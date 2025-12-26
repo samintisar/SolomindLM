@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Search, Globe, Plus, Sparkles, Loader2, ExternalLink } from 'lucide-react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { X, Search, Globe, Plus, Loader2, ExternalLink } from 'lucide-react';
 import { Source } from '../types';
 
 interface DiscoverSourcesModalProps {
@@ -31,42 +30,11 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
     setError(null);
     setResults([]);
 
-    try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error('VITE_GEMINI_API_KEY is not configured');
-      }
-
-      const ai = new GoogleGenerativeAI(apiKey);
-      const model = ai.getGenerativeModel({
-        model: 'gemini-2.0-flash-exp',
-        tools: [{ googleSearchRetrieval: {} }],
-      });
-
-      const response = await model.generateContent(
-        `I need to find credible sources for a notebook about: ${query}. Please provide a summary of the topic and list some high-quality web resources.`
-      );
-
-      const groundingChunks = response.response.candidates?.[0]?.groundingMetadata?.searchEntry?.renderedContent;
-      const text = response.response.text() || '';
-
-      // For now, create a simple result from the AI response
-      // The full search integration would require additional setup
-      const mappedResults: WebResult[] = [
-        {
-          title: `AI Summary for: ${query}`,
-          uri: 'https://gemini.google.com',
-          snippet: text.slice(0, 200) + '...',
-          isAdded: false,
-        },
-      ];
-      setResults(mappedResults);
-    } catch (err) {
-      console.error('Search error:', err);
-      setError('Failed to fetch results. Please check your API key configuration.');
-    } finally {
+    // Search functionality disabled
+    setTimeout(() => {
+      setError('Search functionality is currently disabled.');
       setIsLoading(false);
-    }
+    }, 500);
   };
 
   const handleAddResult = (result: WebResult) => {
@@ -131,11 +99,10 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
                 <div className="flex flex-col items-center justify-center h-64 text-center space-y-4">
                    <div className="relative">
                       <Loader2 className="w-12 h-12 text-primary animate-spin" />
-                      <Sparkles className="w-5 h-5 text-primary absolute -top-1 -right-1 animate-pulse" />
                    </div>
                    <div className="space-y-1">
                       <p className="font-bold text-lg font-sans">Scouring the web...</p>
-                      <p className="text-sm text-muted-foreground font-serif">Gemini is finding the most relevant sources for you.</p>
+                      <p className="text-sm text-muted-foreground font-serif">Finding the most relevant sources for you.</p>
                    </div>
                 </div>
              ) : error ? (
