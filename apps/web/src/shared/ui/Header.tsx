@@ -111,13 +111,13 @@ export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoC
       <div className="flex items-center gap-2 sm:gap-4">
         {!isHome && (
           <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-foreground border border-border rounded-sm hover:bg-accent transition-colors uppercase tracking-wider">
-            <Share2 className="w-3 h-3" />
+            <Share2 className="w-3 h-3 shrink-0" />
             Share
           </button>
         )}
         
-        <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-ring transition-all">
-          <User className="w-4 h-4 text-secondary-foreground" />
+        <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-ring transition-all shrink-0">
+          <User className="w-4 h-4 text-secondary-foreground shrink-0" />
         </div>
       </div>
     </header>

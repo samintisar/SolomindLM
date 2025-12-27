@@ -7,6 +7,7 @@ export interface Source {
   date: string;
   selected: boolean;
   content?: string;
+  status?: 'pending' | 'processing' | 'completed' | 'failed';
 }
 
 export interface Message {
@@ -56,4 +57,24 @@ export interface NotebookItem {
   coverColor?: string; // e.g. 'bg-amber-200'
   icon?: string;
   isFeatured?: boolean;
+}
+
+export interface Document {
+  id: string;
+  user_id: string;
+  note_id: string;
+  title?: string;
+  file_name: string;
+  file_type: 'file' | 'url' | 'youtube';
+  file_url?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadResponse {
+  message: string;
+  documentId: string;
+  status: string;
 }

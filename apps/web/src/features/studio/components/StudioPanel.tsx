@@ -287,7 +287,7 @@ const QuizView: React.FC<{ note: Note }> = ({ note }) => {
                 </div>
             </div>
 
-            <div className="flex-shrink-0 p-4 md:px-12 md:py-6 border-t border-border bg-background/80 backdrop-blur-md z-10">
+            <div className="shrink-0 p-4 md:px-12 md:py-6 border-t border-border bg-background/80 backdrop-blur-md z-10">
                 <div className="max-w-2xl mx-auto w-full flex items-center justify-between">
                     <div className="relative">
                         <button 
@@ -474,7 +474,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     <div
       style={{ width: isOpen ? width : 0 }}
       className={`
-        relative flex-shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col
+        relative shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col
         overflow-hidden
         ${!isResizing ? 'panel-transition' : ''}
         ${isOpen ? 'opacity-100' : 'opacity-0'}
@@ -485,9 +485,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             <div className="flex items-center gap-2 text-sidebar-foreground w-full">
                 <button 
                   onClick={() => setActiveNoteId(null)}
-                  className="p-1 -ml-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  className="p-1 -ml-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0"
                 >
-                  <ArrowLeft className="w-5 h-5" />
+                  <ArrowLeft className="w-5 h-5 shrink-0" />
                 </button>
                 <div className="flex flex-col overflow-hidden">
                     <span className="font-sans font-bold text-sm tracking-wide truncate">{activeNote.title}</span>
@@ -497,12 +497,12 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             <>
                 <button 
                   onClick={onClose}
-                  className="p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  className="p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  <ChevronRight className="w-5 h-5 shrink-0" />
                 </button>
                 <div className="flex items-center gap-2 text-sidebar-foreground">
-                  <PenTool className="w-4 h-4" />
+                  <PenTool className="w-4 h-4 shrink-0" />
                   <span className="font-sans font-bold text-sm tracking-wide uppercase">Studio</span>
                 </div>
             </>
@@ -554,23 +554,23 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                         <div className="flex justify-between items-start gap-3">
                           <div className="flex-1 flex gap-3 min-w-0">
                             {note.type === 'audio' && (
-                                <button className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play">
-                                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                                <button className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play">
+                                    <Play className="w-3.5 h-3.5 fill-current ml-0.5 shrink-0" />
                                 </button>
                             )}
                             {note.type === 'flashcard' && (
-                                <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
-                                    <Layers className="w-4 h-4" />
+                                <div className="shrink-0 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
+                                    <Layers className="w-4 h-4 shrink-0" />
                                 </div>
                             )}
                             {note.type === 'report' && (
-                                <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                                    <FileText className="w-4 h-4" />
+                                <div className="shrink-0 w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                                    <FileText className="w-4 h-4 shrink-0" />
                                 </div>
                             )}
                              {note.type === 'quiz' && (
-                                <div className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center">
-                                    <HelpCircle className="w-4 h-4" />
+                                <div className="shrink-0 w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                                    <HelpCircle className="w-4 h-4 shrink-0" />
                                 </div>
                             )}
                             <div className="flex-1 min-w-0">
@@ -598,9 +598,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                     e.stopPropagation();
                                     setActiveMenuId(activeMenuId === note.id ? null : note.id);
                                 }}
-                                className="text-muted-foreground hover:text-foreground p-1 rounded-sm hover:bg-secondary transition-colors"
+                                className="text-muted-foreground hover:text-foreground p-1 rounded-sm hover:bg-secondary transition-colors flex items-center justify-center shrink-0"
                             >
-                              <MoreVertical className="w-3.5 h-3.5" />
+                              <MoreVertical className="w-3.5 h-3.5 shrink-0" />
                             </button>
                             {activeMenuId === note.id && (
                                 <div className="absolute right-0 top-6 w-36 bg-popover border border-border shadow-lg rounded-md z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
@@ -608,13 +608,13 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                         onClick={(e) => { e.stopPropagation(); handleStartEdit(note); }}
                                         className="w-full text-left px-3 py-2 text-xs hover:bg-accent text-popover-foreground flex items-center gap-2"
                                     >
-                                        <Pencil className="w-3.5 h-3.5" /> Rename
+                                        <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
                                     </button>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); onDeleteNote(note.id); setActiveMenuId(null); }}
                                         className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
                                     >
-                                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                                        <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
                                     </button>
                                 </div>
                             )}

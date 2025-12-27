@@ -1,0 +1,17 @@
+{
+  "name": "solomindlm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/**\" dev",
+    "dev:web": "pnpm --filter @solomindlm/web dev",
+    "dev:api": "pnpm --filter @solomindlm/api dev",
+    "build": "pnpm --filter \"./apps/**\" build",
+    "start:api": "pnpm --filter @solomindlm/api start",
+    "jobs:api": "pnpm --filter @solomindlm/api jobs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

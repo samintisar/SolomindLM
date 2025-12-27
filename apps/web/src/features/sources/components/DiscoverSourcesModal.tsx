@@ -60,7 +60,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
+            <div className="p-2 bg-primary/10 rounded-lg flex items-center justify-center">
                 <Compass className="w-5 h-5 text-primary" />
             </div>
             <h2 className="text-xl font-bold">Discover Sources</h2>
@@ -74,22 +74,26 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
           {/* Search Bar */}
           <div className="p-6 border-b border-border/30">
             <form onSubmit={handleSearch} className="relative group">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-               <input 
-                 autoFocus
-                 type="text" 
-                 value={query}
-                 onChange={(e) => setQuery(e.target.value)}
-                 placeholder="Search for articles, papers, or websites..." 
-                 className="w-full pl-12 pr-24 py-4 bg-background border-2 border-border rounded-xl text-lg font-serif focus:outline-none focus:border-primary transition-all placeholder:text-muted-foreground/50 shadow-sm"
-               />
-               <button 
-                 type="submit"
-                 disabled={isLoading}
-                 className="absolute right-3 top-1/2 -translate-y-1/2 px-4 py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center gap-2"
-               >
-                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-               </button>
+               <div className="relative">
+                 <input 
+                   autoFocus
+                   type="text" 
+                   value={query}
+                   onChange={(e) => setQuery(e.target.value)}
+                   placeholder="Search for articles, papers, or websites..." 
+                   className="w-full pl-12 pr-28 py-4 bg-background border-2 border-border rounded-xl text-lg font-serif focus:outline-none focus:border-primary transition-all placeholder:text-muted-foreground/50 shadow-sm leading-normal"
+                 />
+                 <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+                   <Search className="w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                 </div>
+                 <button 
+                   type="submit"
+                   disabled={isLoading}
+                   className="absolute right-2 top-2 bottom-2 px-5 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                 >
+                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                 </button>
+               </div>
             </form>
           </div>
 
@@ -151,7 +155,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
                 </div>
              ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-center p-12 opacity-40">
-                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4 shrink-0">
                       <Search className="w-8 h-8" />
                    </div>
                    <p className="font-serif italic text-lg">Enter a topic to discover related web sources</p>
