@@ -2,22 +2,34 @@
 import React, { useState } from 'react';
 import { X, Search, Globe, Plus, Loader2, ExternalLink } from 'lucide-react';
 import { Source } from '@/shared/types/index';
+import { documentsApi } from '../services/documentsApi';
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddSource: (source: Source) => void;
   isAtLimit: boolean;
+  userId?: string | null;
+  noteId?: string | null;
 }
 
 interface WebResult {
   title: string;
-  uri: string;
+  url: string;
   snippet: string;
+  score: number;
   isAdded?: boolean;
+  isAdding?: boolean;
 }
 
-export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOpen, onClose, onAddSource, isAtLimit }) => {
+export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
+  isOpen,
+  onClose,
+  onAddSource,
+  isAtLimit,
+  userId,
+  noteId,
+}) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<WebResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,26 +43,82 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
     setError(null);
     setResults([]);
 
-    // Search functionality disabled
-    setTimeout(() => {
-      setError('Search functionality is currently disabled.');
+    try {
+      const response = await documentsApi.discoverSources({
+        query: query.trim(),
+        scoreThreshold: 0.5,
+        maxResults: 10,
+      });
+
+      setResults(response.sources.map(source => ({ ...source, isAdded: false })));
+
+      if (response.sources.length === 0) {
+        setError('No sources found. Try a different search query.');
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError(err instanceof Error ? err.message : 'Search failed. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
-  const handleAddResult = (result: WebResult) => {
-    if (isAtLimit) return;
+  const handleAddResult = async (result: WebResult) => {
+    if (isAtLimit || !userId || !noteId) return;
 
-    const newSource: Source = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: result.title,
-      type: 'WEB',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      selected: true,
-      content: `Source found via Discovery:\n\nURL: ${result.uri}\n\n*Content retrieval simulated from summary information.*`
-    };
-    onAddSource(newSource);
-    setResults(prev => prev.map(r => r.uri === result.uri ? { ...r, isAdded: true } : r));
+    // Set loading state for this specific result
+    setResults(prev => prev.map(r =>
+      r.url === result.url ? { ...r, isAdding: true } : r
+    ));
+
+    try {
+      const response = await documentsApi.uploadUrl(userId, noteId, result.url, 'url');
+
+      // Create a Source object for the frontend
+      const newSource: Source = {
+        id: response.documentId,
+        title: result.title,
+        type: 'WEB',
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        selected: true,
+        status: 'pending',
+      };
+
+      onAddSource(newSource);
+
+      // Mark as added
+      setResults(prev => prev.map(r =>
+        r.url === result.url ? { ...r, isAdded: true, isAdding: false } : r
+      ));
+    } catch (err) {
+      console.error('Add source error:', err);
+      alert(err instanceof Error ? err.message : 'Failed to add source');
+
+      // Reset loading state
+      setResults(prev => prev.map(r =>
+        r.url === result.url ? { ...r, isAdding: false } : r
+      ));
+    }
+  };
+
+  const getHostname = (url: string): string => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
+
+  const getScoreLabel = (score: number): string => {
+    if (score >= 0.8) return 'High';
+    if (score >= 0.6) return 'Medium';
+    return 'Low';
+  };
+
+  const getScoreColor = (score: number): string => {
+    if (score >= 0.8) return 'text-green-600 dark:text-green-500';
+    if (score >= 0.6) return 'text-yellow-600 dark:text-yellow-500';
+    return 'text-gray-600 dark:text-gray-500';
   };
 
   if (!isOpen) return null;
@@ -58,7 +126,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      
+
       <div className="relative w-full max-w-4xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col max-h-[90vh] overflow-hidden font-sans">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
@@ -78,20 +146,20 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
           <div className="p-6 border-b border-border/30">
             <form onSubmit={handleSearch} className="relative group">
                <div className="relative">
-                 <input 
+                 <input
                    autoFocus
-                   type="text" 
+                   type="text"
                    value={query}
                    onChange={(e) => setQuery(e.target.value)}
-                   placeholder="Search for articles, papers, or websites..." 
+                   placeholder="Search for articles, papers, or websites..."
                    className="w-full pl-12 pr-28 py-4 bg-background border-2 border-border rounded-xl text-lg font-serif focus:outline-none focus:border-primary transition-all placeholder:text-muted-foreground/50 shadow-sm leading-normal"
                  />
                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
                    <Search className="w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                  </div>
-                 <button 
+                 <button
                    type="submit"
-                   disabled={isLoading}
+                   disabled={isLoading || !query.trim()}
                    className="absolute right-2 top-2 bottom-2 px-5 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                  >
                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
@@ -127,30 +195,43 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({ isOp
                                   <Globe className="w-3 h-3" />
                                   <span>Website</span>
                                </div>
-                               <a href={result.uri} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors">
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                               </a>
+                               <div className="flex items-center gap-2">
+                                  <span className={`text-[10px] font-bold uppercase ${getScoreColor(result.score)}`}>
+                                    {getScoreLabel(result.score)} relevance
+                                  </span>
+                                  <a href={result.url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors">
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                               </div>
                             </div>
                             <h3 className="font-bold font-serif text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors">{result.title}</h3>
                             <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">{result.snippet}</p>
                          </div>
                          <div className="mt-6 pt-4 border-t border-border/30 flex justify-between items-center">
-                            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[150px]">{new URL(result.uri).hostname}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[150px]">{getHostname(result.url)}</span>
                             <button
                               onClick={() => handleAddResult(result)}
-                              disabled={result.isAdded || isAtLimit}
+                              disabled={result.isAdded || result.isAdding || isAtLimit}
                               className={`
                                 px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5
                                 ${result.isAdded || isAtLimit
                                   ? 'bg-secondary text-muted-foreground cursor-default'
-                                  : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm'}
+                                  : result.isAdding
+                                  ? 'bg-primary/50 text-primary-foreground cursor-wait'
+                                  : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm'
+                                }
                               `}
                               title={isAtLimit ? 'Source limit reached' : undefined}
                             >
-                               {result.isAdded ? (
-                                 <>Added</>
+                               {result.isAdding ? (
+                                 <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Adding...
+                                 </>
+                               ) : result.isAdded ? (
+                                 'Added'
                                ) : isAtLimit ? (
-                                 <>Limit reached</>
+                                 'Limit reached'
                                ) : (
                                  <><Plus className="w-3 h-3" /> Add to Notebook</>
                                )}

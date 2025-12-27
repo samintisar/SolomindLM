@@ -815,6 +815,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onClose={() => setIsDiscoverOpen(false)}
         onAddSource={onAddSource}
         isAtLimit={sources.length >= MAX_SOURCES}
+        userId={userId}
+        noteId={noteId}
       />
     </>
   );

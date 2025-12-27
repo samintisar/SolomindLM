@@ -2,12 +2,14 @@ import { Router } from 'express';
 import documentsRouter from './documents.js';
 import authRouter from './auth.js';
 import notebooksRouter from './notebooks.js';
+import sourcesRouter from './sources.js';
 
 const router = Router();
 
 router.use('/auth', authRouter);
 router.use('/documents', documentsRouter);
 router.use('/notebooks', notebooksRouter);
+router.use('/sources', sourcesRouter);
 
 // Health check
 router.get('/health', (req, res) => {

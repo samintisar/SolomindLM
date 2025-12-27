@@ -14,6 +14,7 @@ const envSchema = z.object({
   MISTRAL_API_KEY: z.string(),
   TOGETHER_AI_API_KEY: z.string(),
   SUPADATA_API_KEY: z.string(),
+  TAVILY_API_KEY: z.string(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 });
 

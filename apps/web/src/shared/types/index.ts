@@ -78,3 +78,32 @@ export interface UploadResponse {
   documentId: string;
   status: string;
 }
+
+/**
+ * Discovered web source from search API
+ */
+export interface DiscoveredSource {
+  title: string;
+  url: string;
+  snippet: string;
+  score: number;
+}
+
+/**
+ * Response from source discovery API
+ */
+export interface DiscoveryResponse {
+  query: string;
+  count: number;
+  sources: DiscoveredSource[];
+}
+
+/**
+ * Request options for source discovery
+ */
+export interface DiscoveryRequest {
+  query: string;
+  scoreThreshold?: number;
+  excludeDomains?: string[];
+  maxResults?: number;
+}

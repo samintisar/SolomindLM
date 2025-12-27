@@ -1,4 +1,4 @@
-import type { Document, UploadResponse } from '@/shared/types/index';
+import type { Document, UploadResponse, DiscoveryRequest, DiscoveryResponse } from '@/shared/types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -215,5 +215,23 @@ export const documentsApi = {
     }
 
     throw new Error('Document processing timed out');
+  },
+
+  /**
+   * Discover web sources using Tavily Search API
+   */
+  async discoverSources(request: DiscoveryRequest): Promise<DiscoveryResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/sources/discover`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Source discovery failed');
+    }
+
+    return response.json();
   },
 };
