@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './shared/ui/Header';
 import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
@@ -56,6 +56,9 @@ const AppContent: React.FC = () => {
   const [rightWidth, setRightWidth] = useState(320);
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
+
+  // Ref to track the polling interval for document status updates
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
@@ -223,11 +226,56 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated, user, activeNotebookId, currentView]);
 
-  // Handle document upload - trigger a refresh
+  // Cleanup polling interval on unmount or when switching notebooks
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [activeNotebookId]);
+
+  // Handle document upload - trigger a refresh and start polling if needed
   const handleDocumentUploaded = useCallback(() => {
     if (user && activeNotebookId) {
       documentsApi.getDocuments(user.id, activeNotebookId)
-        .then(docs => setSources(docs.map(documentToSource)))
+        .then(docs => {
+          const mappedSources = docs.map(documentToSource);
+          setSources(mappedSources);
+
+          // Check if any documents are still processing and start polling
+          const hasProcessing = docs.some(doc => doc.status === 'pending' || doc.status === 'processing');
+          if (hasProcessing) {
+            // Clear any existing polling interval
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+            }
+
+            // Poll every 2 seconds until all documents are completed/failed
+            pollingIntervalRef.current = setInterval(async () => {
+              try {
+                const updatedDocs = await documentsApi.getDocuments(user.id, activeNotebookId);
+                const allDone = updatedDocs.every(doc => doc.status === 'completed' || doc.status === 'failed');
+
+                setSources(updatedDocs.map(documentToSource));
+
+                if (allDone) {
+                  if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current);
+                    pollingIntervalRef.current = null;
+                  }
+                }
+              } catch (err) {
+                console.error('Failed to poll document status:', err);
+                if (pollingIntervalRef.current) {
+                  clearInterval(pollingIntervalRef.current);
+                  pollingIntervalRef.current = null;
+                }
+              }
+            }, 2000);
+          }
+        })
         .catch(err => console.error('Failed to load documents:', err));
     }
   }, [user, activeNotebookId]);

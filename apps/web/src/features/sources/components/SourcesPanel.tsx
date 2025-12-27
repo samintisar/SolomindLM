@@ -9,7 +9,6 @@ import ReactMarkdown from 'react-markdown';
 import { Source } from '@/shared/types/index';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
 import { documentsApi } from '../services/documentsApi';
-import { useDocumentStatus } from '../hooks/useDocumentStatus';
 
 interface SourcesPanelProps {
   isOpen: boolean;
