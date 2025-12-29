@@ -384,13 +384,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                               )}
                               {/* Status badge */}
                               {status === 'processing' && (
-                                <div className="flex items-center gap-1 text-[10px] font-medium text-yellow-600 dark:text-yellow-500 font-sans shrink-0">
+                                <div className="flex items-center gap-1 text-[10px] font-medium text-warning font-sans shrink-0">
                                   <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                                   <span>Processing</span>
                                 </div>
                               )}
                               {status === 'completed' && (
-                                <div className="flex items-center gap-1 text-[10px] font-medium text-green-600 dark:text-green-500 font-sans shrink-0">
+                                <div className="flex items-center gap-1 text-[10px] font-medium text-success font-sans shrink-0">
                                   <CheckCircle className="w-3 h-3 shrink-0" />
                                   <span>Ready</span>
                                 </div>
@@ -553,7 +553,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                                 className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                   <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
-                                      <HardDrive className="w-4 h-4 text-emerald-600" />
+                                      <HardDrive className="w-4 h-4 text-chart-2" />
                                   </div>
                                   <span className="text-sm font-medium">Google Drive</span>
                               </button>
@@ -572,7 +572,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                                 disabled={!userId || sources.length >= MAX_SOURCES}
                                 className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                  <Globe className="w-4 h-4 text-sky-600 group-hover:scale-110 transition-transform shrink-0" />
+                                  <Globe className="w-4 h-4 text-chart-3 group-hover:scale-110 transition-transform shrink-0" />
                                   <span className="text-sm font-medium">Website</span>
                               </button>
                               <button
@@ -580,7 +580,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                                 disabled={!userId || sources.length >= MAX_SOURCES}
                                 className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                  <Youtube className="w-4 h-4 text-red-600 group-hover:scale-110 transition-transform shrink-0" />
+                                  <Youtube className="w-4 h-4 text-destructive group-hover:scale-110 transition-transform shrink-0" />
                                   <span className="text-sm font-medium">Transcripts</span>
                               </button>
                           </div>
@@ -599,7 +599,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                                 className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                   <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
-                                      <FileText className="w-4 h-4 text-indigo-600" />
+                                      <FileText className="w-4 h-4 text-chart-4" />
                                   </div>
                                   <span className="text-sm font-medium">Copied text</span>
                               </button>

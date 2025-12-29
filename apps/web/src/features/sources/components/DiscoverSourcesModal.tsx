@@ -116,9 +116,9 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   };
 
   const getScoreColor = (score: number): string => {
-    if (score >= 0.8) return 'text-green-600 dark:text-green-500';
-    if (score >= 0.6) return 'text-yellow-600 dark:text-yellow-500';
-    return 'text-gray-600 dark:text-gray-500';
+    if (score >= 0.8) return 'text-success';
+    if (score >= 0.6) return 'text-warning';
+    return 'text-muted-foreground';
   };
 
   if (!isOpen) return null;

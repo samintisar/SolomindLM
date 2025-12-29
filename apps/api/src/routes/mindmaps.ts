@@ -173,6 +173,59 @@ router.get('/single/:mindMapId', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/mindmaps/:mindMapId - Update a mindmap (e.g., rename)
+router.patch('/:mindMapId', async (req: Request, res: Response) => {
+  try {
+    const { mindMapId } = req.params;
+    const userId = req.query.userId as string;
+    const { title } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // Verify user owns the mindmap
+    const { data: mindmap, error: fetchError } = await supabase
+      .from('mindmaps')
+      .select('*')
+      .eq('id', mindMapId)
+      .single();
+
+    if (fetchError || !mindmap) {
+      return res.status(404).json({ error: 'Mind map not found' });
+    }
+
+    if (mindmap.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Update the mindmap title
+    const updateData: any = {};
+    if (title !== undefined) {
+      updateData.title = title;
+    }
+
+    const { data: updatedMindmap, error: updateError } = await supabase
+      .from('mindmaps')
+      .update(updateData)
+      .eq('id', mindMapId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('[MindMaps] Error updating mind map:', updateError);
+      return res.status(500).json({ error: 'Failed to update mind map' });
+    }
+
+    return res.json(updatedMindmap);
+  } catch (error) {
+    console.error('[MindMaps] Error updating mind map:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to update mind map',
+    });
+  }
+});
+
 // DELETE /api/mindmaps/:mindMapId - Delete a mindmap
 router.delete('/:mindMapId', async (req: Request, res: Response) => {
   try {

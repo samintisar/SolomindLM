@@ -83,17 +83,40 @@ const AppContent: React.FC = () => {
 
   const handleUpdateNote = async (id: string, newTitle: string) => {
     try {
+      // Find the note to check its type
+      const noteToUpdate = notes.find(n => n.id === id);
+
       // Optimistically update UI
       setNotes(prev => prev.map(n => n.id === id ? { ...n, title: newTitle } : n));
 
-      // Sync with backend
-      await notesApi.renameNote(id, newTitle);
+      // Sync with backend - route to correct API based on type
+      if (noteToUpdate?.type === 'mindmap') {
+        await mindMapApi.renameMindMap(id, newTitle);
+      } else {
+        await notesApi.renameNote(id, newTitle);
+      }
     } catch (error) {
       console.error('Failed to rename note:', error);
       // Reload notes on error
       if (activeNotebookId) {
-        notesApi.getNotes(activeNotebookId)
-          .then(loadedNotes => setNotes(loadedNotes))
+        Promise.all([
+          notesApi.getNotes(activeNotebookId).catch(err => {
+            console.error('Failed to load notes:', err);
+            return [];
+          }),
+          mindMapApi.getMindMaps(activeNotebookId).catch(err => {
+            console.error('Failed to load mind maps:', err);
+            return [];
+          }),
+        ])
+          .then(([loadedNotes, loadedMindMaps]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps].sort((a, b) => {
+              const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
+              const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
+              return bDate.localeCompare(aDate);
+            });
+            setNotes(allNotes);
+          })
           .catch(err => console.error('Failed to reload notes:', err));
       }
     }

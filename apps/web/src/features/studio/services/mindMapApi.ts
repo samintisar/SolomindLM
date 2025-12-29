@@ -173,6 +173,35 @@ export const mindMapApi = {
   },
 
   /**
+   * Rename a mind map by ID
+   */
+  async renameMindMap(mindMapId: string, newTitle: string): Promise<Note> {
+    const storedUser = localStorage.getItem('solomind_user');
+    const userId = storedUser ? JSON.parse(storedUser).id : null;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    const params = new URLSearchParams({ userId });
+    const response = await fetch(
+      `${API_BASE_URL}/api/mindmaps/${mindMapId}?${params.toString()}`,
+      {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ title: newTitle }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to rename mind map');
+    }
+
+    const mindmap = await response.json();
+    return mapMindMapToNote(mindmap);
+  },
+
+  /**
    * Delete a mind map by ID
    */
   async deleteMindMap(mindMapId: string): Promise<void> {

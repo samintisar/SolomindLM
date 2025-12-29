@@ -121,9 +121,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
 
                             if (isAnswered) {
                                 if (idx === currentQuestion.answer) {
-                                    stateStyles = "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400";
+                                    stateStyles = "bg-success/10 border-success text-success";
                                 } else if (idx === selectedOption) {
-                                    stateStyles = "bg-red-500/10 border-red-500 text-red-700 dark:text-red-400";
+                                    stateStyles = "bg-destructive/10 border-destructive text-destructive";
                                 } else {
                                     stateStyles = "opacity-50 border-border";
                                 }
@@ -139,8 +139,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                                     className={`w-full text-left p-5 md:p-6 rounded-xl border-2 transition-all flex items-center justify-between group ${stateStyles}`}
                                 >
                                     <span className="font-medium text-base md:text-lg">{option}</span>
-                                    {isAnswered && idx === currentQuestion.answer && <CheckCircle2 className="w-5 h-5 text-green-600" />}
-                                    {isAnswered && idx === selectedOption && idx !== currentQuestion.answer && <XCircle className="w-5 h-5 text-red-600" />}
+                                    {isAnswered && idx === currentQuestion.answer && <CheckCircle2 className="w-5 h-5 text-success" />}
+                                    {isAnswered && idx === selectedOption && idx !== currentQuestion.answer && <XCircle className="w-5 h-5 text-destructive" />}
                                 </button>
                             );
                         })}
