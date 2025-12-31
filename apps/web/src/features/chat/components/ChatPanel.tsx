@@ -1,5 +1,5 @@
-import React from 'react';
-import { Paperclip, ArrowUp, Sparkles, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Paperclip, ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { Message } from '@/shared/types/index';
 
 interface ChatPanelProps {
@@ -8,6 +8,7 @@ interface ChatPanelProps {
   isRightOpen: boolean;
   toggleLeft: () => void;
   toggleRight: () => void;
+  onClearHistory?: () => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({ 
@@ -15,11 +16,145 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isLeftOpen, 
   isRightOpen,
   toggleLeft,
-  toggleRight
+  toggleRight,
+  onClearHistory
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('top');
+  const [tooltipStyle, setTooltipStyle] = useState<{ top?: number; left?: number }>({});
+  const [isTooltipHovered, setIsTooltipHovered] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hideTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDeleteHistory = () => {
+    if (confirm('Are you sure you want to delete all chat history? This action cannot be undone.')) {
+      onClearHistory?.();
+      setIsMenuOpen(false);
+    }
+  };
+
+  const handleRefHover = (refId: number, event: React.MouseEvent) => {
+    handleRefEnter();
+    setHoveredRefId(refId);
+    // Calculate if tooltip should appear above or below based on position
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const containerRect = messagesContainerRef.current?.getBoundingClientRect();
+    
+    if (!containerRect) return;
+
+    const tooltipHeight = 200;
+    const spaceAbove = rect.top - containerRect.top;
+    const spaceBelow = containerRect.bottom - rect.bottom;
+    
+    const position = spaceAbove > spaceBelow ? 'top' : 'bottom';
+    setTooltipPosition(position);
+    
+    // Calculate tooltip position relative to messages container
+    const refCenterX = rect.left - containerRect.left + rect.width / 2;
+    const refCenterY = rect.top - containerRect.top;
+    
+    if (position === 'top') {
+      setTooltipStyle({
+        left: refCenterX,
+        top: refCenterY - 2,
+      });
+    } else {
+      setTooltipStyle({
+        left: refCenterX,
+        top: refCenterY + rect.height + 2,
+      });
+    }
+  };
+
+  const handleRefLeave = () => {
+    // Cancel any existing timeout
+    if (hideTooltipTimeoutRef.current) {
+      clearTimeout(hideTooltipTimeoutRef.current);
+    }
+    
+    // Set a delay before hiding - gives user time to move cursor to tooltip
+    hideTooltipTimeoutRef.current = setTimeout(() => {
+      if (!isTooltipHovered) {
+        setHoveredRefId(null);
+      }
+    }, 200); // 200ms delay
+  };
+
+  const handleRefEnter = () => {
+    // Cancel any pending hide when hovering back over badge
+    if (hideTooltipTimeoutRef.current) {
+      clearTimeout(hideTooltipTimeoutRef.current);
+    }
+  };
+
+  const renderMessageWithReferences = (content: string, references?: any[]) => {
+    if (!references || references.length === 0) {
+      return <div className="whitespace-pre-wrap">{content}</div>;
+    }
+
+    const refMap = Object.fromEntries(references.map(ref => [ref.id, ref]));
+    const parts = content.split(/(\[\d+\])/g);
+
+    return (
+      <div className="whitespace-pre-wrap relative">
+        {parts.map((part, idx) => {
+          const match = part.match(/\[(\d+)\]/);
+          if (match) {
+            const refId = parseInt(match[1]);
+            return (
+              <span key={idx} className="relative inline-group">
+                <span
+                  onMouseEnter={(e) => handleRefHover(refId, e)}
+                  onMouseLeave={handleRefLeave}
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold cursor-pointer hover:bg-primary/90 transition-colors mx-1"
+                  title={`Reference ${refId}`}
+                >
+                  {refId}
+                </span>
+              </span>
+            );
+          }
+          return <span key={idx}>{part}</span>;
+        })}
+      </div>
+    );
+  };
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
       
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10 h-14">
+        <div className="flex items-center gap-2 text-foreground">
+          <MessageCircle className="w-4 h-4" />
+          <span className="font-sans font-bold text-sm tracking-wide uppercase">Chat</span>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="p-1 hover:bg-secondary rounded-sm transition-colors text-foreground/70 hover:text-foreground flex items-center justify-center shrink-0"
+            title="Options"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+          {isMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 w-40 bg-card border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  onClick={handleDeleteHistory}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  Delete history
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Dynamic Header for Toggles when panels are closed */}
       {(!isLeftOpen || !isRightOpen) && (
         <div className="absolute top-4 left-4 right-4 z-20 flex justify-between pointer-events-none">
@@ -49,7 +184,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-12 md:px-20 lg:px-32 space-y-8 scroll-smooth">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-6 sm:px-12 md:px-20 lg:px-32 space-y-8 scroll-smooth overflow-x-hidden relative"
+      >
         {messages.map((msg) => (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div 
@@ -60,23 +198,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   : 'bg-card border border-border shadow-sm text-card-foreground'}
               `}
             >
-              {msg.role === 'assistant' && (
-                <div className="absolute -top-3 -left-3 w-8 h-8 bg-background border-2 border-border rounded-full flex items-center justify-center shadow-xs">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                </div>
-              )}
               
-              <div className="whitespace-pre-wrap">{msg.content}</div>
-
-              {msg.citations && msg.citations.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {msg.citations.map((cite) => (
-                    <span key={cite} className="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-mono border border-border/50 cursor-pointer hover:bg-secondary/80 hover:border-primary/50 transition-colors">
-                      {cite}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {renderMessageWithReferences(msg.content, msg.references)}
             </div>
             <span className="text-[10px] text-muted-foreground mt-2 font-mono uppercase tracking-widest px-1">
               {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -85,6 +208,65 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         ))}
         {/* Spacer for bottom input */}
         <div className="h-32" />
+
+        {/* Floating Tooltip */}
+        {hoveredRefId !== null && messagesContainerRef.current && (() => {
+          const allReferences = messages
+            .filter(msg => msg.references)
+            .flatMap(msg => msg.references || []);
+          const ref = allReferences.find(r => r.id === hoveredRefId);
+          const containerRect = messagesContainerRef.current?.getBoundingClientRect();
+          
+          if (!ref || !containerRect) return null;
+
+          const tooltipX = (tooltipStyle.left || 0) + containerRect.left;
+          const tooltipWidth = 384; // w-96
+          
+          // Clamp tooltip X position to stay within viewport
+          let adjustedX = tooltipX - tooltipWidth / 2;
+          const minX = containerRect.left + 16; // padding
+          const maxX = containerRect.right - tooltipWidth - 16;
+          
+          if (adjustedX < minX) adjustedX = minX;
+          if (adjustedX > maxX) adjustedX = maxX;
+          
+          const tooltipY = tooltipPosition === 'top' 
+            ? containerRect.top + (tooltipStyle.top || 0) - 256 - 2
+            : containerRect.top + (tooltipStyle.top || 0);
+          
+          return (
+            <div
+              ref={tooltipRef}
+              className="fixed z-50"
+              style={{
+                left: `${adjustedX}px`,
+                top: `${tooltipY}px`,
+                pointerEvents: 'auto',
+              }}
+              onMouseEnter={() => {
+                setIsTooltipHovered(true);
+                // Clear any pending hide timeout when hovering over tooltip
+                if (hideTooltipTimeoutRef.current) {
+                  clearTimeout(hideTooltipTimeoutRef.current);
+                }
+              }}
+              onMouseLeave={() => {
+                setIsTooltipHovered(false);
+                // Hide immediately when leaving tooltip
+                setHoveredRefId(null);
+              }}
+            >
+              <div className="bg-popover border border-border rounded-lg shadow-xl p-5 w-96 max-h-64 overflow-y-auto text-sm animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+                <p className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-3 font-bold shrink-0">
+                  Reference {hoveredRefId} • {ref.sourceTitle}
+                </p>
+                <p className="text-popover-foreground whitespace-pre-wrap text-sm leading-relaxed">
+                  {ref.content}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Input Area */}

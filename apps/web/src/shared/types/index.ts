@@ -10,11 +10,18 @@ export interface Source {
   status?: 'pending' | 'processing' | 'completed' | 'failed';
 }
 
+export interface ReferenceChunk {
+  id: number;
+  sourceTitle: string;
+  content: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   citations?: number[];
+  references?: ReferenceChunk[];
   timestamp: Date;
 }
 

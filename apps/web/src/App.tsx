@@ -46,6 +46,7 @@ const AppContent: React.FC = () => {
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [notebookTitle, setNotebookTitle] = useState("CPSC 304");
+  const [messages, setMessages] = useState(MOCK_MESSAGES);
 
   // Notebooks State
   const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
@@ -67,6 +68,9 @@ const AppContent: React.FC = () => {
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
+  const handleClearChatHistory = () => {
+    setMessages([]);
+  };
 
   const handleToggleSource = (id: string) => {
     setSources(prev => prev.map(source => 
@@ -544,11 +548,12 @@ const AppContent: React.FC = () => {
           )}
           
           <ChatPanel 
-            messages={MOCK_MESSAGES} 
+            messages={messages} 
             isLeftOpen={isSourcesOpen}
             isRightOpen={isStudioOpen}
             toggleLeft={toggleSources}
             toggleRight={toggleStudio}
+            onClearHistory={handleClearChatHistory}
           />
           
           {/* Right Drag Handle */}
