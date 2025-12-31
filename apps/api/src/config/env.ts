@@ -37,6 +37,12 @@ const envSchema = z.object({
   REPORT_MAP_CHUNK_SIZE: z.string().default('30000'),
   // Reduce phase: 60K chars ≈ 15K tokens (~6% of 261K context)
   REPORT_REDUCE_CHUNK_SIZE: z.string().default('60000'),
+  // Quiz Generation
+  // Map phase: 20K chars ≈ 5K tokens (~4% of 131K context)
+  QUIZ_MAP_CHUNK_SIZE: z.string().default('20000'),
+  // Reduce phase: 40K chars ≈ 10K tokens (~4% of 261K context)
+  QUIZ_REDUCE_CHUNK_SIZE: z.string().default('40000'),
+  QUIZ_MAX_TOKENS: z.string().default('16000'),
   SUPADATA_API_KEY: z.string(),
   TAVILY_API_KEY: z.string(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),

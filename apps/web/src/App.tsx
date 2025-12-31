@@ -13,6 +13,7 @@ import { notebooksApi } from './features/notebooks/services/notebooksApi';
 import { notesApi } from './features/notebooks/services/notesApi';
 import { mindMapApi } from './features/studio/services/mindMapApi';
 import { flashcardsApi } from './features/studio/services/flashcardsApi';
+import { quizzesApi } from './features/studio/services/quizzesApi';
 import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
@@ -95,6 +96,8 @@ const AppContent: React.FC = () => {
         await mindMapApi.renameMindMap(id, newTitle);
       } else if (noteToUpdate?.type === 'flashcard') {
         await flashcardsApi.renameFlashcard(id, newTitle);
+      } else if (noteToUpdate?.type === 'quiz') {
+        await quizzesApi.renameQuiz(id, newTitle);
       } else {
         await notesApi.renameNote(id, newTitle);
       }
@@ -115,9 +118,13 @@ const AppContent: React.FC = () => {
             console.error('Failed to load flashcards:', err);
             return [];
           }),
+          quizzesApi.getQuizzes(activeNotebookId).catch(err => {
+            console.error('Failed to load quizzes:', err);
+            return [];
+          }),
         ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards].sort((a, b) => {
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes].sort((a, b) => {
               const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
               const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
               return bDate.localeCompare(aDate);
@@ -146,6 +153,8 @@ const AppContent: React.FC = () => {
         await mindMapApi.deleteMindMap(id);
       } else if (noteToDelete?.type === 'flashcard') {
         await flashcardsApi.deleteFlashcard(id);
+      } else if (noteToDelete?.type === 'quiz') {
+        await quizzesApi.deleteQuiz(id);
       } else {
         await notesApi.deleteNote(id);
       }
@@ -300,10 +309,10 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated, user, activeNotebookId, currentView]);
 
-  // Load notes, mind maps, and flashcards from API when authenticated and notebook is active
+  // Load notes, mind maps, flashcards, and quizzes from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
-      // Fetch notes, mind maps, and flashcards in parallel
+      // Fetch notes, mind maps, flashcards, and quizzes in parallel
       Promise.all([
         notesApi.getNotes(activeNotebookId).catch(err => {
           console.error('Failed to load notes:', err);
@@ -317,10 +326,14 @@ const AppContent: React.FC = () => {
           console.error('Failed to load flashcards:', err);
           return [];
         }),
+        quizzesApi.getQuizzes(activeNotebookId).catch(err => {
+          console.error('Failed to load quizzes:', err);
+          return [];
+        }),
       ])
-        .then(([loadedNotes, loadedMindMaps, loadedFlashcards]) => {
-          // Merge notes, mind maps, and flashcards, sort by created_at descending
-          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards].sort((a, b) => {
+        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes]) => {
+          // Merge notes, mind maps, flashcards, and quizzes, sort by created_at descending
+          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes].sort((a, b) => {
             const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
             const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
             return bDate.localeCompare(aDate);

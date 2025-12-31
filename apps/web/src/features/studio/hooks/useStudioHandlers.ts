@@ -3,6 +3,7 @@ import { Note, Source } from '@/shared/types/index';
 import { reportsApi } from '../services/reportsApi';
 import { mindMapApi } from '../services/mindMapApi';
 import { flashcardsApi } from '../services/flashcardsApi';
+import { quizzesApi } from '../services/quizzesApi';
 import { getReportSubtitle } from '@/shared/types/reportTypes';
 import { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
 import { QuizConfig } from '../components/CustomizeQuizModal';
@@ -35,7 +36,7 @@ export interface UseStudioHandlersReturn {
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
   handleCreateFlashcards: (config: FlashcardConfig) => Promise<void>;
-  handleCreateQuiz: (config: QuizConfig) => void;
+  handleCreateQuiz: (config: QuizConfig) => Promise<void>;
   handleCreateMindMap: () => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
 }
@@ -153,21 +154,100 @@ export function useStudioHandlers({
     }
   }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
-  const handleCreateQuiz = useCallback((config: QuizConfig) => {
+  const handleCreateQuiz = useCallback(async (config: QuizConfig) => {
     setIsQuizModalOpen(false);
+
+    // Get selected document IDs from sources
+    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    if (selectedDocumentIds.length === 0) {
+      alert('Please select at least one source to generate a quiz');
+      return;
+    }
+
+    if (!userId || !noteId) {
+      alert('Authentication error. Please log in again.');
+      return;
+    }
+
+    // Question count mapping
+    const countMap = { fewer: 10, standard: 20, more: 30 };
+    const questionCount = countMap[config.count];
+
+    // Create placeholder note
+    const placeholderId = Math.random().toString(36).substr(2, 9);
     const newNote: Note = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: config.focus ? `Quiz: ${config.focus}` : 'Concept Quiz',
-      preview: `${config.count === 'standard' ? '5' : config.count === 'fewer' ? '3' : '10'} Questions • ${config.difficulty}`,
+      id: placeholderId,
+      title: 'Quiz', // Initial placeholder - AI will generate descriptive title
+      preview: `${questionCount} Questions • ${config.difficulty} • Generating...`,
       type: 'quiz',
-      questions: [] // Initial empty state triggers generating view
+      questions: [],
+      status: 'generating',
+      metadata: {
+        questionCount: config.count,
+        difficulty: config.difficulty,
+        focus: config.focus,
+      }
     };
+
     onAddNote(newNote);
-    onSetActiveNoteId(newNote.id);
-    setTimeout(() => {
-        onUpdateNote(newNote.id, newNote.title);
-    }, 2500);
-  }, [onAddNote, onSetActiveNoteId, onUpdateNote]);
+    onSetActiveNoteId(placeholderId);
+
+    try {
+      // Call API to create and queue quiz generation
+      const { quizId, quiz } = await quizzesApi.createQuiz({
+        userId,
+        notebookId: noteId,
+        documentIds: selectedDocumentIds,
+        questionCount: config.count,
+        difficulty: config.difficulty,
+        focus: config.focus || undefined,
+      });
+
+      // Update note ID with real quiz ID
+      if (onUpdateNoteFull) {
+        onUpdateNoteFull(placeholderId, { ...quiz, type: 'quiz' as const });
+      }
+      onSetActiveNoteId(quizId);
+
+      // Start polling for status
+      quizzesApi.pollQuizStatus(
+        quizId,
+        (updatedNote) => {
+          // Update note during polling
+          if (onUpdateNoteFull) {
+            onUpdateNoteFull(quizId, { ...updatedNote, type: 'quiz' as const });
+          }
+        }
+      ).then(finalNote => {
+        // Final update when complete
+        if (onUpdateNoteFull) {
+          onUpdateNoteFull(quizId, { ...finalNote, type: 'quiz' as const });
+        }
+      }).catch(error => {
+        console.error('Quiz generation failed:', error);
+        // Update with failed status
+        if (onUpdateNoteFull) {
+          const failedNote = notes.find(n => n.id === quizId) || newNote;
+          onUpdateNoteFull(quizId, {
+            ...failedNote,
+            status: 'failed',
+            preview: `${questionCount} Questions • ${config.difficulty} • Failed`,
+            metadata: {
+              ...failedNote.metadata,
+              error: error instanceof Error ? error.message : 'Failed to generate quiz',
+            }
+          });
+        }
+      });
+
+    } catch (error) {
+      console.error('Failed to create quiz:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create quiz');
+      // Remove the placeholder note
+      onDeleteNote(placeholderId);
+    }
+  }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
   const handleCreateReport = useCallback(async (formatId: string, customPrompt?: string) => {
     setIsReportModalOpen(false);

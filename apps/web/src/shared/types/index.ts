@@ -29,7 +29,8 @@ export interface QuizQuestion {
   question: string;
   options: string[];
   answer: number; // index of correct option
-  hint?: string;
+  hint: string; // always required
+  explanation: string; // always required
 }
 
 export interface Flashcard {

@@ -5,6 +5,7 @@ import {
   ChevronUp,
   CheckCircle2,
   XCircle,
+  Info,
 } from 'lucide-react';
 import { Note } from '@/shared/types/index';
 
@@ -121,9 +122,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
 
                             if (isAnswered) {
                                 if (idx === currentQuestion.answer) {
-                                    stateStyles = "bg-success/10 border-success text-success";
+                                    stateStyles = "bg-green-500/25 border-green-600 text-green-700 dark:text-green-400";
                                 } else if (idx === selectedOption) {
-                                    stateStyles = "bg-destructive/10 border-destructive text-destructive";
+                                    stateStyles = "bg-destructive/25 border-destructive text-destructive";
                                 } else {
                                     stateStyles = "opacity-50 border-border";
                                 }
@@ -145,6 +146,21 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                             );
                         })}
                     </div>
+
+                    {/* Explanation shown after answering */}
+                    {isAnswered && (
+                        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 animate-in fade-in slide-in-from-bottom-2">
+                            <div className="flex items-start gap-3">
+                                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <span className="font-semibold text-sm text-blue-800 dark:text-blue-200">Explanation</span>
+                                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1.5 leading-relaxed">
+                                        {currentQuestion.explanation}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -6,6 +6,7 @@ type DocEmbeddingJobPayload = import('../services/jobs/DocEmbeddingJob.js').DocE
 type ReportGenerationJobPayload = import('../services/jobs/ReportGenerationJob.js').ReportGenerationJobPayload;
 type MindMapGenerationJobPayload = import('../services/jobs/MindMapGenerationJob.js').MindMapGenerationJobPayload;
 type FlashcardGenerationJobPayload = import('../services/jobs/FlashcardGenerationJob.js').FlashcardGenerationJobPayload;
+type QuizGenerationJobPayload = import('../services/jobs/QuizGenerationJob.js').QuizGenerationJobPayload;
 
 // Lazy import tasks to catch import errors early
 async function loadTasks() {
@@ -13,7 +14,8 @@ async function loadTasks() {
   const { reportGenerationJob } = await import('../services/jobs/ReportGenerationJob.js');
   const { mindMapGenerationJob } = await import('../services/jobs/MindMapGenerationJob.js');
   const { flashcardGenerationJob } = await import('../services/jobs/FlashcardGenerationJob.js');
-  return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob };
+  const { quizGenerationJob } = await import('../services/jobs/QuizGenerationJob.js');
+  return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob, quizGenerationJob };
 }
 
 // ============================================================
@@ -74,7 +76,7 @@ async function startWorker() {
   }
 
   console.log('[Worker] Starting Graphile Worker with concurrency=5, pollInterval=1000ms');
-  console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration');
+  console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration, quizGeneration');
 
   // Start worker - let graphile-worker handle signals (remove noHandleSignals)
   await run({
@@ -125,6 +127,17 @@ async function startWorker() {
           console.log(`[Worker] [${new Date().toISOString()}] flashcardGeneration task (Job ID: ${jobId}) completed successfully`);
         } catch (error) {
           console.error(`[Worker] [${new Date().toISOString()}] flashcardGeneration task (Job ID: ${jobId}) failed:`, error);
+          throw error;
+        }
+      },
+      quizGeneration: async (payload, helpers) => {
+        const jobId = helpers?.job?.id || 'unknown';
+        console.log(`[Worker] [${new Date().toISOString()}] Received quizGeneration task (Job ID: ${jobId})`);
+        try {
+          await tasks.quizGenerationJob(payload as QuizGenerationJobPayload);
+          console.log(`[Worker] [${new Date().toISOString()}] quizGeneration task (Job ID: ${jobId}) completed successfully`);
+        } catch (error) {
+          console.error(`[Worker] [${new Date().toISOString()}] quizGeneration task (Job ID: ${jobId}) failed:`, error);
           throw error;
         }
       },
