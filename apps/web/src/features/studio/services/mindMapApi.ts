@@ -76,7 +76,7 @@ export const mindMapApi = {
    * Create a new mind map and queue generation
    */
   async generateMindMap(params: CreateMindMapParams): Promise<CreateMindMapResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/mindmaps/generate`, {
+    const response = await fetch(`${API_BASE_URL}/api/mindmaps`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(params),
@@ -108,7 +108,7 @@ export const mindMapApi = {
 
     const queryParams = new URLSearchParams({ userId });
     const response = await fetch(
-      `${API_BASE_URL}/api/mindmaps/single/${mindMapId}?${queryParams.toString()}`,
+      `${API_BASE_URL}/api/mindmaps/${mindMapId}?${queryParams.toString()}`,
       {
         headers: getAuthHeaders(),
       }
@@ -158,7 +158,7 @@ export const mindMapApi = {
 
     const params = new URLSearchParams({ userId });
     const response = await fetch(
-      `${API_BASE_URL}/api/mindmaps/${notebookId}?${params.toString()}`,
+      `${API_BASE_URL}/api/mindmaps/notebook/${notebookId}?${params.toString()}`,
       {
         headers: getAuthHeaders(),
       }
@@ -175,7 +175,7 @@ export const mindMapApi = {
   /**
    * Rename a mind map by ID
    */
-  async renameMindMap(mindMapId: string, newTitle: string): Promise<Note> {
+  async renameMindMap(mindMapId: string, newTitle: string): Promise<{ success: boolean; title: string }> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 
@@ -197,8 +197,7 @@ export const mindMapApi = {
       throw new Error('Failed to rename mind map');
     }
 
-    const mindmap = await response.json();
-    return mapMindMapToNote(mindmap);
+    return await response.json();
   },
 
   /**

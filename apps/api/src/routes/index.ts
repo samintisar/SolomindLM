@@ -6,6 +6,7 @@ import sourcesRouter from './sources.js';
 import reportsRouter from './reports.js';
 import notesRouter from './notes.js';
 import mindmapsRouter from './mindmaps.js';
+import flashcardsRouter from './flashcards.js';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.use('/sources', sourcesRouter);
 router.use('/reports', reportsRouter);
 router.use('/notes', notesRouter);
 router.use('/mindmaps', mindmapsRouter);
+router.use('/flashcards', flashcardsRouter);
 
 // Health check
 router.get('/health', (req, res) => {

@@ -12,7 +12,7 @@ import { env } from '../../config/env.js';
 const mistralOCR = new MistralOCRService(env.MISTRAL_API_KEY);
 const supadataLoader = new SupadataLoaderService();
 const textSplitter = new TextSplitterService();
-const titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.TOGETHER_AI_MODEL);
+const titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.FAST_LLM);
 const embeddingService = new EmbeddingService(env.COHERE_API_KEY);
 const vectorStore = new VectorStoreService();
 const storageService = new SupabaseStorageService();

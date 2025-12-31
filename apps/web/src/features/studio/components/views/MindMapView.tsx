@@ -5,7 +5,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  X,
+  Minimize2,
 } from 'lucide-react';
 import { Note } from '@/shared/types/index';
 
@@ -175,6 +175,28 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
 
       // Set initial scale
       setScale(mind.scaleVal || 1);
+
+      // Track manual zoom changes via Ctrl+Scroll or mouse wheel
+      let lastScale = mind.scaleVal || 1;
+      const pollInterval = setInterval(() => {
+        if (mindRef.current && mindRef.current.scaleVal) {
+          const currentScale = mindRef.current.scaleVal;
+          // Only update if scale has actually changed
+          if (Math.abs(currentScale - lastScale) > 0.001) {
+            lastScale = currentScale;
+            setScale(currentScale);
+          }
+        }
+      }, 100); // Poll every 100ms
+
+      if (containerRef.current) {
+        // Store cleanup function to clear the interval
+        const originalCleanup = (containerRef.current as any)._cleanupSelection;
+        (containerRef.current as any)._cleanupSelection = () => {
+          if (originalCleanup) originalCleanup();
+          clearInterval(pollInterval);
+        };
+      }
     });
 
     return () => {
@@ -277,6 +299,11 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
       {/* Custom Control Bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/30">
         <div className="flex items-center gap-2">
+          {isExpanded && (
+            <h2 className="text-sm font-bold text-foreground mr-4">
+              {note.title}
+            </h2>
+          )}
           <button
             onClick={handleZoomOut}
             className="p-2 rounded-md hover:bg-secondary transition-colors"
@@ -302,7 +329,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
               className="p-2 rounded-md hover:bg-secondary transition-colors"
               title="Exit Full Screen"
             >
-              <X className="w-4 h-4" />
+              <Minimize2 className="w-4 h-4" />
             </button>
           ) : (
             <button
@@ -329,7 +356,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
       {!isExpanded && (
         <div className="px-4 py-2 border-t border-border bg-muted/20">
           <p className="text-xs text-muted-foreground">
-            <span className="font-medium">Tip:</span> Drag to pan, use controls to zoom. Click arrows to expand nodes.
+            <span className="font-medium">Tip:</span> Drag to pan, use controls to zoom.
           </p>
         </div>
       )}

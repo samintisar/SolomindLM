@@ -1,95 +1,97 @@
 import { supabase } from '../../config/database.js';
-import { ReportGenerationService } from '../generation/ReportGenerationService.js';
+import { FlashcardGenerationService } from '../generation/FlashcardGenerationService.js';
 
-export interface ReportGenerationJobPayload {
-  reportId: string;  // This is the note/report ID
+export interface FlashcardGenerationJobPayload {
+  flashcardId: string;
   userId: string;
-  noteId: string;    // This is the notebook ID
+  notebookId: string;
   documentIds: string[];
-  reportType: string;
-  customPrompt?: string;
+  cardCount: number;
+  difficulty: string;
+  topic?: string;
   attempt?: number;
 }
 
 // Graphile Worker task handler
-export async function reportGenerationJob(
-  payload: ReportGenerationJobPayload,
+export async function flashcardGenerationJob(
+  payload: FlashcardGenerationJobPayload,
   helpers?: { addJob: (identifier: string, payload: unknown, options?: { runAt: Date }) => void }
 ) {
-  const { reportId, userId: _userId, noteId: _notebookId, documentIds, reportType, customPrompt, attempt = 0 } = payload;
+  const { flashcardId, userId: _userId, notebookId: _notebookId, documentIds, cardCount, difficulty, topic, attempt = 0 } = payload;
 
   console.log(JSON.stringify({
     timestamp: new Date().toISOString(),
-    service: 'ReportGeneration',
+    service: 'FlashcardGeneration',
     action: 'process_job',
-    reportId,
-    reportType,
+    flashcardId,
+    cardCount,
+    difficulty,
     attempt,
   }));
 
   const maxRetries = 3;
 
   try {
-    // Update status to generating - use reportId (the note ID)
+    // Update status to generating
     await supabase
-      .from('notes')
+      .from('flashcards')
       .update({ status: 'generating' })
-      .eq('id', reportId);
+      .eq('id', flashcardId);
 
     // Initialize service
-    const service = new ReportGenerationService();
+    const service = new FlashcardGenerationService();
 
-    // Status update callback - use reportId (the note ID)
-    // Note: For notes, intermediate statuses (mapping, collapsing, reducing) are stored in metadata.phase
+    // Status update callback
+    // Note: For flashcards, intermediate statuses (mapping, collapsing, reducing) are stored in metadata.phase
     // The database status field only accepts: draft, generating, completed, failed
     const onStatusUpdate = async (status: string) => {
       console.log(JSON.stringify({
         timestamp: new Date().toISOString(),
-        service: 'ReportGeneration',
+        service: 'FlashcardGeneration',
         action: 'status_update',
-        reportId,
+        flashcardId,
         status,
       }));
 
-      // For notes, intermediate processing statuses go in metadata.phase only
+      // For flashcards, intermediate processing statuses go in metadata.phase only
       // The status field stays as 'generating' until completion
       const validStatuses = ['generating', 'completed', 'failed'];
       const dbStatus = validStatuses.includes(status) ? status : 'generating';
 
-      await service.updateReportStatus(reportId, dbStatus, {
+      await service.updateFlashcardStatus(flashcardId, dbStatus, {
         phase: status,
         updatedAt: new Date().toISOString(),
       });
     };
 
-    // Generate report with timeout
+    // Generate flashcards with timeout
     const result = await withTimeout(
-      service.generateReport({
+      service.generateFlashcards({
         documentIds,
-        reportType,
-        customPrompt,
+        cardCount,
+        difficulty,
+        topic,
         onStatusUpdate,
       }),
       300000, // 5 minutes total timeout
-      'Report generation timed out'
+      'Flashcard generation timed out'
     );
 
-    // Generate AI-powered title from report content
-    // If content is empty or title generation fails, fall back to chunks-based generation
-    let title = await service.generateTitleFromContent(result.content);
-    if (title === 'Report' && result.content.length > 0) {
-      // Content exists but got generic title, try generating from chunks
-      console.log('[ReportGeneration] Title from content was generic, trying chunks fallback');
+    // Generate AI-powered title from flashcard content
+    // If flashcards are empty or title generation fails, fall back to chunks-based generation
+    let title = await service.generateTitleFromFlashcards(result.flashcards);
+    if (title === 'Flashcards' && result.flashcards.length > 0) {
+      // Flashcards exist but got generic title, try generating from chunks
+      console.log('[FlashcardGeneration] Title from flashcards was generic, trying chunks fallback');
       const chunks = await service.fetchChunks(documentIds);
-      title = await service.generateTitleFromChunks(chunks, reportType);
+      title = await service.generateTitleFromChunks(chunks);
     }
 
-    // Save report - use reportId (the note ID)
-    await service.saveReport({
-      noteId: reportId,  // Use reportId as the note ID
+    // Save flashcards
+    await service.saveFlashcards({
+      flashcardId,
       title,
-      content: result.content,
-      reportType,
+      flashcards: result.flashcards,
       metadata: {
         ...result.metadata,
         phase: 'completed',
@@ -99,17 +101,17 @@ export async function reportGenerationJob(
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
-      service: 'ReportGeneration',
+      service: 'FlashcardGeneration',
       action: 'job_complete',
-      reportId,
-      contentLength: result.content.length,
+      flashcardId,
+      cardsCount: result.flashcards.length,
     }));
   } catch (error) {
     console.error(JSON.stringify({
       timestamp: new Date().toISOString(),
-      service: 'ReportGeneration',
+      service: 'FlashcardGeneration',
       action: 'job_error',
-      reportId,
+      flashcardId,
       error: error instanceof Error ? error.message : 'Unknown error',
       attempt,
       maxRetries,
@@ -122,16 +124,16 @@ export async function reportGenerationJob(
         const retryAt = new Date(Date.now() + backoffDelay);
 
         helpers.addJob(
-          'reportGeneration',
+          'flashcardGeneration',
           { ...payload, attempt: attempt + 1 },
           { runAt: retryAt }
         );
 
         console.log(JSON.stringify({
           timestamp: new Date().toISOString(),
-          service: 'ReportGeneration',
+          service: 'FlashcardGeneration',
           action: 'job_retry_scheduled',
-          reportId,
+          flashcardId,
           nextAttempt: attempt + 1,
           retryAt,
         }));
@@ -139,18 +141,18 @@ export async function reportGenerationJob(
       } catch (addError) {
         console.error(JSON.stringify({
           timestamp: new Date().toISOString(),
-          service: 'ReportGeneration',
+          service: 'FlashcardGeneration',
           action: 'job_retry_failed',
-          reportId,
+          flashcardId,
           error: addError instanceof Error ? addError.message : 'Unknown error',
         }));
         // Fall through to mark as failed
       }
     }
 
-    // Update failed status - use reportId (the note ID)
+    // Mark as failed after max retries
     await supabase
-      .from('notes')
+      .from('flashcards')
       .update({
         status: 'failed',
         metadata: {
@@ -160,7 +162,7 @@ export async function reportGenerationJob(
           attempts: attempt + 1,
         },
       })
-      .eq('id', reportId);
+      .eq('id', flashcardId);
 
     throw error; // Re-throw so Graphile Worker knows it failed
   }

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { SupabaseStorageService } from '../services/storage/SupabaseStorageService.js';
+import { makeWorkerUtils, runMigrations } from 'graphile-worker';
 import { pgPool } from '../config/worker.js';
 import { upload } from '../middleware/upload.js';
 import { escapeIdentifier } from 'pg';
@@ -8,22 +9,43 @@ import { escapeIdentifier } from 'pg';
 const router = Router();
 const storageService = new SupabaseStorageService();
 
-// Helper function to add a job to Graphile Worker
+// Worker utils lazy loader - ensures schema is initialized before use
+let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
+
+async function getWorkerUtils() {
+  if (!workerUtilsPromise) {
+    // Ensure migrations are run first
+    await runMigrations({ pgPool });
+    workerUtilsPromise = makeWorkerUtils({
+      pgPool,
+    });
+  }
+  return workerUtilsPromise;
+}
+
+// Helper function to add a job to Graphile Worker using the SDK
 async function addJob(taskIdentifier: string, payload: any) {
-  const client = await pgPool.connect();
   try {
-    // Graphile Worker expects json type (not jsonb)
-    // We need to pass it as a JSON string and cast to json type
-    const result = await client.query(
-      `SELECT graphile_worker.add_job($1::text, $2::text::json)`,
-      [taskIdentifier, JSON.stringify(payload)]
+    const workerUtils = await getWorkerUtils();
+    await workerUtils.addJob(
+      taskIdentifier,
+      payload,
+      { queueName: 'default' }
     );
     console.log(`[Upload] Successfully added job '${taskIdentifier}' with document ID: ${payload.documentId}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error(`[Upload] Failed to add job '${taskIdentifier}':`, error);
+
+    // Check if it's a missing function/schema error
+    if (error.code === '42883' || error.code === '3F000' ||
+        error.message?.includes('graphile_worker') ||
+        error.message?.includes('schema')) {
+      throw new Error(
+        'Graphile Worker is not properly configured. Please start the worker process first to initialize the database schema.'
+      );
+    }
+
     throw error;
-  } finally {
-    client.release();
   }
 }
 

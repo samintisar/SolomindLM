@@ -13,9 +13,30 @@ const envSchema = z.object({
   COHERE_API_KEY: z.string(),
   MISTRAL_API_KEY: z.string(),
   TOGETHER_AI_API_KEY: z.string(),
-  TOGETHER_AI_MODEL: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
+  FAST_LLM: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
+  SMART_LLM: z.string().optional(), // Optional: smarter model for complex tasks
   REPORT_MAX_TOKENS: z.string().default('24000'), // Context window for report generation
   REPORT_MAP_BATCH_SIZE: z.string().default('10'),
+  // Flashcard Generation
+  // Map phase (fast_llm with 131K context): ~7.5K tokens per chunk
+  FLASHCARD_MAP_CHUNK_SIZE: z.string().default('30000'),
+  // Reduce phase (smart_llm with 261K context): ~15K tokens per chunk
+  FLASHCARD_REDUCE_CHUNK_SIZE: z.string().default('60000'),
+  // Cards per chunk bounds for quality control
+  FLASHCARD_MIN_CARDS_PER_CHUNK: z.string().default('2'),
+  FLASHCARD_MAX_CARDS_PER_CHUNK: z.string().default('18'),
+  // Minimum chunks to process for diversity
+  FLASHCARD_MIN_CHUNKS: z.string().default('3'),
+  // Mind Map Generation
+  // Map phase: 15K chars ≈ 3.75K tokens (~3% of 131K context)
+  MINDMAP_MAP_CHUNK_SIZE: z.string().default('15000'),
+  // Reduce phase: 30K chars for aggregation
+  MINDMAP_REDUCE_CHUNK_SIZE: z.string().default('30000'),
+  // Report Generation
+  // Map phase: 30K chars ≈ 7.5K tokens (~6% of 131K context)
+  REPORT_MAP_CHUNK_SIZE: z.string().default('30000'),
+  // Reduce phase: 60K chars ≈ 15K tokens (~6% of 261K context)
+  REPORT_REDUCE_CHUNK_SIZE: z.string().default('60000'),
   SUPADATA_API_KEY: z.string(),
   TAVILY_API_KEY: z.string(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),

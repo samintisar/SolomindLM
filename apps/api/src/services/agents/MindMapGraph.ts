@@ -1,416 +1,507 @@
 import { StateGraph, START, END, Send, Annotation } from '@langchain/langgraph';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
+import { env } from '../../config/env.js';
 
-// Zod Schema for mind map validation
-// Note: Cannot use .optional() with structured outputs - must use .nullable() or make required
-const MindMapNodeSchema: z.ZodType<any> = z.lazy(() =>
-  z.object({
-    id: z.string(),
-    topic: z.string().refine((val) => val.split(' ').length <= 7, {
-      message: "Max 7 words per node"
-    }),
-    children: z.array(MindMapNodeSchema).min(0).max(8),
-  })
-);
+// ============================================================
+// CONFIGURATION
+// ============================================================
 
-const MindMapSchema = z.object({
-  nodeData: z.object({
-    id: z.string(),
-    topic: z.string().refine((val) => val.split(' ').length <= 7, {
-      message: "Root max 7 words"
-    }),
-    children: z.array(MindMapNodeSchema).min(5).max(10),
-  })
+const GRAPH_CONFIG = {
+  // 15k chars (~3.75k tokens) for map phase - configurable via env
+  OPTIMAL_CHUNK_SIZE: parseInt(env.MINDMAP_MAP_CHUNK_SIZE || '15000', 10),
+  // 30k chars for reduce phase aggregation
+  REDUCE_CHUNK_SIZE: parseInt(env.MINDMAP_REDUCE_CHUNK_SIZE || '30000', 10),
+  // High concurrency is fine with smaller chunks
+  MAX_CONCURRENT_CHUNKS: 10,
+  // Give ample time for slow provider responses to avoid wasteful retries
+  MAP_TIMEOUT_MS: 120000, // 2 minutes
+  REDUCE_TIMEOUT_MS: 180000, // 3 minutes
+} as const;
+
+// ============================================================
+// SCHEMAS
+// ============================================================
+
+const ConceptExtractionSchema = z.object({
+  main_theme: z.string(),
+  summary: z.string(),
+  key_concepts: z.array(z.string()),
 });
 
-// State definitions using the newer Annotation API
-export const OverallState = Annotation.Root({
-  documentIds: Annotation<string[]>({
-    reducer: (_x: string[], y?: string[]) => y ?? _x,
-    default: () => [],
+export interface ConceptExtraction {
+  main_theme: string;
+  summary: string;
+  key_concepts: string[];
+}
+
+export interface MindMapNode {
+  topic: string;
+  children: MindMapNode[] | null;
+}
+
+export interface FinalMindMap {
+  nodeData: MindMapNode;
+}
+
+// ============================================================
+// STATE DEFINITIONS
+// ============================================================
+
+const ChunkState = Annotation.Root({
+  content: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => '' }),
+  retryCount: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
+});
+
+const OverallState = Annotation.Root({
+  allChunks: Annotation<string[]>({ reducer: (x, y) => y ?? x, default: () => [] }),
+  extractedConcepts: Annotation<ConceptExtraction[]>({
+    reducer: (x, y) => [...x, ...(y ?? [])],
+    default: () => []
   }),
-  chunks: Annotation<string[]>({
-    reducer: (_x: string[], y?: string[]) => y ?? _x,
-    default: () => [],
-  }),
-  mapOutputs: Annotation<string[]>({
-    // Reducer concatenates arrays - critical for aggregating parallel outputs
-    reducer: (x: string[], y: string[]) => x.concat(y),
-    default: () => [],
-  }),
-  collapsedOutputs: Annotation<string[]>({
-    reducer: (_x: string[], y?: string[]) => y ?? _x,
-    default: () => [],
-  }),
-  finalOutput: Annotation<any>({
-    reducer: (_x: any, y?: any) => y ?? _x,
-    default: () => null,
-  }),
-  status: Annotation<string>({
-    reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => 'generating',
-  }),
+  finalOutput: Annotation<any>({ reducer: (x, y) => y ?? x, default: () => null }),
+  status: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => 'generating' }),
 });
 
 export type OverallStateType = typeof OverallState.State;
+export type ChunkStateType = typeof ChunkState.State;
 
-// Minimal state for parallel map processing - only what each chunk needs
-export interface ChunkProcessState {
-  chunk: string;
-}
+// ============================================================
+// PROMPTS
+// ============================================================
 
-// Map Phase Prompt: Generate study guides from chunks
-const MAP_PROMPT = `You are an Expert Curriculum Designer creating comprehensive study guides for visual mind mapping.
+const MAP_PROMPT = `You are a Research Assistant.
+Analyze the text and extract raw information.
 
-Transform document content into rich, multi-level hierarchical study guide. MAX 7 WORDS PER NODE.
+OUTPUT REQUIREMENTS:
+1. **Main Theme:** The specific subject of this text chunk.
+2. **Summary:** 2-3 sentence high-level summary.
+3. **Key Concepts:** 10-20 specific terms, people, events, or ideas defined here.
 
-Format your response as:
+Input:
+{content}`;
 
-# MAIN TOPIC (2-4 words)
-## PRIMARY BRANCH (3-6 words)
-- KEY CONCEPT (2-5 words)
-  ### SUB-CONCEPT (2-4 words)
-  ### RELATED IDEA (2-4 words)
-- CORE PROCESS (2-5 words)
-  ### STEP/DETAIL (2-4 words)
-  ### APPLICATION (2-4 words)
+const REDUCE_PROMPT = `You are a Mind Map Architect.
+Analyze the extracted data and create a deep, hierarchical mind map.
+
+OUTPUT FORMAT:
+- Use Markdown bullet points (* or -).
+- Indentation determines depth (2 spaces per level).
+- The first line must be the Root Topic prefixed with # (e.g., "# Roman Empire").
 
 RULES:
-- ABSOLUTE MAX: 7 words per header/bullet
-- 5-10 primary branches (## level) - create comprehensive coverage
-- 3-8 key concepts per branch (- bullets)
-- MUST include sub-details (### level) for each concept - aim for 2-5 sub-items per concept
-- Create depth: root → branches → concepts → sub-concepts (3-4 levels minimum)
-- Keywords only, no sentences
-- Remove articles/prepositions
-- Extract ALL major themes, don't summarize too aggressively
+1. Create ONE Root Topic that encompasses all themes.
+2. Create 4-7 Main Branches (Level 1) as high-level categories.
+3. Nest sub-topics 3-5 levels deep using indentation.
+4. Group related concepts logically under meaningful category names.
+5. Use specific, descriptive topic names (not "Aspect 1", "Category 2", etc.).
 
-End with: --- END STUDY GUIDE ---
+EXAMPLE STRUCTURE:
+# The Roman Empire
+* Political Structure
+  * The Emperor
+    * Powers and authority
+    * Succession mechanisms
+  * The Senate
+    * Advisory role
+    * Legislative functions
+* Military System
+  * Legion organization
+    * Centuries and cohorts
+    * Legion commanders
+  * Provincial defenses
+* Society and Culture
+  * Social classes
+    * Patricians
+    * Plebeians
+    * Slaves
+  * Daily life
+    * Entertainment
+    * Religion
 
-Content:
-{chunk}
+DATA (Themes and Concepts from documents):
+{extractions}
 
-STUDY GUIDE:`;
+Generate the mind map now.`;
 
-// Reduce Phase Prompt: Convert study guides to Mind Elixir JSON
-const REDUCE_PROMPT = `You are a Visual Learning Architect creating comprehensive, multi-level mind maps from study guides.
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
-MAX 7 WORDS PER NODE. Keywords only.
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(errorMsg)), timeoutMs);
+  });
+  return Promise.race([promise.finally(() => clearTimeout(timer!)), timeoutPromise]);
+}
 
-REQUIREMENTS:
-1. Root: 2-5 words (main subject)
-2. 5-10 main branches (all major themes from content)
-3. Main branches: 3-7 words each
-4. Each branch MUST have 3-8 child nodes
-5. Each child node SHOULD have 2-5 grandchildren when content supports it
-6. Create 3-4 levels of depth minimum
-7. Balanced visual distribution across all branches
-8. Don't lose information - capture all key concepts
+export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE): string[] {
+  if (!chunks || chunks.length === 0) return [];
 
-JSON STRUCTURE - NO OTHER TEXT:
-{{
-  "nodeData": {{
-    "id": "root",
-    "topic": "MAIN TOPIC",
-    "children": [
-      {{
-        "id": "branch1",
-        "topic": "PRIMARY BRANCH",
-        "children": [
-          {{
-            "id": "1a",
-            "topic": "KEY CONCEPT",
-            "children": [
-              {{"id": "1a1", "topic": "SUB-DETAIL", "children": []}},
-              {{"id": "1a2", "topic": "RELATED POINT", "children": []}}
-            ]
-          }},
-          {{
-            "id": "1b",
-            "topic": "CORE PROCESS",
-            "children": [
-              {{"id": "1b1", "topic": "STEP ONE", "children": []}},
-              {{"id": "1b2", "topic": "STEP TWO", "children": []}}
-            ]
-          }}
-        ]
-      }}
-    ]
-  }}
-}}
+  console.log(`\n[MindMapGraph] ===== CHUNK PACKING =====`);
+  console.log(`[MindMapGraph] Original chunks: ${chunks.length}`);
+  console.log(`[MindMapGraph] Target size: ${targetSize} chars per packed chunk`);
 
-Study guides:
-{content}
+  const packed: string[] = [];
+  const buffer: string[] = [];
+  let bufferSize = 0;
 
-MIND MAP JSON:`;
+  for (const chunk of chunks) {
+    if (!chunk?.trim()) continue;
+
+    const chunkSize = chunk.length + (buffer.length > 0 ? 2 : 0);
+
+    if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
+      packed.push(buffer.join('\n\n'));
+      buffer.length = 0;
+      bufferSize = 0;
+    }
+
+    buffer.push(chunk);
+    bufferSize += chunkSize;
+  }
+
+  if (buffer.length > 0) {
+    packed.push(buffer.join('\n\n'));
+  }
+
+  const totalOriginalChars = chunks.join('').length;
+  const totalPackedChars = packed.join('').length;
+  const reduction = Math.round((1 - packed.length / chunks.length) * 100);
+
+  console.log(`[MindMapGraph] Packed into: ${packed.length} chunks`);
+  console.log(`[MindMapGraph] Original: ${totalOriginalChars} chars → Packed: ${totalPackedChars} chars`);
+  console.log(`[MindMapGraph] Reduction: ${chunks.length} → ${packed.length} (${reduction}% fewer API calls)`);
+
+  return packed;
+}
+
+export function validateChunks(chunks: string[]): string[] {
+  if (!chunks || chunks.length === 0) return [];
+
+  console.log(`\n[MindMapGraph] ===== INPUT VALIDATION =====`);
+  console.log(`[MindMapGraph] Input chunks: ${chunks.length}`);
+
+  const validated = chunks
+    .filter(c => c && typeof c === 'string')
+    .map(c => c.slice(0, 50000))
+    .filter(c => c.trim().length > 50);
+
+  const filteredOut = chunks.length - validated.length;
+  console.log(`[MindMapGraph] Valid chunks: ${validated.length}`);
+  console.log(`[MindMapGraph] Filtered out: ${filteredOut} (too short or invalid)`);
+
+  return validated;
+}
+
+// ============================================================
+// MAIN CLASS
+// ============================================================
 
 export class MindMapGraph {
-  private llm: ChatTogetherAI;
-  private maxTokens: number;
+  private fastLlm: ChatTogetherAI;
+  private smartLlm: ChatTogetherAI;
 
-  constructor(apiKey: string, model: string, maxTokens: number = 24000) {
-    this.llm = new ChatTogetherAI({
+  constructor(apiKey: string, mapModel: string, reduceModel: string) {
+    // Fast model for extraction
+    this.fastLlm = new ChatTogetherAI({
       apiKey,
-      model,
-      temperature: 0.5,
+      model: mapModel || "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+      temperature: 0.1,
+      maxTokens: 4000,
     });
-    this.maxTokens = maxTokens;
+
+    // Smart model for markdown generation
+    this.smartLlm = new ChatTogetherAI({
+      apiKey,
+      model: reduceModel || "Qwen/Qwen2.5-72B-Instruct-Turbo",
+      temperature: 0.3,
+      maxTokens: 16000,
+    });
   }
 
-  private estimateTokens(text: string): number {
-    // Rough approximation: 1 token ≈ 4 characters
-    return Math.ceil(text.length / 4);
+  // 1. Fan Out
+  routeInput(state: OverallStateType): Send[] {
+    const validated = validateChunks(state.allChunks);
+    const packed = packChunks(validated, GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE);
+
+    console.log(`\n[MindMapGraph] 🚀 FANNING OUT: ${packed.length} packed chunks (Original: ${state.allChunks.length})`);
+    console.log(`[MindMapGraph] Max concurrency: ${GRAPH_CONFIG.MAX_CONCURRENT_CHUNKS}`);
+
+    return packed.map(chunk => new Send("map_process", {
+      content: chunk,
+      retryCount: 0
+    }));
   }
 
-  // Node: Split chunks for routing
-  splitChunks(state: OverallStateType): Partial<OverallStateType> {
-    return {
-      ...state,
-      status: 'mapping',
-      mapOutputs: state.mapOutputs || [],
-      collapsedOutputs: state.collapsedOutputs || [],
-      finalOutput: state.finalOutput || null,
-    };
-  }
+  // 2. Map Node (Extraction with smart retry logic)
+  async mapProcess(state: ChunkStateType): Promise<Partial<OverallStateType> | Send> {
+    const chunkLength = state.content?.length || 0;
+    const retryCount = state.retryCount ?? 0;
 
-  // Conditional routing function - returns Send objects for fan-out or 'collapse' string
-  routeToMap(state: OverallStateType): Send[] | 'collapse' {
-    // If no chunks, skip to collapse
-    if (state.chunks.length === 0) {
-      console.warn('[MindMapGraph] No chunks to process, routing to collapse');
-      return 'collapse';
-    }
+    console.log(`[MindMapGraph] → Processing chunk (${chunkLength} chars) [Attempt ${retryCount + 1}/3]`);
 
-    console.log(`[MindMapGraph] Creating ${state.chunks.length} parallel map tasks`);
+    // @ts-ignore
+    const parser = this.fastLlm.withStructuredOutput(ConceptExtractionSchema);
 
-    // Create Send objects with minimal state - only what each parallel task needs
-    return state.chunks.map((chunk) =>
-      new Send('map_process', {
-        chunk,
-      })
-    );
-  }
+    const startTime = Date.now();
 
-  // Node: Map phase (runs in parallel via Send)
-  // Accepts ChunkProcessState with minimal data for this branch
-  async mapProcess(state: ChunkProcessState): Promise<Partial<OverallStateType>> {
-    const { chunk } = state;
-
-    console.log(`[MindMapGraph] Processing chunk (${chunk.length} chars) in map phase`);
-
-    const prompt = MAP_PROMPT.replace('{chunk}', chunk);
-
-    const response = await this.llm.invoke([
-      new SystemMessage('You are an expert curriculum designer creating hierarchical study guides for mind mapping.'),
-      new HumanMessage(prompt),
-    ]);
-
-    const output = response.content.toString();
-    console.log(`[MindMapGraph] Generated study guide (${output.length} chars)`);
-
-    // Return single output in array - reducer will concatenate all outputs
-    return {
-      mapOutputs: [output],
-    };
-  }
-
-  // Node: Collapse phase (if needed)
-  async collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {
-    console.log(`[MindMapGraph] Collapse: received ${state.mapOutputs.length} mapOutputs`);
-    console.log(
-      `[MindMapGraph] Collapse: first mapOutput preview: ${state.mapOutputs[0]?.substring(0, 100) || 'EMPTY'}...`
-    );
-
-    // Safety check: if no mapOutputs, return early
-    if (!state.mapOutputs || state.mapOutputs.length === 0) {
-      console.error('[MindMapGraph] Collapse: ERROR - No mapOutputs received!');
-      return {
-        ...state,
-        collapsedOutputs: [],
-        status: 'reducing',
-      };
-    }
-
-    const totalTokens = state.mapOutputs.reduce(
-      (sum, s) => sum + this.estimateTokens(s),
-      0
-    );
-
-    console.log(`[MindMapGraph] Collapse: total tokens ${totalTokens}, max tokens ${this.maxTokens}`);
-
-    if (totalTokens <= this.maxTokens) {
-      console.log('[MindMapGraph] Collapse: skipping recursive collapse, using mapOutputs directly');
-      return {
-        ...state,
-        collapsedOutputs: state.mapOutputs,
-        status: 'reducing',
-      };
-    }
-
-    // Recursive collapse
-    console.log('[MindMapGraph] Collapse: performing recursive collapse');
-    const collapsed = await this.recursiveCollapse(state.mapOutputs);
-    return {
-      ...state,
-      collapsedOutputs: collapsed,
-      status: 'reducing',
-    };
-  }
-
-  private async recursiveCollapse(summaries: string[]): Promise<string[]> {
-    const totalTokens = summaries.reduce(
-      (sum, s) => sum + this.estimateTokens(s),
-      0
-    );
-
-    if (totalTokens <= this.maxTokens) {
-      return summaries;
-    }
-
-    // Group and collapse
-    const groupSize = 3;
-    const collapsed: string[] = [];
-
-    for (let i = 0; i < summaries.length; i += groupSize) {
-      const group = summaries.slice(i, i + groupSize);
-      const combined = group.join('\n\n---\n\n');
-
-      const prompt = `Condense these study guides into a single study guide while retaining all key topics and hierarchical structure:\n\n${combined}\n\nCONDENSED:`;
-
-      const response = await this.llm.invoke([
-        new SystemMessage('You are an expert at synthesizing study guides while preserving hierarchical structure.'),
-        new HumanMessage(prompt),
-      ]);
-
-      collapsed.push(response.content.toString());
-    }
-
-    // Recursively check if still too large
-    return this.recursiveCollapse(collapsed);
-  }
-
-  // Node: Reduce phase - convert study guides to Mind Elixir JSON
-  async reduce(state: OverallStateType): Promise<Partial<OverallStateType>> {
-    console.log(`[MindMapGraph] Reduce: received ${state.collapsedOutputs.length} collapsedOutputs`);
-
-    const combined = state.collapsedOutputs.join('\n\n--- NEXT STUDY GUIDE ---\n\n');
-
-    console.log(`[MindMapGraph] Reduce: combined study guides length: ${combined.length} chars`);
-
-    const prompt = REDUCE_PROMPT.replace('{content}', combined);
-
-    console.log(`[MindMapGraph] Reduce: prompt length: ${prompt.length} chars`);
-
-    // Use regular LLM call with JSON parsing instead of structured outputs
-    // Together AI doesn't always support structured outputs reliably
-    const response = await this.llm.invoke([
-      new SystemMessage('You are a visual learning architect creating mind map JSON structures from study guides. You must respond with valid JSON only, no other text.'),
-      new HumanMessage(prompt),
-    ]);
-
-    const content = response.content.toString();
-    console.log(`[MindMapGraph] Reduce: received response (${content.length} chars)`);
-
-    // Parse JSON from the response - handle markdown code blocks
-    let parsedData: any;
     try {
-      // Remove markdown code blocks if present
-      let jsonStr = content.trim();
-      if (jsonStr.startsWith('```json')) {
-        jsonStr = jsonStr.slice(7);
-      } else if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.slice(3);
+      // Add jitter to prevent thundering herd
+      if (retryCount === 0) {
+        await new Promise(r => setTimeout(r, Math.random() * 2000));
       }
-      if (jsonStr.endsWith('```')) {
-        jsonStr = jsonStr.slice(0, -3);
+
+      const response = await withTimeout(
+        parser.invoke([
+          new SystemMessage('Extract main theme, 2–3 sentence summary, and 10–20 key concepts.'),
+          new HumanMessage(MAP_PROMPT.replace('{content}', state.content || ''))
+        ]),
+        GRAPH_CONFIG.MAP_TIMEOUT_MS,
+        'Map Timeout'
+      );
+
+      const extraction = response as ConceptExtraction;
+      const elapsed = Date.now() - startTime;
+
+      console.log(`[MindMapGraph]   ✅ Extracted ${extraction.key_concepts.length} concepts in ${elapsed}ms`);
+      console.log(`[MindMapGraph]   main_theme: "${extraction.main_theme}"`);
+
+      return { extractedConcepts: [extraction] };
+
+    } catch (e: any) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[MindMapGraph]   ⚠️ Chunk failed: ${msg}`);
+
+      // Only retry on timeouts and server errors (500, 503). Fail fast on client errors.
+      const isTimeout = msg.toLowerCase().includes('timeout');
+      const isServerErr = msg.includes('500') || msg.includes('503') || msg.includes('internal server error');
+
+      if ((isTimeout || isServerErr) && retryCount < 2) {
+        console.log(`[MindMapGraph]   ↺ Retrying chunk (${retryCount + 1}/2)...`);
+        return new Send('map_process', {
+          content: state.content,
+          retryCount: retryCount + 1,
+        });
       }
-      jsonStr = jsonStr.trim();
 
-      parsedData = JSON.parse(jsonStr);
-      console.log(`[MindMapGraph] Reduce: successfully parsed JSON`);
+      console.error(`[MindMapGraph]   ❌ Chunk failed permanently after ${retryCount + 1} attempts`);
+      return { extractedConcepts: [] };
+    }
+  }
 
-      // Handle case where LLM returns nodeData as array instead of object
-      if (Array.isArray(parsedData.nodeData)) {
-        console.warn(`[MindMapGraph] Reduce: nodeData is array, transforming to object structure`);
-        // LLM returned array of nodes - use first node as root, rest as siblings
-        const firstNode = parsedData.nodeData[0];
-        if (firstNode && typeof firstNode === 'object') {
-          parsedData = {
-            nodeData: {
-              id: firstNode.id || 'root',
-              topic: firstNode.topic || 'Mind Map',
-              children: firstNode.children || parsedData.nodeData.slice(1),
-            },
-          };
+  // 3. Reduce Node (Markdown Strategy)
+  async reduceNode(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    const extractions = state.extractedConcepts || [];
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`[MindMapGraph] ===== REDUCE PHASE =====`);
+    console.log(`[MindMapGraph] 🧩 Reducing ${extractions.length} extractions into map...`);
+
+    if (extractions.length === 0) {
+      console.error('[MindMapGraph] ✗ No extractions to build from!');
+      return {
+        finalOutput: { nodeData: { topic: 'Error: No Content', children: null } },
+        status: 'failed',
+      };
+    }
+
+    // Prepare text input
+    const inputData = extractions.map(e =>
+      `THEME: ${e.main_theme}\nSUMMARY: ${e.summary}\nCONCEPTS: ${e.key_concepts.join(", ")}`
+    ).join("\n\n---\n\n");
+
+    console.log(`[MindMapGraph] Input size: ${inputData.length} chars`);
+    const safeInput = inputData.slice(0, 150000);
+
+    console.log(`[MindMapGraph] Model: ${(this.smartLlm as any).model}`);
+    console.log(`[MindMapGraph] Starting markdown generation at ${new Date().toISOString()}`);
+
+    try {
+      const start = Date.now();
+      const response = await withTimeout(
+        this.smartLlm.invoke([
+          new SystemMessage('You are a Mind Map Architect. Create hierarchical markdown outlines.'),
+          new HumanMessage(REDUCE_PROMPT.replace('{extractions}', safeInput))
+        ]),
+        GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+        'Reduce Timeout'
+      );
+
+      const markdown = (response.content[0] as any)?.text || String(response.content);
+      console.log(`[MindMapGraph] Generated ${markdown.length} chars of markdown`);
+
+      const parsedTree = this.parseMarkdownToTree(markdown);
+      const elapsed = Date.now() - start;
+
+      console.log(`[MindMapGraph] ✓ Final map generated in ${elapsed}ms`);
+      console.log(`[MindMapGraph]   Root topic: "${parsedTree.topic}"`);
+      console.log(`[MindMapGraph]   Branches: ${parsedTree.children?.length ?? 0}`);
+
+      if (parsedTree.children) {
+        const branchTopics = parsedTree.children.map(c => c.topic).join(', ');
+        console.log(`[MindMapGraph]   Branch topics: ${branchTopics}`);
+      }
+
+      return { finalOutput: { nodeData: parsedTree }, status: 'completed' };
+
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[MindMapGraph] ✗ Reduce Error: ${msg}`);
+      console.error(`[MindMapGraph] Using smart fallback...`);
+
+      return {
+        finalOutput: this.createSmartFallback(extractions),
+        status: 'completed',
+      };
+    }
+  }
+
+  // ============================================================
+  // MARKDOWN PARSER
+  // ============================================================
+
+  /**
+   * Parses markdown indentation into a JSON tree
+   * Supports:
+   * - # Root headers
+   * - *, -, or 1. for bullets
+   * - 2-space or 4-space indentation
+   */
+  parseMarkdownToTree(markdown: string): MindMapNode {
+    const lines = markdown.split('\n').filter(l => l.trim().length > 0);
+    let root: MindMapNode = { topic: "Knowledge Map", children: [] };
+
+    const stack: { node: MindMapNode; level: number }[] = [];
+
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/\t/g, '  '); // Normalize tabs to spaces
+
+      // Detect Root (# Title or ## Title)
+      if (line.trim().startsWith('#')) {
+        const rootTopic = line.replace(/^#+\s*/, '').trim();
+        root = { topic: rootTopic, children: [] };
+        stack.length = 0;
+        stack.push({ node: root, level: 0 });
+        continue;
+      }
+
+      // Detect bullet points: *, -, or 1.
+      const bulletMatch = line.match(/^(\s*)(?:[-*]|\d+\.)\s+(.+)/);
+
+      if (bulletMatch) {
+        const indent = bulletMatch[1].length;
+        const topic = bulletMatch[2].trim();
+
+        // Calculate level (2 spaces per level)
+        const level = Math.floor(indent / 2) + 1;
+
+        const newNode: MindMapNode = { topic, children: [] };
+
+        // Find parent by popping stack until we find a node at a higher level
+        while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+          stack.pop();
+        }
+
+        if (stack.length === 0) {
+          // Shouldn't happen if there's a root, but handle gracefully
+          if (!root.children) root.children = [];
+          root.children.push(newNode);
+          stack.push({ node: newNode, level });
         } else {
-          // Fallback: wrap entire array as children of new root
-          parsedData = {
-            nodeData: {
-              id: 'root',
-              topic: 'Mind Map',
-              children: parsedData.nodeData,
-            },
-          };
+          const parent = stack[stack.length - 1].node;
+          if (!parent.children) parent.children = [];
+          parent.children.push(newNode);
+          stack.push({ node: newNode, level });
         }
       }
-
-      // If no nodeData key at all, create default structure
-      if (!parsedData.nodeData) {
-        console.warn(`[MindMapGraph] Reduce: no nodeData found, creating default structure`);
-        parsedData = {
-          nodeData: {
-            id: 'root',
-            topic: 'Mind Map',
-            children: Array.isArray(parsedData) ? parsedData : [],
-          },
-        };
-      }
-    } catch (error) {
-      console.error(`[MindMapGraph] Reduce: failed to parse JSON`, error);
-      console.error(`[MindMapGraph] Reduce: response content preview: ${content.substring(0, 500)}...`);
-      throw new Error('Failed to parse mind map JSON from LLM response');
     }
 
-    // Validate against schema (optional, for logging only)
-    try {
-      MindMapSchema.parse(parsedData);
-      console.log(`[MindMapGraph] Reduce: JSON validated successfully`);
-    } catch (error) {
-      // Zod errors have circular structure, log message only
-      console.warn(`[MindMapGraph] Reduce: JSON validation warning (non-fatal): ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Cleanup: convert empty children arrays to null for leaf nodes
+    this.cleanLeafNodes(root);
+    return root;
+  }
+
+  cleanLeafNodes(node: MindMapNode): void {
+    if (node.children && node.children.length === 0) {
+      node.children = null;
+    } else if (node.children) {
+      node.children.forEach(c => this.cleanLeafNodes(c));
     }
+  }
+
+  // ============================================================
+  // SMART FALLBACK
+  // ============================================================
+
+  /**
+   * Creates a meaningful fallback tree by:
+   * 1. Finding the most common theme for the root title
+   * 2. Grouping concepts by theme
+   * 3. No fake "Aspect" buckets
+   */
+  createSmartFallback(extractions: ConceptExtraction[]): FinalMindMap {
+    // Find most common theme for Root Title
+    const themeCounts: Record<string, number> = {};
+    extractions.forEach(e => {
+      const t = e.main_theme || "Unknown";
+      themeCounts[t] = (themeCounts[t] || 0) + 1;
+    });
+
+    const rootTitle = Object.entries(themeCounts)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || "Knowledge Map";
+
+    console.log(`[MindMapGraph] Fallback root: "${rootTitle}"`);
+
+    // Deduplicate themes and build tree
+    const seenThemes = new Set<string>();
+    const children: MindMapNode[] = [];
+
+    for (const ex of extractions) {
+      const theme = ex.main_theme || "Misc";
+      if (seenThemes.has(theme)) continue;
+      seenThemes.add(theme);
+
+      // Use a different name if theme matches root to avoid duplication
+      const branchName = theme === rootTitle ? "Overview" : theme;
+
+      children.push({
+        topic: branchName,
+        children: ex.key_concepts.map(c => ({
+          topic: c,
+          children: null
+        }))
+      });
+    }
+
+    console.log(`[MindMapGraph] Fallback: ${children.length} branches`);
 
     return {
-      ...state,
-      finalOutput: parsedData,
-      status: 'completed',
+      nodeData: {
+        topic: rootTitle,
+        children: children.length > 0 ? children : null
+      }
     };
   }
 
-  // Build the graph using the newer Annotation API
+  // 4. Build Graph
   buildGraph() {
     const builder = new StateGraph(OverallState);
 
-    // Add nodes with proper types
-    builder.addNode('split_chunks', (state: OverallStateType) => this.splitChunks(state));
-    builder.addNode('map_process', (state: ChunkProcessState) => this.mapProcess(state));
-    builder.addNode('collapse', (state: OverallStateType) => this.collapse(state));
-    builder.addNode('reduce', (state: OverallStateType) => this.reduce(state));
+    builder.addNode('map_process', (s: ChunkStateType) => this.mapProcess(s));
+    builder.addNode('reduce_node', (s: OverallStateType) => this.reduceNode(s));
 
-    // Add edges
-    // Type assertions are needed due to LangGraph JS's TypeScript limitations
-    builder.addEdge(START, 'split_chunks' as never);
-
-    // Conditional edge for Send API fan-out
-    builder.addConditionalEdges('split_chunks' as never, (state: OverallStateType) =>
-      this.routeToMap(state)
+    // Immediate Fan Out
+    builder.addConditionalEdges(
+      START,
+      (s: OverallStateType) => this.routeInput(s),
+      { map_process: 'map_process' } as any
     );
 
-    builder.addEdge('map_process' as never, 'collapse' as never);
-    builder.addEdge('collapse' as never, 'reduce' as never);
-    builder.addEdge('reduce' as never, END);
+    // map_process -> reduce_node -> END
+    builder.addEdge('map_process' as any, 'reduce_node' as any);
+    builder.addEdge('reduce_node' as any, END as any);
 
     return builder.compile();
   }

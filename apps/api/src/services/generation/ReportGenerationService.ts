@@ -34,10 +34,11 @@ export class ReportGenerationService {
   constructor() {
     this.reportGraph = new ReportGraph(
       env.TOGETHER_AI_API_KEY,
-      env.TOGETHER_AI_MODEL,
+      env.FAST_LLM,
+      env.SMART_LLM || env.FAST_LLM, // Use smart model for reduce, fall back to fast if not set
       parseInt(env.REPORT_MAX_TOKENS, 10)
     );
-    this.titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.TOGETHER_AI_MODEL);
+    this.titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.FAST_LLM);
   }
 
   async generateReport(params: ReportGenerationParams): Promise<ReportResult> {
@@ -91,37 +92,65 @@ export class ReportGenerationService {
 
   async fetchChunks(documentIds: string[]): Promise<string[]> {
     try {
-      console.log(`[ReportGeneration] Fetching chunks for documents: ${documentIds.join(', ')}`);
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        service: 'ReportGeneration',
+        action: 'fetch_chunks',
+        documentIds,
+      }));
 
-      const { data, error } = await supabase
-        .from('document_chunks')
-        .select('content, document_id, chunk_index')
-        .in('document_id', documentIds)
-        .order('chunk_index', { ascending: true });
+      const chunks: string[] = [];
+      const batchSize = 100;
+      let offset = 0;
+      let hasMore = true;
 
-      if (error) {
-        console.error('[ReportGeneration] Error fetching chunks:', error);
-        throw new Error(`Failed to fetch chunks: ${error.message}`);
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('document_chunks')
+          .select('content, document_id, chunk_index')
+          .in('document_id', documentIds)
+          .order('document_id', { ascending: true })
+          .order('chunk_index', { ascending: true })
+          .range(offset, offset + batchSize - 1);
+
+        if (error) {
+          console.error('[ReportGeneration] Error fetching chunks:', error);
+          throw new Error(`Failed to fetch chunks: ${error.message}`);
+        }
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          chunks.push(...data.map((d) => d.content));
+          if (data.length < batchSize) {
+            hasMore = false;
+          } else {
+            offset += batchSize;
+          }
+        }
       }
 
-      const chunks = data?.map((d) => d.content) || [];
-      console.log(`[ReportGeneration] Fetched ${chunks.length} chunks`);
+      // Filter out empty chunks
+      const nonEmptyChunks = chunks.filter(c => c && c.trim().length > 0);
+
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        service: 'ReportGeneration',
+        action: 'fetch_chunks_complete',
+        totalChunks: chunks.length,
+        nonEmptyChunks: nonEmptyChunks.length,
+        emptyChunksFiltered: chunks.length - nonEmptyChunks.length,
+      }));
 
       // Debug: Log first chunk preview to verify content
-      if (chunks.length > 0) {
-        const firstChunkPreview = chunks[0]?.substring(0, 200) || 'EMPTY';
-        console.log(`[ReportGeneration] First chunk preview (${chunks[0]?.length || 0} chars): ${firstChunkPreview}...`);
+      if (nonEmptyChunks.length > 0) {
+        const firstChunkPreview = nonEmptyChunks[0]?.substring(0, 200) || 'EMPTY';
+        console.log(`[ReportGeneration] First chunk preview (${nonEmptyChunks[0]?.length || 0} chars): ${firstChunkPreview}...`);
       } else {
         console.warn('[ReportGeneration] WARNING: No chunks found!');
       }
 
-      // Check for empty chunks
-      const emptyChunks = chunks.filter(c => !c || c.trim().length === 0);
-      if (emptyChunks.length > 0) {
-        console.warn(`[ReportGeneration] WARNING: ${emptyChunks.length} empty chunks found!`);
-      }
-
-      return chunks;
+      return nonEmptyChunks;
     } catch (error) {
       console.error('[ReportGeneration] Error in fetchChunks:', error);
       throw error;
@@ -197,11 +226,19 @@ export class ReportGenerationService {
     return titles[reportType] || 'Report';
   }
 
-  getPreviewText(reportType: string, status: string): string {
-    if (status === 'generating' || status === 'mapping' || status === 'collapsing' || status === 'reducing') {
+  getPreviewText(reportType: string, status: string, metadata?: any): string {
+    // Check if generating (either via status field or metadata.phase)
+    const phase = metadata?.phase || status;
+    const isGenerating = status === 'generating' ||
+      phase === 'generating' ||
+      phase === 'mapping' ||
+      phase === 'collapsing' ||
+      phase === 'reducing';
+
+    if (isGenerating) {
       return 'Report • Generating...';
     }
-    if (status === 'failed') {
+    if (status === 'failed' || phase === 'failed') {
       return 'Report • Failed';
     }
     return `Report • ${this.getReportTitle(reportType)}`;

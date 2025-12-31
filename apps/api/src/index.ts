@@ -16,9 +16,28 @@ async function ensureGraphileWorkerSchema() {
     console.log('[API] Running Graphile Worker schema migration...');
     await runMigrations({ pgPool });
     console.log('[API] Graphile Worker schema migration completed');
+
+    // Verify the schema is installed by checking for the add_job function
+    const verifyResult = await pgPool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_proc
+        WHERE proname = 'add_job'
+        AND pronamespace = 'graphile_worker'::regnamespace
+      )
+    `);
+    if (!verifyResult.rows[0].exists) {
+      throw new Error('Graphile Worker schema verification failed - add_job function not found');
+    }
+    console.log('[API] Graphile Worker schema verified successfully');
   } catch (error) {
-    console.error('[API] Graphile Worker schema migration failed:', error);
-    // Don't throw - let server start anyway, worker may handle migrations
+    console.error('[API] CRITICAL: Graphile Worker schema migration failed:', error);
+    if (error instanceof Error) {
+      console.error('[API] Error details:', {
+        message: error.message,
+        code: (error as any).code,
+      });
+    }
+    // Still attempt to start, but flashcard creation will fail
   }
 }
 

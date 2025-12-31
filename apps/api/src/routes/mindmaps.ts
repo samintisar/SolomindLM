@@ -1,52 +1,117 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
-import { makeWorkerUtils } from 'graphile-worker';
+import { makeWorkerUtils, runMigrations } from 'graphile-worker';
 import { pgPool } from '../config/worker.js';
 
 const router = Router();
 
-// Helper function to add a job to Graphile Worker using WorkerUtils
-async function addMindMapJob(payload: any) {
-  let workerUtils;
-  try {
-    // Create worker utilities for adding jobs
-    workerUtils = await makeWorkerUtils({
+// Worker utils lazy loader - ensures schema is initialized before use
+let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
+
+async function getWorkerUtils() {
+  if (!workerUtilsPromise) {
+    // Ensure migrations are run first
+    await runMigrations({ pgPool });
+    workerUtilsPromise = makeWorkerUtils({
       pgPool,
     });
+  }
+  return workerUtilsPromise;
+}
 
-    // Add the job using the proper API
+// Configuration constants
+const CONFIG = {
+  MINDMAP: {
+    MIN_TITLE_LENGTH: 1,
+    MAX_TITLE_LENGTH: 200,
+    MAX_DOCUMENTS: 10,
+  },
+} as const;
+
+// Type definitions for Supabase responses
+interface MindMapRow {
+  id: string;
+  user_id: string;
+  notebook_id: string;
+  title: string;
+  data: Record<string, any>;
+  status: 'draft' | 'generating' | 'completed' | 'failed';
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+// Validation helpers
+function isValidUUID(value: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value);
+}
+
+function validateDocumentIds(ids: unknown): ids is string[] {
+  return Array.isArray(ids) &&
+    ids.length > 0 &&
+    ids.length <= CONFIG.MINDMAP.MAX_DOCUMENTS &&
+    ids.every(id => typeof id === 'string' && isValidUUID(id));
+}
+
+function validateTitle(title: unknown): boolean {
+  return typeof title === 'string' &&
+    title.trim().length >= CONFIG.MINDMAP.MIN_TITLE_LENGTH &&
+    title.trim().length <= CONFIG.MINDMAP.MAX_TITLE_LENGTH;
+}
+
+// Helper function to add a job to Graphile Worker using the SDK
+async function addMindMapJob(payload: unknown) {
+  try {
+    const workerUtils = await getWorkerUtils();
     await workerUtils.addJob(
-      'mindmapGeneration',  // task identifier
-      payload,              // job payload
-      {}                    // job options (empty defaults)
+      'mindmapGeneration',
+      payload,
+      { queueName: 'default' }
     );
-
-    console.log(`[MindMaps] Successfully added mindmapGeneration job with ID: ${payload.mindMapId}`);
-  } catch (error) {
+    console.log(`[MindMaps] Successfully added mindmapGeneration job`);
+  } catch (error: any) {
     console.error(`[MindMaps] Failed to add mindmapGeneration job:`, error);
-    throw error;
-  } finally {
-    // Always release the worker utilities
-    if (workerUtils) {
-      await workerUtils.release();
+
+    // Check if it's a missing function/schema error
+    if (error.code === '42883' || error.code === '3F000' ||
+        error.message?.includes('graphile_worker') ||
+        error.message?.includes('schema')) {
+      throw new Error(
+        'Graphile Worker is not properly configured. Please start the worker process first to initialize the database schema.'
+      );
     }
+
+    throw error;
   }
 }
 
-// POST /api/mindmaps/generate - Create mindmap and queue job
-router.post('/generate', async (req: Request, res: Response) => {
+// POST /api/mindmaps - Create mindmap and queue job
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { userId, notebookId, documentIds } = req.body;
 
-    console.log(`[MindMaps] Creating mind map:`, { userId, notebookId, documentIds });
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'MindMaps',
+      action: 'create_mindmap',
+      userId,
+      notebookId,
+    }));
 
-    // Validation
-    if (!userId || !notebookId) {
-      return res.status(400).json({ error: 'userId and notebookId are required' });
+    // Validation: userId and notebookId
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+    if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
+      return res.status(400).json({ error: 'Invalid notebookId format' });
     }
 
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
-      return res.status(400).json({ error: 'At least one documentId is required' });
+    // Validation: documentIds
+    if (!validateDocumentIds(documentIds)) {
+      return res.status(400).json({
+        error: `documentIds must be an array of 1-${CONFIG.MINDMAP.MAX_DOCUMENTS} valid UUIDs`
+      });
     }
 
     // Verify user owns the notebook
@@ -68,13 +133,15 @@ router.post('/generate', async (req: Request, res: Response) => {
     const mindMapId = crypto.randomUUID();
 
     // Create mindmap entry with generating status
+    // Initial title is a simple placeholder - AI will generate a descriptive title later
+    const title = 'Mind Map';
     const { data: mindmap, error: mindmapError } = await supabase
       .from('mindmaps')
       .insert({
         id: mindMapId,
         user_id: userId,
         notebook_id: notebookId,
-        title: 'Mind Map',
+        title,
         data: {},
         status: 'generating',
         metadata: {
@@ -112,14 +179,19 @@ router.post('/generate', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/mindmaps/:notebookId - Get all mindmaps for a notebook
-router.get('/:notebookId', async (req: Request, res: Response) => {
+// GET /api/mindmaps/notebook/:notebookId - Get all mindmaps for a notebook
+// MUST come before /:mindMapId route to avoid route conflicts
+router.get('/notebook/:notebookId', async (req: Request, res: Response) => {
   try {
     const { notebookId } = req.params;
     const userId = req.query.userId as string;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
+      return res.status(400).json({ error: 'Invalid notebookId format' });
     }
 
     const { data: mindmaps, error } = await supabase
@@ -143,14 +215,19 @@ router.get('/:notebookId', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/mindmap/:mindMapId - Get single mindmap by ID
-router.get('/single/:mindMapId', async (req: Request, res: Response) => {
+// GET /api/mindmaps/:mindMapId - Get single mindmap by ID
+// MUST come after /notebook/:notebookId to avoid route conflicts
+router.get('/:mindMapId', async (req: Request, res: Response) => {
   try {
     const { mindMapId } = req.params;
     const userId = req.query.userId as string;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof mindMapId !== 'string' || !isValidUUID(mindMapId)) {
+      return res.status(400).json({ error: 'Invalid mindMapId format' });
     }
 
     const { data: mindmap, error } = await supabase
@@ -173,21 +250,31 @@ router.get('/single/:mindMapId', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/mindmaps/:mindMapId - Update a mindmap (e.g., rename)
+// PATCH /api/mindmaps/:mindMapId - Rename a mindmap
 router.patch('/:mindMapId', async (req: Request, res: Response) => {
   try {
     const { mindMapId } = req.params;
-    const userId = req.query.userId as string;
     const { title } = req.body;
+    const userId = req.query.userId as string;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof mindMapId !== 'string' || !isValidUUID(mindMapId)) {
+      return res.status(400).json({ error: 'Invalid mindMapId format' });
+    }
+
+    if (!validateTitle(title)) {
+      return res.status(400).json({
+        error: `title must be between ${CONFIG.MINDMAP.MIN_TITLE_LENGTH} and ${CONFIG.MINDMAP.MAX_TITLE_LENGTH} characters`
+      });
     }
 
     // Verify user owns the mindmap
     const { data: mindmap, error: fetchError } = await supabase
       .from('mindmaps')
-      .select('*')
+      .select('user_id')
       .eq('id', mindMapId)
       .single();
 
@@ -199,29 +286,22 @@ router.patch('/:mindMapId', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Update the mindmap title
-    const updateData: any = {};
-    if (title !== undefined) {
-      updateData.title = title;
-    }
-
-    const { data: updatedMindmap, error: updateError } = await supabase
+    const trimmedTitle = title.trim();
+    const { error: updateError } = await supabase
       .from('mindmaps')
-      .update(updateData)
-      .eq('id', mindMapId)
-      .select()
-      .single();
+      .update({ title: trimmedTitle, updated_at: new Date().toISOString() })
+      .eq('id', mindMapId);
 
     if (updateError) {
-      console.error('[MindMaps] Error updating mind map:', updateError);
-      return res.status(500).json({ error: 'Failed to update mind map' });
+      console.error('[MindMaps] Error renaming mind map:', updateError);
+      return res.status(500).json({ error: 'Failed to rename mind map' });
     }
 
-    return res.json(updatedMindmap);
+    return res.json({ success: true, title: trimmedTitle });
   } catch (error) {
-    console.error('[MindMaps] Error updating mind map:', error);
+    console.error('[MindMaps] Error renaming mind map:', error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to update mind map',
+      error: error instanceof Error ? error.message : 'Failed to rename mind map',
     });
   }
 });
@@ -232,8 +312,12 @@ router.delete('/:mindMapId', async (req: Request, res: Response) => {
     const { mindMapId } = req.params;
     const userId = req.query.userId as string;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof mindMapId !== 'string' || !isValidUUID(mindMapId)) {
+      return res.status(400).json({ error: 'Invalid mindMapId format' });
     }
 
     // Verify user owns the mindmap

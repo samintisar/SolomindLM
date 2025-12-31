@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Note, Source } from '@/shared/types/index';
 import { reportsApi } from '../services/reportsApi';
 import { mindMapApi } from '../services/mindMapApi';
+import { flashcardsApi } from '../services/flashcardsApi';
 import { getReportSubtitle } from '@/shared/types/reportTypes';
 import { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
 import { QuizConfig } from '../components/CustomizeQuizModal';
@@ -33,7 +34,7 @@ export interface UseStudioHandlersReturn {
   // Handlers
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
-  handleCreateFlashcards: (config: FlashcardConfig) => void;
+  handleCreateFlashcards: (config: FlashcardConfig) => Promise<void>;
   handleCreateQuiz: (config: QuizConfig) => void;
   handleCreateMindMap: () => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
@@ -56,21 +57,101 @@ export function useStudioHandlers({
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
 
-  const handleCreateFlashcards = useCallback((config: FlashcardConfig) => {
+  const handleCreateFlashcards = useCallback(async (config: FlashcardConfig) => {
     setIsFlashcardModalOpen(false);
+
+    // Get selected document IDs from sources
+    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    if (selectedDocumentIds.length === 0) {
+      alert('Please select at least one source to generate flashcards');
+      return;
+    }
+
+    if (!userId || !noteId) {
+      alert('Authentication error. Please log in again.');
+      return;
+    }
+
+    // Card count mapping - use midpoints of ranges
+    // fewer: ~15-25, standard: ~30-40, more: ~50-60
+    const countMap = { fewer: 20, standard: 35, more: 55 };
+    const cardCount = countMap[config.count];
+
+    // Create placeholder note
+    const placeholderId = Math.random().toString(36).substr(2, 9);
     const newNote: Note = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: config.topic ? `Flashcards: ${config.topic}` : 'Study Flashcards',
-      preview: `${config.count === 'standard' ? '10' : config.count === 'fewer' ? '5' : '20'} Cards • ${config.difficulty}`,
+      id: placeholderId,
+      title: 'Flashcards', // Initial placeholder - AI will generate descriptive title
+      preview: `${cardCount} Cards • ${config.difficulty} • Generating...`,
       type: 'flashcard',
-      flashcards: [] // Initial empty state triggers generating view
+      flashcards: [],
+      status: 'generating',
+      metadata: {
+        cardCount: config.count,
+        difficulty: config.difficulty,
+        topic: config.topic,
+      }
     };
+
     onAddNote(newNote);
-    onSetActiveNoteId(newNote.id);
-    setTimeout(() => {
-        onUpdateNote(newNote.id, newNote.title); // Trigger content fill
-    }, 2500);
-  }, [onAddNote, onSetActiveNoteId, onUpdateNote]);
+    onSetActiveNoteId(placeholderId);
+
+    try {
+      // Call API to create and queue flashcard generation
+      const { flashcardId, flashcard } = await flashcardsApi.createFlashcards({
+        userId,
+        notebookId: noteId,
+        documentIds: selectedDocumentIds,
+        cardCount,
+        difficulty: config.difficulty,
+        topic: config.topic || undefined,
+      });
+
+      // Update note ID with real flashcard ID
+      if (onUpdateNoteFull) {
+        onUpdateNoteFull(placeholderId, { ...flashcard, type: 'flashcard' as const });
+      }
+      onSetActiveNoteId(flashcardId);
+
+      // Start polling for status
+      flashcardsApi.pollFlashcardStatus(
+        flashcardId,
+        (updatedNote) => {
+          // Update note during polling
+          if (onUpdateNoteFull) {
+            onUpdateNoteFull(flashcardId, { ...updatedNote, type: 'flashcard' as const });
+          }
+        }
+      ).then(finalNote => {
+        // Final update when complete
+        if (onUpdateNoteFull) {
+          onUpdateNoteFull(flashcardId, { ...finalNote, type: 'flashcard' as const });
+        }
+      }).catch(error => {
+        console.error('Flashcard generation failed:', error);
+        // Update with failed status
+        if (onUpdateNoteFull) {
+          const failedNote = notes.find(n => n.id === flashcardId) || newNote;
+          onUpdateNoteFull(flashcardId, {
+            ...failedNote,
+            status: 'failed',
+            preview: `${cardCount} Cards • ${config.difficulty} • Failed`,
+            metadata: {
+              ...failedNote.metadata,
+              error: error instanceof Error ? error.message : 'Failed to generate flashcards',
+            }
+          });
+        }
+      });
+
+    } catch (error) {
+      console.error('Failed to create flashcards:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create flashcards');
+      // Remove the placeholder note
+      onDeleteNote(placeholderId);
+    }
+  }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
   const handleCreateQuiz = useCallback((config: QuizConfig) => {
     setIsQuizModalOpen(false);

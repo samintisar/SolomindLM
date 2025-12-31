@@ -1,25 +1,107 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
+import { makeWorkerUtils, runMigrations } from 'graphile-worker';
 import { pgPool } from '../config/worker.js';
 import { ReportGenerationService } from '../services/generation/ReportGenerationService.js';
 
 const router = Router();
 const reportService = new ReportGenerationService();
 
-// Helper function to add a job to Graphile Worker
-async function addReportJob(payload: any) {
-  const client = await pgPool.connect();
+// Worker utils lazy loader - ensures schema is initialized before use
+let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
+
+async function getWorkerUtils() {
+  if (!workerUtilsPromise) {
+    // Ensure migrations are run first
+    await runMigrations({ pgPool });
+    workerUtilsPromise = makeWorkerUtils({
+      pgPool,
+    });
+  }
+  return workerUtilsPromise;
+}
+
+// Configuration constants
+const CONFIG = {
+  REPORT: {
+    MIN_TITLE_LENGTH: 1,
+    MAX_TITLE_LENGTH: 200,
+    MAX_DOCUMENTS: 10,
+    VALID_REPORT_TYPES: [
+      'briefing',
+      'study_guide',
+      'blog_post',
+      'summary',
+      'technical_report',
+      'concept_explainer',
+      'methodology_overview',
+      'custom',
+    ] as const,
+  },
+} as const;
+
+// Type definitions for Supabase responses
+interface NoteRow {
+  id: string;
+  user_id: string;
+  notebook_id: string;
+  title: string;
+  content: string;
+  note_type: 'manual' | 'report';
+  status: 'draft' | 'generating' | 'completed' | 'failed';
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+// Validation helpers
+type ReportType = typeof CONFIG.REPORT.VALID_REPORT_TYPES[number];
+
+function isValidUUID(value: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value);
+}
+
+function isValidReportType(value: string): value is ReportType {
+  return CONFIG.REPORT.VALID_REPORT_TYPES.includes(value as ReportType);
+}
+
+function validateDocumentIds(ids: unknown): ids is string[] {
+  return Array.isArray(ids) &&
+    ids.length > 0 &&
+    ids.length <= CONFIG.REPORT.MAX_DOCUMENTS &&
+    ids.every(id => typeof id === 'string' && isValidUUID(id));
+}
+
+function validateTitle(title: unknown): boolean {
+  return typeof title === 'string' &&
+    title.trim().length >= CONFIG.REPORT.MIN_TITLE_LENGTH &&
+    title.trim().length <= CONFIG.REPORT.MAX_TITLE_LENGTH;
+}
+
+// Helper function to add a job to Graphile Worker using the SDK
+async function addReportJob(payload: unknown) {
   try {
-    const result = await client.query(
-      `SELECT graphile_worker.add_job($1::text, $2::text::json)`,
-      ['reportGeneration', JSON.stringify(payload)]
+    const workerUtils = await getWorkerUtils();
+    await workerUtils.addJob(
+      'reportGeneration',
+      payload,
+      { queueName: 'default' }
     );
-    console.log(`[Reports] Successfully added reportGeneration job with ID: ${payload.reportId}`);
-  } catch (error) {
+    console.log(`[Reports] Successfully added reportGeneration job`);
+  } catch (error: any) {
     console.error(`[Reports] Failed to add reportGeneration job:`, error);
+
+    // Check if it's a missing function/schema error
+    if (error.code === '42883' || error.code === '3F000' ||
+        error.message?.includes('graphile_worker') ||
+        error.message?.includes('schema')) {
+      throw new Error(
+        'Graphile Worker is not properly configured. Please start the worker process first to initialize the database schema.'
+      );
+    }
+
     throw error;
-  } finally {
-    client.release();
   }
 }
 
@@ -28,19 +110,40 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const { userId, noteId, documentIds, reportType, customPrompt } = req.body;
 
-    console.log(`[Reports] Creating report:`, { userId, noteId, reportType, documentIds });
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      service: 'Reports',
+      action: 'create_report',
+      userId,
+      noteId,
+      reportType,
+    }));
 
-    // Validation
-    if (!userId || !noteId) {
-      return res.status(400).json({ error: 'userId and noteId are required' });
+    // Validation: userId and notebookId
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+    if (typeof noteId !== 'string' || !isValidUUID(noteId)) {
+      return res.status(400).json({ error: 'Invalid noteId format' });
     }
 
-    if (!reportType) {
-      return res.status(400).json({ error: 'reportType is required' });
+    // Validation: reportType
+    if (typeof reportType !== 'string' || !isValidReportType(reportType)) {
+      return res.status(400).json({
+        error: `reportType must be one of: ${CONFIG.REPORT.VALID_REPORT_TYPES.join(', ')}`
+      });
     }
 
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
-      return res.status(400).json({ error: 'At least one documentId is required' });
+    // Validation: documentIds
+    if (!validateDocumentIds(documentIds)) {
+      return res.status(400).json({
+        error: `documentIds must be an array of 1-${CONFIG.REPORT.MAX_DOCUMENTS} valid UUIDs`
+      });
+    }
+
+    // Validation: customPrompt (optional)
+    if (customPrompt !== undefined && typeof customPrompt !== 'string') {
+      return res.status(400).json({ error: 'customPrompt must be a string' });
     }
 
     // Verify user owns the notebook
@@ -62,7 +165,8 @@ router.post('/', async (req: Request, res: Response) => {
     const reportId = crypto.randomUUID();
 
     // Create note entry with generating status
-    const title = reportService.getReportTitle(reportType);
+    // Initial title is a simple placeholder - AI will generate a descriptive title later
+    const title = 'Report';
     const { data: note, error: noteError } = await supabase
       .from('notes')
       .insert({
@@ -111,20 +215,62 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/reports/:id - Get report status and content
-router.get('/:id', async (req: Request, res: Response) => {
+// GET /api/reports/notebook/:notebookId - Get all reports for a notebook
+// MUST come before /:reportId route to avoid route conflicts
+router.get('/notebook/:notebookId', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { notebookId } = req.params;
     const userId = req.query.userId as string;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
+      return res.status(400).json({ error: 'Invalid notebookId format' });
+    }
+
+    const { data: notes, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('notebook_id', notebookId)
+      .eq('user_id', userId)
+      .eq('note_type', 'report')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[Reports] Error fetching reports:', error);
+      return res.status(500).json({ error: 'Failed to fetch reports' });
+    }
+
+    return res.json(notes || []);
+  } catch (error) {
+    console.error('[Reports] Error fetching reports:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to fetch reports',
+    });
+  }
+});
+
+// GET /api/reports/:reportId - Get report status and content
+// MUST come after /notebook/:notebookId to avoid route conflicts
+router.get('/:reportId', async (req: Request, res: Response) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.query.userId as string;
+
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof reportId !== 'string' || !isValidUUID(reportId)) {
+      return res.status(400).json({ error: 'Invalid reportId format' });
     }
 
     const { data: note, error } = await supabase
       .from('notes')
       .select('*')
-      .eq('id', id)
+      .eq('id', reportId)
       .eq('user_id', userId)
       .single();
 
@@ -149,53 +295,81 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/reports/notebook/:noteId - Get all reports for a notebook
-router.get('/notebook/:noteId', async (req: Request, res: Response) => {
+// PATCH /api/reports/:reportId - Rename a report
+router.patch('/:reportId', async (req: Request, res: Response) => {
   try {
-    const { noteId } = req.params;
+    const { reportId } = req.params;
+    const { title } = req.body;
     const userId = req.query.userId as string;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
     }
 
-    const { data: notes, error } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('notebook_id', noteId)
-      .eq('user_id', userId)
-      .eq('note_type', 'report')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[Reports] Error fetching reports:', error);
-      return res.status(500).json({ error: 'Failed to fetch reports' });
+    if (typeof reportId !== 'string' || !isValidUUID(reportId)) {
+      return res.status(400).json({ error: 'Invalid reportId format' });
     }
 
-    return res.json(notes || []);
-  } catch (error) {
-    console.error('[Reports] Error fetching reports:', error);
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to fetch reports',
-    });
-  }
-});
-
-// DELETE /api/reports/:id - Delete a report
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = req.query.userId as string;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (!validateTitle(title)) {
+      return res.status(400).json({
+        error: `title must be between ${CONFIG.REPORT.MIN_TITLE_LENGTH} and ${CONFIG.REPORT.MAX_TITLE_LENGTH} characters`
+      });
     }
 
     // Verify user owns the note
     const { data: note, error: fetchError } = await supabase
       .from('notes')
       .select('user_id')
-      .eq('id', id)
+      .eq('id', reportId)
+      .single();
+
+    if (fetchError || !note) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    if (note.user_id !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const trimmedTitle = title.trim();
+    const { error: updateError } = await supabase
+      .from('notes')
+      .update({ title: trimmedTitle, updated_at: new Date().toISOString() })
+      .eq('id', reportId);
+
+    if (updateError) {
+      console.error('[Reports] Error renaming report:', updateError);
+      return res.status(500).json({ error: 'Failed to rename report' });
+    }
+
+    return res.json({ success: true, title: trimmedTitle });
+  } catch (error) {
+    console.error('[Reports] Error renaming report:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to rename report',
+    });
+  }
+});
+
+// DELETE /api/reports/:reportId - Delete a report
+router.delete('/:reportId', async (req: Request, res: Response) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.query.userId as string;
+
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof reportId !== 'string' || !isValidUUID(reportId)) {
+      return res.status(400).json({ error: 'Invalid reportId format' });
+    }
+
+    // Verify user owns the note
+    const { data: note, error: fetchError } = await supabase
+      .from('notes')
+      .select('user_id')
+      .eq('id', reportId)
       .single();
 
     if (fetchError || !note) {
@@ -209,7 +383,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     const { error: deleteError } = await supabase
       .from('notes')
       .delete()
-      .eq('id', id);
+      .eq('id', reportId);
 
     if (deleteError) {
       console.error('[Reports] Error deleting report:', deleteError);
