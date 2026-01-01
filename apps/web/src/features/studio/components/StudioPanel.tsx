@@ -207,9 +207,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                         <div
                           key={tool.id}
                           onClick={() => handleToolClick(tool.id)}
-                          className="group flex flex-col justify-between p-3 h-24 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer relative overflow-hidden"
+                          className="group flex flex-col justify-between p-3 h-24 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer"
                         >
-                           <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-primary/10 group-hover:border-primary/30 transition-colors" />
                            <div className="flex justify-between items-start w-full">
                              <Icon className={`w-5 h-5 ${tool.color} opacity-90 group-hover:scale-110 transition-transform`} />
                            </div>

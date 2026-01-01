@@ -1,6 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Share2 } from 'lucide-react';
+import { useAuth } from '../../features/auth/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { DropdownMenu } from './DropdownMenu';
+import { AvatarDropdown } from '../../features/auth/components/AvatarDropdown';
+import { LoginModal } from '../../features/auth/components/LoginModal';
 
 interface HeaderProps {
   title: string;
@@ -10,6 +15,10 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoClick }) => {
+  const { user, isAuthenticated, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,10 +125,29 @@ export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoC
           </button>
         )}
         
-        <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-ring transition-all shrink-0">
-          <User className="w-4 h-4 text-secondary-foreground shrink-0" />
-        </div>
+        <DropdownMenu
+          trigger={
+            <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center hover:ring-2 hover:ring-ring transition-all shrink-0">
+              <User className="w-4 h-4 text-secondary-foreground shrink-0" />
+            </div>
+          }
+          align="right"
+        >
+          <AvatarDropdown
+            user={user}
+            isAuthenticated={isAuthenticated}
+            onLogin={() => setShowLoginModal(true)}
+            onLogout={signOut}
+            theme={theme}
+            toggleTheme={toggleTheme}
+          />
+        </DropdownMenu>
       </div>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
     </header>
   );
 };

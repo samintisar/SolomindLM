@@ -6,6 +6,7 @@ import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
+import { ThemeProvider } from './shared/contexts/ThemeContext';
 import { STUDIO_TOOLS, SAVED_NOTES } from './shared/constants';
 import { Source, Note, NotebookItem, Document, Message } from '@/shared/types/index';
 import { documentsApi } from './features/sources/services/documentsApi';
@@ -725,9 +726,11 @@ const AppContent: React.FC = () => {
 // Wrapper component with AuthProvider
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

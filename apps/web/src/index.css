@@ -61,42 +61,74 @@
   }
 
   .dark {
-    --background: oklch(0.2747 0.0139 57.6523);
-    --foreground: oklch(0.9239 0.0190 83.0636);
-    --card: oklch(0.3237 0.0155 59.0603);
-    --card-foreground: oklch(0.9239 0.0190 83.0636);
-    --popover: oklch(0.3237 0.0155 59.0603);
-    --popover-foreground: oklch(0.9239 0.0190 83.0636);
-    --primary: oklch(0.7264 0.0581 66.6967);
-    --primary-foreground: oklch(0.2747 0.0139 57.6523);
-    --secondary: oklch(0.3795 0.0181 57.1280);
-    --secondary-foreground: oklch(0.9239 0.0190 83.0636);
-    --muted: oklch(0.2939 0.0125 62.1298);
-    --muted-foreground: oklch(0.7982 0.0243 82.1078);
-    --accent: oklch(0.4186 0.0281 56.3404);
-    --accent-foreground: oklch(0.9239 0.0190 83.0636);
-    --destructive: oklch(0.5471 0.1438 32.9149);
-    --destructive-foreground: oklch(1.0000 0 0);
-    --border: oklch(0.3795 0.0181 57.1280);
-    --input: oklch(0.3795 0.0181 57.1280);
-    --ring: oklch(0.7264 0.0581 66.6967);
-    --success: oklch(0.6471 0.1438 142.9149);
-    --success-foreground: oklch(0.9239 0.0190 83.0636);
-    --warning: oklch(0.75 0.15 85);
-    --warning-foreground: oklch(0.9239 0.0190 83.0636);
-    --chart-1: oklch(0.7264 0.0581 66.6967);
-    --chart-2: oklch(0.6777 0.0624 64.7755);
-    --chart-3: oklch(0.6180 0.0778 65.5444);
-    --chart-4: oklch(0.5604 0.0624 68.5805);
-    --chart-5: oklch(0.4851 0.0570 72.6827);
-    --sidebar: oklch(0.2747 0.0139 57.6523);
-    --sidebar-foreground: oklch(0.9239 0.0190 83.0636);
-    --sidebar-primary: oklch(0.7264 0.0581 66.6967);
-    --sidebar-primary-foreground: oklch(0.2747 0.0139 57.6523);
-    --sidebar-accent: oklch(0.4186 0.0281 56.3404);
-    --sidebar-accent-foreground: oklch(0.9239 0.0190 83.0636);
-    --sidebar-border: oklch(0.3795 0.0181 57.1280);
-    --sidebar-ring: oklch(0.7264 0.0581 66.6967);
+    /* BACKGROUNDS:
+       The Chroma (2nd number) is dropped to 0.006.
+       This creates a 'Warm Grey' rather than a distinct Brown.
+    */
+    --background: oklch(0.19 0.006 65.00); 
+    --foreground: oklch(0.85 0.01 80.00); /* Off-white stone color */
+
+    /* CARDS:
+       Very subtle separation from background.
+       Think 'dark slate' texture.
+    */
+    --card: oklch(0.22 0.008 65.00);
+    --card-foreground: oklch(0.85 0.01 80.00);
+    
+    --popover: oklch(0.22 0.008 65.00);
+    --popover-foreground: oklch(0.85 0.01 80.00);
+
+    /* PRIMARY ACCENT:
+       Muted even further to 'Old Brass'. 
+       It stands out by Lightness, not Saturation.
+    */
+    --primary: oklch(0.60 0.06 70.00);
+    --primary-foreground: oklch(0.20 0.01 65.00);
+
+    /* SECONDARY:
+       Almost pure grey, just a hint of warmth.
+    */
+    --secondary: oklch(0.28 0.008 65.00);
+    --secondary-foreground: oklch(0.80 0.01 80.00);
+
+    --muted: oklch(0.25 0.005 65.00);
+    --muted-foreground: oklch(0.55 0.01 80.00);
+
+    --accent: oklch(0.28 0.01 65.00);
+    --accent-foreground: oklch(0.85 0.01 80.00);
+
+    --destructive: oklch(0.40 0.08 25.00);
+    --destructive-foreground: oklch(0.85 0.01 80.00);
+
+    /* BORDERS:
+       Very low contrast borders. They are there for structure, 
+       but they blend into the grey.
+    */
+    --border: oklch(0.26 0.008 65.00);
+    --input: oklch(0.26 0.008 65.00);
+    
+    --ring: oklch(0.50 0.05 70.00);
+
+    /* CHARTS: 
+       Desaturated, matte colors.
+    */
+    --chart-1: oklch(0.55 0.06 70.00); /* Matte Gold */
+    --chart-2: oklch(0.50 0.05 45.00); /* Matte Sienna */
+    --chart-3: oklch(0.50 0.04 140.00); /* Matte Sage */
+    --chart-4: oklch(0.45 0.05 30.00); /* Matte Rose */
+    --chart-5: oklch(0.50 0.04 60.00); /* Matte Bronze */
+
+    /* SIDEBAR:
+       The darkest shade of grey for visual anchoring.
+    */
+    --sidebar: oklch(0.17 0.006 65.00);
+    --sidebar-foreground: oklch(0.80 0.01 80.00);
+    --sidebar-primary: oklch(0.60 0.06 70.00);
+    --sidebar-primary-foreground: oklch(0.20 0.01 65.00);
+    --sidebar-accent: oklch(0.24 0.008 65.00);
+    --sidebar-accent-foreground: oklch(0.85 0.01 80.00);
+    --sidebar-border: oklch(0.24 0.008 65.00);
+    --sidebar-ring: oklch(0.60 0.06 70.00);
     --font-sans: 'Libre Baskerville', serif;
     --font-serif: 'Lora', serif;
     --font-mono: 'IBM Plex Mono', monospace;
@@ -106,15 +138,15 @@
     --shadow-blur: 5px;
     --shadow-spread: 0px;
     --shadow-opacity: 0.12;
-    --shadow-color: hsl(28 13% 20%);
-    --shadow-2xs: 2px 3px 5px 0px hsl(28 13% 20% / 0.06);
-    --shadow-xs: 2px 3px 5px 0px hsl(28 13% 20% / 0.06);
-    --shadow-sm: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 1px 2px -1px hsl(28 13% 20% / 0.12);
-    --shadow: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 1px 2px -1px hsl(28 13% 20% / 0.12);
-    --shadow-md: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 2px 4px -1px hsl(28 13% 20% / 0.12);
-    --shadow-lg: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 4px 6px -1px hsl(28 13% 20% / 0.12);
-    --shadow-xl: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 8px 10px -1px hsl(28 13% 20% / 0.12);
-    --shadow-2xl: 2px 3px 5px 0px hsl(28 13% 20% / 0.30);
+    --shadow-color: hsl(35 30% 10%);
+    --shadow-2xs: 2px 3px 5px 0px hsl(35 30% 10% / 0.06);
+    --shadow-xs: 2px 3px 5px 0px hsl(35 30% 10% / 0.06);
+    --shadow-sm: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 1px 2px -1px hsl(35 30% 10% / 0.12);
+    --shadow: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 1px 2px -1px hsl(35 30% 10% / 0.12);
+    --shadow-md: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 2px 4px -1px hsl(35 30% 10% / 0.12);
+    --shadow-lg: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 4px 6px -1px hsl(35 30% 10% / 0.12);
+    --shadow-xl: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 8px 10px -1px hsl(35 30% 10% / 0.12);
+    --shadow-2xl: 2px 3px 5px 0px hsl(35 30% 10% / 0.30);
   }
 
   body {

@@ -268,24 +268,29 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {/* Messages Area */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 sm:px-12 md:px-20 lg:px-32 space-y-8 scroll-smooth overflow-x-hidden relative"
+        className="flex-1 overflow-y-auto px-4 py-6 sm:px-12 md:px-20 lg:px-32 space-y-6 scroll-smooth overflow-x-hidden relative"
       >
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`} data-message-id={msg.id}>
-            <div
-              className={`
-                max-w-[85%] relative p-6 rounded-2xl text-base leading-relaxed
-                ${msg.role === 'user' 
-                  ? 'bg-transparent text-foreground border-b-2 border-primary/20 font-handwriting italic' 
-                  : 'bg-card border border-border shadow-sm text-card-foreground'}
-              `}
-            >
-              
-              {renderMessageWithReferences(msg.id, msg.content, msg.references)}
-            </div>
-            <span className="text-[10px] text-muted-foreground mt-2 font-mono uppercase tracking-widest px-1">
-              {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
+          <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-1`} data-message-id={msg.id}>
+            {msg.role === 'user' ? (
+              <>
+                <div className="max-w-[75%] relative p-4 rounded-xl text-base leading-relaxed bg-primary/10 text-foreground shadow-sm">
+                  {renderMessageWithReferences(msg.id, msg.content, msg.references)}
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="max-w-[90%] text-base leading-relaxed text-foreground">
+                  {renderMessageWithReferences(msg.id, msg.content, msg.references)}
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </>
+            )}
           </div>
         ))}
         {/* Spacer for bottom input */}
@@ -382,11 +387,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
            </div>
         </div>
       </div>
-
-      {/* Background Noise Texture */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0" 
-           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} 
-      />
     </div>
   );
 };
