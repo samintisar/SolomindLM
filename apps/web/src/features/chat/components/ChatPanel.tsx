@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Paperclip, ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2 } from 'lucide-react';
-import { Message } from '@/shared/types/index';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2, Loader2 } from 'lucide-react';
+import { Message, ReferenceChunk } from '@/shared/types/index';
+import { chatApi } from '../services/chatApi';
 
 interface ChatPanelProps {
   messages: Message[];
@@ -9,22 +10,33 @@ interface ChatPanelProps {
   toggleLeft: () => void;
   toggleRight: () => void;
   onClearHistory?: () => void;
+  onSendMessage?: (message: string) => void;
+  isLoading?: boolean;
+  notebookId?: string | null;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ 
-  messages, 
-  isLeftOpen, 
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+  messages,
+  isLeftOpen,
   isRightOpen,
   toggleLeft,
   toggleRight,
-  onClearHistory
+  onClearHistory,
+  onSendMessage,
+  isLoading = false,
+  notebookId,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('top');
   const [tooltipStyle, setTooltipStyle] = useState<{ top?: number; left?: number }>({});
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -35,9 +47,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
-  const handleRefHover = (refId: number, event: React.MouseEvent) => {
+  const handleRefHover = (refId: number, messageId: string, event: React.MouseEvent) => {
     handleRefEnter();
     setHoveredRefId(refId);
+    setHoveredMessageId(messageId);
     // Calculate if tooltip should appear above or below based on position
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const containerRect = messagesContainerRef.current?.getBoundingClientRect();
@@ -78,6 +91,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     hideTooltipTimeoutRef.current = setTimeout(() => {
       if (!isTooltipHovered) {
         setHoveredRefId(null);
+        setHoveredMessageId(null);
       }
     }, 200); // 200ms delay
   };
@@ -89,13 +103,84 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   };
 
-  const renderMessageWithReferences = (content: string, references?: any[]) => {
-    if (!references || references.length === 0) {
-      return <div className="whitespace-pre-wrap">{content}</div>;
+  // Handle sending a message
+  const handleSendMessage = useCallback(async () => {
+    const trimmed = inputMessage.trim();
+    if (!trimmed || isSending || !notebookId || !onSendMessage) return;
+
+    setIsSending(true);
+    setInputMessage('');
+
+    // Add user message immediately to UI
+    onSendMessage(trimmed);
+
+    try {
+      // The actual streaming is handled by the parent component via chatApi
+      // This component just triggers the send
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setIsSending(false);
+    }
+  }, [inputMessage, isSending, notebookId, onSendMessage]);
+
+  // Handle textarea keydown (Enter to send)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }, [handleSendMessage]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  }, [inputMessage]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
+
+  // Strip "References:" section from message content (LLM sometimes adds it)
+  const stripReferencesSection = (content: string): string => {
+    // Match "References:" or "Reference:" followed by a list of references
+    // This handles formats like:
+    // - References:\n1. Title\n2. Title
+    // - References: 1 Title, 2 Title
+    const referencesPattern = /\n?(?:References|Reference):\s*\n?[\d\s\.,\-:\–\—]*$/i;
+    const match = content.match(referencesPattern);
+    if (match) {
+      return content.substring(0, match.index).trim();
+    }
+    return content;
+  };
+
+  const renderMessageWithReferences = (messageId: string, content: string, references?: any[] | any) => {
+    // Strip any "References:" section that the LLM might have added
+    const cleanContent = stripReferencesSection(content);
+
+    // Handle references that might be an object (from Supabase JSONB) instead of array
+    const refsArray = Array.isArray(references) ? references : [];
+
+    // Debug logging
+    if (content.match(/\[\d+\]/)) {
+      console.log(`[ChatPanel] Message ${messageId}: has citations, refsArray.length=${refsArray.length}`, refsArray);
     }
 
-    const refMap = Object.fromEntries(references.map(ref => [ref.id, ref]));
-    const parts = content.split(/(\[\d+\])/g);
+    if (refsArray.length === 0) {
+      return <div className="whitespace-pre-wrap">{cleanContent}</div>;
+    }
+
+    const refMap = Object.fromEntries(refsArray.map(ref => [ref.id, ref]));
+    const parts = cleanContent.split(/(\[\d+\])/g);
 
     return (
       <div className="whitespace-pre-wrap relative">
@@ -106,7 +191,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             return (
               <span key={idx} className="relative inline-group">
                 <span
-                  onMouseEnter={(e) => handleRefHover(refId, e)}
+                  onMouseEnter={(e) => handleRefHover(refId, messageId, e)}
                   onMouseLeave={handleRefLeave}
                   className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold cursor-pointer hover:bg-primary/90 transition-colors mx-1"
                   title={`Reference ${refId}`}
@@ -189,7 +274,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         className="flex-1 overflow-y-auto px-4 py-6 sm:px-12 md:px-20 lg:px-32 space-y-8 scroll-smooth overflow-x-hidden relative"
       >
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+          <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`} data-message-id={msg.id}>
             <div 
               className={`
                 max-w-[85%] relative p-6 rounded-sm text-base leading-relaxed
@@ -199,7 +284,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               `}
             >
               
-              {renderMessageWithReferences(msg.content, msg.references)}
+              {renderMessageWithReferences(msg.id, msg.content, msg.references)}
             </div>
             <span className="text-[10px] text-muted-foreground mt-2 font-mono uppercase tracking-widest px-1">
               {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -210,11 +295,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div className="h-32" />
 
         {/* Floating Tooltip */}
-        {hoveredRefId !== null && messagesContainerRef.current && (() => {
-          const allReferences = messages
-            .filter(msg => msg.references)
-            .flatMap(msg => msg.references || []);
-          const ref = allReferences.find(r => r.id === hoveredRefId);
+        {hoveredRefId !== null && hoveredMessageId !== null && messagesContainerRef.current && (() => {
+          // Find the message being hovered
+          const hoveredMessage = messages.find(msg => msg.id === hoveredMessageId);
+
+          // Normalize references to array (handles Supabase JSONB objects)
+          const refsArray = Array.isArray(hoveredMessage?.references) ? hoveredMessage.references : [];
+
+          // Only look for references within that specific message
+          const ref = refsArray.find(r => Number(r.id) === hoveredRefId);
           const containerRect = messagesContainerRef.current?.getBoundingClientRect();
           
           if (!ref || !containerRect) return null;
@@ -272,26 +361,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       {/* Input Area */}
       <div className="absolute bottom-8 left-0 right-0 px-4 flex justify-center z-20">
         <div className="w-full max-w-3xl bg-card border-2 border-border shadow-lg rounded-sm p-2 flex flex-col gap-2 relative">
-           
-           <textarea 
+
+           <textarea
+             ref={textareaRef}
              placeholder="Ask a question about your sources..."
-             className="w-full bg-transparent border-none p-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[60px] font-serif text-lg"
+             className="w-full bg-transparent border-none p-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[60px] max-h-[200px] font-serif text-lg"
              rows={2}
+             value={inputMessage}
+             onChange={(e) => setInputMessage(e.target.value)}
+             onKeyDown={handleKeyDown}
+             disabled={isSending || isLoading}
            />
-           
-           <div className="flex justify-between items-center px-2 pb-1">
-             <div className="flex gap-2">
-                <button className="p-2 hover:bg-secondary rounded-sm text-muted-foreground transition-colors">
-                  <Paperclip className="w-5 h-5" />
-                </button>
-             </div>
-             
-             <div className="flex items-center gap-3 text-xs text-muted-foreground font-sans">
-                <span>2/50 Sources</span>
-                <button className="p-2 bg-primary text-primary-foreground rounded-sm hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5">
-                  <ArrowUp className="w-5 h-5" />
-                </button>
-             </div>
+
+           <div className="flex justify-end items-center px-2 pb-1">
+             <button
+               onClick={handleSendMessage}
+               disabled={!inputMessage.trim() || isSending || isLoading || !notebookId}
+               className="p-2 bg-primary text-primary-foreground rounded-sm hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+               title={inputMessage.trim() ? 'Send message (Enter)' : 'Type a message to send'}
+             >
+               {isSending || isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
+             </button>
            </div>
         </div>
       </div>

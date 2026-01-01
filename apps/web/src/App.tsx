@@ -6,14 +6,15 @@ import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
-import { MOCK_MESSAGES, STUDIO_TOOLS, SAVED_NOTES } from './shared/constants';
-import { Source, Note, NotebookItem, Document } from '@/shared/types/index';
+import { STUDIO_TOOLS, SAVED_NOTES } from './shared/constants';
+import { Source, Note, NotebookItem, Document, Message } from '@/shared/types/index';
 import { documentsApi } from './features/sources/services/documentsApi';
 import { notebooksApi } from './features/notebooks/services/notebooksApi';
 import { notesApi } from './features/notebooks/services/notesApi';
 import { mindMapApi } from './features/studio/services/mindMapApi';
 import { flashcardsApi } from './features/studio/services/flashcardsApi';
 import { quizzesApi } from './features/studio/services/quizzesApi';
+import { chatApi } from './features/chat/services/chatApi';
 import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
@@ -46,7 +47,8 @@ const AppContent: React.FC = () => {
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [notebookTitle, setNotebookTitle] = useState("CPSC 304");
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isChatStreaming, setIsChatStreaming] = useState(false);
 
   // Notebooks State
   const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
@@ -68,8 +70,139 @@ const AppContent: React.FC = () => {
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
-  const handleClearChatHistory = () => {
-    setMessages([]);
+
+  const handleClearChatHistory = async () => {
+    if (!activeNotebookId) return;
+
+    try {
+      await chatApi.clearHistory(activeNotebookId);
+      setMessages([]);
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
+      alert(error instanceof Error ? error.message : 'Failed to clear chat history');
+    }
+  };
+
+  // Load chat history when notebook changes
+  useEffect(() => {
+    if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
+      chatApi.getHistory(activeNotebookId)
+        .then(data => {
+          // Transform API messages to UI format
+          const uiMessages = data.messages.map(msg => {
+            const transformed = {
+              id: msg.id,
+              role: msg.role as 'user' | 'assistant',
+              content: msg.content,
+              timestamp: new Date(msg.created_at),
+              references: msg.references,
+            };
+            // Log assistant messages with citations
+            if (msg.role === 'assistant' && msg.content.match(/\[\d+\]/)) {
+              console.log(`[App] Loaded assistant message ${msg.id} with citations:`, {
+                hasReferences: !!msg.references,
+                referencesCount: Array.isArray(msg.references) ? msg.references.length : 0,
+                references: msg.references
+              });
+            }
+            return transformed;
+          });
+          setMessages(uiMessages);
+        })
+        .catch(err => {
+          console.error('Failed to load chat history:', err);
+          // Set empty messages on error (not critical, user can start fresh)
+          setMessages([]);
+        });
+    } else if (currentView === 'home') {
+      // Clear messages when going to home
+      setMessages([]);
+    }
+  }, [isAuthenticated, user, activeNotebookId, currentView]);
+
+  // Handle sending a chat message
+  const handleSendMessage = async (messageText: string) => {
+    if (!activeNotebookId || isChatStreaming) return;
+
+    // Add user message immediately
+    const userMessage = {
+      id: `temp-${Date.now()}`,
+      role: 'user' as const,
+      content: messageText,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    // Create a placeholder assistant message for streaming
+    const tempAssistantId = `temp-assistant-${Date.now()}`;
+    const assistantMessage = {
+      id: tempAssistantId,
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date(),
+      references: undefined,
+    };
+    setMessages(prev => [...prev, assistantMessage]);
+
+    setIsChatStreaming(true);
+
+    // Get selected document IDs
+    const selectedDocumentIds = sources
+      .filter(source => source.selected)
+      .map(source => source.id);
+
+    try {
+      await chatApi.sendMessage(
+        activeNotebookId,
+        messageText,
+        {
+          onToken: (token: string) => {
+            setMessages(prev => prev.map(msg =>
+              msg.id === tempAssistantId
+                ? { ...msg, content: msg.content + token }
+                : msg
+            ));
+          },
+          onReferences: (references: any[]) => {
+            console.log('[App] Received references:', references);
+            setMessages(prev => prev.map(msg =>
+              msg.id === tempAssistantId
+                ? { ...msg, references }
+                : msg
+            ));
+          },
+          onComplete: () => {
+            setIsChatStreaming(false);
+            // Reload chat history to get the persisted message with proper ID
+            chatApi.getHistory(activeNotebookId)
+              .then(data => {
+                const uiMessages = data.messages.map(msg => ({
+                  id: msg.id,
+                  role: msg.role as 'user' | 'assistant',
+                  content: msg.content,
+                  timestamp: new Date(msg.created_at),
+                  references: msg.references,
+                }));
+                setMessages(uiMessages);
+              })
+              .catch(err => console.error('Failed to reload chat history:', err));
+          },
+          onError: (error: string) => {
+            console.error('Chat error:', error);
+            setIsChatStreaming(false);
+            // Remove the temporary assistant message and add error indicator
+            setMessages(prev => prev.filter(msg => msg.id !== tempAssistantId));
+            alert(`Chat error: ${error}`);
+          },
+        },
+        selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined
+      );
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setIsChatStreaming(false);
+      setMessages(prev => prev.filter(msg => msg.id !== tempAssistantId));
+      alert(error instanceof Error ? error.message : 'Failed to send message');
+    }
   };
 
   const handleToggleSource = (id: string) => {
@@ -547,13 +680,16 @@ const AppContent: React.FC = () => {
             />
           )}
           
-          <ChatPanel 
-            messages={messages} 
+          <ChatPanel
+            messages={messages}
             isLeftOpen={isSourcesOpen}
             isRightOpen={isStudioOpen}
             toggleLeft={toggleSources}
             toggleRight={toggleStudio}
             onClearHistory={handleClearChatHistory}
+            onSendMessage={handleSendMessage}
+            isLoading={isChatStreaming}
+            notebookId={activeNotebookId}
           />
           
           {/* Right Drag Handle */}

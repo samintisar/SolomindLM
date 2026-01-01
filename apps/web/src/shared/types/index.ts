@@ -12,8 +12,11 @@ export interface Source {
 
 export interface ReferenceChunk {
   id: number;
+  sourceId: string;
   sourceTitle: string;
   content: string;
+  chunkIndex: number;
+  similarity?: number;
 }
 
 export interface Message {

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
     "build": "tsc",
+    "type-check": "tsc --noEmit",
     "start": "node dist/index.js",
     "worker": "tsx src/utils/worker.ts",
     "clear-jobs": "tsx src/utils/clearJobs.ts"

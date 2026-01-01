@@ -43,6 +43,15 @@ const envSchema = z.object({
   // Reduce phase: 40K chars ≈ 10K tokens (~4% of 261K context)
   QUIZ_REDUCE_CHUNK_SIZE: z.string().default('40000'),
   QUIZ_MAX_TOKENS: z.string().default('16000'),
+  // Chat/RAG Configuration
+  CHAT_LLM_TEMPERATURE: z.string().default('0.7'),
+  CHAT_MAX_HISTORY_MESSAGES: z.string().default('20'),
+  CHAT_VECTOR_MATCH_THRESHOLD: z.string().default('0.5'),
+  CHAT_VECTOR_MATCH_COUNT: z.string().default('10'),
+  CHAT_RERANK_THRESHOLD: z.string().default('3'),
+  CHAT_MAX_RESULTS: z.string().default('20'),
+  CHAT_QUERY_VARIANTS_MAX: z.string().default('5'),
+  CHAT_DOCUMENT_MAX_CHARS: z.string().default('3000'),
   SUPADATA_API_KEY: z.string(),
   TAVILY_API_KEY: z.string(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),

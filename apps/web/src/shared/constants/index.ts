@@ -59,12 +59,16 @@ export const MOCK_MESSAGES: Message[] = [
     references: [
       {
         id: 1,
+        sourceId: '2',
         sourceTitle: 'Database_Systems_Complete.txt',
+        chunkIndex: 0,
         content: 'CHAPTER 4: NORMALIZATION\n\nFirst Normal Form (1NF):\n- Eliminate Repeating Groups\n- Create a separate table for each set of related data\n- All attributes must contain only atomic (indivisible) values\n\nSecond Normal Form (2NF):\n- Eliminate Redundant Data\n- Remove all partial dependencies (non-key attributes should depend on the entire primary key, not just part of it)\n- If an attribute depends on only part of a multi-valued key, remove it to a separate table\n\nThird Normal Form (3NF):\n- Eliminate Transitive Dependencies\n- Non-key attributes must not depend on other non-key attributes\n- Every non-key attribute must be functionally dependent on the primary key alone\n\nBoyce-Codd Normal Form (BCNF):\n- Every determinant is a candidate key\n- Stricter than 3NF by eliminating all anomalies related to functional dependencies'
       },
       {
         id: 2,
+        sourceId: '2',
         sourceTitle: 'Database_Systems_Complete.txt',
+        chunkIndex: 1,
         content: 'FUNCTIONAL DEPENDENCIES AND NORMALIZATION\n\nFunctional Dependency (X → A):\n- Attribute A is functionally dependent on attribute X if each value of X is associated with exactly one value of A\n- Example: StudentID → StudentName (each student ID maps to exactly one name)\n\nThird Normal Form (3NF) Definition:\n- A relation is in 3NF if it is in 2NF and every non-prime attribute is non-transitively dependent on the primary key\n- In 3NF, a functional dependency X → A is allowed if either:\n  1. X is a superkey (contains the primary key)\n  2. A is a prime attribute (part of a candidate key)\n\nBoyce-Codd Normal Form (BCNF) Definition:\n- A relation is in BCNF if every non-trivial functional dependency X → A has X as a superkey\n- BCNF is stricter than 3NF because it eliminates the second condition (prime attributes)\n- This means every determinant must be a candidate key\n- BCNF removes the "prime attribute" loophole found in 3NF'
       }
     ],
