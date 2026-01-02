@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Download, FileText } from 'lucide-react';
+import { Play, Pause, Download } from 'lucide-react';
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -11,7 +11,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [showTranscript, setShowTranscript] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -83,23 +82,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+    <div className="h-full flex flex-col bg-card border border-border rounded-xl p-4 space-y-4">
       {/* Hidden audio element */}
       <audio ref={audioRef} src={audioUrl} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <h3 className="font-bold text-foreground">{title || 'Audio Overview'}</h3>
         <div className="flex gap-2">
-          {transcript && (
-            <button
-              onClick={() => setShowTranscript(!showTranscript)}
-              className="p-2 hover:bg-secondary rounded-lg transition-colors"
-              title={showTranscript ? 'Hide transcript' : 'Show transcript'}
-            >
-              <FileText className="w-4 h-4" />
-            </button>
-          )}
           <a
             href={audioUrl}
             download
@@ -112,7 +102,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
       </div>
 
       {/* Progress bar */}
-      <div className="space-y-2">
+      <div className="space-y-2 shrink-0">
         <input
           type="range"
           min="0"
@@ -129,7 +119,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-4">
+      <div className="flex items-center justify-center gap-4 shrink-0">
         <button
           onClick={togglePlay}
           className="p-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
@@ -146,11 +136,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
         </button>
       </div>
 
-      {/* Transcript */}
-      {showTranscript && transcript && (
-        <div className="border-t border-border pt-4">
-          <h4 className="font-semibold text-sm mb-2">Transcript</h4>
-          <div className="max-h-60 overflow-y-auto text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+      {/* Transcript - Always shown and takes up remaining space */}
+      {transcript && (
+        <div className="flex-1 overflow-hidden flex flex-col border-t border-border pt-4 min-h-0">
+          <h4 className="font-semibold text-sm mb-2 shrink-0">Transcript</h4>
+          <div className="flex-1 overflow-y-auto text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
             {transcript}
           </div>
         </div>

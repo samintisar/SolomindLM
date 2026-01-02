@@ -1,4 +1,4 @@
-import type { Note, Flashcard } from '@/shared/types/index';
+import type { Note, Flashcard, FlashcardNote } from '@/shared/types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -29,7 +29,7 @@ export interface CreateFlashcardsParams {
 export interface CreateFlashcardsResponse {
   flashcardId: string;
   status: string;
-  flashcard: Note;
+  flashcard: FlashcardNote;
 }
 
 /**
@@ -48,9 +48,9 @@ function getPreviewText(status: string, cardCount: number, metadata?: any): stri
 }
 
 /**
- * Map a database flashcard response to the frontend Note interface
+ * Map a database flashcard response to the frontend FlashcardNote interface
  */
-function mapFlashcardToNote(dbFlashcard: any): Note {
+function mapFlashcardToNote(dbFlashcard: any): FlashcardNote {
   // API returns 'flashcards' array (already parsed), or use 'cards_data' for raw DB responses
   const flashcards: Flashcard[] = dbFlashcard.flashcards || (dbFlashcard.cards_data ? JSON.parse(dbFlashcard.cards_data) : []);
   const actualCardCount = flashcards.length;
@@ -62,7 +62,11 @@ function mapFlashcardToNote(dbFlashcard: any): Note {
     type: 'flashcard',
     flashcards,
     status: dbFlashcard.status,
-    metadata: dbFlashcard.metadata,
+    metadata: {
+      difficulty: dbFlashcard.metadata?.difficulty || 'medium',
+      cardCount: actualCardCount,
+      topic: dbFlashcard.metadata?.topic,
+    },
   };
 }
 
@@ -93,7 +97,7 @@ export const flashcardsApi = {
   /**
    * Get a specific flashcard set by ID
    */
-  async getFlashcard(flashcardId: string): Promise<Note> {
+  async getFlashcard(flashcardId: string): Promise<FlashcardNote> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 
@@ -122,10 +126,10 @@ export const flashcardsApi = {
    */
   async pollFlashcardStatus(
     flashcardId: string,
-    onUpdate?: (note: Note) => void,
+    onUpdate?: (note: FlashcardNote) => void,
     maxAttempts = 180, // 6 minutes @ 2s intervals
     interval = 2000
-  ): Promise<Note> {
+  ): Promise<FlashcardNote> {
     for (let i = 0; i < maxAttempts; i++) {
       const note = await this.getFlashcard(flashcardId);
 
@@ -143,7 +147,7 @@ export const flashcardsApi = {
   /**
    * Get all flashcard sets for a notebook
    */
-  async getFlashcards(notebookId: string): Promise<Note[]> {
+  async getFlashcards(notebookId: string): Promise<FlashcardNote[]> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 

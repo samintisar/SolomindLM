@@ -52,6 +52,14 @@ const AppContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isChatStreaming, setIsChatStreaming] = useState(false);
 
+  // Mini Audio Player state
+  const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
+  const [miniPlayerData, setMiniPlayerData] = useState<{
+    audioUrl: string;
+    title: string;
+    transcript?: string;
+  } | null>(null);
+
   // Notebooks State
   const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
   const [notebooksLoading, setNotebooksLoading] = useState(false);
@@ -636,6 +644,33 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handlePlayAudio = (audioUrl: string, title: string, transcript?: string, noteId?: string) => {
+    setMiniPlayerData({ audioUrl, title, transcript });
+    setMiniPlayerVisible(true);
+    // Store the current playing audio note ID for expand functionality
+    if (noteId) {
+      (window as any).__currentPlayingAudioNoteId = noteId;
+    }
+  };
+
+  const handleCloseMiniPlayer = () => {
+    setMiniPlayerVisible(false);
+  };
+
+  const handleExpandAudioPlayer = () => {
+    // Close mini player and open the full player in studio panel
+    setMiniPlayerVisible(false);
+    const noteId = (window as any).__currentPlayingAudioNoteId;
+    if (noteId) {
+      const note = notes.find(n => n.id === noteId);
+      if (note) {
+        // Trigger the note click by setting it as active
+        const event = new CustomEvent('setActiveNote', { detail: { noteId } });
+        window.dispatchEvent(event);
+      }
+    }
+  };
+
   return (
     <>
       {/* Login Modal */}
@@ -728,6 +763,11 @@ const AppContent: React.FC = () => {
             sources={sources}
             userId={user?.id}
             noteId={activeNotebookId}
+            onPlayAudio={handlePlayAudio}
+            miniPlayerVisible={miniPlayerVisible}
+            miniPlayerData={miniPlayerData}
+            onCloseMiniPlayer={handleCloseMiniPlayer}
+            onExpandAudioPlayer={handleExpandAudioPlayer}
           />
         </main>
       )}

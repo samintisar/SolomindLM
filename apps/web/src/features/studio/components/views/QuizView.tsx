@@ -7,10 +7,10 @@ import {
   XCircle,
   Info,
 } from 'lucide-react';
-import { Note } from '@/shared/types/index';
+import { QuizNote } from '@/shared/types/index';
 
 export interface QuizViewProps {
-  note: Note;
+  note: QuizNote;
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
@@ -19,7 +19,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
     const [showResults, setShowResults] = useState(false);
     const [showHint, setShowHint] = useState(false);
 
-    const questions = note.questions || [];
+    const questions = note.questions;
     const currentQuestion = questions[currentIndex];
 
     // Derived state

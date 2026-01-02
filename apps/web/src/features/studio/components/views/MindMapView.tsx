@@ -7,10 +7,10 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { Note } from '@/shared/types/index';
+import { MindMapNote } from '@/shared/types/index';
 
 export interface MindMapViewProps {
-  note: Note;
+  note: MindMapNote;
   isExpanded?: boolean;
   onToggleExpanded?: () => void;
 }

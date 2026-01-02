@@ -1,4 +1,4 @@
-import type { Note } from '@/shared/types/index';
+import type { Note, ReportNote } from '@/shared/types/index';
 import { getReportSubtitle, normalizeReportTypeId } from '@/shared/types/reportTypes';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -29,13 +29,13 @@ export interface CreateReportParams {
 export interface CreateReportResponse {
   reportId: string;
   status: string;
-  note: Note;
+  note: ReportNote;
 }
 
 /**
- * Map a database note response to the frontend Note interface with proper preview
+ * Map a database note response to the frontend ReportNote interface with proper preview
  */
-function mapDatabaseNoteToNote(dbNote: any): Note {
+function mapDatabaseNoteToNote(dbNote: any): ReportNote {
   const reportType = normalizeReportTypeId(dbNote.metadata?.reportType || 'custom');
   let preview = '';
 
@@ -54,10 +54,16 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
     id: dbNote.id,
     title: dbNote.title,
     preview,
-    type: dbNote.note_type === 'report' ? 'report' : 'text',
-    content: dbNote.content,
+    type: 'report',
+    content: dbNote.content || '',
     status: dbNote.status,
-    metadata: dbNote.metadata,
+    metadata: {
+      reportType,
+      documentIds: dbNote.metadata?.documentIds || [],
+      phase: dbNote.metadata?.phase,
+      error: dbNote.metadata?.error,
+      chunksProcessed: dbNote.metadata?.chunksProcessed,
+    },
   };
 }
 
@@ -88,7 +94,7 @@ export const reportsApi = {
   /**
    * Get a specific report by ID
    */
-  async getReport(reportId: string): Promise<Note> {
+  async getReport(reportId: string): Promise<ReportNote> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 
@@ -117,10 +123,10 @@ export const reportsApi = {
    */
   async pollReportStatus(
     reportId: string,
-    onUpdate?: (note: Note) => void,
+    onUpdate?: (note: ReportNote) => void,
     maxAttempts = 180, // 6 minutes @ 2s intervals
     interval = 2000
-  ): Promise<Note> {
+  ): Promise<ReportNote> {
     for (let i = 0; i < maxAttempts; i++) {
       const note = await this.getReport(reportId);
 
@@ -138,7 +144,7 @@ export const reportsApi = {
   /**
    * Get all reports for a notebook
    */
-  async getReports(notebookId: string): Promise<Note[]> {
+  async getReports(notebookId: string): Promise<ReportNote[]> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 

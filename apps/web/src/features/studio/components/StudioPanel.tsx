@@ -16,7 +16,7 @@ import {
   ArrowLeft,
   X,
 } from 'lucide-react';
-import { StudioTool, Note } from '@/shared/types/index';
+import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote } from '@/shared/types/index';
 import { CreateReportModal } from './CreateReportModal';
 import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
 import { CustomizeQuizModal } from './CustomizeQuizModal';
@@ -26,6 +26,7 @@ import { FlashcardView } from './views/FlashcardView';
 import { QuizView } from './views/QuizView';
 import { MindMapView } from './views/MindMapView';
 import { AudioPlayer } from '@/features/audio/components/AudioPlayer';
+import { MiniAudioPlayer } from '@/features/audio/components/MiniAudioPlayer';
 import { useStudioHandlers } from '../hooks/useStudioHandlers';
 import './MindMapStyles.css';
 
@@ -43,6 +44,15 @@ interface StudioPanelProps {
   sources?: any[];
   userId?: string | null;
   noteId?: string | null;
+  onPlayAudio?: (audioUrl: string, title: string, transcript?: string, noteId?: string) => void;
+  miniPlayerVisible?: boolean;
+  miniPlayerData?: {
+    audioUrl: string;
+    title: string;
+    transcript?: string;
+  } | null;
+  onCloseMiniPlayer?: () => void;
+  onExpandAudioPlayer?: () => void;
 }
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -68,6 +78,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   sources = [],
   userId,
   noteId,
+  onPlayAudio,
+  miniPlayerVisible = false,
+  miniPlayerData = null,
+  onCloseMiniPlayer,
+  onExpandAudioPlayer,
 }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -114,6 +129,21 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeMenuId]);
+
+  useEffect(() => {
+    const handleSetActiveNote = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const noteId = customEvent.detail?.noteId;
+      if (noteId) {
+        const note = notes.find(n => n.id === noteId);
+        if (note) {
+          setActiveNoteId(noteId);
+        }
+      }
+    };
+    window.addEventListener('setActiveNote', handleSetActiveNote);
+    return () => window.removeEventListener('setActiveNote', handleSetActiveNote);
+  }, [notes]);
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -184,46 +214,46 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto w-full relative">
+      <div className={`flex-1 overflow-y-auto w-full relative ${miniPlayerVisible ? 'overflow-hidden' : ''}`}>
         {activeNote ? (
             <div className="h-full p-4">
-                {activeNote.type === 'report' && <ReportView note={activeNote} />}
-                {activeNote.type === 'flashcard' && <FlashcardView note={activeNote} />}
-                {activeNote.type === 'quiz' && <QuizView note={activeNote} />}
-                {activeNote.type === 'mindmap' && (
+                {isReportNote(activeNote) && <ReportView note={activeNote} />}
+                {isFlashcardNote(activeNote) && <FlashcardView note={activeNote} />}
+                {isQuizNote(activeNote) && <QuizView note={activeNote} />}
+                {isMindMapNote(activeNote) && (
                   <MindMapView
                     note={activeNote}
                     isExpanded={isMindMapExpanded}
                     onToggleExpanded={() => setIsMindMapExpanded(!isMindMapExpanded)}
                   />
                 )}
-                {activeNote.type === 'audio' && activeNote.status === 'completed' && activeNote.metadata?.audioUrl && (
+                {isAudioNote(activeNote) && activeNote.status === 'completed' && activeNote.metadata.audioUrl && (
                   <AudioPlayer
                     audioUrl={activeNote.metadata.audioUrl}
-                    transcript={activeNote.metadata.transcript}
+                    transcript={activeNote.content}
                     title={activeNote.title}
                   />
                 )}
-                {activeNote.type === 'audio' && activeNote.status === 'generating' && (
+                {isAudioNote(activeNote) && activeNote.status === 'generating' && (
                   <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                     <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                     <div>
                       <h3 className="text-lg font-semibold">Generating Audio Overview...</h3>
                       <p className="text-sm text-muted-foreground mt-1">This may take a few minutes</p>
-                      {activeNote.metadata?.phase && (
+                      {activeNote.metadata.phase && (
                         <p className="text-xs text-muted-foreground mt-2">Phase: {activeNote.metadata.phase}</p>
                       )}
                     </div>
                   </div>
                 )}
-                {activeNote.type === 'audio' && activeNote.status === 'failed' && (
+                {isAudioNote(activeNote) && activeNote.status === 'failed' && (
                   <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                     <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
                       <X className="w-6 h-6 text-destructive" />
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-destructive">Generation Failed</h3>
-                      <p className="text-sm text-muted-foreground mt-1">{activeNote.metadata?.error || 'An error occurred while generating the audio overview'}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{activeNote.metadata.error || 'An error occurred while generating the audio overview'}</p>
                     </div>
                   </div>
                 )}
@@ -265,7 +295,15 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                         <div className="flex justify-between items-start gap-3">
                           <div className="flex-1 flex gap-3 min-w-0">
                             {note.type === 'audio' && (
-                                <button className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isAudioNote(note) && note.status === 'completed' && note.metadata.audioUrl) {
+                                      onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
+                                    }
+                                  }}
+                                  className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play"
+                                >
                                     <Play className="w-3.5 h-3.5 fill-current ml-0.5 shrink-0" />
                                 </button>
                             )}
@@ -344,12 +382,24 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         )}
       </div>
 
-      {!activeNote && (
+      {!activeNote && !miniPlayerVisible && (
           <div className="p-4 border-t border-border bg-sidebar/30 mt-auto">
             <button className="w-full py-2 bg-sidebar-accent border border-sidebar-border text-sidebar-foreground text-xs font-bold uppercase tracking-wide rounded-sm hover:bg-sidebar-accent/80 transition-colors shadow-sm">
               + Add New Note
             </button>
           </div>
+      )}
+
+      {/* Mini Audio Player */}
+      {miniPlayerVisible && miniPlayerData && (
+        <MiniAudioPlayer
+          audioUrl={miniPlayerData.audioUrl}
+          title={miniPlayerData.title}
+          transcript={miniPlayerData.transcript}
+          isVisible={miniPlayerVisible}
+          onClose={onCloseMiniPlayer || (() => {})}
+          onExpand={onExpandAudioPlayer || (() => {})}
+        />
       )}
 
       {/* Modals */}

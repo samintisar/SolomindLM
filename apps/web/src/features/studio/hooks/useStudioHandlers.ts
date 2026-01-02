@@ -90,7 +90,7 @@ export function useStudioHandlers({
       flashcards: [],
       status: 'generating',
       metadata: {
-        cardCount: config.count,
+        cardCount,
         difficulty: config.difficulty,
         topic: config.topic,
       }
@@ -112,7 +112,7 @@ export function useStudioHandlers({
 
       // Update note ID with real flashcard ID
       if (onUpdateNoteFull) {
-        onUpdateNoteFull(placeholderId, { ...flashcard, type: 'flashcard' as const });
+        onUpdateNoteFull(placeholderId, flashcard);
       }
       onSetActiveNoteId(flashcardId);
 
@@ -122,28 +122,30 @@ export function useStudioHandlers({
         (updatedNote) => {
           // Update note during polling
           if (onUpdateNoteFull) {
-            onUpdateNoteFull(flashcardId, { ...updatedNote, type: 'flashcard' as const });
+            onUpdateNoteFull(flashcardId, updatedNote);
           }
         }
       ).then(finalNote => {
         // Final update when complete
         if (onUpdateNoteFull) {
-          onUpdateNoteFull(flashcardId, { ...finalNote, type: 'flashcard' as const });
+          onUpdateNoteFull(flashcardId, finalNote);
         }
       }).catch(error => {
         console.error('Flashcard generation failed:', error);
         // Update with failed status
         if (onUpdateNoteFull) {
           const failedNote = notes.find(n => n.id === flashcardId) || newNote;
-          onUpdateNoteFull(flashcardId, {
-            ...failedNote,
-            status: 'failed',
-            preview: `${cardCount} Cards • ${config.difficulty} • Failed`,
-            metadata: {
-              ...failedNote.metadata,
-              error: error instanceof Error ? error.message : 'Failed to generate flashcards',
-            }
-          });
+          if (failedNote.type === 'flashcard') {
+            onUpdateNoteFull(flashcardId, {
+              ...failedNote,
+              status: 'failed',
+              preview: `${cardCount} Cards • ${config.difficulty} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate flashcards',
+              }
+            });
+          }
         }
       });
 
@@ -185,9 +187,9 @@ export function useStudioHandlers({
       questions: [],
       status: 'generating',
       metadata: {
-        questionCount: config.count,
+        questionCount,
         difficulty: config.difficulty,
-        focus: config.focus,
+        focusArea: config.focus,
       }
     };
 
@@ -207,7 +209,7 @@ export function useStudioHandlers({
 
       // Update note ID with real quiz ID
       if (onUpdateNoteFull) {
-        onUpdateNoteFull(placeholderId, { ...quiz, type: 'quiz' as const });
+        onUpdateNoteFull(placeholderId, quiz);
       }
       onSetActiveNoteId(quizId);
 
@@ -217,28 +219,30 @@ export function useStudioHandlers({
         (updatedNote) => {
           // Update note during polling
           if (onUpdateNoteFull) {
-            onUpdateNoteFull(quizId, { ...updatedNote, type: 'quiz' as const });
+            onUpdateNoteFull(quizId, updatedNote);
           }
         }
       ).then(finalNote => {
         // Final update when complete
         if (onUpdateNoteFull) {
-          onUpdateNoteFull(quizId, { ...finalNote, type: 'quiz' as const });
+          onUpdateNoteFull(quizId, finalNote);
         }
       }).catch(error => {
         console.error('Quiz generation failed:', error);
         // Update with failed status
         if (onUpdateNoteFull) {
           const failedNote = notes.find(n => n.id === quizId) || newNote;
-          onUpdateNoteFull(quizId, {
-            ...failedNote,
-            status: 'failed',
-            preview: `${questionCount} Questions • ${config.difficulty} • Failed`,
-            metadata: {
-              ...failedNote.metadata,
-              error: error instanceof Error ? error.message : 'Failed to generate quiz',
-            }
-          });
+          if (failedNote.type === 'quiz') {
+            onUpdateNoteFull(quizId, {
+              ...failedNote,
+              status: 'failed',
+              preview: `${questionCount} Questions • ${config.difficulty} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate quiz',
+              }
+            });
+          }
         }
       });
 
@@ -288,6 +292,7 @@ export function useStudioHandlers({
       status: 'generating',
       metadata: {
         reportType: formatId,
+        documentIds: selectedDocumentIds,
       }
     };
 
@@ -306,7 +311,7 @@ export function useStudioHandlers({
 
       // Update note ID with real report ID
       if (onUpdateNoteFull) {
-        onUpdateNoteFull(placeholderId, { ...note, type: 'report' as const });
+        onUpdateNoteFull(placeholderId, note);
       }
       onSetActiveNoteId(reportId);
 
@@ -316,29 +321,31 @@ export function useStudioHandlers({
         (updatedNote) => {
           // Update note during polling
           if (onUpdateNoteFull) {
-            onUpdateNoteFull(reportId, { ...updatedNote, type: 'report' as const });
+            onUpdateNoteFull(reportId, updatedNote);
           }
         }
       ).then(finalNote => {
         // Final update when complete
         if (onUpdateNoteFull) {
-          onUpdateNoteFull(reportId, { ...finalNote, type: 'report' as const });
+          onUpdateNoteFull(reportId, finalNote);
         }
       }).catch(error => {
         console.error('Report generation failed:', error);
         // Update with failed status
         if (onUpdateNoteFull) {
           const failedNote = notes.find(n => n.id === reportId) || newNote;
-          const reportType = failedNote.metadata?.reportType || formatId;
-          onUpdateNoteFull(reportId, {
-            ...failedNote,
-            status: 'failed',
-            preview: `${getReportSubtitle(reportType)} • Failed`,
-            metadata: {
-              ...failedNote.metadata,
-              error: error instanceof Error ? error.message : 'Failed to generate report',
-            }
-          });
+          if (failedNote.type === 'report') {
+            const reportType = failedNote.metadata.reportType || formatId;
+            onUpdateNoteFull(reportId, {
+              ...failedNote,
+              status: 'failed',
+              preview: `${getReportSubtitle(reportType)} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate report',
+              }
+            });
+          }
         }
       });
 
@@ -372,7 +379,9 @@ export function useStudioHandlers({
       preview: 'Mind Map • Generating...',
       type: 'mindmap',
       content: '',
+      mindMapData: { nodeData: { id: 'root', topic: '', children: [] } },
       status: 'generating',
+      metadata: {},
     };
 
     onAddNote(newNote);
@@ -410,28 +419,30 @@ export function useStudioHandlers({
         (updatedNote) => {
           // Update note during polling
           if (onUpdateNoteFull) {
-            onUpdateNoteFull(mindMapId, { ...updatedNote, type: 'mindmap' as const });
+            onUpdateNoteFull(mindMapId, updatedNote);
           }
         }
       ).then(finalNote => {
         // Final update when complete
         if (onUpdateNoteFull) {
-          onUpdateNoteFull(mindMapId, { ...finalNote, type: 'mindmap' as const });
+          onUpdateNoteFull(mindMapId, finalNote);
         }
       }).catch(error => {
         console.error('Mind map generation failed:', error);
         // Update with failed status
         if (onUpdateNoteFull) {
           const failedNote = notes.find(n => n.id === mindMapId) || newNote;
-          onUpdateNoteFull(mindMapId, {
-            ...failedNote,
-            status: 'failed',
-            preview: 'Mind Map • Failed',
-            metadata: {
-              ...failedNote.metadata,
-              error: error instanceof Error ? error.message : 'Failed to generate mind map',
-            }
-          });
+          if (failedNote.type === 'mindmap') {
+            onUpdateNoteFull(mindMapId, {
+              ...failedNote,
+              status: 'failed',
+              preview: 'Mind Map • Failed',
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate mind map',
+              }
+            });
+          }
         }
       });
 
@@ -481,11 +492,12 @@ export function useStudioHandlers({
       title: 'Audio Overview', // Initial placeholder - AI will generate descriptive title
       preview: `Audio Overview • ${config.length} • Generating...`,
       type: 'audio',
+      content: '',
       status: 'generating',
       metadata: {
+        audioUrl: '',
         audioType: config.formatId,
-        length: config.length,
-        focus: config.focus,
+        audioOverviewId: placeholderId,
       }
     };
 
@@ -508,7 +520,11 @@ export function useStudioHandlers({
         onUpdateNoteFull(placeholderId, {
           ...newNote,
           id: audioOverviewId,
-          metadata: { ...newNote.metadata, audioOverviewId }
+          metadata: {
+            audioUrl: '',
+            audioType: newNote.metadata.audioType,
+            audioOverviewId,
+          }
         });
       }
       onSetActiveNoteId(audioOverviewId);
@@ -519,29 +535,31 @@ export function useStudioHandlers({
         (updatedNote) => {
           // Update note during polling
           if (onUpdateNoteFull) {
-            onUpdateNoteFull(audioOverviewId, { ...updatedNote, type: 'audio' as const });
+            onUpdateNoteFull(audioOverviewId, updatedNote);
           }
         }
       ).then(finalNote => {
         // Final update when complete
         if (onUpdateNoteFull) {
-          onUpdateNoteFull(audioOverviewId, { ...finalNote, type: 'audio' as const });
+          onUpdateNoteFull(audioOverviewId, finalNote);
         }
       }).catch(error => {
         console.error('Audio overview generation failed:', error);
         // Update with failed status
         if (onUpdateNoteFull) {
           const failedNote = notes.find(n => n.id === audioOverviewId) || newNote;
-          onUpdateNoteFull(audioOverviewId, {
-            ...failedNote,
-            id: audioOverviewId,
-            status: 'failed',
-            preview: `Audio Overview • ${config.formatId.replace('_', ' ')} • Failed`,
-            metadata: {
-              ...failedNote.metadata,
-              error: error instanceof Error ? error.message : 'Failed to generate audio overview',
-            }
-          });
+          if (failedNote.type === 'audio') {
+            onUpdateNoteFull(audioOverviewId, {
+              ...failedNote,
+              id: audioOverviewId,
+              status: 'failed',
+              preview: `Audio Overview • ${config.formatId.replace('_', ' ')} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate audio overview',
+              }
+            });
+          }
         }
       });
 

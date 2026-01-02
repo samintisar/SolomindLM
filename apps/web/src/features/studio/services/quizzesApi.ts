@@ -1,4 +1,4 @@
-import type { Note, QuizQuestion } from '@/shared/types/index';
+import type { Note, QuizQuestion, QuizNote } from '@/shared/types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -29,7 +29,7 @@ export interface CreateQuizParams {
 export interface CreateQuizResponse {
   quizId: string;
   status: string;
-  quiz: Note;
+  quiz: QuizNote;
 }
 
 /**
@@ -71,10 +71,11 @@ function getPreviewText(status: string, metadata?: any): string {
 }
 
 /**
- * Map a database quiz response to the frontend Note interface
+ * Map a database quiz response to the frontend QuizNote interface
  */
-function mapQuizToNote(dbQuiz: any): Note {
+function mapQuizToNote(dbQuiz: any): QuizNote {
   const questions: QuizQuestion[] = dbQuiz.questions || [];
+  const questionCount = questions.length;
 
   return {
     id: dbQuiz.id,
@@ -83,7 +84,11 @@ function mapQuizToNote(dbQuiz: any): Note {
     type: 'quiz',
     questions,
     status: dbQuiz.status,
-    metadata: dbQuiz.metadata,
+    metadata: {
+      questionCount,
+      difficulty: dbQuiz.metadata?.difficulty || 'medium',
+      focusArea: dbQuiz.metadata?.focus,
+    },
   };
 }
 
@@ -114,7 +119,7 @@ export const quizzesApi = {
   /**
    * Get a specific quiz by ID
    */
-  async getQuiz(quizId: string): Promise<Note> {
+  async getQuiz(quizId: string): Promise<QuizNote> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 
@@ -143,10 +148,10 @@ export const quizzesApi = {
    */
   async pollQuizStatus(
     quizId: string,
-    onUpdate?: (note: Note) => void,
+    onUpdate?: (note: QuizNote) => void,
     maxAttempts = 180, // 6 minutes @ 2s intervals
     interval = 2000
-  ): Promise<Note> {
+  ): Promise<QuizNote> {
     for (let i = 0; i < maxAttempts; i++) {
       const note = await this.getQuiz(quizId);
 
@@ -164,7 +169,7 @@ export const quizzesApi = {
   /**
    * Get all quizzes for a notebook
    */
-  async getQuizzes(notebookId: string): Promise<Note[]> {
+  async getQuizzes(notebookId: string): Promise<QuizNote[]> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 

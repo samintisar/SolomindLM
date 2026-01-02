@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { XCircle, Loader2 } from 'lucide-react';
-import { Note } from '@/shared/types/index';
+import { ReportNote } from '@/shared/types/index';
 
 export interface ReportViewProps {
-  note: Note;
+  note: ReportNote;
 }
 
 export const ReportView: React.FC<ReportViewProps> = ({ note }) => {

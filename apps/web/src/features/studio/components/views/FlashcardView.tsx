@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Sparkles, RotateCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Note } from '@/shared/types/index';
+import { FlashcardNote } from '@/shared/types/index';
 
 export interface FlashcardViewProps {
-  note: Note;
+  note: FlashcardNote;
 }
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
-    const cards = note.flashcards || [];
+    const cards = note.flashcards;
 
     const handleNext = () => {
         setIsFlipped(false);

@@ -1,4 +1,4 @@
-import type { Note } from '@/shared/types/index';
+import type { Note, AudioNote } from '@/shared/types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -46,9 +46,9 @@ export interface AudioOverview {
 }
 
 /**
- * Map a database audio overview response to the frontend Note interface
+ * Map a database audio overview response to the frontend AudioNote interface
  */
-function mapAudioOverviewToNote(audioOverview: AudioOverview): Note {
+function mapAudioOverviewToNote(audioOverview: AudioOverview): AudioNote {
   const audioType = audioOverview.audio_type;
   let preview = '';
 
@@ -76,14 +76,13 @@ function mapAudioOverviewToNote(audioOverview: AudioOverview): Note {
     title: audioOverview.title,
     preview,
     type: 'audio',
-    content: audioOverview.transcript || undefined,
+    content: audioOverview.transcript || '',
     status: audioOverview.status,
     metadata: {
-      ...audioOverview.metadata,
-      audioUrl: audioOverview.audio_url,
-      transcript: audioOverview.transcript,
-      audioOverviewId: audioOverview.id,
+      audioUrl: audioOverview.audio_url || '',
       audioType: audioOverview.audio_type,
+      audioOverviewId: audioOverview.id,
+      duration: audioOverview.metadata?.duration,
     },
   };
 }
@@ -148,10 +147,10 @@ export const audioApi = {
    */
   async pollAudioOverview(
     audioOverviewId: string,
-    onUpdate?: (note: Note) => void,
+    onUpdate?: (note: AudioNote) => void,
     maxAttempts = 300, // 10 minutes @ 2s intervals
     interval = 2000
-  ): Promise<Note> {
+  ): Promise<AudioNote> {
     for (let i = 0; i < maxAttempts; i++) {
       const audioOverview = await this.getAudioOverview(audioOverviewId);
       const note = mapAudioOverviewToNote(audioOverview);
@@ -170,7 +169,7 @@ export const audioApi = {
   /**
    * Get all audio overviews for a notebook
    */
-  async getAudioOverviewsByNotebook(notebookId: string): Promise<Note[]> {
+  async getAudioOverviewsByNotebook(notebookId: string): Promise<AudioNote[]> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 

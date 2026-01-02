@@ -58,29 +58,109 @@ export interface MindMapNodeData {
   nodeData: MindMapNode;
 }
 
-export interface Note {
+// Base interface with shared properties for all note types
+interface BaseNote {
   id: string;
   title: string;
   preview: string;
-  type: 'text' | 'report' | 'flashcard' | 'quiz' | 'audio' | 'mindmap';
-  // Content
-  content?: string;
-  // Core status for UI - intermediate phases stored in metadata.phase
   status?: 'draft' | 'generating' | 'completed' | 'failed';
-  metadata?: {
-    reportType?: string;
-    documentIds?: string[];
+}
+
+// Text note - simple content
+export interface TextNote extends BaseNote {
+  type: 'text';
+  content: string;
+}
+
+// Report note - document-based report with processing phases
+export interface ReportNote extends BaseNote {
+  type: 'report';
+  content: string;
+  metadata: {
+    reportType: string;
+    documentIds: string[];
     phase?: string; // For internal intermediate statuses: mapping, collapsing, reducing, synthesizing, etc.
     error?: string;
     chunksProcessed?: number;
+  };
+}
+
+// Flashcard note - study cards
+export interface FlashcardNote extends BaseNote {
+  type: 'flashcard';
+  flashcards: Flashcard[];
+  metadata: {
+    difficulty: string;
+    cardCount: number;
+    topic?: string;
+    error?: string;
+  };
+}
+
+// Quiz note - multiple choice questions
+export interface QuizNote extends BaseNote {
+  type: 'quiz';
+  questions: QuizQuestion[];
+  metadata: {
+    questionCount: number;
+    difficulty: string;
+    focusArea?: string;
+    error?: string;
+  };
+}
+
+// Audio note - audio overview with transcript
+export interface AudioNote extends BaseNote {
+  type: 'audio';
+  content: string; // transcript
+  metadata: {
+    audioUrl: string;
+    audioType: string;
+    audioOverviewId: string;
+    duration?: number;
+    phase?: string;
+    error?: string;
+  };
+}
+
+// Mind map note - hierarchical knowledge graph
+export interface MindMapNote extends BaseNote {
+  type: 'mindmap';
+  mindMapData: MindMapNodeData;
+  content: string; // JSON string representation
+  metadata?: {
+    phase?: string;
+    error?: string;
     [key: string]: any;
   };
-  // Flashcard-specific fields
-  flashcards?: Flashcard[];
-  // Quiz-specific fields
-  questions?: QuizQuestion[];
-  // Mind Map-specific fields
-  mindMapData?: MindMapNodeData;
+}
+
+// Discriminated union - the main Note type
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote;
+
+// Type guard functions for checking note types at runtime
+export function isTextNote(note: Note): note is TextNote {
+  return note.type === 'text';
+}
+
+export function isReportNote(note: Note): note is ReportNote {
+  return note.type === 'report';
+}
+
+export function isFlashcardNote(note: Note): note is FlashcardNote {
+  return note.type === 'flashcard';
+}
+
+export function isQuizNote(note: Note): note is QuizNote {
+  return note.type === 'quiz';
+}
+
+export function isAudioNote(note: Note): note is AudioNote {
+  return note.type === 'audio';
+}
+
+export function isMindMapNote(note: Note): note is MindMapNote {
+  return note.type === 'mindmap';
 }
 
 export interface NotebookItem {

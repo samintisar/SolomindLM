@@ -1,4 +1,4 @@
-import type { Note } from '@/shared/types/index';
+import type { Note, MindMapNote } from '@/shared/types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -43,9 +43,9 @@ export interface MindMapData {
 }
 
 /**
- * Map a database mindmap response to the frontend Note interface
+ * Map a database mindmap response to the frontend MindMapNote interface
  */
-function mapMindMapToNote(mindmap: MindMapData, type: 'mindmap' = 'mindmap'): Note {
+function mapMindMapToNote(mindmap: MindMapData, type: 'mindmap' = 'mindmap'): MindMapNote {
   let preview = '';
 
   // Determine preview based on status
@@ -65,8 +65,8 @@ function mapMindMapToNote(mindmap: MindMapData, type: 'mindmap' = 'mindmap'): No
     preview,
     type,
     content: JSON.stringify(mindmap.data, null, 2),
-    status: mindmap.status as Note['status'],
-    metadata: mindmap.metadata,
+    status: mindmap.status as MindMapNote['status'],
+    metadata: mindmap.metadata || {},
     mindMapData: mindmap.data,
   };
 }
@@ -98,7 +98,7 @@ export const mindMapApi = {
   /**
    * Get a specific mind map by ID
    */
-  async getMindMap(mindMapId: string): Promise<Note> {
+  async getMindMap(mindMapId: string): Promise<MindMapNote> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 
@@ -127,10 +127,10 @@ export const mindMapApi = {
    */
   async pollMindMapStatus(
     mindMapId: string,
-    onUpdate?: (note: Note) => void,
+    onUpdate?: (note: MindMapNote) => void,
     maxAttempts = 180, // 6 minutes @ 2s intervals
     interval = 2000
-  ): Promise<Note> {
+  ): Promise<MindMapNote> {
     for (let i = 0; i < maxAttempts; i++) {
       const note = await this.getMindMap(mindMapId);
 
@@ -148,7 +148,7 @@ export const mindMapApi = {
   /**
    * Get all mind maps for a notebook
    */
-  async getMindMaps(notebookId: string): Promise<Note[]> {
+  async getMindMaps(notebookId: string): Promise<MindMapNote[]> {
     const storedUser = localStorage.getItem('solomind_user');
     const userId = storedUser ? JSON.parse(storedUser).id : null;
 
