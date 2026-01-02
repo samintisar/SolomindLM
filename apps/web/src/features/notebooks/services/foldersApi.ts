@@ -1,4 +1,4 @@
-import type { NotebookItem } from '@/shared/types/index';
+import type { FolderItem, NotebookItem } from '@/shared/types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -17,16 +17,58 @@ function getAuthHeaders(): HeadersInit {
   };
 }
 
-export const notebooksApi = {
+export const foldersApi = {
   /**
-   * Get all notebooks for the authenticated user
+   * Get all folders for the authenticated user
    */
-  async getNotebooks(): Promise<NotebookItem[]> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks`, {
+  async getFolders(): Promise<FolderItem[]> {
+    const response = await fetch(`${API_BASE_URL}/api/folders`, {
       headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized. Please sign in again.');
+      }
+      throw new Error('Failed to fetch folders');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get a specific folder by ID
+   */
+  async getFolder(id: string): Promise<FolderItem> {
+    const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Folder not found');
+      }
+      if (response.status === 401) {
+        throw new Error('Unauthorized. Please sign in again.');
+      }
+      throw new Error('Failed to fetch folder');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get notebooks in a specific folder
+   */
+  async getFolderNotebooks(folderId: string): Promise<NotebookItem[]> {
+    const response = await fetch(`${API_BASE_URL}/api/folders/${folderId}/notebooks`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Folder not found');
+      }
       if (response.status === 401) {
         throw new Error('Unauthorized. Please sign in again.');
       }
@@ -37,36 +79,15 @@ export const notebooksApi = {
   },
 
   /**
-   * Get a specific notebook by ID
+   * Create a new folder
    */
-  async getNotebook(id: string): Promise<NotebookItem> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks/${id}`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Notebook not found');
-      }
-      if (response.status === 401) {
-        throw new Error('Unauthorized. Please sign in again.');
-      }
-      throw new Error('Failed to fetch notebook');
-    }
-
-    return response.json();
-  },
-
-  /**
-   * Create a new notebook
-   */
-  async createNotebook(data: {
-    title: string;
-    coverColor?: string;
+  async createFolder(data: {
+    name: string;
+    description?: string;
+    color?: string;
     icon?: string;
-    isFeatured?: boolean;
-  }): Promise<NotebookItem> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks`, {
+  }): Promise<FolderItem> {
+    const response = await fetch(`${API_BASE_URL}/api/folders`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -77,26 +98,25 @@ export const notebooksApi = {
       if (response.status === 401) {
         throw new Error('Unauthorized. Please sign in again.');
       }
-      throw new Error(errorData.error || 'Failed to create notebook');
+      throw new Error(errorData.error || 'Failed to create folder');
     }
 
     return response.json();
   },
 
   /**
-   * Update a notebook
+   * Update a folder
    */
-  async updateNotebook(
+  async updateFolder(
     id: string,
     updates: {
-      title?: string;
-      coverColor?: string;
+      name?: string;
+      description?: string;
+      color?: string;
       icon?: string;
-      isFeatured?: boolean;
-      folderId?: string | null;
     }
-  ): Promise<NotebookItem> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks/${id}`, {
+  ): Promise<FolderItem> {
+    const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(updates),
@@ -105,22 +125,22 @@ export const notebooksApi = {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (response.status === 404) {
-        throw new Error('Notebook not found');
+        throw new Error('Folder not found');
       }
       if (response.status === 401) {
         throw new Error('Unauthorized. Please sign in again.');
       }
-      throw new Error(errorData.error || 'Failed to update notebook');
+      throw new Error(errorData.error || 'Failed to update folder');
     }
 
     return response.json();
   },
 
   /**
-   * Delete a notebook
+   * Delete a folder
    */
-  async deleteNotebook(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks/${id}`, {
+  async deleteFolder(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -128,13 +148,12 @@ export const notebooksApi = {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (response.status === 404) {
-        throw new Error('Notebook not found');
+        throw new Error('Folder not found');
       }
       if (response.status === 401) {
         throw new Error('Unauthorized. Please sign in again.');
       }
-      throw new Error(errorData.error || 'Failed to delete notebook');
+      throw new Error(errorData.error || 'Failed to delete folder');
     }
   },
 };
-

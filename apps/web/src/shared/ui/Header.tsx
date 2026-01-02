@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoC
           
           {isHome ? (
             <span className="text-xl font-sans font-bold text-foreground tracking-tight">
-              NotebookLM
+              SolomindLM
             </span>
           ) : (
             <>

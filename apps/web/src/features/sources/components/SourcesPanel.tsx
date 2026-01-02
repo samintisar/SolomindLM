@@ -473,7 +473,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                   <div className="flex items-center justify-center">
                     <FileStack className="w-5 h-5 text-primary" />
                   </div>
-                  <h2 className="text-xl font-bold">NotebookLM</h2>
+                  <h2 className="text-xl font-bold">SolomindLM</h2>
                 </div>
                 <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
                     <X className="w-5 h-5" />
@@ -493,7 +493,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                         </button>
                       </div>
                       <p className="text-muted-foreground text-sm leading-relaxed max-w-3xl">
-                          Sources let NotebookLM base its responses on the information that matters most to you.<br/>
+                          Sources let SolomindLM base its responses on the information that matters most to you.<br/>
                           (Examples: marketing plans, course reading, research notes, meeting transcripts, sales documents, etc.)
                       </p>
                   </div>

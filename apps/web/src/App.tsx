@@ -8,9 +8,10 @@ import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
 import { STUDIO_TOOLS, SAVED_NOTES } from './shared/constants';
-import { Source, Note, NotebookItem, Document, Message } from '@/shared/types/index';
+import { Source, Note, NotebookItem, Document, Message, FolderItem } from '@/shared/types/index';
 import { documentsApi } from './features/sources/services/documentsApi';
 import { notebooksApi } from './features/notebooks/services/notebooksApi';
+import { foldersApi } from './features/notebooks/services/foldersApi';
 import { notesApi } from './features/notebooks/services/notesApi';
 import { mindMapApi } from './features/studio/services/mindMapApi';
 import { flashcardsApi } from './features/studio/services/flashcardsApi';
@@ -64,6 +65,11 @@ const AppContent: React.FC = () => {
   const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
   const [notebooksLoading, setNotebooksLoading] = useState(false);
   const [notebooksError, setNotebooksError] = useState<string | null>(null);
+
+  // Folders State
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [foldersError, setFoldersError] = useState<string | null>(null);
 
   // Filter notebooks for home page
   const featuredNotebooks = notebooks.filter(nb => nb.isFeatured);
@@ -455,6 +461,31 @@ const AppContent: React.FC = () => {
     loadNotebooks();
   }, [loadNotebooks]);
 
+  // Load folders from API when authenticated
+  const loadFolders = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setFolders([]);
+      return;
+    }
+
+    setFoldersLoading(true);
+    setFoldersError(null);
+    try {
+      const fetchedFolders = await foldersApi.getFolders();
+      setFolders(fetchedFolders);
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+      setFoldersError(error instanceof Error ? error.message : 'Failed to load folders');
+      setFolders([]);
+    } finally {
+      setFoldersLoading(false);
+    }
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
+
   // Load documents from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
@@ -644,6 +675,106 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handleCreateFolder = async () => {
+    if (!isAuthenticated || !user) {
+      console.error('Cannot create folder: not authenticated');
+      return;
+    }
+
+    try {
+      const newFolder = await foldersApi.createFolder({
+        name: 'New Folder',
+        color: 'bg-blue-500',
+        icon: 'Folder',
+      });
+
+      setFolders(prev => [newFolder, ...prev]);
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      setFoldersError(error instanceof Error ? error.message : 'Failed to create folder');
+    }
+  };
+
+  const handleUpdateFolder = async (id: string, updates: Partial<FolderItem>) => {
+    if (!isAuthenticated || !user) {
+      console.error('Cannot update folder: not authenticated');
+      return;
+    }
+
+    try {
+      // Optimistically update UI
+      setFolders(prev => prev.map(f => f.id === id ? ({ ...f, ...updates }) : f));
+
+      // Sync with backend
+      const updatedFolder = await foldersApi.updateFolder(id, {
+        name: updates.name,
+        description: updates.description,
+        color: updates.color,
+        icon: updates.icon,
+      });
+
+      // Update with server response
+      setFolders(prev => prev.map(f => f.id === id ? updatedFolder : f));
+    } catch (error) {
+      console.error('Failed to update folder:', error);
+      loadFolders();
+      setFoldersError(error instanceof Error ? error.message : 'Failed to update folder');
+    }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!isAuthenticated || !user) {
+      console.error('Cannot delete folder: not authenticated');
+      return;
+    }
+
+    try {
+      // Optimistically remove from UI
+      setFolders(prev => prev.filter(f => f.id !== id));
+
+      // Sync with backend (this will also set notebooks' folder_id to null)
+      await foldersApi.deleteFolder(id);
+
+      // Reload notebooks to get updated folder_id values
+      loadNotebooks();
+    } catch (error) {
+      console.error('Failed to delete folder:', error);
+      loadFolders();
+      setFoldersError(error instanceof Error ? error.message : 'Failed to delete folder');
+    }
+  };
+
+  const handleMoveNotebookToFolder = async (notebookId: string, folderId: string | null) => {
+    if (!isAuthenticated || !user) {
+      console.error('Cannot move notebook: not authenticated');
+      return;
+    }
+
+    try {
+      // Optimistically update UI - remove from notebooks list (it will be in folder now)
+      setNotebooks(prev => prev.map(nb => {
+        if (nb.id === notebookId) {
+          return { ...nb, folderId: folderId || undefined };
+        }
+        return nb;
+      }));
+
+      // Sync with backend
+      const updatedNotebook = await notebooksApi.updateNotebook(notebookId, { folderId });
+
+      // Update with server response
+      setNotebooks(prev => prev.map(nb => nb.id === notebookId ? updatedNotebook : nb));
+
+      // Reload folders to update notebook counts
+      loadFolders();
+    } catch (error) {
+      console.error('Failed to move notebook:', error);
+      loadNotebooks();
+      loadFolders();
+      setNotebooksError(error instanceof Error ? error.message : 'Failed to move notebook');
+    }
+  };
+
   const handlePlayAudio = (audioUrl: string, title: string, transcript?: string, noteId?: string) => {
     setMiniPlayerData({ audioUrl, title, transcript });
     setMiniPlayerVisible(true);
@@ -693,7 +824,7 @@ const AppContent: React.FC = () => {
       />
       
       {currentView === 'home' ? (
-        <HomePage 
+        <HomePage
           featuredNotebooks={featuredNotebooks}
           recentNotebooks={recentNotebooks}
           onSelectNotebook={handleSelectNotebook}
@@ -702,6 +833,12 @@ const AppContent: React.FC = () => {
           onDeleteNotebook={handleDeleteNotebook}
           isLoading={notebooksLoading}
           error={notebooksError}
+          folders={folders}
+          onCreateFolder={handleCreateFolder}
+          onUpdateFolder={handleUpdateFolder}
+          onDeleteFolder={handleDeleteFolder}
+          onMoveNotebookToFolder={handleMoveNotebookToFolder}
+          loadFolders={loadFolders}
         />
       ) : (
         <main className="flex-1 flex overflow-hidden relative animate-in fade-in duration-300">

@@ -1,5 +1,5 @@
-/* NotebookLM-Style Mind Map Styles */
-/* Clean, card-based, minimalist aesthetic inspired by Google NotebookLM */
+/* SolomindLM Mind Map Styles */
+/* Clean, card-based, minimalist aesthetic */
 
 /* ========================================
    CANVAS BACKGROUND
@@ -7,7 +7,7 @@
 .map-container,
 .mind-elixir-container,
 .mind-map-container {
-  background: #f8f9fa !important; /* Light grey background like NotebookLM */
+  background: #f8f9fa !important; /* Light grey background */
   font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   cursor: grab !important;
   user-select: none !important;
@@ -40,7 +40,7 @@
 
 /* ========================================
    ROOT NODE (The Title)
-   White card with larger, bolder text - true NotebookLM style
+   White card with larger, bolder text
    ======================================== */
 me-root > me-tpc,
 .mind-elixir .topic[data-nodeid="root"] {
@@ -71,7 +71,7 @@ me-tpc,
   padding: 8px 16px !important; /* Space inside the card */
   font-size: 14px !important;
   color: #3c4043 !important;
-  box-shadow: none !important; /* NotebookLM is flat until hovered */
+  box-shadow: none !important; /* Flat until hovered */
   min-width: 50px !important; /* Ensure very short text still looks like a card */
   transition: all 0.2s ease !important;
   z-index: 2 !important; /* Ensure nodes are above connection lines */

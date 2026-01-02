@@ -239,7 +239,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({ isOpen, on
               <textarea 
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="Tell NotebookLM how to structure and write your report..."
+                placeholder="Tell SolomindLM how to structure and write your report..."
                 className="w-full h-56 bg-background border border-border rounded-lg p-6 text-base font-serif leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/40"
               />
             </div>

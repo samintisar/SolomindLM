@@ -53,20 +53,21 @@ router.get('/', async (req: Request, res: Response) => {
           .eq('note_id', notebook.id);
 
         const metadata = (notebook.metadata as Record<string, any>) || {};
-        
+
         return {
           id: notebook.id,
           title: notebook.title,
-          date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric' 
+          date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
           }),
           sourceCount: count || 0,
           author: metadata.author,
           coverColor: metadata.coverColor || 'bg-yellow-500',
           icon: metadata.icon || 'Folder',
           isFeatured: metadata.isFeatured || false,
+          folderId: notebook.folder_id,
           created_at: notebook.created_at,
           updated_at: notebook.updated_at,
         };
@@ -119,16 +120,17 @@ router.get('/:id', async (req: Request, res: Response) => {
     res.json({
       id: notebook.id,
       title: notebook.title,
-      date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       }),
       sourceCount: count || 0,
       author: metadata.author,
       coverColor: metadata.coverColor || 'bg-yellow-500',
       icon: metadata.icon || 'Folder',
       isFeatured: metadata.isFeatured || false,
+      folderId: notebook.folder_id,
       created_at: notebook.created_at,
       updated_at: notebook.updated_at,
     });
@@ -179,15 +181,16 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(201).json({
       id: notebook.id,
       title: notebook.title,
-      date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       }),
       sourceCount: 0,
       coverColor: metadata.coverColor || 'bg-yellow-500',
       icon: metadata.icon || 'Folder',
       isFeatured: metadata.isFeatured || false,
+      folderId: notebook.folder_id,
       created_at: notebook.created_at,
       updated_at: notebook.updated_at,
     });
@@ -210,7 +213,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     }
 
     const { id } = req.params;
-    const { title, coverColor, icon, isFeatured } = req.body;
+    const { title, coverColor, icon, isFeatured, folderId } = req.body;
 
     // First, get the existing notebook to verify ownership
     const { data: existingNotebook, error: fetchError } = await supabase
@@ -234,6 +237,11 @@ router.put('/:id', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Title cannot be empty' });
       }
       updateData.title = title.trim();
+    }
+
+    // Handle folderId - can be set to a folder UUID or null to remove from folder
+    if (folderId !== undefined) {
+      updateData.folder_id = folderId;
     }
 
     // Update metadata
@@ -270,16 +278,17 @@ router.put('/:id', async (req: Request, res: Response) => {
     res.json({
       id: notebook.id,
       title: notebook.title,
-      date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
+      date: new Date(notebook.updated_at || notebook.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
       }),
       sourceCount: count || 0,
       author: metadata.author,
       coverColor: metadata.coverColor || 'bg-yellow-500',
       icon: metadata.icon || 'Folder',
       isFeatured: metadata.isFeatured || false,
+      folderId: notebook.folder_id,
       created_at: notebook.created_at,
       updated_at: notebook.updated_at,
     });

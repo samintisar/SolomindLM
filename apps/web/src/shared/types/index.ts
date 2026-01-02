@@ -172,6 +172,28 @@ export interface NotebookItem {
   coverColor?: string; // e.g. 'bg-amber-200'
   icon?: string;
   isFeatured?: boolean;
+  folderId?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FolderItem {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string; // e.g. 'bg-blue-500'
+  icon?: string;
+  notebookCount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Union type for rendering mixed lists
+export type NotebookOrFolder = NotebookItem | FolderItem;
+
+// Type guard
+export function isFolder(item: NotebookOrFolder): item is FolderItem {
+  return 'notebookCount' in item;
 }
 
 export interface Document {

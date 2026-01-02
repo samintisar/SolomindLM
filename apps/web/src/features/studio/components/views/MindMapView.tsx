@@ -35,7 +35,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
     import('mind-elixir').then(({ default: MindElixir }) => {
       const options = {
         el: containerRef.current,
-        direction: MindElixir.RIGHT, // Right-growing tree (Left-to-Right) like NotebookLM
+        direction: MindElixir.RIGHT, // Right-growing tree (Left-to-Right)
         draggable: true,
         contextMenu: false, // Disable right-click context menu
         toolBar: false, // Disable default toolbar to use custom controls
@@ -53,12 +53,11 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
             return true;
           },
         },
-        // NotebookLM-inspired theme: clean, card-based, minimalist
+        // SolomindLM theme: clean, card-based, minimalist
         theme: {
-          name: 'NotebookLM',
+          name: 'SolomindLM',
           // Uniform blue/gray palette - monochrome with blue accents
           palette: ['#1a73e8', '#5f6368', '#3c4043'],
-          // Google NotebookLM color variables
           cssVar: {
             '--main-color': '#1f1f1f',       // Dark grey text for root
             '--main-bgcolor': '#ffffff',     // White background for root

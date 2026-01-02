@@ -10,6 +10,7 @@ import flashcardsRouter from './flashcards.js';
 import quizzesRouter from './quizzes.js';
 import chatRouter from './chat.js';
 import audioOverviewsRouter from './audio-overviews.js';
+import foldersRouter from './folders.js';
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.use('/flashcards', flashcardsRouter);
 router.use('/quizzes', quizzesRouter);
 router.use('/chat', chatRouter);
 router.use('/audio-overviews', audioOverviewsRouter);
+router.use('/folders', foldersRouter);
 
 // Health check
 router.get('/health', (req, res) => {
