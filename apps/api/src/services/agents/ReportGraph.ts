@@ -7,8 +7,28 @@ import { env } from '../../config/env.js';
 const GRAPH_CONFIG = {
   MAP_CHUNK_SIZE: parseInt(env.REPORT_MAP_CHUNK_SIZE || '20000', 10), // Reduced from 30K for faster, more reliable processing
   REDUCE_CHUNK_SIZE: parseInt(env.REPORT_REDUCE_CHUNK_SIZE || '60000', 10),
-  MAP_TIMEOUT_MS: 180000, // Increased from 120s to 180s for large chunks
+  MAP_TIMEOUT_MS: 200000, // Increased from 120s to 180s for large chunks
   REDUCE_TIMEOUT_MS: 300000, // Increased from 180s to 300s for synthesis
+} as const;
+
+// Internal processing configuration (magic numbers)
+const PROCESSING_CONFIG = {
+  MIN_CHUNK_LENGTH: 50,
+  MAX_CHUNK_LENGTH: 50000,
+  COLLAPSE_BUFFER_RATIO: 0.8,
+  PREVIEW_LENGTH: 100,
+  HASH_START_LENGTH: 50,
+  HASH_END_LENGTH: 20,
+  OUTPUT_PREVIEW_LENGTH: 300,
+  TOPIC_PREVIEW_LENGTH: 150,
+  LOG_PREVIEW_LENGTH: 500,
+  MAX_TOPICS_PER_CHUNK: 5,
+  TOKEN_ESTIMATION_RATIO: 3, // Conservative: 3 chars per token
+  TOPIC_CACHE_SIZE: 100,
+  TOPIC_CACHE_KEY_LENGTH: 200,
+  MAX_RETRY_ATTEMPTS: 3,
+  RETRY_BACKOFF_MS: 1000,
+  MAX_PROMPT_LENGTH: 5000,
 } as const;
 
 // State definitions using the newer Annotation API
@@ -78,7 +98,7 @@ export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.M
 
     if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
       packed.push(buffer.join('\n\n'));
-      buffer.length = 0;
+      buffer.splice(0); // Properly clear array references
       bufferSize = 0;
     }
 
@@ -104,8 +124,8 @@ export function validateChunks(chunks: string[]): string[] {
 
   const validated = chunks
     .filter(c => c && typeof c === 'string')
-    .map(c => c.slice(0, 50000))
-    .filter(c => c.trim().length > 50);
+    .map(c => c.slice(0, PROCESSING_CONFIG.MAX_CHUNK_LENGTH))
+    .filter(c => c.trim().length > PROCESSING_CONFIG.MIN_CHUNK_LENGTH);
 
   console.log(`[ReportGraph] Valid chunks: ${validated.length}`);
   console.log(`[ReportGraph] Filtered out: ${chunks.length - validated.length} (too short or invalid)`);
@@ -443,62 +463,210 @@ If the sources cover 6+ distinct topics, each should be addressed meaningfully.
 export class ReportGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
+  private topicCache = new Map<string, string[]>();
   private maxTokens: number;
 
-  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = 24000) {
+  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = 64000) {
     // Fast model for map phase (parallel content extraction)
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
       temperature: 0.7,
       timeout: GRAPH_CONFIG.MAP_TIMEOUT_MS,
+      maxTokens: parseInt(env.REPORT_MAP_MAX_OUTPUT_TOKENS || '8192', 10),
     });
 
     // Smart model for reduce/merge phases (quality writing and synthesis)
+    // Use high maxTokens for reduce phase to generate complete reports without truncation
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
       temperature: 0.7,
       timeout: GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+      maxTokens: parseInt(env.REPORT_REDUCE_MAX_OUTPUT_TOKENS || '32000', 10),
     });
 
-    this.maxTokens = maxTokens;
+    this.maxTokens = maxTokens; // Used for collapse phase logic
   }
 
   private estimateTokens(text: string): number {
-    // Rough approximation: 1 token ≈ 4 characters
-    return Math.ceil(text.length / 4);
+    // Conservative estimation: 1 token ≈ 3 characters
+    return Math.ceil(text.length / PROCESSING_CONFIG.TOKEN_ESTIMATION_RATIO);
   }
 
   // Generate a short hash for identifying chunks in logs
   private chunkHash(chunk: string): string {
-    // First 50 chars + length + last 20 chars for identification
-    const start = chunk.substring(0, 50).replace(/\n/g, ' ');
-    const end = chunk.substring(Math.max(0, chunk.length - 20)).replace(/\n/g, ' ');
+    const start = chunk.substring(0, PROCESSING_CONFIG.HASH_START_LENGTH).replace(/\n/g, ' ');
+    const end = chunk.substring(Math.max(0, chunk.length - PROCESSING_CONFIG.HASH_END_LENGTH)).replace(/\n/g, ' ');
     return `[${chunk.length} chars] "${start}..."..."${end}"`;
   }
 
-  // Extract topics from map output text
+  // Sanitize user input to prevent prompt injection
+  private sanitizeUserInput(input: string): string {
+    if (!input) return '';
+    return input
+      .replace(/\n{3,}/g, '\n\n') // Limit consecutive newlines
+      .replace(/system:|assistant:|user:/gi, '') // Remove role markers
+      .replace(/<\|.*?\|>/g, '') // Remove special tokens
+      .trim()
+      .substring(0, PROCESSING_CONFIG.MAX_PROMPT_LENGTH);
+  }
+
+  // Helper method to invoke with timeout and proper cleanup
+  private async invokeWithTimeout<T>(
+    invokeFn: () => Promise<T>,
+    timeoutMs: number,
+    phase: string
+  ): Promise<T> {
+    let timeoutId!: NodeJS.Timeout; // Definite assignment assertion - will be set in Promise executor
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`${phase} timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    try {
+      const result = await Promise.race([invokeFn(), timeoutPromise]);
+      clearTimeout(timeoutId);
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.message.includes('timeout')) {
+        throw new Error(`${phase} phase exceeded timeout of ${timeoutMs}ms`);
+      }
+      throw error;
+    }
+  }
+
+  // Helper to extract message content safely
+  private getMessageContent(response: unknown): string {
+    if (typeof response === 'object' && response !== null) {
+      const msg = response as { content?: unknown };
+      if (typeof msg.content === 'string') {
+        return msg.content;
+      }
+      if (typeof msg.content === 'object' && msg.content !== null) {
+        // Handle structured content
+        if (typeof (msg.content as { toString?: () => string }).toString === 'function') {
+          return (msg.content as { toString: () => string }).toString();
+        }
+      }
+    }
+    // Fallback
+    return String(response);
+  }
+
+  // Retry logic with exponential backoff
+  private async invokeWithRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = PROCESSING_CONFIG.MAX_RETRY_ATTEMPTS,
+    phase: string
+  ): Promise<T> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error as Error;
+
+        // Don't retry on validation or timeout errors (already handled)
+        if (error instanceof Error &&
+            (error.message.includes('Invalid') ||
+             error.message.includes('validation') ||
+             error.message.includes('timeout'))) {
+          throw error;
+        }
+
+        console.warn(
+          `[ReportGraph] ${phase} attempt ${attempt + 1}/${maxRetries} failed:`,
+          error instanceof Error ? error.message : String(error)
+        );
+
+        if (attempt < maxRetries - 1) {
+          const backoff = PROCESSING_CONFIG.RETRY_BACKOFF_MS * Math.pow(2, attempt);
+          console.log(`[ReportGraph] Retrying ${phase} in ${backoff}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoff));
+        }
+      }
+    }
+
+    throw lastError || new Error(`${phase} failed after ${maxRetries} attempts`);
+  }
+
+  // Extract topics from map output text (with caching)
   private extractTopicsFromOutput(output: string): string[] {
+    // Check cache first
+    const cacheKey = output.substring(0, PROCESSING_CONFIG.TOPIC_CACHE_KEY_LENGTH);
+    if (this.topicCache.has(cacheKey)) {
+      return this.topicCache.get(cacheKey)!;
+    }
+
+    const topics = this.extractTopicsInternal(output);
+
+    // Update cache with LRU eviction
+    if (this.topicCache.size >= PROCESSING_CONFIG.TOPIC_CACHE_SIZE) {
+      const firstKey = this.topicCache.keys().next().value;
+      if (firstKey) {
+        this.topicCache.delete(firstKey);
+      }
+    }
+    this.topicCache.set(cacheKey, topics);
+
+    return topics;
+  }
+
+  // Internal topic extraction with single-pass parsing
+  private extractTopicsInternal(output: string): string[] {
     const topics: string[] = [];
+    const lines = output.split('\n');
+    let inTopicsSection = false;
 
-    // Try to extract topics from "Main Topics:" section
-    // Handle format: "**Main Topics:** 1. Topic one 2. Topic two 3. Topic three"
-    const mainTopicsMatch = output.match(/\*{0,2}Main Topics:\*{0,2}\s*(.+?)(?=\n\n|\n\*{0,2}Main|\n\*{0,2}Key|\n\*{0,2}Important|$)/is);
-    if (mainTopicsMatch) {
-      const topicsText = mainTopicsMatch[1].trim();
+    for (const line of lines) {
+      // Check for Main Topics section header
+      if (/\*{0,2}Main Topics:\*{0,2}/i.test(line)) {
+        inTopicsSection = true;
+        continue;
+      }
 
-      // Try to extract numbered topics like "1. Topic one 2. Topic two"
-      const numberedTopics = topicsText.match(/\d+\.\s+([^.\d]+?)(?=\s+\d+\.|$)/g);
-      if (numberedTopics) {
-        const extracted = numberedTopics.map(t => t.replace(/^\d+\.\s*/, '').trim()).filter(t => t.length > 2);
-        topics.push(...extracted.slice(0, 5));
-      } else {
-        // Fallback: split by common delimiters
-        const extractedTopics = topicsText.split(/,|;|\n|\d+\.|and|&/i)
-          .map(t => t.trim().replace(/^\*+|\*+$/g, ''))
-          .filter(t => t.length > 3 && !t.match(/Main Topics/i));
-        topics.push(...extractedTopics.slice(0, 5));
+      // Exit topics section when hitting another section
+      if (inTopicsSection) {
+        if (line.match(/^\*{0,2}(Key|Important|Learning|Surprising|Notable|Actionable|Technical|Supporting)/i)) {
+          break;
+        }
+
+        // Extract numbered topics
+        const match = line.match(/^\s*\d+\.\s*(.+)$/);
+        if (match) {
+          const topic = match[1].trim();
+          if (topic.length > 2 && topics.length < PROCESSING_CONFIG.MAX_TOPICS_PER_CHUNK) {
+            topics.push(topic);
+          }
+        }
+      }
+    }
+
+    // Fallback: try regex extraction if single-pass didn't work
+    if (topics.length === 0) {
+      const mainTopicsMatch = output.match(/\*{0,2}Main Topics:\*{0,2}\s*(.+?)(?=\n\n|\n\*{0,2}Main|\n\*{0,2}Key|\n\*{0,2}Important|$)/is);
+      if (mainTopicsMatch) {
+        const topicsText = mainTopicsMatch[1].trim();
+        const numberedTopics = topicsText.match(/\d+\.\s+([^.\d]+?)(?=\s+\d+\.|$)/g);
+        if (numberedTopics) {
+          const extracted = numberedTopics
+            .map(t => t.replace(/^\d+\.\s*/, '').trim())
+            .filter(t => t.length > 2)
+            .slice(0, PROCESSING_CONFIG.MAX_TOPICS_PER_CHUNK);
+          topics.push(...extracted);
+        } else {
+          // Final fallback: split by delimiters
+          const extractedTopics = topicsText.split(/,|;|\n|\d+\.|and|&/i)
+            .map(t => t.trim().replace(/^\*+|\*+$/g, ''))
+            .filter(t => t.length > 3 && !t.match(/Main Topics/i))
+            .slice(0, PROCESSING_CONFIG.MAX_TOPICS_PER_CHUNK);
+          topics.push(...extractedTopics);
+        }
       }
     }
 
@@ -534,6 +702,132 @@ export class ReportGraph {
     }
 
     return { topics: topicCounts, allTopics };
+  }
+
+  // Validate input state before processing
+  private validateInput(state: OverallStateType): Partial<OverallStateType> {
+    console.log('\n' + '='.repeat(80));
+    console.log('[ReportGraph] ===== INPUT VALIDATION =====');
+    console.log('='.repeat(80));
+
+    const errors: string[] = [];
+
+    if (!state.chunks || state.chunks.length === 0) {
+      errors.push('No chunks provided for processing');
+    }
+
+    if (!state.reportType) {
+      errors.push('Report type is required');
+    }
+
+    if (state.reportType && !MAP_PROMPTS[state.reportType]) {
+      errors.push(`Invalid report type: ${state.reportType}. Valid types: ${Object.keys(MAP_PROMPTS).join(', ')}`);
+    }
+
+    if (errors.length > 0) {
+      console.error('[ReportGraph] Validation failed:', errors);
+      return {
+        ...state,
+        status: 'error',
+        finalOutput: `# Validation Error\n\n${errors.map(e => `- ${e}`).join('\n')}\n\nPlease fix these issues and try again.`,
+      };
+    }
+
+    console.log('[ReportGraph] Validation passed');
+    console.log(`  - Document IDs: ${state.documentIds?.length || 0}`);
+    console.log(`  - Chunks: ${state.chunks?.length || 0}`);
+    console.log(`  - Report Type: ${state.reportType}`);
+    console.log(`  - Custom Prompt: ${state.customPrompt ? 'Yes (' + state.customPrompt.length + ' chars)' : 'No'}`);
+
+    return state;
+  }
+
+  // Validate report completeness for truncation detection
+  private validateReportCompleteness(output: string, reportType: string): {
+    isComplete: boolean;
+    missing: string[];
+  } {
+    const missing: string[] = [];
+
+    if (reportType === 'study_guide') {
+      // Check for required sections with flexible matching
+      const requiredSections = [
+        'Learning Objectives',
+        'Study Notes',
+        'Quiz Questions',
+        'Answer Key',
+        'Essay Questions',
+        'Glossary'
+      ];
+
+      for (const section of requiredSections) {
+        // More flexible matching - check for section in various formats
+        const patterns = [
+          new RegExp(`##\\s*${section}`, 'i'),  // ## Learning Objectives
+          new RegExp(`###\\s*${section}`, 'i'), // ### Learning Objectives
+          new RegExp(`\\*\\*${section}\\*\\*`, 'i'), // **Learning Objectives**
+          new RegExp(`${section}`, 'i'), // Anywhere in text (case-insensitive)
+        ];
+
+        const found = patterns.some(pattern => pattern.test(output));
+
+        if (!found) {
+          missing.push(`Missing section: ${section}`);
+        }
+      }
+
+      // Check for complete quiz (should have 10 questions)
+      const quizMatches = output.match(/^\d+\.\s+.+$/gm) || [];
+      if (quizMatches.length < 10) {
+        missing.push(`Incomplete quiz (${quizMatches.length}/10 questions)`);
+      }
+
+      // Check for glossary entries
+      const glossaryPatterns = [
+        /##\s*Glossary/i,
+        /###\s*Glossary/i,
+        /\*\*Glossary\*\*/i,
+      ];
+      const hasGlossary = glossaryPatterns.some(pattern => pattern.test(output));
+
+      if (hasGlossary) {
+        // Extract glossary section and count entries
+        const glossaryMatch = output.match(/##\s*Glossary[\s\S]+$/i);
+        if (glossaryMatch) {
+          const glossaryEntries = glossaryMatch[0].match(/^[-*]\s+\*\*\w+/gm) || [];
+          if (glossaryEntries.length < 5) {
+            missing.push(`Incomplete glossary (${glossaryEntries.length} entries)`);
+          }
+        }
+      }
+
+      // Check for abrupt ending
+      const lastLine = output.trim().split('\n').pop() || '';
+      if (lastLine.length > 0 && !lastLine.match(/[.!?"]$/) && !lastLine.startsWith('#')) {
+        missing.push('Abrupt ending detected (likely truncated)');
+      }
+    } else if (reportType === 'briefing' || reportType === 'summary' || reportType === 'technical_report') {
+      // Check for abrupt ending - common truncation indicator
+      const lastLine = output.trim().split('\n').pop() || '';
+      if (lastLine.length > 0 && !lastLine.match(/[.!?]$/) && !lastLine.startsWith('#')) {
+        missing.push('Abrupt ending detected (likely truncated)');
+      }
+
+      // Check if expected sections exist based on report type (flexible matching)
+      if (reportType === 'briefing') {
+        const expectedSections = ['Executive Summary', 'Main Themes', 'Key Findings', 'Recommendations'];
+        for (const section of expectedSections) {
+          if (!new RegExp(section, 'i').test(output)) {
+            missing.push(`Missing section: ${section}`);
+          }
+        }
+      }
+    }
+
+    return {
+      isComplete: missing.length === 0,
+      missing,
+    };
   }
 
   // Conditional routing function - returns Send objects for fan-out or 'collapse' string
@@ -614,27 +908,46 @@ export class ReportGraph {
     const promptTemplate = MAP_PROMPTS[reportType] || MAP_PROMPTS['custom'];
     const prompt = promptTemplate
       .replace('{chunk}', chunk)
-      .replace('{customPrompt}', customPrompt || '');
+      .replace('{customPrompt}', this.sanitizeUserInput(customPrompt || ''));
 
     console.log(`[ReportGraph] ${chunkId} Sending prompt to LLM (${prompt.length} chars)...`);
 
     let output: string;
     try {
-      // Add timeout wrapper
-      const response = await Promise.race([
-        this.fastLlm.invoke([
-          new SystemMessage('You are a professional content analyzer and writer.'),
-          new HumanMessage(prompt),
-        ]),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Map timeout')), GRAPH_CONFIG.MAP_TIMEOUT_MS - 1000)
-        )
-      ]) as any;
-      output = response.content.toString();
+      // Use retry with timeout wrapper for better resilience
+      const response = await this.invokeWithRetry(
+        () => this.invokeWithTimeout(
+          () => this.fastLlm.invoke([
+            new SystemMessage('You are a professional content analyzer and writer.'),
+            new HumanMessage(prompt),
+          ]),
+          GRAPH_CONFIG.MAP_TIMEOUT_MS,
+          'Map'
+        ),
+        PROCESSING_CONFIG.MAX_RETRY_ATTEMPTS,
+        `Map ${chunkId}`
+      );
+      output = this.getMessageContent(response);
     } catch (error) {
-      console.error(`[ReportGraph] ${chunkId} ERROR:`, error);
+      const errorContext = {
+        timestamp: new Date().toISOString(),
+        chunkId,
+        chunkLength: chunk.length,
+        reportType,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'), // First 3 lines of stack
+        } : String(error),
+      };
+      console.error('[ReportGraph] Map process error:', JSON.stringify(errorContext, null, 2));
+
       // Return a fallback output so processing can continue
-      output = `- Main Topics: Error processing chunk\n- Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n[Fallback: This chunk could not be processed due to timeout or error. The report will continue with other chunks.]`;
+      output = `- Main Topics: Error processing chunk
+- Error: ${error instanceof Error ? error.message : 'Unknown error'}
+- Chunk Info: ${chunk.length} chars, type: ${reportType}
+
+[Fallback: This chunk could not be processed due to timeout or error. The report will continue with other chunks.]`;
     }
 
     const elapsed = Date.now() - startTime;
@@ -701,18 +1014,9 @@ export class ReportGraph {
       0
     );
 
-    console.log(`[ReportGraph] Collapse: total tokens ${totalTokens}, max tokens ${this.maxTokens}`);
+    console.log(`[ReportGraph] Collapse: total tokens ${totalTokens}`);
 
-    if (totalTokens <= this.maxTokens) {
-      console.log('[ReportGraph] Collapse: skipping recursive collapse, using mapOutputs directly');
-      return {
-        ...state,
-        collapsedOutputs: state.mapOutputs,
-        status: 'reducing',
-      };
-    }
-
-    // Recursive collapse
+    // Always perform recursive collapse to synthesize map outputs
     console.log('[ReportGraph] Collapse: performing recursive collapse');
     const collapsed = await this.recursiveCollapse(state.mapOutputs);
     return {
@@ -723,36 +1027,37 @@ export class ReportGraph {
   }
 
   private async recursiveCollapse(summaries: string[]): Promise<string[]> {
-    const totalTokens = summaries.reduce(
-      (sum, s) => sum + this.estimateTokens(s),
-      0
-    );
-
-    if (totalTokens <= this.maxTokens) {
+    // Stop when we have a small enough number of summaries to synthesize directly
+    if (summaries.length <= 3) {
       return summaries;
     }
 
-    // Dynamic grouping based on token budget
-    const targetGroupTokens = this.maxTokens * 0.8; // Leave 20% buffer
-    const collapsed: string[] = [];
+    // Dynamic grouping - target ~3-4 summaries per group
+    const targetGroupSize = 4;
+    const groups: string[][] = [];
     let currentGroup: string[] = [];
-    let currentTokens = 0;
 
     for (const summary of summaries) {
-      const tokens = this.estimateTokens(summary);
-      if (currentTokens + tokens > targetGroupTokens && currentGroup.length > 0) {
-        collapsed.push(await this.collapseGroup(currentGroup));
+      if (currentGroup.length >= targetGroupSize) {
+        groups.push([...currentGroup]);
         currentGroup = [summary];
-        currentTokens = tokens;
       } else {
         currentGroup.push(summary);
-        currentTokens += tokens;
       }
     }
 
     if (currentGroup.length > 0) {
-      collapsed.push(await this.collapseGroup(currentGroup));
+      groups.push(currentGroup);
     }
+
+    // Process groups in parallel for better performance
+    console.log(`[ReportGraph] Collapsing ${groups.length} groups in parallel`);
+    const collapsed = await Promise.all(
+      groups.map((group, idx) => {
+        console.log(`[ReportGraph] Collapsing group ${idx + 1}/${groups.length} (${group.length} summaries)`);
+        return this.collapseGroup(group);
+      })
+    );
 
     // Recursively check if still too large
     return this.recursiveCollapse(collapsed);
@@ -761,14 +1066,29 @@ export class ReportGraph {
   private async collapseGroup(group: string[]): Promise<string> {
     const combined = group.join('\n\n---\n\n');
 
-    const prompt = `Condense these summaries into a brief summary while retaining all key information:\n\n${combined}\n\nCONDENSED:`;
+    // Improved prompt that preserves the structured format with "Main Topics:" section
+    const prompt = `Condense these summaries while PRESERVING the structured format.
+Keep the "Main Topics:" section intact with all topic listings.
+Only condense the detailed explanations while maintaining the overall structure.
 
-    const response = await this.smartLlm.invoke([
-      new SystemMessage('You are a skilled summarizer.'),
-      new HumanMessage(prompt),
-    ]);
+${combined}
 
-    return response.content.toString();
+CONDENSED (maintain topic structure and "Main Topics:" format):`;
+
+    const response = await this.invokeWithRetry(
+      () => this.invokeWithTimeout(
+        () => this.smartLlm.invoke([
+          new SystemMessage('You are a skilled summarizer. Always maintain structured format with topic headers like "Main Topics:"'),
+          new HumanMessage(prompt),
+        ]),
+        GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+        'CollapseGroup'
+      ),
+      PROCESSING_CONFIG.MAX_RETRY_ATTEMPTS,
+      'CollapseGroup'
+    );
+
+    return this.getMessageContent(response);
   }
 
   // Node: Reduce phase
@@ -831,7 +1151,7 @@ Do NOT combine topics or focus primarily on one.
 
     const prompt = promptTemplate
       .replace('{content}', combined)
-      .replace('{customPrompt}', state.customPrompt || '');
+      .replace('{customPrompt}', this.sanitizeUserInput(state.customPrompt || ''));
 
     console.log(`[ReportGraph] Reduce: prompt length: ${prompt.length} chars`);
     console.log(`[ReportGraph] Reduce: prompt preview: ${prompt.substring(0, 500)}...`);
@@ -840,21 +1160,79 @@ Do NOT combine topics or focus primarily on one.
     let finalOutput: string;
 
     try {
-      // Add timeout wrapper
-      const response = await Promise.race([
-        this.smartLlm.invoke([
-          new SystemMessage('You are a professional content writer and editor.'),
-          new HumanMessage(prompt),
-        ]),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Reduce timeout')), GRAPH_CONFIG.REDUCE_TIMEOUT_MS - 1000)
-        )
-      ]) as any;
-      finalOutput = response.content.toString();
+      // Use retry with timeout wrapper for better resilience
+      const response = await this.invokeWithRetry(
+        () => this.invokeWithTimeout(
+          () => this.smartLlm.invoke([
+            new SystemMessage('You are a professional content writer and editor.'),
+            new HumanMessage(prompt),
+          ]),
+          GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+          'Reduce'
+        ),
+        PROCESSING_CONFIG.MAX_RETRY_ATTEMPTS,
+        'Reduce'
+      );
+
+      // Extract response metadata for truncation detection
+      const responseAny = response as any;
+      const metadata = responseAny.response_metadata || {};
+      const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;
+
+      // Log response analysis
+      console.log('[ReportGraph] ===== RESPONSE ANALYSIS =====');
+      console.log('[ReportGraph] Content length:', responseAny.content?.toString()?.length || 'N/A');
+      console.log('[ReportGraph] Estimated tokens:', Math.ceil((responseAny.content?.toString()?.length || 0) / 3));
+      console.log('[ReportGraph] Finish reason:', finishReason);
+      console.log('[ReportGraph] Token usage:', JSON.stringify(metadata.token_usage || metadata));
+      console.log('[ReportGraph] Last 200 chars:', (responseAny.content?.toString() || '').slice(-200));
+      console.log('[ReportGraph] =====================================');
+
+      finalOutput = this.getMessageContent(response);
+
+      // Check for truncation
+      if (finishReason === 'length') {
+        console.error('[ReportGraph] ⚠️ OUTPUT TRUNCATED BY TOKEN LIMIT!');
+        console.error('[ReportGraph] Increase REPORT_REDUCE_MAX_OUTPUT_TOKENS in env');
+
+        finalOutput += '\n\n---\n\n⚠️ **This report was truncated due to output length limits. ' +
+          'To generate a complete report, increase the REPORT_REDUCE_MAX_OUTPUT_TOKENS setting ' +
+          'or reduce the number of source documents.**';
+      }
+
+      // Validate report completeness
+      const validation = this.validateReportCompleteness(finalOutput, state.reportType);
+      if (!validation.isComplete) {
+        console.warn('[ReportGraph] Report validation issues:', validation.missing);
+        if (finishReason === 'length') {
+          console.error('[ReportGraph] Confirmed: truncation likely caused incompleteness');
+        }
+      }
     } catch (error) {
-      console.error(`[ReportGraph] Reduce ERROR:`, error);
+      const errorContext = {
+        timestamp: new Date().toISOString(),
+        reportType: state.reportType,
+        collapsedOutputsCount: state.collapsedOutputs.length,
+        contentLength: combined.length,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'), // First 3 lines of stack
+        } : String(error),
+      };
+      console.error('[ReportGraph] Reduce phase error:', JSON.stringify(errorContext, null, 2));
+
       // Return a fallback output
-      finalOutput = `# Report Generation Error\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nThe report generation could not be completed due to a timeout or error. Please try again with fewer documents or a shorter report type.`;
+      finalOutput = `# Report Generation Error
+
+**Error:** ${error instanceof Error ? error.message : 'Unknown error'}
+
+**Details:**
+- Report Type: ${state.reportType}
+- Input Size: ${combined.length} characters
+- Processed Chunks: ${state.collapsedOutputs.length}
+
+The report generation could not be completed due to a timeout or error. Please try again with fewer documents or a shorter report type.`;
     }
 
     const elapsed = Date.now() - startTime;
@@ -899,15 +1277,24 @@ Do NOT combine topics or focus primarily on one.
     const builder = new StateGraph(OverallState);
 
     // Add nodes with proper types
+    builder.addNode('validate_input', (state: OverallStateType) => this.validateInput(state));
     builder.addNode('map_process', (state: ChunkProcessState) => this.mapProcess(state));
     builder.addNode('collapse', (state: OverallStateType) => this.collapse(state));
     builder.addNode('reduce', (state: OverallStateType) => this.reduce(state));
     builder.addNode('merge_results', (state: OverallStateType) => this.mergeResults(state));
 
-    // Simplified edges - no batch processing loop
+    // Start with validation
+    builder.addEdge(START, 'validate_input' as never);
+
+    // After validation, check for errors or proceed to map
     builder.addConditionalEdges(
-      START,
-      (s: OverallStateType) => this.routeToMap(s)
+      'validate_input' as never,
+      (s: OverallStateType) => {
+        if (s.status === 'error') {
+          return 'merge_results';
+        }
+        return this.routeToMap(s);
+      }
     );
 
     builder.addEdge('map_process' as never, 'collapse' as never);

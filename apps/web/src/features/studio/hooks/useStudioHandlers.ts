@@ -9,6 +9,7 @@ import { getReportSubtitle } from '@/shared/types/reportTypes';
 import { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
 import { QuizConfig } from '../components/CustomizeQuizModal';
 import { AudioConfig } from '../components/CustomizeAudioModal';
+import { SlideDeckConfig } from '../components/CreateSlideDeckModal';
 
 export interface UseStudioHandlersProps {
   notes: Note[];
@@ -28,11 +29,13 @@ export interface UseStudioHandlersReturn {
   isFlashcardModalOpen: boolean;
   isQuizModalOpen: boolean;
   isAudioModalOpen: boolean;
+  isSlideDeckModalOpen: boolean;
   // Modal setters
   setIsReportModalOpen: (open: boolean) => void;
   setIsFlashcardModalOpen: (open: boolean) => void;
   setIsQuizModalOpen: (open: boolean) => void;
   setIsAudioModalOpen: (open: boolean) => void;
+  setIsSlideDeckModalOpen: (open: boolean) => void;
   // Handlers
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
@@ -40,6 +43,7 @@ export interface UseStudioHandlersReturn {
   handleCreateQuiz: (config: QuizConfig) => Promise<void>;
   handleCreateMindMap: () => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
+  handleCreateSlideDeck: (config: SlideDeckConfig) => void;
 }
 
 export function useStudioHandlers({
@@ -58,6 +62,7 @@ export function useStudioHandlers({
   const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+  const [isSlideDeckModalOpen, setIsSlideDeckModalOpen] = useState(false);
 
   const handleCreateFlashcards = useCallback(async (config: FlashcardConfig) => {
     setIsFlashcardModalOpen(false);
@@ -97,7 +102,6 @@ export function useStudioHandlers({
     };
 
     onAddNote(newNote);
-    onSetActiveNoteId(placeholderId);
 
     try {
       // Call API to create and queue flashcard generation
@@ -114,7 +118,6 @@ export function useStudioHandlers({
       if (onUpdateNoteFull) {
         onUpdateNoteFull(placeholderId, flashcard);
       }
-      onSetActiveNoteId(flashcardId);
 
       // Start polling for status
       flashcardsApi.pollFlashcardStatus(
@@ -194,7 +197,6 @@ export function useStudioHandlers({
     };
 
     onAddNote(newNote);
-    onSetActiveNoteId(placeholderId);
 
     try {
       // Call API to create and queue quiz generation
@@ -211,7 +213,6 @@ export function useStudioHandlers({
       if (onUpdateNoteFull) {
         onUpdateNoteFull(placeholderId, quiz);
       }
-      onSetActiveNoteId(quizId);
 
       // Start polling for status
       quizzesApi.pollQuizStatus(
@@ -297,7 +298,6 @@ export function useStudioHandlers({
     };
 
     onAddNote(newNote);
-    onSetActiveNoteId(placeholderId);
 
     try {
       // Call API to create and queue report
@@ -313,7 +313,6 @@ export function useStudioHandlers({
       if (onUpdateNoteFull) {
         onUpdateNoteFull(placeholderId, note);
       }
-      onSetActiveNoteId(reportId);
 
       // Start polling for status
       reportsApi.pollReportStatus(
@@ -385,7 +384,6 @@ export function useStudioHandlers({
     };
 
     onAddNote(newNote);
-    onSetActiveNoteId(placeholderId);
 
     try {
       // Call API to create and queue mind map
@@ -411,7 +409,6 @@ export function useStudioHandlers({
       if (onUpdateNoteFull) {
         onUpdateNoteFull(placeholderId, noteFromMindmap);
       }
-      onSetActiveNoteId(mindMapId);
 
       // Start polling for status
       mindMapApi.pollMindMapStatus(
@@ -464,6 +461,8 @@ export function useStudioHandlers({
       setIsQuizModalOpen(true);
     } else if (toolId === 'audio') {
       setIsAudioModalOpen(true);
+    } else if (toolId === 'slides') {
+      setIsSlideDeckModalOpen(true);
     } else if (toolId === 'mindmap') {
       handleCreateMindMap();
     }
@@ -502,7 +501,6 @@ export function useStudioHandlers({
     };
 
     onAddNote(newNote);
-    onSetActiveNoteId(placeholderId);
 
     try {
       // Call API to create and queue audio overview generation
@@ -527,7 +525,6 @@ export function useStudioHandlers({
           }
         });
       }
-      onSetActiveNoteId(audioOverviewId);
 
       // Start polling for status
       audioApi.pollAudioOverview(
@@ -571,20 +568,86 @@ export function useStudioHandlers({
     }
   }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
+  const handleCreateSlideDeck = useCallback(async (config: SlideDeckConfig) => {
+    setIsSlideDeckModalOpen(false);
+
+    // Get selected document IDs from sources
+    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    if (selectedDocumentIds.length === 0) {
+      alert('Please select at least one source to generate a slide deck');
+      return;
+    }
+
+    if (!userId || !noteId) {
+      alert('Authentication error. Please log in again.');
+      return;
+    }
+
+    // Create placeholder note with simple title - AI will generate descriptive title
+    const placeholderId = Math.random().toString(36).substr(2, 9);
+    const newNote: Note = {
+      id: placeholderId,
+      title: 'Slide Deck', // Initial placeholder - AI will generate descriptive title
+      preview: `Slide Deck • ${config.format} • Generating...`,
+      type: 'slidedeck',
+      content: '',
+      status: 'generating',
+      metadata: {
+        format: config.format,
+        length: config.length,
+        style: config.style,
+      }
+    };
+
+    onAddNote(newNote);
+
+    try {
+      // Call API to create and queue slide deck generation
+      // For now, we're just creating a placeholder since the API endpoint may not exist yet
+      console.log('Creating slide deck with config:', config);
+      
+      // TODO: Add actual API call when slide deck generation endpoint is ready
+      // For now, just mark as completed immediately for testing
+      const slidedeckId = placeholderId;
+
+      if (onUpdateNoteFull) {
+        onUpdateNoteFull(placeholderId, {
+          ...newNote,
+          id: slidedeckId,
+          status: 'completed',
+          preview: `Slide Deck • ${config.format} • Ready`,
+          metadata: {
+            ...newNote.metadata,
+          }
+        });
+      }
+
+    } catch (error) {
+      console.error('Failed to create slide deck:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create slide deck');
+      // Remove the placeholder note
+      onDeleteNote(placeholderId);
+    }
+  }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
+
   return {
     isReportModalOpen,
     isFlashcardModalOpen,
     isQuizModalOpen,
     isAudioModalOpen,
+    isSlideDeckModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
+    setIsSlideDeckModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
     handleCreateQuiz,
     handleCreateMindMap,
     handleCreateAudio,
+    handleCreateSlideDeck,
   };
 }

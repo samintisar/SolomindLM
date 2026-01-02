@@ -36,7 +36,7 @@ export class ReportGenerationService {
       env.TOGETHER_AI_API_KEY,
       env.FAST_LLM,
       env.SMART_LLM || env.FAST_LLM, // Use smart model for reduce, fall back to fast if not set
-      parseInt(env.REPORT_MAX_TOKENS, 10)
+      parseInt(env.REPORT_MAX_TOKENS, 10) // Max tokens for collapse phase
     );
     this.titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.FAST_LLM);
   }

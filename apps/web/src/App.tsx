@@ -27,10 +27,27 @@ type ViewState = 'home' | 'notebook';
 
 // Transform Document API type to Source UI type
 function documentToSource(doc: Document): Source {
+  // Extract file extension and determine type
+  let type: 'PDF' | 'TXT' | 'WEB' = 'PDF';
+  
+  if (doc.file_type === 'youtube') {
+    type = 'WEB';
+  } else if (doc.file_type === 'url') {
+    type = 'WEB';
+  } else if (doc.file_type === 'file') {
+    // Extract extension from file_name
+    const ext = doc.file_name.split('.').pop()?.toLowerCase() || '';
+    if (ext === 'txt' || ext === 'md' || ext === 'json' || ext === 'csv') {
+      type = 'TXT';
+    } else {
+      type = 'PDF';
+    }
+  }
+  
   return {
     id: doc.id,
     title: doc.title || doc.file_name,
-    type: doc.file_type === 'youtube' ? 'WEB' : (doc.file_type === 'file' ? 'PDF' : 'WEB'),
+    type,
     date: new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     selected: true,
     content: '',

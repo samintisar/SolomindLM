@@ -15,12 +15,14 @@ import {
   Play,
   ArrowLeft,
   X,
+  Loader2,
 } from 'lucide-react';
-import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote } from '@/shared/types/index';
+import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isSlideDeckNote } from '@/shared/types/index';
 import { CreateReportModal } from './CreateReportModal';
 import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
 import { CustomizeQuizModal } from './CustomizeQuizModal';
 import { CustomizeAudioModal } from './CustomizeAudioModal';
+import { CreateSlideDeckModal } from './CreateSlideDeckModal';
 import { ReportView } from './views/ReportView';
 import { FlashcardView } from './views/FlashcardView';
 import { QuizView } from './views/QuizView';
@@ -99,15 +101,18 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     isFlashcardModalOpen,
     isQuizModalOpen,
     isAudioModalOpen,
+    isSlideDeckModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
+    setIsSlideDeckModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
     handleCreateQuiz,
     handleCreateAudio,
+    handleCreateSlideDeck,
   } = useStudioHandlers({
     notes,
     sources,
@@ -170,7 +175,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   };
 
   const handleNoteClick = (note: Note) => {
-    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio') {
+    // Prevent clicking on generating notes
+    if (note.status === 'generating') {
+      return;
+    }
+    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'slidedeck') {
         setActiveNoteId(note.id);
     }
   };
@@ -234,18 +243,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                     title={activeNote.title}
                   />
                 )}
-                {isAudioNote(activeNote) && activeNote.status === 'generating' && (
-                  <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                    <div>
-                      <h3 className="text-lg font-semibold">Generating Audio Overview...</h3>
-                      <p className="text-sm text-muted-foreground mt-1">This may take a few minutes</p>
-                      {activeNote.metadata.phase && (
-                        <p className="text-xs text-muted-foreground mt-2">Phase: {activeNote.metadata.phase}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
                 {isAudioNote(activeNote) && activeNote.status === 'failed' && (
                   <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                     <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -294,38 +291,51 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                       >
                         <div className="flex justify-between items-start gap-3">
                           <div className="flex-1 flex gap-3 min-w-0">
-                            {note.type === 'audio' && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isAudioNote(note) && note.status === 'completed' && note.metadata.audioUrl) {
-                                      onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
-                                    }
-                                  }}
-                                  className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play"
-                                >
+                            {note.status === 'generating' ? (
+                              <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                              </div>
+                            ) : (
+                              <>
+                                {note.type === 'audio' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isAudioNote(note) && note.status === 'completed' && note.metadata.audioUrl) {
+                                        onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
+                                      }
+                                    }}
+                                    className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play"
+                                  >
                                     <Play className="w-3.5 h-3.5 fill-current ml-0.5 shrink-0" />
-                                </button>
-                            )}
-                            {note.type === 'flashcard' && (
-                                <div className="shrink-0 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
+                                  </button>
+                                )}
+                                {note.type === 'flashcard' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
                                     <Layers className="w-4 h-4 shrink-0" />
-                                </div>
-                            )}
-                            {note.type === 'report' && (
-                                <div className="shrink-0 w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                                  </div>
+                                )}
+                                {note.type === 'report' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
                                     <FileText className="w-4 h-4 shrink-0" />
-                                </div>
-                            )}
-                             {note.type === 'quiz' && (
-                                <div className="shrink-0 w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                                  </div>
+                                )}
+                                {note.type === 'quiz' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center">
                                     <HelpCircle className="w-4 h-4 shrink-0" />
-                                </div>
-                            )}
-                            {note.type === 'mindmap' && (
-                                <div className="shrink-0 w-8 h-8 rounded-lg bg-fuchsia-500/10 text-fuchsia-600 flex items-center justify-center">
+                                  </div>
+                                )}
+                                {note.type === 'mindmap' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-fuchsia-500/10 text-fuchsia-600 flex items-center justify-center">
                                     <GitFork className="w-4 h-4 shrink-0" />
-                                </div>
+                                  </div>
+                                )}
+                                {note.type === 'slidedeck' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                                    <Presentation className="w-4 h-4 shrink-0" />
+                                  </div>
+                                )}
+                              </>
                             )}
                             <div className="flex-1 min-w-0">
                                 {editingId === note.id ? (
@@ -342,7 +352,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                     <h4 className="text-sm font-bold text-foreground font-serif truncate leading-tight mb-1 group-hover:text-primary transition-colors">{note.title}</h4>
                                 )}
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span className="font-mono tracking-tight">{note.preview}</span>
+                                  {note.status === 'generating' ? (
+                                    <span className="font-mono tracking-tight text-primary italic">Generating...</span>
+                                  ) : (
+                                    <span className="font-mono tracking-tight">{note.preview}</span>
+                                  )}
                                 </div>
                             </div>
                           </div>
@@ -425,6 +439,15 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         isOpen={isAudioModalOpen}
         onClose={() => setIsAudioModalOpen(false)}
         onGenerate={handleCreateAudio}
+      />
+
+      <CreateSlideDeckModal
+        isOpen={isSlideDeckModalOpen}
+        onClose={() => setIsSlideDeckModalOpen(false)}
+        onGenerate={(config) => {
+          handleCreateSlideDeck(config);
+          setIsSlideDeckModalOpen(false);
+        }}
       />
     </div>
   );

@@ -2,7 +2,6 @@ import { supabase } from '../../config/database.js';
 import { MistralOCRService } from '../extraction/MistralOCRService.js';
 import { SupadataLoaderService } from '../extraction/SupadataLoaderService.js';
 import { TextSplitterService } from '../processing/TextSplitterService.js';
-import { TitleGeneratorService } from '../processing/TitleGeneratorService.js';
 import { EmbeddingService } from '../processing/EmbeddingService.js';
 import { VectorStoreService } from '../storage/VectorStoreService.js';
 import { SupabaseStorageService } from '../storage/SupabaseStorageService.js';
@@ -12,7 +11,6 @@ import { env } from '../../config/env.js';
 const mistralOCR = new MistralOCRService(env.MISTRAL_API_KEY);
 const supadataLoader = new SupadataLoaderService();
 const textSplitter = new TextSplitterService();
-const titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.FAST_LLM);
 const embeddingService = new EmbeddingService(env.COHERE_API_KEY);
 const vectorStore = new VectorStoreService();
 const storageService = new SupabaseStorageService();
@@ -213,10 +211,43 @@ export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
     const chunks = await textSplitter.splitText(extractedText);
     console.log(`[DocEmbedding] Split into ${chunks.length} chunks`);
 
-    // Step 3: Generate title
-    console.log(`[DocEmbedding] Step 3: Generating title...`);
-    const title = await titleGenerator.generateTitle(chunks[0]);
-    console.log(`[DocEmbedding] Generated title: ${title}`);
+    // Step 3: Get title (use original file name instead of generating)
+    console.log(`[DocEmbedding] Step 3: Setting title from source...`);
+    let title: string;
+
+    if (type === 'file') {
+      // Use the original file name (remove extension for cleaner display)
+      const { data: doc } = await supabase
+        .from('documents')
+        .select('file_name')
+        .eq('id', documentId)
+        .single();
+
+      const fileName = doc?.file_name || source;
+      // Remove file extension
+      title = fileName.replace(/\.[^/.]+$/, '');
+    } else if (type === 'url') {
+      // For URLs, use the hostname
+      try {
+        const url = new URL(source);
+        title = url.hostname;
+      } catch {
+        title = source;
+      }
+    } else if (type === 'youtube') {
+      // For YouTube, use the video ID or URL
+      const match = source.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      if (match) {
+        title = `YouTube: ${match[1]}`;
+      } else {
+        title = 'YouTube Video';
+      }
+    } else {
+      // For text input
+      title = 'Pasted Text';
+    }
+
+    console.log(`[DocEmbedding] Set title: ${title}`);
 
     await supabase
       .from('documents')

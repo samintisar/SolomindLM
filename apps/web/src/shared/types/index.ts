@@ -135,8 +135,21 @@ export interface MindMapNote extends BaseNote {
   };
 }
 
+// Slide deck note - presentation slides
+export interface SlideDeckNote extends BaseNote {
+  type: 'slidedeck';
+  content: string; // HTML or markdown representation of slides
+  metadata: {
+    format: 'detailed' | 'presenter';
+    length: 'short' | 'default' | 'long';
+    style?: string;
+    slideCount?: number;
+    error?: string;
+  };
+}
+
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote;
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | SlideDeckNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
@@ -161,6 +174,10 @@ export function isAudioNote(note: Note): note is AudioNote {
 
 export function isMindMapNote(note: Note): note is MindMapNote {
   return note.type === 'mindmap';
+}
+
+export function isSlideDeckNote(note: Note): note is SlideDeckNote {
+  return note.type === 'slidedeck';
 }
 
 export interface NotebookItem {

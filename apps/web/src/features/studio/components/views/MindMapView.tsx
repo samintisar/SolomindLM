@@ -234,32 +234,6 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
                        note.metadata?.phase === 'reducing';
   const isFailed = note.status === 'failed';
 
-  if (isGenerating) {
-    return (
-      <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300">
-        <div className="p-4 border-b border-border bg-secondary/30">
-          <div className="flex items-center justify-center gap-3">
-            <Loader2 className="w-5 h-5 text-primary animate-spin" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Creating mind map...
-            </span>
-          </div>
-          <p className="text-xs text-center text-muted-foreground/60 mt-2">
-            This may take a moment
-          </p>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
-            <p className="text-muted-foreground font-serif italic">
-              Generating mind map from your sources...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (isFailed) {
     return (
       <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300">

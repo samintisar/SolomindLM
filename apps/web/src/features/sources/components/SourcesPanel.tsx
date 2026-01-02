@@ -6,6 +6,7 @@ import {
   FileStack, Loader2, XCircle, MoreVertical, Edit2, Trash2
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Source } from '@/shared/types/index';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
 import { documentsApi } from '../services/documentsApi';
@@ -91,13 +92,15 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // File upload handler
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !userId || !noteId) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !userId || !noteId) return;
 
     setIsUploading(true);
     try {
-      const response = await documentsApi.uploadFile(userId, noteId, file);
-      onDocumentUploaded?.(response.documentId);
+      for (const file of files) {
+        const response = await documentsApi.uploadFile(userId, noteId, file);
+        onDocumentUploaded?.(response.documentId);
+      }
       setIsModalOpen(false);
     } catch (err) {
       console.error('Upload failed:', err);
@@ -279,6 +282,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               {loadingContentId !== viewingSourceId && (
                 <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       // Remove all images
                       img: () => null,
@@ -290,6 +294,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                       audio: () => null,
                       // Remove iframe elements
                       iframe: () => null,
+                      // Render tables properly
+                      table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                      thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                      th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                      td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
                     }}
                   >
                     {contentCache[viewingSourceId] || "No content available."}
@@ -351,7 +362,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                       >
                         <div className="flex items-center gap-3 p-3">
                           <div className="text-muted-foreground shrink-0 flex items-center justify-center">
-                            {source.type === 'WEB' ? <Globe className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                            {source.type === 'WEB' ? (
+                              <Globe className="w-5 h-5" />
+                            ) : source.type === 'PDF' ? (
+                              <File className="w-5 h-5" />
+                            ) : (
+                              <FileText className="w-5 h-5" />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -504,7 +521,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                     ref={fileInputRef}
                     className="hidden"
                     onChange={handleFileSelect}
-                    accept=".pdf,.txt,.md,.docx"
+                    accept=".pdf,.docx,.pptx,.txt,.md,.json,.csv,.png,.jpg,.jpeg,.avif"
+                    multiple
                   />
 
                   {/* Upload Area */}
@@ -522,7 +540,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                           <p className="text-sm text-muted-foreground">Drag & drop or <span className="text-primary underline decoration-dotted font-medium">choose file</span> to upload</p>
                       </div>
                       <p className="text-[10px] text-muted-foreground/60 text-center max-w-xl mt-4 font-mono">
-                          Supported file types: PDF, .txt, Markdown, Audio (e.g. mp3), .docx, .avif, .bmp, .gif, .ico, .jp2, .png, .webp, .tif, .tiff, .heic, .heif, .jpeg, .jpg, .jpe
+                          Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF
                       </p>
                   </div>
 

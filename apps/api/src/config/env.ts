@@ -15,7 +15,7 @@ const envSchema = z.object({
   TOGETHER_AI_API_KEY: z.string(),
   FAST_LLM: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
   SMART_LLM: z.string().optional(), // Optional: smarter model for complex tasks
-  REPORT_MAX_TOKENS: z.string().default('24000'), // Context window for report generation
+  REPORT_MAX_TOKENS: z.string().default('64000'), // Max tokens for report output (increased to prevent truncation)
   REPORT_MAP_BATCH_SIZE: z.string().default('10'),
   // Flashcard Generation
   // Map phase (fast_llm with 131K context): ~7.5K tokens per chunk
@@ -37,6 +37,10 @@ const envSchema = z.object({
   REPORT_MAP_CHUNK_SIZE: z.string().default('30000'),
   // Reduce phase: 60K chars ≈ 15K tokens (~6% of 261K context)
   REPORT_REDUCE_CHUNK_SIZE: z.string().default('60000'),
+  // Max OUTPUT tokens for map phase (extracting topics/insights)
+  REPORT_MAP_MAX_OUTPUT_TOKENS: z.string().default('8192'),
+  // Max OUTPUT tokens for reduce phase (final report generation)
+  REPORT_REDUCE_MAX_OUTPUT_TOKENS: z.string().default('32000'),
   // Quiz Generation
   // Map phase: 20K chars ≈ 5K tokens (~4% of 131K context)
   QUIZ_MAP_CHUNK_SIZE: z.string().default('20000'),

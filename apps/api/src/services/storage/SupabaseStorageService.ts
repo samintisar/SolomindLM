@@ -1,6 +1,47 @@
 import { supabase } from '../../config/database.js';
 
 export class SupabaseStorageService {
+  /**
+   * Map file extensions to their proper MIME types
+   */
+  private getMimeType(fileName: string, providedMimeType: string): string {
+    // If the provided MIME type is not a generic octet-stream, use it
+    if (providedMimeType && providedMimeType !== 'application/octet-stream') {
+      return providedMimeType;
+    }
+
+    // Extract file extension
+    const ext = fileName.toLowerCase().split('.').pop();
+
+    // Map common extensions to MIME types
+    const mimeTypeMap: Record<string, string> = {
+      'md': 'text/markdown',
+      'markdown': 'text/markdown',
+      'txt': 'text/plain',
+      'pdf': 'application/pdf',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'doc': 'application/msword',
+      'csv': 'text/csv',
+      'json': 'application/json',
+      'xml': 'application/xml',
+      'html': 'text/html',
+      'htm': 'text/html',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'svg': 'image/svg+xml',
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'mp4': 'video/mp4',
+      'zip': 'application/zip',
+    };
+
+    // Return mapped MIME type or the provided one as fallback
+    return ext && mimeTypeMap[ext] ? mimeTypeMap[ext] : providedMimeType;
+  }
+
   async uploadFile(
     userId: string,
     noteId: string,
@@ -20,13 +61,17 @@ export class SupabaseStorageService {
       throw new Error('File buffer is empty');
     }
 
+    // Map to proper MIME type if needed
+    const properMimeType = this.getMimeType(fileName, contentType);
+    console.log('[Storage] Using MIME type:', properMimeType, '(original:', contentType + ')');
+
     const filePath = `${userId}/${noteId}/${Date.now()}-${fileName}`;
     console.log('[Storage] Uploading to path:', filePath);
 
     const { data, error } = await supabase.storage
       .from('documents')
       .upload(filePath, file, {
-        contentType,
+        contentType: properMimeType,
         upsert: false,
       });
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { XCircle, Loader2 } from 'lucide-react';
 import { ReportNote } from '@/shared/types/index';
 
@@ -17,21 +18,6 @@ export const ReportView: React.FC<ReportViewProps> = ({ note }) => {
 
   return (
       <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300">
-           {/* Progress Header */}
-           {isGenerating && (
-             <div className="p-4 border-b border-border bg-secondary/30">
-               <div className="flex items-center justify-center gap-3">
-                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                 <span className="text-sm font-medium text-muted-foreground">
-                   Generating report...
-                 </span>
-               </div>
-               <p className="text-xs text-center text-muted-foreground/60 mt-2">
-                 This may take a moment
-               </p>
-             </div>
-           )}
-
            {/* Error State */}
            {isFailed && (
              <div className="p-4 border-b border-border bg-destructive/10">
@@ -52,12 +38,20 @@ export const ReportView: React.FC<ReportViewProps> = ({ note }) => {
                    <div className="prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed select-text">
                       {note.content ? (
                           <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
                               components={{
                                   img: () => null,
                                   a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
                                   video: () => null,
                                   audio: () => null,
                                   iframe: () => null,
+                                  // Render tables properly
+                                  table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                  thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                  tbody: ({ children }) => <tbody>{children}</tbody>,
+                                  tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                  th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                  td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
                               }}
                           >
                               {note.content}
@@ -73,10 +67,6 @@ export const ReportView: React.FC<ReportViewProps> = ({ note }) => {
                             <div className="h-4 bg-muted/50 rounded w-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
                             <div className="h-4 bg-muted/50 rounded w-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
                             <div className="h-4 bg-muted/50 rounded w-5/6 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
-                            <div className="flex items-center justify-center py-8">
-                              <Loader2 className="w-5 h-5 text-primary animate-spin mr-2" />
-                              <p className="text-muted-foreground italic text-sm">Generating your report...</p>
-                            </div>
                           </div>
                       )}
                    </div>
