@@ -37,8 +37,7 @@ export class QuizGenerationService {
     this.quizGraph = new QuizGraph(
       env.TOGETHER_AI_API_KEY,
       env.FAST_LLM,
-      env.SMART_LLM || env.FAST_LLM,
-      parseInt(env.QUIZ_MAX_TOKENS || '16000', 10)
+      env.SMART_LLM || env.FAST_LLM
     );
     this.titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.FAST_LLM);
   }

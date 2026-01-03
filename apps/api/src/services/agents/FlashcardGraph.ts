@@ -66,6 +66,19 @@ const GRAPH_CONFIG = {
   ...FLASHCARD_CONFIG,
 } as const;
 
+// Problematic phrases that indicate flashcards aren't self-contained
+// Only include phrases that are strong indicators of external content references
+// Note: "the following" is intentionally excluded - it's commonly used in questions
+const PROBLEMATIC_PHRASES = [
+  'the diagram',
+  'the above',
+  'as shown',
+  'this chart',
+  'that example',
+  'the table',
+  'this figure',
+] as const;
+
 // State definitions using the newer Annotation API
 export const OverallState = Annotation.Root({
   documentIds: Annotation<string[]>({
@@ -150,8 +163,47 @@ ${topic ? `**Topic Focus:** ${topic}` : ''}
 - Focus on key concepts, definitions, and important relationships
 - Avoid overly trivial or obvious questions
 
+**SELF-CONTAINED FLASHCARDS REQUIREMENT:**
+CRITICAL: Each flashcard question MUST BE COMPLETELY SELF-CONTAINED. The user will ONLY see the question and answer.
+
+RULES FOR CONTEXT INCLUSION:
+1. If a question references a diagram, chart, or visual element:
+   - Describe it thoroughly within the question
+   - Example: "In the ER diagram showing Entities A(id) and B(id) with a one-to-many relationship from A to B, what does the foreign key represent?"
+
+2. If a question references a code snippet:
+   - Include the relevant code in the question
+   - Example: "Given the code 'function foo() { return 1; }', what does foo() return?"
+
+3. If a question references a scenario/example:
+   - Summarize the key details within the question
+   - Example: "In a scenario where a user attempts login with invalid credentials, what response should the server return?"
+
+4. NEVER use vague references like "the diagram", "the above", or "the following" without including the actual content
+   - REWRITE to include the actual content being referenced
+
+5. If context is too long (>300 chars):
+   - Summarize the essential parts needed to answer
+   - Example: "Given a database schema with Users(id, email) and Orders(user_id, total)..." instead of full schema
+
+BALANCE: Questions should be complete but concise. Include only what's necessary to answer correctly.
+
+**EXAMPLES OF SELF-CONTAINED FLASHCARDS:**
+
+EXAMPLE 1 - Formula Reference:
+Q: Using the formula F = ma, if a force of 100N is applied to a 10kg object, what is the acceleration?
+A: 10 m/s² (a = F/m = 100N / 10kg = 10 m/s²)
+
+EXAMPLE 2 - Code Reference:
+Q: What does the following JavaScript code output? 'const arr = [1, 2, 3]; arr.push(4); console.log(arr.length);'
+A: 4 (The push() method adds an element to the array, resulting in [1, 2, 3, 4], so length is 4)
+
+EXAMPLE 3 - Context-Heavy Reference:
+Q: A chemical reaction produces 50g of product from 100g of reactant. If the theoretical maximum yield is 80g, what is the percent yield?
+A: 62.5% (Percent yield = (actual / theoretical) × 100 = (50g / 80g) × 100 = 62.5%)
+
 **Format each pair as:**
-Q: [your question]
+Q: [your question text - COMPLETE AND SELF-CONTAINED with all necessary context]
 A: [your answer]
 
 Content:
@@ -798,14 +850,18 @@ Select exactly ${targetCount} diverse flashcards:`;
   // Extract topic from a flashcard (copied from groupFlashcardsByTopic logic)
   private extractTopic(card: Flashcard): string {
     const question = card.front.toLowerCase();
-    if (question.includes('julius caesar') || question.includes('caesar')) return 'Julius Caesar';
-    if (question.includes('emperor') || question.includes('empire')) return 'Emperors/Empire';
-    if (question.includes('colosseum') || question.includes('roman architecture') || question.includes('building')) return 'Architecture/Buildings';
-    if (question.includes('battle') || question.includes('war') || question.includes('military')) return 'Military/Wars';
-    if (question.includes('senate') || question.includes('republic') || question.includes('government')) return 'Government/Politics';
-    if (question.includes('period') || question.includes('century') || question.includes('year') || question.includes('bc') || question.includes('ad')) return 'Timeline/Dates';
-    if (question.includes('roman') || question.includes('rome')) return 'Roman History';
-    return 'other';
+
+    // Simple keyword-based topic extraction (generalized for all content types)
+    if (question.includes('what is') || question.includes('define') || question.includes('definition')) return 'Definitions';
+    if (question.includes('when') || question.includes('year') || question.includes('century') || question.includes('date')) return 'Timeline/Dates';
+    if (question.includes('who') || question.includes('person') || question.includes('people')) return 'People';
+    if (question.includes('where') || question.includes('place') || question.includes('location')) return 'Places';
+    if (question.includes('why') || question.includes('because') || question.includes('reason') || question.includes('cause')) return 'Causes/Reasons';
+    if (question.includes('how') || question.includes('process') || question.includes('method') || question.includes('step')) return 'Processes';
+    if (question.includes('which') || question.includes('select') || question.includes('choose') || question.includes('identify')) return 'Classification';
+    if (question.includes('true') || question.includes('false') || question.includes('correct')) return 'Facts';
+
+    return 'General';
   }
 
   // Helper method to group flashcards by topic for debugging
@@ -813,22 +869,49 @@ Select exactly ${targetCount} diverse flashcards:`;
     const topics: Record<string, number> = {};
 
     for (const card of flashcards) {
-      // Simple topic extraction based on keywords in the question
-      const question = card.front.toLowerCase();
-      let topic = 'other';
-
-      if (question.includes('julius caesar') || question.includes('caesar')) topic = 'Julius Caesar';
-      else if (question.includes('emperor') || question.includes('empire')) topic = 'Emperors/Empire';
-      else if (question.includes('colosseum') || question.includes('roman architecture') || question.includes('building')) topic = 'Architecture/Buildings';
-      else if (question.includes('battle') || question.includes('war') || question.includes('military')) topic = 'Military/Wars';
-      else if (question.includes('senate') || question.includes('republic') || question.includes('government')) topic = 'Government/Politics';
-      else if (question.includes('roman') || question.includes('rome')) topic = 'Roman History';
-      else if (question.includes('period') || question.includes('century') || question.includes('year') || question.includes('bc') || question.includes('ad')) topic = 'Timeline/Dates';
-
+      // Use the same generalized topic extraction logic as extractTopic()
+      const topic = this.extractTopic(card);
       topics[topic] = (topics[topic] || 0) + 1;
     }
 
     return topics;
+  }
+
+  /**
+   * Validate that a flashcard is self-contained (doesn't reference external content)
+   * Returns true if the flashcard is self-contained, false if it has problematic phrases.
+   *
+   * Smart validation: Only reject flashcards that are BOTH short (<150 chars) AND have problematic phrases.
+   * Longer flashcards likely include the necessary context embedded.
+   */
+  private validateSelfContained(card: Flashcard): boolean {
+    const text = card.front.toLowerCase();
+    const hasProblematicPhrase = PROBLEMATIC_PHRASES.some(phrase => text.includes(phrase));
+    const isShort = text.length < 150;
+
+    // Only reject if both short AND has problematic phrases
+    // (longer flashcards likely have context embedded despite the phrases)
+    const shouldReject = hasProblematicPhrase && isShort;
+
+    if (shouldReject) {
+      logWarn({
+        agent: 'FlashcardGraph',
+        phase: 'validate_self_contained',
+        questionPreview: card.front.substring(0, 100),
+        questionLength: text.length,
+        foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
+      }, 'Flashcard rejected: short with potential external references');
+    } else if (hasProblematicPhrase && !isShort) {
+      logInfo({
+        agent: 'FlashcardGraph',
+        phase: 'validate_self_contained_accept',
+        questionPreview: card.front.substring(0, 100),
+        questionLength: text.length,
+        foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
+      }, 'Flashcard accepted: has phrases but is long enough to include context');
+    }
+
+    return !shouldReject;
   }
 
   // Node: Reduce phase
@@ -1014,6 +1097,9 @@ Select exactly ${targetCount} diverse flashcards:`;
     }, 'Attempting manual parsing...');
 
     const flashcards: Flashcard[] = [];
+    let failedParseCount = 0;
+    let failedValidationCount = 0;
+
     const qaPattern = /Q:\s*(.+?)\s*A:\s*([\s\S]+?)(?=Q:|$)/g;
     let match: RegExpExecArray | null;
 
@@ -1022,7 +1108,17 @@ Select exactly ${targetCount} diverse flashcards:`;
       const back = match[2].trim();
 
       if (front.length > 0 && back.length > 0) {
-        flashcards.push({ front, back });
+        const card: Flashcard = { front, back };
+
+        // Validate that flashcard is self-contained
+        if (!this.validateSelfContained(card)) {
+          failedValidationCount++;
+          continue; // Skip flashcards that aren't self-contained
+        }
+
+        flashcards.push(card);
+      } else {
+        failedParseCount++;
       }
     }
 
@@ -1044,7 +1140,13 @@ Select exactly ${targetCount} diverse flashcards:`;
 
         if (qMatch) {
           if (currentFront && currentBack) {
-            flashcards.push({ front: currentFront, back: currentBack });
+            const card: Flashcard = { front: currentFront, back: currentBack.trim() };
+            // Validate that flashcard is self-contained
+            if (this.validateSelfContained(card)) {
+              flashcards.push(card);
+            } else {
+              failedValidationCount++;
+            }
           }
           currentFront = qMatch[1].trim();
           currentBack = '';
@@ -1058,7 +1160,13 @@ Select exactly ${targetCount} diverse flashcards:`;
 
       // Add the last card
       if (currentFront && currentBack) {
-        flashcards.push({ front: currentFront, back: currentBack.trim() });
+        const card: Flashcard = { front: currentFront, back: currentBack.trim() };
+        // Validate that flashcard is self-contained
+        if (this.validateSelfContained(card)) {
+          flashcards.push(card);
+        } else {
+          failedValidationCount++;
+        }
       }
 
       logInfo({
@@ -1067,6 +1175,14 @@ Select exactly ${targetCount} diverse flashcards:`;
         extractedCount: flashcards.length,
       }, `Line-by-line extraction: ${flashcards.length} cards`);
     }
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'fallback_parse_complete',
+      extractedCount: flashcards.length,
+      failedParseCount,
+      failedValidationCount,
+    }, `Extracted ${flashcards.length} flashcards (${failedParseCount} failed to parse, ${failedValidationCount} failed validation)`);
 
     return flashcards;
   }

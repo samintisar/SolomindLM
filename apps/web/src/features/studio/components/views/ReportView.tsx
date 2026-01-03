@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { XCircle, Loader2 } from 'lucide-react';
 import { ReportNote } from '@/shared/types/index';
 
@@ -38,7 +40,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ note }) => {
                    <div className="prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed select-text">
                       {note.content ? (
                           <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
+                              remarkPlugins={[remarkGfm, remarkMath]}
+                              rehypePlugins={[rehypeKatex]}
                               components={{
                                   img: () => null,
                                   a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,

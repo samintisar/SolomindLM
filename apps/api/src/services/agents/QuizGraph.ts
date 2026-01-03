@@ -59,15 +59,34 @@ const GRAPH_CONFIG = {
   MAP_CHUNK_SIZE: parseInt(env.QUIZ_MAP_CHUNK_SIZE || '20000', 10),
   // Reduce phase: smart_llm (261K tokens) -> 40K chars (~10K tokens)
   REDUCE_CHUNK_SIZE: parseInt(env.QUIZ_REDUCE_CHUNK_SIZE || '40000', 10),
-  // Questions per chunk bounds
+  // Minimum questions per chunk (dynamic max is calculated based on chunk count)
   MIN_QUESTIONS_PER_CHUNK: 3,
-  MAX_QUESTIONS_PER_CHUNK: 6,
   // Minimum chunks to process
   MIN_CHUNKS: 3,
   // Timeout settings for LLM calls
   MAP_TIMEOUT_MS: parseInt(env.QUIZ_MAP_TIMEOUT_MS || '180000', 10), // 3 minutes
   REDUCE_TIMEOUT_MS: parseInt(env.QUIZ_REDUCE_TIMEOUT_MS || '240000', 10), // 4 minutes
+  // Collapse recursion limit to prevent infinite loops
+  MAX_COLLAPSE_DEPTH: 5,
+  // Minimum question block length for parsing (characters)
+  MIN_QUESTION_BLOCK_LENGTH: 50,
+  // Topic allocation multiplier for question refinement
+  // Allows topics to take up to 2x their proportional share to ensure diversity
+  TOPIC_ALLOCATION_MULTIPLIER: 2.0,
 } as const;
+
+// Problematic phrases that indicate questions aren't self-contained
+// Only include phrases that are strong indicators of external content references
+// Note: "the following" is intentionally excluded - it's commonly used in "Which of the following..." questions
+const PROBLEMATIC_PHRASES = [
+  'the diagram',
+  'the above',
+  'as shown',
+  'this chart',
+  'that example',
+  'the table',
+  'this figure',
+] as const;
 
 // ============================================================
 // STATE DEFINITIONS
@@ -110,6 +129,10 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'generating',
   }),
+  reduceRetryCount: Annotation<number>({
+    reducer: (_x: number, y?: number) => y ?? _x,
+    default: () => 0,
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -145,18 +168,45 @@ const getMapPrompt = (params: {
 
   return `You are an expert educator creating HIGH-QUALITY multiple-choice quiz questions from educational content.
 
-HARD LIMIT: Generate ${questionsPerChunk} questions maximum from this section. NOT more.
+REQUIRED OUTPUT: You MUST generate exactly ${questionsPerChunk} questions from this section.
 This is part of a larger set targeting ${questionCount} total questions across all chunks.
 
 **Difficulty Level: ${difficulty.toUpperCase()}** (${difficultyGuidance[difficulty] || difficulty})
 ${focus ? `**Topic Focus:** ${focus}` : ''}
 
 CRITICAL REQUIREMENTS:
-- Generate exactly 4 options per question (A, B, C, D)
+- You MUST output exactly ${questionsPerChunk} questions - no fewer, no more
+- **EXACTLY 4 OPTIONS ONLY** - Each question MUST have exactly 4 options labeled A), B), C), D)
+- **NO E) OPTION** - Never add a 5th option (E, F, etc.). Only A, B, C, D exist.
 - Distractors (wrong options) must be plausible but clearly incorrect to someone who studied
 - Avoid giving away the answer with obvious patterns (e.g., "All of the above")
 - Hints must GUIDE thinking without revealing the answer - point to relevant concepts, ask leading questions, or suggest what to consider
 - Explanations should clearly explain why the correct answer is right, connecting to key concepts
+
+**SELF-CONTAINED QUESTIONS REQUIREMENT:**
+CRITICAL: Each question MUST BE COMPLETELY SELF-CONTAINED. The user will ONLY see the question text and options.
+
+RULES FOR CONTEXT INCLUSION:
+1. If a question references a diagram, chart, or visual element:
+   - Describe it thoroughly within the question
+   - Example: "Based on the ER diagram showing Entities A(id) and B(id) with a one-to-many relationship from A to B..."
+
+2. If a question references a code snippet:
+   - Include the relevant code in the question
+   - Example: "Consider this code: function foo() { return 1; } What does it return?"
+
+3. If a question references a scenario/example:
+   - Summarize the key details within the question
+   - Example: "In a scenario where a user attempts login with invalid credentials..."
+
+4. NEVER use vague references like "the diagram", "the following", or "the above" without including the actual content
+   - REWRITE to include the actual content being referenced
+
+5. If context is too long (>300 chars):
+   - Summarize the essential parts needed to answer
+   - Example: "Given a database schema with Users(id, email) and Orders(user_id, total)..." instead of full schema
+
+BALANCE: Questions should be complete but concise. Include only what's necessary to answer correctly.
 
 **Hint Guidelines (IMPORTANT):**
 - DO NOT restate the answer in the hint
@@ -165,7 +215,39 @@ CRITICAL REQUIREMENTS:
 - DO use phrases like "Refer to...", "Recall that...", "Consider the..."
 
 **Format each question as:**
-Q: [your question text]
+
+EXAMPLE 1 - Formula Reference:
+Q: Using the formula F = ma, if a force of 100N is applied to a 10kg object, what is the acceleration?
+A) 0.1 m/s²
+B) 10 m/s²
+C) 100 m/s²
+D) 1000 m/s²
+ANSWER: B
+HINT: Rearrange the formula to solve for acceleration: a = F/m
+EXPLANATION: a = 100N / 10kg = 10 m/s²
+
+EXAMPLE 2 - Code Reference:
+Q: Consider this JavaScript code: const arr = [1, 2, 3]; arr.push(4); What is arr.length?
+A) 3
+B) 4
+C) undefined
+D) TypeError
+ANSWER: B
+HINT: The push() method adds an element to the array.
+EXPLANATION: After push(4), the array contains [1, 2, 3, 4], so length is 4.
+
+EXAMPLE 3 - Context-Heavy Reference:
+Q: A reaction produces 50g of product from 100g of reactant. What is the percent yield if the theoretical maximum is 80g?
+A) 37.5%
+B) 50%
+C) 62.5%
+D) 80%
+ANSWER: C
+HINT: Percent yield = (actual / theoretical) × 100
+EXPLANATION: (50g / 80g) × 100 = 62.5%
+
+Your question:
+Q: [your question text - COMPLETE AND SELF-CONTAINED with all necessary context]
 A) [option 1]
 B) [option 2]
 C) [option 3]
@@ -195,6 +277,11 @@ You MUST select questions from DIFFERENT topics. Do NOT select more than 2 quest
 If there are 8+ topics available, select 1-2 questions from each topic.
 Your goal is MAXIMUM TOPIC DIVERSITY, not maximum questions on one topic.
 
+QUALITY FILTER:
+- Prioritize questions that are self-contained (include all necessary context)
+- Avoid questions with vague references like "the diagram", "the example", "the above", or "the following" without embedded context
+- When selecting between similar questions, choose the one that includes more complete context
+
 TASK:
 1. First, mentally identify 6-10 distinct topics in the content below
 2. Then select ${questionCount} questions distributed EVENLY across those topics
@@ -203,10 +290,84 @@ TASK:
 Difficulty: ${difficulty}
 ${focus ? `User preference: ${focus} (but still maintain diversity)` : ''}
 
-AVAILABLE QUESTIONS:
-${content}
+IMPORTANT OUTPUT FORMAT REQUIREMENTS:
+- Your output must contain EXACTLY ${questionCount} questions
+- Start immediately with the first question - NO preamble, introduction, or summary
+- End after the last question - NO postamble or closing statement
+- Use the EXACT format shown below (each question must have Q:, A), B), C), D), ANSWER:, HINT:, EXPLANATION:)
 
-Select exactly ${questionCount} diverse questions. Return them in the same format.`;
+EXPECTED FORMAT (copy this exactly):
+Q: [question text]
+A) [option 1]
+B) [option 2]
+C) [option 3]
+D) [option 4]
+ANSWER: [A/B/C/D]
+HINT: [hint text]
+EXPLANATION: [explanation text]
+
+Q: [next question]
+A) [option 1]
+B) [option 2]
+C) [option 3]
+D) [option 4]
+ANSWER: [A/B/C/D]
+HINT: [hint text]
+EXPLANATION: [explanation text]
+
+[continue for all ${questionCount} questions]
+
+AVAILABLE QUESTIONS:
+${content}`;
+};
+
+// Stricter version of reduce prompt for retries when initial attempt fails
+const getReducePromptStrict = (params: {
+  content: string;
+  questionCount: number;
+  difficulty: string;
+  focus?: string;
+}): string => {
+  const { content, questionCount, difficulty, focus } = params;
+
+  return `You are selecting quiz questions for a study set.
+
+CRITICAL: Your previous output was NOT in the correct format. Follow these instructions EXACTLY.
+
+OUTPUT FORMAT RULES (MUST FOLLOW):
+1. Start IMMEDIATELY with "Q:" - NO introduction, preamble, or summary
+2. Each question MUST have exactly 4 options labeled A), B), C), D)
+3. Each question MUST have ANSWER:, HINT:, and EXPLANATION: fields
+4. Output EXACTLY ${questionCount} questions - no more, no less
+5. End after the last question - NO closing statement
+
+WRONG (do NOT do this):
+❌ "Here are 30 questions..."
+❌ "I have selected the following questions..."
+❌ "Below is a diverse set..."
+❌ Any introduction or conclusion text
+
+CORRECT (do this instead):
+✅ Q: What is...?
+✅ A) Option 1
+✅ B) Option 2
+✅ C) Option 3
+✅ D) Option 4
+✅ ANSWER: A
+✅ HINT: Consider...
+✅ EXPLANATION: The correct answer...
+
+Q: [next question]
+A) [option]
+...
+
+DIFFERENT TOPICS REQUIRED: Select from different topics, max 2 per topic.
+
+Difficulty: ${difficulty}
+${focus ? `User preference: ${focus}` : ''}
+
+AVAILABLE QUESTIONS:
+${content}`;
 };
 
 // ============================================================
@@ -244,9 +405,8 @@ export function validateChunks(chunks: string[]): string[] {
 export class QuizGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
-  private maxTokens: number;
 
-  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = 16000) {
+  constructor(apiKey: string, mapModel: string, reduceModel: string) {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
@@ -258,8 +418,6 @@ export class QuizGraph {
       model: reduceModel,
       temperature: 0.5,
     });
-
-    this.maxTokens = maxTokens;
   }
 
   private estimateTokens(text: string): number {
@@ -311,8 +469,16 @@ export class QuizGraph {
     const validatedChunks = validateChunks(state.chunks);
     const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE);
 
+    // Dynamic max questions per chunk: fewer chunks → higher max, more chunks → lower max
+    // This ensures we can hit the target without over-generating when there are many chunks
+    // Formula: target divided by chunks, with 1.5x buffer to account for under-generation
+    const dynamicMaxPerChunk = Math.max(
+      4, // Minimum max even with many chunks
+      Math.min(12, Math.ceil(state.questionCount / packedChunks.length * 1.5))
+    );
+
     let adjustedQuestionCount = state.questionCount;
-    const maxPossibleQuestions = packedChunks.length * GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK;
+    const maxPossibleQuestions = packedChunks.length * dynamicMaxPerChunk;
 
     if (state.questionCount > maxPossibleQuestions) {
       console.warn(`[QuizGraph] Target adjustment: ${state.questionCount} questions requested, max possible: ${maxPossibleQuestions}`);
@@ -321,7 +487,7 @@ export class QuizGraph {
 
     const questionsPerChunk = Math.max(
       GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
-      Math.min(GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK, Math.ceil(adjustedQuestionCount / packedChunks.length))
+      Math.min(dynamicMaxPerChunk, Math.ceil(adjustedQuestionCount / packedChunks.length))
     );
 
     console.log(JSON.stringify({
@@ -332,7 +498,9 @@ export class QuizGraph {
       packedChunks: packedChunks.length,
       originalTarget: state.questionCount,
       adjustedTarget: adjustedQuestionCount,
+      dynamicMaxPerChunk,
       questionsPerChunk,
+      maxPossible: packedChunks.length * dynamicMaxPerChunk,
       difficulty: state.difficulty,
       focus: state.focus,
     }, null, 2));
@@ -475,7 +643,11 @@ export class QuizGraph {
     }, null, 2));
 
     if (!state.mapOutputs || state.mapOutputs.length === 0) {
-      console.error('[QuizGraph] Collapse: ERROR - No mapOutputs received!');
+      logError({
+        agent: 'QuizGraph',
+        phase: 'collapse',
+        error: 'No mapOutputs received',
+      }, 'Collapse: ERROR - No mapOutputs received!');
       return {
         ...state,
         collapsedOutputs: [],
@@ -488,11 +660,21 @@ export class QuizGraph {
       0
     );
 
-    console.log(`[QuizGraph] Total tokens: ${totalTokens}, Reduce chunk size: ${GRAPH_CONFIG.REDUCE_CHUNK_SIZE} chars`);
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'collapse',
+      totalTokens,
+      reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE,
+    }, `Total tokens: ${totalTokens}, Reduce chunk size: ${GRAPH_CONFIG.REDUCE_CHUNK_SIZE} chars`);
 
     const estimatedChars = totalTokens * 4;
     if (estimatedChars <= GRAPH_CONFIG.REDUCE_CHUNK_SIZE) {
-      console.log('[QuizGraph] Collapse: skipping recursive collapse, using mapOutputs directly');
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'collapse_skip',
+        estimatedChars,
+        reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE,
+      }, 'Collapse: skipping recursive collapse, using mapOutputs directly');
       return {
         ...state,
         collapsedOutputs: state.mapOutputs,
@@ -500,7 +682,12 @@ export class QuizGraph {
       };
     }
 
-    console.log('[QuizGraph] Collapse: performing recursive collapse');
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'collapse_recursive',
+      estimatedChars,
+      reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE,
+    }, 'Collapse: performing recursive collapse');
     const collapsed = await this.recursiveCollapse(state.mapOutputs);
     return {
       ...state,
@@ -509,7 +696,19 @@ export class QuizGraph {
     };
   }
 
-  private async recursiveCollapse(outputs: string[]): Promise<string[]> {
+  private async recursiveCollapse(outputs: string[], depth: number = 0): Promise<string[]> {
+    // Prevent infinite loops with depth limit
+    if (depth >= GRAPH_CONFIG.MAX_COLLAPSE_DEPTH) {
+      logWarn({
+        agent: 'QuizGraph',
+        phase: 'recursive_collapse',
+        depth,
+        maxDepth: GRAPH_CONFIG.MAX_COLLAPSE_DEPTH,
+        outputCount: outputs.length,
+      }, `Max collapse depth (${GRAPH_CONFIG.MAX_COLLAPSE_DEPTH}) reached, returning current outputs`);
+      return outputs;
+    }
+
     const totalTokens = outputs.reduce(
       (sum, s) => sum + this.estimateTokens(s),
       0
@@ -541,7 +740,7 @@ export class QuizGraph {
       collapsed.push(await this.collapseGroup(currentGroup));
     }
 
-    return this.recursiveCollapse(collapsed);
+    return this.recursiveCollapse(collapsed, depth + 1);
   }
 
   private async collapseGroup(group: string[]): Promise<string> {
@@ -570,7 +769,7 @@ export class QuizGraph {
   }
 
   // Node: Reduce phase
-  async reduce(state: OverallStateType): Promise<Partial<OverallStateType>> {
+  async reduce(state: OverallStateType): Promise<Partial<OverallStateType> | Send> {
     // Structured logging start
     logPhaseStart({
       agent: 'QuizGraph',
@@ -584,14 +783,220 @@ export class QuizGraph {
     const combined = state.collapsedOutputs.join('\n\n---\n\n');
     const totalQuestionsBefore = combined.split('Q:').length - 1;
 
+    // Determine if we should use LLM for intelligent selection
+    // Skip LLM if we're close to target count (within 10%) OR if we have fewer questions than target
+    // (asking LLM to output more questions than exist causes it to hallucinate malformed content)
+    const shouldSkipLLM = (totalQuestionsBefore >= state.questionCount * 0.9 &&
+                          totalQuestionsBefore <= state.questionCount * 1.1) ||
+                          totalQuestionsBefore < state.questionCount;
+
+    if (shouldSkipLLM) {
+      const skipReason = totalQuestionsBefore < state.questionCount
+        ? 'Fewer questions than target (LLM would hallucinate)'
+        : 'Question count within acceptable range';
+
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_skip_llm',
+        combinedLength: combined.length,
+        totalQuestionsExtracted: totalQuestionsBefore,
+        targetQuestionCount: state.questionCount,
+        reason: skipReason,
+      }, `Skipping LLM reduce, parsing ${totalQuestionsBefore} questions directly from map outputs...`);
+
+      const questions = this.fallbackParseQuizQuestions(combined);
+
+      // Validate quiz quality
+      const validation = validateQuiz(JSON.stringify(questions), state.questionCount);
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_after_parsing',
+        questionsParsed: questions.length,
+        validation: {
+          isValid: validation.isValid,
+          warnings: validation.warnings,
+          score: validation.score,
+        },
+      }, `Parsed ${questions.length} questions from map outputs`);
+
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce',
+        questionsGenerated: questions.length,
+        targetQuestionCount: state.questionCount,
+      }, `Generated ${questions.length} questions (target: ${state.questionCount})`);
+
+      if (questions.length === 0) {
+        logError({
+          agent: 'QuizGraph',
+          phase: 'reduce',
+          error: 'No questions generated',
+          totalQuestionsBefore,
+        }, `CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions!`);
+        return {
+          ...state,
+          finalOutput: [],
+          status: 'failed',
+        };
+      }
+
+      // Post-processing: enforce exact question count
+      if (questions.length > state.questionCount) {
+        logInfo({
+          agent: 'QuizGraph',
+          phase: 'reduce_refinement',
+          currentCount: questions.length,
+          targetCount: state.questionCount,
+        }, `Have ${questions.length} questions, need exactly ${state.questionCount}. Running fast topic-based refinement.`);
+
+        const refined = this.refineQuestionSelectionFast(questions, state.questionCount);
+
+        // Log final refined questions
+        logInfo({
+          agent: 'QuizGraph',
+          phase: 'reduce_final',
+          finalQuestionCount: refined.length,
+          finalQuestions: refined.map((q, idx) => ({
+            index: idx + 1,
+            question: q.question,
+            optionsCount: q.options.length,
+            answer: q.answer,
+          })),
+        });
+
+        logBanner(
+          {
+            agent: 'QuizGraph',
+            phase: 'generation_complete',
+            finalQuestionCount: refined.length,
+            targetQuestionCount: state.questionCount,
+          },
+          'GENERATION COMPLETE'
+        );
+
+        return {
+          ...state,
+          finalOutput: refined,
+          status: 'completed',
+        };
+      }
+
+      if (questions.length < state.questionCount) {
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'reduce',
+          generatedCount: questions.length,
+          targetCount: state.questionCount,
+        }, `Generated ${questions.length} questions, target was ${state.questionCount}. Accepting fewer.`);
+      }
+
+      // Log final questions
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_final',
+        finalQuestionCount: questions.length,
+        finalQuestions: questions.map((q, idx) => ({
+          index: idx + 1,
+          question: q.question,
+          optionsCount: q.options.length,
+          answer: q.answer,
+        })),
+      });
+
+      logBanner(
+        {
+          agent: 'QuizGraph',
+          phase: 'generation_complete',
+          finalQuestionCount: questions.length,
+          targetQuestionCount: state.questionCount,
+        },
+        'GENERATION COMPLETE'
+      );
+
+      return {
+        ...state,
+        finalOutput: questions,
+        status: 'completed',
+      };
+    }
+
+    // Use smart LLM for intelligent selection
+    const retryCount = state.reduceRetryCount ?? 0;
+
     logInfo({
       agent: 'QuizGraph',
-      phase: 'reduce_before_parsing',
-      combinedLength: combined.length,
-      totalQuestionsExtracted: totalQuestionsBefore,
-    }, `Skipping LLM reduce, parsing ${totalQuestionsBefore} questions directly from map outputs...`);
+      phase: 'reduce_llm_selection',
+      totalQuestionsBefore,
+      targetQuestionCount: state.questionCount,
+      retryAttempt: retryCount + 1,
+      reason: 'Question count outside acceptable range, using LLM for selection',
+    }, `Using smart LLM for intelligent question selection from ${totalQuestionsBefore} questions [Attempt ${retryCount + 1}/2]...`);
 
-    const questions = this.fallbackParseQuizQuestions(combined);
+    const sanitizedFocus = state.focus ? sanitizeUserInput(state.focus) : undefined;
+
+    // Use stricter prompt on retries
+    const prompt = retryCount > 0
+      ? getReducePromptStrict({
+          content: combined,
+          questionCount: state.questionCount,
+          difficulty: state.difficulty,
+          focus: sanitizedFocus,
+        })
+      : getReducePrompt({
+          content: combined,
+          questionCount: state.questionCount,
+          difficulty: state.difficulty,
+          focus: sanitizedFocus,
+        });
+
+    let llmOutput: string;
+    try {
+      const response = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => this.smartLlm.invoke([
+            new SystemMessage('You are a quiz curator selecting diverse, high-quality questions for study sets.'),
+            new HumanMessage(prompt),
+          ]),
+          GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+          'QuizReduce'
+        ),
+        {
+          maxAttempts: 2,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'QuizGraph',
+              phase: 'reduce_llm_retry',
+              attempt,
+              error: error.message,
+            }, `LLM reduce retry attempt ${attempt}/2`);
+          }
+        },
+        'QuizReduce'
+      );
+
+      llmOutput = response.content.toString();
+
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_llm_success',
+        outputLength: llmOutput.length,
+      }, `LLM selection completed, output: ${llmOutput.length} chars`);
+    } catch (error) {
+      // Fallback to parsing all questions if LLM fails
+      logError({
+        agent: 'QuizGraph',
+        phase: 'reduce_llm_failed',
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+        } : String(error),
+      }, `LLM reduce failed, falling back to direct parsing`);
+
+      llmOutput = combined;
+    }
+
+    const questions = this.fallbackParseQuizQuestions(llmOutput);
 
     // Validate quiz quality
     const validation = validateQuiz(JSON.stringify(questions), state.questionCount);
@@ -604,7 +1009,7 @@ export class QuizGraph {
         warnings: validation.warnings,
         score: validation.score,
       },
-    }, `Parsed ${questions.length} questions from map outputs`);
+    }, `Parsed ${questions.length} questions after LLM selection`);
 
     logInfo({
       agent: 'QuizGraph',
@@ -614,12 +1019,32 @@ export class QuizGraph {
     }, `Generated ${questions.length} questions (target: ${state.questionCount})`);
 
     if (questions.length === 0) {
+      // Retry with stricter prompt if we haven't exceeded max retries
+      const MAXReduce_RETRIES = 1; // Allow 1 retry (total 2 attempts)
+      if (retryCount < MAXReduce_RETRIES) {
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'reduce',
+          error: 'No questions parsed from LLM output',
+          totalQuestionsBefore,
+          currentAttempt: retryCount + 1,
+        }, `LLM output produced 0 parsable questions. Retrying with stricter prompt...`);
+
+        // Return a Send to re-route to reduce with incremented retry count
+        return new Send('reduce', {
+          ...state,
+          reduceRetryCount: retryCount + 1,
+        } as any);
+      }
+
+      // Final failure after all retries exhausted
       logError({
         agent: 'QuizGraph',
         phase: 'reduce',
-        error: 'No questions generated',
+        error: 'No questions generated after all retry attempts',
         totalQuestionsBefore,
-      }, `CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions!`);
+        totalAttempts: retryCount + 1,
+      }, `CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions after ${retryCount + 1} attempts!`);
       return {
         ...state,
         finalOutput: [],
@@ -731,6 +1156,43 @@ export class QuizGraph {
     return cleaned.trim();
   }
 
+  /**
+   * Validate that a question is self-contained (doesn't reference external content)
+   * Returns true if the question is self-contained, false if it has problematic phrases.
+   *
+   * Smart validation: Only reject questions that are BOTH short (<150 chars) AND have problematic phrases.
+   * Longer questions likely include the necessary context embedded.
+   */
+  private validateSelfContained(question: QuizQuestion): boolean {
+    const text = question.question.toLowerCase();
+    const hasProblematicPhrase = PROBLEMATIC_PHRASES.some(phrase => text.includes(phrase));
+    const isShort = text.length < 150;
+
+    // Only reject if both short AND has problematic phrases
+    // (longer questions likely have context embedded despite the phrases)
+    const shouldReject = hasProblematicPhrase && isShort;
+
+    if (shouldReject) {
+      logWarn({
+        agent: 'QuizGraph',
+        phase: 'validate_self_contained',
+        questionPreview: question.question.substring(0, 100),
+        questionLength: text.length,
+        foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
+      }, 'Question rejected: short with potential external references');
+    } else if (hasProblematicPhrase && !isShort) {
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'validate_self_contained_accept',
+        questionPreview: question.question.substring(0, 100),
+        questionLength: text.length,
+        foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
+      }, 'Question accepted: has phrases but is long enough to include context');
+    }
+
+    return !shouldReject;
+  }
+
   // Fallback parser for quiz questions
   private fallbackParseQuizQuestions(content: string): QuizQuestion[] {
     logInfo({
@@ -740,27 +1202,44 @@ export class QuizGraph {
     }, 'Attempting manual parsing...');
 
     const questions: QuizQuestion[] = [];
+    let failedParseCount = 0;
+    let failedValidationCount = 0;
 
     // Split by Q: markers
-    const questionBlocks = content.split(/Q:\s*/).filter(block => block.trim().length > 50);
+    const questionBlocks = content.split(/Q:\s*/).filter(block => block.trim().length > GRAPH_CONFIG.MIN_QUESTION_BLOCK_LENGTH);
 
     for (const block of questionBlocks) {
       try {
         const questionText = block.split(/\n[A]\)|\nA\)/)[0]?.trim() || '';
         if (!questionText) continue;
 
-        // Extract options
-        const optionsMatch = block.match(/(?:A\)|A\))\s*([\s\S]+?)(?:\n[B]\)|\nB\))/);
+        // Extract options - Fixed duplicate regex pattern
+        const optionsMatch = block.match(/A\)\s*([\s\S]+?)(?:\nB\)|\nB\))/);
         const optionA = optionsMatch?.[1]?.trim() || '';
 
-        const bMatch = block.match(/(?:B\)|B\))\s*([\s\S]+?)(?:\n[C]\)|\nC\))/);
+        const bMatch = block.match(/B\)\s*([\s\S]+?)(?:\nC\)|\nC\))/);
         const optionB = bMatch?.[1]?.trim() || '';
 
-        const cMatch = block.match(/(?:C\)|C\))\s*([\s\S]+?)(?:\n[D]\)|\nD\))/);
+        const cMatch = block.match(/C\)\s*([\s\S]+?)(?:\nD\)|\nD\))/);
         const optionC = cMatch?.[1]?.trim() || '';
 
-        const dMatch = block.match(/(?:D\)|D\))\s*([\s\S]+?)(?:\nANSWER:|\nANSWER\))/);
+        const dMatch = block.match(/D\)\s*([\s\S]+?)(?:\nANSWER:|\nANSWER\))/);
         const optionD = dMatch?.[1]?.trim() || '';
+
+        // Validate that we have exactly 4 non-empty options
+        const options = [optionA, optionB, optionC, optionD];
+        const validOptionsCount = options.filter(o => o.length > 0).length;
+
+        if (validOptionsCount !== 4) {
+          failedParseCount++;
+          logWarn({
+            agent: 'QuizGraph',
+            phase: 'fallback_parse_validation',
+            questionPreview: questionText.substring(0, 100),
+            optionsFound: validOptionsCount,
+          }, `Question has invalid number of options (${validOptionsCount}/4), skipping`);
+          continue;
+        }
 
         // Extract answer
         const answerMatch = block.match(/ANSWER:\s*([ABCD])/i);
@@ -777,16 +1256,23 @@ export class QuizGraph {
         const rawExplanation = explanationMatch?.[1]?.trim() || 'The correct answer follows from the material.';
         const explanation = this.cleanExplanation(rawExplanation);
 
-        if (questionText && optionA && optionB && optionC && optionD) {
-          questions.push({
-            question: questionText,
-            options: [optionA, optionB, optionC, optionD],
-            answer: answerIndex,
-            hint,
-            explanation,
-          });
+        const question: QuizQuestion = {
+          question: questionText,
+          options: [optionA, optionB, optionC, optionD],
+          answer: answerIndex,
+          hint,
+          explanation,
+        };
+
+        // Validate that question is self-contained
+        if (!this.validateSelfContained(question)) {
+          failedValidationCount++;
+          continue; // Skip questions that aren't self-contained
         }
+
+        questions.push(question);
       } catch (e) {
+        failedParseCount++;
         logWarn({
           agent: 'QuizGraph',
           phase: 'fallback_parse_error',
@@ -799,7 +1285,10 @@ export class QuizGraph {
       agent: 'QuizGraph',
       phase: 'fallback_parse_complete',
       extractedCount: questions.length,
-    }, `Extracted ${questions.length} questions`);
+      failedParseCount,
+      failedValidationCount,
+      totalBlocks: questionBlocks.length,
+    }, `Extracted ${questions.length} questions (${failedParseCount} failed to parse, ${failedValidationCount} failed validation)`);
 
     return questions;
   }
@@ -832,7 +1321,10 @@ export class QuizGraph {
     // Allocate questions proportionally
     const allocations: Record<string, number> = {};
     let allocated = 0;
-    const maxPerTopic = Math.max(2, Math.ceil(targetCount / topics.length * 2));
+    const maxPerTopic = Math.max(
+      2,
+      Math.ceil(targetCount / topics.length * GRAPH_CONFIG.TOPIC_ALLOCATION_MULTIPLIER)
+    );
 
     for (const topic of topics) {
       const topicSize = topicGroups[topic].length;

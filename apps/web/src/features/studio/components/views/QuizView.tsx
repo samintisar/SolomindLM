@@ -7,6 +7,10 @@ import {
   XCircle,
   Info,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { QuizNote } from '@/shared/types/index';
 
 export interface QuizViewProps {
@@ -112,9 +116,27 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                         </div>
                     </div>
 
-                    <h3 className="text-xl md:text-3xl font-bold font-serif mb-10 leading-snug text-foreground">
-                        {currentQuestion.question}
-                    </h3>
+                    <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-10 text-lg md:text-2xl">
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm, remarkMath]}
+                            rehypePlugins={[rehypeKatex]}
+                            components={{
+                                img: () => null,
+                                a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
+                                video: () => null,
+                                audio: () => null,
+                                iframe: () => null,
+                                table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                tbody: ({ children }) => <tbody>{children}</tbody>,
+                                tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+                            }}
+                        >
+                            {currentQuestion.question}
+                        </ReactMarkdown>
+                    </div>
 
                     <div className="space-y-4 flex-1 pb-10">
                         {currentQuestion.options.map((option, idx) => {
@@ -139,7 +161,28 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                                     disabled={isAnswered}
                                     className={`w-full text-left p-5 md:p-6 rounded-xl border-2 transition-all flex items-center justify-between group ${stateStyles}`}
                                 >
-                                    <span className="font-medium text-base md:text-lg">{option}</span>
+                                    <div className="flex-1 prose prose-stone dark:prose-invert max-w-none font-serif text-base md:text-lg">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                            rehypePlugins={[rehypeKatex]}
+                                            components={{
+                                                img: () => null,
+                                                a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
+                                                video: () => null,
+                                                audio: () => null,
+                                                iframe: () => null,
+                                                table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                                thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                                tbody: ({ children }) => <tbody>{children}</tbody>,
+                                                tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                                th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                                td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+                                                p: ({ children }) => <span className="font-medium">{children}</span>,
+                                            }}
+                                        >
+                                            {option}
+                                        </ReactMarkdown>
+                                    </div>
                                     {isAnswered && idx === currentQuestion.answer && <CheckCircle2 className="w-5 h-5 text-success" />}
                                     {isAnswered && idx === selectedOption && idx !== currentQuestion.answer && <XCircle className="w-5 h-5 text-destructive" />}
                                 </button>
@@ -154,9 +197,28 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                                 <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                                 <div className="flex-1">
                                     <span className="font-semibold text-sm text-blue-800 dark:text-blue-200">Explanation</span>
-                                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1.5 leading-relaxed">
-                                        {currentQuestion.explanation}
-                                    </p>
+                                    <div className="text-sm text-blue-700 dark:text-blue-300 mt-1.5 leading-relaxed prose prose-sm prose-stone dark:prose-invert max-w-none">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                            rehypePlugins={[rehypeKatex]}
+                                            components={{
+                                                img: () => null,
+                                                a: ({ node, children, ...props }) => <span className="text-blue-700 dark:text-blue-300">{children}</span>,
+                                                video: () => null,
+                                                audio: () => null,
+                                                iframe: () => null,
+                                                table: ({ children }) => <table className="w-full border-collapse border border-blue-300 dark:border-blue-600 rounded-lg overflow-hidden">{children}</table>,
+                                                thead: ({ children }) => <thead className="bg-blue-200/50 dark:bg-blue-800/50">{children}</thead>,
+                                                tbody: ({ children }) => <tbody>{children}</tbody>,
+                                                tr: ({ children }) => <tr className="border-b border-blue-300 dark:border-blue-600">{children}</tr>,
+                                                th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-blue-800 dark:text-blue-200 border-r border-blue-300 dark:border-blue-600 last:border-r-0">{children}</th>,
+                                                td: ({ children }) => <td className="px-4 py-2 text-blue-700 dark:text-blue-300 border-r border-blue-300 dark:border-blue-600 last:border-r-0">{children}</td>,
+                                                p: ({ children }) => <p className="text-sm text-blue-700 dark:text-blue-300">{children}</p>,
+                                            }}
+                                        >
+                                            {currentQuestion.explanation}
+                                        </ReactMarkdown>
+                                    </div>
                                 </div>
                             </div>
                         </div>

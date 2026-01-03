@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { Sparkles, RotateCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { FlashcardNote } from '@/shared/types/index';
 
 export interface FlashcardViewProps {
@@ -39,17 +43,57 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note }) => {
 
                     {/* Front */}
                     <div className="absolute inset-0 backface-hidden bg-card rounded-xl flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 text-center">
-                         <span className="text-xs uppercase tracking-widest text-muted-foreground absolute top-4 sm:top-6 flex-shrink-0">Front</span>
-                         <p className="text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)]">{currentCard.front}</p>
-                         <div className="absolute bottom-4 sm:bottom-6 text-xs text-muted-foreground/50 flex items-center gap-2 flex-shrink-0">
+                         <span className="text-xs uppercase tracking-widest text-muted-foreground absolute top-4 sm:top-6 shrink-0">Front</span>
+                         <div className="text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)] w-full prose prose-stone dark:prose-invert max-w-none">
+                             <ReactMarkdown
+                                 remarkPlugins={[remarkGfm, remarkMath]}
+                                 rehypePlugins={[rehypeKatex]}
+                                 components={{
+                                     img: () => null,
+                                     a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
+                                     video: () => null,
+                                     audio: () => null,
+                                     iframe: () => null,
+                                     table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                     thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                     tbody: ({ children }) => <tbody>{children}</tbody>,
+                                     tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                     th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                     td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+                                 }}
+                             >
+                                 {currentCard.front}
+                             </ReactMarkdown>
+                         </div>
+                         <div className="absolute bottom-4 sm:bottom-6 text-xs text-muted-foreground/50 flex items-center gap-2 shrink-0">
                              <RotateCw className="w-3 h-3" /> Click to flip
                          </div>
                     </div>
 
                     {/* Back */}
                     <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary rounded-xl flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
-                         <span className="text-xs uppercase tracking-widest text-secondary-foreground/60 absolute top-4 sm:top-6 flex-shrink-0">Back</span>
-                         <p className="text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)]">{currentCard.back}</p>
+                         <span className="text-xs uppercase tracking-widest text-secondary-foreground/60 absolute top-4 sm:top-6 shrink-0">Back</span>
+                         <div className="text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)] w-full prose prose-stone dark:prose-invert max-w-none">
+                             <ReactMarkdown
+                                 remarkPlugins={[remarkGfm, remarkMath]}
+                                 rehypePlugins={[rehypeKatex]}
+                                 components={{
+                                     img: () => null,
+                                     a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
+                                     video: () => null,
+                                     audio: () => null,
+                                     iframe: () => null,
+                                     table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                     thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                     tbody: ({ children }) => <tbody>{children}</tbody>,
+                                     tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                     th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                     td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+                                 }}
+                             >
+                                 {currentCard.back}
+                             </ReactMarkdown>
+                         </div>
                     </div>
 
                 </div>

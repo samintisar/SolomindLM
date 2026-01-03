@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Message, ReferenceChunk } from '@/shared/types/index';
 import { chatApi } from '../services/chatApi';
 
@@ -176,14 +180,58 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     if (refsArray.length === 0) {
-      return <div className="whitespace-pre-wrap">{cleanContent}</div>;
+      return (
+        <div className="prose prose-sm prose-stone dark:prose-invert max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              img: () => null,
+              a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
+              video: () => null,
+              audio: () => null,
+              iframe: () => null,
+              table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+              thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+              tbody: ({ children }) => <tbody>{children}</tbody>,
+              tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+              th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+              td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+            }}
+          >
+            {cleanContent}
+          </ReactMarkdown>
+        </div>
+      );
     }
 
     const refMap = Object.fromEntries(refsArray.map(ref => [ref.id, ref]));
     const parts = cleanContent.split(/(\[\d+\])/g);
 
     return (
-      <div className="whitespace-pre-wrap relative">
+      <div className="relative">
+        <div className="prose prose-sm prose-stone dark:prose-invert max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={{
+              img: () => null,
+              a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
+              video: () => null,
+              audio: () => null,
+              iframe: () => null,
+              table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+              thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+              tbody: ({ children }) => <tbody>{children}</tbody>,
+              tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+              th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+              td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+            }}
+          >
+            {cleanContent}
+          </ReactMarkdown>
+        </div>
+        {/* Reference badges */}
         {parts.map((part, idx) => {
           const match = part.match(/\[(\d+)\]/);
           if (match) {
@@ -201,7 +249,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </span>
             );
           }
-          return <span key={idx}>{part}</span>;
+          return null;
         })}
       </div>
     );
