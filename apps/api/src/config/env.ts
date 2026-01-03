@@ -27,6 +27,9 @@ const envSchema = z.object({
   FLASHCARD_MAX_CARDS_PER_CHUNK: z.string().default('18'),
   // Minimum chunks to process for diversity
   FLASHCARD_MIN_CHUNKS: z.string().default('3'),
+  // Timeout settings for LLM calls
+  FLASHCARD_MAP_TIMEOUT_MS: z.string().default('180000'),
+  FLASHCARD_REDUCE_TIMEOUT_MS: z.string().default('240000'),
   // Mind Map Generation
   // Map phase: 15K chars ≈ 3.75K tokens (~3% of 131K context)
   MINDMAP_MAP_CHUNK_SIZE: z.string().default('15000'),
@@ -47,6 +50,9 @@ const envSchema = z.object({
   // Reduce phase: 40K chars ≈ 10K tokens (~4% of 261K context)
   QUIZ_REDUCE_CHUNK_SIZE: z.string().default('40000'),
   QUIZ_MAX_TOKENS: z.string().default('16000'),
+  // Timeout settings for LLM calls
+  QUIZ_MAP_TIMEOUT_MS: z.string().default('180000'),
+  QUIZ_REDUCE_TIMEOUT_MS: z.string().default('240000'),
   // Audio Overview Generation
   DEEPGRAM_API_KEY: z.string(),
   AUDIO_MAP_CHUNK_SIZE: z.string().default('15000'),

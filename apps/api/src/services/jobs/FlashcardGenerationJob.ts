@@ -94,6 +94,7 @@ export async function flashcardGenerationJob(
       flashcards: result.flashcards,
       metadata: {
         ...result.metadata,
+        cardCount: result.flashcards.length, // Override with actual count
         phase: 'completed',
         generatedAt: new Date().toISOString(),
       },

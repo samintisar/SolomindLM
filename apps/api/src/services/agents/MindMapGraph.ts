@@ -4,6 +4,22 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 
+// Shared utilities for production-level patterns
+import {
+  invokeWithTimeout,
+  invokeWithRetry,
+  RetryConfig,
+  packChunks as sharedPackChunks,
+  validateChunks as sharedValidateChunks,
+  ChunkConfig,
+  logInfo,
+  logWarn,
+  logError,
+  logPhaseStart,
+  logPhaseComplete,
+  logBanner,
+} from './shared/index.js';
+
 // ============================================================
 // CONFIGURATION
 // ============================================================
@@ -129,71 +145,28 @@ Generate the mind map now.`;
 // HELPER FUNCTIONS
 // ============================================================
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> {
-  let timer: NodeJS.Timeout;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(errorMsg)), timeoutMs);
-  });
-  return Promise.race([promise.finally(() => clearTimeout(timer!)), timeoutPromise]);
-}
-
+/**
+ * Wrapper around shared packChunks utility with MindMapGraph logging.
+ */
 export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[MindMapGraph] ===== CHUNK PACKING =====`);
-  console.log(`[MindMapGraph] Original chunks: ${chunks.length}`);
-  console.log(`[MindMapGraph] Target size: ${targetSize} chars per packed chunk`);
-
-  const packed: string[] = [];
-  const buffer: string[] = [];
-  let bufferSize = 0;
-
-  for (const chunk of chunks) {
-    if (!chunk?.trim()) continue;
-
-    const chunkSize = chunk.length + (buffer.length > 0 ? 2 : 0);
-
-    if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
-      packed.push(buffer.join('\n\n'));
-      buffer.length = 0;
-      bufferSize = 0;
-    }
-
-    buffer.push(chunk);
-    bufferSize += chunkSize;
-  }
-
-  if (buffer.length > 0) {
-    packed.push(buffer.join('\n\n'));
-  }
-
-  const totalOriginalChars = chunks.join('').length;
-  const totalPackedChars = packed.join('').length;
-  const reduction = Math.round((1 - packed.length / chunks.length) * 100);
-
-  console.log(`[MindMapGraph] Packed into: ${packed.length} chunks`);
-  console.log(`[MindMapGraph] Original: ${totalOriginalChars} chars → Packed: ${totalPackedChars} chars`);
-  console.log(`[MindMapGraph] Reduction: ${chunks.length} → ${packed.length} (${reduction}% fewer API calls)`);
-
-  return packed;
+  return sharedPackChunks(chunks, {
+    targetSize,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'MindMapGraph',
+  });
 }
 
+/**
+ * Wrapper around shared validateChunks utility with MindMapGraph logging.
+ */
 export function validateChunks(chunks: string[]): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[MindMapGraph] ===== INPUT VALIDATION =====`);
-  console.log(`[MindMapGraph] Input chunks: ${chunks.length}`);
-
-  const validated = chunks
-    .filter(c => c && typeof c === 'string')
-    .map(c => c.slice(0, 50000))
-    .filter(c => c.trim().length > 50);
-
-  const filteredOut = chunks.length - validated.length;
-  console.log(`[MindMapGraph] Valid chunks: ${validated.length}`);
-  console.log(`[MindMapGraph] Filtered out: ${filteredOut} (too short or invalid)`);
-
-  return validated;
+  return sharedValidateChunks(chunks, {
+    targetSize: GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'MindMapGraph',
+  });
 }
 
 // ============================================================
@@ -227,8 +200,14 @@ export class MindMapGraph {
     const validated = validateChunks(state.allChunks);
     const packed = packChunks(validated, GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE);
 
-    console.log(`\n[MindMapGraph] 🚀 FANNING OUT: ${packed.length} packed chunks (Original: ${state.allChunks.length})`);
-    console.log(`[MindMapGraph] Max concurrency: ${GRAPH_CONFIG.MAX_CONCURRENT_CHUNKS}`);
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'route_input',
+      originalChunks: state.allChunks.length,
+      validatedChunks: validated.length,
+      packedChunks: packed.length,
+      maxConcurrency: GRAPH_CONFIG.MAX_CONCURRENT_CHUNKS,
+    }, `Fanning out: ${packed.length} packed chunks (Original: ${state.allChunks.length})`);
 
     return packed.map(chunk => new Send("map_process", {
       content: chunk,
@@ -241,7 +220,13 @@ export class MindMapGraph {
     const chunkLength = state.content?.length || 0;
     const retryCount = state.retryCount ?? 0;
 
-    console.log(`[MindMapGraph] → Processing chunk (${chunkLength} chars) [Attempt ${retryCount + 1}/3]`);
+    // Structured logging start
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'map_process',
+      chunkLength,
+      attempt: retryCount + 1,
+    }, `Processing chunk (${chunkLength} chars) [Attempt ${retryCount + 1}/3]`);
 
     // @ts-ignore
     const parser = this.fastLlm.withStructuredOutput(ConceptExtractionSchema);
@@ -254,40 +239,83 @@ export class MindMapGraph {
         await new Promise(r => setTimeout(r, Math.random() * 2000));
       }
 
-      const response = await withTimeout(
-        parser.invoke([
-          new SystemMessage('Extract main theme, 2–3 sentence summary, and 10–20 key concepts.'),
-          new HumanMessage(MAP_PROMPT.replace('{content}', state.content || ''))
-        ]),
+      // Use shared timeout and retry utilities
+      const response = await invokeWithTimeout(
+        () => invokeWithRetry(
+          () => parser.invoke([
+            new SystemMessage('Extract main theme, 2–3 sentence summary, and 10–20 key concepts.'),
+            new HumanMessage(MAP_PROMPT.replace('{content}', state.content || ''))
+          ]),
+          {
+            maxAttempts: 3 - retryCount,
+            baseDelayMs: 1000,
+            retryableErrors: (error) => {
+              const msg = error instanceof Error ? error.message.toLowerCase() : String(error);
+              return msg.includes('timeout') || msg.includes('500') || msg.includes('503') || msg.includes('internal server error');
+            },
+            onRetry: (attempt, error) => {
+              logWarn({
+                agent: 'MindMapGraph',
+                phase: 'map_process',
+                attempt,
+                error: error.message,
+              }, `Retry attempt ${attempt}/3`);
+            }
+          },
+          'MindMapMap'
+        ),
         GRAPH_CONFIG.MAP_TIMEOUT_MS,
-        'Map Timeout'
+        'MindMapMap'
       );
 
       const extraction = response as ConceptExtraction;
       const elapsed = Date.now() - startTime;
 
-      console.log(`[MindMapGraph]   ✅ Extracted ${extraction.key_concepts.length} concepts in ${elapsed}ms`);
-      console.log(`[MindMapGraph]   main_theme: "${extraction.main_theme}"`);
+      logInfo({
+        agent: 'MindMapGraph',
+        phase: 'map_process',
+        conceptsExtracted: extraction.key_concepts.length,
+        processingTimeMs: elapsed,
+        mainTheme: extraction.main_theme,
+      }, `Extracted ${extraction.key_concepts.length} concepts in ${elapsed}ms`);
 
       return { extractedConcepts: [extraction] };
 
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`[MindMapGraph]   ⚠️ Chunk failed: ${msg}`);
+
+      logError({
+        agent: 'MindMapGraph',
+        phase: 'map_process',
+        error: e instanceof Error ? {
+          name: e.name,
+          message: e.message,
+          stack: e.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(e),
+        attempts: retryCount + 1,
+      }, `Chunk failed: ${msg}`);
 
       // Only retry on timeouts and server errors (500, 503). Fail fast on client errors.
       const isTimeout = msg.toLowerCase().includes('timeout');
       const isServerErr = msg.includes('500') || msg.includes('503') || msg.includes('internal server error');
 
       if ((isTimeout || isServerErr) && retryCount < 2) {
-        console.log(`[MindMapGraph]   ↺ Retrying chunk (${retryCount + 1}/2)...`);
+        logWarn({
+          agent: 'MindMapGraph',
+          phase: 'map_process',
+          retryAttempt: retryCount + 1,
+        }, `Retrying chunk (${retryCount + 1}/2)...`);
         return new Send('map_process', {
           content: state.content,
           retryCount: retryCount + 1,
         });
       }
 
-      console.error(`[MindMapGraph]   ❌ Chunk failed permanently after ${retryCount + 1} attempts`);
+      logError({
+        agent: 'MindMapGraph',
+        phase: 'map_process',
+        attempts: retryCount + 1,
+      }, `Chunk failed permanently after ${retryCount + 1} attempts`);
       return { extractedConcepts: [] };
     }
   }
@@ -295,12 +323,18 @@ export class MindMapGraph {
   // 3. Reduce Node (Markdown Strategy)
   async reduceNode(state: OverallStateType): Promise<Partial<OverallStateType>> {
     const extractions = state.extractedConcepts || [];
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`[MindMapGraph] ===== REDUCE PHASE =====`);
-    console.log(`[MindMapGraph] 🧩 Reducing ${extractions.length} extractions into map...`);
+
+    logPhaseStart({
+      agent: 'MindMapGraph',
+      phase: 'reduce',
+      extractionsCount: extractions.length,
+    });
 
     if (extractions.length === 0) {
-      console.error('[MindMapGraph] ✗ No extractions to build from!');
+      logError({
+        agent: 'MindMapGraph',
+        phase: 'reduce',
+      }, 'No extractions to build from!');
       return {
         finalOutput: { nodeData: { topic: 'Error: No Content', children: null } },
         status: 'failed',
@@ -312,44 +346,80 @@ export class MindMapGraph {
       `THEME: ${e.main_theme}\nSUMMARY: ${e.summary}\nCONCEPTS: ${e.key_concepts.join(", ")}`
     ).join("\n\n---\n\n");
 
-    console.log(`[MindMapGraph] Input size: ${inputData.length} chars`);
     const safeInput = inputData.slice(0, 150000);
 
-    console.log(`[MindMapGraph] Model: ${(this.smartLlm as any).model}`);
-    console.log(`[MindMapGraph] Starting markdown generation at ${new Date().toISOString()}`);
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'reduce',
+      inputSize: inputData.length,
+      truncatedSize: safeInput.length,
+      model: (this.smartLlm as any).model,
+    }, `Reducing ${extractions.length} extractions into map (${safeInput.length} chars)`);
 
     try {
       const start = Date.now();
-      const response = await withTimeout(
-        this.smartLlm.invoke([
+      const response = await invokeWithTimeout(
+        () => this.smartLlm.invoke([
           new SystemMessage('You are a Mind Map Architect. Create hierarchical markdown outlines.'),
           new HumanMessage(REDUCE_PROMPT.replace('{extractions}', safeInput))
         ]),
         GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-        'Reduce Timeout'
+        'MindMapReduce'
       );
 
       const markdown = (response.content[0] as any)?.text || String(response.content);
-      console.log(`[MindMapGraph] Generated ${markdown.length} chars of markdown`);
 
       const parsedTree = this.parseMarkdownToTree(markdown);
       const elapsed = Date.now() - start;
 
-      console.log(`[MindMapGraph] ✓ Final map generated in ${elapsed}ms`);
-      console.log(`[MindMapGraph]   Root topic: "${parsedTree.topic}"`);
-      console.log(`[MindMapGraph]   Branches: ${parsedTree.children?.length ?? 0}`);
+      logInfo({
+        agent: 'MindMapGraph',
+        phase: 'reduce',
+        markdownLength: markdown.length,
+        processingTimeMs: elapsed,
+        rootTopic: parsedTree.topic,
+        branchCount: parsedTree.children?.length ?? 0,
+      }, `Final map generated in ${elapsed}ms`);
 
       if (parsedTree.children) {
         const branchTopics = parsedTree.children.map(c => c.topic).join(', ');
-        console.log(`[MindMapGraph]   Branch topics: ${branchTopics}`);
+        logInfo({
+          agent: 'MindMapGraph',
+          phase: 'reduce',
+          branchTopics,
+        }, `Branch topics: ${branchTopics}`);
       }
+
+      logBanner(
+        {
+          agent: 'MindMapGraph',
+          phase: 'generation_complete',
+          rootTopic: parsedTree.topic,
+          branchCount: parsedTree.children?.length ?? 0,
+          processingTimeMs: elapsed,
+        },
+        'MIND MAP GENERATION COMPLETE'
+      );
 
       return { finalOutput: { nodeData: parsedTree }, status: 'completed' };
 
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[MindMapGraph] ✗ Reduce Error: ${msg}`);
-      console.error(`[MindMapGraph] Using smart fallback...`);
+
+      logError({
+        agent: 'MindMapGraph',
+        phase: 'reduce',
+        error: e instanceof Error ? {
+          name: e.name,
+          message: e.message,
+          stack: e.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(e),
+      }, `Reduce Error: ${msg}. Using smart fallback...`);
+
+      logInfo({
+        agent: 'MindMapGraph',
+        phase: 'reduce_fallback',
+      }, 'Using smart fallback');
 
       return {
         finalOutput: this.createSmartFallback(extractions),
@@ -452,7 +522,12 @@ export class MindMapGraph {
     const rootTitle = Object.entries(themeCounts)
       .sort((a, b) => b[1] - a[1])[0]?.[0] || "Knowledge Map";
 
-    console.log(`[MindMapGraph] Fallback root: "${rootTitle}"`);
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'fallback',
+      rootTitle,
+      themeCounts,
+    }, `Fallback root: "${rootTitle}"`);
 
     // Deduplicate themes and build tree
     const seenThemes = new Set<string>();
@@ -475,7 +550,11 @@ export class MindMapGraph {
       });
     }
 
-    console.log(`[MindMapGraph] Fallback: ${children.length} branches`);
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'fallback',
+      branchCount: children.length,
+    }, `Fallback: ${children.length} branches`);
 
     return {
       nodeData: {

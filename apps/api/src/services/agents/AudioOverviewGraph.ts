@@ -4,6 +4,23 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { createClient } from '@deepgram/sdk';
 import { env } from '../../config/env.js';
 
+// Shared utilities for production-level patterns
+import {
+  invokeWithTimeout,
+  invokeWithRetry,
+  RetryConfig,
+  packChunks as sharedPackChunks,
+  validateChunks as sharedValidateChunks,
+  ChunkConfig,
+  logInfo,
+  logWarn,
+  logError,
+  logPhaseStart,
+  logPhaseComplete,
+  logBanner,
+  sanitizeUserInput,
+} from './shared/index.js';
+
 // Configuration constants
 const GRAPH_CONFIG = {
   MAP_CHUNK_SIZE: parseInt(env.AUDIO_MAP_CHUNK_SIZE || '15000', 10),
@@ -199,57 +216,31 @@ SOURCE MATERIAL (dialogue beats):
 Generate the dialogue script as a JSON array. Output ONLY the JSON, no markdown formatting:`;
 
 // ============================================================
-// HELPER FUNCTIONS (copied from ReportGraph)
+// HELPER FUNCTIONS
 // ============================================================
 
-export function validateChunks(chunks: string[]): string[] {
-  return chunks
-    .filter(chunk => chunk && chunk.trim().length > 50)
-    .map(chunk => {
-      if (chunk.length > 50000) {
-        return chunk.substring(0, 50000);
-      }
-      return chunk;
-    });
+/**
+ * Wrapper around shared packChunks utility with AudioOverviewGraph logging.
+ */
+export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.MAP_CHUNK_SIZE): string[] {
+  return sharedPackChunks(chunks, {
+    targetSize,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'AudioOverviewGraph',
+  });
 }
 
-export function packChunks(chunks: string[], targetSize: number): string[] {
-  const packed: string[] = [];
-  let currentPack = '';
-
-  for (const chunk of chunks) {
-    const testPack = currentPack ? `${currentPack}\n\n${chunk}` : chunk;
-
-    if (testPack.length <= targetSize) {
-      currentPack = testPack;
-    } else {
-      if (currentPack) {
-        packed.push(currentPack);
-      }
-      currentPack = chunk;
-    }
-  }
-
-  if (currentPack) {
-    packed.push(currentPack);
-  }
-
-  const originalSize = chunks.join('\n\n').length;
-  const packedSize = packed.join('\n\n').length;
-  const reduction = ((1 - packed.length / chunks.length) * 100).toFixed(1);
-
-  console.log(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    service: 'AudioOverviewGraph',
-    action: 'pack_chunks',
-    originalChunks: chunks.length,
-    packedChunks: packed.length,
-    reductionPercent: reduction,
-    originalSize,
-    packedSize,
-  }));
-
-  return packed;
+/**
+ * Wrapper around shared validateChunks utility with AudioOverviewGraph logging.
+ */
+export function validateChunks(chunks: string[]): string[] {
+  return sharedValidateChunks(chunks, {
+    targetSize: GRAPH_CONFIG.MAP_CHUNK_SIZE,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'AudioOverviewGraph',
+  });
 }
 
 async function recursiveCollapse(outputs: string[], maxTokens: number): Promise<string[]> {
@@ -270,13 +261,12 @@ async function recursiveCollapse(outputs: string[], maxTokens: number): Promise<
     collapsed.push(batch.join('\n\n---\n\n'));
   }
 
-  console.log(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    service: 'AudioOverviewGraph',
-    action: 'recursive_collapse',
+  logInfo({
+    agent: 'AudioOverviewGraph',
+    phase: 'recursive_collapse',
     inputCount: outputs.length,
     outputCount: collapsed.length,
-  }));
+  }, `Recursive collapse: ${outputs.length} -> ${collapsed.length}`);
 
   return collapsed;
 }
@@ -323,47 +313,92 @@ export class AudioOverviewGraph {
   // ============================================================
 
   async extractBeats(state: ChunkProcessState): Promise<Partial<OverallStateType>> {
-    const { chunk, audioType, length, focus } = state;
+    const { chunk, audioType, length, focus, chunkIndex } = state;
+    const startTime = Date.now();
+
+    // Structured logging start
+    logPhaseStart({
+      agent: 'AudioOverviewGraph',
+      phase: 'extract_beats',
+      chunkIndex,
+      chunkLength: chunk.length,
+      audioType,
+      length,
+      focus: focus || 'none',
+    });
+
+    // Sanitize user input (focus)
+    const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
 
     const promptTemplate = MAP_PROMPTS[audioType] || MAP_PROMPTS['deep_dive'];
     const prompt = promptTemplate.replace('{chunk}', chunk);
 
-    const chunkId = chunk.substring(0, 50).replace(/\s/g, '').substring(0, 20);
+    logInfo({
+      agent: 'AudioOverviewGraph',
+      phase: 'extract_beats',
+      chunkIndex,
+      promptLength: prompt.length,
+    }, `Sending prompt to LLM (${prompt.length} chars)...`);
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'AudioOverviewGraph',
-      action: 'extract_beats',
-      chunkIndex: state.chunkIndex,
-      audioType,
-      chunkId,
-      chunkSize: chunk.length,
-    }));
-
-    let output = '';
+    let output: string;
     try {
-      const response = await Promise.race([
-        this.fastLlm.invoke([
-          new SystemMessage('You are extracting engaging content for a podcast conversation. Extract key points that would make for interesting discussion.'),
-          new HumanMessage(prompt),
-        ]),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Map timeout')), GRAPH_CONFIG.MAP_TIMEOUT_MS - 1000)
+      // Timeout + Retry wrapper for resilient LLM calls
+      const response = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => this.fastLlm.invoke([
+            new SystemMessage('You are extracting engaging content for a podcast conversation. Extract key points that would make for interesting discussion.'),
+            new HumanMessage(prompt),
+          ]),
+          GRAPH_CONFIG.MAP_TIMEOUT_MS,
+          'AudioMap'
         ),
-      ]) as any;
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'AudioOverviewGraph',
+              phase: 'extract_beats',
+              chunkIndex,
+              attempt,
+              error: error.message,
+            }, `Retry attempt ${attempt}/3`);
+          }
+        },
+        'AudioMap'
+      );
 
       output = response.content.toString();
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        service: 'AudioOverviewGraph',
-        action: 'extract_beats_complete',
-        chunkIndex: state.chunkIndex,
-        outputLength: output.length,
-      }));
     } catch (error) {
-      console.error(`[AudioOverviewGraph] Error extracting beats for chunk ${state.chunkIndex}:`, error);
-      output = `• Error processing chunk ${state.chunkIndex}\n• Unable to extract dialogue beats\n\n[Fallback: Continue with other chunks]`;
+      // Graceful fallback on permanent failure
+      const errorContext = {
+        agent: 'AudioOverviewGraph',
+        phase: 'extract_beats',
+        chunkIndex,
+        chunkLength: chunk.length,
+        audioType,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(error),
+      };
+
+      logError(errorContext, 'Extract beats failed');
+
+      output = `• Error processing chunk ${chunkIndex}\n• Unable to extract dialogue beats\n\n[Fallback: Continue with other chunks]`;
     }
+
+    const elapsed = Date.now() - startTime;
+
+    // Structured logging complete
+    logPhaseComplete({
+      agent: 'AudioOverviewGraph',
+      phase: 'extract_beats',
+      chunkIndex,
+      outputLength: output.length,
+      processingTimeMs: elapsed,
+    });
 
     return { mapOutputs: [output] };
   }
@@ -375,14 +410,19 @@ export class AudioOverviewGraph {
   async collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {
     const { mapOutputs } = state;
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'AudioOverviewGraph',
-      action: 'collapse',
+    logPhaseStart({
+      agent: 'AudioOverviewGraph',
+      phase: 'collapse',
       inputCount: mapOutputs.length,
-    }));
+    });
 
     const collapsed = await recursiveCollapse(mapOutputs, GRAPH_CONFIG.REDUCE_CHUNK_SIZE / 2);
+
+    logInfo({
+      agent: 'AudioOverviewGraph',
+      phase: 'collapse',
+      outputCount: collapsed.length,
+    }, `Collapsed ${mapOutputs.length} outputs to ${collapsed.length}`);
 
     return {
       ...state,
@@ -397,6 +437,20 @@ export class AudioOverviewGraph {
 
   async writeScript(state: OverallStateType): Promise<Partial<OverallStateType>> {
     const { collapsedOutputs, audioType, length, focus } = state;
+    const startTime = Date.now();
+
+    // Structured logging start
+    logPhaseStart({
+      agent: 'AudioOverviewGraph',
+      phase: 'write_script',
+      audioType,
+      length,
+      collapsedOutputsCount: collapsedOutputs.length,
+      focus: focus || 'none',
+    });
+
+    // Sanitize user input (focus)
+    const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
 
     const combined = collapsedOutputs.join('\n\n---\n\n');
     const targetLines = TARGET_LINE_COUNTS[length] || TARGET_LINE_COUNTS.default;
@@ -405,30 +459,42 @@ export class AudioOverviewGraph {
       .replace('{content}', combined)
       .replace('{audioType}', audioType)
       .replace('{targetLines}', targetLines.toString())
-      .replace('{focus}', focus || 'general overview');
+      .replace('{focus}', sanitizedFocus || 'general overview');
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'AudioOverviewGraph',
-      action: 'write_script',
-      audioType,
-      length,
+    logInfo({
+      agent: 'AudioOverviewGraph',
+      phase: 'write_script',
+      promptLength: prompt.length,
       targetLines,
-      inputLength: combined.length,
-    }));
+    }, `Generating dialogue script (~${targetLines} lines)`);
 
     let dialogueScript: DialogueLine[] = [];
 
     try {
-      const response = await Promise.race([
-        this.smartLlm.invoke([
-          new SystemMessage('You are an expert podcast scriptwriter. Output ONLY valid JSON arrays of dialogue lines.'),
-          new HumanMessage(prompt),
-        ]),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Reduce timeout')), GRAPH_CONFIG.REDUCE_TIMEOUT_MS - 1000)
+      // Timeout + Retry wrapper for resilient LLM calls
+      const response = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => this.smartLlm.invoke([
+            new SystemMessage('You are an expert podcast scriptwriter. Output ONLY valid JSON arrays of dialogue lines.'),
+            new HumanMessage(prompt),
+          ]),
+          GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+          'AudioReduce'
         ),
-      ]) as any;
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'AudioOverviewGraph',
+              phase: 'write_script',
+              attempt,
+              error: error.message,
+            }, `Retry attempt ${attempt}/3`);
+          }
+        },
+        'AudioReduce'
+      );
 
       const responseText = response.content.toString();
 
@@ -446,14 +512,21 @@ export class AudioOverviewGraph {
             throw new Error('Invalid dialogue script structure');
           }
         } catch (parseError) {
-          console.warn('[AudioOverviewGraph] JSON parsing failed, using fallback:', parseError);
+          logWarn({
+            agent: 'AudioOverviewGraph',
+            phase: 'write_script',
+            error: parseError instanceof Error ? parseError.message : String(parseError),
+          }, 'JSON parsing failed, using fallback');
           dialogueScript = [];
         }
       }
 
       // If extraction failed, generate fallback
       if (dialogueScript.length === 0) {
-        console.warn('[AudioOverviewGraph] JSON extraction failed, using fallback script');
+        logWarn({
+          agent: 'AudioOverviewGraph',
+          phase: 'write_script',
+        }, 'JSON extraction failed, using fallback script');
         dialogueScript = [
           { speaker: 'host_a', text: "I've analyzed the content you provided." },
           { speaker: 'host_b', text: 'What did you find most interesting?' },
@@ -461,14 +534,26 @@ export class AudioOverviewGraph {
         ];
       }
 
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        service: 'AudioOverviewGraph',
-        action: 'write_script_complete',
+      const elapsed = Date.now() - startTime;
+
+      // Structured logging complete
+      logPhaseComplete({
+        agent: 'AudioOverviewGraph',
+        phase: 'write_script',
         dialogueLines: dialogueScript.length,
-      }));
+        processingTimeMs: elapsed,
+      });
     } catch (error) {
-      console.error('[AudioOverviewGraph] Error writing dialogue script:', error);
+      logError({
+        agent: 'AudioOverviewGraph',
+        phase: 'write_script',
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(error),
+      }, 'Error writing dialogue script');
+
       dialogueScript = [
         { speaker: 'host_a', text: 'I apologize, but I had trouble processing this content.' },
         { speaker: 'host_b', text: 'That sounds frustrating. What went wrong?' },
@@ -494,12 +579,11 @@ export class AudioOverviewGraph {
       throw new Error('No dialogue script to synthesize');
     }
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'AudioOverviewGraph',
-      action: 'synthesize_audio',
+    logPhaseStart({
+      agent: 'AudioOverviewGraph',
+      phase: 'synthesize_audio',
       dialogueLines: dialogueScript.length,
-    }));
+    });
 
     // Container for all results
     const results: { index: number; buffer: Buffer | null }[] = [];
@@ -510,13 +594,12 @@ export class AudioOverviewGraph {
       // 1. Get the current batch of lines
       const batchLines = dialogueScript.slice(i, i + BATCH_SIZE);
 
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        service: 'AudioOverviewGraph',
-        action: 'synthesize_batch',
+      logInfo({
+        agent: 'AudioOverviewGraph',
+        phase: 'synthesize_batch',
         batch: Math.floor(i / BATCH_SIZE) + 1,
         batchLines: batchLines.length,
-      }));
+      }, `Processing batch ${Math.floor(i / BATCH_SIZE) + 1}`);
 
       // 2. Create promises ONLY for this batch
       const batchPromises = batchLines.map(async (line, batchIdx) => {
@@ -542,19 +625,23 @@ export class AudioOverviewGraph {
 
           const buffer = await this.streamToBuffer(stream);
 
-          console.log(JSON.stringify({
-            timestamp: new Date().toISOString(),
-            service: 'AudioOverviewGraph',
-            action: 'synthesize_line',
+          logInfo({
+            agent: 'AudioOverviewGraph',
+            phase: 'synthesize_line',
             line: globalIndex + 1,
             total: dialogueScript.length,
             speaker: line.speaker,
             bufferSize: buffer.length,
-          }));
+          });
 
           return { index: globalIndex, buffer };
         } catch (error) {
-          console.error(`[AudioOverviewGraph] Failed line ${globalIndex + 1}:`, error);
+          logError({
+            agent: 'AudioOverviewGraph',
+            phase: 'synthesize_line',
+            line: globalIndex + 1,
+            error: error instanceof Error ? error.message : String(error),
+          }, `Failed line ${globalIndex + 1}`);
           return { index: globalIndex, buffer: null };
         }
       });
@@ -574,21 +661,28 @@ export class AudioOverviewGraph {
 
     // Check if enough lines succeeded
     if (successCount < dialogueScript.length * 0.5) {
+      logError({
+        agent: 'AudioOverviewGraph',
+        phase: 'synthesize_audio',
+        successCount,
+        totalLines: dialogueScript.length,
+      }, `Too many synthesis failures: ${successCount}/${dialogueScript.length} lines succeeded`);
       throw new Error(`Too many synthesis failures: ${successCount}/${dialogueScript.length} lines succeeded`);
     }
 
     // Concatenate buffers
-    // Note: Duration metadata will be incorrect; for production use fluent-ffmpeg to merge
     const audioBuffer = Buffer.concat(sortedBuffers);
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'AudioOverviewGraph',
-      action: 'synthesize_audio_complete',
-      linesSucceeded: successCount,
-      totalLines: dialogueScript.length,
-      finalAudioSize: audioBuffer.length,
-    }));
+    logBanner(
+      {
+        agent: 'AudioOverviewGraph',
+        phase: 'generation_complete',
+        linesSucceeded: successCount,
+        totalLines: dialogueScript.length,
+        finalAudioSize: audioBuffer.length,
+      },
+      'AUDIO GENERATION COMPLETE'
+    );
 
     return {
       ...state,
@@ -603,23 +697,25 @@ export class AudioOverviewGraph {
 
   routeToMap(state: OverallStateType): Send[] | 'collapse' {
     if (state.chunks.length === 0) {
-      console.warn('[AudioOverviewGraph] No chunks to process, routing to collapse');
+      logWarn({
+        agent: 'AudioOverviewGraph',
+        phase: 'route_to_map',
+      }, 'No chunks to process, routing to collapse');
       return 'collapse';
     }
 
     const validatedChunks = validateChunks(state.chunks);
     const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE);
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      service: 'AudioOverviewGraph',
-      action: 'route_to_map',
+    logInfo({
+      agent: 'AudioOverviewGraph',
+      phase: 'route_to_map',
       originalChunks: state.chunks.length,
       validatedChunks: validatedChunks.length,
       packedChunks: packedChunks.length,
       audioType: state.audioType,
       length: state.length,
-    }));
+    }, `Creating ${packedChunks.length} parallel map tasks`);
 
     return packedChunks.map((chunk, idx) =>
       new Send('extract_beats', {

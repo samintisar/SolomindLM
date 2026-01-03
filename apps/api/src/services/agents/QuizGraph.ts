@@ -4,6 +4,24 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 
+// Shared utilities for production-level patterns
+import {
+  invokeWithTimeout,
+  invokeWithRetry,
+  RetryConfig,
+  packChunks as sharedPackChunks,
+  validateChunks as sharedValidateChunks,
+  ChunkConfig,
+  logInfo,
+  logWarn,
+  logError,
+  logPhaseStart,
+  logPhaseComplete,
+  logBanner,
+  sanitizeUserInput,
+  validateQuiz,
+} from './shared/index.js';
+
 // ============================================================
 // SCHEMAS
 // ============================================================
@@ -46,6 +64,9 @@ const GRAPH_CONFIG = {
   MAX_QUESTIONS_PER_CHUNK: 6,
   // Minimum chunks to process
   MIN_CHUNKS: 3,
+  // Timeout settings for LLM calls
+  MAP_TIMEOUT_MS: parseInt(env.QUIZ_MAP_TIMEOUT_MS || '180000', 10), // 3 minutes
+  REDUCE_TIMEOUT_MS: parseInt(env.QUIZ_REDUCE_TIMEOUT_MS || '240000', 10), // 4 minutes
 } as const;
 
 // ============================================================
@@ -192,56 +213,28 @@ Select exactly ${questionCount} diverse questions. Return them in the same forma
 // HELPER FUNCTIONS
 // ============================================================
 
+/**
+ * Wrapper around shared packChunks utility with QuizGraph logging.
+ */
 export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.MAP_CHUNK_SIZE): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[QuizGraph] ===== CHUNK PACKING =====`);
-  console.log(`[QuizGraph] Original chunks: ${chunks.length}`);
-  console.log(`[QuizGraph] Target size: ${targetSize} chars per packed chunk`);
-
-  const packed: string[] = [];
-  const buffer: string[] = [];
-  let bufferSize = 0;
-
-  for (const chunk of chunks) {
-    if (!chunk?.trim()) continue;
-    const chunkSize = chunk.length + (buffer.length > 0 ? 2 : 0);
-
-    if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
-      packed.push(buffer.join('\n\n'));
-      buffer.length = 0;
-      bufferSize = 0;
-    }
-
-    buffer.push(chunk);
-    bufferSize += chunkSize;
-  }
-
-  if (buffer.length > 0) {
-    packed.push(buffer.join('\n\n'));
-  }
-
-  const reduction = Math.round((1 - packed.length / chunks.length) * 100);
-  console.log(`[QuizGraph] Packed into: ${packed.length} chunks (${reduction}% fewer API calls)`);
-
-  return packed;
+  return sharedPackChunks(chunks, {
+    targetSize,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'QuizGraph',
+  });
 }
 
+/**
+ * Wrapper around shared validateChunks utility with QuizGraph logging.
+ */
 export function validateChunks(chunks: string[]): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[QuizGraph] ===== INPUT VALIDATION =====`);
-  console.log(`[QuizGraph] Input chunks: ${chunks.length}`);
-
-  const validated = chunks
-    .filter(c => c && typeof c === 'string')
-    .map(c => c.slice(0, 50000))
-    .filter(c => c.trim().length > 50);
-
-  console.log(`[QuizGraph] Valid chunks: ${validated.length}`);
-  console.log(`[QuizGraph] Filtered out: ${chunks.length - validated.length} (too short or invalid)`);
-
-  return validated;
+  return sharedValidateChunks(chunks, {
+    targetSize: GRAPH_CONFIG.MAP_CHUNK_SIZE,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'QuizGraph',
+  });
 }
 
 // ============================================================
@@ -366,43 +359,97 @@ export class QuizGraph {
     const startTime = Date.now();
 
     const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`[QuizGraph] ===== MAP PROCESS PHASE ${chunkId} =====`);
-    console.log('='.repeat(80));
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+
+    // Structured logging start
+    logPhaseStart({
+      agent: 'QuizGraph',
       phase: 'map_process',
-      chunkIndex: chunkIndex,
+      chunkIndex,
       chunkLength: chunk.length,
       chunkPreview: chunk.substring(0, 150).replace(/\n/g, ' '),
       targetQuestionCount: questionCount,
       questionsPerChunkTarget: questionsPerChunk,
-      difficulty: difficulty,
+      difficulty,
       focus: focus || 'none',
-    }, null, 2));
+    });
 
-    const prompt = getMapPrompt({ chunk, questionCount, questionsPerChunk, difficulty, focus });
+    // Sanitize user input (focus)
+    const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
+    const prompt = getMapPrompt({ chunk, questionCount, questionsPerChunk, difficulty, focus: sanitizedFocus });
 
-    console.log(`[QuizGraph] ${chunkId} Sending prompt to LLM (${prompt.length} chars)...`);
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'map_process',
+      chunkId,
+      promptLength: prompt.length,
+    }, `Sending prompt to LLM (${prompt.length} chars)...`);
 
-    const response = await this.fastLlm.invoke([
-      new SystemMessage('You are a professional educator creating multiple-choice quiz questions.'),
-      new HumanMessage(prompt),
-    ]);
+    let output: string;
+    try {
+      // Timeout + Retry wrapper for resilient LLM calls
+      const response = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => this.fastLlm.invoke([
+            new SystemMessage('You are a professional educator creating multiple-choice quiz questions.'),
+            new HumanMessage(prompt),
+          ]),
+          GRAPH_CONFIG.MAP_TIMEOUT_MS,
+          'QuizMap'
+        ),
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'QuizGraph',
+              phase: 'map_process',
+              chunkIndex,
+              attempt,
+              error: error.message,
+            }, `Retry attempt ${attempt}/3`);
+          }
+        },
+        'QuizMap'
+      );
 
-    const output = response.content.toString();
+      output = response.content.toString();
+    } catch (error) {
+      // Graceful fallback on permanent failure
+      const errorContext = {
+        agent: 'QuizGraph',
+        phase: 'map_process',
+        chunkIndex,
+        chunkLength: chunk.length,
+        difficulty,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(error),
+      };
+
+      logError(errorContext, 'Map process failed');
+
+      output = `- Main Topics: Error processing chunk
+- Error: ${error instanceof Error ? error.message : 'Unknown error'}
+- Chunk Info: ${chunk.length} chars, difficulty: ${difficulty}
+
+[Fallback: This chunk could not be processed due to timeout or error. The quiz generation will continue with other chunks.]`;
+    }
+
     const questionsGenerated = output.split('Q:').length - 1;
     const elapsed = Date.now() - startTime;
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      phase: 'map_process_complete',
-      chunkIndex: chunkIndex,
+    // Structured logging complete
+    logPhaseComplete({
+      agent: 'QuizGraph',
+      phase: 'map_process',
+      chunkIndex,
       outputLength: output.length,
-      questionsGenerated: questionsGenerated,
+      questionsGenerated,
       processingTimeMs: elapsed,
       outputPreview: output.substring(0, 200).replace(/\n/g, ' '),
-    }, null, 2));
+    });
 
     return {
       mapOutputs: [output],
@@ -502,41 +549,77 @@ export class QuizGraph {
 
     const prompt = `Condense these quiz questions into a consolidated set while retaining all unique and high-quality questions. Keep the exact same format:\n\n${combined}\n\nCONDENSED QUESTIONS:`;
 
-    const response = await this.smartLlm.invoke([
-      new SystemMessage('You are a skilled content consolidator.'),
-      new HumanMessage(prompt),
-    ]);
+    // Use timeout and retry for collapse operations
+    const response = await invokeWithRetry(
+      () => invokeWithTimeout(
+        () => this.smartLlm.invoke([
+          new SystemMessage('You are a skilled content consolidator.'),
+          new HumanMessage(prompt),
+        ]),
+        GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+        'QuizCollapseGroup'
+      ),
+      {
+        maxAttempts: 2,
+        baseDelayMs: 1000,
+      },
+      'QuizCollapseGroup'
+    );
 
     return response.content.toString();
   }
 
   // Node: Reduce phase
   async reduce(state: OverallStateType): Promise<Partial<OverallStateType>> {
-    console.log(`\n${'='.repeat(80)}`);
-    console.log('[QuizGraph] ===== REDUCE PHASE =====');
-    console.log('='.repeat(80));
-
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+    // Structured logging start
+    logPhaseStart({
+      agent: 'QuizGraph',
       phase: 'reduce',
       collapsedOutputsCount: state.collapsedOutputs.length,
       targetQuestionCount: state.questionCount,
       difficulty: state.difficulty,
-      focus: state.focus,
-    }, null, 2));
+      focus: state.focus || 'none',
+    });
 
     const combined = state.collapsedOutputs.join('\n\n---\n\n');
     const totalQuestionsBefore = combined.split('Q:').length - 1;
 
-    console.log(`[QuizGraph] Skipping LLM reduce, parsing ${totalQuestionsBefore} questions directly from map outputs...`);
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'reduce_before_parsing',
+      combinedLength: combined.length,
+      totalQuestionsExtracted: totalQuestionsBefore,
+    }, `Skipping LLM reduce, parsing ${totalQuestionsBefore} questions directly from map outputs...`);
 
     const questions = this.fallbackParseQuizQuestions(combined);
-    console.log(`[QuizGraph] Parsed ${questions.length} questions from map outputs`);
 
-    console.log(`[QuizGraph] Generated ${questions.length} questions (target: ${state.questionCount})`);
+    // Validate quiz quality
+    const validation = validateQuiz(JSON.stringify(questions), state.questionCount);
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'reduce_after_parsing',
+      questionsParsed: questions.length,
+      validation: {
+        isValid: validation.isValid,
+        warnings: validation.warnings,
+        score: validation.score,
+      },
+    }, `Parsed ${questions.length} questions from map outputs`);
+
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'reduce',
+      questionsGenerated: questions.length,
+      targetQuestionCount: state.questionCount,
+    }, `Generated ${questions.length} questions (target: ${state.questionCount})`);
 
     if (questions.length === 0) {
-      console.error(`[QuizGraph] CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions!`);
+      logError({
+        agent: 'QuizGraph',
+        phase: 'reduce',
+        error: 'No questions generated',
+        totalQuestionsBefore,
+      }, `CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions!`);
       return {
         ...state,
         finalOutput: [],
@@ -546,18 +629,37 @@ export class QuizGraph {
 
     // Post-processing: enforce exact question count
     if (questions.length > state.questionCount) {
-      console.log(`[QuizGraph] Have ${questions.length} questions, need exactly ${state.questionCount}. Running fast topic-based refinement.`);
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_refinement',
+        currentCount: questions.length,
+        targetCount: state.questionCount,
+      }, `Have ${questions.length} questions, need exactly ${state.questionCount}. Running fast topic-based refinement.`);
+
       const refined = this.refineQuestionSelectionFast(questions, state.questionCount);
 
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
+      // Log final refined questions
+      logInfo({
+        agent: 'QuizGraph',
         phase: 'reduce_final',
         finalQuestionCount: refined.length,
-      }, null, 2));
+        finalQuestions: refined.map((q, idx) => ({
+          index: idx + 1,
+          question: q.question,
+          optionsCount: q.options.length,
+          answer: q.answer,
+        })),
+      });
 
-      console.log(`\n${'='.repeat(80)}`);
-      console.log('[QuizGraph] ===== GENERATION COMPLETE =====');
-      console.log('='.repeat(80));
+      logBanner(
+        {
+          agent: 'QuizGraph',
+          phase: 'generation_complete',
+          finalQuestionCount: refined.length,
+          targetQuestionCount: state.questionCount,
+        },
+        'GENERATION COMPLETE'
+      );
 
       return {
         ...state,
@@ -567,12 +669,36 @@ export class QuizGraph {
     }
 
     if (questions.length < state.questionCount) {
-      console.log(`[QuizGraph] Generated ${questions.length} questions, target was ${state.questionCount}. Accepting fewer.`);
+      logWarn({
+        agent: 'QuizGraph',
+        phase: 'reduce',
+        generatedCount: questions.length,
+        targetCount: state.questionCount,
+      }, `Generated ${questions.length} questions, target was ${state.questionCount}. Accepting fewer.`);
     }
 
-    console.log(`\n${'='.repeat(80)}`);
-    console.log('[QuizGraph] ===== GENERATION COMPLETE =====');
-    console.log('='.repeat(80));
+    // Log final questions
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'reduce_final',
+      finalQuestionCount: questions.length,
+      finalQuestions: questions.map((q, idx) => ({
+        index: idx + 1,
+        question: q.question,
+        optionsCount: q.options.length,
+        answer: q.answer,
+      })),
+    });
+
+    logBanner(
+      {
+        agent: 'QuizGraph',
+        phase: 'generation_complete',
+        finalQuestionCount: questions.length,
+        targetQuestionCount: state.questionCount,
+      },
+      'GENERATION COMPLETE'
+    );
 
     return {
       ...state,
@@ -607,7 +733,11 @@ export class QuizGraph {
 
   // Fallback parser for quiz questions
   private fallbackParseQuizQuestions(content: string): QuizQuestion[] {
-    console.log('[QuizGraph] fallbackParseQuizQuestions: attempting manual parsing...');
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'fallback_parse',
+      contentLength: content.length,
+    }, 'Attempting manual parsing...');
 
     const questions: QuizQuestion[] = [];
 
@@ -620,16 +750,16 @@ export class QuizGraph {
         if (!questionText) continue;
 
         // Extract options
-        const optionsMatch = block.match(/(?:A\)|A\))\s*(.+?)(?:\n[B]\)|\nB\))/s);
+        const optionsMatch = block.match(/(?:A\)|A\))\s*([\s\S]+?)(?:\n[B]\)|\nB\))/);
         const optionA = optionsMatch?.[1]?.trim() || '';
 
-        const bMatch = block.match(/(?:B\)|B\))\s*(.+?)(?:\n[C]\)|\nC\))/s);
+        const bMatch = block.match(/(?:B\)|B\))\s*([\s\S]+?)(?:\n[C]\)|\nC\))/);
         const optionB = bMatch?.[1]?.trim() || '';
 
-        const cMatch = block.match(/(?:C\)|C\))\s*(.+?)(?:\n[D]\)|\nD\))/s);
+        const cMatch = block.match(/(?:C\)|C\))\s*([\s\S]+?)(?:\n[D]\)|\nD\))/);
         const optionC = cMatch?.[1]?.trim() || '';
 
-        const dMatch = block.match(/(?:D\)|D\))\s*(.+?)(?:\nANSWER:|\nANSWER\))/s);
+        const dMatch = block.match(/(?:D\)|D\))\s*([\s\S]+?)(?:\nANSWER:|\nANSWER\))/);
         const optionD = dMatch?.[1]?.trim() || '';
 
         // Extract answer
@@ -639,11 +769,11 @@ export class QuizGraph {
         const answerIndex = answerLetter ? answerMap[answerLetter] : 0;
 
         // Extract hint
-        const hintMatch = block.match(/HINT:\s*(.+?)(?:\nEXPLANATION:|\nEXPLANATION\))/s);
+        const hintMatch = block.match(/HINT:\s*([\s\S]+?)(?:\nEXPLANATION:|\nEXPLANATION\))/);
         const hint = hintMatch?.[1]?.trim() || 'Consider the key concepts in this question.';
 
         // Extract explanation
-        const explanationMatch = block.match(/EXPLANATION:\s*([\s\S]+?)(?=\nQ:|\n\nQ:|$)/s);
+        const explanationMatch = block.match(/EXPLANATION:\s*([\s\S]+?)(?=\nQ:|\n\nQ:|$)/);
         const rawExplanation = explanationMatch?.[1]?.trim() || 'The correct answer follows from the material.';
         const explanation = this.cleanExplanation(rawExplanation);
 
@@ -657,17 +787,31 @@ export class QuizGraph {
           });
         }
       } catch (e) {
-        console.warn('[QuizGraph] Failed to parse question block:', e);
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'fallback_parse_error',
+          error: e instanceof Error ? e.message : String(e),
+        }, 'Failed to parse question block');
       }
     }
 
-    console.log(`[QuizGraph] fallbackParseQuizQuestions: extracted ${questions.length} questions`);
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'fallback_parse_complete',
+      extractedCount: questions.length,
+    }, `Extracted ${questions.length} questions`);
+
     return questions;
   }
 
   // Fast refinement: topic-based sampling
   private refineQuestionSelectionFast(questions: QuizQuestion[], targetCount: number): QuizQuestion[] {
-    console.log(`[QuizGraph] refineQuestionSelectionFast: selecting ${targetCount} questions from ${questions.length} using topic-based sampling`);
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'refine_fast',
+      totalQuestions: questions.length,
+      targetCount,
+    }, `Selecting ${targetCount} questions from ${questions.length} using topic-based sampling`);
 
     // Group questions by topic (simple keyword extraction)
     const topicGroups: Record<string, QuizQuestion[]> = {};
@@ -678,7 +822,12 @@ export class QuizGraph {
     }
 
     const topics = Object.keys(topicGroups);
-    console.log(`[QuizGraph] Found ${topics.length} topics:`, topics.map(t => `${t}(${topicGroups[t].length})`).join(', '));
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'refine_fast_topics',
+      topicCount: topics.length,
+      topics: topics.map(t => `${t}(${topicGroups[t].length})`),
+    }, `Found ${topics.length} topics`);
 
     // Allocate questions proportionally
     const allocations: Record<string, number> = {};
@@ -716,16 +865,16 @@ export class QuizGraph {
     }
 
     // Trim or fill as needed
-    if (selected.length > targetCount) {
-      return selected.slice(0, targetCount);
-    }
-    if (selected.length < targetCount) {
-      const remaining = questions.slice(-(targetCount - selected.length));
-      return [...selected, ...remaining];
-    }
+    const finalSelected = selected.length > targetCount ? selected.slice(0, targetCount) : selected;
 
-    console.log(`[QuizGraph] Selected ${selected.length} questions`);
-    return selected;
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'refine_fast_selected',
+      selectedCount: finalSelected.length,
+      allocations,
+    }, `Selected ${finalSelected.length} questions`);
+
+    return finalSelected;
   }
 
   private extractTopic(question: QuizQuestion): string {

@@ -88,6 +88,7 @@ export async function quizGenerationJob(
       questions: result.questions,
       metadata: {
         ...result.metadata,
+        questionCount: result.questions.length, // Override with actual count
         phase: 'completed',
         generatedAt: new Date().toISOString(),
       },

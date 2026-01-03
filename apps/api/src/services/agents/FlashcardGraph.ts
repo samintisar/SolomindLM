@@ -4,6 +4,25 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 
+// Shared utilities for production-level patterns
+import {
+  invokeWithTimeout,
+  invokeWithRetry,
+  RetryConfig,
+  RetryPolicies,
+  packChunks as sharedPackChunks,
+  validateChunks as sharedValidateChunks,
+  ChunkConfig,
+  logInfo,
+  logWarn,
+  logError,
+  logPhaseStart,
+  logPhaseComplete,
+  logBanner,
+  sanitizeUserInput,
+  validateFlashcards,
+} from './shared/index.js';
+
 // ============================================================
 // SCHEMAS
 // ============================================================
@@ -38,6 +57,9 @@ const FLASHCARD_CONFIG = {
   MAX_CARDS_PER_CHUNK: parseInt(env.FLASHCARD_MAX_CARDS_PER_CHUNK || '5', 10),
   // Minimum chunks to process
   MIN_CHUNKS: parseInt(env.FLASHCARD_MIN_CHUNKS || '3', 10),
+  // Timeout settings for LLM calls
+  MAP_TIMEOUT_MS: parseInt(env.FLASHCARD_MAP_TIMEOUT_MS || '180000', 10), // 3 minutes
+  REDUCE_TIMEOUT_MS: parseInt(env.FLASHCARD_REDUCE_TIMEOUT_MS || '240000', 10), // 4 minutes
 } as const;
 
 const GRAPH_CONFIG = {
@@ -173,56 +195,28 @@ Select exactly ${cardCount} diverse flashcards:`;
 // HELPER FUNCTIONS
 // ============================================================
 
+/**
+ * Wrapper around shared packChunks utility with FlashcardGraph logging.
+ */
 export function packChunks(chunks: string[], targetSize: number = FLASHCARD_CONFIG.MAP_CHUNK_SIZE): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[FlashcardGraph] ===== CHUNK PACKING =====`);
-  console.log(`[FlashcardGraph] Original chunks: ${chunks.length}`);
-  console.log(`[FlashcardGraph] Target size: ${targetSize} chars per packed chunk`);
-
-  const packed: string[] = [];
-  const buffer: string[] = [];
-  let bufferSize = 0;
-
-  for (const chunk of chunks) {
-    if (!chunk?.trim()) continue;
-    const chunkSize = chunk.length + (buffer.length > 0 ? 2 : 0);
-
-    if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
-      packed.push(buffer.join('\n\n'));
-      buffer.length = 0;
-      bufferSize = 0;
-    }
-
-    buffer.push(chunk);
-    bufferSize += chunkSize;
-  }
-
-  if (buffer.length > 0) {
-    packed.push(buffer.join('\n\n'));
-  }
-
-  const reduction = Math.round((1 - packed.length / chunks.length) * 100);
-  console.log(`[FlashcardGraph] Packed into: ${packed.length} chunks (${reduction}% fewer API calls)`);
-
-  return packed;
+  return sharedPackChunks(chunks, {
+    targetSize,
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'FlashcardGraph',
+  });
 }
 
+/**
+ * Wrapper around shared validateChunks utility with FlashcardGraph logging.
+ */
 export function validateChunks(chunks: string[]): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[FlashcardGraph] ===== INPUT VALIDATION =====`);
-  console.log(`[FlashcardGraph] Input chunks: ${chunks.length}`);
-
-  const validated = chunks
-    .filter(c => c && typeof c === 'string')
-    .map(c => c.slice(0, 50000))
-    .filter(c => c.trim().length > 50);
-
-  console.log(`[FlashcardGraph] Valid chunks: ${validated.length}`);
-  console.log(`[FlashcardGraph] Filtered out: ${chunks.length - validated.length} (too short or invalid)`);
-
-  return validated;
+  return sharedValidateChunks(chunks, {
+    targetSize: FLASHCARD_CONFIG.MAP_CHUNK_SIZE, // Not used for validation but required by interface
+    minChunkLength: 50,
+    maxChunkLength: 50000,
+    agentName: 'FlashcardGraph',
+  });
 }
 
 export class FlashcardGraph {
@@ -371,47 +365,98 @@ export class FlashcardGraph {
     const { chunk, chunkIndex, cardCount, difficulty, topic, cardsPerChunk } = state;
     const startTime = Date.now();
 
-    // ============================================================
-    // DEBUG: Map Phase - Processing Individual Chunk
-    // ============================================================
     const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`[FlashcardGraph] ===== MAP PROCESS PHASE ${chunkId} =====`);
-    console.log('='.repeat(80));
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+
+    // Structured logging start
+    logPhaseStart({
+      agent: 'FlashcardGraph',
       phase: 'map_process',
-      chunkIndex: chunkIndex,
+      chunkIndex,
       chunkLength: chunk.length,
       chunkPreview: chunk.substring(0, 150).replace(/\n/g, ' '),
       targetCardCount: cardCount,
       cardsPerChunkTarget: cardsPerChunk,
-      difficulty: difficulty,
+      difficulty,
       topic: topic || 'none',
-    }, null, 2));
+    });
 
-    const prompt = getMapPrompt({ chunk, cardCount, cardsPerChunk, difficulty, topic });
+    // Sanitize user input (topic)
+    const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
+    const prompt = getMapPrompt({ chunk, cardCount, cardsPerChunk, difficulty, topic: sanitizedTopic });
 
-    console.log(`[FlashcardGraph] ${chunkId} Sending prompt to LLM (${prompt.length} chars)...`);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'map_process',
+      chunkId,
+      promptLength: prompt.length,
+    }, `Sending prompt to LLM (${prompt.length} chars)...`);
 
-    const response = await this.fastLlm.invoke([
-      new SystemMessage('You are a professional educator and content analyst.'),
-      new HumanMessage(prompt),
-    ]);
+    let output: string;
+    try {
+      // Timeout + Retry wrapper for resilient LLM calls
+      const response = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => this.fastLlm.invoke([
+            new SystemMessage('You are a professional educator and content analyst.'),
+            new HumanMessage(prompt),
+          ]),
+          FLASHCARD_CONFIG.MAP_TIMEOUT_MS,
+          'FlashcardMap'
+        ),
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'FlashcardGraph',
+              phase: 'map_process',
+              chunkIndex,
+              attempt,
+              error: error.message,
+            }, `Retry attempt ${attempt}/3`);
+          }
+        },
+        'FlashcardMap'
+      );
 
-    const output = response.content.toString();
+      output = response.content.toString();
+    } catch (error) {
+      // Graceful fallback on permanent failure
+      const errorContext = {
+        agent: 'FlashcardGraph',
+        phase: 'map_process',
+        chunkIndex,
+        chunkLength: chunk.length,
+        difficulty,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(error),
+      };
+
+      logError(errorContext, 'Map process failed');
+
+      output = `- Main Topics: Error processing chunk
+- Error: ${error instanceof Error ? error.message : 'Unknown error'}
+- Chunk Info: ${chunk.length} chars, difficulty: ${difficulty}
+
+[Fallback: This chunk could not be processed due to timeout or error. The flashcard generation will continue with other chunks.]`;
+    }
+
     const questionCount = output.split('Q:').length - 1;
     const elapsed = Date.now() - startTime;
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      phase: 'map_process_complete',
-      chunkIndex: chunkIndex,
+    // Structured logging complete
+    logPhaseComplete({
+      agent: 'FlashcardGraph',
+      phase: 'map_process',
+      chunkIndex,
       outputLength: output.length,
       questionsGenerated: questionCount,
       processingTimeMs: elapsed,
       outputPreview: output.substring(0, 200).replace(/\n/g, ' '),
-    }, null, 2));
+    });
 
     // Return single output in array - reducer will concatenate all outputs
     return {
@@ -521,10 +566,22 @@ export class FlashcardGraph {
 
     const prompt = `Condense these question-answer pairs into a consolidated set while retaining all unique and high-quality pairs:\n\n${combined}\n\nCONDENSED:`;
 
-    const response = await this.smartLlm.invoke([
-      new SystemMessage('You are a skilled content consolidator.'),
-      new HumanMessage(prompt),
-    ]);
+    // Use timeout and retry for collapse operations
+    const response = await invokeWithRetry(
+      () => invokeWithTimeout(
+        () => this.smartLlm.invoke([
+          new SystemMessage('You are a skilled content consolidator.'),
+          new HumanMessage(prompt),
+        ]),
+        FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
+        'FlashcardCollapseGroup'
+      ),
+      {
+        maxAttempts: 2,
+        baseDelayMs: 1000,
+      },
+      'FlashcardCollapseGroup'
+    );
 
     return response.content.toString();
   }
@@ -537,7 +594,12 @@ export class FlashcardGraph {
     difficulty: string,
     topic?: string
   ): Promise<Flashcard[]> {
-    console.log(`[FlashcardGraph] refineFlashcardSelection: selecting ${targetCount} best cards from ${flashcards.length}`);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_selection',
+      totalFlashcards: flashcards.length,
+      targetCount,
+    }, `Selecting ${targetCount} best cards from ${flashcards.length}`);
 
     // Format flashcards for the prompt
     const flashcardsText = flashcards
@@ -567,33 +629,68 @@ Select exactly ${targetCount} diverse flashcards:`;
     // Use structured output for reliable parsing
     // @ts-ignore - LangGraph structured output has complex types
     const structuredLlm = this.smartLlm.withStructuredOutput(FlashcardArraySchema);
-    const response = await structuredLlm.invoke([
-      new SystemMessage('You are an expert curriculum designer creating DIVERSE study sets. Your goal is to spread selections across ALL topics, not cluster on one.'),
-      new HumanMessage(prompt),
-    ]);
+
+    // Use timeout and retry for refinement LLM call
+    const response = await invokeWithRetry(
+      () => invokeWithTimeout(
+        () => structuredLlm.invoke([
+          new SystemMessage('You are an expert curriculum designer creating DIVERSE study sets. Your goal is to spread selections across ALL topics, not cluster on one.'),
+          new HumanMessage(prompt),
+        ]),
+        FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
+        'FlashcardRefineSelection'
+      ),
+      {
+        maxAttempts: 2,
+        baseDelayMs: 1000,
+      },
+      'FlashcardRefineSelection'
+    );
 
     const selected = (response as FlashcardResponse).flashcards;
-    console.log(`[FlashcardGraph] refineFlashcardSelection: selected ${selected.length} cards`);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_selection_complete',
+      selectedCount: selected.length,
+    });
 
     // Log topic distribution for debugging
     const topicGroups = this.groupFlashcardsByTopic(selected);
-    console.log(`[FlashcardGraph] Topic distribution after refinement:`, JSON.stringify(topicGroups, null, 2));
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_topic_distribution',
+      topicDistribution: topicGroups,
+    });
 
     // Fallback: if parsing failed or returned wrong count, take first N
     if (selected.length === 0) {
-      console.warn(`[FlashcardGraph] refineFlashcardSelection: parsing failed, using simple trim`);
+      logWarn({
+        agent: 'FlashcardGraph',
+        phase: 'refine_selection',
+        issue: 'parsing_failed',
+      }, 'Parsing failed, using simple trim');
       return flashcards.slice(0, targetCount);
     }
 
     // If still over limit, trim the excess (this shouldn't happen with a good prompt)
     if (selected.length > targetCount) {
-      console.warn(`[FlashcardGraph] refineFlashcardSelection: got ${selected.length}, trimming to ${targetCount}`);
+      logWarn({
+        agent: 'FlashcardGraph',
+        phase: 'refine_selection',
+        selectedCount: selected.length,
+        targetCount,
+      }, `Got ${selected.length}, trimming to ${targetCount}`);
       return selected.slice(0, targetCount);
     }
 
     // If under limit, take what we got plus fill from end to avoid losing topics
     if (selected.length < targetCount) {
-      console.warn(`[FlashcardGraph] refineFlashcardSelection: got ${selected.length}, adding ${targetCount - selected.length} more`);
+      logWarn({
+        agent: 'FlashcardGraph',
+        phase: 'refine_selection',
+        selectedCount: selected.length,
+        targetCount,
+      }, `Got ${selected.length}, adding ${targetCount - selected.length} more`);
       const remaining = flashcards.slice(-(targetCount - selected.length));
       return [...selected, ...remaining];
     }
@@ -603,7 +700,12 @@ Select exactly ${targetCount} diverse flashcards:`;
 
   // Fast refinement: no LLM call, just topic-based sampling
   private refineFlashcardSelectionFast(flashcards: Flashcard[], targetCount: number): Flashcard[] {
-    console.log(`[FlashcardGraph] refineFlashcardSelectionFast: selecting ${targetCount} cards from ${flashcards.length} using topic-based sampling`);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_fast',
+      totalFlashcards: flashcards.length,
+      targetCount,
+    }, `Selecting ${targetCount} cards from ${flashcards.length} using topic-based sampling`);
 
     // Group cards by topic
     const topicGroups: Record<string, Flashcard[]> = {};
@@ -614,7 +716,12 @@ Select exactly ${targetCount} diverse flashcards:`;
     }
 
     const topics = Object.keys(topicGroups);
-    console.log(`[FlashcardGraph] Found ${topics.length} topics:`, topics.map(t => `${t}(${topicGroups[t].length})`).join(', '));
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_fast_topics',
+      topicCount: topics.length,
+      topics: topics.map(t => `${t}(${topicGroups[t].length})`),
+    }, `Found ${topics.length} topics`);
 
     // Allocate cards proportionally to topic sizes (min 1 per topic, max based on target/topics ratio)
     const totalCards = flashcards.length;
@@ -670,12 +777,20 @@ Select exactly ${targetCount} diverse flashcards:`;
       }
     }
 
-    console.log(`[FlashcardGraph] Selected ${selected.length} cards with allocations:`,
-      Object.entries(allocations).map(([t, n]) => `${t}:${n}`).join(', '));
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_fast_selected',
+      selectedCount: selected.length,
+      allocations,
+    }, `Selected ${selected.length} cards`);
 
     // Log distribution
     const finalDistribution = this.groupFlashcardsByTopic(selected);
-    console.log(`[FlashcardGraph] Final topic distribution:`, JSON.stringify(finalDistribution, null, 2));
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'refine_fast_distribution',
+      finalDistribution,
+    });
 
     return selected;
   }
@@ -718,69 +833,91 @@ Select exactly ${targetCount} diverse flashcards:`;
 
   // Node: Reduce phase
   async reduce(state: OverallStateType): Promise<Partial<OverallStateType>> {
-    // ============================================================
-    // DEBUG: Reduce Phase Analysis
-    // ============================================================
-    console.log(`\n${'='.repeat(80)}`);
-    console.log('[FlashcardGraph] ===== REDUCE PHASE =====');
-    console.log('='.repeat(80));
-
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+    // Structured logging start
+    logPhaseStart({
+      agent: 'FlashcardGraph',
       phase: 'reduce',
       collapsedOutputsCount: state.collapsedOutputs.length,
       targetCardCount: state.cardCount,
       difficulty: state.difficulty,
-      topic: state.topic,
-    }, null, 2));
+      topic: state.topic || 'none',
+    });
 
     // Log each collapsed output for analysis
     state.collapsedOutputs.forEach((output, idx) => {
       const questionCount = output.split('Q:').length - 1;
-      console.log(`[FlashcardGraph] Collapsed output [${idx + 1}/${state.collapsedOutputs.length}]: ${output.length} chars, ~${questionCount} questions`);
-      console.log(`  Preview: ${output.substring(0, 150).replace(/\n/g, ' ')}...`);
+      logInfo({
+        agent: 'FlashcardGraph',
+        phase: 'reduce_analyze_output',
+        outputIndex: idx,
+        outputCount: state.collapsedOutputs.length,
+        outputLength: output.length,
+        questionCount,
+        preview: output.substring(0, 150).replace(/\n/g, ' '),
+      });
     });
 
     const combined = state.collapsedOutputs.join('\n\n---\n\n');
     const totalQuestionsBefore = combined.split('Q:').length - 1;
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+    logInfo({
+      agent: 'FlashcardGraph',
       phase: 'reduce_before_parsing',
       combinedLength: combined.length,
       totalQuestionsExtracted: totalQuestionsBefore,
-    }, null, 2));
-
-    console.log(`[FlashcardGraph] Skipping LLM reduce, parsing ${totalQuestionsBefore} cards directly from map outputs...`);
+    }, `Skipping LLM reduce, parsing ${totalQuestionsBefore} cards directly from map outputs...`);
 
     // Parse directly from map outputs - no LLM call needed
     const flashcards = this.fallbackParseFlashcards(combined);
-    console.log(`[FlashcardGraph] Parsed ${flashcards.length} flashcards from map outputs`);
 
     // Log topic distribution
     const topicDistribution = this.groupFlashcardsByTopic(flashcards);
-    console.log(`[FlashcardGraph] Topic distribution:`, JSON.stringify(topicDistribution, null, 2));
-
-    // Log all generated flashcards for analysis
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+    logInfo({
+      agent: 'FlashcardGraph',
       phase: 'reduce_after_parsing',
       flashcardsGenerated: flashcards.length,
-      topicDistribution: topicDistribution,
+      topicDistribution,
+    }, `Parsed ${flashcards.length} flashcards from map outputs`);
+
+    // Log all generated flashcards for analysis
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'reduce_flashcards_detail',
       flashcards: flashcards.map((card, idx) => ({
         index: idx + 1,
         front: card.front,
         backLength: card.back.length,
         backPreview: card.back.substring(0, 100),
       })),
-    }, null, 2));
+    });
 
-    console.log(`[FlashcardGraph] Generated ${flashcards.length} flashcards (target: ${state.cardCount})`);
+    // Validate flashcard quality
+    const validation = validateFlashcards(JSON.stringify(flashcards), state.cardCount);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'reduce_validation',
+      validation: {
+        isValid: validation.isValid,
+        warnings: validation.warnings,
+        score: validation.score,
+      },
+    });
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'reduce',
+      flashcardsGenerated: flashcards.length,
+      targetCardCount: state.cardCount,
+    }, `Generated ${flashcards.length} flashcards (target: ${state.cardCount})`);
 
     // If still no flashcards, this is a critical failure
     if (flashcards.length === 0) {
-      console.error(`[FlashcardGraph] CRITICAL: No flashcards generated despite ${totalQuestionsBefore} input questions!`);
-      console.error(`[FlashcardGraph] This indicates the LLM failed to process the content or structured output failed.`);
+      logError({
+        agent: 'FlashcardGraph',
+        phase: 'reduce',
+        error: 'No flashcards generated',
+        totalQuestionsBefore,
+      }, `CRITICAL: No flashcards generated despite ${totalQuestionsBefore} input questions!`);
       return {
         ...state,
         finalOutput: [],
@@ -790,12 +927,18 @@ Select exactly ${targetCount} diverse flashcards:`;
 
     // Post-processing: enforce exact card count
     if (flashcards.length > state.cardCount) {
-      console.log(`[FlashcardGraph] Have ${flashcards.length} cards, need exactly ${state.cardCount}. Running fast topic-based refinement.`);
+      logInfo({
+        agent: 'FlashcardGraph',
+        phase: 'reduce_refinement',
+        currentCount: flashcards.length,
+        targetCount: state.cardCount,
+      }, `Have ${flashcards.length} cards, need exactly ${state.cardCount}. Running fast topic-based refinement.`);
+
       const refined = this.refineFlashcardSelectionFast(flashcards, state.cardCount);
 
       // Log final refined cards
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
+      logInfo({
+        agent: 'FlashcardGraph',
         phase: 'reduce_final',
         finalFlashcardCount: refined.length,
         finalFlashcards: refined.map((card, idx) => ({
@@ -804,11 +947,17 @@ Select exactly ${targetCount} diverse flashcards:`;
           backLength: card.back.length,
           backPreview: card.back.substring(0, 100),
         })),
-      }, null, 2));
+      });
 
-      console.log(`\n${'='.repeat(80)}`);
-      console.log('[FlashcardGraph] ===== GENERATION COMPLETE =====');
-      console.log('='.repeat(80));
+      logBanner(
+        {
+          agent: 'FlashcardGraph',
+          phase: 'generation_complete',
+          finalFlashcardCount: refined.length,
+          targetCardCount: state.cardCount,
+        },
+        'GENERATION COMPLETE'
+      );
 
       return {
         ...state,
@@ -818,12 +967,17 @@ Select exactly ${targetCount} diverse flashcards:`;
     }
 
     if (flashcards.length < state.cardCount) {
-      console.log(`[FlashcardGraph] Generated ${flashcards.length} cards, target was ${state.cardCount}. Accepting fewer.`);
+      logWarn({
+        agent: 'FlashcardGraph',
+        phase: 'reduce',
+        generatedCount: flashcards.length,
+        targetCount: state.cardCount,
+      }, `Generated ${flashcards.length} cards, target was ${state.cardCount}. Accepting fewer.`);
     }
 
     // Log final cards
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
+    logInfo({
+      agent: 'FlashcardGraph',
       phase: 'reduce_final',
       finalFlashcardCount: flashcards.length,
       finalFlashcards: flashcards.map((card, idx) => ({
@@ -832,11 +986,17 @@ Select exactly ${targetCount} diverse flashcards:`;
         backLength: card.back.length,
         backPreview: card.back.substring(0, 100),
       })),
-    }, null, 2));
+    });
 
-    console.log(`\n${'='.repeat(80)}`);
-    console.log('[FlashcardGraph] ===== GENERATION COMPLETE =====');
-    console.log('='.repeat(80));
+    logBanner(
+      {
+        agent: 'FlashcardGraph',
+        phase: 'generation_complete',
+        finalFlashcardCount: flashcards.length,
+        targetCardCount: state.cardCount,
+      },
+      'GENERATION COMPLETE'
+    );
 
     return {
       ...state,
@@ -847,7 +1007,11 @@ Select exactly ${targetCount} diverse flashcards:`;
 
   // Fallback parser for when structured output fails
   private fallbackParseFlashcards(content: string): Flashcard[] {
-    console.log('[FlashcardGraph] fallbackParseFlashcards: attempting manual parsing...');
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'fallback_parse',
+      contentLength: content.length,
+    }, 'Attempting manual parsing...');
 
     const flashcards: Flashcard[] = [];
     const qaPattern = /Q:\s*(.+?)\s*A:\s*([\s\S]+?)(?=Q:|$)/g;
@@ -862,7 +1026,11 @@ Select exactly ${targetCount} diverse flashcards:`;
       }
     }
 
-    console.log(`[FlashcardGraph] fallbackParseFlashcards: extracted ${flashcards.length} cards`);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'fallback_parse_regex',
+      extractedCount: flashcards.length,
+    }, `Regex extraction: ${flashcards.length} cards`);
 
     // If regex failed, try to extract from raw Q:/A: patterns individually
     if (flashcards.length === 0) {
@@ -893,7 +1061,11 @@ Select exactly ${targetCount} diverse flashcards:`;
         flashcards.push({ front: currentFront, back: currentBack.trim() });
       }
 
-      console.log(`[FlashcardGraph] fallbackParseFlashcards (line-by-line): extracted ${flashcards.length} cards`);
+      logInfo({
+        agent: 'FlashcardGraph',
+        phase: 'fallback_parse_line_by_line',
+        extractedCount: flashcards.length,
+      }, `Line-by-line extraction: ${flashcards.length} cards`);
     }
 
     return flashcards;
