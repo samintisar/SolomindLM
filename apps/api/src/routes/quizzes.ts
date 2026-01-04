@@ -205,7 +205,7 @@ router.post('/', async (req: Request, res: Response) => {
         notebook_id: notebookId,
         title,
         status: 'generating',
-        questions_data: null,
+        questions_data: {},
         metadata: {
           documentIds,
           questionCount,

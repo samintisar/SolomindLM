@@ -21,7 +21,7 @@ import { chatApi } from './features/chat/services/chatApi';
 import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
-const MAX_PANEL_WIDTH = 600;
+const MAX_PANEL_WIDTH = 900;
 
 type ViewState = 'home' | 'notebook';
 
@@ -454,6 +454,27 @@ const AppContent: React.FC = () => {
     };
   }, [isResizingLeft, isResizingRight, resize, stopResizing]);
 
+  // Listen for panel resize events from child components
+  useEffect(() => {
+    const handleSourcesPanelResize = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setLeftWidth(customEvent.detail.width);
+    };
+    
+    const handleStudioPanelResize = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setRightWidth(customEvent.detail.width);
+    };
+    
+    window.addEventListener('resizeSourcesPanel', handleSourcesPanelResize);
+    window.addEventListener('resizeStudioPanel', handleStudioPanelResize);
+    
+    return () => {
+      window.removeEventListener('resizeSourcesPanel', handleSourcesPanelResize);
+      window.removeEventListener('resizeStudioPanel', handleStudioPanelResize);
+    };
+  }, []);
+
   // Load notebooks from API when authenticated
   const loadNotebooks = useCallback(async () => {
     if (!isAuthenticated || !user) {
@@ -516,7 +537,7 @@ const AppContent: React.FC = () => {
   // Load notes, mind maps, flashcards, quizzes, and audio overviews from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
-      // Fetch notes, mind maps, flashcards, quizzes, and audio overviews in parallel
+      // Fetch all content types in parallel
       Promise.all([
         notesApi.getNotes(activeNotebookId).catch(err => {
           console.error('Failed to load notes:', err);
@@ -540,7 +561,7 @@ const AppContent: React.FC = () => {
         }),
       ])
         .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedAudio]) => {
-          // Merge notes, mind maps, flashcards, quizzes, and audio overviews, sort by created_at descending
+          // Merge all content types, sort by created_at descending
           const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedAudio].sort((a, b) => {
             const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
             const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';

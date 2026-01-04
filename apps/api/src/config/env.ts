@@ -15,6 +15,7 @@ const envSchema = z.object({
   TOGETHER_AI_API_KEY: z.string(),
   FAST_LLM: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
   SMART_LLM: z.string().optional(), // Optional: smarter model for complex tasks
+  IMAGE_LLM: z.string().default('Qwen/Qwen-Image'), // Image generation model
   REPORT_MAX_TOKENS: z.string().default('64000'), // Max tokens for report output (increased to prevent truncation)
   REPORT_MAP_BATCH_SIZE: z.string().default('10'),
   // Flashcard Generation

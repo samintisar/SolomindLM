@@ -179,10 +179,52 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         className={`
           relative shrink-0 bg-sidebar border-r-2 border-border h-full flex flex-col
           overflow-hidden
-          ${!isResizing ? 'panel-transition' : ''}
           ${isOpen ? 'opacity-100' : 'opacity-0'}
         `}
       >
+        {/* Resize Handle */}
+        {isOpen && (
+          <div
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 z-50 transition-colors active:bg-primary/70"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              const startX = e.clientX;
+              const startWidth = width;
+              let animationFrameId: number | null = null;
+              
+              const handleMouseMove = (moveEvent: MouseEvent) => {
+                if (animationFrameId) {
+                  cancelAnimationFrame(animationFrameId);
+                }
+                
+              animationFrameId = requestAnimationFrame(() => {
+                const delta = moveEvent.clientX - startX;
+                const newWidth = Math.max(220, Math.min(900, startWidth + delta));
+                  // Dispatch custom event that parent can listen to
+                  window.dispatchEvent(new CustomEvent('resizeSourcesPanel', { detail: { width: newWidth } }));
+                });
+              };
+              
+              const handleMouseUp = () => {
+                if (animationFrameId) {
+                  cancelAnimationFrame(animationFrameId);
+                }
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+              };
+              
+              document.body.style.userSelect = 'none';
+              document.body.style.cursor = 'col-resize';
+              document.addEventListener('mousemove', handleMouseMove);
+              document.addEventListener('mouseup', handleMouseUp);
+            }}
+          />
+        )}
+        
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-sidebar/50 backdrop-blur-sm sticky top-0 z-10 h-14">
           {viewingSource ? (

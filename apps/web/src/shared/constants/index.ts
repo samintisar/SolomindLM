@@ -82,7 +82,6 @@ export const STUDIO_TOOLS: StudioTool[] = [
   { id: 'reports', label: 'Reports', iconName: 'FileText', color: 'text-amber-600' },
   { id: 'flashcards', label: 'Flashcards', iconName: 'Layers', color: 'text-orange-600' },
   { id: 'quiz', label: 'Quiz', iconName: 'HelpCircle', color: 'text-sky-600' },
-  { id: 'slides', label: 'Slide Deck', iconName: 'Presentation', color: 'text-yellow-600' },
 ];
 
 export const SAVED_NOTES: Note[] = [];
