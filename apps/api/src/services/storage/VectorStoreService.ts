@@ -52,6 +52,45 @@ export class VectorStoreService {
     return data;
   }
 
+  /**
+   * Hybrid search combining vector similarity with keyword search using RRF
+   * @param userId - User ID
+   * @param noteId - Note ID
+   * @param queryText - Raw query text for keyword search
+   * @param queryEmbedding - Query embedding for vector search
+   * @param limit - Maximum number of results
+   * @param documentIds - Optional document filter
+   * @param matchThreshold - Minimum similarity threshold for vector search
+   * @returns Array of search results with RRF scores
+   */
+  async hybridSearch(
+    userId: string,
+    noteId: string,
+    queryText: string,
+    queryEmbedding: number[],
+    limit: number = 10,
+    documentIds?: string[],
+    matchThreshold: number = 0.5
+  ): Promise<any[]> {
+    const { data, error } = await supabase.rpc('match_documents_hybrid', {
+      query_embedding: queryEmbedding,
+      query_text: queryText,
+      user_id: userId,
+      note_id: noteId,
+      match_threshold: matchThreshold,
+      match_count: limit,
+      document_ids: documentIds && documentIds.length > 0 ? documentIds : null,
+      rrf_k: 60, // Standard RRF constant
+    });
+
+    if (error) {
+      console.error('Hybrid search error:', error);
+      throw new Error(`Failed to perform hybrid search: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
   async getDocumentChunks(documentId: string): Promise<any[]> {
     const { data, error } = await supabase
       .from('document_chunks')

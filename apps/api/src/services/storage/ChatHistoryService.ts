@@ -20,6 +20,9 @@ export interface ReferenceChunk {
   content: string;
   chunkIndex: number;
   similarity?: number;
+  rrfScore?: number; // Reciprocal Rank Fusion score from hybrid search
+  vectorRank?: number | bigint; // Rank from vector search
+  keywordRank?: number | bigint; // Rank from keyword search
 }
 
 export interface Conversation {

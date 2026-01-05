@@ -112,24 +112,91 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
   }
 
   // List view
+  if (isInFolder) {
+    return (
+      <div
+        className="group grid grid-cols-[auto_1fr_auto_auto_48px] items-center gap-2 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-3 rounded-lg"
+      >
+        {/* Clickable Overlay */}
+        <div onClick={() => onSelectNotebook(notebook)} className="absolute inset-0 z-0 rounded-lg" />
+
+        {/* Icon Column */}
+        <div className={`rounded-md ${notebook.coverColor} bg-opacity-15 flex items-center justify-center shrink-0 w-7 h-7`}>
+          <Icon className={`${(notebook.coverColor || '').replace('bg-', 'text-')} w-3.5 h-3.5`} />
+        </div>
+
+        {/* Title Column */}
+        <div className="min-w-0 z-10 pointer-events-none">
+          <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-sm">{notebook.title}</span>
+        </div>
+
+        {/* Date Column */}
+        <div className="text-muted-foreground font-mono z-10 pointer-events-none whitespace-nowrap text-xs">
+          {formatDate(notebook.date)}
+        </div>
+
+        {/* Sources Column */}
+        <div className="z-10 pointer-events-none">
+          <div className="inline-flex items-center gap-1.5 bg-secondary/40 px-2 py-0.5 rounded text-xs font-medium text-muted-foreground">
+            {showAuthor ? <Globe className="w-2.5 h-2.5 shrink-0" /> : <FileText className="w-2.5 h-2.5 shrink-0" />}
+            <span>{notebook.sourceCount}</span>
+          </div>
+        </div>
+
+        {/* Action Column */}
+        <div className="flex justify-end z-20 pointer-events-auto kebab-menu relative">
+          <button
+            onClick={(e) => { e.stopPropagation(); isMenuOpen ? onCloseMenu() : onToggleMenu(); }}
+            className={`p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 ${isMenuOpen ? 'opacity-100 bg-secondary' : 'opacity-0 group-hover:opacity-100'}`}
+          >
+            <MoreVertical className="w-4 h-4 shrink-0" />
+          </button>
+
+          {isMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-border shadow-xl rounded-lg z-50 py-1 animate-in fade-in zoom-in-95 duration-150">
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenCustomize(); }}
+                className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-accent flex items-center gap-2 text-popover-foreground transition-colors"
+              >
+                <Settings2 className="w-3.5 h-3.5 shrink-0" /> Customize
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenMoveToFolder(); }}
+                className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-accent flex items-center gap-2 text-popover-foreground transition-colors"
+              >
+                <FolderOpen className="w-3.5 h-3.5 shrink-0" /> Move to folder
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteNotebook(notebook.id); onCloseMenu(); }}
+                className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`group grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] items-center gap-4 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative ${isInFolder ? 'p-3 rounded-lg ml-6' : 'p-4 rounded-xl'}`}
+      className="group grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] items-center gap-4 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-4 rounded-xl"
     >
       {/* Clickable Overlay */}
       <div onClick={() => onSelectNotebook(notebook)} className="absolute inset-0 z-0 rounded-xl" />
 
       {/* Title Column */}
       <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">
-        <div className={`rounded-md ${notebook.coverColor} bg-opacity-15 flex items-center justify-center shrink-0 ${isInFolder ? 'w-7 h-7' : 'w-9 h-9'}`}>
-          <Icon className={`${(notebook.coverColor || '').replace('bg-', 'text-')} ${isInFolder ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+        <div className={`rounded-md ${notebook.coverColor} bg-opacity-15 flex items-center justify-center shrink-0 w-9 h-9`}>
+          <Icon className={`${(notebook.coverColor || '').replace('bg-', 'text-')} w-4 h-4`} />
         </div>
 
-        <span className={`font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors ${isInFolder ? 'text-sm' : 'text-base'}`}>{notebook.title}</span>
+        <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-base">{notebook.title}</span>
       </div>
 
       {/* Date Column */}
-      <div className={`text-muted-foreground font-mono z-10 pointer-events-none whitespace-nowrap ${isInFolder ? 'text-xs' : 'text-sm'}`}>
+      <div className="text-muted-foreground font-mono z-10 pointer-events-none whitespace-nowrap text-sm">
         {formatDate(notebook.date)}
       </div>
 

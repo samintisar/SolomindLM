@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2, Loader2, Search, FileText, Brain } from 'lucide-react';
+import { Virtuoso } from 'react-virtuoso';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -43,6 +44,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const virtuosoRef = useRef<any>(null);
 
   const handleDeleteHistory = () => {
     if (confirm('Are you sure you want to delete all chat history? This action cannot be undone.')) {
@@ -145,13 +147,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [inputMessage]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change using Virtuoso
   useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (container) {
-      container.scrollTop = container.scrollHeight;
+    if (virtuosoRef.current && messages.length > 0) {
+      // Small delay to ensure Virtuoso has updated
+      setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: messages.length - 1,
+          align: 'end',
+          behavior: 'smooth',
+        });
+      }, 100);
     }
-  }, [messages]);
+  }, [messages.length]);
 
   // Strip "References:" section from message content (LLM sometimes adds it)
   const stripReferencesSection = (content: string): string => {
@@ -227,6 +235,90 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
     );
   };
+
+  // Status icon mapping for "Thinking" states
+  const getStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'searching':
+        return <Search className="w-4 h-4 animate-pulse" />;
+      case 'reading':
+        return <FileText className="w-4 h-4 animate-pulse" />;
+      case 'thinking':
+        return <Brain className="w-4 h-4 animate-pulse" />;
+      case 'generating':
+        return <Loader2 className="w-4 h-4 animate-spin" />;
+      default:
+        return null;
+    }
+  };
+
+  // Status message mapping
+  const getStatusMessage = (status?: string) => {
+    switch (status) {
+      case 'searching':
+        return 'Searching sources...';
+      case 'reading':
+        return 'Reading sources...';
+      case 'thinking':
+        return 'Thinking...';
+      case 'generating':
+        return 'Generating response...';
+      default:
+        return null;
+    }
+  };
+
+  // Memoized MessageBubble component for performance
+  const MessageBubble = React.memo<{
+    message: Message;
+    onRefHover: (refId: number, messageId: string, event: React.MouseEvent) => void;
+    onRefLeave: () => void;
+  }>(({ message, onRefHover, onRefLeave }) => {
+    const isUser = message.role === 'user';
+
+    return (
+      <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1`} data-message-id={message.id}>
+        {isUser ? (
+          <>
+            <div className="max-w-[75%] relative p-4 rounded-xl font-serif text-lg leading-relaxed bg-primary/10 text-foreground shadow-sm">
+              {renderMessageWithReferences(message.id, message.content, message.references)}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
+              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </>
+        ) : (
+          <>
+            {/* Status indicator for assistant messages */}
+            {message.status && (
+              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                {getStatusIcon(message.status)}
+                <span className="animate-pulse">{getStatusMessage(message.status)}</span>
+              </div>
+            )}
+            <div className="max-w-[90%] font-serif text-lg leading-relaxed text-foreground">
+              {renderMessageWithReferences(message.id, message.content, message.references)}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
+              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </>
+        )}
+      </div>
+    );
+  }, (prev, next) => {
+    // Only re-render if content, status, or references change
+    return (
+      prev.message.id === next.message.id &&
+      prev.message.content === next.message.content &&
+      prev.message.status === next.message.status &&
+      prev.message.references === next.message.references
+    );
+  });
+
+  // Memoize the messages array to prevent unnecessary re-renders
+  const memoizedMessages = useMemo(() => messages, [messages]);
+
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
       
@@ -286,36 +378,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div 
+      {/* Messages Area - Virtualized */}
+      <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 sm:px-12 md:px-20 lg:px-32 space-y-6 scroll-smooth overflow-x-hidden relative"
+        className="flex-1 overflow-hidden relative"
       >
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-1`} data-message-id={msg.id}>
-            {msg.role === 'user' ? (
-              <>
-                <div className="max-w-[75%] relative p-4 rounded-xl font-serif text-lg leading-relaxed bg-primary/10 text-foreground shadow-sm">
-                  {renderMessageWithReferences(msg.id, msg.content, msg.references)}
-                </div>
-                <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </>
-            ) : (
-              <>
-                <div className="max-w-[90%] font-serif text-lg leading-relaxed text-foreground">
-                  {renderMessageWithReferences(msg.id, msg.content, msg.references)}
-                </div>
-                <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </>
-            )}
-          </div>
-        ))}
-        {/* Spacer for bottom input */}
-        <div className="h-56" />
+        <Virtuoso
+          ref={virtuosoRef}
+          style={{ height: '100%' }}
+          data={memoizedMessages}
+          itemContent={(index, message) => (
+            <div className="px-4 py-3 sm:px-12 md:px-20 lg:px-32">
+              <MessageBubble
+                key={message.id}
+                message={message}
+                onRefHover={handleRefHover}
+                onRefLeave={handleRefLeave}
+              />
+            </div>
+          )}
+          components={{
+            Footer: () => <div className="h-56" />,
+          }}
+          defaultItemHeight={150}
+          increaseViewportBy={{ top: 200, bottom: 400 }}
+        />
 
         {/* Floating Tooltip */}
         {hoveredRefId !== null && hoveredMessageId !== null && messagesContainerRef.current && (() => {

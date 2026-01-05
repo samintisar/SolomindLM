@@ -26,6 +26,7 @@ export interface Message {
   citations?: number[];
   references?: ReferenceChunk[];
   timestamp: Date;
+  status?: 'searching' | 'reading' | 'thinking' | 'generating';
 }
 
 export interface StudioTool {

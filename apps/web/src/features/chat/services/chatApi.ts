@@ -25,6 +25,7 @@ export interface ChatHistoryResponse {
 export interface SendMessageCallbacks {
   onToken: (token: string) => void;
   onReferences: (references: ReferenceChunk[]) => void;
+  onStatus?: (status: string, message?: string) => void;
   onComplete: () => void;
   onError: (error: string) => void;
 }
@@ -148,6 +149,8 @@ export const chatApi = {
                 callbacks.onToken(data.content);
               } else if (data.type === 'references') {
                 callbacks.onReferences(data.data);
+              } else if (data.type === 'status') {
+                callbacks.onStatus?.(data.status, data.message);
               } else if (data.type === 'done') {
                 callbacks.onComplete();
               } else if (data.type === 'error') {

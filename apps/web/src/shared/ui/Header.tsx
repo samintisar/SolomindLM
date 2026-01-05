@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Share2 } from 'lucide-react';
+import { User } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { DropdownMenu } from './DropdownMenu';
@@ -118,13 +118,6 @@ export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoC
 
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {!isHome && (
-          <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-foreground border border-border rounded-sm hover:bg-accent transition-colors uppercase tracking-wider">
-            <Share2 className="w-3 h-3 shrink-0" />
-            Share
-          </button>
-        )}
-        
         <DropdownMenu
           trigger={
             <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center hover:ring-2 hover:ring-ring transition-all shrink-0">
