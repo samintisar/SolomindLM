@@ -1,5 +1,5 @@
 import { run, runMigrations } from 'graphile-worker';
-import { pgPool } from '../config/worker.js';
+import { pgPool, workerConfig } from '../config/worker.js';
 
 // Type imports for payloads
 type DocEmbeddingJobPayload = import('../services/jobs/DocEmbeddingJob.js').DocEmbeddingJobPayload;
@@ -20,6 +20,51 @@ async function loadTasks() {
   const { audioOverviewGenerationJob } = await import('../services/jobs/AudioOverviewGenerationJob.js');
   const { writtenQuestionsGenerationJob } = await import('../services/jobs/WrittenQuestionsGenerationJob.js');
   return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob, quizGenerationJob, audioOverviewGenerationJob, writtenQuestionsGenerationJob };
+}
+
+// Heartbeat function to monitor worker health
+function startHeartbeat() {
+  // NOTE: Increased from 10s to 5 minutes to avoid interfering with Graphile Worker's built-in recovery mechanisms
+  // Graphile Worker has native mechanisms to handle crashed workers
+  setInterval(async () => {
+    try {
+      // Check pending jobs (summary only, no details to reduce log spam)
+      const jobsResult = await pgPool.query(
+        `SELECT COUNT(*) as count
+         FROM graphile_worker.jobs
+         WHERE locked_at IS NULL`
+      );
+      const pendingCount = parseInt(jobsResult.rows[0].count);
+      console.log(`[Worker] Heartbeat: ${pendingCount} pending jobs`);
+
+      // Only log details if there are many pending jobs (potential issue)
+      if (pendingCount > 20) {
+        const taskBreakdown = await pgPool.query(
+          `SELECT task_identifier, COUNT(*) as count
+           FROM graphile_worker.jobs
+           WHERE locked_at IS NULL
+           GROUP BY task_identifier`
+        );
+        console.log('[Worker] High pending job count - breakdown by task:');
+        for (const row of taskBreakdown.rows) {
+          console.log(`[Worker]   - ${row.task_identifier}: ${row.count}`);
+        }
+      }
+
+      // Check locked jobs (summary only)
+      const lockedResult = await pgPool.query(
+        `SELECT COUNT(*) as count
+         FROM graphile_worker.jobs
+         WHERE locked_at IS NOT NULL`
+      );
+      const lockedCount = parseInt(lockedResult.rows[0].count);
+      if (lockedCount > 0) {
+        console.log(`[Worker] Currently locked jobs: ${lockedCount}`);
+      }
+    } catch (error) {
+      console.error('[Worker] Heartbeat failed:', error);
+    }
+  }, 300000); // 5 minutes (300000ms) instead of 10 seconds
 }
 
 // ============================================================
@@ -79,14 +124,17 @@ async function startWorker() {
     console.error('[Worker] Failed to clean up stale locks:', error);
   }
 
-  console.log('[Worker] Starting Graphile Worker with concurrency=5, pollInterval=1000ms');
+  console.log(`[Worker] Starting Graphile Worker with concurrency=${workerConfig.concurrency}, pollInterval=2000ms (Total capacity: ${workerConfig.totalCapacity})`);
   console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration, quizGeneration, audioOverviewGeneration, writtenQuestionsGeneration');
 
+  // Start heartbeat in parallel (don't await it)
+  startHeartbeat();
+
   // Start worker - let graphile-worker handle signals (remove noHandleSignals)
-  await run({
+  const promise = run({
     pgPool,
-    concurrency: 5,
-    pollInterval: 1000,
+    concurrency: workerConfig.concurrency,
+    pollInterval: 2000,
     // CRITICAL: Let graphile-worker handle its own signals for proper Windows support
     // noHandleSignals: true, // REMOVED - causes issues on Windows
     taskList: {
@@ -170,62 +218,30 @@ async function startWorker() {
     },
   });
 
+  // The run() promise will resolve when the worker stops
   console.log('[Worker] Graphile Worker started successfully');
-
-  // Keep the process alive with a periodic heartbeat
-  setInterval(async () => {
-    try {
-      // Cleanup stale locks every heartbeat (10 seconds)
-      await pgPool.query(`
-        -- Unlock job queues locked for more than 5 minutes
-        UPDATE graphile_worker._private_job_queues
-        SET locked_at = NULL, locked_by = NULL
-        WHERE locked_at < NOW() - INTERVAL '5 minutes';
-
-        -- Unlock jobs locked for more than 30 minutes
-        UPDATE graphile_worker._private_jobs
-        SET locked_at = NULL, locked_by = NULL
-        WHERE locked_at IS NOT NULL
-          AND locked_at < NOW() - INTERVAL '30 minutes';
-      `);
-
-      // Check pending jobs with details
-      const jobsResult = await pgPool.query(
-        `SELECT id, task_identifier, run_at, locked_at, attempts, max_attempts, last_error
-         FROM graphile_worker.jobs
-         WHERE locked_at IS NULL
-         ORDER BY created_at ASC
-         LIMIT 10`
-      );
-      const pendingCount = jobsResult.rows.length;
-      console.log(`[Worker] Heartbeat: ${pendingCount} pending jobs`);
-
-      // Log details of pending jobs
-      if (pendingCount > 0) {
-        console.log('[Worker] Pending jobs details:');
-        for (const row of jobsResult.rows) {
-          console.log(`[Worker]   - Job ID: ${row.id}, Task: ${row.task_identifier}, Run at: ${row.run_at}, Attempts: ${row.attempts}/${row.max_attempts}, Last error: ${row.last_error || 'none'}`);
-        }
-      }
-
-      // Check locked jobs
-      const lockedResult = await pgPool.query(
-        `SELECT id, task_identifier, locked_at, locked_by
-         FROM graphile_worker.jobs
-         WHERE locked_at IS NOT NULL`
-      );
-      const lockedCount = lockedResult.rows.length;
-      if (lockedCount > 0) {
-        console.log(`[Worker] Currently locked jobs: ${lockedCount}`);
-        for (const row of lockedResult.rows) {
-          console.log(`[Worker]   - Job ID: ${row.id}, Task: ${row.task_identifier}, Locked at: ${row.locked_at}, Locked by: ${row.locked_by}`);
-        }
-      }
-    } catch (error) {
-      console.error('[Worker] Heartbeat failed:', error);
-    }
-  }, 10000);
+  await promise;
 }
+
+// Handle graceful shutdown
+async function shutdown(signal: string) {
+  console.log(`[Worker] Received ${signal}, shutting down gracefully...`);
+
+  try {
+    // Close the database pool
+    await pgPool.end();
+    console.log('[Worker] Database pool closed');
+
+    process.exit(0);
+  } catch (error) {
+    console.error('[Worker] Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+// Handle shutdown signals
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Handle unhandled rejections
 process.on('unhandledRejection', (reason, promise) => {

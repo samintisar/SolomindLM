@@ -1,27 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
-import { makeWorkerUtils, runMigrations } from 'graphile-worker';
-import { pgPool } from '../config/worker.js';
+import { scheduleAudioOverviewGeneration } from '../utils/jobHelpers.js';
 import { AudioOverviewGenerationService } from '../services/generation/AudioOverviewGenerationService.js';
 import { SupabaseStorageService } from '../services/storage/SupabaseStorageService.js';
 
 const router = Router();
 const audioOverviewService = new AudioOverviewGenerationService();
 const storageService = new SupabaseStorageService();
-
-// Worker utils lazy loader - ensures schema is initialized before use
-let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
-
-async function getWorkerUtils() {
-  if (!workerUtilsPromise) {
-    // Ensure migrations are run first
-    await runMigrations({ pgPool });
-    workerUtilsPromise = makeWorkerUtils({
-      pgPool,
-    });
-  }
-  return workerUtilsPromise;
-}
 
 // Configuration constants
 const CONFIG = {
@@ -83,14 +68,20 @@ function validateDocumentIds(ids: unknown): ids is string[] {
 }
 
 // Helper function to add a job to Graphile Worker using the SDK
-async function addAudioOverviewJob(payload: unknown) {
+async function addAudioOverviewJob(
+  payload: {
+    audioOverviewId: string;
+    userId: string;
+    notebookId: string;
+    documentIds: string[];
+  },
+  options?: {
+    priority?: number;
+    queueName?: string;
+  }
+) {
   try {
-    const workerUtils = await getWorkerUtils();
-    await workerUtils.addJob(
-      'audioOverviewGeneration',
-      payload,
-      { queueName: 'default' }
-    );
+    await scheduleAudioOverviewGeneration(payload, options);
     console.log(`[AudioOverviews] Successfully added audioOverviewGeneration job`);
   } catch (error: any) {
     console.error(`[AudioOverviews] Failed to add audioOverviewGeneration job:`, error);

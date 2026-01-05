@@ -1,24 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
-import { makeWorkerUtils, runMigrations } from 'graphile-worker';
-import { pgPool } from '../config/worker.js';
+import { scheduleQuizGeneration } from '../utils/jobHelpers.js';
 import { QuizGenerationService } from '../services/generation/QuizGenerationService.js';
 
 const router = Router();
 const quizService = new QuizGenerationService();
-
-// Worker utils lazy loader - ensures schema is initialized before use
-let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
-
-async function getWorkerUtils() {
-  if (!workerUtilsPromise) {
-    await runMigrations({ pgPool });
-    workerUtilsPromise = makeWorkerUtils({
-      pgPool,
-    });
-  }
-  return workerUtilsPromise;
-}
 
 // Configuration constants
 const CONFIG = {
@@ -104,14 +90,22 @@ function getQuestionCountValue(count: QuestionCount): number {
 }
 
 // Helper function to add a job to Graphile Worker using the SDK
-async function addQuizJob(payload: unknown) {
+async function addQuizJob(
+  payload: {
+    quizId: string;
+    userId: string;
+    notebookId: string;
+    documentIds: string[];
+    questionCount: number;
+    difficulty: string;
+  },
+  options?: {
+    priority?: number;
+    queueName?: string;
+  }
+) {
   try {
-    const workerUtils = await getWorkerUtils();
-    await workerUtils.addJob(
-      'quizGeneration',
-      payload,
-      { queueName: 'default' }
-    );
+    await scheduleQuizGeneration(payload, options);
     console.log(`[Quizzes] Successfully added quizGeneration job`);
   } catch (error: any) {
     console.error(`[Quizzes] Failed to add quizGeneration job:`, error);

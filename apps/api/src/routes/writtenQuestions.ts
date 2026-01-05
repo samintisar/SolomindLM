@@ -1,22 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
-import { makeWorkerUtils, runMigrations } from 'graphile-worker';
-import { pgPool } from '../config/worker.js';
+import { scheduleWrittenQuestionsGeneration } from '../utils/jobHelpers.js';
 
 const router = Router();
-
-// Worker utils lazy loader - ensures schema is initialized before use
-let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
-
-async function getWorkerUtils() {
-  if (!workerUtilsPromise) {
-    await runMigrations({ pgPool });
-    workerUtilsPromise = makeWorkerUtils({
-      pgPool,
-    });
-  }
-  return workerUtilsPromise;
-}
 
 // Configuration constants
 const CONFIG = {
@@ -130,14 +116,21 @@ function getQuestionCountValue(count: QuestionCount): number {
 }
 
 // Helper function to add a job to Graphile Worker using the SDK
-async function addWrittenQuestionsJob(payload: unknown) {
+async function addWrittenQuestionsJob(
+  payload: {
+    writtenQuestionId: string;
+    userId: string;
+    notebookId: string;
+    documentIds: string[];
+    questionCount: number;
+  },
+  options?: {
+    priority?: number;
+    queueName?: string;
+  }
+) {
   try {
-    const workerUtils = await getWorkerUtils();
-    await workerUtils.addJob(
-      'writtenQuestionsGeneration',
-      payload,
-      { queueName: 'default' }
-    );
+    await scheduleWrittenQuestionsGeneration(payload, options);
     console.log(`[WrittenQuestions] Successfully added writtenQuestionsGeneration job`);
   } catch (error: any) {
     console.error(`[WrittenQuestions] Failed to add writtenQuestionsGeneration job:`, error);

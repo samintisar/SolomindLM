@@ -1,25 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
-import { makeWorkerUtils, runMigrations } from 'graphile-worker';
-import { pgPool } from '../config/worker.js';
+import { scheduleReportGeneration } from '../utils/jobHelpers.js';
 import { ReportGenerationService } from '../services/generation/ReportGenerationService.js';
 
 const router = Router();
 const reportService = new ReportGenerationService();
-
-// Worker utils lazy loader - ensures schema is initialized before use
-let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
-
-async function getWorkerUtils() {
-  if (!workerUtilsPromise) {
-    // Ensure migrations are run first
-    await runMigrations({ pgPool });
-    workerUtilsPromise = makeWorkerUtils({
-      pgPool,
-    });
-  }
-  return workerUtilsPromise;
-}
 
 // Configuration constants
 const CONFIG = {
@@ -80,14 +65,22 @@ function validateTitle(title: unknown): boolean {
 }
 
 // Helper function to add a job to Graphile Worker using the SDK
-async function addReportJob(payload: unknown) {
+async function addReportJob(
+  payload: {
+    reportId: string;
+    userId: string;
+    notebookId: string;
+    documentIds: string[];
+    reportType: string;
+    customPrompt?: string;
+  },
+  options?: {
+    priority?: number;
+    queueName?: string;
+  }
+) {
   try {
-    const workerUtils = await getWorkerUtils();
-    await workerUtils.addJob(
-      'reportGeneration',
-      payload,
-      { queueName: 'default' }
-    );
+    await scheduleReportGeneration(payload, options);
     console.log(`[Reports] Successfully added reportGeneration job`);
   } catch (error: any) {
     console.error(`[Reports] Failed to add reportGeneration job:`, error);

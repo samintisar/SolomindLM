@@ -89,6 +89,10 @@ const envSchema = z.object({
   SUPADATA_API_KEY: z.string(),
   TAVILY_API_KEY: z.string(),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  // Graphile Worker Configuration
+  WORKER_CONCURRENCY: z.string().default('5'),
+  WORKER_INSTANCES: z.string().default('1'),
+  DB_POOL_MAX: z.string().default('10'),
 });
 
 export const env = envSchema.parse(process.env);

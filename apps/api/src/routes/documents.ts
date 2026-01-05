@@ -1,38 +1,33 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { SupabaseStorageService } from '../services/storage/SupabaseStorageService.js';
-import { makeWorkerUtils, runMigrations } from 'graphile-worker';
-import { pgPool } from '../config/worker.js';
+import { scheduleDocEmbedding } from '../utils/jobHelpers.js';
 import { upload } from '../middleware/upload.js';
 import { escapeIdentifier } from 'pg';
 
 const router = Router();
 const storageService = new SupabaseStorageService();
 
-// Worker utils lazy loader - ensures schema is initialized before use
-let workerUtilsPromise: ReturnType<typeof makeWorkerUtils> | null = null;
-
-async function getWorkerUtils() {
-  if (!workerUtilsPromise) {
-    // Ensure migrations are run first
-    await runMigrations({ pgPool });
-    workerUtilsPromise = makeWorkerUtils({
-      pgPool,
-    });
-  }
-  return workerUtilsPromise;
-}
-
 // Helper function to add a job to Graphile Worker using the SDK
-async function addJob(taskIdentifier: string, payload: any) {
+async function addJob(
+  taskIdentifier: string,
+  payload: {
+    documentId: string;
+    userId: string;
+    notebookId: string;
+  },
+  options?: {
+    priority?: number;
+    queueName?: string;
+  }
+) {
   try {
-    const workerUtils = await getWorkerUtils();
-    await workerUtils.addJob(
-      taskIdentifier,
-      payload,
-      { queueName: 'default' }
-    );
-    console.log(`[Upload] Successfully added job '${taskIdentifier}' with document ID: ${payload.documentId}`);
+    if (taskIdentifier === 'docEmbedding') {
+      await scheduleDocEmbedding(payload, options);
+      console.log(`[Upload] Successfully added job '${taskIdentifier}' with document ID: ${payload.documentId}`);
+    } else {
+      throw new Error(`Unknown task identifier: ${taskIdentifier}`);
+    }
   } catch (error: any) {
     console.error(`[Upload] Failed to add job '${taskIdentifier}':`, error);
 
