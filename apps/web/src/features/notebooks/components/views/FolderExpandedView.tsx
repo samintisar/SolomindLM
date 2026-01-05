@@ -43,7 +43,7 @@ export const FolderExpandedView: React.FC<FolderExpandedViewProps> = ({
   }
 
   return (
-    <div className="mt-2 space-y-2">
+    <div className="space-y-2 mt-2 pl-2 border-l-2 border-border/30">
       {notebooks.map((nb) => (
         <NotebookCard
           key={nb.id}

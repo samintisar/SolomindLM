@@ -277,6 +277,7 @@ router.get('/notebook/:notebookId', async (req: Request, res: Response) => {
       id: quiz.id,
       title: quiz.title,
       questions: parseQuestionsData(quiz),
+      userAnswers: quiz.metadata?.userAnswers || {},
       status: quiz.status,
       metadata: quiz.metadata,
       created_at: quiz.created_at,
@@ -323,6 +324,7 @@ router.get('/:quizId', async (req: Request, res: Response) => {
       id: quiz.id,
       title: quiz.title,
       questions,
+      userAnswers: quiz.metadata?.userAnswers || {},
       status: quiz.status,
       metadata: quiz.metadata,
       created_at: quiz.created_at,
@@ -332,6 +334,84 @@ router.get('/:quizId', async (req: Request, res: Response) => {
     console.error('[Quizzes] Error fetching quiz:', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to fetch quiz',
+    });
+  }
+});
+
+// POST /api/quizzes/:quizId/submit - Submit answer for a quiz question
+router.post('/:quizId/submit', async (req: Request, res: Response) => {
+  try {
+    const { quizId } = req.params;
+    const { questionIndex, selectedOption } = req.body;
+    const userId = req.query.userId as string;
+
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof quizId !== 'string' || !isValidUUID(quizId)) {
+      return res.status(400).json({ error: 'Invalid quizId format' });
+    }
+
+    if (typeof questionIndex !== 'number' || questionIndex < 0) {
+      return res.status(400).json({ error: 'questionIndex must be a non-negative number' });
+    }
+
+    if (typeof selectedOption !== 'number' || selectedOption < 0 || selectedOption > 3) {
+      return res.status(400).json({ error: 'selectedOption must be a number between 0 and 3' });
+    }
+
+    // Verify user owns the quiz
+    const { data: quiz, error: fetchError } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('id', quizId)
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError || !quiz) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+
+    // Parse questions to validate questionIndex
+    const questions = parseQuestionsData(quiz as QuizRow);
+    if (questionIndex >= questions.length) {
+      return res.status(400).json({ error: 'questionIndex out of bounds' });
+    }
+
+    // Update metadata with the user answer
+    const currentMetadata = quiz.metadata || {};
+    const currentUserAnswers = currentMetadata.userAnswers || {};
+
+    const updatedUserAnswers = {
+      ...currentUserAnswers,
+      [questionIndex]: selectedOption,
+    };
+
+    const { error: updateError } = await supabase
+      .from('quizzes')
+      .update({
+        metadata: {
+          ...currentMetadata,
+          userAnswers: updatedUserAnswers,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', quizId);
+
+    if (updateError) {
+      console.error('[Quizzes] Error saving answer:', updateError);
+      return res.status(500).json({ error: 'Failed to save answer' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Answer saved successfully',
+    });
+  } catch (error) {
+    console.error('[Quizzes] Error submitting answer:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to submit answer',
     });
   }
 });
@@ -388,6 +468,59 @@ router.patch('/:quizId', async (req: Request, res: Response) => {
     console.error('[Quizzes] Error renaming quiz:', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to rename quiz',
+    });
+  }
+});
+
+// POST /api/quizzes/:quizId/reset - Reset all user answers
+router.post('/:quizId/reset', async (req: Request, res: Response) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.query.userId as string;
+
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof quizId !== 'string' || !isValidUUID(quizId)) {
+      return res.status(400).json({ error: 'Invalid quizId format' });
+    }
+
+    // Verify user owns the quiz
+    const { data: quiz, error: fetchError } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('id', quizId)
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError || !quiz) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+
+    // Clear user answers from metadata
+    const currentMetadata = quiz.metadata || {};
+    const { error: updateError } = await supabase
+      .from('quizzes')
+      .update({
+        metadata: {
+          ...currentMetadata,
+          userAnswers: {},
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', quizId);
+
+    if (updateError) {
+      console.error('[Quizzes] Error resetting answers:', updateError);
+      return res.status(500).json({ error: 'Failed to reset answers' });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[Quizzes] Error resetting answers:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to reset answers',
     });
   }
 });

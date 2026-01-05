@@ -11,8 +11,11 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string(),
   DATABASE_URL: z.string(), // PostgreSQL connection for Graphile Worker
   COHERE_API_KEY: z.string(),
+  COHERE_EMBEDDING_MODEL: z.string().default('embed-multilingual-v3.0'),
+  COHERE_RERANK_MODEL: z.string().default('rerank-v4.0-fast'),
   MISTRAL_API_KEY: z.string(),
   TOGETHER_AI_API_KEY: z.string(),
+  DEEPGRAM_API_KEY: z.string(),
   FAST_LLM: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
   SMART_LLM: z.string().optional(), // Optional: smarter model for complex tasks
   IMAGE_LLM: z.string().default('Qwen/Qwen-Image'), // Image generation model
@@ -54,15 +57,25 @@ const envSchema = z.object({
   // Timeout settings for LLM calls
   QUIZ_MAP_TIMEOUT_MS: z.string().default('180000'),
   QUIZ_REDUCE_TIMEOUT_MS: z.string().default('240000'),
+  // Written Questions Generation
+  // Map phase: 30K chars ≈ 7.5K tokens (~6% of 131K context)
+  WRITTEN_QUESTIONS_MAP_CHUNK_SIZE: z.string().default('30000'),
+  // Reduce phase: 60K chars ≈ 15K tokens (~6% of 261K context)
+  WRITTEN_QUESTIONS_REDUCE_CHUNK_SIZE: z.string().default('60000'),
+  // Timeout settings for LLM calls
+  WRITTEN_QUESTIONS_MAP_TIMEOUT_MS: z.string().default('180000'),
+  WRITTEN_QUESTIONS_REDUCE_TIMEOUT_MS: z.string().default('240000'),
   // Audio Overview Generation
-  DEEPGRAM_API_KEY: z.string(),
   AUDIO_MAP_CHUNK_SIZE: z.string().default('15000'),
   AUDIO_REDUCE_CHUNK_SIZE: z.string().default('40000'),
   AUDIO_MAP_TIMEOUT_MS: z.string().default('180000'),
   AUDIO_REDUCE_TIMEOUT_MS: z.string().default('300000'),
   AUDIO_TTS_TIMEOUT_MS: z.string().default('300000'),
+  // Deepgram Voice Models
+  AUDIO_VOICE_HOST_A: z.string().default('aura-2-thalia-en'),
+  AUDIO_VOICE_HOST_B: z.string().default('aura-2-hermes-en'),
   // Chat/RAG Configuration
-  CHAT_LLM_TEMPERATURE: z.string().default('0.7'),
+  CHAT_LLM_TEMPERATURE: z.string().default('0.3'),
   CHAT_MAX_HISTORY_MESSAGES: z.string().default('20'),
   CHAT_VECTOR_MATCH_THRESHOLD: z.string().default('0.5'),
   CHAT_VECTOR_MATCH_COUNT: z.string().default('10'),

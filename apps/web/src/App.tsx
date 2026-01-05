@@ -16,6 +16,7 @@ import { notesApi } from './features/notebooks/services/notesApi';
 import { mindMapApi } from './features/studio/services/mindMapApi';
 import { flashcardsApi } from './features/studio/services/flashcardsApi';
 import { quizzesApi } from './features/studio/services/quizzesApi';
+import { writtenQuestionsApi } from './features/studio/services/writtenQuestionsApi';
 import { audioApi } from './features/audio/api/audioApi';
 import { chatApi } from './features/chat/services/chatApi';
 import 'mind-elixir/style.css';
@@ -268,6 +269,8 @@ const AppContent: React.FC = () => {
         await flashcardsApi.renameFlashcard(id, newTitle);
       } else if (noteToUpdate?.type === 'quiz') {
         await quizzesApi.renameQuiz(id, newTitle);
+      } else if (noteToUpdate?.type === 'writtenQuestions') {
+        await writtenQuestionsApi.renameWrittenQuestions(id, newTitle);
       } else if (noteToUpdate?.type === 'audio') {
         await audioApi.renameAudioOverview(id, newTitle);
       } else {
@@ -294,13 +297,17 @@ const AppContent: React.FC = () => {
             console.error('Failed to load quizzes:', err);
             return [];
           }),
+          writtenQuestionsApi.getWrittenQuestionsByNotebook(activeNotebookId).catch(err => {
+            console.error('Failed to load written questions:', err);
+            return [];
+          }),
           audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
             console.error('Failed to load audio overviews:', err);
             return [];
           }),
         ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedAudio].sort((a, b) => {
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedAudio]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedAudio].sort((a, b) => {
               const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
               const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
               return bDate.localeCompare(aDate);
@@ -331,6 +338,8 @@ const AppContent: React.FC = () => {
         await flashcardsApi.deleteFlashcard(id);
       } else if (noteToDelete?.type === 'quiz') {
         await quizzesApi.deleteQuiz(id);
+      } else if (noteToDelete?.type === 'writtenQuestions') {
+        await writtenQuestionsApi.deleteWrittenQuestions(id);
       } else if (noteToDelete?.type === 'audio') {
         await audioApi.deleteAudioOverview(id);
       } else {
@@ -340,8 +349,40 @@ const AppContent: React.FC = () => {
       console.error('Failed to delete note:', error);
       // Reload notes on error
       if (activeNotebookId) {
-        notesApi.getNotes(activeNotebookId)
-          .then(loadedNotes => setNotes(loadedNotes))
+        Promise.all([
+          notesApi.getNotes(activeNotebookId).catch(err => {
+            console.error('Failed to load notes:', err);
+            return [];
+          }),
+          mindMapApi.getMindMaps(activeNotebookId).catch(err => {
+            console.error('Failed to load mind maps:', err);
+            return [];
+          }),
+          flashcardsApi.getFlashcards(activeNotebookId).catch(err => {
+            console.error('Failed to load flashcards:', err);
+            return [];
+          }),
+          quizzesApi.getQuizzes(activeNotebookId).catch(err => {
+            console.error('Failed to load quizzes:', err);
+            return [];
+          }),
+          writtenQuestionsApi.getWrittenQuestionsByNotebook(activeNotebookId).catch(err => {
+            console.error('Failed to load written questions:', err);
+            return [];
+          }),
+          audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
+            console.error('Failed to load audio overviews:', err);
+            return [];
+          }),
+        ])
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedAudio]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedAudio].sort((a, b) => {
+              const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
+              const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
+              return bDate.localeCompare(aDate);
+            });
+            setNotes(allNotes);
+          })
           .catch(err => console.error('Failed to reload notes:', err));
       }
     }
@@ -534,7 +575,7 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated, user, activeNotebookId, currentView]);
 
-  // Load notes, mind maps, flashcards, quizzes, and audio overviews from API when authenticated and notebook is active
+  // Load notes, mind maps, flashcards, quizzes, written questions, and audio overviews from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
       // Fetch all content types in parallel
@@ -555,14 +596,18 @@ const AppContent: React.FC = () => {
           console.error('Failed to load quizzes:', err);
           return [];
         }),
+        writtenQuestionsApi.getWrittenQuestionsByNotebook(activeNotebookId).catch(err => {
+          console.error('Failed to load written questions:', err);
+          return [];
+        }),
         audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
           console.error('Failed to load audio overviews:', err);
           return [];
         }),
       ])
-        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedAudio]) => {
+        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedAudio]) => {
           // Merge all content types, sort by created_at descending
-          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedAudio].sort((a, b) => {
+          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedAudio].sort((a, b) => {
             const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
             const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
             return bDate.localeCompare(aDate);

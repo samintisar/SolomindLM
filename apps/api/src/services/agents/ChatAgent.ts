@@ -322,7 +322,7 @@ export class ChatAgent {
       const { CohereRerank } = await import('@langchain/cohere');
       const reranker = new CohereRerank({
         apiKey: env.COHERE_API_KEY,
-        model: 'rerank-v4.0-fast',
+        model: env.COHERE_RERANK_MODEL,
         topN: Math.min(results.length, 15),
       });
 

@@ -8,10 +8,8 @@ import { env } from '../../config/env.js';
 import {
   invokeWithTimeout,
   invokeWithRetry,
-  RetryConfig,
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
-  ChunkConfig,
   logInfo,
   logWarn,
   logError,
@@ -30,10 +28,10 @@ const GRAPH_CONFIG = {
   TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS || '300000', 10),
 } as const;
 
-// Voice Configuration (Deepgram Aura Models)
+// Voice Configuration (Deepgram Aura Models) - configurable via env
 const VOICES = {
-  host_a: 'aura-2-thalia-en', // Female, articulate (The "Expert")
-  host_b: 'aura-2-hermes-en',   // Male, deep voice (The "Interviewer")
+  host_a: env.AUDIO_VOICE_HOST_A,
+  host_b: env.AUDIO_VOICE_HOST_B,
 } as const;
 
 // Dialogue line interface
@@ -195,9 +193,9 @@ TEXT TO ANALYZE:
 // ============================================================
 
 const TARGET_LINE_COUNTS: Record<string, number> = {
-  short: 40,     // ~4-7 minutes (600-1000 words)
-  default: 100,  // ~10-15 minutes (1500-2250 words)
-  long: 200,     // ~20-30 minutes (3000-4500 words)
+  short: 30,     // ~4 minutes (600-650 words)
+  default: 65,   // ~7.5 minutes (1200-1300 words)
+  long: 100,     // ~12.5 minutes (2000-2200 words)
 };
 
 const ESTIMATED_WORDS_PER_LINE = 20; // Average words per dialogue turn
@@ -232,17 +230,17 @@ ANTI-REPETITION RULES:
 {coveredTopicsPrompt}
 
 HOST PERSONALITIES:
-- host_a (Asteria - Expert): Knowledgeable, explains concepts clearly, provides specific details, cites evidence, sounds authoritative but accessible. Shows enthusiasm with "Right!", "Exactly!", "Here's the thing..."
-- host_b (Orion - Interviewer): HIGHLY ENERGETIC and genuinely curious! Uses exclamations, emphasis words ("really", "actually", "literally", "seriously"), and reacts with surprise ("Wait, really?!", "No way!", "That's wild!", "Hold on..."). Plays devil's advocate, asks follow-up questions, adds natural fillers ("Hmm", "Interesting", "I mean", "you know")
+- host_a (Asteria - Expert): Knowledgeable, explains concepts clearly, provides specific details, cites evidence, sounds authoritative but accessible. Shows measured enthusiasm with "Right," "Exactly," "That's a great point," "Here's what's interesting..."
+- host_b (Orion - Interviewer): Genuinely curious and intellectually engaged. Asks thoughtful follow-up questions, makes connections, shows interest through phrases like "That's fascinating," "I hadn't considered that," "So what you're saying is," "That makes sense but..." Plays devil's advocate respectfully, adds natural fillers ("Hmm," "Interesting," "Right," "I see")
 
 NATURALNESS REQUIREMENTS FOR PODCAST DIALOGUE:
-- host_b should sound excited and energetic - this is a PODCAST, not a lecture
-- Include natural speech patterns: "Wait, what?", "Hold on...", "That's wild!", "Are you serious?"
-- Add hesitation markers naturally: "um", "uh", "you know", "I mean" (but not excessive)
-- Use emphasis words: "really", "actually", "literally", "seriously", "honestly"
-- host_b should interrupt with reactions: "No way!", "Wait, really?!", "That's insane!", "You're kidding!"
-- Add breathing room with "..." for dramatic pauses before reveals
-- Both hosts should show genuine enthusiasm and engagement
+- host_b should sound intellectually curious and engaged - excited about ideas, not just shocked
+- Include thoughtful reactions: "That's really interesting," "That's a great way to put it," "I see what you mean," "That connects to something you said earlier"
+- Add hesitation markers naturally: "Hmm," "let me think about this," "so in other words" (but not excessive)
+- Use emphasis words thoughtfully: "really," "actually," "essentially," "fundamentally" - for clarity, not drama
+- host_b should respond with genuine engagement: "That's a great point," "That helps me understand," "I hadn't thought of it that way"
+- Add breathing room with "..." for thoughtful pauses when processing complex ideas
+- Both hosts should show authentic intellectual engagement - excited about learning, not performing
 
 GUIDELINES FOR NATURAL CONVERSATION:
 1. Alternate speakers naturally (not rigid A-B-A-B pattern - sometimes one speaks twice for depth)
@@ -251,16 +249,16 @@ GUIDELINES FOR NATURAL CONVERSATION:
 4. Start with a hook that grabs attention ("So, here's something wild...")
 5. End with a summary reflection or takeaway
 6. Make it sound like two real people talking, not reading a script
-7. When something is surprising, host_b SHOULD react: "Wait, hold on... that's actually fascinating!"
-8. Use "..." for dramatic pauses before reveals or after questions
-9. host_b should ask "dumb questions" that listeners are thinking
+7. When something is surprising or insightful, host_b responds thoughtfully: "That's really interesting," or "I hadn't thought of it that way"
+8. Use "..." for thoughtful pauses when processing complex ideas or making connections
+9. host_b should ask clarifying questions that help listeners understand - "So if I'm understanding correctly..." or "Can you give an example of that?"
 
-EXAMPLES OF ENERGETIC DIALOGUE:
-host_b: "Wait, hold on... you're telling me that [surprising fact]? That's absolutely wild!"
-host_a: "I know, right? And here's what's even crazier..."
-host_b: "No way! So what happened next?"
-host_a: "So basically... [explanation with details]"
-host_b: "That's actually fascinating. I mean, I never thought about it that way."
+EXAMPLES OF ENGAGING DIALOGUE:
+host_b: "That's a really interesting point... so you're saying that [concept] works like [analogy]?"
+host_a: "Exactly. And what's particularly noteworthy is how [detail] connects to [broader principle]."
+host_b: "That helps me understand it better. But what about [edge case]?"
+host_a: "Great question. That's where [nuance] comes in..."
+host_b: "Right, I see. So it's not just [simple view], it's actually [more sophisticated view]."
 
 AUDIO TYPE: {audioType}
 TARGET LENGTH: {targetLines} dialogue turns (~{estimatedWords} words)
@@ -340,13 +338,13 @@ export class AudioOverviewGraph {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
-      temperature: 0.7,
+      temperature: 0.3, // Lower temp for factual content extraction
     });
 
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
-      temperature: 0.7,
+      temperature: 0.6, // Higher temp for natural, engaging dialogue
     });
 
     this.deepgram = createClient(deepgramKey);

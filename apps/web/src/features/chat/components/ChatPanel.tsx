@@ -174,11 +174,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // Handle references that might be an object (from Supabase JSONB) instead of array
     const refsArray = Array.isArray(references) ? references : [];
 
-    // Debug logging
-    if (content.match(/\[\d+\]/)) {
-      console.log(`[ChatPanel] Message ${messageId}: has citations, refsArray.length=${refsArray.length}`, refsArray);
-    }
-
     // Convert citation markers [1] to inline code markers `CITE:1` for ReactMarkdown to process
     const processedContent = cleanContent.replace(/\[(\d+)\]/g, '`CITE:$1`');
 

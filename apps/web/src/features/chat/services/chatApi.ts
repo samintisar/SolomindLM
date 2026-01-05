@@ -91,36 +91,22 @@ export const chatApi = {
       return;
     }
 
-    console.log(`[chatApi] ========== SEND MESSAGE START ==========`);
-    console.log(`[chatApi] notebookId=${notebookId}`);
-    console.log(`[chatApi] message="${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
-    console.log(`[chatApi] API_BASE_URL=${API_BASE_URL}`);
-    if (documentIds && documentIds.length > 0) {
-      console.log(`[chatApi] documentIds=${documentIds.length} selected documents`);
-    }
-
     const requestBody = {
       userId,
       notebookId,
       message,
       documentIds,
     };
-    console.log(`[chatApi] Request body:`, requestBody);
 
     try {
-      console.log(`[chatApi] Fetching ${API_BASE_URL}/api/chat/message...`);
       const response = await fetch(`${API_BASE_URL}/api/chat/message`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(requestBody),
       });
 
-      console.log(`[chatApi] Response status: ${response.status} ${response.statusText}`);
-      console.log(`[chatApi] Response headers:`, Object.fromEntries(response.headers.entries()));
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error(`[chatApi] Error response:`, errorData);
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -128,27 +114,19 @@ export const chatApi = {
       const decoder = new TextDecoder();
 
       if (!reader) {
-        console.error('[chatApi] No response body');
         throw new Error('No response body received');
       }
 
-      console.log('[chatApi] Starting to read SSE stream...');
       let buffer = '';
-      let messageCount = 0;
-      let tokenCount = 0;
-      let startTime = Date.now();
 
       while (true) {
         const { done, value } = await reader.read();
 
         if (done) {
-          console.log('[chatApi] Stream done signal received');
           break;
         }
 
-        const chunkSize = value.length;
         buffer += decoder.decode(value, { stream: true });
-        console.log(`[chatApi] Received chunk: ${chunkSize} bytes, buffer length: ${buffer.length}`);
 
         // Process complete SSE messages
         const lines = buffer.split('\n\n');
@@ -156,55 +134,32 @@ export const chatApi = {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            messageCount++;
             const dataLine = line.slice(6);
-            console.log(`[chatApi] SSE message ${messageCount}: "${dataLine.substring(0, 100)}..."`);
 
             // Skip keep-alive
             if (dataLine.trim().startsWith(':')) {
-              console.log('[chatApi] Skipping keep-alive');
               continue;
             }
 
             try {
               const data = JSON.parse(dataLine);
-              console.log(`[chatApi] Parsed SSE data: type=${data.type}`);
 
               if (data.type === 'token') {
-                tokenCount++;
-                const token = data.content;
-                console.log(`[chatApi] Token ${tokenCount}: "${token.substring(0, 30)}..."`);
-                callbacks.onToken(token);
+                callbacks.onToken(data.content);
               } else if (data.type === 'references') {
-                console.log(`[chatApi] References: ${data.data.length} items`);
-                console.log(`[chatApi] Reference data:`, data.data);
                 callbacks.onReferences(data.data);
               } else if (data.type === 'done') {
-                console.log('[chatApi] Done signal received');
                 callbacks.onComplete();
               } else if (data.type === 'error') {
-                console.error('[chatApi] Server error:', data.error);
                 callbacks.onError(data.error);
               }
             } catch (e) {
-              console.error('[chatApi] Failed to parse SSE data:', dataLine, e);
+              // Failed to parse SSE data, skip
             }
           }
         }
       }
-
-      const elapsed = Date.now() - startTime;
-      console.log(`[chatApi] ========== STREAM COMPLETE ==========`);
-      console.log(`[chatApi] Total messages: ${messageCount}`);
-      console.log(`[chatApi] Total tokens: ${tokenCount}`);
-      console.log(`[chatApi] Time elapsed: ${elapsed}ms`);
     } catch (error) {
-      console.error('[chatApi] ========== SEND MESSAGE ERROR ==========');
-      console.error('[chatApi] Error:', error);
-      if (error instanceof Error) {
-        console.error('[chatApi] Error name:', error.name);
-        console.error('[chatApi] Error message:', error.message);
-      }
       callbacks.onError(error instanceof Error ? error.message : 'Failed to send message');
     }
   },
@@ -235,7 +190,6 @@ export const chatApi = {
     }
 
     const data = await response.json();
-    console.log(`[chatApi] Loaded history: ${data.messages.length} messages`);
     return data;
   },
 
@@ -262,8 +216,6 @@ export const chatApi = {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(errorData.error || 'Failed to clear conversation history');
     }
-
-    console.log('[chatApi] Cleared conversation history');
   },
 
   /**
@@ -289,8 +241,6 @@ export const chatApi = {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(errorData.error || 'Failed to delete conversation');
     }
-
-    console.log('[chatApi] Deleted conversation');
   },
 
   /**
@@ -313,7 +263,5 @@ export const chatApi = {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(errorData.error || 'Failed to rename conversation');
     }
-
-    console.log('[chatApi] Renamed conversation to:', title);
   },
 };

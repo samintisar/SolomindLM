@@ -29,6 +29,8 @@ interface RecentSectionProps {
   folderNotebooks: Record<string, NotebookItem[]>;
   loadingFolderNotebooks: Set<string>;
   toggleFolderExpansion: (folderId: string) => Promise<void>;
+  // Sorting
+  getSortedNotebooks?: (items: NotebookItem[]) => NotebookItem[];
 }
 
 export const RecentSection: React.FC<RecentSectionProps> = ({
@@ -54,6 +56,8 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
   folderNotebooks,
   loadingFolderNotebooks,
   toggleFolderExpansion,
+  // Sorting
+  getSortedNotebooks,
 }) => {
   // Filter notebooks without folders for main display
   const notebooksWithoutFolder = recentNotebooks.filter(nb => !nb.folderId);
@@ -112,7 +116,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
                 {isExpanded && (
                   <FolderExpandedView
                     folder={folder}
-                    notebooks={folderNotebooks[folder.id] || []}
+                    notebooks={getSortedNotebooks ? getSortedNotebooks(folderNotebooks[folder.id] || []) : (folderNotebooks[folder.id] || [])}
                     isLoading={isLoading}
                     onSelectNotebook={onSelectNotebook}
                     activeMenuId={activeMenuId}
@@ -144,31 +148,35 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
         </div>
       ) : (
         /* RECENT LIST */
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-0">
           <ListHeader />
 
           {/* Create New Folder Row */}
           {onCreateFolder && (
             <div
               onClick={onCreateFolder}
-              className="grid grid-cols-[auto_1fr] items-center gap-4 p-4 rounded-xl border border-dashed border-border hover:bg-blue-500/10 hover:border-blue-500/50 cursor-pointer group transition-all"
+              className="grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] gap-4 items-center p-4 mb-2 rounded-lg border border-dashed border-border/50 hover:bg-blue-500/10 hover:border-blue-500/50 cursor-pointer group transition-all"
             >
-              <div className="w-10 h-10 rounded-full bg-secondary text-blue-500 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                <FolderInput className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-md bg-secondary text-blue-500 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                  <FolderInput className="w-4 h-4" />
+                </div>
+                <span className="font-medium text-muted-foreground group-hover:text-blue-500 transition-colors font-sans">Create new folder</span>
               </div>
-              <span className="font-bold text-muted-foreground group-hover:text-blue-500 transition-colors font-sans">Create new folder</span>
             </div>
           )}
 
           {/* Create New Notebook Row */}
           <div
             onClick={onCreateNotebook}
-            className="grid grid-cols-[auto_1fr] items-center gap-4 p-4 rounded-xl border border-dashed border-border hover:bg-secondary/20 hover:border-primary/50 cursor-pointer group transition-all"
+            className="grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] gap-4 items-center p-4 mb-2 rounded-lg border border-dashed border-border/50 hover:bg-secondary/20 hover:border-primary/50 cursor-pointer group transition-all"
           >
-            <div className="w-10 h-10 rounded-full bg-secondary text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-              <Plus className="w-5 h-5" />
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-md bg-secondary text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                <Plus className="w-4 h-4" />
+              </div>
+              <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors font-sans">Create new notebook</span>
             </div>
-            <span className="font-bold text-muted-foreground group-hover:text-foreground transition-colors font-sans">Create new notebook</span>
           </div>
 
           {/* Folder Rows */}
@@ -177,7 +185,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
             const isLoading = loadingFolderNotebooks.has(folder.id);
 
             return (
-              <div key={folder.id} className="relative">
+              <div key={folder.id} className="relative mb-2">
                 <FolderCard
                   folder={folder}
                   viewMode={viewMode}
@@ -194,7 +202,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
                 {isExpanded && (
                   <FolderExpandedView
                     folder={folder}
-                    notebooks={folderNotebooks[folder.id] || []}
+                    notebooks={getSortedNotebooks ? getSortedNotebooks(folderNotebooks[folder.id] || []) : (folderNotebooks[folder.id] || [])}
                     isLoading={isLoading}
                     onSelectNotebook={onSelectNotebook}
                     activeMenuId={activeMenuId}
@@ -210,18 +218,19 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
 
           {/* Notebook Rows */}
           {notebooksWithoutFolder.map((nb) => (
-            <NotebookCard
-              key={nb.id}
-              notebook={nb}
-              viewMode={viewMode}
-              isMenuOpen={activeMenuId === nb.id}
-              onSelectNotebook={onSelectNotebook}
-              onOpenCustomize={() => onOpenCustomize(nb.id)}
-              onOpenMoveToFolder={() => onOpenMoveToFolder(nb.id)}
-              onDeleteNotebook={onDeleteNotebook}
-              onToggleMenu={() => setActiveMenuId(activeMenuId === nb.id ? null : nb.id)}
-              onCloseMenu={() => setActiveMenuId(null)}
-            />
+            <div key={nb.id} className="mb-2">
+              <NotebookCard
+                notebook={nb}
+                viewMode={viewMode}
+                isMenuOpen={activeMenuId === nb.id}
+                onSelectNotebook={onSelectNotebook}
+                onOpenCustomize={() => onOpenCustomize(nb.id)}
+                onOpenMoveToFolder={() => onOpenMoveToFolder(nb.id)}
+                onDeleteNotebook={onDeleteNotebook}
+                onToggleMenu={() => setActiveMenuId(activeMenuId === nb.id ? null : nb.id)}
+                onCloseMenu={() => setActiveMenuId(null)}
+              />
+            </div>
           ))}
         </div>
       )}

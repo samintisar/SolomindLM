@@ -83,6 +83,7 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
     preview: getPreviewText(dbQuiz.status, dbQuiz.metadata),
     type: 'quiz',
     questions,
+    userAnswers: dbQuiz.userAnswers || {},
     status: dbQuiz.status,
     metadata: {
       questionCount,
@@ -242,5 +243,60 @@ export const quizzesApi = {
     if (!response.ok) {
       throw new Error('Failed to delete quiz');
     }
+  },
+
+  /**
+   * Submit an answer for a quiz question
+   */
+  async submitAnswer(quizId: string, questionIndex: number, selectedOption: number): Promise<void> {
+    const storedUser = localStorage.getItem('solomind_user');
+    const userId = storedUser ? JSON.parse(storedUser).id : null;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    const params = new URLSearchParams({ userId });
+    const response = await fetch(
+      `${API_BASE_URL}/api/quizzes/${quizId}/submit?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ questionIndex, selectedOption }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to submit answer');
+    }
+  },
+
+  /**
+   * Reset all answers for a quiz
+   */
+  async resetAnswers(quizId: string): Promise<QuizNote> {
+    const storedUser = localStorage.getItem('solomind_user');
+    const userId = storedUser ? JSON.parse(storedUser).id : null;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    const params = new URLSearchParams({ userId });
+    const response = await fetch(
+      `${API_BASE_URL}/api/quizzes/${quizId}/reset?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to reset answers');
+    }
+
+    // Fetch and return the updated quiz
+    return this.getQuiz(quizId);
   },
 };

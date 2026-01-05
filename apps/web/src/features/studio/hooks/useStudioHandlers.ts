@@ -5,10 +5,12 @@ import { mindMapApi } from '../services/mindMapApi';
 import { flashcardsApi } from '../services/flashcardsApi';
 import { quizzesApi } from '../services/quizzesApi';
 import { audioApi } from '@/features/audio/api/audioApi';
+import { writtenQuestionsApi } from '../services/writtenQuestionsApi';
 import { getReportSubtitle } from '@/shared/types/reportTypes';
 import { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
 import { QuizConfig } from '../components/CustomizeQuizModal';
 import { AudioConfig } from '../components/CustomizeAudioModal';
+import { WrittenQuestionsConfig } from '../components/CustomizeWrittenQuestionsModal';
 
 export interface UseStudioHandlersProps {
   notes: Note[];
@@ -28,11 +30,13 @@ export interface UseStudioHandlersReturn {
   isFlashcardModalOpen: boolean;
   isQuizModalOpen: boolean;
   isAudioModalOpen: boolean;
+  isWrittenQuestionsModalOpen: boolean;
   // Modal setters
   setIsReportModalOpen: (open: boolean) => void;
   setIsFlashcardModalOpen: (open: boolean) => void;
   setIsQuizModalOpen: (open: boolean) => void;
   setIsAudioModalOpen: (open: boolean) => void;
+  setIsWrittenQuestionsModalOpen: (open: boolean) => void;
   // Handlers
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
@@ -40,6 +44,7 @@ export interface UseStudioHandlersReturn {
   handleCreateQuiz: (config: QuizConfig) => Promise<void>;
   handleCreateMindMap: () => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
+  handleCreateWrittenQuestions: (config: WrittenQuestionsConfig) => void;
 }
 
 export function useStudioHandlers({
@@ -58,6 +63,7 @@ export function useStudioHandlers({
   const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
+  const [isWrittenQuestionsModalOpen, setIsWrittenQuestionsModalOpen] = useState(false);
 
   const handleCreateFlashcards = useCallback(async (config: FlashcardConfig) => {
     setIsFlashcardModalOpen(false);
@@ -446,6 +452,103 @@ export function useStudioHandlers({
     }
   }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
+  const handleCreateWrittenQuestions = useCallback(async (config: WrittenQuestionsConfig) => {
+    setIsWrittenQuestionsModalOpen(false);
+
+    // Get selected document IDs from sources
+    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    if (selectedDocumentIds.length === 0) {
+      alert('Please select at least one source to generate written questions');
+      return;
+    }
+
+    if (!userId || !noteId) {
+      alert('Authentication error. Please log in again.');
+      return;
+    }
+
+    // Question count mapping
+    const countMap = { fewer: 5, standard: 10, more: 15 };
+    const questionCount = countMap[config.count];
+
+    // Create placeholder note
+    const placeholderId = Math.random().toString(36).substr(2, 9);
+    const newNote: Note = {
+      id: placeholderId,
+      title: 'Written Questions', // Initial placeholder - AI will generate descriptive title
+      preview: `${questionCount} Questions • ${config.questionType} • Generating...`,
+      type: 'writtenQuestions',
+      questions: [],
+      status: 'generating',
+      metadata: {
+        questionCount,
+        difficulty: config.difficulty,
+        questionType: config.questionType,
+        focusArea: config.focus,
+      }
+    };
+
+    onAddNote(newNote);
+
+    try {
+      // Call API to create and queue written questions generation
+      const { writtenQuestionsId, writtenQuestions } = await writtenQuestionsApi.createWrittenQuestions({
+        userId,
+        notebookId: noteId,
+        documentIds: selectedDocumentIds,
+        questionCount: config.count,
+        difficulty: config.difficulty,
+        questionType: config.questionType,
+        focus: config.focus || undefined,
+      });
+
+      // Update note ID with real written questions ID
+      if (onUpdateNoteFull) {
+        onUpdateNoteFull(placeholderId, writtenQuestions);
+      }
+
+      // Start polling for status
+      writtenQuestionsApi.pollWrittenQuestionsStatus(
+        writtenQuestionsId,
+        (updatedNote) => {
+          // Update note during polling
+          if (onUpdateNoteFull) {
+            onUpdateNoteFull(writtenQuestionsId, updatedNote);
+          }
+        }
+      ).then(finalNote => {
+        // Final update when complete
+        if (onUpdateNoteFull) {
+          onUpdateNoteFull(writtenQuestionsId, finalNote);
+        }
+      }).catch(error => {
+        console.error('Written questions generation failed:', error);
+        // Update with failed status
+        if (onUpdateNoteFull) {
+          const failedNote = notes.find(n => n.id === writtenQuestionsId) || newNote;
+          if (failedNote.type === 'writtenQuestions') {
+            onUpdateNoteFull(writtenQuestionsId, {
+              ...failedNote,
+              status: 'failed',
+              preview: `${questionCount} Questions • ${config.questionType} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate written questions',
+              }
+            });
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Failed to create written questions:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create written questions');
+      // Remove the placeholder note
+      onDeleteNote(placeholderId);
+    }
+  }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
+
   // Tool click handler - defined after handleCreateMindMap to avoid forward reference
   const handleToolClick = useCallback((toolId: string) => {
     if (toolId === 'reports') {
@@ -458,6 +561,8 @@ export function useStudioHandlers({
       setIsAudioModalOpen(true);
     } else if (toolId === 'mindmap') {
       handleCreateMindMap();
+    } else if (toolId === 'writtenQuestions') {
+      setIsWrittenQuestionsModalOpen(true);
     }
   }, [handleCreateMindMap]);
 
@@ -566,15 +671,18 @@ export function useStudioHandlers({
     isFlashcardModalOpen,
     isQuizModalOpen,
     isAudioModalOpen,
+    isWrittenQuestionsModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
+    setIsWrittenQuestionsModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
     handleCreateQuiz,
     handleCreateMindMap,
     handleCreateAudio,
+    handleCreateWrittenQuestions,
   };
 }

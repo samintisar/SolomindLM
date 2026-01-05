@@ -15,16 +15,19 @@ import {
   ArrowLeft,
   X,
   Loader2,
+  MessageSquareText,
 } from 'lucide-react';
-import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote } from '@/shared/types/index';
+import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote } from '@/shared/types/index';
 import { CreateReportModal } from './CreateReportModal';
 import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
 import { CustomizeQuizModal } from './CustomizeQuizModal';
 import { CustomizeAudioModal } from './CustomizeAudioModal';
+import { CustomizeWrittenQuestionsModal } from './CustomizeWrittenQuestionsModal';
 import { ReportView } from './views/ReportView';
 import { FlashcardView } from './views/FlashcardView';
 import { QuizView } from './views/QuizView';
 import { MindMapView } from './views/MindMapView';
+import { WrittenQuestionsView } from './views/WrittenQuestionsView';
 import { AudioPlayer } from '@/features/audio/components/AudioPlayer';
 import { MiniAudioPlayer } from '@/features/audio/components/MiniAudioPlayer';
 import { useStudioHandlers } from '../hooks/useStudioHandlers';
@@ -61,6 +64,7 @@ const IconMap: Record<string, React.FC<any>> = {
   FileText,
   Layers,
   HelpCircle,
+  MessageSquareText,
 };
 
 export const StudioPanel: React.FC<StudioPanelProps> = ({
@@ -98,15 +102,18 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     isFlashcardModalOpen,
     isQuizModalOpen,
     isAudioModalOpen,
+    isWrittenQuestionsModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
+    setIsWrittenQuestionsModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
     handleCreateQuiz,
     handleCreateAudio,
+    handleCreateWrittenQuestions,
   } = useStudioHandlers({
     notes,
     sources,
@@ -173,7 +180,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     if (note.status === 'generating') {
       return;
     }
-    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio') {
+    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions') {
         setActiveNoteId(note.id);
     }
   };
@@ -265,7 +272,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             <div className="h-full p-4">
                 {isReportNote(activeNote) && <ReportView note={activeNote} />}
                 {isFlashcardNote(activeNote) && <FlashcardView note={activeNote} />}
-                {isQuizNote(activeNote) && <QuizView note={activeNote} />}
+                {isQuizNote(activeNote) && <QuizView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} />}
                 {isMindMapNote(activeNote) && (
                   <MindMapView
                     note={activeNote}
@@ -291,6 +298,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                     </div>
                   </div>
                 )}
+                {isWrittenQuestionsNote(activeNote) && <WrittenQuestionsView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} />}
             </div>
         ) : (
             <div className="p-4 space-y-8">
@@ -365,6 +373,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                 {note.type === 'mindmap' && (
                                   <div className="shrink-0 w-8 h-8 rounded-lg bg-fuchsia-500/10 text-fuchsia-600 flex items-center justify-center">
                                     <GitFork className="w-4 h-4 shrink-0" />
+                                  </div>
+                                )}
+                                {note.type === 'writtenQuestions' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                                    <MessageSquareText className="w-4 h-4 shrink-0" />
                                   </div>
                                 )}
                               </>
@@ -471,6 +484,12 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         isOpen={isAudioModalOpen}
         onClose={() => setIsAudioModalOpen(false)}
         onGenerate={handleCreateAudio}
+      />
+
+      <CustomizeWrittenQuestionsModal
+        isOpen={isWrittenQuestionsModalOpen}
+        onClose={() => setIsWrittenQuestionsModalOpen(false)}
+        onGenerate={handleCreateWrittenQuestions}
       />
     </div>
   );

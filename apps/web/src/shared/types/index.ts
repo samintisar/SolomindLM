@@ -43,6 +43,28 @@ export interface QuizQuestion {
   explanation: string; // always required
 }
 
+export interface WrittenQuestion {
+  id: string;
+  question: string;
+  questionType: 'short' | 'essay';
+  rubric: {
+    maxPoints: number;
+    criteria: string[];
+  };
+  modelAnswer?: string;
+}
+
+export interface WrittenQuestionAnswer {
+  answer: string;
+  graded: boolean;
+  score?: number;
+  maxScore?: number;
+  feedback?: string;
+  strengths?: string[];
+  improvements?: string[];
+  gradedAt?: string;
+}
+
 export interface Flashcard {
   front: string;
   back: string;
@@ -101,6 +123,7 @@ export interface FlashcardNote extends BaseNote {
 export interface QuizNote extends BaseNote {
   type: 'quiz';
   questions: QuizQuestion[];
+  userAnswers?: Record<number, number>; // question index -> selected option
   metadata: {
     questionCount: number;
     difficulty: string;
@@ -135,8 +158,23 @@ export interface MindMapNote extends BaseNote {
   };
 }
 
+// Written questions note - open-ended questions with LLM grading
+export interface WrittenQuestionsNote extends BaseNote {
+  type: 'writtenQuestions';
+  questions: WrittenQuestion[];
+  userAnswers?: Record<string, WrittenQuestionAnswer>;
+  metadata: {
+    questionCount: number;
+    difficulty: 'easy' | 'medium' | 'hard';
+    questionType: 'short' | 'essay' | 'mixed';
+    focusArea?: string;
+    totalPoints?: number;
+    error?: string;
+  };
+}
+
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote;
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | WrittenQuestionsNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
@@ -161,6 +199,10 @@ export function isAudioNote(note: Note): note is AudioNote {
 
 export function isMindMapNote(note: Note): note is MindMapNote {
   return note.type === 'mindmap';
+}
+
+export function isWrittenQuestionsNote(note: Note): note is WrittenQuestionsNote {
+  return note.type === 'writtenQuestions';
 }
 
 export interface NotebookItem {

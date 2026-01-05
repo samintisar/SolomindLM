@@ -1,4 +1,5 @@
 import { CohereEmbeddings } from '@langchain/cohere';
+import { env } from '../../config/env';
 
 export class EmbeddingService {
   private embeddings: CohereEmbeddings;
@@ -6,7 +7,7 @@ export class EmbeddingService {
   constructor(apiKey: string) {
     this.embeddings = new CohereEmbeddings({
       apiKey,
-      model: 'embed-multilingual-v3.0', // 1024 dimensions
+      model: env.COHERE_EMBEDDING_MODEL,
       batchSize: 96, // Cohere handles max 96 texts per call
     });
   }

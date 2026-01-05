@@ -126,6 +126,10 @@ export const HomePage: React.FC<HomePageProps> = ({
     folders,
   });
 
+  // Sort notebooks based on current sort option
+  const sortedRecentNotebooks = getSortedNotebooks(recentNotebooks);
+  const sortedFeaturedNotebooks = getSortedNotebooks(featuredNotebooks);
+
   // Click outside to close menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -255,7 +259,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           {/* Featured Section */}
           {(activeTab === 'All' || activeTab === 'Featured notebooks') && (
             <FeaturedSection
-              featuredNotebooks={featuredNotebooks}
+              featuredNotebooks={sortedFeaturedNotebooks}
               viewMode={viewMode}
               onSelectNotebook={onSelectNotebook}
             />
@@ -264,7 +268,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Recent Notebooks Section */}
         {(activeTab === 'All' || activeTab === 'My notebooks') && (
           <RecentSection
-              recentNotebooks={recentNotebooks}
+              recentNotebooks={sortedRecentNotebooks}
               folders={folders}
               viewMode={viewMode}
               onCreateNotebook={notebookHandlers.openCreateNotebook}
@@ -286,6 +290,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               folderNotebooks={folderNotebooks}
               loadingFolderNotebooks={loadingFolderNotebooks}
               toggleFolderExpansion={toggleFolderExpansion}
+              // Sorting
+              getSortedNotebooks={getSortedNotebooks}
             />
           )}
         </div>

@@ -2,10 +2,10 @@ import React from 'react';
 
 export const ListHeader: React.FC = () => {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto_40px] gap-6 px-6 py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest border-b border-border mb-2 font-sans">
+    <div className="grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] gap-4 px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-widest border-b border-border/50 mb-3 font-sans bg-secondary/30">
       <span>Title</span>
-      <span className="w-32">Last Modified</span>
-      <span className="w-20 text-right">Sources</span>
+      <span>Last Modified</span>
+      <span className="text-right">Sources</span>
       <span></span>
     </div>
   );

@@ -3,6 +3,21 @@ import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { env } from '../../config/env.js';
 
+// Shared utilities for production-level patterns
+import {
+  invokeWithTimeout,
+  invokeWithRetry,
+  packChunks as sharedPackChunks,
+  validateChunks as sharedValidateChunks,
+  logInfo,
+  logWarn,
+  logError,
+  logPhaseStart,
+  logPhaseComplete,
+  logBanner,
+  sanitizeUserInput,
+} from './shared/index.js';
+
 // Configuration constants - now with env variable support
 const GRAPH_CONFIG = {
   MAP_CHUNK_SIZE: parseInt(env.REPORT_MAP_CHUNK_SIZE || '20000', 10), // Reduced from 30K for faster, more reliable processing
@@ -31,7 +46,37 @@ const PROCESSING_CONFIG = {
   MAX_PROMPT_LENGTH: 5000,
 } as const;
 
-// State definitions using the newer Annotation API
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+/**
+ * Wrapper around shared packChunks utility with ReportGraph logging.
+ */
+export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.MAP_CHUNK_SIZE): string[] {
+  return sharedPackChunks(chunks, {
+    targetSize,
+    minChunkLength: PROCESSING_CONFIG.MIN_CHUNK_LENGTH,
+    maxChunkLength: PROCESSING_CONFIG.MAX_CHUNK_LENGTH,
+    agentName: 'ReportGraph',
+  });
+}
+
+/**
+ * Wrapper around shared validateChunks utility with ReportGraph logging.
+ */
+export function validateChunks(chunks: string[]): string[] {
+  return sharedValidateChunks(chunks, {
+    targetSize: GRAPH_CONFIG.MAP_CHUNK_SIZE,
+    minChunkLength: PROCESSING_CONFIG.MIN_CHUNK_LENGTH,
+    maxChunkLength: PROCESSING_CONFIG.MAX_CHUNK_LENGTH,
+    agentName: 'ReportGraph',
+  });
+}
+
+// ============================================================
+// STATE DEFINITIONS
+// ============================================================
 export const OverallState = Annotation.Root({
   documentIds: Annotation<string[]>({
     reducer: (_x: string[], y?: string[]) => y ?? _x,
@@ -65,6 +110,10 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'generating',
   }),
+  reduceRetryCount: Annotation<number>({
+    reducer: (_x: number, y?: number) => y ?? _x,
+    default: () => 0,
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -75,62 +124,6 @@ export interface ChunkProcessState {
   chunkIndex?: number; // Track which chunk this is for debugging
   reportType: string;
   customPrompt?: string;
-}
-
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
-
-export function packChunks(chunks: string[], targetSize: number = GRAPH_CONFIG.MAP_CHUNK_SIZE): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[ReportGraph] ===== CHUNK PACKING =====`);
-  console.log(`[ReportGraph] Original chunks: ${chunks.length}`);
-  console.log(`[ReportGraph] Target size: ${targetSize} chars per packed chunk`);
-
-  const packed: string[] = [];
-  const buffer: string[] = [];
-  let bufferSize = 0;
-
-  for (const chunk of chunks) {
-    if (!chunk?.trim()) continue;
-    const chunkSize = chunk.length + (buffer.length > 0 ? 2 : 0);
-
-    if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
-      packed.push(buffer.join('\n\n'));
-      buffer.splice(0); // Properly clear array references
-      bufferSize = 0;
-    }
-
-    buffer.push(chunk);
-    bufferSize += chunkSize;
-  }
-
-  if (buffer.length > 0) {
-    packed.push(buffer.join('\n\n'));
-  }
-
-  const reduction = Math.round((1 - packed.length / chunks.length) * 100);
-  console.log(`[ReportGraph] Packed into: ${packed.length} chunks (${reduction}% fewer API calls)`);
-
-  return packed;
-}
-
-export function validateChunks(chunks: string[]): string[] {
-  if (!chunks || chunks.length === 0) return [];
-
-  console.log(`\n[ReportGraph] ===== INPUT VALIDATION =====`);
-  console.log(`[ReportGraph] Input chunks: ${chunks.length}`);
-
-  const validated = chunks
-    .filter(c => c && typeof c === 'string')
-    .map(c => c.slice(0, PROCESSING_CONFIG.MAX_CHUNK_LENGTH))
-    .filter(c => c.trim().length > PROCESSING_CONFIG.MIN_CHUNK_LENGTH);
-
-  console.log(`[ReportGraph] Valid chunks: ${validated.length}`);
-  console.log(`[ReportGraph] Filtered out: ${chunks.length - validated.length} (too short or invalid)`);
-
-  return validated;
 }
 
 // Map prompts for each report type
@@ -471,7 +464,7 @@ export class ReportGraph {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
-      temperature: 0.7,
+      temperature: 0.3, // Lower temp for factual extraction
       timeout: GRAPH_CONFIG.MAP_TIMEOUT_MS,
       maxTokens: parseInt(env.REPORT_MAP_MAX_OUTPUT_TOKENS || '8192', 10),
     });
@@ -481,7 +474,7 @@ export class ReportGraph {
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
-      temperature: 0.7,
+      temperature: 0.5, // Moderate temp for engaging writing
       timeout: GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
       maxTokens: parseInt(env.REPORT_REDUCE_MAX_OUTPUT_TOKENS || '32000', 10),
     });
@@ -649,7 +642,7 @@ export class ReportGraph {
 
     // Fallback: try regex extraction if single-pass didn't work
     if (topics.length === 0) {
-      const mainTopicsMatch = output.match(/\*{0,2}Main Topics:\*{0,2}\s*(.+?)(?=\n\n|\n\*{0,2}Main|\n\*{0,2}Key|\n\*{0,2}Important|$)/is);
+      const mainTopicsMatch = output.match(/\*{0,2}Main Topics:\*{0,2}\s*([\s\S]+?)(?=\n\n|\n\*{0,2}Main|\n\*{0,2}Key|\n\*{0,2}Important|$)/i);
       if (mainTopicsMatch) {
         const topicsText = mainTopicsMatch[1].trim();
         const numberedTopics = topicsText.match(/\d+\.\s+([^.\d]+?)(?=\s+\d+\.|$)/g);
@@ -997,7 +990,7 @@ export class ReportGraph {
     // Analyze topic distribution
     const { topics: topicDistribution, allTopics } = this.analyzeAllTopics(state.mapOutputs);
     console.log(`[ReportGraph] Topic distribution across map outputs:`, JSON.stringify(topicDistribution, null, 2));
-    console.log(`[ReportGraph] All unique topics found: ${[...new Set(allTopics)].join(', ')}`);
+    console.log(`[ReportGraph] All unique topics found: ${Array.from(new Set(allTopics)).join(', ')}`);
 
     // Safety check: if no mapOutputs, return early
     if (!state.mapOutputs || state.mapOutputs.length === 0) {
@@ -1111,7 +1104,7 @@ CONDENSED (maintain topic structure and "Main Topics:" format):`;
     const { topics: topicDistribution, allTopics } = this.analyzeAllTopics(state.collapsedOutputs);
 
     // Filter out error topics and get unique valid topics
-    const validTopics = [...new Set(allTopics)].filter(t =>
+    const validTopics = Array.from(new Set(allTopics)).filter(t =>
       !t.includes('Error') && !t.includes('error') && !t.includes('timeout') && !t.includes('Unknown')
     );
 

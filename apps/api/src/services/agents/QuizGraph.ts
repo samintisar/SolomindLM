@@ -8,10 +8,8 @@ import { env } from '../../config/env.js';
 import {
   invokeWithTimeout,
   invokeWithRetry,
-  RetryConfig,
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
-  ChunkConfig,
   logInfo,
   logWarn,
   logError,
@@ -410,13 +408,13 @@ export class QuizGraph {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
-      temperature: 0.6,
+      temperature: 0.4, // Moderate temp for question variety
     });
 
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
-      temperature: 0.5,
+      temperature: 0.3, // Lower temp for consistent selection
     });
   }
 

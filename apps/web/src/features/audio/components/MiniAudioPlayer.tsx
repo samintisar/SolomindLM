@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Download, ChevronUp, X } from 'lucide-react';
+import { Play, Pause, Download, ChevronUp, X, RotateCcw, RotateCw } from 'lucide-react';
 
 interface MiniAudioPlayerProps {
   audioUrl: string;
@@ -35,7 +35,10 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      // Set default playback to 0.9x but display as 1x to users
+      audio.playbackRate = 0.9;
+      // Multiply by 1.11 to reflect listening time at 0.9x playback speed
+      setDuration(audio.duration * 1.11);
       // Auto-play when the player is visible and metadata is loaded
       if (isVisible) {
         audio.play().catch(err => console.error('Autoplay failed:', err));
@@ -78,8 +81,10 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (audioRef.current && duration) {
-      const newTime = (parseFloat(e.target.value) / 100) * duration;
-      audioRef.current.currentTime = newTime;
+      const displayedTime = (parseFloat(e.target.value) / 100) * duration;
+      // Convert displayed time back to actual audio time (accounting for 0.9x playback)
+      const actualTime = displayedTime / 1.11;
+      audioRef.current.currentTime = actualTime;
       setProgress(parseFloat(e.target.value));
     }
   };
@@ -92,6 +97,12 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     setPlaybackRate(newRate);
     if (audioRef.current) {
       audioRef.current.playbackRate = newRate;
+    }
+  };
+
+  const skip = (seconds: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.max(0, Math.min(audioRef.current.duration, audioRef.current.currentTime + seconds));
     }
   };
 
@@ -160,6 +171,16 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
         {/* Player Controls */}
         <div className="flex items-center gap-3">
+          {/* Skip Backward Button */}
+          <button
+            onClick={() => skip(-5)}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors shrink-0"
+            aria-label="Backward 5 seconds"
+            title="Backward 5s"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
           {/* Play/Pause Button */}
           <button
             onClick={togglePlay}
@@ -171,6 +192,16 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
             ) : (
               <Play className="w-4 h-4 ml-0.5" />
             )}
+          </button>
+
+          {/* Skip Forward Button */}
+          <button
+            onClick={() => skip(5)}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors shrink-0"
+            aria-label="Forward 5 seconds"
+            title="Forward 5s"
+          >
+            <RotateCw className="w-4 h-4" />
           </button>
 
           {/* Playback Rate Button */}

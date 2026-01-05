@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Lightbulb,
@@ -6,22 +6,34 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  Eye,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { QuizNote } from '@/shared/types/index';
+import { quizzesApi } from '@/features/studio/services/quizzesApi';
 
 export interface QuizViewProps {
   note: QuizNote;
+  onNoteUpdate?: (note: QuizNote) => void;
 }
 
-export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
+export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
+    const [userAnswers, setUserAnswers] = useState<Record<number, number>>(note.userAnswers || {});
     const [showResults, setShowResults] = useState(false);
     const [showHint, setShowHint] = useState(false);
+    const [reviewMode, setReviewMode] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+
+    // Sync userAnswers with note.userAnswers
+    useEffect(() => {
+        if (note.userAnswers) {
+            setUserAnswers(note.userAnswers);
+        }
+    }, [note.userAnswers]);
 
     const questions = note.questions;
     const currentQuestion = questions[currentIndex];
@@ -30,9 +42,26 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
     const isAnswered = userAnswers[currentIndex] !== undefined;
     const selectedOption = userAnswers[currentIndex] ?? null;
 
-    const handleSelect = (index: number) => {
-        if (isAnswered) return;
+    const handleSelect = async (index: number) => {
+        if (isAnswered || reviewMode) return;
+
+        // Update local state immediately for responsiveness
         setUserAnswers(prev => ({...prev, [currentIndex]: index}));
+
+        // Submit to server in the background
+        try {
+            await quizzesApi.submitAnswer(note.id, currentIndex, index);
+            // Optionally refresh the note to get updated data
+            // We can do this silently or wait for next sync
+        } catch (error) {
+            console.error('Failed to submit answer:', error);
+            // Revert the local state on error
+            setUserAnswers(prev => {
+                const newState = { ...prev };
+                delete newState[currentIndex];
+                return newState;
+            });
+        }
     };
 
     const handleNext = () => {
@@ -51,10 +80,32 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
         }
     };
 
-    const resetQuiz = () => {
+    const resetQuiz = async () => {
+        setIsResetting(true);
+        try {
+            // Call API to reset all answers on the server
+            const updatedNote = await quizzesApi.resetAnswers(note.id);
+            if (onNoteUpdate) {
+                onNoteUpdate(updatedNote);
+            }
+            // Reset local state
+            setCurrentIndex(0);
+            setUserAnswers({});
+            setShowResults(false);
+            setShowHint(false);
+            setReviewMode(false);
+        } catch (error) {
+            console.error('Failed to reset answers:', error);
+            alert(error instanceof Error ? error.message : 'Failed to reset answers');
+        } finally {
+            setIsResetting(false);
+        }
+    };
+
+    const reviewQuiz = () => {
         setCurrentIndex(0);
-        setUserAnswers({});
         setShowResults(false);
+        setReviewMode(true);
         setShowHint(false);
     };
 
@@ -88,12 +139,29 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                             style={{ width: `${((score / questions.length) * 100)}%` }}
                         />
                     </div>
-                    <button
-                        onClick={resetQuiz}
-                        className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                        Try Again
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={reviewQuiz}
+                            className="flex-1 py-3 bg-secondary text-secondary-foreground font-bold rounded-lg hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Eye className="w-4 h-4" />
+                            Review
+                        </button>
+                        <button
+                            onClick={resetQuiz}
+                            disabled={isResetting}
+                            className="flex-1 py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isResetting ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                                    Resetting...
+                                </>
+                            ) : (
+                                'Try Again'
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -103,6 +171,21 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
         <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300 relative">
             <div className="flex-1 overflow-y-auto">
                 <div className="max-w-2xl mx-auto w-full p-8 md:p-12 min-h-full flex flex-col">
+                    {/* Review Mode Banner */}
+                    {reviewMode && (
+                        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center gap-3">
+                            <Eye className="w-5 h-5 text-amber-700 dark:text-amber-300 shrink-0" />
+                            <div>
+                                <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                                    Review Mode
+                                </span>
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    You are viewing your previous answers. Selection is disabled.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="mb-8">
                         <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
                             <span>Question {currentIndex + 1}</span>
@@ -142,7 +225,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                         {currentQuestion.options.map((option, idx) => {
                             let stateStyles = "border-border hover:bg-secondary/50 hover:border-primary/50";
 
-                            if (isAnswered) {
+                            if (isAnswered || reviewMode) {
                                 if (idx === currentQuestion.answer) {
                                     stateStyles = "bg-green-500/25 border-green-600 text-green-700 dark:text-green-400";
                                 } else if (idx === selectedOption) {
@@ -158,8 +241,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                                 <button
                                     key={idx}
                                     onClick={() => handleSelect(idx)}
-                                    disabled={isAnswered}
-                                    className={`w-full text-left p-5 md:p-6 rounded-xl border-2 transition-all flex items-center justify-between group ${stateStyles}`}
+                                    disabled={isAnswered || reviewMode}
+                                    className={`w-full text-left p-5 md:p-6 rounded-xl border-2 transition-all flex items-center justify-between group ${stateStyles} ${reviewMode ? 'cursor-not-allowed' : ''}`}
                                 >
                                     <div className="flex-1 prose prose-stone dark:prose-invert max-w-none font-serif text-base md:text-lg">
                                         <ReactMarkdown
@@ -228,6 +311,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
 
             <div className="shrink-0 p-4 md:px-12 md:py-6 border-t border-border bg-background/80 backdrop-blur-md z-10">
                 <div className="max-w-2xl mx-auto w-full flex items-center justify-between">
+                    {!reviewMode && (
                     <div className="relative">
                         <button
                             onClick={() => setShowHint(!showHint)}
@@ -244,6 +328,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note }) => {
                              </div>
                         )}
                     </div>
+                    )}
                     <div className="flex items-center gap-3">
                         <button
                             onClick={handlePrev}

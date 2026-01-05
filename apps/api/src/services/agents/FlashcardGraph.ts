@@ -8,11 +8,8 @@ import { env } from '../../config/env.js';
 import {
   invokeWithTimeout,
   invokeWithRetry,
-  RetryConfig,
-  RetryPolicies,
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
-  ChunkConfig,
   logInfo,
   logWarn,
   logError,
@@ -118,6 +115,10 @@ export const OverallState = Annotation.Root({
   status: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'generating',
+  }),
+  reduceRetryCount: Annotation<number>({
+    reducer: (_x: number, y?: number) => y ?? _x,
+    default: () => 0,
   }),
 });
 
@@ -287,14 +288,14 @@ export class FlashcardGraph {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
-      temperature: 0.6,
+      temperature: 0.3, // Lower temperature for factual extraction
     });
 
     // Smart model for reduce/collapse phases (selection and refinement)
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
-      temperature: 0.5, // Lower temperature for more consistent selection
+      temperature: 0.3, // Lower temperature for consistent selection
     });
 
     this.maxTokens = maxTokens;
