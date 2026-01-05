@@ -39,6 +39,9 @@ const envSchema = z.object({
   MINDMAP_MAP_CHUNK_SIZE: z.string().default('15000'),
   // Reduce phase: 30K chars for aggregation
   MINDMAP_REDUCE_CHUNK_SIZE: z.string().default('30000'),
+  // Timeout settings for LLM calls
+  MINDMAP_MAP_TIMEOUT_MS: z.string().default('300000'),
+  MINDMAP_REDUCE_TIMEOUT_MS: z.string().default('300000'),
   // Report Generation
   // Map phase: 30K chars ≈ 7.5K tokens (~6% of 131K context)
   REPORT_MAP_CHUNK_SIZE: z.string().default('30000'),

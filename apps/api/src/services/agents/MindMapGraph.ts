@@ -7,7 +7,6 @@ import { env } from '../../config/env.js';
 // Shared utilities for production-level patterns
 import {
   invokeWithTimeout,
-  invokeWithRetry,
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
   logInfo,
@@ -22,17 +21,42 @@ import {
 // CONFIGURATION
 // ============================================================
 
-const GRAPH_CONFIG = {
-  // 15k chars (~3.75k tokens) for map phase - configurable via env
-  OPTIMAL_CHUNK_SIZE: parseInt(env.MINDMAP_MAP_CHUNK_SIZE || '15000', 10),
-  // 30k chars for reduce phase aggregation
-  REDUCE_CHUNK_SIZE: parseInt(env.MINDMAP_REDUCE_CHUNK_SIZE || '30000', 10),
-  // High concurrency is fine with smaller chunks
-  MAX_CONCURRENT_CHUNKS: 10,
-  // Give ample time for slow provider responses to avoid wasteful retries
-  MAP_TIMEOUT_MS: 120000, // 2 minutes
-  REDUCE_TIMEOUT_MS: 180000, // 3 minutes
-} as const;
+// Helper to validate and parse configuration values
+function validateConfigRange(value: number, min: number, max: number, name: string): number {
+  if (isNaN(value) || value < min || value > max) {
+    throw new Error(`Invalid ${name}: ${value}. Must be between ${min} and ${max}`);
+  }
+  return value;
+}
+
+// Validate once at initialization to avoid repeated validation
+const GRAPH_CONFIG = (() => {
+  const optimalChunkSize = validateConfigRange(
+    parseInt(env.MINDMAP_MAP_CHUNK_SIZE || '15000', 10),
+    1000, 50000, 'MINDMAP_MAP_CHUNK_SIZE'
+  );
+
+  return {
+    // 15k chars (~3.75k tokens) for map phase - configurable via env
+    OPTIMAL_CHUNK_SIZE: optimalChunkSize,
+    // 30k chars for reduce phase aggregation
+    REDUCE_CHUNK_SIZE: validateConfigRange(
+      parseInt(env.MINDMAP_REDUCE_CHUNK_SIZE || '30000', 10),
+      1000, 100000, 'MINDMAP_REDUCE_CHUNK_SIZE'
+    ),
+    // High concurrency is fine with smaller chunks
+    MAX_CONCURRENT_CHUNKS: 10,
+    // Give ample time for slow provider responses to avoid wasteful retries
+    MAP_TIMEOUT_MS: validateConfigRange(
+      parseInt(env.MINDMAP_MAP_TIMEOUT_MS || '300000', 10),
+      30000, 600000, 'MINDMAP_MAP_TIMEOUT_MS'
+    ),
+    REDUCE_TIMEOUT_MS: validateConfigRange(
+      parseInt(env.MINDMAP_REDUCE_TIMEOUT_MS || '300000', 10),
+      30000, 600000, 'MINDMAP_REDUCE_TIMEOUT_MS'
+    ),
+  } as const;
+})();
 
 // ============================================================
 // SCHEMAS
@@ -71,7 +95,28 @@ const ChunkState = Annotation.Root({
 const OverallState = Annotation.Root({
   allChunks: Annotation<string[]>({ reducer: (x, y) => y ?? x, default: () => [] }),
   extractedConcepts: Annotation<ConceptExtraction[]>({
-    reducer: (x, y) => [...x, ...(y ?? [])],
+    reducer: (existing, incoming) => {
+      const combined = [...existing, ...(incoming ?? [])];
+
+      // Improved deduplication using full theme + summary for better accuracy
+      const seen = new Set<string>();
+      return combined.filter(item => {
+        // Use full summary instead of truncated hash
+        const key = `${item.main_theme}|${item.summary}`;
+
+        if (seen.has(key)) {
+          logInfo({
+            agent: 'MindMapGraph',
+            phase: 'deduplication',
+            theme: item.main_theme,
+          }, `Skipping duplicate extraction: ${item.main_theme}`);
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+    },
     default: () => []
   }),
   finalOutput: Annotation<any>({ reducer: (x, y) => y ?? x, default: () => null }),
@@ -85,15 +130,17 @@ export type ChunkStateType = typeof ChunkState.State;
 // PROMPTS
 // ============================================================
 
-const MAP_PROMPT = `You are a Research Assistant.
-Analyze the text and extract raw information.
+const MAP_PROMPT = `You are a Research Assistant analyzing document chunks.
 
-OUTPUT REQUIREMENTS:
-1. **Main Theme:** The specific subject of this text chunk.
-2. **Summary:** 2-3 sentence high-level summary.
-3. **Key Concepts:** 10-20 specific terms, people, events, or ideas defined here.
+Extract EXACTLY this structure:
+1. **Main Theme:** Single sentence identifying the core subject (max 15 words)
+2. **Summary:** 2-3 sentences covering key points (50-100 words)
+3. **Key Concepts:** Exactly 15 distinct concepts as bullet points
+   - Prioritize: Technical terms, named entities, core ideas
+   - Format: "Concept name: brief context (5-10 words)"
+   - Avoid: Generic terms, duplicates, overly broad categories
 
-Input:
+Input chunk:
 {content}`;
 
 const REDUCE_PROMPT = `You are a Mind Map Architect.
@@ -104,40 +151,49 @@ OUTPUT FORMAT:
 - Indentation determines depth (2 spaces per level).
 - The first line must be the Root Topic prefixed with # (e.g., "# Roman Empire").
 
-RULES:
-1. Create ONE Root Topic that encompasses all themes.
-2. Create 4-7 Main Branches (Level 1) as high-level categories.
-3. Nest sub-topics 3-5 levels deep using indentation.
-4. Group related concepts logically under meaningful category names.
-5. Use specific, descriptive topic names (not "Aspect 1", "Category 2", etc.).
+MANDATORY STRUCTURE:
+- Level 0 (Root): # Single overarching topic
+- Level 1: 4-7 main branches (* with 2-space indent)
+- Level 2: 3-5 sub-topics per branch (4-space indent)
+- Level 3-4: Granular concepts (6-8 space indent)
 
-EXAMPLE STRUCTURE:
-# The Roman Empire
-* Political Structure
-  * The Emperor
-    * Powers and authority
-    * Succession mechanisms
-  * The Senate
-    * Advisory role
-    * Legislative functions
-* Military System
-  * Legion organization
-    * Centuries and cohorts
-    * Legion commanders
-  * Provincial defenses
-* Society and Culture
-  * Social classes
-    * Patricians
-    * Plebeians
-    * Slaves
-  * Daily life
-    * Entertainment
-    * Religion
+VALIDATION:
+- Minimum 4 levels deep for at least 2 branches
+- No generic labels like "Overview", "Introduction", "Conclusion", "Aspect", "Category"
+- Each terminal node must be a specific concept, not a category
+
+EXAMPLE:
+# Machine Learning in Healthcare
+* Clinical Applications
+  * Diagnostic Systems
+    * Medical imaging analysis
+      * CT scan interpretation
+      * MRI anomaly detection
+    * Disease prediction models
+      * Early warning systems
+      * Risk stratification
+* Data Processing
+  * Feature engineering
+    * Signal processing
+    * Image normalization
+  * Model training
+    * Supervised learning
+      * Classification algorithms
+      * Regression analysis
 
 DATA (Themes and Concepts from documents):
 {extractions}
 
 Generate the mind map now.`;
+
+// ============================================================
+// NODE NAMES
+// ============================================================
+
+const NODES = {
+  MAP_PROCESS: 'map_process',
+  REDUCE_NODE: 'reduce_node',
+} as const;
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -174,46 +230,48 @@ export function validateChunks(chunks: string[]): string[] {
 export class MindMapGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
+  // Circuit breaker: track total permanent failures across all chunks
+  private failureCount = 0;
+  private readonly MAX_TOTAL_FAILURES = 5; // Trip after 5 permanent failures
 
   constructor(apiKey: string, mapModel: string, reduceModel: string) {
-    // Fast model for extraction
+    // Fast model for extraction (using env.FAST_LLM from service)
     this.fastLlm = new ChatTogetherAI({
       apiKey,
-      model: mapModel || "meta-llama/Llama-3.2-3B-Instruct-Turbo",
+      model: mapModel,
       temperature: 0.1,
-      maxTokens: 4000,
+      maxTokens: 8000, // Increased from 4000 for better output
     });
 
     // Smart model for markdown generation
     this.smartLlm = new ChatTogetherAI({
       apiKey,
-      model: reduceModel || "Qwen/Qwen2.5-72B-Instruct-Turbo",
+      model: reduceModel,
       temperature: 0.3,
       maxTokens: 16000,
     });
   }
 
-  // 1. Fan Out
-  routeInput(state: OverallStateType): Send[] {
-    const validated = validateChunks(state.allChunks);
-    const packed = packChunks(validated, GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE);
+  /**
+   * Typed wrapper for concept extraction to avoid @ts-expect-error
+   */
+  private async extractConcepts(content: string): Promise<ConceptExtraction> {
+    const structuredLlm = this.fastLlm.withStructuredOutput<ConceptExtraction>(
+      ConceptExtractionSchema,
+      { name: "concept_extraction" }
+    );
 
-    logInfo({
-      agent: 'MindMapGraph',
-      phase: 'route_input',
-      originalChunks: state.allChunks.length,
-      validatedChunks: validated.length,
-      packedChunks: packed.length,
-      maxConcurrency: GRAPH_CONFIG.MAX_CONCURRENT_CHUNKS,
-    }, `Fanning out: ${packed.length} packed chunks (Original: ${state.allChunks.length})`);
-
-    return packed.map(chunk => new Send("map_process", {
-      content: chunk,
-      retryCount: 0
-    }));
+    return await invokeWithTimeout(
+      () => structuredLlm.invoke([
+        new SystemMessage('Extract main theme, 2–3 sentence summary, and 10–20 key concepts.'),
+        new HumanMessage(MAP_PROMPT.replace('{content}', content))
+      ]),
+      GRAPH_CONFIG.MAP_TIMEOUT_MS,
+      'MindMapMap'
+    );
   }
 
-  // 2. Map Node (Extraction with smart retry logic)
+  // Map Node (Extraction - simplified without manual retry)
   async mapProcess(state: ChunkStateType): Promise<Partial<OverallStateType> | Send> {
     const chunkLength = state.content?.length || 0;
     const retryCount = state.retryCount ?? 0;
@@ -226,47 +284,28 @@ export class MindMapGraph {
       attempt: retryCount + 1,
     }, `Processing chunk (${chunkLength} chars) [Attempt ${retryCount + 1}/3]`);
 
-    // @ts-ignore
-    const parser = this.fastLlm.withStructuredOutput(ConceptExtractionSchema);
-
     const startTime = Date.now();
 
     try {
-      // Add jitter to prevent thundering herd
-      if (retryCount === 0) {
-        await new Promise(r => setTimeout(r, Math.random() * 2000));
+      // Add jitter only on retries to prevent thundering herd
+      // Use exponential backoff with jitter for retries
+      if (retryCount > 0) {
+        const backoff = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+        const jitter = Math.random() * backoff * 0.1;
+        await new Promise(r => setTimeout(r, backoff + jitter));
+
+        logInfo({
+          agent: 'MindMapGraph',
+          phase: 'map_process',
+          backoff: Math.round(backoff + jitter),
+        }, `Retry backoff: ${Math.round(backoff + jitter)}ms`);
+      } else {
+        // Small jitter on first attempt to prevent synchronized starts
+        await new Promise(r => setTimeout(r, Math.random() * 500));
       }
 
-      // Use shared timeout and retry utilities
-      const response = await invokeWithTimeout(
-        () => invokeWithRetry(
-          () => parser.invoke([
-            new SystemMessage('Extract main theme, 2–3 sentence summary, and 10–20 key concepts.'),
-            new HumanMessage(MAP_PROMPT.replace('{content}', state.content || ''))
-          ]),
-          {
-            maxAttempts: 3 - retryCount,
-            baseDelayMs: 1000,
-            retryableErrors: (error) => {
-              const msg = error instanceof Error ? error.message.toLowerCase() : String(error);
-              return msg.includes('timeout') || msg.includes('500') || msg.includes('503') || msg.includes('internal server error');
-            },
-            onRetry: (attempt, error) => {
-              logWarn({
-                agent: 'MindMapGraph',
-                phase: 'map_process',
-                attempt,
-                error: error.message,
-              }, `Retry attempt ${attempt}/3`);
-            }
-          },
-          'MindMapMap'
-        ),
-        GRAPH_CONFIG.MAP_TIMEOUT_MS,
-        'MindMapMap'
-      );
-
-      const extraction = response as ConceptExtraction;
+      // Use typed extraction method
+      const extraction = await this.extractConcepts(state.content || '');
       const elapsed = Date.now() - startTime;
 
       logInfo({
@@ -277,6 +316,10 @@ export class MindMapGraph {
         mainTheme: extraction.main_theme,
       }, `Extracted ${extraction.key_concepts.length} concepts in ${elapsed}ms`);
 
+      // Reset failure count on success
+      this.failureCount = 0;
+
+      // Return concepts - LangGraph handles aggregation automatically
       return { extractedConcepts: [extraction] };
 
     } catch (e: any) {
@@ -297,23 +340,39 @@ export class MindMapGraph {
       const isTimeout = msg.toLowerCase().includes('timeout');
       const isServerErr = msg.includes('500') || msg.includes('503') || msg.includes('internal server error');
 
-      if ((isTimeout || isServerErr) && retryCount < 2) {
+      // Simplified retry: max 3 attempts total (no nested retries)
+      const MAX_ATTEMPTS = 3;
+      if ((isTimeout || isServerErr) && retryCount < MAX_ATTEMPTS - 1) {
         logWarn({
           agent: 'MindMapGraph',
           phase: 'map_process',
           retryAttempt: retryCount + 1,
-        }, `Retrying chunk (${retryCount + 1}/2)...`);
-        return new Send('map_process', {
+          maxAttempts: MAX_ATTEMPTS,
+        }, `Retrying chunk (${retryCount + 1}/${MAX_ATTEMPTS})...`);
+        return new Send(NODES.MAP_PROCESS, {
           content: state.content,
           retryCount: retryCount + 1,
         });
+      }
+
+      // Circuit breaker: increment failure count and check if we should stop
+      this.failureCount++;
+      if (this.failureCount >= this.MAX_TOTAL_FAILURES) {
+        logError({
+          agent: 'MindMapGraph',
+          phase: 'map_process',
+          totalFailures: this.failureCount,
+        }, `CIRCUIT BREAKER: ${this.failureCount} failures - stopping generation`);
+
+        throw new Error(`Circuit breaker tripped: ${this.failureCount} chunks failed permanently`);
       }
 
       logError({
         agent: 'MindMapGraph',
         phase: 'map_process',
         attempts: retryCount + 1,
-      }, `Chunk failed permanently after ${retryCount + 1} attempts`);
+        totalFailures: this.failureCount,
+      }, `Chunk failed permanently (${this.failureCount} total failures)`);
       return { extractedConcepts: [] };
     }
   }
@@ -562,23 +621,113 @@ export class MindMapGraph {
     };
   }
 
-  // 4. Build Graph
+  // ============================================================
+  // FAN-OUT LOGIC
+  // ============================================================
+
+  /**
+   * Creates parallel map tasks from input chunks.
+   * Separated for cleaner graph structure and reusability.
+   */
+  private createMapTasks(state: OverallStateType): Send[] {
+    // Validate and pack chunks
+    const validated = validateChunks(state.allChunks);
+
+    if (validated.length === 0) {
+      throw new Error('No valid chunks after validation');
+    }
+
+    const packed = packChunks(validated, GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE);
+
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'fan_out',
+      originalChunks: state.allChunks.length,
+      packedChunks: packed.length,
+    }, `Fanning out to ${packed.length} map nodes`);
+
+    // Return Send array - LangGraph parallelizes automatically
+    return packed.map(chunk =>
+      new Send(NODES.MAP_PROCESS, { content: chunk, retryCount: 0 })
+    );
+  }
+
+  // ============================================================
+  // PUBLIC API
+  // ============================================================
+
+  /**
+   * Public API method with input validation.
+   * Main entry point for mind map generation.
+   */
+  async generate(chunks: string[]): Promise<FinalMindMap> {
+    // Pre-flight validation
+    if (!chunks || chunks.length === 0) {
+      throw new Error('No chunks provided for mind map generation');
+    }
+
+    const validated = validateChunks(chunks);
+    if (validated.length === 0) {
+      throw new Error('All chunks failed validation (empty or too small)');
+    }
+
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'initialize',
+      inputChunks: chunks.length,
+      validChunks: validated.length,
+    }, `Starting mind map generation with ${validated.length} valid chunks`);
+
+    // Reset circuit breaker
+    this.failureCount = 0;
+
+    const graph = this.buildGraph();
+
+    try {
+      const result = await graph.invoke({
+        allChunks: chunks,
+        status: 'generating',
+      });
+
+      if (!result.finalOutput) {
+        throw new Error('Graph execution completed but no output generated');
+      }
+
+      return result.finalOutput;
+    } catch (error) {
+      logError({
+        agent: 'MindMapGraph',
+        phase: 'generate',
+        error: error instanceof Error ? error.message : String(error),
+      }, `Mind map generation failed: ${error}`);
+
+      throw error;
+    }
+  }
+
+  // ============================================================
+  // GRAPH BUILDER
+  // ============================================================
+
+  /**
+   * Build Graph - using correct LangGraph map-reduce pattern.
+   * LangGraph automatically handles fan-in synchronization via reducers.
+   */
   buildGraph() {
     const builder = new StateGraph(OverallState);
 
-    builder.addNode('map_process', (s: ChunkStateType) => this.mapProcess(s));
-    builder.addNode('reduce_node', (s: OverallStateType) => this.reduceNode(s));
+    // Only 2 nodes needed for map-reduce pattern
+    builder.addNode(NODES.MAP_PROCESS, (s: ChunkStateType) => this.mapProcess(s));
+    builder.addNode(NODES.REDUCE_NODE, (s: OverallStateType) => this.reduceNode(s));
 
-    // Immediate Fan Out
-    builder.addConditionalEdges(
-      START,
-      (s: OverallStateType) => this.routeInput(s),
-      { map_process: 'map_process' } as any
-    );
+    // Fan out from START using conditional edges that return Send objects
+    // LangGraph automatically parallelizes all Send objects to the same target
+    builder.addConditionalEdges(START, this.createMapTasks.bind(this));
 
-    // map_process -> reduce_node -> END
-    builder.addEdge('map_process' as any, 'reduce_node' as any);
-    builder.addEdge('reduce_node' as any, END as any);
+    // Automatic fan-in: LangGraph waits for ALL map_process nodes to complete
+    // then aggregates via the reducer, then proceeds to reduce_node
+    builder.addEdge(NODES.MAP_PROCESS as any, NODES.REDUCE_NODE as any);
+    builder.addEdge(NODES.REDUCE_NODE as any, END);
 
     return builder.compile();
   }

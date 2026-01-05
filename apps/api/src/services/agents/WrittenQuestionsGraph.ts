@@ -65,6 +65,7 @@ const GRAPH_CONFIG = {
   MAP_TIMEOUT_MS: parseInt(env.WRITTEN_QUESTIONS_MAP_TIMEOUT_MS || '180000', 10),
   REDUCE_TIMEOUT_MS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_TIMEOUT_MS || '240000', 10),
   MAX_COLLAPSE_DEPTH: 3,
+  TOPIC_ALLOCATION_MULTIPLIER: 2.0,  // Allows topics to exceed proportional share
 } as const;
 
 // Problematic phrases that indicate questions aren't self-contained
@@ -752,9 +753,9 @@ export class WrittenQuestionsGraph {
         };
       }
 
-      // Trim or pad to target count
+      // Trim or pad to target count using topic-based sampling for diversity
       const finalQuestions = questions.length > state.questionCount
-        ? questions.slice(0, state.questionCount)
+        ? this.refineQuestionSelectionFast(questions, state.questionCount)
         : questions;
 
       // Log final questions
@@ -898,9 +899,9 @@ export class WrittenQuestionsGraph {
       };
     }
 
-    // Trim or pad to target count
+    // Trim or pad to target count using topic-based sampling for diversity
     const finalQuestions = questions.length > state.questionCount
-      ? questions.slice(0, state.questionCount)
+      ? this.refineQuestionSelectionFast(questions, state.questionCount)
       : questions;
 
     // Log final questions
@@ -968,6 +969,131 @@ export class WrittenQuestionsGraph {
     }
 
     return !shouldReject;
+  }
+
+  /**
+   * Extract topic from a question for diversity enforcement.
+   * Pattern from FlashcardGraph.ts:858-872 and QuizGraph.ts:1370-1384.
+   */
+  private extractTopic(question: WrittenQuestion): string {
+    const text = question.question.toLowerCase();
+
+    // Simple keyword-based topic extraction (consistent with FlashcardGraph/QuizGraph)
+    if (text.includes('what is') || text.includes('define') || text.includes('definition')) return 'Definitions';
+    if (text.includes('when') || text.includes('year') || text.includes('century') || text.includes('date')) return 'Timeline/Dates';
+    if (text.includes('who') || text.includes('person') || text.includes('people')) return 'People';
+    if (text.includes('where') || text.includes('place') || text.includes('location')) return 'Places';
+    if (text.includes('why') || text.includes('because') || text.includes('reason') || text.includes('cause')) return 'Causes/Reasons';
+    if (text.includes('how') || text.includes('process') || text.includes('method') || text.includes('step')) return 'Processes';
+    if (text.includes('which') || text.includes('select') || text.includes('choose') || text.includes('identify')) return 'Classification';
+    if (text.includes('true') || text.includes('false') || text.includes('correct')) return 'Facts';
+    if (text.includes('compare') || text.includes('difference') || text.includes('contrast') || text.includes('versus')) return 'Comparisons';
+    if (text.includes('explain') || text.includes('describe') || text.includes('discuss')) return 'Explanations';
+    if (text.includes('analyze') || text.includes('analysis') || text.includes('evaluate')) return 'Analysis';
+
+    return 'General';
+  }
+
+  /**
+   * Helper method to group questions by topic for debugging.
+   * Pattern from FlashcardGraph.ts:875-892.
+   */
+  private groupQuestionsByTopic(questions: WrittenQuestion[]): Record<string, number> {
+    const topics: Record<string, number> = {};
+
+    for (const q of questions) {
+      const topic = this.extractTopic(q);
+      topics[topic] = (topics[topic] || 0) + 1;
+    }
+
+    return topics;
+  }
+
+  /**
+   * Fast refinement: topic-based sampling to ensure diverse question selection.
+   * Pattern from FlashcardGraph.ts:761-855 and QuizGraph.ts:1295-1368.
+   */
+  private refineQuestionSelectionFast(questions: WrittenQuestion[], targetCount: number): WrittenQuestion[] {
+    logInfo({
+      agent: 'WrittenQuestionsGraph',
+      phase: 'refine_fast',
+      totalQuestions: questions.length,
+      targetCount,
+    }, `Selecting ${targetCount} questions from ${questions.length} using topic-based sampling`);
+
+    // Group questions by topic
+    const topicGroups: Record<string, WrittenQuestion[]> = {};
+    for (const q of questions) {
+      const topic = this.extractTopic(q);
+      if (!topicGroups[topic]) topicGroups[topic] = [];
+      topicGroups[topic].push(q);
+    }
+
+    const topics = Object.keys(topicGroups);
+    logInfo({
+      agent: 'WrittenQuestionsGraph',
+      phase: 'refine_fast_topics',
+      topicCount: topics.length,
+      topics: topics.map(t => `${t}(${topicGroups[t].length})`),
+    }, `Found ${topics.length} topics`);
+
+    // Allocate questions proportionally
+    const allocations: Record<string, number> = {};
+    let allocated = 0;
+    const maxPerTopic = Math.max(
+      2,
+      Math.ceil(targetCount / topics.length * GRAPH_CONFIG.TOPIC_ALLOCATION_MULTIPLIER)
+    );
+
+    for (const topic of topics) {
+      const topicSize = topicGroups[topic].length;
+      const proportional = Math.round((topicSize / questions.length) * targetCount);
+      allocations[topic] = Math.max(1, Math.min(maxPerTopic, proportional));
+      allocated += allocations[topic];
+    }
+
+    // Adjust allocation
+    if (allocated < targetCount) {
+      let deficit = targetCount - allocated;
+      const sortedTopics = [...topics].sort((a, b) => topicGroups[b].length - topicGroups[a].length);
+      for (const topic of sortedTopics) {
+        if (deficit <= 0) break;
+        const canAdd = Math.min(topicGroups[topic].length - allocations[topic], deficit);
+        allocations[topic] += canAdd;
+        deficit -= canAdd;
+      }
+    }
+
+    // Sample from each topic
+    const selected: WrittenQuestion[] = [];
+    for (const topic of topics) {
+      const qs = topicGroups[topic];
+      const count = Math.min(allocations[topic], qs.length);
+      const step = Math.floor(qs.length / count);
+      for (let i = 0; i < count; i++) {
+        selected.push(qs[i * step]);
+      }
+    }
+
+    // Trim or fill as needed
+    const finalSelected = selected.length > targetCount ? selected.slice(0, targetCount) : selected;
+
+    logInfo({
+      agent: 'WrittenQuestionsGraph',
+      phase: 'refine_fast_selected',
+      selectedCount: finalSelected.length,
+      allocations,
+    }, `Selected ${finalSelected.length} questions`);
+
+    // Log distribution
+    const finalDistribution = this.groupQuestionsByTopic(finalSelected);
+    logInfo({
+      agent: 'WrittenQuestionsGraph',
+      phase: 'refine_fast_distribution',
+      finalDistribution,
+    });
+
+    return finalSelected;
   }
 
   // Parse written questions from LLM output
