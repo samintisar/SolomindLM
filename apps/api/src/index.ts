@@ -49,7 +49,13 @@ app.use(cors({
   origin: env.CORS_ORIGIN,
   credentials: true,
 }));
-app.use(express.json({ limit: '50mb' }));
+// JSON parser for all routes EXCEPT webhooks (webhooks need raw body for signature verification)
+app.use((req, res, next) => {
+  if (req.path === '/api/webhook/stripe') {
+    return next();
+  }
+  express.json({ limit: '50mb' })(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request logging

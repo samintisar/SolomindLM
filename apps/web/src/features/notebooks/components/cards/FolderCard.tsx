@@ -1,6 +1,7 @@
 import React from 'react';
 import { MoreVertical, Settings2, Trash2, Folder, ChevronDown, Book, BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb } from 'lucide-react';
 import { FolderItem } from '@/shared/types/index';
+import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
 const IconMap: Record<string, React.FC<any>> = {
   Folder, Book, BarChart: BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb
@@ -30,9 +31,22 @@ export const FolderCard: React.FC<FolderCardProps> = ({
   onCloseMenu,
 }) => {
   const FolderIcon = folder.icon ? IconMap[folder.icon] : Folder;
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+
+  const handleDeleteWithConfirmation = async () => {
+    const confirmed = await confirm(
+      'Delete Folder',
+      `Are you sure you want to delete "${folder.name}"? This will also remove all notebooks inside this folder.`,
+      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+    );
+    if (confirmed) {
+      onDeleteFolder(folder.id);
+    }
+  };
 
   if (viewMode === 'grid') {
     return (
+      <>
       <div className="relative">
         {/* Folder Card */}
         <div
@@ -62,7 +76,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
                     <Settings2 className="w-3.5 h-3.5" /> Customize
                   </button>
                   <button
-                    onClick={() => { onDeleteFolder(folder.id); onCloseMenu(); }}
+                    onClick={() => { handleDeleteWithConfirmation(); onCloseMenu(); }}
                     className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -91,11 +105,14 @@ export const FolderCard: React.FC<FolderCardProps> = ({
           </div>
         </div>
       </div>
+      <ConfirmDialogComponent />
+      </>
     );
   }
 
   // List view
   return (
+    <>
     <div className="relative">
       <div
         className={`group grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] items-center gap-4 p-4 rounded-xl bg-gradient-to-r ${folder.color || 'bg-blue-500'} bg-opacity-5 border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative`}
@@ -145,7 +162,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
                 <Settings2 className="w-3.5 h-3.5 shrink-0" /> Customize
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); onCloseMenu(); }}
+                onClick={(e) => { e.stopPropagation(); handleDeleteWithConfirmation(); onCloseMenu(); }}
                 className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
@@ -155,5 +172,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
         </div>
       </div>
     </div>
+    <ConfirmDialogComponent />
+    </>
   );
 };

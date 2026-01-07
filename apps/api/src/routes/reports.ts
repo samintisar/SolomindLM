@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleReportGeneration } from '../utils/jobHelpers.js';
 import { ReportGenerationService } from '../services/generation/ReportGenerationService.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 const reportService = new ReportGenerationService();
@@ -99,7 +100,7 @@ async function addReportJob(
 }
 
 // POST /api/reports - Create report and queue job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', rateLimiter('report'), async (req: Request, res: Response) => {
   try {
     const { userId, noteId, documentIds, reportType, customPrompt } = req.body;
 
@@ -189,7 +190,7 @@ router.post('/', async (req: Request, res: Response) => {
     await addReportJob({
       reportId,
       userId,
-      noteId,
+      notebookId: noteId,
       documentIds,
       reportType,
       customPrompt,

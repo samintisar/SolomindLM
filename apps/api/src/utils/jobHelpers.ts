@@ -117,7 +117,9 @@ export async function scheduleDocEmbedding(
   payload: {
     documentId: string;
     userId: string;
-    notebookId: string;
+    noteId: string;
+    type: 'file' | 'url' | 'youtube' | 'text';
+    source: string;
   },
   options?: JobScheduleOptions
 ) {

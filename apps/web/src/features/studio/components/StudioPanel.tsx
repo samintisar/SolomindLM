@@ -18,6 +18,7 @@ import {
   MessageSquareText,
 } from 'lucide-react';
 import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote } from '@/shared/types/index';
+import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { CreateReportModal } from './CreateReportModal';
 import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
 import { CustomizeQuizModal } from './CustomizeQuizModal';
@@ -95,6 +96,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const activeNote = notes.find(n => n.id === activeNoteId);
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   // Use custom hook for business logic handlers
   const {
@@ -124,6 +126,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     onUpdateNoteFull,
     onDeleteNote,
     onSetActiveNoteId: setActiveNoteId,
+    confirm,
   });
 
   useEffect(() => {
@@ -175,6 +178,17 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     if (e.key === 'Escape') setEditingId(null);
   };
 
+  const handleDeleteNoteWithConfirmation = async (note: Note) => {
+    const confirmed = await confirm(
+      'Delete Note',
+      `Are you sure you want to delete "${note.title}"? This action cannot be undone.`,
+      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+    );
+    if (confirmed) {
+      onDeleteNote(note.id);
+    }
+  };
+
   const handleNoteClick = (note: Note) => {
     // Prevent clicking on generating notes
     if (note.status === 'generating') {
@@ -186,7 +200,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   };
 
   return (
-    <div
+    <><div
       style={{ width: isOpen ? width : 0 }}
       className={`
         relative shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col
@@ -424,7 +438,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                         <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
                                     </button>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); onDeleteNote(note.id); setActiveMenuId(null); }}
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteNoteWithConfirmation(note); setActiveMenuId(null); }}
                                         className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
                                     >
                                         <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
@@ -460,6 +474,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           onExpand={onExpandAudioPlayer || (() => {})}
         />
       )}
+      </div>
 
       {/* Modals */}
       <CreateReportModal
@@ -491,6 +506,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         onClose={() => setIsWrittenQuestionsModalOpen(false)}
         onGenerate={handleCreateWrittenQuestions}
       />
-    </div>
-  );
+      <ConfirmDialogComponent />
+    </>);
 };

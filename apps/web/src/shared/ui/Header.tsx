@@ -12,9 +12,11 @@ interface HeaderProps {
   onRename: (newTitle: string) => void;
   isHome: boolean;
   onLogoClick: () => void;
+  onBillingClick?: () => void;
+  hasSubscription?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoClick }) => {
+export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoClick, onBillingClick, hasSubscription = false }) => {
   const { user, isAuthenticated, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -77,8 +79,21 @@ export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoC
           className="flex items-center gap-3 cursor-pointer group"
           title="Go to Home"
         >
-          <div className="w-8 h-8 bg-primary rounded-sm flex items-center justify-center text-primary-foreground font-bold font-serif shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-            N
+          <div className="w-8 h-8 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
+            <img 
+              src="/SolomindLM_logo.png" 
+              alt="SolomindLM Logo" 
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                // Fallback to 'N' if image doesn't exist
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                if (target.parentElement) {
+                  target.parentElement.textContent = 'N';
+                  target.parentElement.className = "w-8 h-8 bg-primary rounded-sm flex items-center justify-center text-primary-foreground font-bold font-serif shadow-sm shrink-0 group-hover:scale-105 transition-transform";
+                }
+              }}
+            />
           </div>
           
           {isHome ? (
@@ -118,6 +133,22 @@ export const Header: React.FC<HeaderProps> = ({ title, onRename, isHome, onLogoC
 
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-4">
+        {onBillingClick && !hasSubscription && (
+          <button
+            onClick={onBillingClick}
+            className="px-3 py-1.5 text-sm font-medium bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors"
+          >
+            Upgrade to Pro
+          </button>
+        )}
+        {onBillingClick && hasSubscription && (
+          <button
+            onClick={onBillingClick}
+            className="px-3 py-1.5 text-sm font-medium bg-success/10 hover:bg-success/20 text-success rounded-md transition-colors"
+          >
+            Pro
+          </button>
+        )}
         <DropdownMenu
           trigger={
             <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center hover:ring-2 hover:ring-ring transition-all shrink-0">

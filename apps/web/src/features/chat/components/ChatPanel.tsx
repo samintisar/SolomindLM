@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, MoreVertical, Trash2, Loader2, Search, FileText, Brain } from 'lucide-react';
+import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, RefreshCw, Loader2, Search, FileText, Brain } from 'lucide-react';
+import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Virtuoso } from 'react-virtuoso';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -31,7 +32,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isLoading = false,
   notebookId,
 }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('top');
@@ -46,10 +46,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const hideTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const virtuosoRef = useRef<any>(null);
 
-  const handleDeleteHistory = () => {
-    if (confirm('Are you sure you want to delete all chat history? This action cannot be undone.')) {
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+
+  const handleDeleteHistory = async () => {
+    const confirmed = await confirm(
+      'Clear Chat History',
+      'Are you sure you want to delete all chat history? This action cannot be undone.',
+      { confirmText: 'Clear History', cancelText: 'Cancel', variant: 'danger' }
+    );
+    if (confirmed) {
       onClearHistory?.();
-      setIsMenuOpen(false);
     }
   };
 
@@ -320,7 +326,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const memoizedMessages = useMemo(() => messages, [messages]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
+    <><div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
       
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10 h-14">
@@ -351,30 +357,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </button>
           )}
 
-          {/* Options Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-1 hover:bg-secondary rounded-lg transition-colors text-foreground/70 hover:text-foreground flex items-center justify-center shrink-0"
-              title="Options"
-            >
-              <MoreVertical className="w-5 h-5" />
-            </button>
-            {isMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 w-40 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  <button
-                    onClick={handleDeleteHistory}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4 shrink-0" />
-                    Delete history
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          {/* Refresh Button */}
+          <button
+            onClick={handleDeleteHistory}
+            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
+            title="Refresh chat"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -495,6 +485,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
            </div>
         </div>
       </div>
-    </div>
-  );
+      </div>
+      <ConfirmDialogComponent />
+    </>);
 };

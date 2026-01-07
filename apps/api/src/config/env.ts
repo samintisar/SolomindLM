@@ -93,6 +93,14 @@ const envSchema = z.object({
   WORKER_CONCURRENCY: z.string().default('5'),
   WORKER_INSTANCES: z.string().default('1'),
   DB_POOL_MAX: z.string().default('10'),
+  // Rate Limiting Configuration
+  RATE_LIMIT_ENABLED: z.string().default('true'),
+  RATE_LIMIT_FAIL_OPEN: z.string().default('true'),
+  // Stripe Configuration
+  STRIPE_SECRET_KEY: z.string(),
+  STRIPE_WEBHOOK_SECRET: z.string(),
+  STRIPE_PRO_MONTHLY_PRICE_ID: z.string(),
+  STRIPE_PRO_YEARLY_PRICE_ID: z.string(),
 });
 
 export const env = envSchema.parse(process.env);

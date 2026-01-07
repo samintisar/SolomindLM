@@ -1,6 +1,7 @@
 import React from 'react';
 import { MoreVertical, Settings2, Trash2, FolderOpen, FileText, Book, Globe, BarChart3, Monitor, Search, Brain, Folder, GraduationCap, Lightbulb } from 'lucide-react';
 import { NotebookItem } from '@/shared/types/index';
+import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
 const IconMap: Record<string, React.FC<any>> = {
   Folder, Book, BarChart: BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb
@@ -34,6 +35,18 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
   isInFolder = false,
 }) => {
   const Icon = notebook.icon ? IconMap[notebook.icon] : Folder;
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+
+  const handleDeleteWithConfirmation = async () => {
+    const confirmed = await confirm(
+      'Delete Notebook',
+      `Are you sure you want to delete "${notebook.title}"? This action cannot be undone.`,
+      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+    );
+    if (confirmed) {
+      onDeleteNotebook(notebook.id);
+    }
+  };
   
   // Format date to remove the year (e.g., "JAN 2, 2026" -> "JAN 2")
   const formatDate = (dateString: string) => {
@@ -47,6 +60,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
 
   if (viewMode === 'grid') {
     return (
+      <>
       <div
         className={`group relative aspect-16/10 rounded-2xl bg-card border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col ring-1 ring-border/50 ${isInFolder ? '' : ''}`}
       >
@@ -80,7 +94,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
                   <FolderOpen className="w-3.5 h-3.5" /> Move to folder
                 </button>
                 <button
-                  onClick={() => { onDeleteNotebook(notebook.id); onCloseMenu(); }}
+                  onClick={() => { handleDeleteWithConfirmation(); onCloseMenu(); }}
                   className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2"
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -108,12 +122,15 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
           </div>
         </div>
       </div>
+      <ConfirmDialogComponent />
+      </>
     );
   }
 
   // List view
   if (isInFolder) {
     return (
+      <>
       <div
         className="group grid grid-cols-[auto_1fr_auto_auto_48px] items-center gap-2 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-3 rounded-lg"
       >
@@ -167,7 +184,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
                 <FolderOpen className="w-3.5 h-3.5 shrink-0" /> Move to folder
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onDeleteNotebook(notebook.id); onCloseMenu(); }}
+                onClick={(e) => { e.stopPropagation(); handleDeleteWithConfirmation(); onCloseMenu(); }}
                 className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
@@ -176,10 +193,13 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
           )}
         </div>
       </div>
+      <ConfirmDialogComponent />
+      </>
     );
   }
 
   return (
+    <>
     <div
       className="group grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] items-center gap-4 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-4 rounded-xl"
     >
@@ -232,7 +252,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
               <FolderOpen className="w-3.5 h-3.5 shrink-0" /> Move to folder
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onDeleteNotebook(notebook.id); onCloseMenu(); }}
+              onClick={(e) => { e.stopPropagation(); handleDeleteWithConfirmation(); onCloseMenu(); }}
               className="w-full text-left px-3 py-2 text-xs font-medium hover:bg-destructive/10 text-destructive flex items-center gap-2 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
@@ -241,5 +261,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
         )}
       </div>
     </div>
+    <ConfirmDialogComponent />
+    </>
   );
 };

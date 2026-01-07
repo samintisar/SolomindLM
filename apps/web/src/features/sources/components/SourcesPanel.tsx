@@ -12,6 +12,7 @@ import rehypeKatex from 'rehype-katex';
 import { Source } from '@/shared/types/index';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
 import { documentsApi } from '../services/documentsApi';
+import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
 const MAX_SOURCES = 100;
 
@@ -61,11 +62,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [renameValue, setRenameValue] = useState('');
   const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
   const [contentCache, setContentCache] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
-  const viewingSource = useMemo(() => 
-    sources.find(s => s.id === viewingSourceId), 
+  const viewingSource = useMemo(() =>
+    sources.find(s => s.id === viewingSourceId),
     [sources, viewingSourceId]
   );
+
+  const filteredSources = useMemo(() => {
+    if (!searchQuery.trim()) return sources;
+    const query = searchQuery.toLowerCase();
+    return sources.filter(source =>
+      source.title.toLowerCase().includes(query)
+    );
+  }, [sources, searchQuery]);
+
+  const handleDeleteSource = async (sourceId: string, sourceTitle: string) => {
+    const confirmed = await confirm(
+      'Delete Source',
+      `Are you sure you want to delete "${sourceTitle}"? This action cannot be undone.`,
+      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+    );
+    if (confirmed) {
+      onDeleteSource(sourceId);
+    }
+  };
 
   // Fetch content when a source is being viewed
   useEffect(() => {
@@ -95,7 +117,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   // File upload handler
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0 || !userId || !noteId) return;
+    if (files.length === 0) return;
+
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading files.');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -117,7 +144,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // URL upload handler
   const handleUrlUpload = async () => {
-    if (!urlInput || !userId || !noteId) return;
+    if (!urlInput) return;
+
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading URLs.');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -136,7 +168,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // Social Media upload handler (YouTube, TikTok, Instagram, X)
   const handleSocialMediaUpload = async () => {
-    if (!urlInput || !userId || !noteId) return;
+    if (!urlInput) return;
+
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading social media content.');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -155,7 +192,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // Text upload handler
   const handleTextUpload = async () => {
-    if (!textInput || !userId || !noteId) return;
+    if (!textInput) return;
+
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading text.');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -379,24 +421,26 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               <div className="space-y-3">
                 <div className="relative flex items-center">
                   <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none shrink-0" />
-                  <input 
-                    type="text" 
-                    placeholder="Search sources..." 
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search sources..."
                     className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring font-serif shadow-xs"
                   />
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-1 font-sans">
-                    <span>{sources.length} items</span>
-                    <button 
+                    <span>{filteredSources.length} {searchQuery.trim() ? `of ${sources.length}` : ''} items</span>
+                    <button
                       onClick={onToggleAll}
                       className="hover:text-primary transition-colors cursor-pointer select-none font-medium"
                     >
                       {allSelected ? 'Deselect all' : 'Select all'}
                     </button>
                   </div>
-                  {sources.map((source) => {
+                  {filteredSources.map((source) => {
                     const status = source.status || 'completed';
                     const isRenaming = renamingId === source.id;
                     return (
@@ -498,9 +542,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          if (confirm(`Delete "${source.title}"?`)) {
-                                            onDeleteSource(source.id);
-                                          }
+                                          handleDeleteSource(source.id, source.title);
                                           setOpenMenuId(null);
                                         }}
                                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 last:rounded-b-lg transition-colors"
@@ -572,9 +614,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
                   {/* Upload Area */}
                   <div
-                    onClick={() => userId && sources.length < MAX_SOURCES && fileInputRef.current?.click()}
+                    onClick={() => userId && noteId && sources.length < MAX_SOURCES && fileInputRef.current?.click()}
                     className={`border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center gap-4 bg-secondary/5 transition-colors group ${
-                      !userId || sources.length >= MAX_SOURCES ? 'opacity-50 cursor-not-allowed' : 'hover:bg-secondary/10 cursor-pointer'
+                      !userId || !noteId || sources.length >= MAX_SOURCES ? 'opacity-50 cursor-not-allowed' : 'hover:bg-secondary/10 cursor-pointer'
                     }`}
                   >
                       <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0">
@@ -599,7 +641,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                           </div>
                           <div className="space-y-2">
                               <button
-                                disabled={!userId || sources.length >= MAX_SOURCES}
+                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
                                 className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                   <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
@@ -618,16 +660,16 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                               <button
-                                onClick={() => userId && sources.length < MAX_SOURCES ? setShowUrlInput(true) : null}
-                                disabled={!userId || sources.length >= MAX_SOURCES}
+                                onClick={() => userId && noteId && sources.length < MAX_SOURCES ? setShowUrlInput(true) : null}
+                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
                                 className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                   <Globe className="w-4 h-4 text-chart-3 group-hover:scale-110 transition-transform shrink-0" />
                                   <span className="text-sm font-medium">Website</span>
                               </button>
                               <button
-                                onClick={() => userId && sources.length < MAX_SOURCES ? setShowSocialMediaInput(true) : null}
-                                disabled={!userId || sources.length >= MAX_SOURCES}
+                                onClick={() => userId && noteId && sources.length < MAX_SOURCES ? setShowSocialMediaInput(true) : null}
+                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
                                 className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                   <Youtube className="w-4 h-4 text-destructive group-hover:scale-110 transition-transform shrink-0" />
@@ -644,8 +686,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                           </div>
                           <div className="space-y-2">
                               <button
-                                onClick={() => userId && sources.length < MAX_SOURCES ? setShowTextInput(true) : null}
-                                disabled={!userId || sources.length >= MAX_SOURCES}
+                                onClick={() => userId && noteId && sources.length < MAX_SOURCES ? setShowTextInput(true) : null}
+                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
                                 className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                   <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
@@ -657,8 +699,18 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                       </div>
                   </div>
 
-                  {/* Limit Warning */}
-                  {sources.length >= MAX_SOURCES && (
+                  {/* Warnings */}
+                  {!userId || !noteId ? (
+                    <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
+                      <XCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-warning">Authentication required</p>
+                        <p className="text-xs text-warning/80 mt-1">
+                          Please log in and select a notebook to upload sources.
+                        </p>
+                      </div>
+                    </div>
+                  ) : sources.length >= MAX_SOURCES ? (
                     <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-start gap-3">
                       <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                       <div className="flex-1">
@@ -668,7 +720,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                         </p>
                       </div>
                     </div>
-                  )}
+                  ) : null}
               </div>
 
               {/* Footer Limit */}
@@ -868,6 +920,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         userId={userId}
         noteId={noteId}
       />
+      <ConfirmDialogComponent />
     </>
   );
 };

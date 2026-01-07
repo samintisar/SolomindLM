@@ -22,6 +22,11 @@ export interface UseStudioHandlersProps {
   onUpdateNoteFull?: (id: string, note: Note) => void;
   onDeleteNote: (id: string) => void;
   onSetActiveNoteId: (noteId: string | null) => void;
+  confirm?: (title: string, message: string | React.ReactNode, options?: {
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'default';
+  }) => Promise<boolean>;
 }
 
 export interface UseStudioHandlersReturn {
@@ -57,6 +62,7 @@ export function useStudioHandlers({
   onUpdateNoteFull,
   onDeleteNote,
   onSetActiveNoteId,
+  confirm,
 }: UseStudioHandlersProps): UseStudioHandlersReturn {
   // Modal states
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -69,11 +75,31 @@ export function useStudioHandlers({
     setIsFlashcardModalOpen(false);
 
     // Get selected document IDs from sources
-    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
 
     if (selectedDocumentIds.length === 0) {
-      alert('Please select at least one source to generate flashcards');
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate flashcards', { variant: 'warning' });
+      }
       return;
+    }
+
+    // Handle case where user has selected more than 10 sources
+    if (selectedDocumentIds.length > 10) {
+      const confirmed = confirm ? await confirm(
+        'Source Limit Warning',
+        `You have selected ${selectedDocumentIds.length} sources, but flashcard generation supports a maximum of 10 sources.\n\n` +
+        `Would you like to use the first 10 selected sources?`,
+        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
+      ) : true;
+
+      if (!confirmed) {
+        setIsFlashcardModalOpen(true);
+        return;
+      }
+
+      // Use only the first 10 selected sources
+      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
     }
 
     if (!userId || !noteId) {
@@ -165,11 +191,31 @@ export function useStudioHandlers({
     setIsQuizModalOpen(false);
 
     // Get selected document IDs from sources
-    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
 
     if (selectedDocumentIds.length === 0) {
-      alert('Please select at least one source to generate a quiz');
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate a quiz', { variant: 'warning' });
+      }
       return;
+    }
+
+    // Handle case where user has selected more than 10 sources
+    if (selectedDocumentIds.length > 10) {
+      const confirmed = confirm ? await confirm(
+        'Source Limit Warning',
+        `You have selected ${selectedDocumentIds.length} sources, but quiz generation supports a maximum of 10 sources.\n\n` +
+        `Would you like to use the first 10 selected sources?`,
+        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
+      ) : true;
+
+      if (!confirmed) {
+        setIsQuizModalOpen(true);
+        return;
+      }
+
+      // Use only the first 10 selected sources
+      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
     }
 
     if (!userId || !noteId) {
@@ -260,11 +306,31 @@ export function useStudioHandlers({
     setIsReportModalOpen(false);
 
     // Get selected document IDs from sources
-    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
 
     if (selectedDocumentIds.length === 0) {
-      alert('Please select at least one source to generate a report');
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate a report', { variant: 'warning' });
+      }
       return;
+    }
+
+    // Handle case where user has selected more than 10 sources
+    if (selectedDocumentIds.length > 10) {
+      const confirmed = confirm ? await confirm(
+        'Source Limit Warning',
+        `You have selected ${selectedDocumentIds.length} sources, but report generation supports a maximum of 10 sources.\n\n` +
+        `Would you like to use the first 10 selected sources?`,
+        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
+      ) : true;
+
+      if (!confirmed) {
+        setIsReportModalOpen(true);
+        return;
+      }
+      
+      // Use only the first 10 selected sources
+      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
     }
 
     if (!userId || !noteId) {
@@ -358,12 +424,39 @@ export function useStudioHandlers({
   }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNote, onUpdateNoteFull, onDeleteNote]);
 
   const handleCreateMindMap = useCallback(async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:385',message:'handleCreateMindMap entry',data:{sourcesCount:sources.length,sourcesWithSelected:sources.filter(s=>s.selected).length,userId,noteId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
+    
     // Get selected document IDs from sources
-    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:392',message:'selectedDocumentIds after filtering',data:{selectedDocumentIds,selectedDocumentIdsLength:selectedDocumentIds.length,sources:sources.map(s=>({id:s.id,selected:s.selected,title:s.title}))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
 
     if (selectedDocumentIds.length === 0) {
-      alert('Please select at least one source to generate a mind map');
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate a mind map', { variant: 'warning' });
+      }
       return;
+    }
+
+    // Handle case where user has selected more than 10 sources
+    if (selectedDocumentIds.length > 10) {
+      const confirmed = confirm ? await confirm(
+        'Source Limit Warning',
+        `You have selected ${selectedDocumentIds.length} sources, but mind map generation supports a maximum of 10 sources.\n\n` +
+        `Would you like to use the first 10 selected sources?`,
+        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
+      ) : true;
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      // Use only the first 10 selected sources
+      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
     }
 
     if (!userId || !noteId) {
@@ -387,12 +480,20 @@ export function useStudioHandlers({
     onAddNote(newNote);
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:415',message:'Before mindMapApi.generateMindMap call',data:{userId,notebookId:noteId,documentIds:selectedDocumentIds,placeholderId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      
       // Call API to create and queue mind map
       const { mindMapId, mindmap } = await mindMapApi.generateMindMap({
         userId,
         notebookId: noteId,
         documentIds: selectedDocumentIds,
       });
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:425',message:'After mindMapApi.generateMindMap success',data:{mindMapId,mindmapId:mindmap.id,mindmapTitle:mindmap.title,mindmapStatus:mindmap.status,placeholderId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H6'})}).catch(()=>{});
+      // #endregion
 
       // Create note from mindmap data
       const noteFromMindmap: Note = {
@@ -406,10 +507,18 @@ export function useStudioHandlers({
         mindMapData: mindmap.data,
       };
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:440',message:'Before onUpdateNoteFull call',data:{placeholderId,noteFromMindmapId:noteFromMindmap.id,hasOnUpdateNoteFull:!!onUpdateNoteFull},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+
       // Update note ID with real mind map ID
       if (onUpdateNoteFull) {
         onUpdateNoteFull(placeholderId, noteFromMindmap);
       }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:449',message:'After onUpdateNoteFull call',data:{placeholderId,noteFromMindmapId:noteFromMindmap.id},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
 
       // Start polling for status
       mindMapApi.pollMindMapStatus(
@@ -445,6 +554,10 @@ export function useStudioHandlers({
       });
 
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useStudioHandlers.ts:475',message:'Mind map creation error caught',data:{error:error instanceof Error?error.message:String(error),errorStack:error instanceof Error?error.stack:undefined,placeholderId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'})}).catch(()=>{});
+      // #endregion
+      
       console.error('Failed to create mind map:', error);
       alert(error instanceof Error ? error.message : 'Failed to create mind map');
       // Remove the placeholder note
@@ -456,11 +569,31 @@ export function useStudioHandlers({
     setIsWrittenQuestionsModalOpen(false);
 
     // Get selected document IDs from sources
-    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
 
     if (selectedDocumentIds.length === 0) {
-      alert('Please select at least one source to generate written questions');
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate written questions', { variant: 'warning' });
+      }
       return;
+    }
+
+    // Handle case where user has selected more than 10 sources
+    if (selectedDocumentIds.length > 10) {
+      const confirmed = confirm ? await confirm(
+        'Source Limit Warning',
+        `You have selected ${selectedDocumentIds.length} sources, but written questions generation supports a maximum of 10 sources.\n\n` +
+        `Would you like to use the first 10 selected sources?`,
+        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
+      ) : true;
+
+      if (!confirmed) {
+        setIsWrittenQuestionsModalOpen(true);
+        return;
+      }
+      
+      // Use only the first 10 selected sources
+      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
     }
 
     if (!userId || !noteId) {
@@ -570,11 +703,31 @@ export function useStudioHandlers({
     setIsAudioModalOpen(false);
 
     // Get selected document IDs from sources
-    const selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
 
     if (selectedDocumentIds.length === 0) {
-      alert('Please select at least one source to generate an audio overview');
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate an audio overview', { variant: 'warning' });
+      }
       return;
+    }
+
+    // Handle case where user has selected more than 10 sources
+    if (selectedDocumentIds.length > 10) {
+      const confirmed = confirm ? await confirm(
+        'Source Limit Warning',
+        `You have selected ${selectedDocumentIds.length} sources, but audio overview generation supports a maximum of 10 sources.\n\n` +
+        `Would you like to use the first 10 selected sources?`,
+        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
+      ) : true;
+      
+      if (!confirmed) {
+        setIsAudioModalOpen(true);
+        return;
+      }
+      
+      // Use only the first 10 selected sources
+      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
     }
 
     if (!userId || !noteId) {

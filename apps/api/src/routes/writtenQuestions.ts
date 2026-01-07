@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleWrittenQuestionsGeneration } from '../utils/jobHelpers.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ async function addWrittenQuestionsJob(
 }
 
 // POST /api/written-questions - Create written questions and queue job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', rateLimiter('written_questions'), async (req: Request, res: Response) => {
   try {
     const { userId, notebookId, documentIds, questionCount, difficulty, questionType, focus } = req.body;
 
@@ -251,14 +252,11 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Queue the written questions generation job
     await addWrittenQuestionsJob({
-      writtenQuestionsId,
+      writtenQuestionId: writtenQuestionsId,
       userId,
       notebookId,
       documentIds,
       questionCount: actualQuestionCount,
-      difficulty,
-      questionType,
-      focus,
     });
 
     return res.status(201).json({

@@ -26,6 +26,10 @@ export const documentsApi = {
     noteId: string,
     file: File
   ): Promise<UploadResponse> {
+    if (!userId || !noteId) {
+      throw new Error('userId and noteId are required');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('userId', userId);
@@ -63,6 +67,10 @@ export const documentsApi = {
     url: string,
     type: 'url' | 'youtube'
   ): Promise<UploadResponse> {
+    if (!userId || !noteId) {
+      throw new Error('userId and noteId are required');
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -90,6 +98,10 @@ export const documentsApi = {
     noteId: string,
     text: string
   ): Promise<UploadResponse> {
+    if (!userId || !noteId) {
+      throw new Error('userId and noteId are required');
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
       method: 'POST',
       headers: getAuthHeaders(),

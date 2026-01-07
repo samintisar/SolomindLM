@@ -3,6 +3,7 @@ import { supabase } from '../config/database.js';
 import { scheduleAudioOverviewGeneration } from '../utils/jobHelpers.js';
 import { AudioOverviewGenerationService } from '../services/generation/AudioOverviewGenerationService.js';
 import { SupabaseStorageService } from '../services/storage/SupabaseStorageService.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 const audioOverviewService = new AudioOverviewGenerationService();
@@ -100,7 +101,7 @@ async function addAudioOverviewJob(
 }
 
 // POST /api/audio-overviews - Create audio overview and queue job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', rateLimiter('audio_overview'), async (req: Request, res: Response) => {
   try {
     const { userId, notebookId, documentIds, audioType, length, focus } = req.body;
 
@@ -177,9 +178,6 @@ router.post('/', async (req: Request, res: Response) => {
       userId,
       notebookId,
       documentIds,
-      audioType,
-      length,
-      focus,
     });
 
     return res.status(201).json({

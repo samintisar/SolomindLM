@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleFlashcardGeneration } from '../utils/jobHelpers.js';
 import { FlashcardGenerationService } from '../services/generation/FlashcardGenerationService.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 const flashcardService = new FlashcardGenerationService();
@@ -110,7 +111,7 @@ async function addFlashcardJob(
 }
 
 // POST /api/flashcards - Create flashcard set and queue job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', rateLimiter('flashcard'), async (req: Request, res: Response) => {
   try {
     const { userId, notebookId, documentIds, cardCount, difficulty, topic } = req.body;
 

@@ -12,6 +12,8 @@ import writtenQuestionsRouter from './writtenQuestions.js';
 import chatRouter from './chat.js';
 import audioOverviewsRouter from './audio-overviews.js';
 import foldersRouter from './folders.js';
+import subscriptionsRouter from './subscriptions.js';
+import webhookRouter from './webhook.js';
 
 const router = Router();
 
@@ -28,6 +30,8 @@ router.use('/written-questions', writtenQuestionsRouter);
 router.use('/chat', chatRouter);
 router.use('/audio-overviews', audioOverviewsRouter);
 router.use('/folders', foldersRouter);
+router.use('/subscriptions', subscriptionsRouter);
+router.use('/webhook', webhookRouter);
 
 // Health check
 router.get('/health', (req, res) => {

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ChatAgent } from '../services/agents/ChatAgent.js';
 import { ChatHistoryService } from '../services/storage/ChatHistoryService.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 const chatAgent = new ChatAgent();
@@ -56,7 +57,7 @@ declare global {
  * POST /api/chat/message
  * Send a message and stream the response via SSE
  */
-router.post('/message', validateUserId, async (req: Request, res: Response) => {
+router.post('/message', rateLimiter('chat'), validateUserId, async (req: Request, res: Response) => {
   const { notebookId, message, documentIds } = req.body;
   const userId = req.userId!;
 

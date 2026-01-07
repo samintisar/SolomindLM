@@ -4,6 +4,7 @@ import { SupabaseStorageService } from '../services/storage/SupabaseStorageServi
 import { scheduleDocEmbedding } from '../utils/jobHelpers.js';
 import { upload } from '../middleware/upload.js';
 import { escapeIdentifier } from 'pg';
+import { checkSourceLimit } from '../middleware/sourceLimit.js';
 
 const router = Router();
 const storageService = new SupabaseStorageService();
@@ -14,7 +15,9 @@ async function addJob(
   payload: {
     documentId: string;
     userId: string;
-    notebookId: string;
+    noteId: string;
+    type: 'file' | 'url' | 'youtube' | 'text';
+    source: string;
   },
   options?: {
     priority?: number;
@@ -45,7 +48,7 @@ async function addJob(
 }
 
 // POST /api/documents/upload
-router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/upload', upload.single('file'), checkSourceLimit, async (req: Request, res: Response) => {
   try {
     const { userId, noteId, type, source } = req.body;
     const file = req.file;

@@ -4,10 +4,11 @@ import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
 import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
+import { BillingPage } from './features/billing/components/BillingPage';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
-import { STUDIO_TOOLS, SAVED_NOTES } from './shared/constants';
+import { STUDIO_TOOLS } from './shared/constants';
 import { Source, Note, NotebookItem, Document, Message, FolderItem } from '@/shared/types/index';
 import { documentsApi } from './features/sources/services/documentsApi';
 import { notebooksApi } from './features/notebooks/services/notebooksApi';
@@ -19,12 +20,13 @@ import { quizzesApi } from './features/studio/services/quizzesApi';
 import { writtenQuestionsApi } from './features/studio/services/writtenQuestionsApi';
 import { audioApi } from './features/audio/api/audioApi';
 import { chatApi } from './features/chat/services/chatApi';
+import { subscriptionApi } from './features/billing/services/subscriptionApi';
 import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
 const MAX_PANEL_WIDTH = 900;
 
-type ViewState = 'home' | 'notebook';
+type ViewState = 'home' | 'notebook' | 'billing';
 
 // Transform Document API type to Source UI type
 function documentToSource(doc: Document): Source {
@@ -61,6 +63,7 @@ const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('home');
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Notebook specific state
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
@@ -88,6 +91,9 @@ const AppContent: React.FC = () => {
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [foldersError, setFoldersError] = useState<string | null>(null);
+
+  // Subscription State
+  const [hasSubscription, setHasSubscription] = useState(false);
 
   // Filter notebooks for home page
   const featuredNotebooks = notebooks.filter(nb => nb.isFeatured);
@@ -320,13 +326,31 @@ const AppContent: React.FC = () => {
   };
 
   const handleUpdateNoteFull = (id: string, note: Note) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...note } : n));
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:330',message:'handleUpdateNoteFull entry',data:{oldId:id,newNoteId:note.id,newNoteType:note.type,newNoteTitle:note.title},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+    
+    setNotes(prev => {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:336',message:'Inside setNotes updater',data:{oldId:id,newNoteId:note.id,prevNotesCount:prev.length,prevNoteIds:prev.map(n=>n.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      
+      return prev.map(n => n.id === id ? { ...note } : n);
+    });
   };
 
   const handleDeleteNote = async (id: string) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:344',message:'handleDeleteNote entry',data:{id,idLength:id.length,isValidUUID:/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+    
     try {
       // Find the note to check its type
       const noteToDelete = notes.find(n => n.id === id);
+
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:353',message:'Found note to delete',data:{id,noteToDeleteId:noteToDelete?.id,noteToDeleteType:noteToDelete?.type,noteToDeleteTitle:noteToDelete?.title},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
 
       // Optimistically remove from UI
       setNotes(prev => prev.filter(n => n.id !== id));
@@ -566,6 +590,37 @@ const AppContent: React.FC = () => {
     loadFolders();
   }, [loadFolders]);
 
+  // Load subscription status when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      subscriptionApi.getStatus()
+        .then(status => setHasSubscription(status.hasSubscription))
+        .catch(err => console.error('Failed to load subscription status:', err));
+    } else {
+      setHasSubscription(false);
+    }
+  }, [isAuthenticated, user]);
+
+  // Handle redirect from Stripe checkout
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const canceled = urlParams.get('canceled');
+
+    if ((success === 'true' || canceled === 'true') && isAuthenticated && user) {
+      // Refresh subscription status after returning from Stripe
+      subscriptionApi.getStatus()
+        .then(status => setHasSubscription(status.hasSubscription))
+        .catch(err => console.error('Failed to load subscription status:', err))
+        .finally(() => {
+          // Navigate to billing page after refreshing status
+          setCurrentView('billing');
+          // Clean up URL
+          window.history.replaceState({}, '', window.location.pathname);
+        });
+    }
+  }, [isAuthenticated, user]);
+
   // Load documents from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
@@ -730,6 +785,20 @@ const AppContent: React.FC = () => {
     setActiveNotebookId(null);
   };
 
+  const handleBillingClick = () => {
+    setCurrentView('billing');
+  };
+
+  const handleBillingBack = () => {
+    // Refresh subscription status when returning from billing page
+    if (isAuthenticated && user) {
+      subscriptionApi.getStatus()
+        .then(status => setHasSubscription(status.hasSubscription))
+        .catch(err => console.error('Failed to load subscription status:', err));
+    }
+    setCurrentView('home');
+  };
+
   const handleSelectNotebook = (notebook: NotebookItem) => {
     setActiveNotebookId(notebook.id);
     setNotebookTitle(notebook.title);
@@ -890,24 +959,36 @@ const AppContent: React.FC = () => {
     <>
       {/* Login Modal */}
       {showLoginModal && !isAuthenticated && (
-        <LoginModal onClose={() => setShowLoginModal(false)} />
+        <LoginModal
+          onClose={() => {
+            setShowLoginModal(false);
+            setAuthError(null);
+          }}
+          authError={authError || undefined}
+        />
       )}
 
       <div className="flex flex-col h-screen w-full bg-background text-foreground overflow-hidden font-serif">
-      <Header 
-        title={notebookTitle} 
+      <Header
+        title={notebookTitle}
         onRename={(newTitle: string) => {
           setNotebookTitle(newTitle);
           // If we're in a notebook view, sync the rename with Supabase
           if (activeNotebookId && activeNotebookId !== 'new' && isAuthenticated) {
             handleUpdateNotebook(activeNotebookId, { title: newTitle });
           }
-        }} 
-        isHome={currentView === 'home'}
+        }}
+        isHome={currentView === 'home' || currentView === 'billing'}
         onLogoClick={handleLogoClick}
+        onBillingClick={handleBillingClick}
+        hasSubscription={hasSubscription}
       />
-      
-      {currentView === 'home' ? (
+
+      {currentView === 'billing' ? (
+        <main className="flex-1 overflow-auto">
+          <BillingPage onBack={handleBillingBack} />
+        </main>
+      ) : currentView === 'home' ? (
         <HomePage
           featuredNotebooks={featuredNotebooks}
           recentNotebooks={recentNotebooks}
@@ -923,6 +1004,10 @@ const AppContent: React.FC = () => {
           onDeleteFolder={handleDeleteFolder}
           onMoveNotebookToFolder={handleMoveNotebookToFolder}
           loadFolders={loadFolders}
+          onRequireAuth={(errorMessage) => {
+            setAuthError(errorMessage);
+            setShowLoginModal(true);
+          }}
         />
       ) : (
         <main className="flex-1 flex overflow-hidden relative animate-in fade-in duration-300">

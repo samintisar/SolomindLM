@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleMindmapGeneration } from '../utils/jobHelpers.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -78,7 +79,7 @@ async function addMindMapJob(
 }
 
 // POST /api/mindmaps - Create mindmap and queue job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', rateLimiter('mindmap'), async (req: Request, res: Response) => {
   try {
     const { userId, notebookId, documentIds } = req.body;
 
@@ -90,6 +91,10 @@ router.post('/', async (req: Request, res: Response) => {
       notebookId,
     }));
 
+    // #region agent log
+    console.log('[DEBUG] mindmaps.ts:90 - POST /api/mindmaps entry', JSON.stringify({location:'mindmaps.ts:90',message:'POST /api/mindmaps entry',data:{userId,notebookId,documentIds,documentIdsType:typeof documentIds,documentIdsIsArray:Array.isArray(documentIds),documentIdsLength:Array.isArray(documentIds)?documentIds.length:undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'}));
+    // #endregion
+
     // Validation: userId and notebookId
     if (typeof userId !== 'string' || !isValidUUID(userId)) {
       return res.status(400).json({ error: 'Invalid userId format' });
@@ -100,6 +105,10 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Validation: documentIds
     if (!validateDocumentIds(documentIds)) {
+      // #region agent log
+      console.log('[DEBUG] mindmaps.ts:107 - documentIds validation failed', JSON.stringify({location:'mindmaps.ts:107',message:'documentIds validation failed',data:{documentIds,isArray:Array.isArray(documentIds),length:Array.isArray(documentIds)?documentIds.length:undefined,items:Array.isArray(documentIds)?documentIds.map((id,i)=>({index:i,value:id,type:typeof id,isValidUUID:typeof id==='string'&&isValidUUID(id)})):undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'}));
+      // #endregion
+      
       return res.status(400).json({
         error: `documentIds must be an array of 1-${CONFIG.MINDMAP.MAX_DOCUMENTS} valid UUIDs`
       });
@@ -151,7 +160,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Queue the mind map generation job
     await addMindMapJob({
-      mindMapId,
+      mindmapId: mindMapId,
       userId,
       notebookId,
       documentIds,

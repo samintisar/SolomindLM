@@ -34,6 +34,7 @@ interface HomePageProps {
   onDeleteFolder?: (id: string) => void;
   onMoveNotebookToFolder?: (notebookId: string, folderId: string | null) => void;
   loadFolders?: () => void;
+  onRequireAuth?: (errorMessage: string) => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
@@ -51,6 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onDeleteFolder,
   onMoveNotebookToFolder,
   loadFolders,
+  onRequireAuth,
 }) => {
   const [activeTab, setActiveTab] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -80,6 +82,12 @@ export const HomePage: React.FC<HomePageProps> = ({
       window.location.reload();
     } catch (error) {
       console.error('Failed to create notebook:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (errorMessage.includes('Unauthorized')) {
+        notebookHandlers.closeCustomize();
+        if (onRequireAuth) onRequireAuth('You need to sign in to create a notebook.');
+      }
     }
   };
 
@@ -105,6 +113,12 @@ export const HomePage: React.FC<HomePageProps> = ({
       if (loadFolders) loadFolders();
     } catch (error) {
       console.error('Failed to create folder:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (errorMessage.includes('Unauthorized')) {
+        folderHandlers.closeFolderCustomize();
+        if (onRequireAuth) onRequireAuth('You need to sign in to create a folder.');
+      }
     }
   };
 

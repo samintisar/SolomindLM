@@ -1,12 +1,13 @@
-import { useState } from 'react';
-import { User, Mail, Lock, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Mail, Lock, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 
 interface LoginModalProps {
   onClose: () => void;
+  authError?: string;
 }
 
-export function LoginModal({ onClose }: LoginModalProps) {
+export function LoginModal({ onClose, authError }: LoginModalProps) {
   const { signIn, signUp, isLoading: authLoading } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -14,6 +15,13 @@ export function LoginModal({ onClose }: LoginModalProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Update local error when authError prop changes
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +88,14 @@ export function LoginModal({ onClose }: LoginModalProps) {
           </button>
         </div>
 
+        {/* Auth Error Message */}
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-2">
+            <Info className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <p className="text-sm text-destructive font-serif">{error}</p>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div className="space-y-2">
@@ -136,10 +152,6 @@ export function LoginModal({ onClose }: LoginModalProps) {
                 />
               </div>
             </div>
-          )}
-
-          {error && (
-            <p className="text-sm text-destructive font-serif">{error}</p>
           )}
 
           <button

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleQuizGeneration } from '../utils/jobHelpers.js';
 import { QuizGenerationService } from '../services/generation/QuizGenerationService.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 const quizService = new QuizGenerationService();
@@ -123,7 +124,7 @@ async function addQuizJob(
 }
 
 // POST /api/quizzes - Create quiz and queue job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
   try {
     const { userId, notebookId, documentIds, questionCount, difficulty, focus } = req.body;
 
@@ -225,7 +226,6 @@ router.post('/', async (req: Request, res: Response) => {
       documentIds,
       questionCount: actualQuestionCount,
       difficulty,
-      focus,
     });
 
     return res.status(201).json({
