@@ -1,33 +1,26 @@
-import React, { useRef } from 'react';
+import React from 'react';
+import { NavigationHeader } from './components/NavigationHeader';
 import { HeroSection } from './components/HeroSection';
 import { FeaturesGrid } from './components/FeaturesGrid';
+import { UseCasesSection } from './components/UseCasesSection';
 import { ContentShowcase } from './components/ContentShowcase';
-import { HowItWorks } from './components/HowItWorks';
-import { FinalCTA } from './components/FinalCTA';
+import { PricingSection } from './components/PricingSection';
+import { FAQSection } from './components/FAQSection';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
-  const featuresRef = useRef<HTMLDivElement>(null);
-
-  const handleScrollToFeatures = () => {
-    featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
     <div className="min-h-screen bg-background">
-      <HeroSection
-        onGetStarted={onGetStarted}
-        onScrollToFeatures={handleScrollToFeatures}
-      />
-      <div ref={featuresRef}>
-        <FeaturesGrid />
-      </div>
+      <NavigationHeader onGetStarted={onGetStarted} />
+      <HeroSection onGetStarted={onGetStarted} />
+      <FeaturesGrid />
+      <UseCasesSection />
       <ContentShowcase />
-      <HowItWorks />
-      <FinalCTA onGetStarted={onGetStarted} />
+      <PricingSection onGetStarted={onGetStarted} />
+      <FAQSection />
     </div>
   );
 };

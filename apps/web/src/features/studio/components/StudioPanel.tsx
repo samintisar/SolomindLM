@@ -16,8 +16,10 @@ import {
   X,
   Loader2,
   MessageSquareText,
+  Download,
 } from 'lucide-react';
 import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote } from '@/shared/types/index';
+import { flashcardsApi } from '../services/flashcardsApi';
 import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { CreateReportModal } from './CreateReportModal';
 import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
@@ -93,6 +95,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   const [editTitle, setEditTitle] = useState("");
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const activeNote = notes.find(n => n.id === activeNoteId);
@@ -196,6 +199,20 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     }
     if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions') {
         setActiveNoteId(note.id);
+    }
+  };
+
+  const handleExportFlashcards = async () => {
+    if (!activeNote || !isFlashcardNote(activeNote)) return;
+    
+    try {
+      setIsExporting(true);
+      await flashcardsApi.exportFlashcardsCSV(activeNote.id, activeNote.title);
+    } catch (error) {
+      console.error('Failed to export flashcards:', error);
+      alert('Failed to export flashcards. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -459,6 +476,20 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           <div className="p-4 border-t border-border bg-sidebar/30 mt-auto">
             <button className="w-full py-2 bg-sidebar-accent border border-sidebar-border text-sidebar-foreground text-xs font-bold uppercase tracking-wide rounded-sm hover:bg-sidebar-accent/80 transition-colors shadow-sm">
               + Add New Note
+            </button>
+          </div>
+      )}
+
+      {activeNote && isFlashcardNote(activeNote) && !miniPlayerVisible && (
+          <div className="p-4 border-t border-border bg-sidebar/30 mt-auto">
+            <button 
+              onClick={handleExportFlashcards}
+              disabled={isExporting}
+              className="w-full flex items-center justify-center gap-2 py-2 bg-primary/10 border border-primary/30 text-primary text-xs font-bold uppercase tracking-wide rounded-sm hover:bg-primary/20 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export flashcards as CSV"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
             </button>
           </div>
       )}

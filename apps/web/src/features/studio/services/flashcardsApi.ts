@@ -239,4 +239,47 @@ export const flashcardsApi = {
       throw new Error('Failed to delete flashcard set');
     }
   },
+
+  /**
+   * Export a flashcard set as CSV
+   */
+  async exportFlashcardsCSV(flashcardId: string, title: string): Promise<void> {
+    const storedUser = localStorage.getItem('solomind_user');
+    const userId = storedUser ? JSON.parse(storedUser).id : null;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+
+    const params = new URLSearchParams({ userId });
+    const response = await fetch(
+      `${API_BASE_URL}/api/flashcards/${flashcardId}/export?${params.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to export flashcards');
+    }
+
+    // Create a blob from the response and trigger download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Generate filename
+    const safeTitle = title
+      .replace(/[^a-z0-9]/gi, '_')
+      .replace(/_+/g, '_')
+      .toLowerCase();
+    link.download = `flashcards_${safeTitle}_${new Date().toISOString().split('T')[0]}.csv`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };

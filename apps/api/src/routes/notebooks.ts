@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
+import { checkNotebookLimit } from '../middleware/notebookLimit.js';
 
 const router = Router();
 
@@ -144,7 +145,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/notebooks
  * Create a new notebook
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', checkNotebookLimit, async (req: Request, res: Response) => {
   try {
     const userId = await getUserIdFromToken(req);
     

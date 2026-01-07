@@ -20,8 +20,17 @@ import { UserTier } from '../types/rateLimit.js';
  * These are permanent limits (not daily) enforced per notebook
  */
 export const SOURCE_LIMITS: Record<UserTier, number> = {
-  free: 30,
+  free: 20,
   pro: 100,
+};
+
+/**
+ * Notebook limits per user by user tier
+ * These are permanent limits (not daily) enforced per user account
+ */
+export const NOTEBOOK_LIMITS: Record<UserTier, number> = {
+  free: 20,
+  pro: 200,
 };
 
 /**

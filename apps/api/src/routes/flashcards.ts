@@ -446,4 +446,79 @@ router.delete('/:flashcardId', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/flashcards/:flashcardId/export - Export flashcard set as CSV
+router.get('/:flashcardId/export', async (req: Request, res: Response) => {
+  try {
+    const { flashcardId } = req.params;
+    const userId = req.query.userId as string;
+
+    if (typeof userId !== 'string' || !isValidUUID(userId)) {
+      return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    if (typeof flashcardId !== 'string' || !isValidUUID(flashcardId)) {
+      return res.status(400).json({ error: 'Invalid flashcardId format' });
+    }
+
+    const { data: flashcard, error } = await supabase
+      .from('flashcards')
+      .select('*')
+      .eq('id', flashcardId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !flashcard) {
+      return res.status(404).json({ error: 'Flashcard set not found' });
+    }
+
+    // Parse cards_data using helper
+    const flashcards = parseCardsData(flashcard as FlashcardRow);
+
+    if (flashcards.length === 0) {
+      return res.status(400).json({ error: 'No flashcards to export' });
+    }
+
+    // Helper function to escape CSV fields
+    const escapeCSV = (field: string): string => {
+      if (field.includes('"') || field.includes(',') || field.includes('\n') || field.includes('\r')) {
+        return `"${field.replace(/"/g, '""')}"`;
+      }
+      return field;
+    };
+
+    // Generate CSV content
+    const csvRows: string[] = [];
+    
+    // Add header row
+    csvRows.push('Front,Back');
+    
+    // Add flashcard data
+    flashcards.forEach((card: { front: string; back: string }) => {
+      const front = escapeCSV(card.front);
+      const back = escapeCSV(card.back);
+      csvRows.push(`${front},${back}`);
+    });
+
+    const csvContent = csvRows.join('\n');
+    
+    // Create a safe filename from the title
+    const safeTitle = flashcard.title
+      .replace(/[^a-z0-9]/gi, '_')
+      .replace(/_+/g, '_')
+      .toLowerCase();
+    const filename = `flashcards_${safeTitle}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    return res.send(csvContent);
+  } catch (error) {
+    console.error('[Flashcards] Error exporting flashcard set:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to export flashcard set',
+    });
+  }
+});
+
 export default router;

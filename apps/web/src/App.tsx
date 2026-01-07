@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Header } from './shared/ui/Header';
 import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
@@ -9,6 +10,7 @@ import { LandingPage } from './features/landing/LandingPage';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
+import { ProtectedRoute } from './shared/components/ProtectedRoute';
 import { STUDIO_TOOLS } from './shared/constants';
 import { Source, Note, NotebookItem, Document, Message, FolderItem } from '@/shared/types/index';
 import { documentsApi } from './features/sources/services/documentsApi';
@@ -26,8 +28,6 @@ import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
 const MAX_PANEL_WIDTH = 900;
-
-type ViewState = 'landing' | 'home' | 'notebook' | 'billing';
 
 // Transform Document API type to Source UI type
 function documentToSource(doc: Document): Source {
@@ -61,10 +61,27 @@ function documentToSource(doc: Document): Source {
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, signIn, signOut } = useAuth();
-  const [currentView, setCurrentView] = useState<ViewState>('landing');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Determine current view from URL
+  const currentView = location.pathname === '/'
+    ? 'landing'
+    : location.pathname === '/home'
+    ? 'home'
+    : location.pathname === '/billing'
+    ? 'billing'
+    : location.pathname.startsWith('/notebook/')
+    ? 'notebook'
+    : 'landing';
+
+  // Get notebook ID from URL pathname (e.g., /notebook/abc-123 -> abc-123)
+  const urlNotebookId = location.pathname.startsWith('/notebook/')
+    ? location.pathname.split('/notebook/')[1] || null
+    : null;
 
   // Notebook specific state
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
@@ -108,6 +125,20 @@ const AppContent: React.FC = () => {
 
   // Ref to track the polling interval for document status updates
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync activeNotebookId with URL params
+  useEffect(() => {
+    if (urlNotebookId && urlNotebookId !== activeNotebookId) {
+      setActiveNotebookId(urlNotebookId);
+      // Update notebook title when navigating to a notebook via URL
+      const notebook = notebooks.find(nb => nb.id === urlNotebookId);
+      if (notebook) {
+        setNotebookTitle(notebook.title);
+      }
+    } else if (!urlNotebookId && currentView !== 'notebook') {
+      setActiveNotebookId(null);
+    }
+  }, [urlNotebookId, currentView, notebooks]);
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
@@ -615,12 +646,12 @@ const AppContent: React.FC = () => {
         .catch(err => console.error('Failed to load subscription status:', err))
         .finally(() => {
           // Navigate to billing page after refreshing status
-          setCurrentView('billing');
+          navigate('/billing');
           // Clean up URL
           window.history.replaceState({}, '', window.location.pathname);
         });
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, navigate]);
 
   // Load documents from API when authenticated and notebook is active
   useEffect(() => {
@@ -771,32 +802,31 @@ const AppContent: React.FC = () => {
     }
   }, [user, activeNotebookId]);
 
-  // Show login modal if not authenticated
+  // Show login modal only for protected routes when not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    const isProtectedRoute =
+      location.pathname === '/billing' ||
+      location.pathname.startsWith('/notebook/');
+
+    if (!isLoading && !isAuthenticated && isProtectedRoute) {
       setShowLoginModal(true);
     } else if (isAuthenticated) {
       setShowLoginModal(false);
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, location.pathname]);
 
   // Navigation Handlers
   const handleLogoClick = () => {
-    setCurrentView('landing');
+    navigate('/');
     setActiveNotebookId(null);
   };
 
   const handleGetStarted = () => {
-    if (!isAuthenticated) {
-      setAuthError('Please sign in to continue');
-      setShowLoginModal(true);
-    } else {
-      setCurrentView('home');
-    }
+    navigate('/home');
   };
 
   const handleBillingClick = () => {
-    setCurrentView('billing');
+    navigate('/billing');
   };
 
   const handleBillingBack = () => {
@@ -806,13 +836,11 @@ const AppContent: React.FC = () => {
         .then(status => setHasSubscription(status.hasSubscription))
         .catch(err => console.error('Failed to load subscription status:', err));
     }
-    setCurrentView('home');
+    navigate('/home');
   };
 
   const handleSelectNotebook = (notebook: NotebookItem) => {
-    setActiveNotebookId(notebook.id);
-    setNotebookTitle(notebook.title);
-    setCurrentView('notebook');
+    navigate(`/notebook/${notebook.id}`);
   };
 
   const handleCreateNotebook = async () => {
@@ -827,11 +855,9 @@ const AppContent: React.FC = () => {
         coverColor: 'bg-yellow-500',
         icon: 'Folder',
       });
-      
+
       setNotebooks(prev => [newNotebook, ...prev]);
-      setActiveNotebookId(newNotebook.id);
-      setNotebookTitle(newNotebook.title);
-      setCurrentView('notebook');
+      navigate(`/notebook/${newNotebook.id}`);
     } catch (error) {
       console.error('Failed to create notebook:', error);
       setNotebooksError(error instanceof Error ? error.message : 'Failed to create notebook');
@@ -978,130 +1004,153 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      <div className="flex flex-col h-screen w-full bg-background text-foreground overflow-hidden font-serif">
-      <Header
-        title={notebookTitle}
-        onRename={(newTitle: string) => {
-          setNotebookTitle(newTitle);
-          // If we're in a notebook view, sync the rename with Supabase
-          if (activeNotebookId && activeNotebookId !== 'new' && isAuthenticated) {
-            handleUpdateNotebook(activeNotebookId, { title: newTitle });
-          }
-        }}
-        isHome={currentView === 'home' || currentView === 'billing'}
-        onLogoClick={handleLogoClick}
-        onBillingClick={handleBillingClick}
-        hasSubscription={hasSubscription}
-      />
-
-      {currentView === 'landing' ? (
-        <LandingPage onGetStarted={handleGetStarted} />
-      ) : currentView === 'billing' ? (
-        <main className="flex-1 overflow-auto">
-          <BillingPage onBack={handleBillingBack} />
-        </main>
-      ) : currentView === 'home' ? (
-        <HomePage
-          featuredNotebooks={featuredNotebooks}
-          recentNotebooks={recentNotebooks}
-          onSelectNotebook={handleSelectNotebook}
-          onCreateNotebook={handleCreateNotebook}
-          onUpdateNotebook={handleUpdateNotebook}
-          onDeleteNotebook={handleDeleteNotebook}
-          isLoading={notebooksLoading}
-          error={notebooksError}
-          folders={folders}
-          onCreateFolder={handleCreateFolder}
-          onUpdateFolder={handleUpdateFolder}
-          onDeleteFolder={handleDeleteFolder}
-          onMoveNotebookToFolder={handleMoveNotebookToFolder}
-          loadFolders={loadFolders}
-          onRequireAuth={(errorMessage) => {
-            setAuthError(errorMessage);
-            setShowLoginModal(true);
+      <div className={`w-full bg-background text-foreground font-serif ${location.pathname === '/' ? '' : 'flex flex-col h-screen overflow-hidden'}`}>
+      {location.pathname !== '/' && (
+        <Header
+          title={notebookTitle}
+          onRename={(newTitle: string) => {
+            setNotebookTitle(newTitle);
+            // If we're in a notebook view, sync the rename with Supabase
+            if (activeNotebookId && activeNotebookId !== 'new' && isAuthenticated) {
+              handleUpdateNotebook(activeNotebookId, { title: newTitle });
+            }
           }}
+          isHome={location.pathname === '/home' || location.pathname === '/billing'}
+          onLogoClick={handleLogoClick}
+          onBillingClick={handleBillingClick}
+          hasSubscription={hasSubscription}
         />
-      ) : (
-        <main className="flex-1 flex overflow-hidden relative animate-in fade-in duration-300">
-          <SourcesPanel
-            isOpen={isSourcesOpen}
-            onClose={toggleSources}
-            sources={sources}
-            onToggleSource={handleToggleSource}
-            onToggleAll={handleToggleAll}
-            onAddSource={handleAddSource}
-            onDeleteSource={handleDeleteSource}
-            onRenameSource={handleRenameSource}
-            width={leftWidth}
-            isResizing={isResizingLeft}
-            userId={user?.id}
-            noteId={activeNotebookId}
-            onDocumentUploaded={handleDocumentUploaded}
-          />
-          
-          {/* Left Drag Handle */}
-          {isSourcesOpen && (
-            <div
-              className="w-1 hover:w-1.5 -ml-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
-              onMouseDown={startResizingLeft}
-            />
-          )}
-          
-          <ChatPanel
-            messages={messages}
-            isLeftOpen={isSourcesOpen}
-            isRightOpen={isStudioOpen}
-            toggleLeft={toggleSources}
-            toggleRight={toggleStudio}
-            onClearHistory={handleClearChatHistory}
-            onSendMessage={handleSendMessage}
-            isLoading={isChatStreaming}
-            notebookId={activeNotebookId}
-          />
-          
-          {/* Right Drag Handle */}
-          {isStudioOpen && (
-            <div
-              className="w-1 hover:w-1.5 -mr-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
-              onMouseDown={startResizingRight}
-            />
-          )}
-
-          <StudioPanel
-            isOpen={isStudioOpen}
-            onClose={toggleStudio}
-            tools={STUDIO_TOOLS}
-            notes={notes}
-            onUpdateNote={handleUpdateNote}
-            onUpdateNoteFull={handleUpdateNoteFull}
-            onDeleteNote={handleDeleteNote}
-            onAddNote={handleAddNote}
-            width={rightWidth}
-            isResizing={isResizingRight}
-            sources={sources}
-            userId={user?.id}
-            noteId={activeNotebookId}
-            onPlayAudio={handlePlayAudio}
-            miniPlayerVisible={miniPlayerVisible}
-            miniPlayerData={miniPlayerData}
-            onCloseMiniPlayer={handleCloseMiniPlayer}
-            onExpandAudioPlayer={handleExpandAudioPlayer}
-          />
-        </main>
       )}
+
+      <Routes>
+        <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} />} />
+
+        <Route
+          path="/home"
+          element={
+            <HomePage
+              featuredNotebooks={featuredNotebooks}
+              recentNotebooks={recentNotebooks}
+              onSelectNotebook={handleSelectNotebook}
+              onCreateNotebook={handleCreateNotebook}
+              onUpdateNotebook={handleUpdateNotebook}
+              onDeleteNotebook={handleDeleteNotebook}
+              isLoading={notebooksLoading}
+              error={notebooksError}
+              folders={folders}
+              onCreateFolder={handleCreateFolder}
+              onUpdateFolder={handleUpdateFolder}
+              onDeleteFolder={handleDeleteFolder}
+              onMoveNotebookToFolder={handleMoveNotebookToFolder}
+              loadFolders={loadFolders}
+              onRequireAuth={(errorMessage) => {
+                setAuthError(errorMessage);
+                setShowLoginModal(true);
+              }}
+            />
+          }
+        />
+
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute>
+              <main className="flex-1 overflow-auto">
+                <BillingPage onBack={handleBillingBack} />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/notebook/:id"
+          element={
+            <ProtectedRoute requireNotebookAccess={true}>
+              <main className="flex-1 flex overflow-hidden relative animate-in fade-in duration-300">
+                <SourcesPanel
+                  isOpen={isSourcesOpen}
+                  onClose={toggleSources}
+                  sources={sources}
+                  onToggleSource={handleToggleSource}
+                  onToggleAll={handleToggleAll}
+                  onAddSource={handleAddSource}
+                  onDeleteSource={handleDeleteSource}
+                  onRenameSource={handleRenameSource}
+                  width={leftWidth}
+                  isResizing={isResizingLeft}
+                  userId={user?.id}
+                  noteId={activeNotebookId}
+                  onDocumentUploaded={handleDocumentUploaded}
+                />
+
+                {/* Left Drag Handle */}
+                {isSourcesOpen && (
+                  <div
+                    className="w-1 hover:w-1.5 -ml-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
+                    onMouseDown={startResizingLeft}
+                  />
+                )}
+
+                <ChatPanel
+                  messages={messages}
+                  isLeftOpen={isSourcesOpen}
+                  isRightOpen={isStudioOpen}
+                  toggleLeft={toggleSources}
+                  toggleRight={toggleStudio}
+                  onClearHistory={handleClearChatHistory}
+                  onSendMessage={handleSendMessage}
+                  isLoading={isChatStreaming}
+                  notebookId={activeNotebookId}
+                />
+
+                {/* Right Drag Handle */}
+                {isStudioOpen && (
+                  <div
+                    className="w-1 hover:w-1.5 -mr-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
+                    onMouseDown={startResizingRight}
+                  />
+                )}
+
+                <StudioPanel
+                  isOpen={isStudioOpen}
+                  onClose={toggleStudio}
+                  tools={STUDIO_TOOLS}
+                  notes={notes}
+                  onUpdateNote={handleUpdateNote}
+                  onUpdateNoteFull={handleUpdateNoteFull}
+                  onDeleteNote={handleDeleteNote}
+                  onAddNote={handleAddNote}
+                  width={rightWidth}
+                  isResizing={isResizingRight}
+                  sources={sources}
+                  userId={user?.id}
+                  noteId={activeNotebookId}
+                  onPlayAudio={handlePlayAudio}
+                  miniPlayerVisible={miniPlayerVisible}
+                  miniPlayerData={miniPlayerData}
+                  onCloseMiniPlayer={handleCloseMiniPlayer}
+                  onExpandAudioPlayer={handleExpandAudioPlayer}
+                />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
     </div>
     </>
   );
 };
 
-// Wrapper component with AuthProvider
+// Wrapper component with AuthProvider and BrowserRouter
 const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ThemeProvider>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 };
 

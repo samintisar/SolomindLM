@@ -17,11 +17,11 @@ export const LANDING_CONTENT = {
     description: "SolomindLM accepts virtually any content type and transforms it into interactive study materials",
     formats: [
       { name: "PDFs", icon: "FileText" },
-      { name: "YouTube Videos", icon: "Youtube" },
+      { name: "Social Media Videos", icon: "Youtube" },
       { name: "Websites", icon: "Globe" },
-      { name: "Audio Files", icon: "AudioLines" },
-      { name: "Text Files", icon: "File" },
-      { name: "Markdown", icon: "FileCode" }
+      { name: "Slides", icon: "FileCode" },
+      { name: "Handwritten Notes", icon: "File" },
+      { name: "Text Files", icon: "File" }
     ]
   },
   howItWorks: {

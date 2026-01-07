@@ -8,13 +8,26 @@ interface BillingPageProps {
   onBack: () => void;
 }
 
-const features = [
-  '1,000 chat messages/day',
-  '500 flashcards/day',
-  '500 quizzes/day',
-  '200 reports/day',
-  '100 audio overviews/day',
-  '1,000 document uploads/day',
+const freeFeatures = [
+  '20 notebooks per account',
+  '20 sources per notebook',
+  '50 chat messages/day',
+  '5 flashcards/day',
+  '5 quizzes/day',
+  '5 reports/day',
+  '1 audio overview/day',
+  '5 written questions/day',
+];
+
+const proFeatures = [
+  '200 notebooks per account',
+  '100 sources per notebook',
+  '500 chat messages/day',
+  '100 flashcards/day',
+  '100 quizzes/day',
+  '100 reports/day',
+  '5 audio overviews/day',
+  '100 written questions/day',
 ];
 
 export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
@@ -194,18 +207,12 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
                   Included:
                 </p>
-                <div className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <span className="text-sm text-foreground">Basic features</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <span className="text-sm text-foreground">Limited daily usage</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <span className="text-sm text-foreground">Community support</span>
-                </div>
+                {freeFeatures.map((feature) => (
+                  <div key={feature} className="flex items-start gap-3">
+                    <Check className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <span className="text-sm text-foreground">{feature}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -247,7 +254,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
                   Everything included:
                 </p>
-                {features.map((feature) => (
+                {proFeatures.map((feature) => (
                   <div key={feature} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <span className="text-sm text-foreground">{feature}</span>
@@ -307,7 +314,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
                     Everything included:
                   </p>
-                  {features.map((feature) => (
+                  {proFeatures.map((feature) => (
                     <div key={feature} className="flex items-start gap-3">
                       <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                       <span className="text-sm text-foreground">{feature}</span>
