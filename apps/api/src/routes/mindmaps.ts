@@ -10,7 +10,6 @@ const CONFIG = {
   MINDMAP: {
     MIN_TITLE_LENGTH: 1,
     MAX_TITLE_LENGTH: 200,
-    MAX_DOCUMENTS: 10,
   },
 } as const;
 
@@ -36,7 +35,6 @@ function isValidUUID(value: string): boolean {
 function validateDocumentIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) &&
     ids.length > 0 &&
-    ids.length <= CONFIG.MINDMAP.MAX_DOCUMENTS &&
     ids.every(id => typeof id === 'string' && isValidUUID(id));
 }
 
@@ -108,9 +106,9 @@ router.post('/', rateLimiter('mindmap'), async (req: Request, res: Response) => 
       // #region agent log
       console.log('[DEBUG] mindmaps.ts:107 - documentIds validation failed', JSON.stringify({location:'mindmaps.ts:107',message:'documentIds validation failed',data:{documentIds,isArray:Array.isArray(documentIds),length:Array.isArray(documentIds)?documentIds.length:undefined,items:Array.isArray(documentIds)?documentIds.map((id,i)=>({index:i,value:id,type:typeof id,isValidUUID:typeof id==='string'&&isValidUUID(id)})):undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'}));
       // #endregion
-      
+
       return res.status(400).json({
-        error: `documentIds must be an array of 1-${CONFIG.MINDMAP.MAX_DOCUMENTS} valid UUIDs`
+        error: `documentIds must be a non-empty array of valid UUIDs`
       });
     }
 

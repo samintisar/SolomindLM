@@ -2,7 +2,7 @@ import { supabase } from '../../config/database.js';
 import { WrittenQuestionsGenerationService } from '../generation/WrittenQuestionsGenerationService.js';
 
 export interface WrittenQuestionsGenerationJobPayload {
-  writtenQuestionsId: string;
+  writtenQuestionId: string;  // Note: singular 'writtenQuestionId' to match jobHelpers.ts
   userId: string;
   notebookId: string;
   documentIds: string[];
@@ -18,13 +18,13 @@ export async function writtenQuestionsGenerationJob(
   payload: WrittenQuestionsGenerationJobPayload,
   helpers?: { addJob: (identifier: string, payload: unknown, options?: { runAt: Date }) => void }
 ) {
-  const { writtenQuestionsId, userId: _userId, notebookId: _notebookId, documentIds, questionCount, difficulty, questionType, focus, attempt = 0 } = payload;
+  const { writtenQuestionId, userId: _userId, notebookId: _notebookId, documentIds, questionCount, difficulty, questionType, focus, attempt = 0 } = payload;
 
   console.log(JSON.stringify({
     timestamp: new Date().toISOString(),
     service: 'WrittenQuestionsGeneration',
     action: 'process_job',
-    writtenQuestionsId,
+    writtenQuestionId,
     questionCount,
     difficulty,
     questionType,
@@ -38,7 +38,7 @@ export async function writtenQuestionsGenerationJob(
     await supabase
       .from('written_questions')
       .update({ status: 'generating' })
-      .eq('id', writtenQuestionsId);
+      .eq('id', writtenQuestionId);
 
     // Initialize service
     const service = new WrittenQuestionsGenerationService();
@@ -49,14 +49,14 @@ export async function writtenQuestionsGenerationJob(
         timestamp: new Date().toISOString(),
         service: 'WrittenQuestionsGeneration',
         action: 'status_update',
-        writtenQuestionsId,
+        writtenQuestionId,
         status,
       }));
 
       const validStatuses = ['generating', 'completed', 'failed'];
       const dbStatus = validStatuses.includes(status) ? status : 'generating';
 
-      await service.updateWrittenQuestionsStatus(writtenQuestionsId, dbStatus, {
+      await service.updateWrittenQuestionsStatus(writtenQuestionId, dbStatus, {
         phase: status,
         updatedAt: new Date().toISOString(),
       });
@@ -85,7 +85,7 @@ export async function writtenQuestionsGenerationJob(
 
     // Save written questions
     await service.saveWrittenQuestions({
-      writtenQuestionsId,
+      writtenQuestionId,
       title,
       questions: result.questions,
       metadata: {
@@ -100,7 +100,7 @@ export async function writtenQuestionsGenerationJob(
       timestamp: new Date().toISOString(),
       service: 'WrittenQuestionsGeneration',
       action: 'job_complete',
-      writtenQuestionsId,
+      writtenQuestionId,
       questionsCount: result.questions.length,
     }));
   } catch (error) {
@@ -108,7 +108,7 @@ export async function writtenQuestionsGenerationJob(
       timestamp: new Date().toISOString(),
       service: 'WrittenQuestionsGeneration',
       action: 'job_error',
-      writtenQuestionsId,
+      writtenQuestionId,
       error: error instanceof Error ? error.message : 'Unknown error',
       attempt,
       maxRetries,
@@ -130,7 +130,7 @@ export async function writtenQuestionsGenerationJob(
           timestamp: new Date().toISOString(),
           service: 'WrittenQuestionsGeneration',
           action: 'job_retry_scheduled',
-          writtenQuestionsId,
+          writtenQuestionId,
           nextAttempt: attempt + 1,
           retryAt,
         }));
@@ -140,7 +140,7 @@ export async function writtenQuestionsGenerationJob(
           timestamp: new Date().toISOString(),
           service: 'WrittenQuestionsGeneration',
           action: 'job_retry_failed',
-          writtenQuestionsId,
+          writtenQuestionId,
           error: addError instanceof Error ? addError.message : 'Unknown error',
         }));
       }
@@ -158,7 +158,7 @@ export async function writtenQuestionsGenerationJob(
           attempts: attempt + 1,
         },
       })
-      .eq('id', writtenQuestionsId);
+      .eq('id', writtenQuestionId);
 
     throw error;
   }

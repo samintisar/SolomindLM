@@ -16,7 +16,6 @@ const CONFIG = {
     MIN_TITLE_LENGTH: 1,
     MAX_TITLE_LENGTH: 200,
     MAX_FOCUS_LENGTH: 200,
-    MAX_DOCUMENTS: 10,
   },
 } as const;
 
@@ -62,7 +61,6 @@ function validateQuestionCount(count: number): boolean {
 function validateDocumentIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) &&
     ids.length > 0 &&
-    ids.length <= CONFIG.QUIZ.MAX_DOCUMENTS &&
     ids.every(id => typeof id === 'string' && isValidUUID(id));
 }
 
@@ -80,8 +78,21 @@ function validateTitle(title: unknown): boolean {
 // Helper function to parse questions_data from quiz row
 function parseQuestionsData(quiz: QuizRow) {
   if (!quiz.questions_data) return [];
-  const parsed = JSON.parse(quiz.questions_data);
-  return parsed.questions || [];
+
+  // Handle both string (needs parsing) and array (already parsed)
+  if (typeof quiz.questions_data === 'string') {
+    try {
+      const parsed = JSON.parse(quiz.questions_data);
+      return parsed.questions || [];
+    } catch {
+      return [];
+    }
+  } else if (Array.isArray(quiz.questions_data)) {
+    // questions_data is stored as array directly, return it
+    return quiz.questions_data;
+  }
+
+  return [];
 }
 
 // Map question count to actual numbers
@@ -160,7 +171,7 @@ router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
     // Validation: documentIds
     if (!validateDocumentIds(documentIds)) {
       return res.status(400).json({
-        error: `documentIds must be an array of 1-${CONFIG.QUIZ.MAX_DOCUMENTS} valid UUIDs`
+        error: `documentIds must be a non-empty array of valid UUIDs`
       });
     }
 
@@ -192,6 +203,20 @@ router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
 
     // Create quiz entry with generating status
     const title = 'Quiz';
+
+    // Build metadata object, excluding undefined values to avoid database errors
+    const metadata: Record<string, any> = {
+      documentIds,
+      questionCount,
+      difficulty,
+      phase: 'generating',
+      createdAt: new Date().toISOString(),
+    };
+    // Only include focus if it's defined
+    if (focus !== undefined) {
+      metadata.focus = focus;
+    }
+
     const { data: quiz, error: quizError } = await supabase
       .from('quizzes')
       .insert({
@@ -200,15 +225,8 @@ router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
         notebook_id: notebookId,
         title,
         status: 'generating',
-        questions_data: {},
-        metadata: {
-          documentIds,
-          questionCount,
-          difficulty,
-          focus,
-          phase: 'generating',
-          createdAt: new Date().toISOString(),
-        },
+        questions_data: [], // Store as empty array instead of empty object
+        metadata,
       })
       .select()
       .single();
@@ -228,10 +246,21 @@ router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
       difficulty,
     });
 
+    // Format response to match GET endpoints (include 'questions' field)
+    const questions = parseQuestionsData(quiz as QuizRow);
     return res.status(201).json({
       quizId,
       status: 'generating',
-      quiz,
+      quiz: {
+        id: quiz.id,
+        title: quiz.title,
+        questions,
+        userAnswers: quiz.metadata?.userAnswers || {},
+        status: quiz.status,
+        metadata: quiz.metadata,
+        created_at: quiz.created_at,
+        updated_at: quiz.updated_at,
+      },
     });
   } catch (error) {
     console.error('[Quizzes] Error creating quiz:', error);

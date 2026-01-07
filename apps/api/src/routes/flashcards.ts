@@ -16,7 +16,6 @@ const CONFIG = {
     MIN_TITLE_LENGTH: 1,
     MAX_TITLE_LENGTH: 200,
     MAX_TOPIC_LENGTH: 200,
-    MAX_DOCUMENTS: 10,
   },
 } as const;
 
@@ -55,7 +54,6 @@ function validateCardCount(count: number): boolean {
 function validateDocumentIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) &&
     ids.length > 0 &&
-    ids.length <= CONFIG.FLASHCARD.MAX_DOCUMENTS &&
     ids.every(id => typeof id === 'string' && isValidUUID(id));
 }
 
@@ -72,7 +70,21 @@ function validateTitle(title: unknown): boolean {
 
 // Helper function to parse cards_data from flashcard row
 function parseCardsData(flashcard: FlashcardRow) {
-  return flashcard.cards_data ? JSON.parse(flashcard.cards_data) : [];
+  if (!flashcard.cards_data) return [];
+
+  // Handle both string (needs parsing) and array (already parsed)
+  if (typeof flashcard.cards_data === 'string') {
+    try {
+      return JSON.parse(flashcard.cards_data);
+    } catch {
+      return [];
+    }
+  } else if (Array.isArray(flashcard.cards_data)) {
+    return flashcard.cards_data;
+  }
+
+  // Handle empty objects or other non-array values
+  return [];
 }
 
 // Helper function to add a job to Graphile Worker using the SDK
@@ -148,7 +160,7 @@ router.post('/', rateLimiter('flashcard'), async (req: Request, res: Response) =
     // Validation: documentIds
     if (!validateDocumentIds(documentIds)) {
       return res.status(400).json({
-        error: `documentIds must be an array of 1-${CONFIG.FLASHCARD.MAX_DOCUMENTS} valid UUIDs`
+        error: `documentIds must be a non-empty array of valid UUIDs`
       });
     }
 
@@ -180,6 +192,20 @@ router.post('/', rateLimiter('flashcard'), async (req: Request, res: Response) =
     // Create flashcard entry with generating status
     // Initial title is a simple placeholder - AI will generate a descriptive title later
     const title = 'Flashcards';
+
+    // Build metadata object, excluding undefined values to avoid database errors
+    const metadata: Record<string, any> = {
+      documentIds,
+      cardCount,
+      difficulty,
+      phase: 'generating',
+      createdAt: new Date().toISOString(),
+    };
+    // Only include topic if it's defined
+    if (topic !== undefined) {
+      metadata.topic = topic;
+    }
+
     const { data: flashcard, error: flashcardError } = await supabase
       .from('flashcards')
       .insert({
@@ -188,15 +214,8 @@ router.post('/', rateLimiter('flashcard'), async (req: Request, res: Response) =
         notebook_id: notebookId,
         title,
         status: 'generating',
-        cards_data: {},
-        metadata: {
-          documentIds,
-          cardCount,
-          difficulty,
-          topic,
-          phase: 'generating',
-          createdAt: new Date().toISOString(),
-        },
+        cards_data: [], // Store as empty array instead of empty object
+        metadata,
       })
       .select()
       .single();

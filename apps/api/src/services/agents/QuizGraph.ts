@@ -25,15 +25,15 @@ import {
 // ============================================================
 
 const QuizQuestionSchema = z.object({
-  question: z.string(),
-  options: z.array(z.string()).length(4), // exactly 4 options
-  answer: z.number(), // index of correct option (0-3)
-  hint: z.string(), // always required
-  explanation: z.string(), // always required
+  question: z.string().describe('The complete question text'),
+  options: z.array(z.string()).length(4).describe('Exactly 4 options for the question'),
+  answer: z.number().describe('Index of correct option (0-3)'),
+  hint: z.string().describe('A helpful hint that guides without revealing the answer'),
+  explanation: z.string().describe('Explanation of why the correct answer is right'),
 });
 
 const QuizQuestionArraySchema = z.object({
-  questions: z.array(QuizQuestionSchema),
+  questions: z.array(QuizQuestionSchema).describe('Array of quiz questions'),
 });
 
 export interface QuizQuestion {
@@ -66,25 +66,10 @@ const GRAPH_CONFIG = {
   REDUCE_TIMEOUT_MS: parseInt(env.QUIZ_REDUCE_TIMEOUT_MS || '240000', 10), // 4 minutes
   // Collapse recursion limit to prevent infinite loops
   MAX_COLLAPSE_DEPTH: 5,
-  // Minimum question block length for parsing (characters)
-  MIN_QUESTION_BLOCK_LENGTH: 50,
   // Topic allocation multiplier for question refinement
   // Allows topics to take up to 2x their proportional share to ensure diversity
   TOPIC_ALLOCATION_MULTIPLIER: 2.0,
 } as const;
-
-// Problematic phrases that indicate questions aren't self-contained
-// Only include phrases that are strong indicators of external content references
-// Note: "the following" is intentionally excluded - it's commonly used in "Which of the following..." questions
-const PROBLEMATIC_PHRASES = [
-  'the diagram',
-  'the above',
-  'as shown',
-  'this chart',
-  'that example',
-  'the table',
-  'this figure',
-] as const;
 
 // ============================================================
 // STATE DEFINITIONS
@@ -166,206 +151,35 @@ const getMapPrompt = (params: {
 
   return `You are an expert educator creating HIGH-QUALITY multiple-choice quiz questions from educational content.
 
-REQUIRED OUTPUT: You MUST generate exactly ${questionsPerChunk} questions from this section.
-This is part of a larger set targeting ${questionCount} total questions across all chunks.
+TARGET: Generate exactly ${questionsPerChunk} questions from this section (part of ${questionCount} total questions).
 
-**Difficulty Level: ${difficulty.toUpperCase()}** (${difficultyGuidance[difficulty] || difficulty})
-${focus ? `**Topic Focus:** ${focus}` : ''}
+**Difficulty: ${difficulty.toUpperCase()}** (${difficultyGuidance[difficulty] || difficulty})
+${focus ? `**Focus:** ${focus}` : ''}
 
-CRITICAL REQUIREMENTS:
-- You MUST output exactly ${questionsPerChunk} questions - no fewer, no more
-- **EXACTLY 4 OPTIONS ONLY** - Each question MUST have exactly 4 options labeled A), B), C), D)
-- **NO E) OPTION** - Never add a 5th option (E, F, etc.). Only A, B, C, D exist.
-- Distractors (wrong options) must be plausible but clearly incorrect to someone who studied
-- Avoid giving away the answer with obvious patterns (e.g., "All of the above")
-- Hints must GUIDE thinking without revealing the answer - point to relevant concepts, ask leading questions, or suggest what to consider
-- Explanations should clearly explain why the correct answer is right, connecting to key concepts
+REQUIREMENTS:
+- Each question MUST have exactly 4 options
+- Distractors must be plausible but clearly incorrect
+- Avoid obvious patterns like "All of the above"
+- Hints must guide without revealing the answer
+- Questions MUST be self-contained (include all necessary context)
 
-**SELF-CONTAINED QUESTIONS REQUIREMENT:**
-CRITICAL: Each question MUST BE COMPLETELY SELF-CONTAINED. The user will ONLY see the question text and options.
+**SELF-CONTAINED QUESTIONS:**
+If a question references diagrams, code, or scenarios:
+- Include the relevant content IN the question
+- NEVER use vague references like "the diagram" or "the following" without context
+- Example: BAD → "In the diagram shown..."  GOOD → "In the ER diagram with Entities A(id) and B(id)..."
 
-RULES FOR CONTEXT INCLUSION:
-1. If a question references a diagram, chart, or visual element:
-   - Describe it thoroughly within the question
-   - Example: "Based on the ER diagram showing Entities A(id) and B(id) with a one-to-many relationship from A to B..."
+**HINT GUIDELINES:**
+- Point to relevant concepts without giving the answer
+- Use phrases like "Consider...", "Recall that...", "Think about..."
+- Examples: "Consider the order of operations" or "Recall the definition of..."
 
-2. If a question references a code snippet:
-   - Include the relevant code in the question
-   - Example: "Consider this code: function foo() { return 1; } What does it return?"
+**EXPLANATION GUIDELINES:**
+- Explain WHY the correct answer is right
+- Connect to key concepts from the material
 
-3. If a question references a scenario/example:
-   - Summarize the key details within the question
-   - Example: "In a scenario where a user attempts login with invalid credentials..."
-
-4. NEVER use vague references like "the diagram", "the following", or "the above" without including the actual content
-   - REWRITE to include the actual content being referenced
-
-5. If context is too long (>300 chars):
-   - Summarize the essential parts needed to answer
-   - Example: "Given a database schema with Users(id, email) and Orders(user_id, total)..." instead of full schema
-
-BALANCE: Questions should be complete but concise. Include only what's necessary to answer correctly.
-
-**Hint Guidelines (IMPORTANT):**
-- DO NOT restate the answer in the hint
-- DO provide conceptual guidance (e.g., "Consider the chronological order of events" or "Think about the geographical location mentioned")
-- DO suggest what information to look for in the question
-- DO use phrases like "Refer to...", "Recall that...", "Consider the..."
-
-**Format each question as:**
-
-EXAMPLE 1 - Formula Reference:
-Q: Using the formula F = ma, if a force of 100N is applied to a 10kg object, what is the acceleration?
-A) 0.1 m/s²
-B) 10 m/s²
-C) 100 m/s²
-D) 1000 m/s²
-ANSWER: B
-HINT: Rearrange the formula to solve for acceleration: a = F/m
-EXPLANATION: a = 100N / 10kg = 10 m/s²
-
-EXAMPLE 2 - Code Reference:
-Q: Consider this JavaScript code: const arr = [1, 2, 3]; arr.push(4); What is arr.length?
-A) 3
-B) 4
-C) undefined
-D) TypeError
-ANSWER: B
-HINT: The push() method adds an element to the array.
-EXPLANATION: After push(4), the array contains [1, 2, 3, 4], so length is 4.
-
-EXAMPLE 3 - Context-Heavy Reference:
-Q: A reaction produces 50g of product from 100g of reactant. What is the percent yield if the theoretical maximum is 80g?
-A) 37.5%
-B) 50%
-C) 62.5%
-D) 80%
-ANSWER: C
-HINT: Percent yield = (actual / theoretical) × 100
-EXPLANATION: (50g / 80g) × 100 = 62.5%
-
-Your question:
-Q: [your question text - COMPLETE AND SELF-CONTAINED with all necessary context]
-A) [option 1]
-B) [option 2]
-C) [option 3]
-D) [option 4]
-ANSWER: [A/B/C/D]
-HINT: [guiding hint that points to relevant concepts WITHOUT revealing the answer]
-EXPLANATION: [why the correct answer is right, connecting to key concepts]
-
-Content:
-${chunk}
-
-QUESTIONS:`;
-};
-
-const getReducePrompt = (params: {
-  content: string;
-  questionCount: number;
-  difficulty: string;
-  focus?: string;
-}): string => {
-  const { content, questionCount, difficulty, focus } = params;
-
-  return `You are selecting quiz questions for a study set. Your goal is to create a DIVERSE & HIGH-QUALITY set that covers ALL major topics.
-
-CRITICAL REQUIREMENT - READ CAREFULLY:
-You MUST select questions from DIFFERENT topics. Do NOT select more than 2 questions from any single topic.
-If there are 8+ topics available, select 1-2 questions from each topic.
-Your goal is MAXIMUM TOPIC DIVERSITY, not maximum questions on one topic.
-
-QUALITY FILTER:
-- Prioritize questions that are self-contained (include all necessary context)
-- Avoid questions with vague references like "the diagram", "the example", "the above", or "the following" without embedded context
-- When selecting between similar questions, choose the one that includes more complete context
-
-TASK:
-1. First, mentally identify 6-10 distinct topics in the content below
-2. Then select ${questionCount} questions distributed EVENLY across those topics
-3. Example: If you need 20 questions and have 5 topics, select 4 from each topic
-
-Difficulty: ${difficulty}
-${focus ? `User preference: ${focus} (but still maintain diversity)` : ''}
-
-IMPORTANT OUTPUT FORMAT REQUIREMENTS:
-- Your output must contain EXACTLY ${questionCount} questions
-- Start immediately with the first question - NO preamble, introduction, or summary
-- End after the last question - NO postamble or closing statement
-- Use the EXACT format shown below (each question must have Q:, A), B), C), D), ANSWER:, HINT:, EXPLANATION:)
-
-EXPECTED FORMAT (copy this exactly):
-Q: [question text]
-A) [option 1]
-B) [option 2]
-C) [option 3]
-D) [option 4]
-ANSWER: [A/B/C/D]
-HINT: [hint text]
-EXPLANATION: [explanation text]
-
-Q: [next question]
-A) [option 1]
-B) [option 2]
-C) [option 3]
-D) [option 4]
-ANSWER: [A/B/C/D]
-HINT: [hint text]
-EXPLANATION: [explanation text]
-
-[continue for all ${questionCount} questions]
-
-AVAILABLE QUESTIONS:
-${content}`;
-};
-
-// Stricter version of reduce prompt for retries when initial attempt fails
-const getReducePromptStrict = (params: {
-  content: string;
-  questionCount: number;
-  difficulty: string;
-  focus?: string;
-}): string => {
-  const { content, questionCount, difficulty, focus } = params;
-
-  return `You are selecting quiz questions for a study set.
-
-CRITICAL: Your previous output was NOT in the correct format. Follow these instructions EXACTLY.
-
-OUTPUT FORMAT RULES (MUST FOLLOW):
-1. Start IMMEDIATELY with "Q:" - NO introduction, preamble, or summary
-2. Each question MUST have exactly 4 options labeled A), B), C), D)
-3. Each question MUST have ANSWER:, HINT:, and EXPLANATION: fields
-4. Output EXACTLY ${questionCount} questions - no more, no less
-5. End after the last question - NO closing statement
-
-WRONG (do NOT do this):
-❌ "Here are 30 questions..."
-❌ "I have selected the following questions..."
-❌ "Below is a diverse set..."
-❌ Any introduction or conclusion text
-
-CORRECT (do this instead):
-✅ Q: What is...?
-✅ A) Option 1
-✅ B) Option 2
-✅ C) Option 3
-✅ D) Option 4
-✅ ANSWER: A
-✅ HINT: Consider...
-✅ EXPLANATION: The correct answer...
-
-Q: [next question]
-A) [option]
-...
-
-DIFFERENT TOPICS REQUIRED: Select from different topics, max 2 per topic.
-
-Difficulty: ${difficulty}
-${focus ? `User preference: ${focus}` : ''}
-
-AVAILABLE QUESTIONS:
-${content}`;
+Content to create questions from:
+${chunk}`;
 };
 
 // ============================================================
@@ -552,10 +366,16 @@ export class QuizGraph {
 
     let output: string;
     try {
+      // Use structured output for reliable question generation
+      const structuredLlm = this.fastLlm.withStructuredOutput<QuizQuestionResponse>(
+        QuizQuestionArraySchema,
+        { name: 'quiz_questions' }
+      );
+
       // Timeout + Retry wrapper for resilient LLM calls
-      const response = await invokeWithRetry(
+      const response: QuizQuestionResponse = await invokeWithRetry(
         () => invokeWithTimeout(
-          () => this.fastLlm.invoke([
+          () => structuredLlm.invoke([
             new SystemMessage('You are a professional educator creating multiple-choice quiz questions.'),
             new HumanMessage(prompt),
           ]),
@@ -578,7 +398,8 @@ export class QuizGraph {
         'QuizMap'
       );
 
-      output = response.content.toString();
+      // Serialize questions as JSON for downstream processing
+      output = JSON.stringify(response.questions);
     } catch (error) {
       // Graceful fallback on permanent failure
       const errorContext = {
@@ -596,14 +417,18 @@ export class QuizGraph {
 
       logError(errorContext, 'Map process failed');
 
-      output = `- Main Topics: Error processing chunk
-- Error: ${error instanceof Error ? error.message : 'Unknown error'}
-- Chunk Info: ${chunk.length} chars, difficulty: ${difficulty}
-
-[Fallback: This chunk could not be processed due to timeout or error. The quiz generation will continue with other chunks.]`;
+      output = '[]'; // Return empty array on failure
     }
 
-    const questionsGenerated = output.split('Q:').length - 1;
+    // Parse to count questions
+    let questionsGenerated = 0;
+    try {
+      const parsed = JSON.parse(output) as QuizQuestion[];
+      questionsGenerated = parsed.length;
+    } catch {
+      questionsGenerated = 0;
+    }
+
     const elapsed = Date.now() - startTime;
 
     // Structured logging complete
@@ -628,16 +453,28 @@ export class QuizGraph {
     console.log('[QuizGraph] ===== COLLAPSE PHASE =====');
     console.log('='.repeat(80));
 
+    // Parse map outputs to count questions
+    const mapOutputsDetails = state.mapOutputs.map((output, idx) => {
+      let questions = 0;
+      try {
+        const parsed = JSON.parse(output) as QuizQuestion[];
+        questions = parsed.length;
+      } catch {
+        questions = 0;
+      }
+      return {
+        index: idx,
+        length: output.length,
+        questions,
+        preview: output.substring(0, 100).replace(/\n/g, ' '),
+      };
+    });
+
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       phase: 'collapse',
       mapOutputsReceived: state.mapOutputs.length,
-      mapOutputsDetails: state.mapOutputs.map((output, idx) => ({
-        index: idx,
-        length: output.length,
-        questions: output.split('Q:').length - 1,
-        preview: output.substring(0, 100).replace(/\n/g, ' '),
-      })),
+      mapOutputsDetails,
     }, null, 2));
 
     if (!state.mapOutputs || state.mapOutputs.length === 0) {
@@ -742,28 +579,23 @@ export class QuizGraph {
   }
 
   private async collapseGroup(group: string[]): Promise<string> {
-    const combined = group.join('\n\n---\n\n');
+    // Parse and merge all question arrays
+    const allQuestions: QuizQuestion[] = [];
+    for (const output of group) {
+      try {
+        const parsed = JSON.parse(output) as QuizQuestion[];
+        allQuestions.push(...parsed);
+      } catch (e) {
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'collapse_group_parse_error',
+          error: e instanceof Error ? e.message : String(e),
+        }, 'Failed to parse question array in collapseGroup');
+      }
+    }
 
-    const prompt = `Condense these quiz questions into a consolidated set while retaining all unique and high-quality questions. Keep the exact same format:\n\n${combined}\n\nCONDENSED QUESTIONS:`;
-
-    // Use timeout and retry for collapse operations
-    const response = await invokeWithRetry(
-      () => invokeWithTimeout(
-        () => this.smartLlm.invoke([
-          new SystemMessage('You are a skilled content consolidator.'),
-          new HumanMessage(prompt),
-        ]),
-        GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-        'QuizCollapseGroup'
-      ),
-      {
-        maxAttempts: 2,
-        baseDelayMs: 1000,
-      },
-      'QuizCollapseGroup'
-    );
-
-    return response.content.toString();
+    // Return merged array as JSON
+    return JSON.stringify(allQuestions);
   }
 
   // Node: Reduce phase
@@ -778,12 +610,39 @@ export class QuizGraph {
       focus: state.focus || 'none',
     });
 
-    const combined = state.collapsedOutputs.join('\n\n---\n\n');
-    const totalQuestionsBefore = combined.split('Q:').length - 1;
+    // Parse all question arrays from collapsed outputs
+    const allQuestions: QuizQuestion[] = [];
+    for (const output of state.collapsedOutputs) {
+      try {
+        const parsed = JSON.parse(output) as QuizQuestion[];
+        allQuestions.push(...parsed);
+      } catch (e) {
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'reduce_parse_error',
+          error: e instanceof Error ? e.message : String(e),
+        }, 'Failed to parse question array in reduce');
+      }
+    }
+
+    const totalQuestionsBefore = allQuestions.length;
+
+    // If we have no questions, fail
+    if (totalQuestionsBefore === 0) {
+      logError({
+        agent: 'QuizGraph',
+        phase: 'reduce',
+        error: 'No questions generated',
+      }, 'CRITICAL: No questions in collapsed outputs!');
+      return {
+        ...state,
+        finalOutput: [],
+        status: 'failed',
+      };
+    }
 
     // Determine if we should use LLM for intelligent selection
     // Skip LLM if we're close to target count (within 10%) OR if we have fewer questions than target
-    // (asking LLM to output more questions than exist causes it to hallucinate malformed content)
     const shouldSkipLLM = (totalQuestionsBefore >= state.questionCount * 0.9 &&
                           totalQuestionsBefore <= state.questionCount * 1.1) ||
                           totalQuestionsBefore < state.questionCount;
@@ -796,129 +655,15 @@ export class QuizGraph {
       logInfo({
         agent: 'QuizGraph',
         phase: 'reduce_skip_llm',
-        combinedLength: combined.length,
         totalQuestionsExtracted: totalQuestionsBefore,
         targetQuestionCount: state.questionCount,
         reason: skipReason,
-      }, `Skipping LLM reduce, parsing ${totalQuestionsBefore} questions directly from map outputs...`);
+      }, `Skipping LLM reduce, using ${totalQuestionsBefore} questions directly...`);
 
-      const questions = this.fallbackParseQuizQuestions(combined);
-
-      // Validate quiz quality
-      const validation = validateQuiz(JSON.stringify(questions), state.questionCount);
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'reduce_after_parsing',
-        questionsParsed: questions.length,
-        validation: {
-          isValid: validation.isValid,
-          warnings: validation.warnings,
-          score: validation.score,
-        },
-      }, `Parsed ${questions.length} questions from map outputs`);
-
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'reduce',
-        questionsGenerated: questions.length,
-        targetQuestionCount: state.questionCount,
-      }, `Generated ${questions.length} questions (target: ${state.questionCount})`);
-
-      if (questions.length === 0) {
-        logError({
-          agent: 'QuizGraph',
-          phase: 'reduce',
-          error: 'No questions generated',
-          totalQuestionsBefore,
-        }, `CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions!`);
-        return {
-          ...state,
-          finalOutput: [],
-          status: 'failed',
-        };
-      }
-
-      // Post-processing: enforce exact question count
-      if (questions.length > state.questionCount) {
-        logInfo({
-          agent: 'QuizGraph',
-          phase: 'reduce_refinement',
-          currentCount: questions.length,
-          targetCount: state.questionCount,
-        }, `Have ${questions.length} questions, need exactly ${state.questionCount}. Running fast topic-based refinement.`);
-
-        const refined = this.refineQuestionSelectionFast(questions, state.questionCount);
-
-        // Log final refined questions
-        logInfo({
-          agent: 'QuizGraph',
-          phase: 'reduce_final',
-          finalQuestionCount: refined.length,
-          finalQuestions: refined.map((q, idx) => ({
-            index: idx + 1,
-            question: q.question,
-            optionsCount: q.options.length,
-            answer: q.answer,
-          })),
-        });
-
-        logBanner(
-          {
-            agent: 'QuizGraph',
-            phase: 'generation_complete',
-            finalQuestionCount: refined.length,
-            targetQuestionCount: state.questionCount,
-          },
-          'GENERATION COMPLETE'
-        );
-
-        return {
-          ...state,
-          finalOutput: refined,
-          status: 'completed',
-        };
-      }
-
-      if (questions.length < state.questionCount) {
-        logWarn({
-          agent: 'QuizGraph',
-          phase: 'reduce',
-          generatedCount: questions.length,
-          targetCount: state.questionCount,
-        }, `Generated ${questions.length} questions, target was ${state.questionCount}. Accepting fewer.`);
-      }
-
-      // Log final questions
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'reduce_final',
-        finalQuestionCount: questions.length,
-        finalQuestions: questions.map((q, idx) => ({
-          index: idx + 1,
-          question: q.question,
-          optionsCount: q.options.length,
-          answer: q.answer,
-        })),
-      });
-
-      logBanner(
-        {
-          agent: 'QuizGraph',
-          phase: 'generation_complete',
-          finalQuestionCount: questions.length,
-          targetQuestionCount: state.questionCount,
-        },
-        'GENERATION COMPLETE'
-      );
-
-      return {
-        ...state,
-        finalOutput: questions,
-        status: 'completed',
-      };
+      return this.finalizeQuestions(allQuestions, state);
     }
 
-    // Use smart LLM for intelligent selection
+    // Use smart LLM for intelligent selection with structured output
     const retryCount = state.reduceRetryCount ?? 0;
 
     logInfo({
@@ -930,30 +675,26 @@ export class QuizGraph {
       reason: 'Question count outside acceptable range, using LLM for selection',
     }, `Using smart LLM for intelligent question selection from ${totalQuestionsBefore} questions [Attempt ${retryCount + 1}/2]...`);
 
-    const sanitizedFocus = state.focus ? sanitizeUserInput(state.focus) : undefined;
-
-    // Use stricter prompt on retries
-    const prompt = retryCount > 0
-      ? getReducePromptStrict({
-          content: combined,
-          questionCount: state.questionCount,
-          difficulty: state.difficulty,
-          focus: sanitizedFocus,
-        })
-      : getReducePrompt({
-          content: combined,
-          questionCount: state.questionCount,
-          difficulty: state.difficulty,
-          focus: sanitizedFocus,
-        });
-
-    let llmOutput: string;
     try {
-      const response = await invokeWithRetry(
+      // Use structured output for reliable question selection
+      const structuredLlm = this.smartLlm.withStructuredOutput<QuizQuestionResponse>(
+        QuizQuestionArraySchema,
+        { name: 'quiz_selection' }
+      );
+
+      // Create a simplified prompt for selection
+      const selectionPrompt = this.getSelectionPrompt({
+        questions: allQuestions,
+        targetCount: state.questionCount,
+        difficulty: state.difficulty,
+        focus: state.focus,
+      });
+
+      const response: QuizQuestionResponse = await invokeWithRetry(
         () => invokeWithTimeout(
-          () => this.smartLlm.invoke([
+          () => structuredLlm.invoke([
             new SystemMessage('You are a quiz curator selecting diverse, high-quality questions for study sets.'),
-            new HumanMessage(prompt),
+            new HumanMessage(selectionPrompt),
           ]),
           GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
           'QuizReduce'
@@ -973,15 +714,19 @@ export class QuizGraph {
         'QuizReduce'
       );
 
-      llmOutput = response.content.toString();
-
       logInfo({
         agent: 'QuizGraph',
         phase: 'reduce_llm_success',
-        outputLength: llmOutput.length,
-      }, `LLM selection completed, output: ${llmOutput.length} chars`);
+        selectedCount: response.questions.length,
+      }, `LLM selection completed, selected ${response.questions.length} questions`);
+
+      if (response.questions.length === 0) {
+        throw new Error('LLM returned zero questions');
+      }
+
+      return this.finalizeQuestions(response.questions, state);
     } catch (error) {
-      // Fallback to parsing all questions if LLM fails
+      // Fallback to direct selection if LLM fails
       logError({
         agent: 'QuizGraph',
         phase: 'reduce_llm_failed',
@@ -989,13 +734,25 @@ export class QuizGraph {
           name: error.name,
           message: error.message,
         } : String(error),
-      }, `LLM reduce failed, falling back to direct parsing`);
+      }, `LLM reduce failed, falling back to direct selection`);
 
-      llmOutput = combined;
+      // Use topic-based refinement to select from all questions
+      const refined = this.refineQuestionSelectionFast(allQuestions, state.questionCount);
+
+      if (refined.length === 0 && retryCount < 1) {
+        // Retry if we got nothing
+        return new Send('reduce', {
+          ...state,
+          reduceRetryCount: retryCount + 1,
+        } as any);
+      }
+
+      return this.finalizeQuestions(refined, state);
     }
+  }
 
-    const questions = this.fallbackParseQuizQuestions(llmOutput);
-
+  // Helper method to finalize and return questions
+  private finalizeQuestions(questions: QuizQuestion[], state: OverallStateType): Partial<OverallStateType> {
     // Validate quiz quality
     const validation = validateQuiz(JSON.stringify(questions), state.questionCount);
     logInfo({
@@ -1007,7 +764,7 @@ export class QuizGraph {
         warnings: validation.warnings,
         score: validation.score,
       },
-    }, `Parsed ${questions.length} questions after LLM selection`);
+    }, `Finalizing ${questions.length} questions`);
 
     logInfo({
       agent: 'QuizGraph',
@@ -1015,40 +772,6 @@ export class QuizGraph {
       questionsGenerated: questions.length,
       targetQuestionCount: state.questionCount,
     }, `Generated ${questions.length} questions (target: ${state.questionCount})`);
-
-    if (questions.length === 0) {
-      // Retry with stricter prompt if we haven't exceeded max retries
-      const MAXReduce_RETRIES = 1; // Allow 1 retry (total 2 attempts)
-      if (retryCount < MAXReduce_RETRIES) {
-        logWarn({
-          agent: 'QuizGraph',
-          phase: 'reduce',
-          error: 'No questions parsed from LLM output',
-          totalQuestionsBefore,
-          currentAttempt: retryCount + 1,
-        }, `LLM output produced 0 parsable questions. Retrying with stricter prompt...`);
-
-        // Return a Send to re-route to reduce with incremented retry count
-        return new Send('reduce', {
-          ...state,
-          reduceRetryCount: retryCount + 1,
-        } as any);
-      }
-
-      // Final failure after all retries exhausted
-      logError({
-        agent: 'QuizGraph',
-        phase: 'reduce',
-        error: 'No questions generated after all retry attempts',
-        totalQuestionsBefore,
-        totalAttempts: retryCount + 1,
-      }, `CRITICAL: No questions generated despite ${totalQuestionsBefore} input questions after ${retryCount + 1} attempts!`);
-      return {
-        ...state,
-        finalOutput: [],
-        status: 'failed',
-      };
-    }
 
     // Post-processing: enforce exact question count
     if (questions.length > state.questionCount) {
@@ -1130,165 +853,35 @@ export class QuizGraph {
     };
   }
 
-  // Clean explanation field by removing LLM artifacts
-  private cleanExplanation(explanation: string): string {
-    if (!explanation) return 'The correct answer follows from the material.';
+  // Helper method to create selection prompt
+  private getSelectionPrompt(params: {
+    questions: QuizQuestion[];
+    targetCount: number;
+    difficulty: string;
+    focus?: string;
+  }): string {
+    const { questions, targetCount, difficulty, focus } = params;
 
-    let cleaned = explanation.trim();
+    // Create a compact representation of available questions
+    const questionsList = questions.map((q, idx) =>
+      `Q${idx + 1}: ${q.question.substring(0, 100)}...`
+    ).join('\n');
 
-    // Remove trailing "---" patterns
-    cleaned = cleaned.replace(/---\s*$/gm, '');
-    cleaned = cleaned.replace(/\n---\n[\s\S]*$/g, '');
+    return `Select exactly ${targetCount} diverse questions from the available pool.
 
-    // Remove trailing LLM artifacts like "Here are X multiple-choice questions..."
-    cleaned = cleaned.replace(/\n\nHere are \d+ multiple[- ]choice quiz questions based on.*/gi, '');
-    cleaned = cleaned.replace(/\n\nHere are \d+ questions based on.*/gi, '');
+CRITICAL REQUIREMENTS:
+- Select EXACTLY ${targetCount} questions - no more, no less
+- Select from DIFFERENT topics (max 2 questions per topic)
+- Prioritize self-contained questions
+- Return the FULL, COMPLETE question objects for your selections
 
-    // Remove other common LLM artifacts
-    cleaned = cleaned.replace(/\n\n---\n\n/g, '\n');
-    cleaned = cleaned.replace(/---$/gm, '');
+Difficulty: ${difficulty}
+${focus ? `Focus: ${focus} (but maintain diversity)` : ''}
 
-    // Clean up any double newlines left over
-    cleaned = cleaned.replace(/\n\n\n+/g, '\n\n');
+AVAILABLE QUESTIONS (${questions.length} total):
+${questionsList}
 
-    return cleaned.trim();
-  }
-
-  /**
-   * Validate that a question is self-contained (doesn't reference external content)
-   * Returns true if the question is self-contained, false if it has problematic phrases.
-   *
-   * Smart validation: Only reject questions that are BOTH short (<150 chars) AND have problematic phrases.
-   * Longer questions likely include the necessary context embedded.
-   */
-  private validateSelfContained(question: QuizQuestion): boolean {
-    const text = question.question.toLowerCase();
-    const hasProblematicPhrase = PROBLEMATIC_PHRASES.some(phrase => text.includes(phrase));
-    const isShort = text.length < 150;
-
-    // Only reject if both short AND has problematic phrases
-    // (longer questions likely have context embedded despite the phrases)
-    const shouldReject = hasProblematicPhrase && isShort;
-
-    if (shouldReject) {
-      logWarn({
-        agent: 'QuizGraph',
-        phase: 'validate_self_contained',
-        questionPreview: question.question.substring(0, 100),
-        questionLength: text.length,
-        foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
-      }, 'Question rejected: short with potential external references');
-    } else if (hasProblematicPhrase && !isShort) {
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'validate_self_contained_accept',
-        questionPreview: question.question.substring(0, 100),
-        questionLength: text.length,
-        foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
-      }, 'Question accepted: has phrases but is long enough to include context');
-    }
-
-    return !shouldReject;
-  }
-
-  // Fallback parser for quiz questions
-  private fallbackParseQuizQuestions(content: string): QuizQuestion[] {
-    logInfo({
-      agent: 'QuizGraph',
-      phase: 'fallback_parse',
-      contentLength: content.length,
-    }, 'Attempting manual parsing...');
-
-    const questions: QuizQuestion[] = [];
-    let failedParseCount = 0;
-    let failedValidationCount = 0;
-
-    // Split by Q: markers
-    const questionBlocks = content.split(/Q:\s*/).filter(block => block.trim().length > GRAPH_CONFIG.MIN_QUESTION_BLOCK_LENGTH);
-
-    for (const block of questionBlocks) {
-      try {
-        const questionText = block.split(/\n[A]\)|\nA\)/)[0]?.trim() || '';
-        if (!questionText) continue;
-
-        // Extract options - Fixed duplicate regex pattern
-        const optionsMatch = block.match(/A\)\s*([\s\S]+?)(?:\nB\)|\nB\))/);
-        const optionA = optionsMatch?.[1]?.trim() || '';
-
-        const bMatch = block.match(/B\)\s*([\s\S]+?)(?:\nC\)|\nC\))/);
-        const optionB = bMatch?.[1]?.trim() || '';
-
-        const cMatch = block.match(/C\)\s*([\s\S]+?)(?:\nD\)|\nD\))/);
-        const optionC = cMatch?.[1]?.trim() || '';
-
-        const dMatch = block.match(/D\)\s*([\s\S]+?)(?:\nANSWER:|\nANSWER\))/);
-        const optionD = dMatch?.[1]?.trim() || '';
-
-        // Validate that we have exactly 4 non-empty options
-        const options = [optionA, optionB, optionC, optionD];
-        const validOptionsCount = options.filter(o => o.length > 0).length;
-
-        if (validOptionsCount !== 4) {
-          failedParseCount++;
-          logWarn({
-            agent: 'QuizGraph',
-            phase: 'fallback_parse_validation',
-            questionPreview: questionText.substring(0, 100),
-            optionsFound: validOptionsCount,
-          }, `Question has invalid number of options (${validOptionsCount}/4), skipping`);
-          continue;
-        }
-
-        // Extract answer
-        const answerMatch = block.match(/ANSWER:\s*([ABCD])/i);
-        const answerLetter = answerMatch?.[1]?.toUpperCase();
-        const answerMap: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
-        const answerIndex = answerLetter ? answerMap[answerLetter] : 0;
-
-        // Extract hint
-        const hintMatch = block.match(/HINT:\s*([\s\S]+?)(?:\nEXPLANATION:|\nEXPLANATION\))/);
-        const hint = hintMatch?.[1]?.trim() || 'Consider the key concepts in this question.';
-
-        // Extract explanation
-        const explanationMatch = block.match(/EXPLANATION:\s*([\s\S]+?)(?=\nQ:|\n\nQ:|$)/);
-        const rawExplanation = explanationMatch?.[1]?.trim() || 'The correct answer follows from the material.';
-        const explanation = this.cleanExplanation(rawExplanation);
-
-        const question: QuizQuestion = {
-          question: questionText,
-          options: [optionA, optionB, optionC, optionD],
-          answer: answerIndex,
-          hint,
-          explanation,
-        };
-
-        // Validate that question is self-contained
-        if (!this.validateSelfContained(question)) {
-          failedValidationCount++;
-          continue; // Skip questions that aren't self-contained
-        }
-
-        questions.push(question);
-      } catch (e) {
-        failedParseCount++;
-        logWarn({
-          agent: 'QuizGraph',
-          phase: 'fallback_parse_error',
-          error: e instanceof Error ? e.message : String(e),
-        }, 'Failed to parse question block');
-      }
-    }
-
-    logInfo({
-      agent: 'QuizGraph',
-      phase: 'fallback_parse_complete',
-      extractedCount: questions.length,
-      failedParseCount,
-      failedValidationCount,
-      totalBlocks: questionBlocks.length,
-    }, `Extracted ${questions.length} questions (${failedParseCount} failed to parse, ${failedValidationCount} failed validation)`);
-
-    return questions;
+Return the complete selected questions as a JSON array.`;
   }
 
   // Fast refinement: topic-based sampling

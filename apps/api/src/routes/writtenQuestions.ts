@@ -13,7 +13,6 @@ const CONFIG = {
     MIN_TITLE_LENGTH: 1,
     MAX_TITLE_LENGTH: 200,
     MAX_FOCUS_LENGTH: 500,
-    MAX_DOCUMENTS: 10,
   },
 } as const;
 
@@ -77,7 +76,6 @@ function validateQuestionCount(count: number): boolean {
 function validateDocumentIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) &&
     ids.length > 0 &&
-    ids.length <= CONFIG.WRITTEN_QUESTIONS.MAX_DOCUMENTS &&
     ids.every(id => typeof id === 'string' && isValidUUID(id));
 }
 
@@ -98,11 +96,16 @@ function parseQuestionsData(wq: WrittenQuestionsRow): WrittenQuestion[] {
     return [];
   }
 
-  // Handle both string (during initial insert) and object (Supabase jsonb auto-parse)
+  // Handle both string (during initial insert) and object/array (Supabase jsonb auto-parse)
   try {
     const data = typeof wq.questions_data === 'string'
       ? JSON.parse(wq.questions_data)
       : wq.questions_data;
+
+    // Handle structured format { questions: [...] } or direct array [...]
+    if (Array.isArray(data)) {
+      return data;
+    }
     return data.questions || [];
   } catch (error) {
     console.error('[WrittenQuestions] Error parsing questions_data:', error);
@@ -191,7 +194,7 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
     // Validation: documentIds
     if (!validateDocumentIds(documentIds)) {
       return res.status(400).json({
-        error: `documentIds must be an array of 1-${CONFIG.WRITTEN_QUESTIONS.MAX_DOCUMENTS} valid UUIDs`
+        error: `documentIds must be a non-empty array of valid UUIDs`
       });
     }
 
@@ -223,6 +226,21 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
 
     // Create written questions entry with generating status
     const title = 'Written Questions';
+
+    // Build metadata object, excluding undefined values to avoid database errors
+    const metadata: Record<string, any> = {
+      documentIds,
+      questionCount: actualQuestionCount,
+      difficulty,
+      questionType,
+      phase: 'generating',
+      createdAt: new Date().toISOString(),
+    };
+    // Only include focus if it's defined
+    if (focus !== undefined) {
+      metadata.focus = focus;
+    }
+
     const { data: writtenQuestions, error: createError } = await supabase
       .from('written_questions')
       .insert({
@@ -232,15 +250,7 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
         title,
         status: 'generating',
         questions_data: [],
-        metadata: {
-          documentIds,
-          questionCount: actualQuestionCount,
-          difficulty,
-          questionType,
-          focus,
-          phase: 'generating',
-          createdAt: new Date().toISOString(),
-        },
+        metadata,
       })
       .select()
       .single();
@@ -259,10 +269,21 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
       questionCount: actualQuestionCount,
     });
 
+    // Format response to match GET endpoints (include 'questions' field)
+    const questions = parseQuestionsData(writtenQuestions as WrittenQuestionsRow);
     return res.status(201).json({
       writtenQuestionsId,
       status: 'generating',
-      writtenQuestions,
+      writtenQuestions: {
+        id: writtenQuestions.id,
+        title: writtenQuestions.title,
+        questions,
+        userAnswers: writtenQuestions.metadata?.userAnswers || {},
+        status: writtenQuestions.status,
+        metadata: writtenQuestions.metadata,
+        created_at: writtenQuestions.created_at,
+        updated_at: writtenQuestions.updated_at,
+      },
     });
   } catch (error) {
     console.error('[WrittenQuestions] Error creating written questions:', error);

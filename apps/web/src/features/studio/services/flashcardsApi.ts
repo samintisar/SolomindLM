@@ -52,7 +52,25 @@ function getPreviewText(status: string, cardCount: number, metadata?: any): stri
  */
 function mapFlashcardToNote(dbFlashcard: any): FlashcardNote {
   // API returns 'flashcards' array (already parsed), or use 'cards_data' for raw DB responses
-  const flashcards: Flashcard[] = dbFlashcard.flashcards || (dbFlashcard.cards_data ? JSON.parse(dbFlashcard.cards_data) : []);
+  // cards_data might be a string (needs parsing) or already an object/array
+  const cardsData = dbFlashcard.cards_data;
+  let parsedCards: Flashcard[] = [];
+
+  if (dbFlashcard.flashcards) {
+    parsedCards = dbFlashcard.flashcards;
+  } else if (cardsData) {
+    if (typeof cardsData === 'string') {
+      try {
+        parsedCards = JSON.parse(cardsData);
+      } catch {
+        parsedCards = [];
+      }
+    } else if (Array.isArray(cardsData)) {
+      parsedCards = cardsData;
+    }
+  }
+
+  const flashcards: Flashcard[] = parsedCards;
   const actualCardCount = flashcards.length;
 
   return {

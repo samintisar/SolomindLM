@@ -14,7 +14,6 @@ const CONFIG = {
   AUDIO_OVERVIEW: {
     MIN_TITLE_LENGTH: 1,
     MAX_TITLE_LENGTH: 200,
-    MAX_DOCUMENTS: 10,
     VALID_AUDIO_TYPES: [
       'deep_dive',
       'brief',
@@ -64,7 +63,6 @@ function isValidLength(value: string): value is LengthType {
 function validateDocumentIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) &&
     ids.length > 0 &&
-    ids.length <= CONFIG.AUDIO_OVERVIEW.MAX_DOCUMENTS &&
     ids.every(id => typeof id === 'string' && isValidUUID(id));
 }
 
@@ -126,7 +124,7 @@ router.post('/', rateLimiter('audio_overview'), async (req: Request, res: Respon
     // Validation: documentIds
     if (!validateDocumentIds(documentIds)) {
       return res.status(400).json({
-        error: `documentIds must be an array of 1-${CONFIG.AUDIO_OVERVIEW.MAX_DOCUMENTS} valid UUIDs`
+        error: `documentIds must be a non-empty array of valid UUIDs`
       });
     }
 

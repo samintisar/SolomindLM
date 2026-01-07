@@ -25,7 +25,7 @@ export interface WrittenQuestionsResult {
 }
 
 export interface SaveWrittenQuestionsParams {
-  writtenQuestionsId: string;
+  writtenQuestionId: string;  // Note: singular to match jobHelpers.ts
   title: string;
   questions: WrittenQuestion[];
   metadata: any;
@@ -162,23 +162,28 @@ export class WrittenQuestionsGenerationService {
 
   async saveWrittenQuestions(params: SaveWrittenQuestionsParams): Promise<void> {
     try {
+      // Filter out undefined values from metadata to avoid database errors
+      const cleanMetadata = Object.fromEntries(
+        Object.entries(params.metadata).filter(([_, v]) => v !== undefined)
+      );
+
       const { error } = await supabase
         .from('written_questions')
         .update({
           title: params.title,
           questions_data: JSON.stringify({ questions: params.questions }),
           status: 'completed',
-          metadata: params.metadata,
+          metadata: cleanMetadata,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', params.writtenQuestionsId);
+        .eq('id', params.writtenQuestionId);
 
       if (error) {
         console.error('[WrittenQuestionsGeneration] Error saving written questions:', error);
         throw new Error(`Failed to save written questions: ${error.message}`);
       }
 
-      console.log(`[WrittenQuestionsGeneration] Written questions saved to ${params.writtenQuestionsId}`);
+      console.log(`[WrittenQuestionsGeneration] Written questions saved to ${params.writtenQuestionId}`);
     } catch (error) {
       console.error('[WrittenQuestionsGeneration] Error in saveWrittenQuestions:', error);
       throw error;
@@ -186,7 +191,7 @@ export class WrittenQuestionsGenerationService {
   }
 
   async updateWrittenQuestionsStatus(
-    writtenQuestionsId: string,
+    writtenQuestionId: string,
     status: string,
     metadata?: any
   ): Promise<void> {
@@ -197,13 +202,24 @@ export class WrittenQuestionsGenerationService {
       };
 
       if (metadata) {
-        updateData.metadata = metadata;
+        // Filter out undefined values to avoid database errors
+        const cleanMetadata = Object.fromEntries(
+          Object.entries(metadata).filter(([_, v]) => v !== undefined)
+        );
+        updateData.metadata = cleanMetadata;
       }
+
+      console.log('[WrittenQuestionsGeneration] Updating written_questions status:', {
+        writtenQuestionId,
+        status,
+        hasMetadata: !!metadata,
+        metadataKeys: metadata ? Object.keys(metadata) : [],
+      });
 
       const { error } = await supabase
         .from('written_questions')
         .update(updateData)
-        .eq('id', writtenQuestionsId);
+        .eq('id', writtenQuestionId);
 
       if (error) {
         console.error('[WrittenQuestionsGeneration] Error updating status:', error);

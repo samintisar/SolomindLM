@@ -84,23 +84,6 @@ export function useStudioHandlers({
       return;
     }
 
-    // Handle case where user has selected more than 10 sources
-    if (selectedDocumentIds.length > 10) {
-      const confirmed = confirm ? await confirm(
-        'Source Limit Warning',
-        `You have selected ${selectedDocumentIds.length} sources, but flashcard generation supports a maximum of 10 sources.\n\n` +
-        `Would you like to use the first 10 selected sources?`,
-        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
-      ) : true;
-
-      if (!confirmed) {
-        setIsFlashcardModalOpen(true);
-        return;
-      }
-
-      // Use only the first 10 selected sources
-      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
-    }
 
     if (!userId || !noteId) {
       alert('Authentication error. Please log in again.');
@@ -200,23 +183,6 @@ export function useStudioHandlers({
       return;
     }
 
-    // Handle case where user has selected more than 10 sources
-    if (selectedDocumentIds.length > 10) {
-      const confirmed = confirm ? await confirm(
-        'Source Limit Warning',
-        `You have selected ${selectedDocumentIds.length} sources, but quiz generation supports a maximum of 10 sources.\n\n` +
-        `Would you like to use the first 10 selected sources?`,
-        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
-      ) : true;
-
-      if (!confirmed) {
-        setIsQuizModalOpen(true);
-        return;
-      }
-
-      // Use only the first 10 selected sources
-      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
-    }
 
     if (!userId || !noteId) {
       alert('Authentication error. Please log in again.');
@@ -315,23 +281,6 @@ export function useStudioHandlers({
       return;
     }
 
-    // Handle case where user has selected more than 10 sources
-    if (selectedDocumentIds.length > 10) {
-      const confirmed = confirm ? await confirm(
-        'Source Limit Warning',
-        `You have selected ${selectedDocumentIds.length} sources, but report generation supports a maximum of 10 sources.\n\n` +
-        `Would you like to use the first 10 selected sources?`,
-        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
-      ) : true;
-
-      if (!confirmed) {
-        setIsReportModalOpen(true);
-        return;
-      }
-      
-      // Use only the first 10 selected sources
-      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
-    }
 
     if (!userId || !noteId) {
       alert('Authentication error. Please log in again.');
@@ -442,22 +391,6 @@ export function useStudioHandlers({
       return;
     }
 
-    // Handle case where user has selected more than 10 sources
-    if (selectedDocumentIds.length > 10) {
-      const confirmed = confirm ? await confirm(
-        'Source Limit Warning',
-        `You have selected ${selectedDocumentIds.length} sources, but mind map generation supports a maximum of 10 sources.\n\n` +
-        `Would you like to use the first 10 selected sources?`,
-        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
-      ) : true;
-      
-      if (!confirmed) {
-        return;
-      }
-      
-      // Use only the first 10 selected sources
-      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
-    }
 
     if (!userId || !noteId) {
       alert('Authentication error. Please log in again.');
@@ -578,23 +511,6 @@ export function useStudioHandlers({
       return;
     }
 
-    // Handle case where user has selected more than 10 sources
-    if (selectedDocumentIds.length > 10) {
-      const confirmed = confirm ? await confirm(
-        'Source Limit Warning',
-        `You have selected ${selectedDocumentIds.length} sources, but written questions generation supports a maximum of 10 sources.\n\n` +
-        `Would you like to use the first 10 selected sources?`,
-        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
-      ) : true;
-
-      if (!confirmed) {
-        setIsWrittenQuestionsModalOpen(true);
-        return;
-      }
-      
-      // Use only the first 10 selected sources
-      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
-    }
 
     if (!userId || !noteId) {
       alert('Authentication error. Please log in again.');
@@ -712,23 +628,6 @@ export function useStudioHandlers({
       return;
     }
 
-    // Handle case where user has selected more than 10 sources
-    if (selectedDocumentIds.length > 10) {
-      const confirmed = confirm ? await confirm(
-        'Source Limit Warning',
-        `You have selected ${selectedDocumentIds.length} sources, but audio overview generation supports a maximum of 10 sources.\n\n` +
-        `Would you like to use the first 10 selected sources?`,
-        { confirmText: 'Use First 10', cancelText: 'Cancel', variant: 'warning' }
-      ) : true;
-      
-      if (!confirmed) {
-        setIsAudioModalOpen(true);
-        return;
-      }
-      
-      // Use only the first 10 selected sources
-      selectedDocumentIds = selectedDocumentIds.slice(0, 10);
-    }
 
     if (!userId || !noteId) {
       alert('Authentication error. Please log in again.');

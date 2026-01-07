@@ -5,6 +5,7 @@ import { ChatPanel } from './features/chat/components/ChatPanel';
 import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
 import { BillingPage } from './features/billing/components/BillingPage';
+import { LandingPage } from './features/landing/LandingPage';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
@@ -26,7 +27,7 @@ import 'mind-elixir/style.css';
 const MIN_PANEL_WIDTH = 220;
 const MAX_PANEL_WIDTH = 900;
 
-type ViewState = 'home' | 'notebook' | 'billing';
+type ViewState = 'landing' | 'home' | 'notebook' | 'billing';
 
 // Transform Document API type to Source UI type
 function documentToSource(doc: Document): Source {
@@ -60,7 +61,7 @@ function documentToSource(doc: Document): Source {
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, signIn, signOut } = useAuth();
-  const [currentView, setCurrentView] = useState<ViewState>('home');
+  const [currentView, setCurrentView] = useState<ViewState>('landing');
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -781,8 +782,17 @@ const AppContent: React.FC = () => {
 
   // Navigation Handlers
   const handleLogoClick = () => {
-    setCurrentView('home');
+    setCurrentView('landing');
     setActiveNotebookId(null);
+  };
+
+  const handleGetStarted = () => {
+    if (!isAuthenticated) {
+      setAuthError('Please sign in to continue');
+      setShowLoginModal(true);
+    } else {
+      setCurrentView('home');
+    }
   };
 
   const handleBillingClick = () => {
@@ -984,7 +994,9 @@ const AppContent: React.FC = () => {
         hasSubscription={hasSubscription}
       />
 
-      {currentView === 'billing' ? (
+      {currentView === 'landing' ? (
+        <LandingPage onGetStarted={handleGetStarted} />
+      ) : currentView === 'billing' ? (
         <main className="flex-1 overflow-auto">
           <BillingPage onBack={handleBillingBack} />
         </main>

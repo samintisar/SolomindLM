@@ -12,7 +12,6 @@ const CONFIG = {
   REPORT: {
     MIN_TITLE_LENGTH: 1,
     MAX_TITLE_LENGTH: 200,
-    MAX_DOCUMENTS: 10,
     VALID_REPORT_TYPES: [
       'briefing',
       'study_guide',
@@ -55,7 +54,6 @@ function isValidReportType(value: string): value is ReportType {
 function validateDocumentIds(ids: unknown): ids is string[] {
   return Array.isArray(ids) &&
     ids.length > 0 &&
-    ids.length <= CONFIG.REPORT.MAX_DOCUMENTS &&
     ids.every(id => typeof id === 'string' && isValidUUID(id));
 }
 
@@ -131,7 +129,7 @@ router.post('/', rateLimiter('report'), async (req: Request, res: Response) => {
     // Validation: documentIds
     if (!validateDocumentIds(documentIds)) {
       return res.status(400).json({
-        error: `documentIds must be an array of 1-${CONFIG.REPORT.MAX_DOCUMENTS} valid UUIDs`
+        error: `documentIds must be a non-empty array of valid UUIDs`
       });
     }
 

@@ -132,30 +132,29 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
     return (
       <>
       <div
-        className="group grid grid-cols-[auto_1fr_auto_auto_48px] items-center gap-2 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-3 rounded-lg"
+        className="group grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] items-center gap-4 bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative p-4 rounded-xl"
       >
         {/* Clickable Overlay */}
-        <div onClick={() => onSelectNotebook(notebook)} className="absolute inset-0 z-0 rounded-lg" />
-
-        {/* Icon Column */}
-        <div className={`rounded-md ${notebook.coverColor} bg-opacity-15 flex items-center justify-center shrink-0 w-7 h-7`}>
-          <Icon className={`${(notebook.coverColor || '').replace('bg-', 'text-')} w-3.5 h-3.5`} />
-        </div>
+        <div onClick={() => onSelectNotebook(notebook)} className="absolute inset-0 z-0 rounded-xl" />
 
         {/* Title Column */}
-        <div className="min-w-0 z-10 pointer-events-none">
-          <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-sm">{notebook.title}</span>
+        <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">
+          <div className={`rounded-md ${notebook.coverColor} bg-opacity-15 flex items-center justify-center shrink-0 w-9 h-9`}>
+            <Icon className={`${(notebook.coverColor || '').replace('bg-', 'text-')} w-4 h-4`} />
+          </div>
+
+          <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-base">{notebook.title}</span>
         </div>
 
         {/* Date Column */}
-        <div className="text-muted-foreground font-mono z-10 pointer-events-none whitespace-nowrap text-xs">
+        <div className="text-muted-foreground font-mono z-10 pointer-events-none whitespace-nowrap text-sm">
           {formatDate(notebook.date)}
         </div>
 
         {/* Sources Column */}
-        <div className="z-10 pointer-events-none">
-          <div className="inline-flex items-center gap-1.5 bg-secondary/40 px-2 py-0.5 rounded text-xs font-medium text-muted-foreground">
-            {showAuthor ? <Globe className="w-2.5 h-2.5 shrink-0" /> : <FileText className="w-2.5 h-2.5 shrink-0" />}
+        <div className="text-right z-10 pointer-events-none">
+          <div className="inline-flex items-center gap-1.5 bg-secondary/40 hover:bg-secondary/60 px-2.5 py-1 rounded text-xs font-medium text-muted-foreground transition-colors">
+            {showAuthor ? <Globe className="w-3 h-3 shrink-0" /> : <FileText className="w-3 h-3 shrink-0" />}
             <span>{notebook.sourceCount}</span>
           </div>
         </div>
@@ -164,7 +163,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
         <div className="flex justify-end z-20 pointer-events-auto kebab-menu relative">
           <button
             onClick={(e) => { e.stopPropagation(); isMenuOpen ? onCloseMenu() : onToggleMenu(); }}
-            className={`p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 ${isMenuOpen ? 'opacity-100 bg-secondary' : 'opacity-0 group-hover:opacity-100'}`}
+            className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 ${isMenuOpen ? 'opacity-100 bg-secondary' : 'opacity-0 group-hover:opacity-100'}`}
           >
             <MoreVertical className="w-4 h-4 shrink-0" />
           </button>
