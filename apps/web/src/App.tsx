@@ -12,6 +12,8 @@ import { LoginModal } from './features/auth/components/LoginModal';
 import { AuthCallback } from './features/auth/components/AuthCallback';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
 import { ProtectedRoute } from './shared/components/ProtectedRoute';
+import { PrivacyPolicy } from './features/legal/components/PrivacyPolicy';
+import { TermsOfService } from './features/legal/components/TermsOfService';
 import { STUDIO_TOOLS } from './shared/constants';
 import { Source, Note, NotebookItem, Document, Message, FolderItem } from '@/shared/types/index';
 import { documentsApi } from './features/sources/services/documentsApi';
@@ -1005,8 +1007,8 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      <div className={`w-full bg-background text-foreground font-serif ${location.pathname === '/' ? '' : 'flex flex-col h-screen overflow-hidden'}`}>
-      {location.pathname !== '/' && (
+      <div className={`w-full bg-background text-foreground font-serif ${location.pathname === '/' || location.pathname === '/privacy' || location.pathname === '/terms' ? '' : 'flex flex-col h-screen overflow-hidden'}`}>
+      {location.pathname !== '/' && location.pathname !== '/privacy' && location.pathname !== '/terms' && (
         <Header
           title={notebookTitle}
           onRename={(newTitle: string) => {
@@ -1026,6 +1028,8 @@ const AppContent: React.FC = () => {
       <Routes>
         <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
 
         <Route
           path="/home"
