@@ -3,7 +3,8 @@
   "build": {
     "builder": "RAILPACK",
     "buildCommand": "pnpm install && pnpm --filter @solomindlm/api build",
-    "watchPatterns": ["apps/api/**"]
+    "watchPatterns": ["apps/api/**"],
+    "packageManager": "pnpm"
   },
   "deploy": {
     "startCommand": "node apps/api/dist/index.js",
