@@ -1,0 +1,17 @@
+{
+  "buildCommand": "cd ../.. && pnpm install && pnpm --filter @solomindlm/web build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" }
+      ]
+    }
+  ]
+}

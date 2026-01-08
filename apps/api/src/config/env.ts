@@ -88,7 +88,7 @@ const envSchema = z.object({
   CHAT_DOCUMENT_MAX_CHARS: z.string().default('3000'),
   SUPADATA_API_KEY: z.string(),
   TAVILY_API_KEY: z.string(),
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().default('http://localhost:5173,https://www.solomindlm.com,https://solomindlm.com,https://*.vercel.app'),
   // Graphile Worker Configuration
   WORKER_CONCURRENCY: z.string().default('5'),
   WORKER_INSTANCES: z.string().default('1'),

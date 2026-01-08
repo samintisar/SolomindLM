@@ -1,5 +1,6 @@
 import { Supadata, SupadataError } from '@supadata/js';
 import { env } from '../../config/env.js';
+import { validateUrl } from '../../utils/urlValidation.js';
 
 /**
  * SupadataLoaderService handles content extraction from:
@@ -82,6 +83,12 @@ export class SupadataLoaderService {
    * @returns Plain text transcript
    */
   async loadTranscript(url: string, lang = 'en'): Promise<string> {
+    // Validate URL to prevent SSRF attacks
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      throw new Error(`Invalid URL: ${validation.error}`);
+    }
+
     console.log(`[Supadata] Fetching transcript for: ${url} (lang: ${lang})`);
 
     try {
@@ -150,6 +157,12 @@ export class SupadataLoaderService {
    * @returns Plain text content of the page
    */
   async loadWebPage(url: string): Promise<string> {
+    // Validate URL to prevent SSRF attacks
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      throw new Error(`Invalid URL: ${validation.error}`);
+    }
+
     console.log(`[Supadata] Scraping web page: ${url}`);
 
     try {
@@ -177,6 +190,12 @@ export class SupadataLoaderService {
    * @returns Site map with URLs
    */
   async mapWebsite(url: string) {
+    // Validate URL to prevent SSRF attacks
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      throw new Error(`Invalid URL: ${validation.error}`);
+    }
+
     console.log(`[Supadata] Mapping website: ${url}`);
 
     try {
@@ -200,6 +219,12 @@ export class SupadataLoaderService {
    * @returns Crawl job results
    */
   async crawlWebsite(url: string, limit = 10) {
+    // Validate URL to prevent SSRF attacks
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      throw new Error(`Invalid URL: ${validation.error}`);
+    }
+
     console.log(`[Supadata] Crawling website: ${url} (limit: ${limit})`);
 
     try {

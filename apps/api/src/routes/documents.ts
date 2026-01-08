@@ -53,28 +53,6 @@ router.post('/upload', upload.single('file'), checkSourceLimit, async (req: Requ
     const { userId, noteId, type, source } = req.body;
     const file = req.file;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'baseline',
-        hypothesisId: 'H1',
-        location: 'apps/api/src/routes/documents.ts:34',
-        message: 'Upload request received',
-        data: {
-          type,
-          userIdProvided: Boolean(userId),
-          noteIdProvided: Boolean(noteId),
-          hasFile: Boolean(file),
-          fileSize: file?.size ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     if (!userId || !noteId) {
       return res.status(400).json({ error: 'userId and noteId are required' });
     }
@@ -95,28 +73,6 @@ router.post('/upload', upload.single('file'), checkSourceLimit, async (req: Requ
     let fileName = source || file?.originalname || '';
 
     if (type === 'file' && file) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'baseline',
-          hypothesisId: 'H2',
-          location: 'apps/api/src/routes/documents.ts:56',
-          message: 'Uploading file to Supabase storage',
-          data: {
-            fileName: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-            userId,
-            noteId,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-
       fileUrl = await storageService.uploadFile(
         userId,
         noteId,
@@ -124,25 +80,6 @@ router.post('/upload', upload.single('file'), checkSourceLimit, async (req: Requ
         file.originalname,
         file.mimetype
       );
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'baseline',
-          hypothesisId: 'H2',
-          location: 'apps/api/src/routes/documents.ts:65',
-          message: 'Supabase storage upload succeeded',
-          data: {
-            fileUrl,
-            fileName: file.originalname,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     }
 
     const { data: document, error } = await supabase
@@ -159,25 +96,6 @@ router.post('/upload', upload.single('file'), checkSourceLimit, async (req: Requ
       .select()
       .single();
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'baseline',
-        hypothesisId: 'H3',
-        location: 'apps/api/src/routes/documents.ts:66',
-        message: 'Inserted document row',
-        data: {
-          documentId: document?.id ?? null,
-          hasError: Boolean(error),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-
     if (error) {
       console.error('Database insert error:', error);
       return res.status(500).json({ error: 'Failed to create document record' });
@@ -191,25 +109,6 @@ router.post('/upload', upload.single('file'), checkSourceLimit, async (req: Requ
       type,
       source: source || fileUrl,
     });
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'baseline',
-        hypothesisId: 'H4',
-        location: 'apps/api/src/routes/documents.ts:85',
-        message: 'Graphile job queued',
-        data: {
-          documentId: document.id,
-          type,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     res.status(201).json({
       message: 'Document uploaded successfully',

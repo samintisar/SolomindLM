@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { subscriptionApi } from '../services/subscriptionApi';
 import type { SubscriptionStatusResponse } from '../types';
-import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
 interface BillingPageProps {
   onBack: () => void;
@@ -304,7 +304,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 ) : (
                   <button
                     onClick={() => handleUpgrade('year')}
-                    className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                    className="w-full mb-8 py-3 bg-white text-foreground font-medium rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     Get Started
                   </button>

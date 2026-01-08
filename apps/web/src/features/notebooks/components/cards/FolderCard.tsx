@@ -115,7 +115,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
     <>
     <div className="relative">
       <div
-        className={`group grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] items-center gap-4 p-4 rounded-xl bg-gradient-to-r ${folder.color || 'bg-blue-500'} bg-opacity-5 border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative`}
+        className={`group grid grid-cols-[minmax(200px,1fr)_100px_48px] items-center gap-4 p-4 rounded-xl bg-linear-to-r ${folder.color || 'bg-blue-500'} bg-opacity-5 border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative`}
       >
         <div onClick={() => onToggleExpansion()} className="absolute inset-0 z-0 rounded-xl" />
 
@@ -132,16 +132,11 @@ export const FolderCard: React.FC<FolderCardProps> = ({
         </div>
 
         {/* Notebook Count Column */}
-        <div className="text-sm text-muted-foreground font-mono z-10 pointer-events-none flex items-center gap-1.5">
-          <div className="w-5 h-5 flex items-center justify-center bg-secondary/50 rounded text-xs font-bold text-foreground">
-            {folder.notebookCount}
+        <div className="text-right z-10 pointer-events-none flex items-center justify-end gap-1.5">
+          <div className="inline-flex items-center gap-1.5">
+            <Folder className="w-3 h-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground font-medium">{folder.notebookCount}</span>
           </div>
-          <span className="text-xs">notebook{folder.notebookCount !== 1 ? 's' : ''}</span>
-        </div>
-
-        {/* Expand Indicator */}
-        <div className="flex justify-center z-10 pointer-events-none">
-          <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }} />
         </div>
 
         {/* Action Column */}

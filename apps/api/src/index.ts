@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import routes from './routes/index.js';
 import { errorHandler } from './middleware/error.js';
@@ -44,10 +45,70 @@ async function ensureGraphileWorkerSchema() {
 const app = express();
 const PORT = env.PORT || 3001;
 
-// Middleware
+// Parse allowed origins from environment variable
+const allowedOrigins = env.CORS_ORIGIN ? env.CORS_ORIGIN.split(',').map(o => o.trim()) : [];
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  noSniff: true,
+  xssFilter: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+// CORS configuration with origin validation and wildcard support
 app.use(cors({
-  origin: env.CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Check if origin matches any allowed pattern
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      // Exact match
+      if (allowedOrigin === origin) {
+        return true;
+      }
+
+      // Wildcard pattern support (e.g., https://*.vercel.app)
+      if (allowedOrigin.includes('*')) {
+        const pattern = allowedOrigin.replace(/\*/g, '[^.]+');
+        const regex = new RegExp(`^${pattern}$`);
+        return regex.test(origin);
+      }
+
+      return false;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.error(`[CORS] Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400, // 24 hours
 }));
 // JSON parser for all routes EXCEPT webhooks (webhooks need raw body for signature verification)
 app.use((req, res, next) => {
@@ -58,11 +119,17 @@ app.use((req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Request logging
+// Simple request logging
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();
 });
+
+// CSRF protection (optional - for state-changing operations)
+// Note: Since this uses JWT auth with Authorization headers, CSRF risk is minimal
+// Uncomment the following line to enable CSRF protection:
+// import { csrfProtection } from './middleware/csrf.js';
+// app.use('/api', csrfProtection);
 
 // Routes
 app.use('/api', routes);

@@ -62,7 +62,8 @@ function getFeatureDescription(id: string): string {
     reports: "Get comprehensive study guides and detailed reports",
     flashcards: "Generate flashcards automatically from any content",
     quiz: "Test your knowledge with AI-generated quizzes",
-    writtenQuestions: "Practice with written questions and detailed feedback"
+    writtenQuestions: "Practice with written questions and detailed feedback",
+    rag: "AI answers grounded in your sources for accurate, source-based learning"
   };
   return descriptions[id] || "";
 }

@@ -70,22 +70,6 @@ export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
 
   console.log(`[DocEmbedding] Processing document ${documentId} of type ${type}`);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: 'debug-session',
-      runId: 'baseline',
-      hypothesisId: 'H5',
-      location: 'apps/api/src/services/jobs/DocEmbeddingJob.ts:33',
-      message: 'DocEmbedding job started',
-      data: { documentId, userId, noteId, type },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   try {
     // Update status to processing
     await supabase
@@ -136,69 +120,15 @@ export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
 
         console.log(`[DocEmbedding] Generated signed URL for OCR processing: ${filePath}`);
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'baseline',
-            hypothesisId: 'H5',
-            message: 'Submitting signed URL to OCR service',
-            data: {
-              documentId,
-              fileName,
-              filePath,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-
         extractedText = await mistralOCR.processDocument(signedData.signedUrl);
       } else {
         console.log(`[DocEmbedding] File '${fileName}' is plaintext, reading directly (no OCR)`);
-
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'baseline',
-            hypothesisId: 'H5',
-            message: 'Reading plaintext file directly (skipping OCR)',
-            data: {
-              documentId,
-              fileName,
-              filePath,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
 
         extractedText = await storageService.downloadFileAsText(filePath);
       }
     } else if (type === 'url') {
       extractedText = await supadataLoader.loadWebPage(source);
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'baseline',
-        hypothesisId: 'H6',
-        location: 'apps/api/src/services/jobs/DocEmbeddingJob.ts:106',
-        message: 'Text extraction completed',
-        data: { documentId, extractedLength: extractedText?.length ?? 0 },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     if (!extractedText || extractedText.trim().length === 0) {
       throw new Error('No text extracted from document');
@@ -269,22 +199,6 @@ export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
 
     await vectorStore.storeChunks(documentId, userId, noteId, chunksWithEmbeddings);
     console.log(`[DocEmbedding] Stored ${chunksWithEmbeddings.length} chunks`);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'baseline',
-        hypothesisId: 'H7',
-        location: 'apps/api/src/services/jobs/DocEmbeddingJob.ts:140',
-        message: 'Vector store write completed',
-        data: { documentId, chunkCount: chunksWithEmbeddings.length },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // Update status to completed
     await supabase

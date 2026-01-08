@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowRight, Play, Sparkles } from 'lucide-react';
+import React from 'react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 
 interface HeroSectionProps {
@@ -7,29 +7,27 @@ interface HeroSectionProps {
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
-  const [isDemoPlaying, setIsDemoPlaying] = useState(false);
 
   return (
     <section className="flex flex-col items-center px-6 pt-56 pb-20 bg-background">
       <div className="max-w-5xl mx-auto text-center space-y-10">
         {/* Main Headline - Stronger Hook */}
-        <h1 className="text-5xl md:text-7xl font-sans font-bold text-foreground leading-tight animate-in fade-in duration-700 delay-150">
-          Turn Any Content Into{' '}
+        <h1 className="text-5xl md:text-7xl font-sans font-bold text-foreground" style={{ lineHeight: '1.15' }}>
+          Learn{' '}
           <span style={{
             background: 'linear-gradient(135deg, #f97316 0%, #fbbf24 50%, #fb7185 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text'
           }}>
-            Smart Study Tools
+            Anything
           </span>
-          <br />in Seconds
         </h1>
 
         {/* Subheadline - More Specific */}
         <p className="text-xl md:text-2xl text-muted-foreground font-serif leading-relaxed max-w-3xl mx-auto animate-in fade-in duration-700 delay-200">
-          Upload PDFs, videos, or articles. Get AI-generated flashcards, quizzes, and mind maps instantly.
-          <span className="text-foreground font-semibold"> Study smarter, not harder.</span>
+          Upload books, lecture slides, videos or websites to generate grounded learning materials.
+          <span className="text-foreground font-semibold"> AI that enhances your learning journey, not replaces your thinking.</span>
         </p>
 
         {/* CTA Buttons - More Compelling */}

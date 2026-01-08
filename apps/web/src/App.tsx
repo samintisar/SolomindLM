@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Header } from './shared/ui/Header';
 import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
@@ -60,7 +60,7 @@ function documentToSource(doc: Document): Source {
 }
 
 const AppContent: React.FC = () => {
-  const { user, isAuthenticated, isLoading, signIn, signOut } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
@@ -107,8 +107,8 @@ const AppContent: React.FC = () => {
 
   // Folders State
   const [folders, setFolders] = useState<FolderItem[]>([]);
-  const [foldersLoading, setFoldersLoading] = useState(false);
-  const [foldersError, setFoldersError] = useState<string | null>(null);
+  const [, setFoldersLoading] = useState(false);
+  const [, setFoldersError] = useState<string | null>(null);
 
   // Subscription State
   const [hasSubscription, setHasSubscription] = useState(false);

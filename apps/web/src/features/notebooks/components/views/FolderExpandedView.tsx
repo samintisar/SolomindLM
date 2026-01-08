@@ -6,6 +6,7 @@ interface FolderExpandedViewProps {
   folder: FolderItem;
   notebooks: NotebookItem[];
   isLoading: boolean;
+  viewMode: 'grid' | 'list';
   onSelectNotebook: (notebook: NotebookItem) => void;
   // Notebook handlers
   activeMenuId: string | null;
@@ -19,6 +20,7 @@ export const FolderExpandedView: React.FC<FolderExpandedViewProps> = ({
   folder,
   notebooks,
   isLoading,
+  viewMode,
   onSelectNotebook,
   activeMenuId,
   onOpenCustomize,
@@ -42,8 +44,9 @@ export const FolderExpandedView: React.FC<FolderExpandedViewProps> = ({
     );
   }
 
+  // Always use list view for notebooks within folders, regardless of parent viewMode
   return (
-    <div className="space-y-2 mt-2 pl-2 border-l-2 border-border/30">
+    <div className="space-y-1 mt-3">
       {notebooks.map((nb) => (
         <NotebookCard
           key={nb.id}

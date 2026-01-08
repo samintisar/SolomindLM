@@ -51,6 +51,12 @@ importers:
       cohere-ai:
         specifier: ^7.20.0
         version: 7.20.0
+      cookie:
+        specifier: ^1.0.2
+        version: 1.1.1
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
       cors:
         specifier: ^2.8.5
         version: 2.8.5
@@ -66,6 +72,9 @@ importers:
       graphile-worker:
         specifier: ^0.16.6
         version: 0.16.6(typescript@5.9.3)
+      helmet:
+        specifier: ^8.0.0
+        version: 8.1.0
       langchain:
         specifier: ^1.0.0
         version: 1.2.3(@langchain/core@1.1.8(openai@6.15.0(ws@8.18.3)(zod@3.25.76)))(openai@6.15.0(ws@8.18.3)(zod@3.25.76))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.0(zod@3.25.76))
@@ -82,6 +91,12 @@ importers:
         specifier: ^3.22.4
         version: 3.25.76
     devDependencies:
+      '@types/cookie':
+        specifier: ^0.6.0
+        version: 0.6.0
+      '@types/cookie-parser':
+        specifier: ^1.4.7
+        version: 1.4.10(@types/express@4.17.25)
       '@types/cors':
         specifier: ^2.8.17
         version: 2.8.19
@@ -1675,6 +1690,14 @@ packages:
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
 
+  '@types/cookie-parser@1.4.10':
+    resolution: {integrity: sha512-B4xqkqfZ8Wek+rCOeRxsjMS9OgvzebEzzLYw7NHYuvzb7IdxOkI0ZHGgeEBX4PUM7QGVvNSK60T3OvWj3YfBRg==}
+    peerDependencies:
+      '@types/express': '*'
+
+  '@types/cookie@0.6.0':
+    resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
+
   '@types/cors@2.8.19':
     resolution: {integrity: sha512-mFNylyeyqN93lfe/9CSxOGREz8cpzAhH+E93xJ4xWQf62V8sQ/24reV2nyzUWM6H6Xji+GGHpkbLe7pVoUEskg==}
 
@@ -2039,6 +2062,13 @@ packages:
   convict@6.2.4:
     resolution: {integrity: sha512-qN60BAwdMVdofckX7AlohVJ2x9UvjTNoKVXCL2LxFk1l7757EJqf1nySdMkPQer0bt8kQ5lQiyZ9/2NvrFBuwQ==}
     engines: {node: '>=6'}
+
+  cookie-parser@1.4.7:
+    resolution: {integrity: sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw==}
+    engines: {node: '>= 0.8.0'}
+
+  cookie-signature@1.0.6:
+    resolution: {integrity: sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==}
 
   cookie-signature@1.0.7:
     resolution: {integrity: sha512-NXdYc3dLr47pBkpUCHtKSwIOQXLVn8dZEuywboCOJY/osA0wFSLlSawr3KN8qXJEyX66FcONTH8EIlVuK0yyFA==}
@@ -2497,6 +2527,10 @@ packages:
 
   hastscript@9.0.1:
     resolution: {integrity: sha512-g7df9rMFX/SPi34tyGCyUBREQoKkapwdY/T04Qn9TDWfHhAYt4/I0gMVirzK5wEzeUqIjEB+LXC/ypb7Aqno5w==}
+
+  helmet@8.1.0:
+    resolution: {integrity: sha512-jOiHyAZsmnr8LqoPGmCjYAaiuWwjAPLgY8ZX2XrmHawt99/u1y6RgrZMTeoPfpUbV96HOalYgz1qzkRbw54Pmg==}
+    engines: {node: '>=18.0.0'}
 
   html-url-attributes@3.0.1:
     resolution: {integrity: sha512-ol6UPyBWqsrO6EJySPz2O7ZSr856WDrEzM5zMqp+FJJLGMW35cLYmmZnl0vztAZxRUoNZJFTCohfjuIJ8I4QBQ==}
@@ -5457,6 +5491,12 @@ snapshots:
     dependencies:
       '@types/node': 25.0.3
 
+  '@types/cookie-parser@1.4.10(@types/express@4.17.25)':
+    dependencies:
+      '@types/express': 4.17.25
+
+  '@types/cookie@0.6.0': {}
+
   '@types/cors@2.8.19':
     dependencies:
       '@types/node': 25.0.3
@@ -5879,6 +5919,13 @@ snapshots:
     dependencies:
       lodash.clonedeep: 4.5.0
       yargs-parser: 20.2.9
+
+  cookie-parser@1.4.7:
+    dependencies:
+      cookie: 0.7.2
+      cookie-signature: 1.0.6
+
+  cookie-signature@1.0.6: {}
 
   cookie-signature@1.0.7: {}
 
@@ -6489,6 +6536,8 @@ snapshots:
       hast-util-parse-selector: 4.0.0
       property-information: 7.1.0
       space-separated-tokens: 2.0.2
+
+  helmet@8.1.0: {}
 
   html-url-attributes@3.0.1: {}
 

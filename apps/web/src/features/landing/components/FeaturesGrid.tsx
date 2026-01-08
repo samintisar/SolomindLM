@@ -1,5 +1,5 @@
 import React from 'react';
-import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText } from 'lucide-react';
+import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText, Brain } from 'lucide-react';
 import { LANDING_CONTENT } from '../constants';
 
 export const FeaturesGrid: React.FC = () => {
@@ -11,6 +11,7 @@ export const FeaturesGrid: React.FC = () => {
       case 'flashcards': return Layers;
       case 'quiz': return HelpCircle;
       case 'writtenQuestions': return MessageSquareText;
+      case 'rag': return Brain;
       default: return HelpCircle;
     }
   };
@@ -23,6 +24,7 @@ export const FeaturesGrid: React.FC = () => {
       case 'flashcards': return 'text-orange-600';
       case 'quiz': return 'text-sky-600';
       case 'writtenQuestions': return 'text-emerald-600';
+      case 'rag': return 'text-violet-600';
       default: return 'text-primary';
     }
   };

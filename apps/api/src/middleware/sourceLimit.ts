@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/database.js';
 import { SOURCE_LIMITS } from '../config/rateLimits.js';
 import { rateLimitService } from '../services/RateLimitService.js';
+import { AppError } from './error.js';
 import type { UserTier } from '../types/rateLimit.js';
 
 interface SourceLimitErrorResponse {
@@ -17,6 +18,13 @@ interface SourceLimitErrorResponse {
   tier: UserTier;
   notebookId: string;
 }
+
+/**
+ * Configuration for fail-open vs fail-closed behavior
+ * In production, fail-closed is recommended for security
+ * In development, fail-open may be preferred for debugging
+ */
+const FAIL_CLOSED = process.env.NODE_ENV === 'production';
 
 /**
  * Middleware to check source count limit per notebook
@@ -48,7 +56,19 @@ export async function checkSourceLimit(
 
     if (countError) {
       console.error('[SourceLimit] Error counting sources:', countError);
-      // Fail open - allow request if count check fails
+
+      // Fail closed in production, fail open in development
+      if (FAIL_CLOSED) {
+        throw new AppError(
+          'Unable to verify source limit. Please try again later.',
+          503,
+          true,
+          'RATE_LIMIT_CHECK_FAILED'
+        );
+      }
+
+      // Log warning in development
+      console.warn('[SourceLimit] Fail-open: allowing request due to database error');
       next();
       return;
     }
@@ -80,8 +100,25 @@ export async function checkSourceLimit(
 
     next();
   } catch (error) {
+    // If it's an AppError, re-throw it to be handled by error middleware
+    if (error instanceof AppError) {
+      throw error;
+    }
+
     console.error('[SourceLimit] Error checking source limit:', error);
-    // Fail open - allow request if check fails
+
+    // Fail closed in production, fail open in development
+    if (FAIL_CLOSED) {
+      throw new AppError(
+        'Unable to verify source limit. Please try again later.',
+        503,
+        true,
+        'RATE_LIMIT_CHECK_FAILED'
+      );
+    }
+
+    // Log warning in development
+    console.warn('[SourceLimit] Fail-open: allowing request due to unexpected error');
     next();
   }
 }

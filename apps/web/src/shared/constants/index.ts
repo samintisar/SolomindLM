@@ -83,6 +83,7 @@ export const STUDIO_TOOLS: StudioTool[] = [
   { id: 'flashcards', label: 'Flashcards', iconName: 'Layers', color: 'text-orange-600' },
   { id: 'quiz', label: 'Quiz', iconName: 'HelpCircle', color: 'text-sky-600' },
   { id: 'writtenQuestions', label: 'Written Questions', iconName: 'MessageSquareText', color: 'text-emerald-600' },
+  { id: 'rag', label: 'Grounded RAG System', iconName: 'Brain', color: 'text-violet-600' },
 ];
 
 export const SAVED_NOTES: Note[] = [];
