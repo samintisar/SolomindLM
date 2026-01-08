@@ -26,61 +26,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const storedUser = localStorage.getItem('solomind_user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          // Verify session is still valid
-          const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${parsedUser.accessToken}`,
-            },
-          });
+  // Check for existing session
+  const checkSession = useCallback(async () => {
+    try {
+      const storedUser = localStorage.getItem('solomind_user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        // Verify session is still valid
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${parsedUser.accessToken}`,
+          },
+        });
 
-          if (response.ok) {
-            setUser(parsedUser);
-          } else {
-            // Session expired, try to refresh
-            if (parsedUser.refreshToken) {
-              try {
-                const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ refreshToken: parsedUser.refreshToken }),
-                });
+        if (response.ok) {
+          setUser(parsedUser);
+        } else {
+          // Session expired, try to refresh
+          if (parsedUser.refreshToken) {
+            try {
+              const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken: parsedUser.refreshToken }),
+              });
 
-                if (refreshResponse.ok) {
-                  const data = await refreshResponse.json();
-                  const refreshedUser = {
-                    ...parsedUser,
-                    accessToken: data.accessToken,
-                    refreshToken: data.refreshToken,
-                  };
-                  localStorage.setItem('solomind_user', JSON.stringify(refreshedUser));
-                  setUser(refreshedUser);
-                } else {
-                  localStorage.removeItem('solomind_user');
-                }
-              } catch {
+              if (refreshResponse.ok) {
+                const data = await refreshResponse.json();
+                const refreshedUser = {
+                  ...parsedUser,
+                  accessToken: data.accessToken,
+                  refreshToken: data.refreshToken,
+                };
+                localStorage.setItem('solomind_user', JSON.stringify(refreshedUser));
+                setUser(refreshedUser);
+              } else {
                 localStorage.removeItem('solomind_user');
               }
-            } else {
+            } catch {
               localStorage.removeItem('solomind_user');
             }
+          } else {
+            localStorage.removeItem('solomind_user');
           }
         }
-      } catch (error) {
-        console.error('Session check error:', error);
-      } finally {
-        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Session check error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
+  // Listen for storage changes (e.g., login from another tab or callback)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'solomind_user') {
+        if (e.newValue && !e.oldValue) {
+          // User logged in
+          const parsedUser = JSON.parse(e.newValue);
+          setUser(parsedUser);
+        } else if (!e.newValue && e.oldValue) {
+          // User logged out
+          setUser(null);
+        }
       }
     };
 
-    checkSession();
-  }, []);
+    // Also listen for custom auth events (for same-tab updates)
+    const handleAuthChange = () => {
+      checkSession();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('auth-change', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auth-change', handleAuthChange);
+    };
+  }, [checkSession]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<User> => {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {

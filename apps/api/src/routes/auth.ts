@@ -226,34 +226,45 @@ router.get('/google', async (req, res) => {
 
 /**
  * POST /api/auth/google/callback
- * Handle Google OAuth callback and exchange code for session
+ * Handle Google OAuth callback and verify tokens
  */
 router.post('/google/callback', async (req, res) => {
   try {
-    const { code } = req.body;
+    const { accessToken, refreshToken } = req.body;
 
-    if (!code) {
-      return res.status(400).json({ error: 'Authorization code is required' });
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Access token is required' });
     }
 
-    // Exchange the code for a session
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    // Verify the access token with Supabase
+    const { data: { user }, error: getUserError } = await supabase.auth.getUser(accessToken);
 
-    if (error) {
-      console.error('Code exchange error:', error);
-      return res.status(400).json({ error: error.message });
+    if (getUserError || !user) {
+      console.error('Token verification error:', getUserError);
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    if (!data.session) {
-      return res.status(400).json({ error: 'Failed to create session' });
+    // Get a fresh session using the refresh token if available
+    let sessionAccessToken = accessToken;
+    let sessionRefreshToken = refreshToken;
+
+    if (refreshToken) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+
+      if (!sessionError && sessionData.session) {
+        sessionAccessToken = sessionData.session.access_token;
+        sessionRefreshToken = sessionData.session.refresh_token;
+      }
     }
 
     res.json({
       message: 'Signed in with Google successfully',
-      userId: data.user.id,
-      email: data.user.email,
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
+      userId: user.id,
+      email: user.email,
+      accessToken: sessionAccessToken,
+      refreshToken: sessionRefreshToken,
     });
   } catch (error) {
     console.error('Google callback error:', error);

@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function AuthCallback() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the code from URL params (Supabase OAuth flow)
-        const code = searchParams.get('code');
-        const errorParam = searchParams.get('error');
-        const errorDescription = searchParams.get('error_description');
+        // Parse hash fragment for OAuth tokens
+        const hashFragment = window.location.hash.substring(1); // Remove leading #
+        const params = new URLSearchParams(hashFragment);
+
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        const errorParam = params.get('error');
+        const errorDescription = params.get('error_description');
 
         if (errorParam) {
           setError(errorDescription || errorParam);
@@ -23,17 +26,17 @@ export function AuthCallback() {
           return;
         }
 
-        if (!code) {
-          setError('No authorization code received');
+        if (!accessToken) {
+          setError('No authorization tokens received');
           setTimeout(() => navigate('/'), 3000);
           return;
         }
 
-        // Exchange code for session via backend
+        // Verify tokens with backend and get user info
         const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ accessToken, refreshToken }),
         });
 
         const data = await response.json();
@@ -52,7 +55,11 @@ export function AuthCallback() {
 
         localStorage.setItem('solomind_user', JSON.stringify(user));
 
-        // Redirect to home
+        // Dispatch event to notify AuthContext of login
+        window.dispatchEvent(new CustomEvent('auth-change'));
+
+        // Clean up URL hash and redirect to home
+        window.history.replaceState({}, '', window.location.pathname);
         navigate('/home');
       } catch (err) {
         console.error('Auth callback error:', err);
@@ -62,7 +69,7 @@ export function AuthCallback() {
     };
 
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [navigate]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background">
