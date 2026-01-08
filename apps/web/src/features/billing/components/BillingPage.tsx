@@ -216,6 +216,67 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
               </div>
             </div>
 
+            {/* Yearly */}
+            <div className="relative">
+              {/* Save Badge */}
+              <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-10">
+                <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
+                  Save 50%
+                </div>
+              </div>
+
+              <div className="bg-card border-2 border-primary rounded-xl p-8 flex flex-col shadow-lg hover:shadow-xl transition-all duration-300">
+                <div className="mb-6">
+                  <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">
+                    Yearly
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Best value – billed once per year
+                  </p>
+                </div>
+
+              <div className="mb-6">
+                <div className="flex items-baseline gap-2">
+                  <p className="text-5xl font-serif font-bold text-foreground">
+                    $7.50
+                    <span className="text-lg font-normal text-muted-foreground">/month</span>
+                  </p>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    ($90/year)
+                  </p>
+                </div>
+              </div>
+
+                {status?.hasSubscription ? (
+                  <button
+                    disabled={true}
+                    className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
+                  >
+                    Current Plan
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleUpgrade('year')}
+                    className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    Get Started
+                  </button>
+                )}
+
+                <div className="space-y-3 flex-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                    Everything included:
+                  </p>
+                  {proFeatures.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <span className="text-sm text-foreground">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Monthly */}
             <div className="bg-card border-2 border-border rounded-xl p-8 flex flex-col hover:shadow-lg hover:border-primary/50 transition-all duration-300">
               <div className="mb-6">
@@ -260,67 +321,6 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                     <span className="text-sm text-foreground">{feature}</span>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* Yearly */}
-            <div className="relative">
-              {/* Save Badge */}
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
-                  Save 50%
-                </div>
-              </div>
-
-              <div className="bg-card border-2 border-primary rounded-xl p-8 flex flex-col shadow-lg hover:shadow-xl transition-all duration-300">
-                <div className="mb-6">
-                  <h3 className="text-2xl font-serif font-bold mb-2 text-foreground">
-                    Yearly
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Best value – billed once per year
-                  </p>
-                </div>
-
-              <div className="mb-6">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-5xl font-serif font-bold text-foreground">
-                    $7.50
-                    <span className="text-lg font-normal text-muted-foreground">/month</span>
-                  </p>
-                  <p className="text-sm text-muted-foreground font-normal">
-                    ($90/year)
-                  </p>
-                </div>
-              </div>
-
-                {status?.hasSubscription ? (
-                  <button
-                    disabled={true}
-                    className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
-                  >
-                    Current Plan
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleUpgrade('year')}
-                    className="w-full mb-8 py-3 bg-white text-foreground font-medium rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    Get Started
-                  </button>
-                )}
-
-                <div className="space-y-3 flex-1">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                    Everything included:
-                  </p>
-                  {proFeatures.map((feature) => (
-                    <div key={feature} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>

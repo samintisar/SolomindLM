@@ -77,13 +77,13 @@ export const MOCK_MESSAGES: Message[] = [
 ];
 
 export const STUDIO_TOOLS: StudioTool[] = [
+  { id: 'rag', label: 'Grounded RAG System', iconName: 'Brain', color: 'text-violet-600' },
   { id: 'audio', label: 'Audio Overview', iconName: 'AudioLines', color: 'text-indigo-600' },
   { id: 'mindmap', label: 'Mind Map', iconName: 'GitFork', color: 'text-fuchsia-600' },
   { id: 'reports', label: 'Reports', iconName: 'FileText', color: 'text-amber-600' },
   { id: 'flashcards', label: 'Flashcards', iconName: 'Layers', color: 'text-orange-600' },
   { id: 'quiz', label: 'Quiz', iconName: 'HelpCircle', color: 'text-sky-600' },
   { id: 'writtenQuestions', label: 'Written Questions', iconName: 'MessageSquareText', color: 'text-emerald-600' },
-  { id: 'rag', label: 'Grounded RAG System', iconName: 'Brain', color: 'text-violet-600' },
 ];
 
 export const SAVED_NOTES: Note[] = [];

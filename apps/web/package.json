@@ -16,7 +16,7 @@
 		"@langchain/textsplitters": "^1.0.1",
 		"@stripe/stripe-js": "^8.6.0",
 		"cheerio": "^1.1.2",
-		"html2pdf.js": "^0.12.1",
+		"html2pdf.js": "^0.13.0",
 		"katex": "^0.16.27",
 		"langchain": "^1.2.3",
 		"lucide-react": "^0.460.0",
