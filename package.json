@@ -2,6 +2,10 @@
   "name": "solomindlm-monorepo",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0 <21.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "pnpm --filter \"./apps/**\" dev",
     "dev:web": "pnpm --filter @solomindlm/web dev",

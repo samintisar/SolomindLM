@@ -151,7 +151,7 @@ async function startServer() {
   // Ensure Graphile Worker schema exists
   await ensureGraphileWorkerSchema();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔═════════════════════════════════════════════════════════╗
 ║                                                         ║
