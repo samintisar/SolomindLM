@@ -20,7 +20,6 @@ export interface WrittenQuestionsResult {
     chunksProcessed: number;
     questionCount: number;
     difficulty: string;
-    questionType: string;
     focus?: string;
   };
 }
@@ -69,7 +68,7 @@ export class WrittenQuestionsGenerationService {
         chunks,
         questionCount,
         difficulty,
-        questionType,
+        questionType: questionType as 'short' | 'essay',
         focus,
         mapOutputs: [],
         collapsedOutputs: [],
@@ -107,7 +106,6 @@ export class WrittenQuestionsGenerationService {
           chunksProcessed: chunks.length,
           questionCount,
           difficulty,
-          questionType,
           focus,
         },
       };
@@ -189,23 +187,44 @@ export class WrittenQuestionsGenerationService {
         Object.entries(params.metadata).filter(([_, v]) => v !== undefined)
       );
 
-      const { error } = await supabase
+      // For JSONB columns, Supabase client expects JavaScript objects, not stringified JSON
+      const questionsData = { questions: params.questions };
+
+      console.log('[WrittenQuestionsGeneration] Saving written questions:', {
+        writtenQuestionId: params.writtenQuestionId,
+        title: params.title,
+        questionsCount: params.questions.length,
+        metadataKeys: Object.keys(cleanMetadata),
+      });
+
+      const { data, error } = await supabase
         .from('written_questions')
         .update({
           title: params.title,
-          questions_data: JSON.stringify({ questions: params.questions }),
+          questions_data: questionsData,
           status: 'completed',
           metadata: cleanMetadata,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', params.writtenQuestionId);
+        .eq('id', params.writtenQuestionId)
+        .select();
 
       if (error) {
-        console.error('[WrittenQuestionsGeneration] Error saving written questions:', error);
+        console.error('[WrittenQuestionsGeneration] Error saving written questions:', {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
         throw new Error(`Failed to save written questions: ${error.message}`);
       }
 
-      console.log(`[WrittenQuestionsGeneration] Written questions saved to ${params.writtenQuestionId}`);
+      if (!data || data.length === 0) {
+        console.error('[WrittenQuestionsGeneration] No rows updated - record may not exist:', params.writtenQuestionId);
+        throw new Error(`Failed to save written questions: No record found with id ${params.writtenQuestionId}`);
+      }
+
+      console.log(`[WrittenQuestionsGeneration] Written questions saved successfully to ${params.writtenQuestionId}`);
     } catch (error) {
       console.error('[WrittenQuestionsGeneration] Error in saveWrittenQuestions:', error);
       throw error;
@@ -224,11 +243,26 @@ export class WrittenQuestionsGenerationService {
       };
 
       if (metadata) {
-        // Filter out undefined values to avoid database errors
-        const cleanMetadata = Object.fromEntries(
+        // Fetch current metadata to merge with new metadata
+        const { data: current, error: fetchError } = await supabase
+          .from('written_questions')
+          .select('metadata')
+          .eq('id', writtenQuestionId)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found, but we'll handle that
+          console.error('[WrittenQuestionsGeneration] Error fetching current metadata:', fetchError);
+        }
+
+        // Merge existing metadata with new metadata
+        const existingMetadata = (current?.metadata as Record<string, any>) || {};
+        const cleanNewMetadata = Object.fromEntries(
           Object.entries(metadata).filter(([_, v]) => v !== undefined)
         );
-        updateData.metadata = cleanMetadata;
+        updateData.metadata = {
+          ...existingMetadata,
+          ...cleanNewMetadata,
+        };
       }
 
       console.log('[WrittenQuestionsGeneration] Updating written_questions status:', {

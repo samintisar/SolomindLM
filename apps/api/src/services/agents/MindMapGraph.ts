@@ -68,6 +68,8 @@ export interface FinalMindMap {
 const ChunkState = Annotation.Root({
   content: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => '' }),
   retryCount: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
+  chunkIndex: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
+  totalChunks: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
 });
 
 const OverallState = Annotation.Root({
@@ -99,6 +101,18 @@ const OverallState = Annotation.Root({
   }),
   finalOutput: Annotation<any>({ reducer: (x, y) => y ?? x, default: () => null }),
   status: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => 'generating' }),
+  // Progress tracking for streaming
+  progress: Annotation<{
+    phase: string;
+    percentage: number;
+    message: string;
+    chunksCompleted?: number;
+    totalChunks?: number;
+    conceptsExtracted?: number;
+  }>({
+    reducer: (_x, y?: any) => y ?? _x,
+    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -298,7 +312,17 @@ export class MindMapGraph {
       this.failureCount = 0;
 
       // Return concepts - LangGraph handles aggregation automatically
-      return { extractedConcepts: [extraction] };
+      return {
+        extractedConcepts: [extraction],
+        progress: {
+          phase: 'map_process',
+          percentage: Math.min(10 + ((state.chunkIndex ?? 0) * 40), 50),
+          message: `Chunk ${(state.chunkIndex ?? 0) + 1}/${state.totalChunks ?? '?'} complete: ${extraction.key_concepts.length} concepts`,
+          chunksCompleted: (state.chunkIndex ?? 0) + 1,
+          totalChunks: state.totalChunks,
+          conceptsExtracted: extraction.key_concepts.length,
+        },
+      };
 
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -373,6 +397,11 @@ export class MindMapGraph {
       return {
         finalOutput: { nodeData: { topic: 'Error: No Content', children: null } },
         status: 'failed',
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: 'Failed: No content extracted',
+        },
       };
     }
 
@@ -436,7 +465,16 @@ export class MindMapGraph {
         'MIND MAP GENERATION COMPLETE'
       );
 
-      return { finalOutput: { nodeData: parsedTree }, status: 'completed' };
+      return {
+        finalOutput: { nodeData: parsedTree },
+        status: 'completed',
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: Mind map "${parsedTree.topic}" with ${parsedTree.children?.length ?? 0} branches`,
+          conceptsExtracted: extractions.length,
+        },
+      };
 
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -456,9 +494,16 @@ export class MindMapGraph {
         phase: 'reduce_fallback',
       }, 'Using smart fallback');
 
+      const fallback = this.createSmartFallback(extractions);
       return {
-        finalOutput: this.createSmartFallback(extractions),
+        finalOutput: fallback,
         status: 'completed',
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: Mind map "${fallback.nodeData.topic}" (fallback mode)`,
+          conceptsExtracted: extractions.length,
+        },
       };
     }
   }
@@ -625,8 +670,13 @@ export class MindMapGraph {
     }, `Fanning out to ${packed.length} map nodes`);
 
     // Return Send array - LangGraph parallelizes automatically
-    return packed.map(chunk =>
-      new Send(NODES.MAP_PROCESS, { content: chunk, retryCount: 0 })
+    return packed.map((chunk, idx) =>
+      new Send(NODES.MAP_PROCESS, {
+        content: chunk,
+        retryCount: 0,
+        chunkIndex: idx,
+        totalChunks: packed.length,
+      })
     );
   }
 

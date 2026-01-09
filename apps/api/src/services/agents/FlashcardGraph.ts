@@ -120,6 +120,18 @@ export const OverallState = Annotation.Root({
     reducer: (_x: number, y?: number) => y ?? _x,
     default: () => 0,
   }),
+  // Progress tracking for streaming
+  progress: Annotation<{
+    phase: string;
+    percentage: number;
+    message: string;
+    chunksCompleted?: number;
+    totalChunks?: number;
+    cardsGenerated?: number;
+  }>({
+    reducer: (_x, y?: any) => y ?? _x,
+    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -351,6 +363,12 @@ export class FlashcardGraph {
       mapOutputs: state.mapOutputs || [],
       collapsedOutputs: state.collapsedOutputs || [],
       finalOutput: state.finalOutput || [],
+      progress: {
+        phase: 'split_chunks',
+        percentage: 5,
+        message: `Preparing ${state.chunks?.length || 0} chunks for processing`,
+        totalChunks: state.chunks?.length || 0,
+      },
     };
   }
 
@@ -522,6 +540,12 @@ export class FlashcardGraph {
     // Return single output in array - reducer will concatenate all outputs
     return {
       mapOutputs: [output],
+      progress: {
+        phase: 'map_process',
+        percentage: Math.min(10 + ((chunkIndex ?? 0) * 30), 60),
+        message: `Chunk ${(chunkIndex ?? 0) + 1} complete: ${questionCount} cards`,
+        chunksCompleted: (chunkIndex ?? 0) + 1,
+      },
     };
   }
 
@@ -571,6 +595,11 @@ export class FlashcardGraph {
         ...state,
         collapsedOutputs: state.mapOutputs,
         status: 'reducing',
+        progress: {
+          phase: 'collapse',
+          percentage: 70,
+          message: `Collected ${state.mapOutputs.length} chunk outputs`,
+        },
       };
     }
 
@@ -581,6 +610,11 @@ export class FlashcardGraph {
       ...state,
       collapsedOutputs: collapsed,
       status: 'reducing',
+      progress: {
+        phase: 'collapse',
+        percentage: 70,
+        message: `Collapsed ${state.mapOutputs.length} outputs into ${collapsed.length}`,
+      },
     };
   }
 
@@ -1055,6 +1089,12 @@ Select exactly ${targetCount} diverse flashcards:`;
         ...state,
         finalOutput: refined,
         status: 'completed',
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: ${refined.length} flashcards generated`,
+          cardsGenerated: refined.length,
+        },
       };
     }
 
@@ -1094,6 +1134,12 @@ Select exactly ${targetCount} diverse flashcards:`;
       ...state,
       finalOutput: flashcards,
       status: 'completed',
+      progress: {
+        phase: 'reduce',
+        percentage: 100,
+        message: `Completed: ${flashcards.length} flashcards generated`,
+        cardsGenerated: flashcards.length,
+      },
     };
   }
 

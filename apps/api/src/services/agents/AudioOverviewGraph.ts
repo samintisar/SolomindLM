@@ -85,6 +85,18 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'generating',
   }),
+  // Progress tracking for streaming
+  progress: Annotation<{
+    phase: string;
+    percentage: number;
+    message: string;
+    chunksCompleted?: number;
+    totalChunks?: number;
+    dialogueLines?: number;
+  }>({
+    reducer: (_x, y?: any) => y ?? _x,
+    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -93,6 +105,7 @@ export type OverallStateType = typeof OverallState.State;
 export interface ChunkProcessState {
   chunk: string;
   chunkIndex?: number;
+  totalChunks?: number;
   audioType: string;
   length: string;
   focus?: string;
@@ -454,7 +467,16 @@ export class AudioOverviewGraph {
       processingTimeMs: elapsed,
     });
 
-    return { mapOutputs: [output] };
+    return {
+      mapOutputs: [output],
+      progress: {
+        phase: 'extract_beats',
+        percentage: Math.min(10 + ((chunkIndex ?? 0) * 20), 40),
+        message: `Chunk ${(chunkIndex ?? 0) + 1}/${state.totalChunks ?? '?'} analyzed`,
+        chunksCompleted: (chunkIndex ?? 0) + 1,
+        totalChunks: state.totalChunks,
+      },
+    };
   }
 
   // ============================================================
@@ -482,6 +504,11 @@ export class AudioOverviewGraph {
       ...state,
       collapsedOutputs: collapsed,
       status: 'reducing',
+      progress: {
+        phase: 'collapse',
+        percentage: 50,
+        message: `Consolidated ${mapOutputs.length} chunks`,
+      },
     };
   }
 
@@ -729,6 +756,12 @@ ${chunkDialogue.map(d => `${d.speaker}: ${d.text}`).join('\n')}`;
       ...state,
       dialogueScript: fullDialogueScript,
       status: 'synthesizing',
+      progress: {
+        phase: 'write_script',
+        percentage: 60,
+        message: `Generated ${fullDialogueScript.length} dialogue lines`,
+        dialogueLines: fullDialogueScript.length,
+      },
     };
   }
 
@@ -852,6 +885,12 @@ ${chunkDialogue.map(d => `${d.speaker}: ${d.text}`).join('\n')}`;
       ...state,
       audioBuffer,
       status: 'completed',
+      progress: {
+        phase: 'complete',
+        percentage: 100,
+        message: `Audio generation complete (${successCount} lines)`,
+        dialogueLines: successCount,
+      },
     };
   }
 
@@ -885,6 +924,7 @@ ${chunkDialogue.map(d => `${d.speaker}: ${d.text}`).join('\n')}`;
       new Send('extract_beats', {
         chunk,
         chunkIndex: idx,
+        totalChunks: packedChunks.length,
         audioType: state.audioType,
         length: state.length,
         focus: state.focus,

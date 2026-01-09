@@ -116,6 +116,18 @@ export const OverallState = Annotation.Root({
     reducer: (_x: number, y?: number) => y ?? _x,
     default: () => 0,
   }),
+  // Progress tracking for streaming
+  progress: Annotation<{
+    phase: string;
+    percentage: number;
+    message: string;
+    chunksCompleted?: number;
+    totalChunks?: number;
+    questionsGenerated?: number;
+  }>({
+    reducer: (_x, y?: any) => y ?? _x,
+    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -266,6 +278,12 @@ export class QuizGraph {
       mapOutputs: state.mapOutputs || [],
       collapsedOutputs: state.collapsedOutputs || [],
       finalOutput: state.finalOutput || [],
+      progress: {
+        phase: 'split_chunks',
+        percentage: 5,
+        message: `Preparing ${state.chunks?.length || 0} chunks for processing`,
+        totalChunks: state.chunks?.length || 0,
+      },
     };
   }
 
@@ -446,6 +464,12 @@ export class QuizGraph {
 
     return {
       mapOutputs: [output],
+      progress: {
+        phase: 'map_process',
+        percentage: Math.min(10 + ((chunkIndex ?? 0) * 30), 60),
+        message: `Chunk ${(chunkIndex ?? 0) + 1} complete: ${questionsGenerated} questions`,
+        chunksCompleted: (chunkIndex ?? 0) + 1,
+      },
     };
   }
 
@@ -516,6 +540,11 @@ export class QuizGraph {
         ...state,
         collapsedOutputs: state.mapOutputs,
         status: 'reducing',
+        progress: {
+          phase: 'collapse',
+          percentage: 70,
+          message: `Collected ${state.mapOutputs.length} chunk outputs`,
+        },
       };
     }
 
@@ -530,6 +559,11 @@ export class QuizGraph {
       ...state,
       collapsedOutputs: collapsed,
       status: 'reducing',
+      progress: {
+        phase: 'collapse',
+        percentage: 70,
+        message: `Collapsed ${state.mapOutputs.length} outputs into ${collapsed.length}`,
+      },
     };
   }
 
@@ -813,6 +847,12 @@ export class QuizGraph {
         ...state,
         finalOutput: refined,
         status: 'completed',
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: ${refined.length} quiz questions generated`,
+          questionsGenerated: refined.length,
+        },
       };
     }
 
@@ -852,6 +892,12 @@ export class QuizGraph {
       ...state,
       finalOutput: questions,
       status: 'completed',
+      progress: {
+        phase: 'reduce',
+        percentage: 100,
+        message: `Completed: ${questions.length} quiz questions generated`,
+        questionsGenerated: questions.length,
+      },
     };
   }
 

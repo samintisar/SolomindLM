@@ -114,6 +114,17 @@ export const OverallState = Annotation.Root({
     reducer: (_x: number, y?: number) => y ?? _x,
     default: () => 0,
   }),
+  // Progress tracking for streaming
+  progress: Annotation<{
+    phase: string;
+    percentage: number;
+    message: string;
+    chunksCompleted?: number;
+    totalChunks?: number;
+  }>({
+    reducer: (_x, y?: any) => y ?? _x,
+    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+  }),
 });
 
 export type OverallStateType = typeof OverallState.State;
@@ -122,6 +133,7 @@ export type OverallStateType = typeof OverallState.State;
 export interface ChunkProcessState {
   chunk: string;
   chunkIndex?: number; // Track which chunk this is for debugging
+  totalChunks?: number; // Total chunks for progress tracking
   reportType: string;
   customPrompt?: string;
 }
@@ -870,6 +882,7 @@ export class ReportGraph {
       return new Send('map_process', {
         chunk,
         chunkIndex: idx,
+        totalChunks: packedChunks.length,
         reportType: state.reportType,
         customPrompt: state.customPrompt,
       });
@@ -963,6 +976,13 @@ export class ReportGraph {
     // Return single output in array - reducer will concatenate all outputs
     return {
       mapOutputs: [output],
+      progress: {
+        phase: 'map_process',
+        percentage: Math.min(10 + ((chunkIndex ?? 0) * 30), 60),
+        message: `Chunk ${(chunkIndex ?? 0) + 1}/${state.totalChunks ?? '?'} complete`,
+        chunksCompleted: (chunkIndex ?? 0) + 1,
+        totalChunks: state.totalChunks,
+      },
     };
   }
 
@@ -1016,6 +1036,11 @@ export class ReportGraph {
       ...state,
       collapsedOutputs: collapsed,
       status: 'reducing',
+      progress: {
+        phase: 'collapse',
+        percentage: 70,
+        message: `Collapsed ${state.mapOutputs.length} outputs into ${collapsed.length}`,
+      },
     };
   }
 
@@ -1244,6 +1269,11 @@ The report generation could not be completed due to a timeout or error. Please t
       ...state,
       finalOutput,
       status: 'completed',
+      progress: {
+        phase: 'reduce',
+        percentage: 100,
+        message: `Completed: ${state.reportType} report generated`,
+      },
     };
   }
 
@@ -1262,6 +1292,11 @@ The report generation could not be completed due to a timeout or error. Please t
     return {
       ...state,
       status: 'completed',
+      progress: {
+        phase: 'complete',
+        percentage: 100,
+        message: 'Report generation complete',
+      },
     };
   }
 
