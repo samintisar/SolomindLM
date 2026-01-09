@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { supabase } from '../config/database.js';
+import { supabase, createUserClient } from '../config/database.js';
 
 const router = Router();
 
@@ -18,6 +18,15 @@ async function getUserIdFromToken(req: Request): Promise<string | null> {
   }
 
   return user.id;
+}
+
+// Helper to extract JWT token from request
+function getTokenFromRequest(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.substring(7);
 }
 
 /**
@@ -213,7 +222,15 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    const { data: folder, error } = await supabase
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
+    const { data: folder, error } = await userClient
       .from('notebook_folders')
       .insert({
         user_id: userId,
@@ -291,7 +308,15 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (color !== undefined) updateData.color = color;
     if (icon !== undefined) updateData.icon = icon;
 
-    const { data: folder, error } = await supabase
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
+    const { data: folder, error } = await userClient
       .from('notebook_folders')
       .update(updateData)
       .eq('id', id)
@@ -355,13 +380,22 @@ router.delete('/:id', async (req: Request, res: Response) => {
     }
 
     // Set folder_id to NULL for all notebooks in this folder
+    // Use service role client for this operation as it's a bulk update
     await supabase
       .from('notebooks')
       .update({ folder_id: null })
       .eq('folder_id', id);
 
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
     // Delete the folder
-    const { error } = await supabase
+    const { error } = await userClient
       .from('notebook_folders')
       .delete()
       .eq('id', id)

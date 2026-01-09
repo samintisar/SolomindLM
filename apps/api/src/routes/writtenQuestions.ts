@@ -24,6 +24,7 @@ interface WrittenQuestionsRow {
   title: string;
   questions_data: string | null;
   status: 'draft' | 'generating' | 'completed' | 'failed';
+  question_type: 'short' | 'essay';
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -47,7 +48,7 @@ type DifficultyLevel = typeof DIFFICULTY_LEVELS[number];
 const QUESTION_COUNTS = ['fewer', 'standard', 'more'] as const;
 type QuestionCount = typeof QUESTION_COUNTS[number];
 
-const QUESTION_TYPES = ['short', 'essay', 'mixed'] as const;
+const QUESTION_TYPES = ['short', 'essay'] as const;
 type QuestionType = typeof QUESTION_TYPES[number];
 
 function isValidDifficulty(value: string): value is DifficultyLevel {
@@ -207,7 +208,7 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
 
     // Validation: questionType
     if (typeof questionType !== 'string' || !isValidQuestionType(questionType)) {
-      return res.status(400).json({ error: 'questionType must be short, essay, or mixed' });
+      return res.status(400).json({ error: 'questionType must be short or essay' });
     }
 
     // Validation: documentIds
@@ -251,7 +252,6 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
       documentIds,
       questionCount: actualQuestionCount,
       difficulty,
-      questionType,
       phase: 'generating',
       createdAt: new Date().toISOString(),
     };
@@ -268,6 +268,7 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
         notebook_id: notebookId,
         title,
         status: 'generating',
+        question_type: questionType,
         questions_data: [],
         metadata,
       })
@@ -302,6 +303,7 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
         questions,
         userAnswers: writtenQuestions.metadata?.userAnswers || {},
         status: writtenQuestions.status,
+        question_type: writtenQuestions.question_type,
         metadata: writtenQuestions.metadata,
         created_at: writtenQuestions.created_at,
         updated_at: writtenQuestions.updated_at,
@@ -347,6 +349,7 @@ router.get('/notebook/:notebookId', async (req: Request, res: Response) => {
       questions: parseQuestionsData(wq),
       userAnswers: wq.metadata?.userAnswers || {},
       status: wq.status,
+      question_type: wq.question_type,
       metadata: wq.metadata,
       created_at: wq.created_at,
       updated_at: wq.updated_at,
@@ -394,6 +397,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       questions,
       userAnswers: wq.metadata?.userAnswers || {},
       status: wq.status,
+      question_type: wq.question_type,
       metadata: wq.metadata,
       created_at: wq.created_at,
       updated_at: wq.updated_at,
@@ -669,6 +673,175 @@ router.delete('/:id', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Failed to delete written questions',
     });
   }
+});
+
+// GET /api/written-questions/:id/stream - SSE endpoint for real-time updates
+router.get('/:id/stream', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.query.userId as string;
+
+  // Validation
+  if (typeof userId !== 'string' || !isValidUUID(userId)) {
+    return res.status(400).json({ error: 'Invalid userId format' });
+  }
+
+  if (typeof id !== 'string' || !isValidUUID(id)) {
+    return res.status(400).json({ error: 'Invalid written questions ID format' });
+  }
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+  // Enable CORS for SSE
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.setHeader('Access-Control-Allow-Origin', frontendUrl);
+  res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+
+  console.log(`[WrittenQuestions] SSE stream opened for ${id} by user ${userId}`);
+
+  // Verify user owns the written questions
+  const { data: wq, error: fetchError } = await supabase
+    .from('written_questions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
+
+  if (fetchError || !wq) {
+    res.write(`data: ${JSON.stringify({ type: 'error', error: 'Written questions not found' })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // Send initial state
+  const questions = parseQuestionsData(wq as WrittenQuestionsRow);
+  res.write(`data: ${JSON.stringify({
+    type: 'init',
+    data: {
+      id: wq.id,
+      title: wq.title,
+      questions,
+      userAnswers: wq.metadata?.userAnswers || {},
+      status: wq.status,
+      question_type: wq.question_type,
+      metadata: wq.metadata,
+      created_at: wq.created_at,
+      updated_at: wq.updated_at,
+    }
+  })}\n\n`);
+
+  // If already completed or failed, close the stream
+  if (wq.status === 'completed' || wq.status === 'failed') {
+    res.write(`data: ${JSON.stringify({ type: 'done', status: wq.status })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // Polling interval
+  const POLL_INTERVAL = 1000; // 1 second
+  let lastMetadata = JSON.stringify(wq.metadata);
+  let lastQuestionsHash = JSON.stringify(questions);
+
+  const pollInterval = setInterval(async () => {
+    try {
+      // Fetch latest state
+      const { data: currentWq, error: pollError } = await supabase
+        .from('written_questions')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .single();
+
+      if (pollError || !currentWq) {
+        clearInterval(pollInterval);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: 'Failed to fetch updates' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      const currentQuestions = parseQuestionsData(currentWq as WrittenQuestionsRow);
+      const currentMetadata = JSON.stringify(currentWq.metadata);
+      const currentQuestionsHash = JSON.stringify(currentQuestions);
+
+      // Check if anything changed
+      const metadataChanged = currentMetadata !== lastMetadata;
+      const questionsChanged = currentQuestionsHash !== lastQuestionsHash;
+      const statusChanged = currentWq.status !== wq.status;
+
+      if (metadataChanged || questionsChanged || statusChanged) {
+        // Send progress update
+        if (currentWq.metadata?.phase) {
+          res.write(`data: ${JSON.stringify({
+            type: 'progress',
+            phase: currentWq.metadata.phase,
+            status: currentWq.status,
+            metadata: currentWq.metadata,
+          })}\n\n`);
+        }
+
+        // If questions changed (final result), send them
+        if (questionsChanged && currentQuestions.length > 0) {
+          res.write(`data: ${JSON.stringify({
+            type: 'questions',
+            questions: currentQuestions,
+            title: currentWq.title,
+          })}\n\n`);
+        }
+
+        // If status changed, send update
+        if (statusChanged) {
+          res.write(`data: ${JSON.stringify({
+            type: 'status',
+            status: currentWq.status,
+          })}\n\n`);
+        }
+
+        // Update caches
+        lastMetadata = currentMetadata;
+        lastQuestionsHash = currentQuestionsHash;
+        wq.status = currentWq.status;
+      }
+
+      // Send heartbeat
+      res.write(': heartbeat\n\n');
+
+      // Check if completed or failed
+      if (currentWq.status === 'completed' || currentWq.status === 'failed') {
+        clearInterval(pollInterval);
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          status: currentWq.status,
+          data: {
+            id: currentWq.id,
+            title: currentWq.title,
+            questions: currentQuestions,
+            userAnswers: currentWq.metadata?.userAnswers || {},
+            status: currentWq.status,
+            question_type: currentWq.question_type,
+            metadata: currentWq.metadata,
+            created_at: currentWq.created_at,
+            updated_at: currentWq.updated_at,
+          }
+        })}\n\n`);
+        res.end();
+        console.log(`[WrittenQuestions] SSE stream closed for ${id} with status: ${currentWq.status}`);
+      }
+    } catch (error) {
+      clearInterval(pollInterval);
+      console.error('[WrittenQuestions] SSE poll error:', error);
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Stream error' })}\n\n`);
+      res.end();
+    }
+  }, POLL_INTERVAL);
+
+  // Clean up on client disconnect
+  req.on('close', () => {
+    clearInterval(pollInterval);
+    console.log(`[WrittenQuestions] SSE stream closed for ${id} (client disconnect)`);
+  });
 });
 
 export default router;

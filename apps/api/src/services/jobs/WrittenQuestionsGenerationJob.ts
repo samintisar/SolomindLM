@@ -62,6 +62,25 @@ export async function writtenQuestionsGenerationJob(
       });
     };
 
+    // Progress update callback - updates metadata with progress info
+    const onProgress = async (progress: { phase: string; percentage: number; message: string; questionsGenerated?: number }) => {
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        service: 'WrittenQuestionsGeneration',
+        action: 'progress_update',
+        writtenQuestionId,
+        progress,
+      }));
+
+      await service.updateWrittenQuestionsStatus(writtenQuestionId, 'generating', {
+        phase: progress.phase,
+        progress: progress.percentage,
+        progressMessage: progress.message,
+        questionsGenerated: progress.questionsGenerated,
+        updatedAt: new Date().toISOString(),
+      });
+    };
+
     // Generate written questions with timeout
     const result = await withTimeout(
       service.generateWrittenQuestions({
@@ -71,6 +90,7 @@ export async function writtenQuestionsGenerationJob(
         questionType,
         focus,
         onStatusUpdate,
+        onProgress,
       }),
       300000, // 5 minutes total timeout
       'Written questions generation timed out'

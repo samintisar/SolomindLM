@@ -256,20 +256,21 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
           </div>
 
           {/* Question Type Badge */}
-          <div className="mb-4 flex items-center gap-3">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                currentQuestion.questionType === 'short'
-                  ? 'bg-vintage-blue-100 text-vintage-blue-800 dark:bg-vintage-blue-900/30 dark:text-vintage-blue-300'
-                  : 'bg-vintage-brown-200 text-vintage-brown-800 dark:bg-vintage-brown-900/30 dark:text-vintage-brown-300'
-              }`}
-            >
-              <MessageSquareText className="w-3 h-3" />
-              {currentQuestion.questionType === 'short' ? 'Short Answer' : 'Essay'}
-            </span>
-            <span className="text-xs font-semibold text-muted-foreground">
-              {currentQuestion.rubric.maxPoints} {currentQuestion.rubric.maxPoints === 1 ? 'pt' : 'pts'}
-            </span>
+          <div className="mb-4">
+            {currentQuestion.questionType === 'short' ? (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-foreground border border-border">
+                <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold uppercase tracking-wide">SHORT ANSWER</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-foreground border border-border">
+                <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold uppercase tracking-wide">ESSAY</span>
+                <span className="text-xs font-semibold text-muted-foreground ml-1">
+                  {currentQuestion.rubric.maxPoints} pts
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Question */}
@@ -428,7 +429,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
             <button
               onClick={handleSubmitAnswer}
               disabled={!isAnswered || isSubmitting}
-              className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-full transition-all shadow-md active:translate-y-0.5 min-w-[140px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
+              className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-full transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
@@ -438,7 +439,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Submit Answer
+                  Submit
                 </>
               )}
             </button>

@@ -10,6 +10,7 @@ export interface WrittenQuestionsGenerationParams {
   questionType: string;
   focus?: string;
   onStatusUpdate?: (status: string) => void;
+  onProgress?: (progress: { phase: string; percentage: number; message: string; questionsGenerated?: number }) => void;
 }
 
 export interface WrittenQuestionsResult {
@@ -45,7 +46,7 @@ export class WrittenQuestionsGenerationService {
   }
 
   async generateWrittenQuestions(params: WrittenQuestionsGenerationParams): Promise<WrittenQuestionsResult> {
-    const { documentIds, questionCount, difficulty, questionType, focus, onStatusUpdate } = params;
+    const { documentIds, questionCount, difficulty, questionType, focus, onStatusUpdate, onProgress } = params;
 
     try {
       onStatusUpdate?.('generating');
@@ -61,7 +62,9 @@ export class WrittenQuestionsGenerationService {
       );
 
       const graph = this.writtenQuestionsGraph.buildGraph();
-      const result = await graph.invoke({
+
+      // Stream the graph execution to get progress updates
+      const stream = await graph.stream({
         documentIds,
         chunks,
         questionCount,
@@ -72,14 +75,33 @@ export class WrittenQuestionsGenerationService {
         collapsedOutputs: [],
         finalOutput: [],
         status: 'generating',
-      }) as unknown as OverallStateType;
+        progress: { phase: 'initializing', percentage: 0, message: 'Starting...' },
+      }, {
+        streamMode: 'values',
+      });
+
+      let finalResult: OverallStateType | null = null;
+
+      // Process stream events
+      for await (const event of stream) {
+        finalResult = event as OverallStateType;
+
+        // Emit progress updates
+        if (finalResult.progress) {
+          onProgress?.(finalResult.progress);
+        }
+      }
+
+      if (!finalResult) {
+        throw new Error('Graph execution produced no result');
+      }
 
       console.log(
-        `[WrittenQuestionsGeneration] Written questions generation completed. Status: ${result.status}, Questions: ${result.finalOutput.length}`
+        `[WrittenQuestionsGeneration] Written questions generation completed. Status: ${finalResult.status}, Questions: ${finalResult.finalOutput.length}`
       );
 
       return {
-        questions: result.finalOutput || [],
+        questions: finalResult.finalOutput || [],
         metadata: {
           documentIds,
           chunksProcessed: chunks.length,
@@ -238,7 +260,7 @@ export class WrittenQuestionsGenerationService {
     return `Written Questions (${questionType || 'short'})`;
   }
 
-  getPreviewText(status: string, metadata?: any): string {
+  getPreviewText(status: string, metadata?: any, questionType?: string): string {
     const phase = metadata?.phase || status;
     const isGenerating = status === 'generating' ||
       phase === 'generating' ||
@@ -248,15 +270,15 @@ export class WrittenQuestionsGenerationService {
 
     if (isGenerating) {
       const questionCount = metadata?.questionCount || 'standard';
-      const questionType = metadata?.questionType || 'short';
-      return `${this.getQuestionCountLabel(questionCount)} Questions • ${questionType} • Generating...`;
+      const type = questionType || 'short';
+      return `${this.getQuestionCountLabel(questionCount)} Questions • ${this.getQuestionTypeLabel(type)} • Generating...`;
     }
     if (status === 'failed' || phase === 'failed') {
       return 'Written Questions • Failed';
     }
     const questionCount = metadata?.questionCount || 'standard';
-    const questionType = metadata?.questionType || 'short';
-    return `${this.getQuestionCountLabel(questionCount)} Questions • ${questionType}`;
+    const type = questionType || 'short';
+    return `${this.getQuestionCountLabel(questionCount)} Questions • ${this.getQuestionTypeLabel(type)}`;
   }
 
   private getQuestionCountLabel(count: string | number): string {
@@ -269,6 +291,14 @@ export class WrittenQuestionsGenerationService {
       return labels[count] || '10';
     }
     return String(count);
+  }
+
+  private getQuestionTypeLabel(questionType: string): string {
+    const labels: Record<string, string> = {
+      short: 'Short Answers',
+      essay: 'Essay',
+    };
+    return labels[questionType] || questionType;
   }
 
   async generateTitleFromQuestions(questions: WrittenQuestion[]): Promise<string> {

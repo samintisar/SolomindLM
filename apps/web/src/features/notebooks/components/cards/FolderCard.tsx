@@ -62,7 +62,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
             <div className="relative folder-kebab-menu z-20" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => isMenuOpen ? onCloseMenu() : onToggleMenu()}
-                className={`p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-full text-muted-foreground/70 hover:text-foreground transition-colors ${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-full text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -145,7 +145,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
         <div className="flex justify-end z-20 pointer-events-auto folder-kebab-menu relative">
           <button
             onClick={(e) => { e.stopPropagation(); isMenuOpen ? onCloseMenu() : onToggleMenu(); }}
-            className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 ${isMenuOpen ? 'opacity-100 bg-secondary' : 'opacity-0 group-hover:opacity-100'}`}
+            className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? 'bg-secondary' : ''}`}
           >
             <MoreVertical className="w-4 h-4 shrink-0" />
           </button>

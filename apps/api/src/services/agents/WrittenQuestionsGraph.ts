@@ -105,8 +105,8 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'medium',
   }),
-  questionType: Annotation<string>({
-    reducer: (_x: string, y?: string) => y ?? _x,
+  questionType: Annotation<'short' | 'essay'>({
+    reducer: (_x: 'short' | 'essay', y?: 'short' | 'essay') => y ?? _x,
     default: () => 'short',
   }),
   focus: Annotation<string | undefined>({
@@ -132,6 +132,18 @@ export const OverallState = Annotation.Root({
   reduceRetryCount: Annotation<number>({
     reducer: (_x: number, y?: number) => y ?? _x,
     default: () => 0,
+  }),
+  // Progress tracking for streaming
+  progress: Annotation<{
+    phase: string;
+    percentage: number;
+    message: string;
+    chunksCompleted?: number;
+    totalChunks?: number;
+    questionsGenerated?: number;
+  }>({
+    reducer: (_x, y?: any) => y ?? _x,
+    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
   }),
 });
 
@@ -169,26 +181,7 @@ const getMapPrompt = (params: {
   };
 
   // Handle mixed vs single types
-  const questionTypeSection = questionType === 'mixed'
-    ? `**Question Type: MIXED (Short-Answer and Essay Questions)**
-
-Generate a MIXED set of questions containing BOTH types:
-- ~50% SHORT-ANSWER questions (5 points each): Single, direct questions answerable in 1-3 sentences
-- ~50% ESSAY questions (12 points each): Substantive questions requiring multi-paragraph answers
-
-**SHORT-ANSWER QUESTIONS:**
-- A SINGLE, DIRECT QUESTION (not a list of tasks)
-- Answerable in 1-3 sentences
-- Worth EXACTLY 5 points
-
-**ESSAY QUESTIONS:**
-- Answerable in multiple paragraphs
-- Worth 12 points
-- Tests analysis, synthesis, and critical thinking
-
-Distribute both types evenly throughout your ${questionsPerChunk} questions.
-For example, with ${questionsPerChunk} questions, aim for ${Math.ceil(questionsPerChunk / 2)} short-answer and ${Math.floor(questionsPerChunk / 2)} essay questions.`
-    : `**Question Type: ${questionType.toUpperCase()}**
+  const questionTypeSection = `**Question Type: ${questionType.toUpperCase()}**
 **Point Value: ${questionType === 'short' ? '5' : '12'}**
 
 ${questionType === 'short'
@@ -311,6 +304,12 @@ export class WrittenQuestionsGraph {
       mapOutputs: state.mapOutputs || [],
       collapsedOutputs: state.collapsedOutputs || [],
       finalOutput: state.finalOutput || [],
+      progress: {
+        phase: 'split_chunks',
+        percentage: 5,
+        message: `Prepared ${packedChunks.length} chunks for processing`,
+        totalChunks: packedChunks.length,
+      },
     };
   }
 
@@ -458,30 +457,20 @@ export class WrittenQuestionsGraph {
 
       // Validate questions are self-contained
       let validQuestions = response.questions.filter(q => this.validateSelfContained(q));
-      
-      // Ensure all questions have valid IDs (assign UUIDs to any with empty/missing IDs)
-      // This fixes the issue at the source, right after LLM generation
+
+      // Set questionType ourselves based on the parameter (more reliable than asking LLM)
+      // Also ensure all questions have valid IDs and correct point values
+      const expectedPoints = questionType === 'short' ? 5 : 12;
       validQuestions = validQuestions.map(q => ({
         ...q,
         id: (q.id && q.id.trim()) ? q.id : randomUUID(),
+        questionType: questionType as 'short' | 'essay',
+        rubric: {
+          ...q.rubric,
+          maxPoints: expectedPoints,
+        },
       }));
 
-      // For mixed type, log distribution for this chunk
-      if (questionType === 'mixed') {
-        const shortCount = validQuestions.filter(q => q.questionType === 'short').length;
-        const essayCount = validQuestions.filter(q => q.questionType === 'essay').length;
-
-        logInfo({
-          agent: 'WrittenQuestionsGraph',
-          phase: 'map_process_mixed_distribution',
-          chunkIndex,
-          shortCount,
-          essayCount,
-          totalCount: validQuestions.length,
-          shortPercent: validQuestions.length > 0 ? Math.round(shortCount / validQuestions.length * 100) : 0,
-          essayPercent: validQuestions.length > 0 ? Math.round(essayCount / validQuestions.length * 100) : 0,
-        }, `Chunk mixed distribution: ${shortCount} short, ${essayCount} essay`);
-      }
 
       logInfo({
         agent: 'WrittenQuestionsGraph',
@@ -556,6 +545,12 @@ export class WrittenQuestionsGraph {
 
     return {
       mapOutputs: [output],
+      progress: {
+        phase: 'map_process',
+        percentage: Math.min(10 + ((chunkIndex ?? 0) * 30), 60),
+        message: `Chunk ${(chunkIndex ?? 0) + 1} complete: ${questionsGenerated} questions`,
+        chunksCompleted: (chunkIndex ?? 0) + 1,
+      },
     };
   }
 
@@ -587,13 +582,19 @@ export class WrittenQuestionsGraph {
       const jsonStr = state.mapOutputs[i];
       try {
         let questions = JSON.parse(jsonStr) as WrittenQuestion[];
-        
-        // Ensure all questions have valid IDs (defensive check - should already be set in map phase)
+
+        // Ensure all questions have valid IDs and questionType (defensive check)
+        const expectedPoints = state.questionType === 'short' ? 5 : 12;
         questions = questions.map(q => ({
           ...q,
           id: (q.id && q.id.trim()) ? q.id : randomUUID(),
+          questionType: state.questionType as 'short' | 'essay',
+          rubric: {
+            ...q.rubric,
+            maxPoints: expectedPoints,
+          },
         }));
-        
+
         if (questions.length === 0) {
           emptyChunks.push(i);
         }
@@ -675,6 +676,12 @@ export class WrittenQuestionsGraph {
       ...state,
       collapsedOutputs: [JSON.stringify(allQuestions)],
       status: 'reducing',
+      progress: {
+        phase: 'collapse',
+        percentage: 70,
+        message: `Collected ${allQuestions.length} questions from all chunks`,
+        questionsGenerated: allQuestions.length,
+      },
     };
   }
 
@@ -722,38 +729,6 @@ export class WrittenQuestionsGraph {
       };
     }
 
-    // For mixed type, validate we have both short and essay questions
-    if (state.questionType === 'mixed') {
-      const shortCount = allQuestions.filter(q => q.questionType === 'short').length;
-      const essayCount = allQuestions.filter(q => q.questionType === 'essay').length;
-
-      logInfo({
-        agent: 'WrittenQuestionsGraph',
-        phase: 'reduce_mixed_validation',
-        shortCount,
-        essayCount,
-        totalCount: totalQuestionsBefore,
-        targetCount: state.questionCount,
-      }, `Mixed type validation: ${shortCount} short, ${essayCount} essay`);
-
-      // Calculate minimum required for each type (roughly 40% of target to allow some flexibility)
-      const minPerType = Math.ceil(state.questionCount * 0.4);
-
-      if (shortCount < minPerType || essayCount < minPerType) {
-        logError({
-          agent: 'WrittenQuestionsGraph',
-          phase: 'reduce_mixed_insufficient',
-          shortCount,
-          essayCount,
-          minPerType,
-          targetCount: state.questionCount,
-        }, `CRITICAL: Mixed type requires at least ${minPerType} of each type. Have ${shortCount} short and ${essayCount} essay.`);
-
-        // Return as-is with whatever we have - better than failing completely
-        return this.finalizeQuestions(allQuestions.slice(0, state.questionCount), state);
-      }
-    }
-
     // If we have fewer than target, return as-is
     if (totalQuestionsBefore <= state.questionCount) {
       logInfo({
@@ -764,7 +739,16 @@ export class WrittenQuestionsGraph {
         reason: 'Fewer questions than target (LLM would hallucinate)',
       }, `Skipping LLM reduce, using ${totalQuestionsBefore} questions directly`);
 
-      return this.finalizeQuestions(allQuestions, state);
+      const result = this.finalizeQuestions(allQuestions, state);
+      return {
+        ...result,
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: ${totalQuestionsBefore} questions generated`,
+          questionsGenerated: totalQuestionsBefore,
+        },
+      };
     }
 
     // Use smart LLM for intelligent selection with structured output
@@ -829,7 +813,16 @@ export class WrittenQuestionsGraph {
         throw new Error('LLM returned zero questions');
       }
 
-      return this.finalizeQuestions(response.questions, state);
+      const result = this.finalizeQuestions(response.questions, state);
+      return {
+        ...result,
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: ${response.questions.length} questions selected`,
+          questionsGenerated: response.questions.length,
+        },
+      };
     } catch (error) {
       // Retry logic for LLM failures
       const errorContext = {
@@ -858,48 +851,28 @@ export class WrittenQuestionsGraph {
       }, 'LLM reduce failed after retries, using direct selection fallback');
 
       const fallback = allQuestions.slice(0, state.questionCount);
-      return this.finalizeQuestions(fallback, state);
+      const result = this.finalizeQuestions(fallback, state);
+      return {
+        ...result,
+        progress: {
+          phase: 'reduce',
+          percentage: 100,
+          message: `Completed: ${fallback.length} questions (fallback mode)`,
+          questionsGenerated: fallback.length,
+        },
+      };
     }
   }
 
   // Helper method to finalize and return questions
   private finalizeQuestions(questions: WrittenQuestion[], state: OverallStateType): Partial<OverallStateType> {
-    // IDs should already be assigned in map phase, but ensure as defensive measure
+    // Ensure IDs are valid and questionType is set correctly from state
+    // IMPORTANT: Always set questionType from state, never trust LLM output
     const questionsWithIds = questions.map(q => ({
       ...q,
       id: (q.id && q.id.trim()) ? q.id : randomUUID(),
+      questionType: state.questionType as 'short' | 'essay',
     }));
-
-    // For mixed type, validate final distribution
-    if (state.questionType === 'mixed' && questionsWithIds.length > 0) {
-      const shortCount = questionsWithIds.filter(q => q.questionType === 'short').length;
-      const essayCount = questionsWithIds.filter(q => q.questionType === 'essay').length;
-      const shortPercent = Math.round(shortCount / questionsWithIds.length * 100);
-      const essayPercent = Math.round(essayCount / questionsWithIds.length * 100);
-
-      logInfo({
-        agent: 'WrittenQuestionsGraph',
-        phase: 'reduce_final_mixed_distribution',
-        shortCount,
-        essayCount,
-        totalQuestions: questions.length,
-        shortPercent,
-        essayPercent,
-        targetPercent: 50,
-      }, `Final mixed type distribution: ${shortPercent}% short (${shortCount}), ${essayPercent}% essay (${essayCount})`);
-
-      // Warn if distribution is significantly off (more than 70/30 split)
-      if (shortPercent < 30 || shortPercent > 70) {
-        logWarn({
-          agent: 'WrittenQuestionsGraph',
-          phase: 'reduce_final_mixed_imbalance',
-          shortCount,
-          essayCount,
-          shortPercent,
-          essayPercent,
-        }, `WARNING: Mixed type distribution is imbalanced (${shortPercent}%/${essayPercent}% instead of ~50/50)`);
-      }
-    }
 
     // Log final questions
     logInfo({
@@ -942,25 +915,6 @@ export class WrittenQuestionsGraph {
   }): string {
     const { questions, targetCount, difficulty, questionType, focus } = params;
 
-    // For mixed type, count available questions of each type
-    let typeDistributionText = '';
-    if (questionType === 'mixed') {
-      const shortCount = questions.filter(q => q.questionType === 'short').length;
-      const essayCount = questions.filter(q => q.questionType === 'essay').length;
-      const targetShort = Math.ceil(targetCount / 2);
-      const targetEssay = Math.floor(targetCount / 2);
-
-      typeDistributionText = `
-
-**MIXED TYPE TARGET DISTRIBUTION:**
-- You MUST select approximately ${targetShort} short-answer questions (5 points each)
-- You MUST select approximately ${targetEssay} essay questions (12 points each)
-- Available: ${shortCount} short-answer, ${essayCount} essay
-- This is approximately ${Math.round(shortCount / questions.length * 100)}% short, ${Math.round(essayCount / questions.length * 100)}% essay
-
-Do NOT deviate significantly from this 50/50 split.`;
-    }
-
     // Group questions by topic for better LLM selection
     const topicGroups: Record<string, WrittenQuestion[]> = {};
     for (const q of questions) {
@@ -972,32 +926,14 @@ Do NOT deviate significantly from this 50/50 split.`;
     // Format questions grouped by topic
     const questionsText = Object.entries(topicGroups)
       .map(([topic, qs]) => {
-        // For mixed type, also show type breakdown per topic
-        const shortInTopic = qs.filter(q => q.questionType === 'short').length;
-        const essayInTopic = qs.filter(q => q.questionType === 'essay').length;
-        const typeInfo = questionType === 'mixed'
-          ? ` (${shortInTopic} short, ${essayInTopic} essay)`
-          : '';
-
         const qList = qs.map((q, i) =>
           `  [${i + 1}] ${q.question}\n      Type: ${q.questionType} | Points: ${q.rubric.maxPoints}`
         ).join('\n');
-        return `**${topic.toUpperCase()}** (${qs.length} questions${typeInfo}):\n${qList}`;
+        return `**${topic.toUpperCase()}** (${qs.length} questions):\n${qList}`;
       })
       .join('\n\n');
 
-    const questionTypeGuidance = questionType === 'mixed'
-      ? `**MIXED QUESTION TYPES - CRITICAL:**
-You MUST select a BALANCED mix of short-answer and essay questions.
-Target: EXACTLY 50% short-answer (5 points) and 50% essay (12 points).
-This means for ${targetCount} total questions, you need ${Math.ceil(targetCount / 2)} short-answer and ${Math.floor(targetCount / 2)} essay.
-
-Prioritize diversity in BOTH:
-1. Topics (spread questions across different topics)
-2. Question types (maintain the 50/50 short/essay balance)
-
-When selecting from topics, be mindful of the type distribution in each topic.`
-      : questionType === 'short'
+    const questionTypeGuidance = questionType === 'short'
       ? `**SHORT-ANSWER QUESTIONS:**
 Must be single, direct questions answerable in 1-3 sentences.
 Select questions that are complete and self-contained.`
@@ -1005,11 +941,7 @@ Select questions that are complete and self-contained.`
 Must be substantive questions requiring multi-paragraph answers.
 Select questions that test analysis and synthesis.`;
 
-    const pointsInstruction = questionType === 'mixed'
-      ? '5 points for short-answer, 12 points for essay'
-      : questionType === 'short'
-      ? '5 points'
-      : '12 points';
+    const pointsInstruction = questionType === 'short' ? '5 points' : '12 points';
 
     return `You are an expert educator selecting written questions for an assessment.
 
@@ -1018,11 +950,10 @@ CRITICAL REQUIREMENTS:
 - Select questions from DIFFERENT topics. Maximum 2 questions per topic
 - Your goal is MAXIMUM TOPIC DIVERSITY
 - Prioritize self-contained questions with clear rubrics
-${typeDistributionText}
 
 ${questionTypeGuidance}
 
-IMPORTANT: Output questions${questionType === 'mixed' ? ' of BOTH types (short and essay) in a 50/50 split' : ` of type "${questionType}"`}.
+IMPORTANT: Output questions of type "${questionType}".
 POINT VALUES: ${pointsInstruction}
 
 AVAILABLE QUESTIONS (GROUPED BY TOPIC):

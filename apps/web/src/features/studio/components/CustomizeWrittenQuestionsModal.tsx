@@ -11,7 +11,7 @@ interface CustomizeWrittenQuestionsModalProps {
 export interface WrittenQuestionsConfig {
   count: 'fewer' | 'standard' | 'more';
   difficulty: 'easy' | 'medium' | 'hard';
-  questionType: 'short' | 'essay' | 'mixed';
+  questionType: 'short' | 'essay';
   focus: string;
 }
 
@@ -71,7 +71,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             <div className="space-y-4">
               <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Question Type</label>
               <div className="flex flex-wrap gap-2">
-                {(['short', 'essay', 'mixed'] as const).map((opt) => (
+                {(['short', 'essay'] as const).map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setQuestionType(opt)}

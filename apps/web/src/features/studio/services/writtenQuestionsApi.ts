@@ -23,7 +23,7 @@ export interface CreateWrittenQuestionsParams {
   documentIds: string[];
   questionCount: 'fewer' | 'standard' | 'more'; // 5, 10, 15
   difficulty: string; // 'easy', 'medium', 'hard'
-  questionType: 'short' | 'essay' | 'mixed';
+  questionType: 'short' | 'essay';
   focus?: string;
 }
 
@@ -48,22 +48,15 @@ export interface GradedResult {
 }
 
 /**
- * Get preview text based on status, actual question count, and metadata
+ * Get preview text based on status, actual question count, and question type
  */
-function getPreviewText(status: string, questionCount: number, metadata?: any): string {
-  const phase = metadata?.phase || status;
-  const questionType = metadata?.questionType || 'short';
-
-  const isGenerating = status === 'generating' ||
-    phase === 'generating' ||
-    phase === 'mapping' ||
-    phase === 'collapsing' ||
-    phase === 'reducing';
+function getPreviewText(status: string, questionCount: number, questionType: string): string {
+  const isGenerating = status === 'generating';
 
   if (isGenerating) {
     return `${questionCount} Questions • ${questionType} • Generating...`;
   }
-  if (status === 'failed' || phase === 'failed') {
+  if (status === 'failed') {
     return 'Written Questions • Failed';
   }
   return `${questionCount} Questions • ${questionType}`;
@@ -75,11 +68,12 @@ function getPreviewText(status: string, questionCount: number, metadata?: any): 
 function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
   const questions: WrittenQuestion[] = dbWQ.questions || [];
   const questionCount = questions.length;
+  const questionType = dbWQ.question_type || 'short';
 
   return {
     id: dbWQ.id,
     title: dbWQ.title,
-    preview: getPreviewText(dbWQ.status, questionCount, dbWQ.metadata),
+    preview: getPreviewText(dbWQ.status, questionCount, questionType),
     type: 'writtenQuestions',
     questions,
     userAnswers: dbWQ.userAnswers || {},
@@ -87,7 +81,7 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
     metadata: {
       questionCount,
       difficulty: dbWQ.metadata?.difficulty || 'medium',
-      questionType: dbWQ.metadata?.questionType || 'short',
+      questionType,
       focusArea: dbWQ.metadata?.focus,
     },
   };

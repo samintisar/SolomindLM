@@ -167,7 +167,7 @@ export interface WrittenQuestionsNote extends BaseNote {
   metadata: {
     questionCount: number;
     difficulty: 'easy' | 'medium' | 'hard';
-    questionType: 'short' | 'essay' | 'mixed';
+    questionType: 'short' | 'essay';
     focusArea?: string;
     totalPoints?: number;
     error?: string;
