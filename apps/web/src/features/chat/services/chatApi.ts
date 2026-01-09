@@ -22,12 +22,17 @@ export interface ChatHistoryResponse {
   messages: ApiMessage[];
 }
 
+export interface ChatError {
+  message: string;
+  type?: string;
+}
+
 export interface SendMessageCallbacks {
   onToken: (token: string) => void;
   onReferences: (references: ReferenceChunk[]) => void;
   onStatus?: (status: string, message?: string) => void;
   onComplete: () => void;
-  onError: (error: string) => void;
+  onError: (error: string | ChatError) => void;
 }
 
 // ============================================================

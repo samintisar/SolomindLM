@@ -263,12 +263,27 @@ const AppContent: React.FC = () => {
               })
               .catch(err => console.error('Failed to reload chat history:', err));
           },
-          onError: (error: string) => {
+          onError: (error: string | { message: string; type?: string }) => {
             console.error('Chat error:', error);
             setIsChatStreaming(false);
-            // Remove the temporary assistant message and add error indicator
-            setMessages(prev => prev.filter(msg => msg.id !== tempAssistantId));
-            alert(`Chat error: ${error}`);
+
+            // Handle no_documents error with a helpful AI message
+            const errorMessage = typeof error === 'string' ? error : error.message;
+            const errorType = typeof error === 'string' ? undefined : error.type;
+
+            if (errorType === 'no_documents') {
+              // Replace the temporary assistant message with a helpful response
+              const helpfulMessage = "I couldn't find any relevant information in your selected documents to answer this question. This could happen if:\n\n• The documents don't contain information related to your question\n• The search terms don't match the language used in the documents\n• The documents are still being processed\n\nTry rephrasing your question, selecting different documents, or adding more relevant sources to your notebook.";
+              setMessages(prev => prev.map(msg =>
+                msg.id === tempAssistantId
+                  ? { ...msg, content: helpfulMessage }
+                  : msg
+              ));
+            } else {
+              // For other errors, remove the temporary message and show alert
+              setMessages(prev => prev.filter(msg => msg.id !== tempAssistantId));
+              alert(`Chat error: ${errorMessage}`);
+            }
           },
         },
         selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined

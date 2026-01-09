@@ -17,7 +17,7 @@ export interface MindMapResult {
 }
 
 export interface SaveMindMapParams {
-  mindMapId: string;
+  mindmapId: string;
   title: string;
   data: any;
   metadata: any;
@@ -213,14 +213,14 @@ export class MindMapGenerationService {
           metadata: params.metadata,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', params.mindMapId);
+        .eq('id', params.mindmapId);
 
       if (error) {
         console.error('[MindMapGeneration] Error saving mind map:', error);
         throw new Error(`Failed to save mind map: ${error.message}`);
       }
 
-      console.log(`[MindMapGeneration] Mind map saved: ${params.mindMapId}`);
+      console.log(`[MindMapGeneration] Mind map saved: ${params.mindmapId}`);
     } catch (error) {
       console.error('[MindMapGeneration] Error in saveMindMap:', error);
       throw error;

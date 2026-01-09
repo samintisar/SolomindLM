@@ -2,7 +2,7 @@ import { supabase } from '../../config/database.js';
 import { MindMapGenerationService } from '../generation/MindMapGenerationService.js';
 
 export interface MindMapGenerationJobPayload {
-  mindMapId: string;
+  mindmapId: string;
   userId: string;
   notebookId: string;
   documentIds: string[];
@@ -14,19 +14,19 @@ export async function mindMapGenerationJob(
   payload: MindMapGenerationJobPayload,
   helpers?: { addJob: (identifier: string, payload: unknown, options?: { runAt: Date }) => void }
 ) {
-  const { mindMapId, userId: _userId, notebookId: _notebookId, documentIds, attempt = 0 } = payload;
+  const { mindmapId, userId: _userId, notebookId: _notebookId, documentIds, attempt = 0 } = payload;
   const jobStartTime = Date.now();
 
   console.log(JSON.stringify({
     timestamp: new Date().toISOString(),
     service: 'MindMapGeneration',
     action: 'process_job',
-    mindMapId,
+    mindmapId,
     attempt,
   }));
 
   console.log(`\n[MindMapGenerationJob] ===== JOB START =====`);
-  console.log(`[MindMapGenerationJob] Mind Map ID: ${mindMapId}`);
+  console.log(`[MindMapGenerationJob] Mind Map ID: ${mindmapId}`);
   console.log(`[MindMapGenerationJob] Document IDs: ${documentIds.length} documents`);
   console.log(`[MindMapGenerationJob] Attempt: ${attempt}/3`);
   console.log(`[MindMapGenerationJob] Started at: ${new Date().toISOString()}`);
@@ -39,7 +39,7 @@ export async function mindMapGenerationJob(
     await supabase
       .from('mindmaps')
       .update({ status: 'generating' })
-      .eq('id', mindMapId);
+      .eq('id', mindmapId);
     console.log(`[MindMapGenerationJob] Status updated`);
 
     // Initialize service
@@ -56,7 +56,7 @@ export async function mindMapGenerationJob(
         timestamp: new Date().toISOString(),
         service: 'MindMapGeneration',
         action: 'status_update',
-        mindMapId,
+        mindmapId,
         status,
         elapsedMs: elapsed,
       }));
@@ -66,7 +66,7 @@ export async function mindMapGenerationJob(
       const validStatuses = ['generating', 'completed', 'failed'];
       const dbStatus = validStatuses.includes(status) ? status : 'generating';
 
-      await service.updateMindMapStatus(mindMapId, dbStatus, {
+      await service.updateMindMapStatus(mindmapId, dbStatus, {
         phase: status,
         updatedAt: new Date().toISOString(),
         elapsedMs: elapsed,
@@ -102,7 +102,7 @@ export async function mindMapGenerationJob(
     // Save mind map
     console.log(`[MindMapGenerationJob] Saving mind map to database...`);
     await service.saveMindMap({
-      mindMapId,
+      mindmapId,
       title,
       data: result.data,
       metadata: {
@@ -121,7 +121,7 @@ export async function mindMapGenerationJob(
       timestamp: new Date().toISOString(),
       service: 'MindMapGeneration',
       action: 'job_complete',
-      mindMapId,
+      mindmapId,
       totalElapsedMs: totalElapsed,
     }));
   } catch (error) {
@@ -129,7 +129,7 @@ export async function mindMapGenerationJob(
       timestamp: new Date().toISOString(),
       service: 'MindMapGeneration',
       action: 'job_error',
-      mindMapId,
+      mindmapId,
       error: error instanceof Error ? error.message : 'Unknown error',
       attempt,
       maxRetries,
@@ -151,7 +151,7 @@ export async function mindMapGenerationJob(
           timestamp: new Date().toISOString(),
           service: 'MindMapGeneration',
           action: 'job_retry_scheduled',
-          mindMapId,
+          mindmapId,
           nextAttempt: attempt + 1,
           retryAt,
         }));
@@ -161,7 +161,7 @@ export async function mindMapGenerationJob(
           timestamp: new Date().toISOString(),
           service: 'MindMapGeneration',
           action: 'job_retry_failed',
-          mindMapId,
+          mindmapId,
           error: addError instanceof Error ? addError.message : 'Unknown error',
         }));
         // Fall through to mark as failed
@@ -180,7 +180,7 @@ export async function mindMapGenerationJob(
           attempts: attempt + 1,
         },
       })
-      .eq('id', mindMapId);
+      .eq('id', mindmapId);
 
     throw error; // Re-throw so Graphile Worker knows it failed
   }
