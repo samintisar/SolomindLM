@@ -92,7 +92,7 @@ const AppContent: React.FC = () => {
   const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'chat' | 'studio'>('sources');
   const [sources, setSources] = useState<Source[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [notebookTitle, setNotebookTitle] = useState("CPSC 304");
+  const [notebookTitle, setNotebookTitle] = useState("Notebook");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isChatStreaming, setIsChatStreaming] = useState(false);
 
@@ -134,7 +134,9 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
       setActiveNotebookId(urlNotebookId);
-      // Update notebook title when navigating to a notebook via URL
+    }
+    // Update notebook title when the notebook in the URL is found in the loaded notebooks
+    if (urlNotebookId && notebooks.length > 0) {
       const notebook = notebooks.find(nb => nb.id === urlNotebookId);
       if (notebook) {
         setNotebookTitle(notebook.title);
