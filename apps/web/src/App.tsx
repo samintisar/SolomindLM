@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Header } from './shared/ui/Header';
 import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
@@ -1253,13 +1255,17 @@ const AppContent: React.FC = () => {
 // Wrapper component with AuthProvider and BrowserRouter
 const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <>
+      <Analytics />
+      <SpeedInsights />
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </>
   );
 };
 

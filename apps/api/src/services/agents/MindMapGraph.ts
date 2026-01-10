@@ -9,6 +9,7 @@ import {
   invokeWithTimeout,
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
+  validateWithPreset,
   logInfo,
   logWarn,
   logError,
@@ -124,19 +125,32 @@ export type ChunkStateType = typeof ChunkState.State;
 
 const MAP_PROMPT = `You are a Research Assistant analyzing document chunks.
 
+CRITICAL GROUNDING REQUIREMENTS:
+- ONLY extract concepts EXPLICITLY STATED in the content below
+- DO NOT add concepts from your training data
+- DO NOT infer relationships not explicitly mentioned
+- If a concept isn't directly in the text, DO NOT include it
+
 Extract EXACTLY this structure:
 1. **Main Theme:** Single sentence identifying the core subject (max 15 words)
 2. **Summary:** 2-3 sentences covering key points (50-100 words)
 3. **Key Concepts:** Exactly 15 distinct concepts as bullet points
-   - Prioritize: Technical terms, named entities, core ideas
+   - ONLY concepts explicitly mentioned in the source
    - Format: "Concept name: brief context (5-10 words)"
-   - Avoid: Generic terms, duplicates, overly broad categories
+   - Avoid: Generic terms, duplicates, concepts not in source
 
 Input chunk:
 {content}`;
 
 const REDUCE_PROMPT = `You are a Mind Map Architect.
 Analyze the extracted data and create a deep, hierarchical mind map.
+
+CRITICAL GROUNDING REQUIREMENTS:
+- ONLY use concepts and themes from the extracted data below
+- DO NOT add branches, nodes, or concepts not present in the source material
+- DO NOT use generic labels like "Overview", "Introduction", "Conclusion", "Aspect", "Category"
+- Each terminal node must be a specific concept from the source
+- If the extracted data doesn't support a 4-level hierarchy, use fewer levels rather than inventing content
 
 OUTPUT FORMAT:
 - Use Markdown bullet points (* or -).
@@ -150,9 +164,9 @@ MANDATORY STRUCTURE:
 - Level 3-4: Granular concepts (6-8 space indent)
 
 VALIDATION:
-- Minimum 4 levels deep for at least 2 branches
+- Minimum 4 levels deep for at least 2 branches (only if supported by content)
 - No generic labels like "Overview", "Introduction", "Conclusion", "Aspect", "Category"
-- Each terminal node must be a specific concept, not a category
+- Each terminal node must be a specific concept from the source, not a category
 
 EXAMPLE:
 # Machine Learning in Healthcare
@@ -432,6 +446,20 @@ export class MindMapGraph {
       );
 
       const markdown = (response.content[0] as any)?.text || String(response.content);
+
+      // Validate the mind map output
+      const validation = validateWithPreset(markdown, 'mindmap');
+      if (!validation.isValid) {
+        logWarn({
+          agent: 'MindMapGraph',
+          phase: 'reduce',
+          validation: {
+            isValid: validation.isValid,
+            warnings: validation.warnings,
+            score: validation.score,
+          },
+        }, `Mind map validation issues: ${validation.warnings.join(', ')}`);
+      }
 
       const parsedTree = this.parseMarkdownToTree(markdown);
       const elapsed = Date.now() - start;

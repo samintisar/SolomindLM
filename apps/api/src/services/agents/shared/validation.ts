@@ -329,6 +329,25 @@ export const ValidationPresets = {
     requiredSections: ['Introduction', 'Core Concepts', 'Examples'],
     checkTruncation: true,
   } as ValidationConfig,
+
+  /**
+   * Mind map validation
+   */
+  mindmap: {
+    checkTruncation: true,
+    customRules: [
+      (output: string) => {
+        // Check for hierarchical structure (indentation)
+        const hasHierarchy = /^  /m.test(output);
+        // Check for root topic
+        const hasRoot = /^#\s+.+/m.test(output);
+        return {
+          valid: hasHierarchy && hasRoot,
+          message: !hasRoot ? 'Missing root topic (#)' : !hasHierarchy ? 'Missing hierarchical structure' : '',
+        };
+      },
+    ],
+  } as ValidationConfig,
 };
 
 /**
