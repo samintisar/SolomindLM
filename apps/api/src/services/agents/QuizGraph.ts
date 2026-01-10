@@ -172,6 +172,13 @@ REQUIREMENTS:
 - Hints must guide without revealing the answer
 - Questions MUST be self-contained (include all necessary context)
 
+**ANSWER FORMAT CRITICAL:**
+- The "answer" field MUST be a NUMBER representing the 0-based index of the correct option
+- Option indices: 0 = first option, 1 = second option, 2 = third option, 3 = fourth option
+- Example: If the correct answer is the FIRST option, set answer: 0
+- Example: If the correct answer is the SECOND option, set answer: 1
+- DO NOT use letters (A, B, C, D) - use ONLY numbers (0, 1, 2, 3)
+
 **SELF-CONTAINED QUESTIONS:**
 If a question references diagrams, code, or scenarios:
 - Include the relevant content IN the question
@@ -184,8 +191,12 @@ If a question references diagrams, code, or scenarios:
 - Examples: "Consider the order of operations" or "Recall the definition of..."
 
 **EXPLANATION GUIDELINES:**
-- Explain WHY the correct answer is right
-- Connect to key concepts from the material
+- CRITICAL: Your explanation MUST be grounded in the provided source material
+- Reference specific concepts, facts, or quotes from the content above
+- DO NOT hallucinate or rely on outside knowledge
+- If the source doesn't support an explanation, create a different question
+- Example format: "According to the text, [concept]..." or "The material states that..."
+- Explain WHY the correct answer is right using evidence from the material
 
 Content to create questions from:
 ${chunk}`;
@@ -298,25 +309,16 @@ export class QuizGraph {
     const validatedChunks = validateChunks(state.chunks);
     const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE);
 
-    // Dynamic max questions per chunk: fewer chunks → higher max, more chunks → lower max
-    // This ensures we can hit the target without over-generating when there are many chunks
-    // Formula: target divided by chunks, with 1.5x buffer to account for under-generation
-    const dynamicMaxPerChunk = Math.max(
-      4, // Minimum max even with many chunks
-      Math.min(12, Math.ceil(state.questionCount / packedChunks.length * 1.5))
-    );
-
-    let adjustedQuestionCount = state.questionCount;
-    const maxPossibleQuestions = packedChunks.length * dynamicMaxPerChunk;
-
-    if (state.questionCount > maxPossibleQuestions) {
-      console.warn(`[QuizGraph] Target adjustment: ${state.questionCount} questions requested, max possible: ${maxPossibleQuestions}`);
-      adjustedQuestionCount = maxPossibleQuestions;
-    }
-
+    // Calculate questions per chunk with buffer and reasonable max
+    // LLMs can reliably generate 20-25 quality questions per call
+    const BUFFER_MULTIPLIER = 1.5;
+    const MAX_QUESTIONS_PER_CHUNK = 25; // Reasonable LLM limit
     const questionsPerChunk = Math.max(
       GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
-      Math.min(dynamicMaxPerChunk, Math.ceil(adjustedQuestionCount / packedChunks.length))
+      Math.min(
+        MAX_QUESTIONS_PER_CHUNK,
+        Math.ceil(state.questionCount / packedChunks.length * BUFFER_MULTIPLIER)
+      )
     );
 
     console.log(JSON.stringify({
@@ -325,11 +327,8 @@ export class QuizGraph {
       originalChunks: state.chunks.length,
       validatedChunks: validatedChunks.length,
       packedChunks: packedChunks.length,
-      originalTarget: state.questionCount,
-      adjustedTarget: adjustedQuestionCount,
-      dynamicMaxPerChunk,
+      targetQuestionCount: state.questionCount,
       questionsPerChunk,
-      maxPossible: packedChunks.length * dynamicMaxPerChunk,
       difficulty: state.difficulty,
       focus: state.focus,
     }, null, 2));
@@ -342,7 +341,7 @@ export class QuizGraph {
       return new Send('map_process', {
         chunk,
         chunkIndex: idx,
-        questionCount: adjustedQuestionCount,
+        questionCount: state.questionCount,
         difficulty: state.difficulty,
         focus: state.focus,
         questionsPerChunk,
@@ -806,6 +805,30 @@ export class QuizGraph {
       },
     }, `Finalizing ${questions.length} questions`);
 
+    // Validate answer indices are within bounds (0-3)
+    for (const q of questions) {
+      if (typeof q.answer !== 'number' || q.answer < 0 || q.answer > 3) {
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'finalize_questions',
+          question: q.question.substring(0, 100),
+          answer: q.answer,
+        }, `Invalid answer index: ${q.answer} (must be 0-3)`);
+      }
+    }
+
+    // Check explanation quality (minimum length to ensure proper grounding)
+    for (const q of questions) {
+      if (q.explanation.length < 20) {
+        logWarn({
+          agent: 'QuizGraph',
+          phase: 'finalize_questions',
+          question: q.question.substring(0, 100),
+          explanationLength: q.explanation.length,
+        }, `Explanation too short (may indicate poor grounding)`);
+      }
+    }
+
     logInfo({
       agent: 'QuizGraph',
       phase: 'reduce',
@@ -881,6 +904,13 @@ CRITICAL REQUIREMENTS:
 - Quality over quantity: Better to have ${Math.ceil(targetCount * 0.8)} unique questions than ${targetCount} with duplicates
 - Your goal is MAXIMUM SEMANTIC DIVERSITY - each question should test a distinct concept
 
+**ANSWER FORMAT CRITICAL:**
+- The "answer" field MUST be a NUMBER representing the 0-based index of the correct option
+- Option indices: 0 = first option, 1 = second option, 2 = third option, 3 = fourth option
+- Example: If the correct answer is the FIRST option, set answer: 0
+- Example: If the correct answer is the SECOND option, set answer: 1
+- DO NOT use letters (A, B, C, D) - use ONLY numbers (0, 1, 2, 3)
+
 SIMILARITY DETECTION GUIDELINES:
 Questions are considered similar if they:
 - Ask about the same concept using different wording (e.g., "What is X?" vs "Define X")
@@ -894,6 +924,13 @@ When you find similar questions:
 - Create a single, clearer question with proper distractors
 - Ensure the merged question is self-contained
 - Keep the most comprehensive explanation
+
+**EXPLANATION GUIDELINES:**
+- CRITICAL: Your explanation MUST be grounded in the provided source material
+- Reference specific concepts, facts, or quotes from the content above
+- DO NOT hallucinate or rely on outside knowledge
+- If the source doesn't support an explanation, create a different question
+- Example format: "According to the text, [concept]..." or "The material states that..."
 
 Return the FULL, COMPLETE question objects for your selections.
 

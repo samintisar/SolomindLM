@@ -49,11 +49,6 @@ const FLASHCARD_CONFIG = {
   MAP_CHUNK_SIZE: parseInt(env.FLASHCARD_MAP_CHUNK_SIZE || '30000', 10),
   // Reduce phase: smart_llm (261K tokens) → 60K chars ≈ 15K tokens (~6% of context)
   REDUCE_CHUNK_SIZE: parseInt(env.FLASHCARD_REDUCE_CHUNK_SIZE || '60000', 10),
-  // Cards per chunk bounds
-  MIN_CARDS_PER_CHUNK: parseInt(env.FLASHCARD_MIN_CARDS_PER_CHUNK || '2', 10),
-  MAX_CARDS_PER_CHUNK: parseInt(env.FLASHCARD_MAX_CARDS_PER_CHUNK || '5', 10),
-  // Minimum chunks to process
-  MIN_CHUNKS: parseInt(env.FLASHCARD_MIN_CHUNKS || '3', 10),
   // Timeout settings for LLM calls
   MAP_TIMEOUT_MS: parseInt(env.FLASHCARD_MAP_TIMEOUT_MS || '180000', 10), // 3 minutes
   REDUCE_TIMEOUT_MS: parseInt(env.FLASHCARD_REDUCE_TIMEOUT_MS || '240000', 10), // 4 minutes
@@ -393,20 +388,17 @@ export class FlashcardGraph {
     // Step 2: Pack chunks into optimal sizes for map phase (fast_llm)
     const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE);
 
-    // Step 3: Intelligent target adjustment for edge cases
-    let adjustedCardCount = state.cardCount;
-    const maxPossibleCards = packedChunks.length * GRAPH_CONFIG.MAX_CARDS_PER_CHUNK;
-
-    // If document is too small for requested card count, adjust target
-    if (state.cardCount > maxPossibleCards) {
-      console.warn(`[FlashcardGraph] ⚠️ Target adjustment: ${state.cardCount} cards requested, max possible: ${maxPossibleCards}`);
-      adjustedCardCount = maxPossibleCards;
-    }
-
-    // Calculate cards per chunk, clamped to configured bounds
+    // Step 3: Calculate cards per chunk with buffer and reasonable max
+    // LLMs can reliably generate 25-30 quality cards per call
+    const MIN_CARDS_PER_CHUNK = 2;
+    const BUFFER_MULTIPLIER = 1.5;
+    const MAX_CARDS_PER_CHUNK = 30; // Reasonable LLM limit
     const cardsPerChunk = Math.max(
-      GRAPH_CONFIG.MIN_CARDS_PER_CHUNK,
-      Math.min(GRAPH_CONFIG.MAX_CARDS_PER_CHUNK, Math.ceil(adjustedCardCount / packedChunks.length))
+      MIN_CARDS_PER_CHUNK,
+      Math.min(
+        MAX_CARDS_PER_CHUNK,
+        Math.ceil(state.cardCount / packedChunks.length * BUFFER_MULTIPLIER)
+      )
     );
 
     console.log(JSON.stringify({
@@ -415,8 +407,7 @@ export class FlashcardGraph {
       originalChunks: state.chunks.length,
       validatedChunks: validatedChunks.length,
       packedChunks: packedChunks.length,
-      originalTarget: state.cardCount,
-      adjustedTarget: adjustedCardCount,
+      targetCardCount: state.cardCount,
       cardsPerChunk,
       difficulty: state.difficulty,
       topic: state.topic,
@@ -424,14 +415,14 @@ export class FlashcardGraph {
 
     console.log(`[FlashcardGraph] Creating ${packedChunks.length} parallel map tasks (~${cardsPerChunk} cards/chunk)`);
 
-    // Create Send objects with adjusted values
+    // Create Send objects
     return packedChunks.map((chunk, idx) => {
       const preview = chunk.substring(0, 100).replace(/\n/g, ' ');
       console.log(`  [Task ${idx + 1}/${packedChunks.length}] ${preview}... (${chunk.length} chars)`);
       return new Send('map_process', {
         chunk,
         chunkIndex: idx,
-        cardCount: adjustedCardCount,
+        cardCount: state.cardCount,
         difficulty: state.difficulty,
         topic: state.topic,
         cardsPerChunk,
@@ -774,9 +765,9 @@ Return the complete selected flashcards as a JSON array.`;
 
     let selected = (response as FlashcardResponse).flashcards;
     
-    // Clean up any trailing enumeration numbers from structured output (defensive)
+    // Clean up any trailing artifacts from structured output (defensive)
     selected = selected.map(card => ({
-      front: card.front,
+      front: this.cleanFrontText(card.front),
       back: this.cleanBackText(card.back),
     }));
     
@@ -794,40 +785,162 @@ Return the complete selected flashcards as a JSON array.`;
       topicDistribution: topicGroups,
     });
 
-    // Fallback: if parsing failed or returned wrong count, take first N
+    // Enhanced fallback: handle various edge cases
     if (selected.length === 0) {
       logWarn({
         agent: 'FlashcardGraph',
         phase: 'refine_selection',
         issue: 'parsing_failed',
-      }, 'Parsing failed, using simple trim');
-      return flashcards.slice(0, targetCount);
+      }, 'Parsing failed, using heuristic selection with deduplication');
+
+      // Fallback: Apply heuristic deduplication and then select
+      return this.heuristicDeduplicateAndSelect(flashcards, targetCount);
     }
 
-    // If still over limit, trim the excess (this shouldn't happen with a good prompt)
+    // If still over limit, apply intelligent trimming (respecting semantic diversity)
     if (selected.length > targetCount) {
       logWarn({
         agent: 'FlashcardGraph',
         phase: 'refine_selection',
         selectedCount: selected.length,
         targetCount,
-      }, `Got ${selected.length}, trimming to ${targetCount}`);
-      return selected.slice(0, targetCount);
+      }, `Got ${selected.length}, applying semantic-aware trimming to ${targetCount}`);
+      return this.trimBySemanticDiversity(selected, targetCount);
     }
 
-    // If under limit, take what we got plus fill from end to avoid losing topics
+    // If under limit, fill from remaining (also respecting semantic diversity)
     if (selected.length < targetCount) {
       logWarn({
         agent: 'FlashcardGraph',
         phase: 'refine_selection',
         selectedCount: selected.length,
         targetCount,
-      }, `Got ${selected.length}, adding ${targetCount - selected.length} more`);
-      const remaining = flashcards.slice(-(targetCount - selected.length));
-      return [...selected, ...remaining];
+      }, `Got ${selected.length}, filling ${targetCount - selected.length} more with semantic awareness`);
+
+      const remaining = flashcards.filter(f =>
+        !selected.some(s => s.front === f.front && s.back === f.back)
+      );
+      const additional = this.trimBySemanticDiversity(remaining, targetCount - selected.length);
+      return [...selected, ...additional];
     }
 
     return selected;
+  }
+
+  /**
+   * Heuristic deduplication and selection when LLM fails.
+   * Uses similarity detection to remove duplicates, then selects by semantic diversity.
+   */
+  private heuristicDeduplicateAndSelect(
+    flashcards: Flashcard[],
+    targetCount: number
+  ): Flashcard[] {
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'heuristic_deduplication',
+      inputCount: flashcards.length,
+      targetCount,
+    }, 'Applying heuristic deduplication...');
+
+    // Detect duplicates
+    const duplicateGroups = this.detectSimilarFlashcards(flashcards);
+
+    // Track indices to keep
+    const indicesToRemove = new Set<number>();
+
+    for (const group of duplicateGroups) {
+      // Keep the first card, mark rest for removal
+      for (let i = 1; i < group.flashcards.length; i++) {
+        indicesToRemove.add(group.flashcards[i].index);
+      }
+    }
+
+    // Filter out duplicates
+    const deduplicated = flashcards.filter((_, idx) => !indicesToRemove.has(idx));
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'heuristic_deduplication_complete',
+      originalCount: flashcards.length,
+      duplicatesRemoved: indicesToRemove.size,
+      remainingCount: deduplicated.length,
+    }, `Removed ${indicesToRemove.size} duplicates`);
+
+    // Select by semantic diversity
+    return this.trimBySemanticDiversity(deduplicated, targetCount);
+  }
+
+  /**
+   * Trim flashcards to target count while respecting semantic diversity.
+   * Prioritizes removing duplicates and keeping diverse concepts.
+   * Does NOT enforce strict topic limits - allows more cards on a topic if they test different concepts.
+   */
+  private trimBySemanticDiversity(flashcards: Flashcard[], targetCount: number): Flashcard[] {
+    if (flashcards.length <= targetCount) {
+      return flashcards;
+    }
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'trim_semantic_diversity',
+      inputCount: flashcards.length,
+      targetCount,
+    }, 'Trimming with semantic diversity...');
+
+    // Step 1: Detect duplicates and mark them for removal
+    const duplicateGroups = this.detectSimilarFlashcards(flashcards);
+    const indicesToRemove = new Set<number>();
+
+    for (const group of duplicateGroups) {
+      // Keep the first card, mark rest for removal
+      for (let i = 1; i < group.flashcards.length; i++) {
+        indicesToRemove.add(group.flashcards[i].index);
+      }
+    }
+
+    // Step 2: Filter out duplicates
+    const deduplicated = flashcards.filter((_, idx) => !indicesToRemove.has(idx));
+
+    // Step 3: If still over count, select evenly from different topics
+    if (deduplicated.length <= targetCount) {
+      return deduplicated.slice(0, targetCount);
+    }
+
+    // Group by topic
+    const topicGroups: Record<string, Flashcard[]> = {};
+    for (const card of deduplicated) {
+      const topic = this.extractTopic(card);
+      if (!topicGroups[topic]) {
+        topicGroups[topic] = [];
+      }
+      topicGroups[topic].push(card);
+    }
+
+    // Select evenly from each topic (prioritizing diversity, but allowing concentration on user's topic)
+    const selected: Flashcard[] = [];
+    const topics = Object.keys(topicGroups);
+
+    // Take cards evenly from each topic
+    const cardsPerTopic = Math.ceil(targetCount / topics.length);
+
+    for (const topic of topics) {
+      const cards = topicGroups[topic].slice(0, cardsPerTopic);
+      selected.push(...cards);
+
+      if (selected.length >= targetCount) {
+        break;
+      }
+    }
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'trim_semantic_diversity_complete',
+      outputCount: selected.length,
+      duplicatesRemoved: indicesToRemove.size,
+      topicsRepresented: topics.length,
+    }, `Trimmed to ${selected.length} cards with semantic diversity`);
+
+    return selected.slice(0, targetCount);
   }
 
   // Extract topic from a flashcard for topic distribution logging
@@ -898,8 +1011,33 @@ Return the complete selected flashcards as a JSON array.`;
   }
 
   /**
-   * Detect semantically similar flashcards using simple heuristics.
-   * Provides visibility into potential duplicates for logging.
+   * Calculate Levenshtein distance for character-level similarity.
+   * Used to detect rewordings and slight variations.
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const m = str1.length;
+    const n = str2.length;
+    const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1];
+        } else {
+          dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+      }
+    }
+
+    return dp[m][n];
+  }
+
+  /**
+   * Detect semantically similar flashcards using multi-dimensional heuristics.
+   * Enhanced to catch more duplicates with improved accuracy.
    */
   private detectSimilarFlashcards(flashcards: Flashcard[]): Array<{
     similarity: string;
@@ -912,26 +1050,110 @@ Return the complete selected flashcards as a JSON array.`;
       reason: string;
     }> = [];
 
+    // Helper to normalize text for comparison
+    const normalizeText = (text: string): string => {
+      return text
+        .toLowerCase()
+        .replace(/\\"/g, '"') // Remove escaped quotes
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/[^\w\s]/g, '') // Remove punctuation
+        .trim();
+    };
+
+    // Helper to extract words
+    const extractWords = (text: string): Set<string> => {
+      const normalized = normalizeText(text);
+      const words = normalized.match(/\b\w+\b/g) || [];
+      return new Set(words);
+    };
+
     for (let i = 0; i < flashcards.length; i++) {
       for (let j = i + 1; j < flashcards.length; j++) {
         const f1 = flashcards[i];
         const f2 = flashcards[j];
 
-        // Check for word overlap in front text (> 70% shared words)
-        const words1 = new Set(f1.front.toLowerCase().match(/\b\w+\b/g) || []);
-        const words2 = new Set(f2.front.toLowerCase().match(/\b\w+\b/g) || []);
+        // Check 1: Front text word overlap (>70%)
+        const words1 = extractWords(f1.front);
+        const words2 = extractWords(f2.front);
         const intersection = [...words1].filter(w => words2.has(w));
         const union = new Set([...words1, ...words2]);
-        const overlap = intersection.length / union.size;
+        const frontOverlap = intersection.length / union.size;
 
-        if (overlap > 0.7) {
+        if (frontOverlap > 0.7) {
           duplicates.push({
-            similarity: 'high_word_overlap',
+            similarity: 'high_front_overlap',
             flashcards: [
               { index: i, front: f1.front, back: f1.back },
               { index: j, front: f2.front, back: f2.back },
             ],
-            reason: `High word overlap: ${(overlap * 100).toFixed(0)}%`,
+            reason: `Front word overlap: ${(frontOverlap * 100).toFixed(0)}%`,
+          });
+          continue; // Already detected, skip other checks
+        }
+
+        // Check 2: Back text word overlap (>75% - stricter for answers)
+        const backWords1 = extractWords(f1.back);
+        const backWords2 = extractWords(f2.back);
+        const backIntersection = [...backWords1].filter(w => backWords2.has(w));
+        const backUnion = new Set([...backWords1, ...backWords2]);
+        const backOverlap = backIntersection.length / backUnion.size;
+
+        if (backOverlap > 0.75) {
+          duplicates.push({
+            similarity: 'high_back_overlap',
+            flashcards: [
+              { index: i, front: f1.front, back: f1.back },
+              { index: j, front: f2.front, back: f2.back },
+            ],
+            reason: `Back word overlap: ${(backOverlap * 100).toFixed(0)}%`,
+          });
+          continue;
+        }
+
+        // Check 3: Same definition pattern (e.g., "Define X" vs "What is X")
+        const normalizedFront1 = normalizeText(f1.front);
+        const normalizedFront2 = normalizeText(f2.front);
+
+        const isDefinition1 = /^(what is|define|explain|describe)/.test(normalizedFront1);
+        const isDefinition2 = /^(what is|define|explain|describe)/.test(normalizedFront2);
+
+        if (isDefinition1 && isDefinition2) {
+          // Extract the last word or phrase as the potential term being defined
+          const words1Arr = normalizedFront1.split(/\s+/);
+          const words2Arr = normalizedFront2.split(/\s+/);
+          const term1 = words1Arr[words1Arr.length - 1] || '';
+          const term2 = words2Arr[words2Arr.length - 1] || '';
+
+          if (term1 === term2 && term1.length > 2) {
+            duplicates.push({
+              similarity: 'same_definition_pattern',
+              flashcards: [
+                { index: i, front: f1.front, back: f1.back },
+                { index: j, front: f2.front, back: f2.back },
+              ],
+              reason: `Both define same term: "${term1}"`,
+            });
+            continue;
+          }
+        }
+
+        // Check 4: Character sequence similarity (catches slight rewordings)
+        const charSimilarity = (s1: string, s2: string): number => {
+          const longer = s1.length > s2.length ? s1 : s2;
+          const shorter = s1.length > s2.length ? s2 : s1;
+          if (longer.length === 0) return 1.0;
+          return (longer.length - this.levenshteinDistance(longer, shorter)) / longer.length;
+        };
+
+        const frontCharSim = charSimilarity(normalizedFront1, normalizedFront2);
+        if (frontCharSim > 0.85) {
+          duplicates.push({
+            similarity: 'high_character_similarity',
+            flashcards: [
+              { index: i, front: f1.front, back: f1.back },
+              { index: j, front: f2.front, back: f2.back },
+            ],
+            reason: `Character similarity: ${(frontCharSim * 100).toFixed(0)}%`,
           });
         }
       }
@@ -974,25 +1196,63 @@ Return the complete selected flashcards as a JSON array.`;
       phase: 'reduce_before_parsing',
       combinedLength: combined.length,
       totalQuestionsExtracted: totalQuestionsBefore,
-    }, `Skipping LLM reduce, parsing ${totalQuestionsBefore} cards directly from map outputs...`);
+    }, `Parsing ${totalQuestionsBefore} cards from map outputs for refinement...`);
 
-    // Parse directly from map outputs - no LLM call needed
-    const flashcards = this.fallbackParseFlashcards(combined);
+    // Step 1: Parse all cards from map outputs
+    const parsedFlashcards = this.fallbackParseFlashcards(combined);
 
-    // Log topic distribution
-    const topicDistribution = this.groupFlashcardsByTopic(flashcards);
     logInfo({
       agent: 'FlashcardGraph',
-      phase: 'reduce_after_parsing',
-      flashcardsGenerated: flashcards.length,
+      phase: 'reduce_after_initial_parse',
+      initialCardCount: parsedFlashcards.length,
+    }, `Parsed ${parsedFlashcards.length} flashcards - running LLM refinement...`);
+
+    // Step 2: ALWAYS run LLM refinement for quality control
+    let finalFlashcards: Flashcard[];
+
+    // If still no flashcards, this is a critical failure
+    if (parsedFlashcards.length === 0) {
+      logError({
+        agent: 'FlashcardGraph',
+        phase: 'reduce',
+        error: 'No flashcards parsed',
+        totalQuestionsBefore,
+      }, `CRITICAL: No flashcards parsed despite ${totalQuestionsBefore} input questions!`);
+      return {
+        ...state,
+        finalOutput: [],
+        status: 'failed',
+      };
+    }
+
+    // Step 3: Apply LLM refinement (handles deduplication, merging, semantic diversity)
+    finalFlashcards = await this.refineFlashcardSelection(
+      parsedFlashcards,
+      state.cardCount,
+      state.difficulty,
+      state.topic
+    );
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'reduce_after_refinement',
+      refinedCount: finalFlashcards.length,
+      originalCount: parsedFlashcards.length,
+    }, `LLM refinement complete: ${parsedFlashcards.length} → ${finalFlashcards.length} cards`);
+
+    // Log topic distribution AFTER refinement
+    const topicDistribution = this.groupFlashcardsByTopic(finalFlashcards);
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'reduce_topic_distribution',
       topicDistribution,
-    }, `Parsed ${flashcards.length} flashcards from map outputs`);
+    }, `Final topic distribution across ${finalFlashcards.length} cards`);
 
     // Log all generated flashcards for analysis
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce_flashcards_detail',
-      flashcards: flashcards.map((card, idx) => ({
+      flashcards: finalFlashcards.map((card, idx) => ({
         index: idx + 1,
         front: card.front,
         backLength: card.back.length,
@@ -1001,7 +1261,7 @@ Return the complete selected flashcards as a JSON array.`;
     });
 
     // Validate flashcard quality
-    const validation = validateFlashcards(JSON.stringify(flashcards), state.cardCount);
+    const validation = validateFlashcards(JSON.stringify(finalFlashcards), state.cardCount);
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce_validation',
@@ -1015,41 +1275,26 @@ Return the complete selected flashcards as a JSON array.`;
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce',
-      flashcardsGenerated: flashcards.length,
+      flashcardsGenerated: finalFlashcards.length,
       targetCardCount: state.cardCount,
-    }, `Generated ${flashcards.length} flashcards (target: ${state.cardCount})`);
-
-    // If still no flashcards, this is a critical failure
-    if (flashcards.length === 0) {
-      logError({
-        agent: 'FlashcardGraph',
-        phase: 'reduce',
-        error: 'No flashcards generated',
-        totalQuestionsBefore,
-      }, `CRITICAL: No flashcards generated despite ${totalQuestionsBefore} input questions!`);
-      return {
-        ...state,
-        finalOutput: [],
-        status: 'failed',
-      };
-    }
+    }, `Generated ${finalFlashcards.length} flashcards (target: ${state.cardCount})`);
 
     // Log if count doesn't match target (LLM should handle exact count in reduce phase)
-    if (flashcards.length !== state.cardCount) {
+    if (finalFlashcards.length !== state.cardCount) {
       logWarn({
         agent: 'FlashcardGraph',
         phase: 'reduce_count_mismatch',
-        generatedCount: flashcards.length,
+        generatedCount: finalFlashcards.length,
         targetCount: state.cardCount,
-      }, `LLM returned ${flashcards.length} cards, target was ${state.cardCount}. Accepting LLM result.`);
+      }, `LLM returned ${finalFlashcards.length} cards, target was ${state.cardCount}. Accepting LLM result.`);
     }
 
     // Log final cards
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce_final',
-      finalFlashcardCount: flashcards.length,
-      finalFlashcards: flashcards.map((card, idx) => ({
+      finalFlashcardCount: finalFlashcards.length,
+      finalFlashcards: finalFlashcards.map((card, idx) => ({
         index: idx + 1,
         front: card.front,
         backLength: card.back.length,
@@ -1061,7 +1306,7 @@ Return the complete selected flashcards as a JSON array.`;
       {
         agent: 'FlashcardGraph',
         phase: 'generation_complete',
-        finalFlashcardCount: flashcards.length,
+        finalFlashcardCount: finalFlashcards.length,
         targetCardCount: state.cardCount,
       },
       'GENERATION COMPLETE'
@@ -1069,28 +1314,77 @@ Return the complete selected flashcards as a JSON array.`;
 
     return {
       ...state,
-      finalOutput: flashcards,
+      finalOutput: finalFlashcards,
       status: 'completed',
       progress: {
         phase: 'reduce',
         percentage: 100,
-        message: `Completed: ${flashcards.length} flashcards generated`,
-        cardsGenerated: flashcards.length,
+        message: `Completed: ${finalFlashcards.length} flashcards generated`,
+        cardsGenerated: finalFlashcards.length,
       },
     };
   }
 
   /**
-   * Cleans up the back text by removing trailing enumeration numbers
-   * (e.g., "2.", "3.") that the LLM sometimes adds
+   * Cleans up the front text by removing formatting artifacts.
+   * Enhanced to handle escaped quotes and markdown issues.
    */
-  private cleanBackText(back: string): string {
-    // Remove trailing enumeration numbers like "2.", "3.", "10." etc.
-    // Pattern matches: optional whitespace, followed by digits, followed by a period, at end of string
-    return back.replace(/\s*\d+\.\s*$/, '').trim();
+  private cleanFrontText(front: string): string {
+    let cleaned = front.trim();
+
+    // Remove escaped quotes (\"pure\" → "pure")
+    cleaned = cleaned.replace(/\\"/g, '"');
+
+    // Remove trailing markdown formatting artifacts
+    cleaned = cleaned.replace(/\s*[*_~]{1,2}\s*$/, '');
+
+    // Remove trailing enumeration numbers
+    cleaned = cleaned.replace(/\s*\d+\.\s*$/, '');
+
+    // Remove trailing whitespace
+    cleaned = cleaned.trim();
+
+    // Fix common markdown issues
+    cleaned = cleaned.replace(/\*\*\s*\*/g, '**'); // Fix ** *
+    cleaned = cleaned.replace(/\*\s*\*/g, '**');   // Fix * *
+
+    // Remove leading bullets if present
+    cleaned = cleaned.replace(/^[\s\-•*]\*/, '');
+
+    return cleaned.trim();
   }
 
-  // Fallback parser for when structured output fails
+  /**
+   * Cleans up the back text by removing formatting artifacts.
+   * Enhanced to handle escaped quotes and weird punctuation.
+   */
+  private cleanBackText(back: string): string {
+    let cleaned = back.trim();
+
+    // Remove escaped quotes
+    cleaned = cleaned.replace(/\\"/g, '"');
+
+    // Remove trailing enumeration numbers
+    cleaned = cleaned.replace(/\s*\d+\.\s*$/, '');
+
+    // Remove markdown artifacts at end
+    cleaned = cleaned.replace(/\s*[*_~]{1,2}\s*$/, '');
+
+    // Fix common punctuation issues (e.g., "concept."")
+    cleaned = cleaned.replace(/"\./g, '".');  // Fix ". scenarios
+    cleaned = cleaned.replace(/\.\./g, '.');  // Fix double periods
+
+    // Remove trailing punctuation that's clearly an artifact
+    cleaned = cleaned.replace(/[,;:\s]+$/, '');
+
+    // Clean up multiple spaces
+    cleaned = cleaned.replace(/\s{2,}/g, ' ');
+
+    return cleaned.trim();
+  }
+
+  // Parser for text-based flashcard output (Q: ... A: ... format)
+  // Used in reduce phase to parse map outputs
   private fallbackParseFlashcards(content: string): Flashcard[] {
     logInfo({
       agent: 'FlashcardGraph',
@@ -1106,10 +1400,11 @@ Return the complete selected flashcards as a JSON array.`;
     let match: RegExpExecArray | null;
 
     while ((match = qaPattern.exec(content)) !== null) {
-      const front = match[1].trim();
+      let front = match[1].trim();
       let back = match[2].trim();
       
-      // Clean up trailing enumeration numbers
+      // Clean up trailing artifacts from both front and back
+      front = this.cleanFrontText(front);
       back = this.cleanBackText(back);
 
       if (front.length > 0 && back.length > 0) {
@@ -1132,56 +1427,6 @@ Return the complete selected flashcards as a JSON array.`;
       phase: 'fallback_parse_regex',
       extractedCount: flashcards.length,
     }, `Regex extraction: ${flashcards.length} cards`);
-
-    // If regex failed, try to extract from raw Q:/A: patterns individually
-    if (flashcards.length === 0) {
-      const lines = content.split('\n');
-      let currentFront = '';
-      let currentBack = '';
-
-      for (const line of lines) {
-        const qMatch = line.match(/^Q:\s*(.+)/);
-        const aMatch = line.match(/^A:\s*(.+)/);
-
-        if (qMatch) {
-          if (currentFront && currentBack) {
-            let cleanedBack = this.cleanBackText(currentBack.trim());
-            const card: Flashcard = { front: currentFront, back: cleanedBack };
-            // Validate that flashcard is self-contained
-            if (this.validateSelfContained(card)) {
-              flashcards.push(card);
-            } else {
-              failedValidationCount++;
-            }
-          }
-          currentFront = qMatch[1].trim();
-          currentBack = '';
-        } else if (aMatch) {
-          currentBack += aMatch[1].trim() + ' ';
-        } else if (currentFront && !currentBack) {
-          // Continuation of answer
-          currentBack += line.trim() + ' ';
-        }
-      }
-
-      // Add the last card
-      if (currentFront && currentBack) {
-        let cleanedBack = this.cleanBackText(currentBack.trim());
-        const card: Flashcard = { front: currentFront, back: cleanedBack };
-        // Validate that flashcard is self-contained
-        if (this.validateSelfContained(card)) {
-          flashcards.push(card);
-        } else {
-          failedValidationCount++;
-        }
-      }
-
-      logInfo({
-        agent: 'FlashcardGraph',
-        phase: 'fallback_parse_line_by_line',
-        extractedCount: flashcards.length,
-      }, `Line-by-line extraction: ${flashcards.length} cards`);
-    }
 
     logInfo({
       agent: 'FlashcardGraph',

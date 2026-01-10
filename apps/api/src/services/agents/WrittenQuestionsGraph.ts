@@ -327,32 +327,23 @@ export class WrittenQuestionsGraph {
 
     const chunkCount = state.chunks.length;
 
-    // Dynamic max calculation with buffer
+    // Calculate questions per chunk with buffer and reasonable max
+    // LLMs can reliably generate 20-25 quality questions per call
+    const MAX_QUESTIONS_PER_CHUNK = 25; // Reasonable LLM limit
     const questionsPerChunk = Math.max(
       GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
       Math.min(
-        GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK,
+        MAX_QUESTIONS_PER_CHUNK,
         Math.ceil(state.questionCount / chunkCount * GRAPH_CONFIG.DYNAMIC_BUFFER_MULTIPLIER)
       )
     );
-
-    // Adjust target if impossible to reach
-    let adjustedQuestionCount = state.questionCount;
-    const maxPossibleQuestions = chunkCount * questionsPerChunk;
-
-    if (state.questionCount > maxPossibleQuestions) {
-      console.warn(`[WrittenQuestionsGraph] Target adjustment: ${state.questionCount} requested, max possible: ${maxPossibleQuestions}`);
-      adjustedQuestionCount = maxPossibleQuestions;
-    }
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       phase: 'route_to_map',
       packedChunks: chunkCount,
       targetQuestionCount: state.questionCount,
-      adjustedQuestionCount,
       questionsPerChunk,
-      maxPossibleQuestions,
       difficulty: state.difficulty,
       questionType: state.questionType,
       focus: state.focus || 'none',
@@ -367,7 +358,7 @@ export class WrittenQuestionsGraph {
         chunk,
         chunkIndex: idx,
         retryCount: 0,
-        questionCount: adjustedQuestionCount,
+        questionCount: state.questionCount,
         difficulty: state.difficulty,
         questionType: state.questionType,
         focus: state.focus,
