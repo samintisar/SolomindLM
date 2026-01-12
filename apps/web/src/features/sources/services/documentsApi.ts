@@ -10,9 +10,6 @@ export const documentsApi = {
     noteId: string,
     file: File
   ): Promise<UploadResponse> {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:8',message:'uploadFile entry',data:{userId,noteId,fileName:file.name,fileSize:file.size,fileType:file.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!userId || !noteId) {
       throw new Error('userId and noteId are required');
     }
@@ -23,27 +20,14 @@ export const documentsApi = {
     formData.append('noteId', noteId);
     formData.append('type', 'file');
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:23',message:'Before apiUpload call',data:{url:'/api/documents/upload',formDataKeys:Array.from(formData.keys())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     const response = await apiUpload('/api/documents/upload', formData);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:25',message:'After apiUpload response',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     if (!response.ok) {
-      // #region agent log
-      const errorBody = await response.json().catch(()=>({}));
-      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:27',message:'Upload response not ok',data:{status:response.status,statusText:response.statusText,errorBody},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       const error = await response.json();
       throw new Error(error.error || 'Upload failed');
     }
 
     const result = await response.json();
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:32',message:'Upload success',data:{documentId:result.documentId,status:result.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return result;
   },
 
@@ -124,22 +108,13 @@ export const documentsApi = {
       params.append('noteId', noteId);
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:104',message:'getDocuments request',data:{userId,noteId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     const response = await apiGet(`/api/documents?${params.toString()}`);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:110',message:'getDocuments response',data:{status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     if (!response.ok) {
       throw new Error('Failed to fetch documents');
     }
 
     const docs = await response.json();
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:116',message:'getDocuments parsed',data:{count:Array.isArray(docs)?docs.length:0,statuses:Array.isArray(docs)?docs.map((d:any)=>({id:d.id,status:d.status})):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     return docs;
   },
 
@@ -167,19 +142,9 @@ export const documentsApi = {
    * Get the full content of a document (reconstructed from chunks)
    */
   async getDocumentContent(documentId: string): Promise<string> {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:142',message:'getDocumentContent entry',data:{documentId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     const response = await apiGet(`/api/documents/${documentId}/content`);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:145',message:'getDocumentContent response',data:{documentId,status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     if (!response.ok) {
-      // #region agent log
-      const errorBody = await response.json().catch(()=>({}));
-      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:147',message:'getDocumentContent error',data:{documentId,status:response.status,errorBody},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       throw new Error('Failed to fetch document content');
     }
 
