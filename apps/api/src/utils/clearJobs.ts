@@ -8,7 +8,9 @@ async function clearJobs() {
 
   try {
     // Create a new pool for this operation
-    // SSL configuration: Allow self-signed certs in development
+    // SSL configuration: Supabase requires self-signed certs to be allowed
+    const isSupabaseDatabase = env.DATABASE_URL?.toLowerCase().includes('supabase') || 
+                               env.DATABASE_URL?.toLowerCase().includes('.supabase.co');
     const isCloudDeployment = !!(
       process.env.RAILWAY_ENVIRONMENT ||
       process.env.VERCEL ||
@@ -16,9 +18,11 @@ async function clearJobs() {
       process.env.AWS_LAMBDA_FUNCTION_NAME
     );
     const isProductionDeployment = env.NODE_ENV === 'production' && isCloudDeployment;
+    const shouldRejectUnauthorized = isProductionDeployment && !isSupabaseDatabase;
+    
     pool = new Pool({
       connectionString: env.DATABASE_URL,
-      ssl: isProductionDeployment ? {
+      ssl: shouldRejectUnauthorized ? {
         rejectUnauthorized: true,
       } : {
         rejectUnauthorized: false,

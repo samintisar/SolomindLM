@@ -17,9 +17,12 @@ const poolMax = DB_POOL_MAX > 0 ? DB_POOL_MAX : CALCULATED_POOL_MAX;
 
 // Create a PostgreSQL connection pool for Graphile Worker
 // Optimized for I/O-bound AI/LLM tasks with external API calls
-// SSL configuration: Allow self-signed certs in development, enforce strict SSL only in production deployments
-// Note: When running locally against production databases (e.g., Supabase), we need to allow self-signed certs
-// Check if we're in an actual cloud deployment (Railway, Vercel, etc.)
+// SSL configuration: Supabase uses certificates not in standard trust chain, so we allow self-signed certs
+// Check if database is Supabase (Supabase requires self-signed certs to be allowed)
+const isSupabaseDatabase = env.DATABASE_URL?.toLowerCase().includes('supabase') || 
+                           env.DATABASE_URL?.toLowerCase().includes('.supabase.co');
+// For Supabase, always allow self-signed certs (Supabase's CA isn't in standard trust chain)
+// For other databases in production, enforce strict SSL
 const isCloudDeployment = !!(
   process.env.RAILWAY_ENVIRONMENT ||
   process.env.VERCEL ||
@@ -27,17 +30,19 @@ const isCloudDeployment = !!(
   process.env.AWS_LAMBDA_FUNCTION_NAME
 );
 const isProductionDeployment = env.NODE_ENV === 'production' && isCloudDeployment;
+const shouldRejectUnauthorized = isProductionDeployment && !isSupabaseDatabase;
+
 export const pgPool = new Pool({
   connectionString: env.DATABASE_URL,
   max: poolMax,
   min: Math.ceil(poolMax / 3), // Keep ~30% of connections ready (reduced from fixed 5)
   idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
   connectionTimeoutMillis: 5000, // Fail fast if can't get connection
-  // SSL configuration: Strict only in actual production deployments, allow self-signed in dev/local
-  ssl: isProductionDeployment ? {
-    rejectUnauthorized: true, // Enforce valid SSL certificates in production
+  // SSL configuration: Allow self-signed certs for Supabase, strict for other DBs in production
+  ssl: shouldRejectUnauthorized ? {
+    rejectUnauthorized: true, // Enforce valid SSL certificates for non-Supabase databases in production
   } : {
-    rejectUnauthorized: false, // Allow self-signed certs for local development and testing
+    rejectUnauthorized: false, // Allow self-signed certs for Supabase and local development
   },
 });
 
