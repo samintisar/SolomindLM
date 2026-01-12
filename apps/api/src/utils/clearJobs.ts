@@ -8,8 +8,21 @@ async function clearJobs() {
 
   try {
     // Create a new pool for this operation
+    // SSL configuration: Allow self-signed certs in development
+    const isCloudDeployment = !!(
+      process.env.RAILWAY_ENVIRONMENT ||
+      process.env.VERCEL ||
+      process.env.HEROKU_APP_NAME ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME
+    );
+    const isProductionDeployment = env.NODE_ENV === 'production' && isCloudDeployment;
     pool = new Pool({
       connectionString: env.DATABASE_URL,
+      ssl: isProductionDeployment ? {
+        rejectUnauthorized: true,
+      } : {
+        rejectUnauthorized: false,
+      },
     });
 
     // Initialize worker utilities

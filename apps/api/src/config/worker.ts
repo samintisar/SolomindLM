@@ -17,16 +17,28 @@ const poolMax = DB_POOL_MAX > 0 ? DB_POOL_MAX : CALCULATED_POOL_MAX;
 
 // Create a PostgreSQL connection pool for Graphile Worker
 // Optimized for I/O-bound AI/LLM tasks with external API calls
+// SSL configuration: Allow self-signed certs in development, enforce strict SSL only in production deployments
+// Note: When running locally against production databases (e.g., Supabase), we need to allow self-signed certs
+// Check if we're in an actual cloud deployment (Railway, Vercel, etc.)
+const isCloudDeployment = !!(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.VERCEL ||
+  process.env.HEROKU_APP_NAME ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME
+);
+const isProductionDeployment = env.NODE_ENV === 'production' && isCloudDeployment;
 export const pgPool = new Pool({
   connectionString: env.DATABASE_URL,
   max: poolMax,
   min: Math.ceil(poolMax / 3), // Keep ~30% of connections ready (reduced from fixed 5)
   idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
   connectionTimeoutMillis: 5000, // Fail fast if can't get connection
-  // Security: Enforce SSL/TLS for database connections
-  ssl: env.NODE_ENV === 'production' ? {
-    rejectUnauthorized: true, // Enforce valid SSL certificates
-  } : undefined, // Allow self-signed certs in development
+  // SSL configuration: Strict only in actual production deployments, allow self-signed in dev/local
+  ssl: isProductionDeployment ? {
+    rejectUnauthorized: true, // Enforce valid SSL certificates in production
+  } : {
+    rejectUnauthorized: false, // Allow self-signed certs for local development and testing
+  },
 });
 
 // Task-specific concurrency limits for AI workloads
