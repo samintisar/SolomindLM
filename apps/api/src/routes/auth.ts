@@ -53,11 +53,13 @@ const router = Router();
 // Cookie configuration for httpOnly cookies
 // For development: Use 'lax' to allow cookies to work across localhost:5173 and localhost:3001
 // 'lax' works for cross-origin top-level navigations and same-origin requests
-// For production: Use 'strict' for better security
+// For production: Use 'none' with secure:true for cross-origin cookie sharing
+// 'strict' does NOT work for cross-origin requests (frontend and API on different domains)
+// 'none' requires secure:true (HTTPS) which production should have
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production' ? true : false,
-  sameSite: (process.env.NODE_ENV === 'production' ? 'strict' : 'lax') as 'strict' | 'lax',
+  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'strict' | 'lax' | 'none',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
@@ -262,11 +264,36 @@ router.post('/logout', async (req, res) => {
 router.get('/me', async (req, res) => {
   try {
     const accessToken = req.cookies.access_token;
+    const refreshToken = req.cookies.refresh_token;
+    
     if (!accessToken) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    let { data: { user }, error } = await supabase.auth.getUser(accessToken);
+
+    // If token is expired but we have a refresh token, try to refresh it
+    if ((error || !user) && refreshToken) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+
+      if (!sessionError && sessionData.session) {
+        // Update cookies with new tokens
+        res.cookie('access_token', sessionData.session.access_token, COOKIE_OPTIONS);
+        res.cookie('refresh_token', sessionData.session.refresh_token, COOKIE_OPTIONS);
+        
+        // Get user with new access token
+        const { data: { user: refreshedUser }, error: getUserError } = await supabase.auth.getUser(sessionData.session.access_token);
+        
+        if (!getUserError && refreshedUser) {
+          return res.json({
+            userId: refreshedUser.id,
+            email: refreshedUser.email,
+          });
+        }
+      }
+    }
 
     if (error || !user) {
       return res.status(401).json({ error: 'Not authenticated' });
