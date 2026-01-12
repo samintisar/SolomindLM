@@ -114,7 +114,8 @@ async function handleCheckoutCompleted(session: StripeSession) {
     throw new Error('No userId in session metadata');
   }
 
-  console.log(`[Webhook] Checkout completed for user ${userId}, session ${session.id}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Webhook] Checkout completed for session ${session.id}`);
   // Subscription will be created in subscription.updated event
 }
 
@@ -176,7 +177,8 @@ async function handleSubscriptionUpdated(subscription: StripeSubscription) {
     throw dbError;
   }
 
-  console.log(`[Webhook] Subscription ${subscription.id} updated for user ${userId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Webhook] Subscription ${subscription.id} updated`);
 }
 
 async function handleSubscriptionDeleted(subscription: StripeSubscription) {
@@ -199,7 +201,8 @@ async function handleSubscriptionDeleted(subscription: StripeSubscription) {
     })
     .eq('stripe_subscription_id', subscription.id);
 
-  console.log(`[Webhook] Subscription ${subscription.id} deleted for user ${userId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Webhook] Subscription ${subscription.id} deleted`);
 }
 
 async function handleInvoicePaid(invoice: StripeInvoice) {

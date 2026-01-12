@@ -752,7 +752,8 @@ router.get('/:id/stream', async (req: Request, res: Response) => {
   res.setHeader('Access-Control-Allow-Origin', frontendUrl);
   res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
 
-  console.log(`[WrittenQuestions] SSE stream opened for ${id} by user ${userId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[WrittenQuestions] SSE stream opened for ${id}`);
 
   // Verify user owns the written questions
   const { data: wq, error: fetchError } = await supabase

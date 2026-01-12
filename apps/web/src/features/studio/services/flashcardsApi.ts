@@ -1,21 +1,7 @@
 import type { Note, Flashcard, FlashcardNote } from '@/shared/types/index';
+import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
 
 export interface CreateFlashcardsParams {
   userId: string;
@@ -33,11 +19,28 @@ export interface CreateFlashcardsResponse {
 }
 
 /**
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
+ */
+function getUserId(): string | null {
+  const storedUser = localStorage.getItem('solomind_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      return user.id || user.user?.id || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * Get preview text based on status, actual flashcard count, and metadata
  */
 function getPreviewText(status: string, cardCount: number, metadata?: any): string {
   const difficulty = metadata?.difficulty || 'medium';
-  
+
   if (status === 'generating' || status === 'mapping' || status === 'collapsing' || status === 'reducing') {
     return `${cardCount} Cards • ${difficulty} • Generating...`;
   }
@@ -93,11 +96,7 @@ export const flashcardsApi = {
    * Create a new flashcard set and queue generation
    */
   async createFlashcards(params: CreateFlashcardsParams): Promise<CreateFlashcardsResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/flashcards`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(params),
-    });
+    const response = await apiPost('/api/flashcards', params);
 
     if (!response.ok) {
       const error = await response.json();
@@ -116,20 +115,14 @@ export const flashcardsApi = {
    * Get a specific flashcard set by ID
    */
   async getFlashcard(flashcardId: string): Promise<FlashcardNote> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/flashcards/${flashcardId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/flashcards/${flashcardId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch flashcard set');
@@ -166,20 +159,14 @@ export const flashcardsApi = {
    * Get all flashcard sets for a notebook
    */
   async getFlashcards(notebookId: string): Promise<FlashcardNote[]> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/flashcards/notebook/${notebookId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/flashcards/notebook/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch flashcard sets');
@@ -193,22 +180,14 @@ export const flashcardsApi = {
    * Rename a flashcard set by ID
    */
   async renameFlashcard(flashcardId: string, newTitle: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/flashcards/${flashcardId}?${params.toString()}`,
-      {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ title: newTitle }),
-      }
-    );
+    const response = await apiPatch(`/api/flashcards/${flashcardId}?${params.toString()}`, { title: newTitle });
 
     if (!response.ok) {
       throw new Error('Failed to rename flashcard set');
@@ -219,45 +198,30 @@ export const flashcardsApi = {
    * Delete a flashcard set by ID
    */
   async deleteFlashcard(flashcardId: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/flashcards/${flashcardId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to delete flashcard set');
-    }
+    await apiDelete(`/api/flashcards/${flashcardId}?${params.toString()}`);
   },
 
   /**
    * Export a flashcard set as CSV
    */
   async exportFlashcardsCSV(flashcardId: string, title: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/flashcards/${flashcardId}/export?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await fetch(`${API_BASE_URL}/api/flashcards/${flashcardId}/export?${params.toString()}`, {
+      credentials: 'include',
+    });
 
     if (!response.ok) {
       const error = await response.json();
@@ -269,14 +233,14 @@ export const flashcardsApi = {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    
+
     // Generate filename
     const safeTitle = title
       .replace(/[^a-z0-9]/gi, '_')
       .replace(/_+/g, '_')
       .toLowerCase();
     link.download = `flashcards_${safeTitle}_${new Date().toISOString().split('T')[0]}.csv`;
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

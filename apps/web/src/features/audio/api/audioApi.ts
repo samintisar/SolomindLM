@@ -1,21 +1,7 @@
 import type { Note, AudioNote } from '@/shared/types/index';
+import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
 
 export interface CreateAudioOverviewParams {
   userId: string;
@@ -43,6 +29,23 @@ export interface AudioOverview {
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
+ */
+function getUserId(): string | null {
+  const storedUser = localStorage.getItem('solomind_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      return user.id || user.user?.id || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -102,11 +105,7 @@ export const audioApi = {
    * Create a new audio overview and queue generation
    */
   async createAudioOverview(params: CreateAudioOverviewParams): Promise<CreateAudioOverviewResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/audio-overviews`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(params),
-    });
+    const response = await apiPost('/api/audio-overviews', params);
 
     if (!response.ok) {
       const error = await response.json();
@@ -120,20 +119,14 @@ export const audioApi = {
    * Get a specific audio overview by ID
    */
   async getAudioOverview(audioOverviewId: string): Promise<AudioOverview> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/audio-overviews/${audioOverviewId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/audio-overviews/${audioOverviewId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch audio overview');
@@ -170,20 +163,14 @@ export const audioApi = {
    * Get all audio overviews for a notebook
    */
   async getAudioOverviewsByNotebook(notebookId: string): Promise<AudioNote[]> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/audio-overviews/notebook/${notebookId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/audio-overviews/notebook/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch audio overviews');
@@ -197,22 +184,14 @@ export const audioApi = {
    * Rename an audio overview by ID
    */
   async renameAudioOverview(audioOverviewId: string, newTitle: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/audio-overviews/${audioOverviewId}?${params.toString()}`,
-      {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ title: newTitle }),
-      }
-    );
+    const response = await apiPatch(`/api/audio-overviews/${audioOverviewId}?${params.toString()}`, { title: newTitle });
 
     if (!response.ok) {
       const error = await response.json();
@@ -224,24 +203,13 @@ export const audioApi = {
    * Delete an audio overview by ID
    */
   async deleteAudioOverview(audioOverviewId: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/audio-overviews/${audioOverviewId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to delete audio overview');
-    }
+    await apiDelete(`/api/audio-overviews/${audioOverviewId}?${params.toString()}`);
   },
 };

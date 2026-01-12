@@ -1,20 +1,23 @@
 import type { Note } from '@/shared/types/index';
+import { apiGet, apiPatch, apiDelete } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
+/**
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
+ */
+function getUserId(): string | null {
   const storedUser = localStorage.getItem('solomind_user');
   if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
+    try {
+      const user = JSON.parse(storedUser);
+      return user.id || user.user?.id || null;
+    } catch {
+      return null;
+    }
   }
-  return {
-    'Content-Type': 'application/json',
-  };
+  return null;
 }
 
 // Convert database note to UI Note format (only reports and text notes)
@@ -69,20 +72,14 @@ export const notesApi = {
    * Get all notes (reports + text notes) for a specific notebook
    */
   async getNotes(notebookId: string): Promise<Note[]> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/notebooks/${notebookId}/notes?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/notebooks/${notebookId}/notes?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch notes');
@@ -96,20 +93,14 @@ export const notesApi = {
    * Get a single note by ID
    */
   async getNote(noteId: string): Promise<Note> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/notes/${noteId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/notes/${noteId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch note');
@@ -123,22 +114,14 @@ export const notesApi = {
    * Rename a note
    */
   async renameNote(noteId: string, newTitle: string): Promise<Note> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/notes/${noteId}?${params.toString()}`,
-      {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ title: newTitle }),
-      }
-    );
+    const response = await apiPatch(`/api/notes/${noteId}?${params.toString()}`, { title: newTitle });
 
     if (!response.ok) {
       throw new Error('Failed to rename note');
@@ -152,24 +135,13 @@ export const notesApi = {
    * Delete a note
    */
   async deleteNote(noteId: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/notes/${noteId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to delete note');
-    }
+    await apiDelete(`/api/notes/${noteId}?${params.toString()}`);
   },
 };

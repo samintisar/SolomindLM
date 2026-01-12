@@ -3,6 +3,9 @@ import { AudioOverviewGraph, OverallStateType, DialogueLine } from '../agents/Au
 import { env } from '../../config/env.js';
 import { TitleGeneratorService } from '../processing/TitleGeneratorService.js';
 
+// Default signed URL expiration time (24 hours)
+const SIGNED_URL_EXPIRY_SECONDS = 60 * 60 * 24;
+
 export interface AudioOverviewParams {
   documentIds: string[];
   audioType: string;
@@ -30,7 +33,6 @@ export class AudioOverviewGenerationService {
   constructor() {
     this.audioGraph = new AudioOverviewGraph(
       env.TOGETHER_AI_API_KEY,
-      env.DEEPGRAM_API_KEY,
       env.FAST_LLM,
       env.SMART_LLM || env.FAST_LLM
     );
@@ -305,12 +307,18 @@ export class AudioOverviewGenerationService {
       throw new Error(`Failed to upload audio: ${error.message}`);
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('audio-overviews').getPublicUrl(filePath);
+    // Security: Use signed URL instead of public URL for audio files
+    const { data: signedData, error: signError } = await supabase.storage
+      .from('audio-overviews')
+      .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SECONDS);
 
-    console.log(`[AudioOverviewGeneration] Audio uploaded: ${publicUrl}`);
-    return publicUrl;
+    if (signError || !signedData?.signedUrl) {
+      console.error('[AudioOverviewGeneration] Failed to generate signed URL:', signError);
+      throw new Error('Failed to generate signed URL for audio');
+    }
+
+    console.log(`[AudioOverviewGeneration] Audio uploaded with signed URL`);
+    return signedData.signedUrl;
   }
 
   getAudioOverviewTitle(audioType: string): string {

@@ -1,7 +1,10 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-dotenv.config();
+// Load environment variables from .env file
+// Override existing environment variables to ensure .env file takes precedence
+// This is important because system env vars might have incorrect values
+dotenv.config({ override: true });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -10,12 +13,11 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string(),
   SUPABASE_SERVICE_ROLE_KEY: z.string(),
   DATABASE_URL: z.string(), // PostgreSQL connection for Graphile Worker
-  COHERE_API_KEY: z.string(),
-  COHERE_EMBEDDING_MODEL: z.string().default('embed-multilingual-v3.0'),
-  COHERE_RERANK_MODEL: z.string().default('rerank-v4.0-fast'),
+  OPENAI_API_KEY: z.string(),
+  ZEROENTROPY_API_KEY: z.string(),
+  ZEROENTROPY_RERANK_MODEL: z.string().default('zerank-2'),
   MISTRAL_API_KEY: z.string(),
   TOGETHER_AI_API_KEY: z.string(),
-  DEEPGRAM_API_KEY: z.string(),
   FAST_LLM: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
   SMART_LLM: z.string().optional(), // Optional: smarter model for complex tasks
   IMAGE_LLM: z.string().default('Qwen/Qwen-Image'), // Image generation model
@@ -34,6 +36,8 @@ const envSchema = z.object({
   // Timeout settings for LLM calls
   FLASHCARD_MAP_TIMEOUT_MS: z.string().default('180000'),
   FLASHCARD_REDUCE_TIMEOUT_MS: z.string().default('240000'),
+  // Max OUTPUT tokens for reduce phase (selection/refinement) - needed for large flashcard sets
+  FLASHCARD_REDUCE_MAX_TOKENS: z.string().default('32000'),
   // Mind Map Generation
   // Map phase: 15K chars ≈ 3.75K tokens (~3% of 131K context)
   MINDMAP_MAP_CHUNK_SIZE: z.string().default('15000'),
@@ -74,13 +78,13 @@ const envSchema = z.object({
   AUDIO_MAP_TIMEOUT_MS: z.string().default('180000'),
   AUDIO_REDUCE_TIMEOUT_MS: z.string().default('300000'),
   AUDIO_TTS_TIMEOUT_MS: z.string().default('300000'),
-  // Deepgram Voice Models
-  AUDIO_VOICE_HOST_A: z.string().default('aura-2-thalia-en'),
-  AUDIO_VOICE_HOST_B: z.string().default('aura-2-hermes-en'),
+  // OpenAI TTS-1 Voice Models
+  AUDIO_VOICE_HOST_A: z.string().default('shimmer'),
+  AUDIO_VOICE_HOST_B: z.string().default('echo'),
   // Chat/RAG Configuration
   CHAT_LLM_TEMPERATURE: z.string().default('0.3'),
   CHAT_MAX_HISTORY_MESSAGES: z.string().default('20'),
-  CHAT_VECTOR_MATCH_THRESHOLD: z.string().default('0.5'),
+  CHAT_VECTOR_MATCH_THRESHOLD: z.string().default('0.3'),
   CHAT_VECTOR_MATCH_COUNT: z.string().default('10'),
   CHAT_RERANK_THRESHOLD: z.string().default('3'),
   CHAT_RERANK_TOP_N: z.string().default('15'),

@@ -99,7 +99,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 DATABASE_URL=
 
 # AI Services
-COHERE_API_KEY=                          # Embeddings & generation
+OPENAI_API_KEY=                          # Embeddings
+ZEROENTROPY_API_KEY=                     # Reranking
 MISTRAL_API_KEY=                         # OCR for images
 TOGETHER_AI_API_KEY=                     # LLM & title generation
 TOGETHER_AI_MODEL=

@@ -1,8 +1,18 @@
 import { Router, Request, Response } from 'express';
-import { supabase } from '../config/database.js';
+import { supabase, createUserClient } from '../config/database.js';
 import { scheduleFlashcardGeneration } from '../utils/jobHelpers.js';
 import { FlashcardGenerationService } from '../services/generation/FlashcardGenerationService.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
+
+// Helper to extract JWT token from request (for RLS client)
+function getTokenFromRequest(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return (req as any).cookies?.access_token || null;
+}
 
 const router = Router();
 const flashcardService = new FlashcardGenerationService();
@@ -123,9 +133,10 @@ async function addFlashcardJob(
 }
 
 // POST /api/flashcards - Create flashcard set and queue job
-router.post('/', rateLimiter('flashcard'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('flashcard'), async (req: Request, res: Response) => {
   try {
-    const { userId, notebookId, documentIds, cardCount, difficulty, topic } = req.body;
+    const userId = req.user!.id;
+    const { notebookId, documentIds, cardCount, difficulty, topic } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -251,14 +262,10 @@ router.post('/', rateLimiter('flashcard'), async (req: Request, res: Response) =
 
 // GET /api/flashcards/notebook/:notebookId - Get all flashcard sets for a notebook
 // MUST come before /:flashcardId route to avoid route conflicts
-router.get('/notebook/:notebookId', async (req: Request, res: Response) => {
+router.get('/notebook/:notebookId', authenticate, async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { notebookId } = req.params;
-    const userId = req.query.userId as string;
-
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
 
     if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
       return res.status(400).json({ error: 'Invalid notebookId format' });
@@ -298,14 +305,10 @@ router.get('/notebook/:notebookId', async (req: Request, res: Response) => {
 
 // GET /api/flashcards/:flashcardId - Get flashcard set by ID
 // MUST come after /notebook/:notebookId to avoid route conflicts
-router.get('/:flashcardId', async (req: Request, res: Response) => {
+router.get('/:flashcardId', authenticate, async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { flashcardId } = req.params;
-    const userId = req.query.userId as string;
-
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
 
     if (typeof flashcardId !== 'string' || !isValidUUID(flashcardId)) {
       return res.status(400).json({ error: 'Invalid flashcardId format' });
@@ -343,15 +346,11 @@ router.get('/:flashcardId', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/flashcards/:flashcardId - Rename a flashcard set
-router.patch('/:flashcardId', async (req: Request, res: Response) => {
+router.patch('/:flashcardId', authenticate, async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { flashcardId } = req.params;
     const { title } = req.body;
-    const userId = req.query.userId as string;
-
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
 
     if (typeof flashcardId !== 'string' || !isValidUUID(flashcardId)) {
       return res.status(400).json({ error: 'Invalid flashcardId format' });
@@ -399,14 +398,10 @@ router.patch('/:flashcardId', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/flashcards/:flashcardId - Delete a flashcard set
-router.delete('/:flashcardId', async (req: Request, res: Response) => {
+router.delete('/:flashcardId', authenticate, async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { flashcardId } = req.params;
-    const userId = req.query.userId as string;
-
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
 
     if (typeof flashcardId !== 'string' || !isValidUUID(flashcardId)) {
       return res.status(400).json({ error: 'Invalid flashcardId format' });
@@ -447,14 +442,10 @@ router.delete('/:flashcardId', async (req: Request, res: Response) => {
 });
 
 // GET /api/flashcards/:flashcardId/export - Export flashcard set as CSV
-router.get('/:flashcardId/export', async (req: Request, res: Response) => {
+router.get('/:flashcardId/export', authenticate, async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { flashcardId } = req.params;
-    const userId = req.query.userId as string;
-
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
 
     if (typeof flashcardId !== 'string' || !isValidUUID(flashcardId)) {
       return res.status(400).json({ error: 'Invalid flashcardId format' });

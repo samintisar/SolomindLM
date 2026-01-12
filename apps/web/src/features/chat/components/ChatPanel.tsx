@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
 import { Message, ReferenceChunk } from '@/shared/types/index';
 import { chatApi } from '../services/chatApi';
 
@@ -242,7 +243,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <div className="font-serif text-base leading-relaxed space-y-2">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeKatex]}
+          rehypePlugins={[rehypeSanitize, rehypeKatex]}
           components={{
             img: () => null,
             a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,

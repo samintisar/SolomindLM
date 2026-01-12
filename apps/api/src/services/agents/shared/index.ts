@@ -96,3 +96,56 @@ export {
   selectBalancedByTopic,
   type TopicExtractionConfig,
 } from './topic-extraction.js';
+
+// ============================================================
+// Composable Factories (New)
+// ============================================================
+
+// State factory
+export {
+  createGraphState,
+  type ProgressInfo,
+  type ChunkProcessStateBase,
+  type CreateChunkProcessState,
+  type GraphStateType,
+} from './state-factory.js';
+
+// LLM factory
+export {
+  createLLMs,
+  createLLM,
+  createLLMsFromEnv,
+  type LLMConfig,
+  type LLMInstances,
+} from './llm-factory.js';
+
+// Node builder
+export {
+  createLLMNode,
+  createCollapseNode,
+  createMapRouteFunction,
+  type NodeConfig,
+  type LLMNodeOptions,
+} from './node-builder.js';
+
+// Graph builder
+export {
+  buildMapReduceGraph,
+  buildLinearGraph,
+  buildCustomGraph,
+  createConditionalRoute,
+  createProgressNode,
+  type MapReduceGraphConfig,
+  type LinearGraphConfig,
+  type NodeFunction,
+  type RouteFunction,
+} from './graph-builder.js';
+
+// Chunk helper factory
+export {
+  createChunkHelpers,
+  createChunkHelpersFromEnv,
+  createMapRoute,
+  type ChunkHelperConfig,
+  type ChunkHelpers,
+} from './chunk-helper-factory.js';

@@ -23,6 +23,10 @@ export const pgPool = new Pool({
   min: Math.ceil(poolMax / 3), // Keep ~30% of connections ready (reduced from fixed 5)
   idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
   connectionTimeoutMillis: 5000, // Fail fast if can't get connection
+  // Security: Enforce SSL/TLS for database connections
+  ssl: env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: true, // Enforce valid SSL certificates
+  } : undefined, // Allow self-signed certs in development
 });
 
 // Task-specific concurrency limits for AI workloads

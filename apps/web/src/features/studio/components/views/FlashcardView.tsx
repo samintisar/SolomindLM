@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
 import { FlashcardNote } from '@/shared/types/index';
 
 export interface FlashcardViewProps {
@@ -61,7 +62,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                          <div className="text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)] w-full prose prose-stone dark:prose-invert max-w-none">
                              <ReactMarkdown
                                  remarkPlugins={[remarkGfm, remarkMath]}
-                                 rehypePlugins={[rehypeKatex]}
+                                 rehypePlugins={[rehypeSanitize, rehypeKatex]}
                                  components={{
                                      img: () => null,
                                      a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
@@ -90,7 +91,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                          <div className="text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)] w-full prose prose-stone dark:prose-invert max-w-none">
                              <ReactMarkdown
                                  remarkPlugins={[remarkGfm, remarkMath]}
-                                 rehypePlugins={[rehypeKatex]}
+                                 rehypePlugins={[rehypeSanitize, rehypeKatex]}
                                  components={{
                                      img: () => null,
                                      a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,

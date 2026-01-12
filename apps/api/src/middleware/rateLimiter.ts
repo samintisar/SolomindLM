@@ -29,7 +29,8 @@ export function rateLimiter(serviceType: ServiceType) {
     }
 
     try {
-      console.log(`[RateLimit] Checking rate limit for user=${userId}, service=${serviceType}`);
+      // Security: Avoid logging user ID to prevent correlation attacks
+      console.log(`[RateLimit] Checking rate limit for service=${serviceType}`);
 
       // Check and increment rate limit atomically
       const result = await rateLimitService.checkAndIncrement(userId, serviceType);
@@ -59,14 +60,14 @@ export function rateLimiter(serviceType: ServiceType) {
         };
 
         console.log(
-          `[RateLimit] Rate limit exceeded for user=${userId}, service=${serviceType}, tier=${userTier}`
+          `[RateLimit] Rate limit exceeded for service=${serviceType}, tier=${userTier}`
         );
 
         return res.status(429).json(errorResponse);
       }
 
       console.log(
-        `[RateLimit] Rate limit check passed for user=${userId}, service=${serviceType}, remaining=${result.remaining}`
+        `[RateLimit] Rate limit check passed for service=${serviceType}, remaining=${result.remaining}`
       );
 
       // Attach rate limit info to request for use in handlers
@@ -80,10 +81,12 @@ export function rateLimiter(serviceType: ServiceType) {
     } catch (error) {
       console.error('[RateLimit] Error checking rate limit:', error);
 
-      // Fail open - allow request if rate limit check fails
-      // This prevents the API from breaking due to rate limit issues
-      console.error('[RateLimit] Failing open - allowing request');
-      next();
+      // Fail closed - reject request if rate limit check fails
+      // This is more secure than fail-open for rate limiting
+      return res.status(500).json({
+        error: 'Unable to verify rate limit. Please try again later.',
+        code: 'RATE_LIMIT_CHECK_FAILED',
+      });
     }
   };
 }

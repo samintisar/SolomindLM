@@ -11,7 +11,7 @@ import { env } from '../../config/env.js';
 const mistralOCR = new MistralOCRService(env.MISTRAL_API_KEY);
 const supadataLoader = new SupadataLoaderService();
 const textSplitter = new TextSplitterService();
-const embeddingService = new EmbeddingService(env.COHERE_API_KEY);
+const embeddingService = new EmbeddingService(env.OPENAI_API_KEY);
 const vectorStore = new VectorStoreService();
 const storageService = new SupabaseStorageService();
 
@@ -66,6 +66,9 @@ export interface DocEmbeddingJobPayload {
 
 // Graphile Worker task handler
 export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
+  // #region agent log
+  try { const fs = await import('fs'); await fs.promises.appendFile('c:\\\\Users\\\\samin\\\\Documents\\\\GitHub\\\\SolomindLM\\\\.cursor\\\\debug.log', JSON.stringify({location:'DocEmbeddingJob.ts:70',message:'docEmbeddingJob start',data:{payload},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})+'\\n'); } catch {}
+  // #endregion
   const { documentId, userId, noteId, type, source } = payload;
 
   console.log(`[DocEmbedding] Processing document ${documentId} of type ${type}`);
@@ -118,8 +121,7 @@ export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
           throw new Error('Could not generate signed URL for document: ' + documentId);
         }
 
-        console.log(`[DocEmbedding] Generated signed URL for OCR processing: ${filePath}`);
-
+        // Security: Do not log signed URLs - they provide temporary access to private files
         extractedText = await mistralOCR.processDocument(signedData.signedUrl);
       } else {
         console.log(`[DocEmbedding] File '${fileName}' is plaintext, reading directly (no OCR)`);
@@ -207,8 +209,14 @@ export async function docEmbeddingJob(payload: DocEmbeddingJobPayload) {
       .eq('id', documentId);
 
     console.log(`[DocEmbedding] Document ${documentId} processed successfully`);
+    // #region agent log
+    try { const fs = await import('fs'); await fs.promises.appendFile('c:\\\\Users\\\\samin\\\\Documents\\\\GitHub\\\\SolomindLM\\\\.cursor\\\\debug.log', JSON.stringify({location:'DocEmbeddingJob.ts:208',message:'docEmbeddingJob success',data:{documentId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})+'\\n'); } catch {}
+    // #endregion
   } catch (error) {
     console.error(`[DocEmbedding] Error processing document ${documentId}:`, error);
+    // #region agent log
+    try { const fs = await import('fs'); await fs.promises.appendFile('c:\\\\Users\\\\samin\\\\Documents\\\\GitHub\\\\SolomindLM\\\\.cursor\\\\debug.log', JSON.stringify({location:'DocEmbeddingJob.ts:211',message:'docEmbeddingJob error',data:{documentId,error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})+'\\n'); } catch {}
+    // #endregion
 
     await supabase
       .from('documents')

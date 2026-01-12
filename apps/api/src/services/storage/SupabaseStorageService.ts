@@ -1,5 +1,8 @@
 import { supabase } from '../../config/database.js';
 
+// Default signed URL expiration time (24 hours)
+const DEFAULT_SIGNED_URL_EXPIRY_SECONDS = 60 * 60 * 24;
+
 export class SupabaseStorageService {
   /**
    * Map file extensions to their proper MIME types
@@ -40,6 +43,82 @@ export class SupabaseStorageService {
 
     // Return mapped MIME type or the provided one as fallback
     return ext && mimeTypeMap[ext] ? mimeTypeMap[ext] : providedMimeType;
+  }
+
+  /**
+   * Generate a signed URL from an existing file URL
+   * Extracts the bucket and path from the URL and generates a new signed URL
+   * This is useful for refreshing expired signed URLs
+   */
+  async refreshSignedUrl(
+    fileUrl: string,
+    expiresIn: number = DEFAULT_SIGNED_URL_EXPIRY_SECONDS
+  ): Promise<string> {
+    // Extract bucket and path from the URL
+    // URL formats:
+    // - https://xxx.supabase.co/storage/v1/object/public/{bucket}/{path}
+    // - https://xxx.supabase.co/storage/v1/object/sign/{bucket}/{path}?token=...
+    // - https://xxx.supabase.co/storage/v1/render/image/sign/{bucket}/{path}?token=...
+
+    let bucket: string | null = null;
+    let path: string | null = null;
+
+    // Try to extract bucket and path from URL
+    const urlPatterns = [
+      /\/storage\/v1\/(?:object|render)\/(?:public|sign|authenticated)\/([^/]+)\/(.+)/,
+      /\/storage\/([^/]+)\/(.+)/,
+    ];
+
+    for (const pattern of urlPatterns) {
+      const match = fileUrl.match(pattern);
+      if (match) {
+        bucket = match[1];
+        path = match[2];
+        // Remove query string and fragment
+        path = path.split('?')[0].split('#')[0];
+        break;
+      }
+    }
+
+    if (!bucket || !path) {
+      throw new Error(`Could not extract bucket and path from URL: ${fileUrl}`);
+    }
+
+    return this.generateSignedUrl(bucket, path, expiresIn);
+  }
+
+  /**
+   * Generate a signed URL for a file with expiration
+   * This ensures files are not publicly accessible without authentication
+   */
+  async generateSignedUrl(
+    bucket: string,
+    filePath: string,
+    expiresIn: number = DEFAULT_SIGNED_URL_EXPIRY_SECONDS
+  ): Promise<string> {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error) {
+      console.error('[Storage] Failed to generate signed URL:', {
+        message: error.message,
+        bucket,
+        path: filePath,
+      });
+      throw new Error(`Failed to generate signed URL: ${error.message}`);
+    }
+
+    if (!data?.signedUrl) {
+      throw new Error('Failed to generate signed URL: No URL returned');
+    }
+
+    console.log('[Storage] Signed URL generated for:', {
+      bucket,
+      path: filePath,
+      expiresIn: `${expiresIn}s`,
+    });
+    return data.signedUrl;
   }
 
   async uploadFile(
@@ -84,12 +163,13 @@ export class SupabaseStorageService {
 
     console.log('[Storage] Upload successful:', data.path);
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('documents').getPublicUrl(filePath);
+    // Security: Use signed URLs instead of public URLs for file access
+    // Signed URLs expire after DEFAULT_SIGNED_URL_EXPIRY_SECONDS (24 hours)
+    // For long-term access, generate a new signed URL when needed
+    const signedUrl = await this.generateSignedUrl('documents', filePath);
 
-    console.log('[Storage] Public URL generated:', publicUrl);
-    return publicUrl;
+    console.log('[Storage] Signed URL generated:', signedUrl);
+    return signedUrl;
   }
 
   async deleteFile(fileUrl: string): Promise<void> {
@@ -156,12 +236,11 @@ export class SupabaseStorageService {
 
     console.log('[Storage] Audio upload successful:', data.path);
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from('audio-overviews').getPublicUrl(filePath);
+    // Security: Use signed URLs instead of public URLs for audio files
+    const signedUrl = await this.generateSignedUrl('audio-overviews', filePath);
 
-    console.log('[Storage] Audio public URL generated:', publicUrl);
-    return publicUrl;
+    console.log('[Storage] Audio signed URL generated:', signedUrl);
+    return signedUrl;
   }
 
   async deleteAudioFile(audioUrl: string): Promise<void> {

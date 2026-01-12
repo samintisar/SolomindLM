@@ -1,21 +1,7 @@
 import type { Note, QuizQuestion, QuizNote } from '@/shared/types/index';
+import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
 
 export interface CreateQuizParams {
   userId: string;
@@ -30,6 +16,23 @@ export interface CreateQuizResponse {
   quizId: string;
   status: string;
   quiz: QuizNote;
+}
+
+/**
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
+ */
+function getUserId(): string | null {
+  const storedUser = localStorage.getItem('solomind_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      return user.id || user.user?.id || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -98,11 +101,7 @@ export const quizzesApi = {
    * Create a new quiz and queue generation
    */
   async createQuiz(params: CreateQuizParams): Promise<CreateQuizResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/quizzes`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(params),
-    });
+    const response = await apiPost('/api/quizzes', params);
 
     if (!response.ok) {
       const error = await response.json();
@@ -121,20 +120,14 @@ export const quizzesApi = {
    * Get a specific quiz by ID
    */
   async getQuiz(quizId: string): Promise<QuizNote> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const queryParams = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/quizzes/${quizId}?${queryParams.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/quizzes/${quizId}?${queryParams.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch quiz');
@@ -171,20 +164,14 @@ export const quizzesApi = {
    * Get all quizzes for a notebook
    */
   async getQuizzes(notebookId: string): Promise<QuizNote[]> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/quizzes/notebook/${notebookId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/quizzes/notebook/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch quizzes');
@@ -198,22 +185,14 @@ export const quizzesApi = {
    * Rename a quiz by ID
    */
   async renameQuiz(quizId: string, newTitle: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/quizzes/${quizId}?${params.toString()}`,
-      {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ title: newTitle }),
-      }
-    );
+    const response = await apiPatch(`/api/quizzes/${quizId}?${params.toString()}`, { title: newTitle });
 
     if (!response.ok) {
       throw new Error('Failed to rename quiz');
@@ -224,47 +203,28 @@ export const quizzesApi = {
    * Delete a quiz by ID
    */
   async deleteQuiz(quizId: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/quizzes/${quizId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to delete quiz');
-    }
+    await apiDelete(`/api/quizzes/${quizId}?${params.toString()}`);
   },
 
   /**
    * Submit an answer for a quiz question
    */
   async submitAnswer(quizId: string, questionIndex: number, selectedOption: number): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/quizzes/${quizId}/submit?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ questionIndex, selectedOption }),
-      }
-    );
+    const response = await apiPost(`/api/quizzes/${quizId}/submit?${params.toString()}`, { questionIndex, selectedOption });
 
     if (!response.ok) {
       const error = await response.json();
@@ -276,25 +236,14 @@ export const quizzesApi = {
    * Reset all answers for a quiz
    */
   async resetAnswers(quizId: string): Promise<QuizNote> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/quizzes/${quizId}/reset?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to reset answers');
-    }
+    await apiPost(`/api/quizzes/${quizId}/reset?${params.toString()}`, {});
 
     // Fetch and return the updated quiz
     return this.getQuiz(quizId);

@@ -40,28 +40,8 @@ export interface SendMessageCallbacks {
 // ============================================================
 
 /**
- * Get auth headers for API requests
- */
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    try {
-      const user = JSON.parse(storedUser);
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.accessToken}`,
-      };
-    } catch {
-      // Invalid stored user, continue without auth
-    }
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
-
-/**
- * Get userId from localStorage
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
  */
 function getUserId(): string | null {
   const storedUser = localStorage.getItem('solomind_user');
@@ -105,9 +85,11 @@ export const chatApi = {
     };
 
     try {
+      // Use direct fetch for streaming response with credentials
       const response = await fetch(`${API_BASE_URL}/api/chat/message`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(requestBody),
       });
 
@@ -189,7 +171,7 @@ export const chatApi = {
 
     const response = await fetch(
       `${API_BASE_URL}/api/chat/history/${notebookId}?${params.toString()}`,
-      { headers: getAuthHeaders() }
+      { credentials: 'include' }
     );
 
     if (!response.ok) {
@@ -216,7 +198,7 @@ export const chatApi = {
       `${API_BASE_URL}/api/chat/history/${notebookId}?${params.toString()}`,
       {
         method: 'DELETE',
-        headers: getAuthHeaders(),
+        credentials: 'include',
       }
     );
 
@@ -241,7 +223,7 @@ export const chatApi = {
       `${API_BASE_URL}/api/chat/conversation/${notebookId}?${params.toString()}`,
       {
         method: 'DELETE',
-        headers: getAuthHeaders(),
+        credentials: 'include',
       }
     );
 
@@ -263,7 +245,8 @@ export const chatApi = {
 
     const response = await fetch(`${API_BASE_URL}/api/chat/rename/${notebookId}`, {
       method: 'PATCH',
-      headers: getAuthHeaders(),
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ userId, title }),
     });
 

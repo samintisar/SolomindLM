@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { ChatAgent } from '../services/agents/ChatAgent.js';
 import { ChatHistoryService } from '../services/storage/ChatHistoryService.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 const chatAgent = new ChatAgent();
@@ -23,33 +24,6 @@ const CONFIG = {
 } as const;
 
 // ============================================================
-// Middleware
-// ============================================================
-
-/**
- * Validate userId from request
- */
-const validateUserId = (req: Request, res: Response, next: Function) => {
-  const userId = req.body?.userId || req.query?.userId || req.headers['x-user-id'];
-
-  if (!userId || typeof userId !== 'string') {
-    return res.status(401).json({ error: 'Unauthorized: userId is required' });
-  }
-
-  req.userId = userId;
-  next();
-};
-
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: string;
-    }
-  }
-}
-
-// ============================================================
 // Routes
 // ============================================================
 
@@ -57,9 +31,9 @@ declare global {
  * POST /api/chat/message
  * Send a message and stream the response via SSE
  */
-router.post('/message', rateLimiter('chat'), validateUserId, async (req: Request, res: Response) => {
+router.post('/message', authenticate, rateLimiter('chat'), async (req: Request, res: Response) => {
   const { notebookId, message, documentIds } = req.body;
-  const userId = req.userId!;
+  const userId = req.user!.id;
 
   // Validation
   if (!notebookId) {
@@ -86,7 +60,8 @@ router.post('/message', rateLimiter('chat'), validateUserId, async (req: Request
   }
 
   console.log(`[Chat /message] ========== NEW MESSAGE ==========`);
-  console.log(`[Chat /message] userId=${userId}, notebookId=${notebookId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Chat /message] notebookId=${notebookId}`);
   console.log(`[Chat /message] message="${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
   if (documentIds && documentIds.length > 0) {
     console.log(`[Chat /message] documentIds=${documentIds.length} selected documents`);
@@ -222,12 +197,13 @@ router.post('/message', rateLimiter('chat'), validateUserId, async (req: Request
  * GET /api/chat/history/:notebookId
  * Get conversation history for a notebook
  */
-router.get('/history/:notebookId', validateUserId, async (req: Request, res: Response) => {
+router.get('/history/:notebookId', authenticate, async (req: Request, res: Response) => {
   const { notebookId } = req.params;
-  const userId = req.userId!;
+  const userId = req.user!.id;
   const limit = parseInt(req.query.limit as string) || CONFIG.HISTORY.DEFAULT_LIMIT;
 
-  console.log(`[Chat /history] userId=${userId}, notebookId=${notebookId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Chat /history] notebookId=${notebookId}`);
 
   try {
     const limitClamped = Math.min(limit, CONFIG.HISTORY.MAX_LIMIT);
@@ -251,11 +227,12 @@ router.get('/history/:notebookId', validateUserId, async (req: Request, res: Res
  * DELETE /api/chat/history/:notebookId
  * Clear all messages in a conversation
  */
-router.delete('/history/:notebookId', validateUserId, async (req: Request, res: Response) => {
+router.delete('/history/:notebookId', authenticate, async (req: Request, res: Response) => {
   const { notebookId } = req.params;
-  const userId = req.userId!;
+  const userId = req.user!.id;
 
-  console.log(`[Chat /history DELETE] userId=${userId}, notebookId=${notebookId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Chat /history DELETE] notebookId=${notebookId}`);
 
   try {
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);
@@ -273,12 +250,13 @@ router.delete('/history/:notebookId', validateUserId, async (req: Request, res: 
  * PATCH /api/chat/rename/:notebookId
  * Rename a conversation
  */
-router.patch('/rename/:notebookId', validateUserId, async (req: Request, res: Response) => {
+router.patch('/rename/:notebookId', authenticate, async (req: Request, res: Response) => {
   const { notebookId } = req.params;
-  const userId = req.userId!;
+  const userId = req.user!.id;
   const { title } = req.body;
 
-  console.log(`[Chat /rename] userId=${userId}, notebookId=${notebookId}, title="${title}"`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Chat /rename] notebookId=${notebookId}, title="${title}"`);
 
   if (!title) {
     return res.status(400).json({ error: 'title is required' });
@@ -304,11 +282,12 @@ router.patch('/rename/:notebookId', validateUserId, async (req: Request, res: Re
  * DELETE /api/chat/conversation/:notebookId
  * Delete a conversation and all its messages
  */
-router.delete('/conversation/:notebookId', validateUserId, async (req: Request, res: Response) => {
+router.delete('/conversation/:notebookId', authenticate, async (req: Request, res: Response) => {
   const { notebookId } = req.params;
-  const userId = req.userId!;
+  const userId = req.user!.id;
 
-  console.log(`[Chat /conversation DELETE] userId=${userId}, notebookId=${notebookId}`);
+  // Security: Avoid logging user ID to prevent correlation attacks
+  console.log(`[Chat /conversation DELETE] notebookId=${notebookId}`);
 
   try {
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);

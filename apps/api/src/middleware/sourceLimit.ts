@@ -51,7 +51,7 @@ export async function checkSourceLimit(
     const { count, error: countError } = await supabase
       .from('documents')
       .select('*', { count: 'exact', head: true })
-      .eq('note_id', noteId)
+      .eq('notebook_id', noteId)
       .eq('user_id', userId);
 
     if (countError) {

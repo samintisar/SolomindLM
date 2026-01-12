@@ -16,7 +16,7 @@ export class VectorStoreService {
     const records = chunks.map((chunk) => ({
       document_id: documentId,
       user_id: userId,
-      note_id: noteId,
+      notebook_id: noteId,
       chunk_index: chunk.index,
       content: chunk.content,
       embedding: chunk.embedding,
@@ -39,7 +39,7 @@ export class VectorStoreService {
     const { data, error } = await supabase.rpc('match_documents', {
       query_embedding: queryEmbedding,
       user_id: userId,
-      note_id: noteId,
+      notebook_id: noteId,
       match_threshold: 0.78,
       match_count: limit,
     });
@@ -76,7 +76,7 @@ export class VectorStoreService {
       query_embedding: queryEmbedding,
       query_text: queryText,
       user_id: userId,
-      note_id: noteId,
+      notebook_id: noteId,
       match_threshold: matchThreshold,
       match_count: limit,
       document_ids: documentIds && documentIds.length > 0 ? documentIds : null,

@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
 import { XCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { ReportNote } from '@/shared/types/index';
 
@@ -55,7 +56,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
                       {note.content ? (
                           <ReactMarkdown
                               remarkPlugins={[remarkGfm, remarkMath]}
-                              rehypePlugins={[rehypeKatex]}
+                              rehypePlugins={[rehypeSanitize, rehypeKatex]}
                               components={{
                                   img: () => null,
                                   a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,

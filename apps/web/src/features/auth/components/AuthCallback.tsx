@@ -32,11 +32,12 @@ export function AuthCallback() {
           return;
         }
 
-        // Verify tokens with backend and get user info
+        // Verify tokens with backend and set cookies
         const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ accessToken, refreshToken }),
+          credentials: 'include',
         });
 
         const data = await response.json();
@@ -44,16 +45,6 @@ export function AuthCallback() {
         if (!response.ok) {
           throw new Error(data.error || 'Authentication failed');
         }
-
-        // Store user data
-        const user = {
-          id: data.userId,
-          email: data.email,
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-        };
-
-        localStorage.setItem('solomind_user', JSON.stringify(user));
 
         // Dispatch event to notify AuthContext of login
         window.dispatchEvent(new CustomEvent('auth-change'));

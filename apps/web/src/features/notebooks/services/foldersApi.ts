@@ -1,30 +1,12 @@
 import type { FolderItem, NotebookItem } from '@/shared/types/index';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
+import { apiGet, apiPost, apiPut, apiDelete } from '@/shared/utils/api';
 
 export const foldersApi = {
   /**
    * Get all folders for the authenticated user
    */
   async getFolders(): Promise<FolderItem[]> {
-    const response = await fetch(`${API_BASE_URL}/api/folders`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet('/api/folders');
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -40,9 +22,7 @@ export const foldersApi = {
    * Get a specific folder by ID
    */
   async getFolder(id: string): Promise<FolderItem> {
-    const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet(`/api/folders/${id}`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -61,9 +41,7 @@ export const foldersApi = {
    * Get notebooks in a specific folder
    */
   async getFolderNotebooks(folderId: string): Promise<NotebookItem[]> {
-    const response = await fetch(`${API_BASE_URL}/api/folders/${folderId}/notebooks`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet(`/api/folders/${folderId}/notebooks`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -87,11 +65,7 @@ export const foldersApi = {
     color?: string;
     icon?: string;
   }): Promise<FolderItem> {
-    const response = await fetch(`${API_BASE_URL}/api/folders`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
+    const response = await apiPost('/api/folders', data);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -116,11 +90,7 @@ export const foldersApi = {
       icon?: string;
     }
   ): Promise<FolderItem> {
-    const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(updates),
-    });
+    const response = await apiPut(`/api/folders/${id}`, updates);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -140,10 +110,7 @@ export const foldersApi = {
    * Delete a folder
    */
   async deleteFolder(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/folders/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
+    const response = await apiDelete(`/api/folders/${id}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

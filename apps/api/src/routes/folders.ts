@@ -1,51 +1,55 @@
 import { Router, Request, Response } from 'express';
 import { supabase, createUserClient } from '../config/database.js';
+import { authenticate } from '../middleware/auth.js';
+import { z } from 'zod';
 
 const router = Router();
 
-// Helper to extract user ID from auth token
-async function getUserIdFromToken(req: Request): Promise<string | null> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
+// Validation schemas
+const createFolderSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+});
 
-  const token = authHeader.substring(7);
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+const updateFolderSchema = z.object({
+  name: z.string().min(1, 'Name cannot be empty').max(100, 'Name must be less than 100 characters').optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+});
 
-  if (error || !user) {
-    return null;
-  }
-
-  return user.id;
-}
-
-// Helper to extract JWT token from request
+// Helper to extract JWT token from request (for RLS client)
 function getTokenFromRequest(req: Request): string | null {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
   }
-  return authHeader.substring(7);
+  // Fallback to cookies (cookie-parser populates req.cookies)
+  return (req as any).cookies?.access_token || null;
 }
 
 /**
  * GET /api/folders
  * Get all folders for the authenticated user with notebook counts
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
+    const userId = req.user!.id;
 
-    if (!userId) {
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get folders for user
-    const { data: folders, error: foldersError } = await supabase
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
+
+    // Get folders for user - RLS will ensure only user's folders are returned
+    const { data: folders, error: foldersError } = await userClient
       .from('notebook_folders')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId) // Defense in depth: explicit user_id filter
       .order('created_at', { ascending: false });
 
     if (foldersError) {
@@ -53,13 +57,14 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch folders' });
     }
 
-    // Get notebook counts for each folder
+    // Get notebook counts for each folder - filter by user_id for security
     const foldersWithCounts = await Promise.all(
       (folders || []).map(async (folder) => {
-        const { count } = await supabase
+        const { count } = await userClient
           .from('notebooks')
           .select('*', { count: 'exact', head: true })
-          .eq('folder_id', folder.id);
+          .eq('folder_id', folder.id)
+          .eq('user_id', userId); // Filter by user_id for security
 
         return {
           id: folder.id,
@@ -84,21 +89,25 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/folders/:id
  * Get a specific folder by ID
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
+    const userId = req.user!.id;
+    const { id } = req.params;
 
-    if (!userId) {
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { id } = req.params;
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
 
-    const { data: folder, error } = await supabase
+    const { data: folder, error } = await userClient
       .from('notebook_folders')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', userId) // Defense in depth: explicit user_id filter
       .single();
 
     if (error) {
@@ -108,11 +117,12 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch folder' });
     }
 
-    // Get notebook count
-    const { count } = await supabase
+    // Get notebook count - filter by user_id for security
+    const { count } = await userClient
       .from('notebooks')
       .select('*', { count: 'exact', head: true })
-      .eq('folder_id', folder.id);
+      .eq('folder_id', folder.id)
+      .eq('user_id', userId); // Filter by user_id for security
 
     res.json({
       id: folder.id,
@@ -133,14 +143,9 @@ router.get('/:id', async (req: Request, res: Response) => {
  * GET /api/folders/:folderId/notebooks
  * Get all notebooks in a specific folder
  */
-router.get('/:folderId/notebooks', async (req: Request, res: Response) => {
+router.get('/:folderId/notebooks', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    const userId = req.user!.id;
     const { folderId } = req.params;
 
     // Verify folder exists and belongs to user
@@ -155,11 +160,21 @@ router.get('/:folderId/notebooks', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Folder not found' });
     }
 
-    // Get notebooks in folder
-    const { data: notebooks, error: notebooksError } = await supabase
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
+
+    // Get notebooks in folder - filter by user_id for security
+    const { data: notebooks, error: notebooksError } = await userClient
       .from('notebooks')
       .select('*')
       .eq('folder_id', folderId)
+      .eq('user_id', userId) // CRITICAL: Filter by user_id to prevent seeing other users' notebooks
       .order('updated_at', { ascending: false });
 
     if (notebooksError) {
@@ -167,13 +182,14 @@ router.get('/:folderId/notebooks', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch notebooks' });
     }
 
-    // Get source counts for each notebook
+    // Get source counts for each notebook - filter by user_id for security
     const notebooksWithCounts = await Promise.all(
       (notebooks || []).map(async (notebook) => {
-        const { count } = await supabase
+        const { count } = await userClient
           .from('documents')
           .select('*', { count: 'exact', head: true })
-          .eq('note_id', notebook.id);
+          .eq('notebook_id', notebook.id)
+          .eq('user_id', userId); // Filter by user_id for security
 
         const metadata = (notebook.metadata as Record<string, any>) || {};
 
@@ -208,19 +224,16 @@ router.get('/:folderId/notebooks', async (req: Request, res: Response) => {
  * POST /api/folders
  * Create a new folder
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
+    const userId = req.user!.id;
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    // Validate request body
+    const validationResult = createFolderSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ error: validationResult.error.errors[0].message });
     }
-
-    const { name, color, icon } = req.body;
-
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return res.status(400).json({ error: 'Name is required' });
-    }
+    const { name, color, icon } = validationResult.data;
 
     // Get user's JWT token to create a client that respects RLS
     const token = getTokenFromRequest(req);
@@ -268,16 +281,17 @@ router.post('/', async (req: Request, res: Response) => {
  * PUT /api/folders/:id
  * Update a folder
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    const userId = req.user!.id;
     const { id } = req.params;
-    const { name, color, icon } = req.body;
+
+    // Validate request body
+    const validationResult = updateFolderSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ error: validationResult.error.errors[0].message });
+    }
+    const { name, color, icon } = validationResult.data;
 
     // First, get the existing folder to verify ownership
     const { data: existingFolder, error: fetchError } = await supabase
@@ -297,13 +311,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     };
 
     if (name !== undefined) {
-      if (typeof name !== 'string' || name.trim().length === 0) {
-        return res.status(400).json({ error: 'Name cannot be empty' });
-      }
       updateData.name = name.trim();
     }
-
-    // No description field to update
 
     if (color !== undefined) updateData.color = color;
     if (icon !== undefined) updateData.icon = icon;
@@ -332,11 +341,12 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to update folder' });
     }
 
-    // Get notebook count
-    const { count } = await supabase
+    // Get notebook count - filter by user_id for security
+    const { count } = await userClient
       .from('notebooks')
       .select('*', { count: 'exact', head: true })
-      .eq('folder_id', folder.id);
+      .eq('folder_id', folder.id)
+      .eq('user_id', userId); // Filter by user_id for security
 
     res.json({
       id: folder.id,
@@ -357,14 +367,9 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/folders/:id
  * Delete a folder (notebooks will have folder_id set to NULL)
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    const userId = req.user!.id;
     const { id } = req.params;
 
     // Verify ownership before deleting

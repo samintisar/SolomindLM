@@ -90,7 +90,8 @@ router.post('/', rateLimiter('mindmap'), async (req: Request, res: Response) => 
     }));
 
     // #region agent log
-    console.log('[DEBUG] mindmaps.ts:90 - POST /api/mindmaps entry', JSON.stringify({location:'mindmaps.ts:90',message:'POST /api/mindmaps entry',data:{userId,notebookId,documentIds,documentIdsType:typeof documentIds,documentIdsIsArray:Array.isArray(documentIds),documentIdsLength:Array.isArray(documentIds)?documentIds.length:undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'}));
+    // Security: Avoid logging user ID to prevent correlation attacks
+    console.log('[DEBUG] mindmaps.ts:90 - POST /api/mindmaps entry', JSON.stringify({location:'mindmaps.ts:90',message:'POST /api/mindmaps entry',data:{notebookId,documentIds,documentIdsType:typeof documentIds,documentIdsIsArray:Array.isArray(documentIds),documentIdsLength:Array.isArray(documentIds)?documentIds.length:undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'}));
     // #endregion
 
     // Validation: userId and notebookId

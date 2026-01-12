@@ -28,22 +28,13 @@ export async function checkNotebookLimit(
 ): Promise<void> {
   try {
     // Extract userId from the authenticated request
-    // The userId should be set by the getUserIdFromToken helper in the route
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // The userId should be set by the authenticate middleware which runs before this
+    if (!req.user || !req.user.id) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    const userId = user.id;
+    const userId = req.user.id;
 
     // Get user tier
     const userTier = await rateLimitService.getUserTier(userId);

@@ -52,6 +52,8 @@ const FLASHCARD_CONFIG = {
   // Timeout settings for LLM calls
   MAP_TIMEOUT_MS: parseInt(env.FLASHCARD_MAP_TIMEOUT_MS || '180000', 10), // 3 minutes
   REDUCE_TIMEOUT_MS: parseInt(env.FLASHCARD_REDUCE_TIMEOUT_MS || '240000', 10), // 4 minutes
+  // Max tokens for reduce phase (selection/refinement) - needed for large flashcard sets
+  REDUCE_MAX_TOKENS: parseInt(env.FLASHCARD_REDUCE_MAX_TOKENS || '32000', 10), // Enough for 55+ flashcards in JSON
 } as const;
 
 const GRAPH_CONFIG = {
@@ -288,26 +290,24 @@ export function validateChunks(chunks: string[]): string[] {
 export class FlashcardGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
-  private maxTokens: number;
 
-  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = 24000) {
+  constructor(apiKey: string, mapModel: string, reduceModel: string) {
     // Fast model for map phase (parallel Q&A generation)
+    // No maxTokens needed - output is short and controlled by prompt
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
       temperature: 0.3, // Lower temperature for factual extraction
-      maxTokens: Math.floor(maxTokens / 2), // Use half for map phase
     });
 
     // Smart model for reduce/collapse phases (selection and refinement)
+    // maxTokens needed for large flashcard sets (55+ cards) to prevent truncation
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
       temperature: 0.3, // Lower temperature for consistent selection
-      maxTokens: maxTokens, // Full tokens for reduce phase
+      maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS, // Enough for large flashcard sets in JSON format
     });
-
-    this.maxTokens = maxTokens;
   }
 
   private estimateTokens(text: string): number {

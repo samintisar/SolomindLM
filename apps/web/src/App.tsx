@@ -780,27 +780,42 @@ const AppContent: React.FC = () => {
 
           // Check if any documents are still processing and start polling
           const hasProcessing = docs.some(doc => doc.status === 'pending' || doc.status === 'processing');
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:782',message:'handleDocumentUploaded check',data:{hasProcessing,docStatuses:docs.map((d:any)=>({id:d.id,status:d.status}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+          // #endregion
           if (hasProcessing) {
             // Clear any existing polling interval
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current);
             }
 
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:789',message:'Starting polling interval',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+            // #endregion
             // Poll every 2 seconds until all documents are completed/failed
             pollingIntervalRef.current = setInterval(async () => {
               try {
                 const updatedDocs = await documentsApi.getDocuments(user.id, activeNotebookId);
                 const allDone = updatedDocs.every(doc => doc.status === 'completed' || doc.status === 'failed');
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:792',message:'Polling check',data:{allDone,docStatuses:updatedDocs.map((d:any)=>({id:d.id,status:d.status}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                // #endregion
 
                 setSources(updatedDocs.map(documentToSource));
 
                 if (allDone) {
+                  // #region agent log
+                  fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:797',message:'Stopping polling - all done',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                  // #endregion
                   if (pollingIntervalRef.current) {
                     clearInterval(pollingIntervalRef.current);
                     pollingIntervalRef.current = null;
                   }
                 }
               } catch (err) {
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:803',message:'Polling error',data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+                // #endregion
                 console.error('Failed to poll document status:', err);
                 if (pollingIntervalRef.current) {
                   clearInterval(pollingIntervalRef.current);

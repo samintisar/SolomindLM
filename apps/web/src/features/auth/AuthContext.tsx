@@ -5,8 +5,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 interface User {
   id: string;
   email: string;
-  accessToken?: string;
-  refreshToken?: string;
 }
 
 interface AuthContextType {
@@ -26,53 +24,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session
+  // Check for existing session (cookies are set by backend)
   const checkSession = useCallback(async () => {
     try {
-      const storedUser = localStorage.getItem('solomind_user');
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        // Verify session is still valid
-        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${parsedUser.accessToken}`,
-          },
-        });
+      // Verify session is still valid by calling /me endpoint
+      // Cookies are automatically sent by the browser
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        credentials: 'include',
+      });
 
-        if (response.ok) {
-          setUser(parsedUser);
-        } else {
-          // Session expired, try to refresh
-          if (parsedUser.refreshToken) {
-            try {
-              const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken: parsedUser.refreshToken }),
-              });
-
-              if (refreshResponse.ok) {
-                const data = await refreshResponse.json();
-                const refreshedUser = {
-                  ...parsedUser,
-                  accessToken: data.accessToken,
-                  refreshToken: data.refreshToken,
-                };
-                localStorage.setItem('solomind_user', JSON.stringify(refreshedUser));
-                setUser(refreshedUser);
-              } else {
-                localStorage.removeItem('solomind_user');
-              }
-            } catch {
-              localStorage.removeItem('solomind_user');
-            }
-          } else {
-            localStorage.removeItem('solomind_user');
-          }
-        }
+      if (response.ok) {
+        const data = await response.json();
+        setUser({ id: data.userId, email: data.email });
+      } else {
+        // Session expired or not authenticated (expected if user hasn't logged in)
+        setUser(null);
       }
     } catch (error) {
-      console.error('Session check error:', error);
+      // Only log unexpected errors, not expected 401s
+      if (error instanceof Error && !error.message.includes('401')) {
+        console.error('Session check error:', error);
+      }
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -83,31 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  // Listen for storage changes (e.g., login from another tab or callback)
+  // Listen for custom auth events (for OAuth callback handling)
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'solomind_user') {
-        if (e.newValue && !e.oldValue) {
-          // User logged in
-          const parsedUser = JSON.parse(e.newValue);
-          setUser(parsedUser);
-        } else if (!e.newValue && e.oldValue) {
-          // User logged out
-          setUser(null);
-        }
-      }
-    };
-
-    // Also listen for custom auth events (for same-tab updates)
     const handleAuthChange = () => {
       checkSession();
     };
 
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('auth-change', handleAuthChange);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('auth-change', handleAuthChange);
     };
   }, [checkSession]);
@@ -117,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -125,24 +83,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || 'Sign in failed');
     }
 
+    // Verify session after login to ensure cookies are set and working
+    await checkSession();
+
+    // Return user from session check or fallback to login response
     const newUser: User = {
       id: data.userId,
       email: data.email,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
     };
 
-    setUser(newUser);
-    localStorage.setItem('solomind_user', JSON.stringify(newUser));
-
     return newUser;
-  }, []);
+  }, [checkSession]);
 
   const signUp = useCallback(async (email: string, password: string): Promise<User> => {
     const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -159,33 +117,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newUser: User = {
       id: data.userId,
       email: data.email,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
     };
 
     setUser(newUser);
-    localStorage.setItem('solomind_user', JSON.stringify(newUser));
-
     return newUser;
   }, []);
 
   const signOut = useCallback(async () => {
     try {
-      if (user?.accessToken) {
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${user.accessToken}`,
-          },
-        });
-      }
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
-      localStorage.removeItem('solomind_user');
     }
-  }, [user]);
+  }, []);
 
   const signInWithGoogle = useCallback(async () => {
     // Redirect to backend OAuth endpoint which will handle Supabase OAuth
@@ -194,31 +143,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshSession = useCallback(async () => {
-    if (!user?.refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: user.refreshToken }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
+      // Session is truly invalid, clear user state
+      setUser(null);
       throw new Error('Session refresh failed');
     }
 
-    const data = await response.json();
-
-    const refreshedUser: User = {
-      ...user,
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-    };
-
-    setUser(refreshedUser);
-    localStorage.setItem('solomind_user', JSON.stringify(refreshedUser));
-  }, [user]);
+    // Cookies are automatically updated by the backend
+    // Re-check session to get updated user info
+    await checkSession();
+  }, [checkSession]);
 
   return (
     <AuthContext.Provider

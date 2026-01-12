@@ -1,22 +1,8 @@
 import type { Note, ReportNote } from '@/shared/types/index';
 import { getReportSubtitle, normalizeReportTypeId } from '@/shared/types/reportTypes';
+import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
 
 export interface CreateReportParams {
   userId: string;
@@ -30,6 +16,23 @@ export interface CreateReportResponse {
   reportId: string;
   status: string;
   note: ReportNote;
+}
+
+/**
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
+ */
+function getUserId(): string | null {
+  const storedUser = localStorage.getItem('solomind_user');
+  if (storedUser) {
+    try {
+      const user = JSON.parse(storedUser);
+      return user.id || user.user?.id || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -72,11 +75,7 @@ export const reportsApi = {
    * Create a new report and queue generation
    */
   async createReport(params: CreateReportParams): Promise<CreateReportResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/reports`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(params),
-    });
+    const response = await apiPost('/api/reports', params);
 
     if (!response.ok) {
       const error = await response.json();
@@ -95,20 +94,14 @@ export const reportsApi = {
    * Get a specific report by ID
    */
   async getReport(reportId: string): Promise<ReportNote> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/reports/${reportId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/reports/${reportId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch report');
@@ -145,20 +138,14 @@ export const reportsApi = {
    * Get all reports for a notebook
    */
   async getReports(notebookId: string): Promise<ReportNote[]> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/reports/notebook/${notebookId}?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await apiGet(`/api/reports/notebook/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch reports');
@@ -172,24 +159,13 @@ export const reportsApi = {
    * Delete a report by ID
    */
   async deleteReport(reportId: string): Promise<void> {
-    const storedUser = localStorage.getItem('solomind_user');
-    const userId = storedUser ? JSON.parse(storedUser).id : null;
+    const userId = getUserId();
 
     if (!userId) {
       throw new Error('User not authenticated');
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/reports/${reportId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to delete report');
-    }
+    await apiDelete(`/api/reports/${reportId}?${params.toString()}`);
   },
 };

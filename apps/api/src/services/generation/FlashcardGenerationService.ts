@@ -37,8 +37,7 @@ export class FlashcardGenerationService {
     this.flashcardGraph = new FlashcardGraph(
       env.TOGETHER_AI_API_KEY,
       env.FAST_LLM,
-      env.SMART_LLM || env.FAST_LLM, // Use smart model for reduce, fall back to fast if not set
-      parseInt(env.REPORT_MAX_TOKENS || '24000', 10)
+      env.SMART_LLM || env.FAST_LLM // Use smart model for reduce, fall back to fast if not set
     );
     this.titleGenerator = new TitleGeneratorService(env.TOGETHER_AI_API_KEY, env.FAST_LLM);
   }

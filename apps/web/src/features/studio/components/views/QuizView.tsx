@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
 import { QuizNote } from '@/shared/types/index';
 import { quizzesApi } from '@/features/studio/services/quizzesApi';
 
@@ -220,7 +221,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                     <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-10 text-lg md:text-2xl">
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm, remarkMath]}
-                            rehypePlugins={[rehypeKatex]}
+                            rehypePlugins={[rehypeSanitize, rehypeKatex]}
                             components={{
                                 img: () => null,
                                 a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
@@ -267,7 +268,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                     <div className="flex-1 prose prose-stone dark:prose-invert max-w-none font-serif text-base md:text-lg">
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm, remarkMath]}
-                                            rehypePlugins={[rehypeKatex]}
+                                            rehypePlugins={[rehypeSanitize, rehypeKatex]}
                                             components={{
                                                 img: () => null,
                                                 a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
@@ -303,7 +304,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                     <div className="text-base mt-2 leading-relaxed prose prose-base prose-stone dark:prose-invert max-w-none text-vintage-blue-700 dark:text-vintage-blue-700">
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm, remarkMath]}
-                                            rehypePlugins={[rehypeKatex]}
+                                            rehypePlugins={[rehypeSanitize, rehypeKatex]}
                                             components={{
                                                 img: () => null,
                                                 a: ({ node, children, ...props }) => <span className="text-vintage-blue-700 dark:text-vintage-blue-700">{children}</span>,

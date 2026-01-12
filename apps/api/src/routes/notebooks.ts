@@ -1,43 +1,60 @@
 import { Router, Request, Response } from 'express';
-import { supabase } from '../config/database.js';
+import { supabase, createUserClient } from '../config/database.js';
 import { checkNotebookLimit } from '../middleware/notebookLimit.js';
+import { authenticate } from '../middleware/auth.js';
+import { z } from 'zod';
 
 const router = Router();
 
-// Helper to extract user ID from auth token
-async function getUserIdFromToken(req: Request): Promise<string | null> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
+// Validation schemas
+const createNotebookSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
+  coverColor: z.string().optional(),
+  icon: z.string().optional(),
+  isFeatured: z.boolean().optional(),
+  folderId: z.string().uuid().optional(),
+});
 
-  const token = authHeader.substring(7);
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  
-  if (error || !user) {
-    return null;
+const updateNotebookSchema = z.object({
+  title: z.string().min(1, 'Title cannot be empty').max(200, 'Title must be less than 200 characters').optional(),
+  coverColor: z.string().optional(),
+  icon: z.string().optional(),
+  isFeatured: z.boolean().optional(),
+  folderId: z.string().uuid().nullable().optional(),
+});
+
+// Helper to extract JWT token from request (for RLS client)
+function getTokenFromRequest(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
   }
-  
-  return user.id;
+  // Fallback to cookies (cookie-parser populates req.cookies)
+  return (req as any).cookies?.access_token || null;
 }
 
 /**
  * GET /api/notebooks
  * Get all notebooks for the authenticated user
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-    
-    if (!userId) {
+    const userId = req.user!.id;
+
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get notebooks with source count
-    const { data: notebooks, error: notebooksError } = await supabase
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
+
+    // Get notebooks with source count - RLS will ensure only user's notebooks are returned
+    const { data: notebooks, error: notebooksError } = await userClient
       .from('notebooks')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId) // Defense in depth: explicit user_id filter
       .order('updated_at', { ascending: false });
 
     if (notebooksError) {
@@ -45,13 +62,14 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch notebooks' });
     }
 
-    // Get source counts for each notebook
+    // Get source counts for each notebook - filter by user_id for security
     const notebooksWithCounts = await Promise.all(
       (notebooks || []).map(async (notebook) => {
-        const { count } = await supabase
+        const { count } = await userClient
           .from('documents')
           .select('*', { count: 'exact', head: true })
-          .eq('note_id', notebook.id);
+          .eq('notebook_id', notebook.id)
+          .eq('user_id', userId); // Filter by user_id for security
 
         const metadata = (notebook.metadata as Record<string, any>) || {};
 
@@ -86,21 +104,25 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/notebooks/:id
  * Get a specific notebook by ID
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-    
-    if (!userId) {
+    const userId = req.user!.id;
+    const { id } = req.params;
+
+    // Get user's JWT token to create a client that respects RLS
+    const token = getTokenFromRequest(req);
+    if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { id } = req.params;
+    // Use user client for RLS-respecting operations
+    const userClient = createUserClient(token);
 
-    const { data: notebook, error } = await supabase
+    const { data: notebook, error } = await userClient
       .from('notebooks')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', userId) // Defense in depth: explicit user_id filter
       .single();
 
     if (error) {
@@ -110,11 +132,12 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch notebook' });
     }
 
-    // Get source count
-    const { count } = await supabase
+    // Get source count - filter by user_id for security
+    const { count } = await userClient
       .from('documents')
       .select('*', { count: 'exact', head: true })
-      .eq('note_id', notebook.id);
+      .eq('notebook_id', notebook.id)
+      .eq('user_id', userId); // Filter by user_id for security
 
     const metadata = (notebook.metadata as Record<string, any>) || {};
 
@@ -145,19 +168,16 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/notebooks
  * Create a new notebook
  */
-router.post('/', checkNotebookLimit, async (req: Request, res: Response) => {
+router.post('/', authenticate, checkNotebookLimit, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const userId = req.user!.id;
 
-    const { title, coverColor, icon, isFeatured } = req.body;
-
-    if (!title || typeof title !== 'string' || title.trim().length === 0) {
-      return res.status(400).json({ error: 'Title is required' });
+    // Validate request body
+    const validationResult = createNotebookSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ error: validationResult.error.errors[0].message });
     }
+    const { title, coverColor, icon, isFeatured } = validationResult.data;
 
     const metadata: Record<string, any> = {};
     if (coverColor) metadata.coverColor = coverColor;
@@ -205,16 +225,17 @@ router.post('/', checkNotebookLimit, async (req: Request, res: Response) => {
  * PUT /api/notebooks/:id
  * Update a notebook
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    const userId = req.user!.id;
     const { id } = req.params;
-    const { title, coverColor, icon, isFeatured, folderId } = req.body;
+
+    // Validate request body
+    const validationResult = updateNotebookSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ error: validationResult.error.errors[0].message });
+    }
+    const { title, coverColor, icon, isFeatured, folderId } = validationResult.data;
 
     // First, get the existing notebook to verify ownership
     const { data: existingNotebook, error: fetchError } = await supabase
@@ -234,9 +255,6 @@ router.put('/:id', async (req: Request, res: Response) => {
     };
 
     if (title !== undefined) {
-      if (typeof title !== 'string' || title.trim().length === 0) {
-        return res.status(400).json({ error: 'Title cannot be empty' });
-      }
       updateData.title = title.trim();
     }
 
@@ -248,11 +266,11 @@ router.put('/:id', async (req: Request, res: Response) => {
     // Update metadata
     const existingMetadata = (existingNotebook.metadata as Record<string, any>) || {};
     const newMetadata = { ...existingMetadata };
-    
+
     if (coverColor !== undefined) newMetadata.coverColor = coverColor;
     if (icon !== undefined) newMetadata.icon = icon;
     if (isFeatured !== undefined) newMetadata.isFeatured = isFeatured;
-    
+
     updateData.metadata = newMetadata;
 
     const { data: notebook, error } = await supabase
@@ -268,11 +286,17 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to update notebook' });
     }
 
-    // Get source count
-    const { count } = await supabase
+    // Get source count - filter by user_id for security
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userClient = createUserClient(token);
+    const { count } = await userClient
       .from('documents')
       .select('*', { count: 'exact', head: true })
-      .eq('note_id', notebook.id);
+      .eq('notebook_id', notebook.id)
+      .eq('user_id', userId); // Filter by user_id for security
 
     const metadata = (notebook.metadata as Record<string, any>) || {};
 
@@ -303,14 +327,9 @@ router.put('/:id', async (req: Request, res: Response) => {
  * DELETE /api/notebooks/:id
  * Delete a notebook
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = await getUserIdFromToken(req);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+    const userId = req.user!.id;
     const { id } = req.params;
 
     // Verify ownership before deleting
@@ -347,14 +366,10 @@ router.delete('/:id', async (req: Request, res: Response) => {
 /**
  * GET /api/notebooks/:notebookId/notes - Get all notes (reports + user notes) for a notebook
  */
-router.get('/:notebookId/notes', async (req: Request, res: Response) => {
+router.get('/:notebookId/notes', authenticate, async (req: Request, res: Response) => {
   try {
     const { notebookId } = req.params;
-    const userId = await getUserIdFromToken(req);
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const userId = req.user!.id;
 
     // Verify user owns the notebook
     const { data: notebook, error: notebookError } = await supabase

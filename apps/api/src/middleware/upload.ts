@@ -1,5 +1,60 @@
 import multer from 'multer';
-import { Request } from 'express';
+import { Request, Response, NextFunction } from 'express';
+import { virusScanService } from '../services/security/VirusScanService.js';
+
+/**
+ * Magic byte signatures for file type validation
+ * Maps file signatures to their corresponding MIME types
+ */
+const MAGIC_BYTES: Record<string, number[][]> = {
+  'application/pdf': [[0x25, 0x50, 0x44, 0x46]], // %PDF
+  'image/png': [[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]], // PNG signature
+  'image/jpeg': [[0xFF, 0xD8, 0xFF]], // JPEG signature (start of image)
+  'image/gif': [[0x47, 0x49, 0x46, 0x38]], // GIF8
+  'image/webp': [[0x52, 0x49, 0x46, 0x46]], // RIFF (WebP starts with RIFF....WEBP)
+  'image/bmp': [[0x42, 0x4D]], // BM
+  'image/avif': [[0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]], // ftypavif
+  'image/svg+xml': [], // SVG is text-based, skip magic byte check
+  'application/msword': [[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]], // DOC (OLE)
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [[0x50, 0x4B, 0x03, 0x04]], // DOCX is ZIP (PK..)
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': [[0x50, 0x4B, 0x03, 0x04]], // PPTX is ZIP
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [[0x50, 0x4B, 0x03, 0x04]], // XLSX is ZIP
+  'application/vnd.ms-powerpoint': [[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]], // PPT (OLE)
+  'application/vnd.ms-excel': [[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]], // XLS (OLE)
+  'text/plain': [], // Text files - skip magic byte check
+  'text/csv': [], // CSV files - skip magic byte check
+  'application/rtf': [[0x7B, 0x5C, 0x72, 0x74, 0x66]], // {\rtf
+  'application/vnd.oasis.opendocument.text': [[0x50, 0x4B, 0x03, 0x04]], // ODT is ZIP
+  'application/vnd.oasis.opendocument.presentation': [[0x50, 0x4B, 0x03, 0x04]], // ODP is ZIP
+  'application/vnd.oasis.opendocument.spreadsheet': [[0x50, 0x4B, 0x03, 0x04]], // ODS is ZIP
+  'application/json': [], // JSON - skip magic byte check
+  'text/markdown': [], // Markdown - skip magic byte check
+};
+
+/**
+ * Check if file buffer matches the expected magic bytes
+ */
+function validateMagicBytes(buffer: Buffer, mimetype: string): boolean {
+  const signatures = MAGIC_BYTES[mimetype];
+
+  // Skip validation for types without magic bytes (text files, etc.)
+  if (!signatures || signatures.length === 0) {
+    return true;
+  }
+
+  // Check if buffer matches any of the signatures
+  return signatures.some(signature => {
+    if (buffer.length < signature.length) {
+      return false;
+    }
+    for (let i = 0; i < signature.length; i++) {
+      if (buffer[i] !== signature[i]) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
 
 /**
  * Allowed MIME types for file upload
@@ -131,7 +186,7 @@ const fileFilter = (
 
   // Get file extension
   const ext = file.originalname.toLowerCase().split('.').pop() || '';
-  
+
   // Handle application/octet-stream by checking file extension
   let mimetype = file.mimetype;
   if (mimetype === 'application/octet-stream' || mimetype === 'application/x-msdownload') {
@@ -162,6 +217,16 @@ const fileFilter = (
     return callback(new Error(
       `File extension .${ext} does not match declared MIME type ${mimetype}`
     ));
+  }
+
+  // Perform magic byte validation if buffer is available
+  if (file.buffer && file.buffer.length > 0) {
+    if (!validateMagicBytes(file.buffer, mimetype)) {
+      return callback(new Error(
+        `File content does not match declared type ${mimetype}. ` +
+        `The file may be corrupted or have an incorrect extension.`
+      ));
+    }
   }
 
   callback(null, true);
@@ -264,4 +329,61 @@ export function getExtensionFromMimeType(mimeType: string): string {
   };
 
   return extMap[mimeType] || '';
+}
+
+/**
+ * Middleware to scan uploaded files for viruses and malware
+ * Uses the VirusScanService with multiple detection strategies
+ *
+ * Security: This is a critical security control that prevents malicious files
+ * from being uploaded and processed by the system
+ */
+export async function scanForViruses(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.file) {
+    return next();
+  }
+
+  try {
+    console.log('[VirusScan] Scanning file:', req.file.originalname);
+
+    const result = await virusScanService.scanFile(req.file.buffer, req.file.originalname);
+
+    console.log('[VirusScan] Scan result:', {
+      isClean: result.isClean,
+      threats: result.threats,
+      method: result.scanMethod,
+      time: result.scanTime,
+    });
+
+    if (!result.isClean) {
+      console.error('[VirusScan] Threat detected:', result.threats);
+      return res.status(400).json({
+        error: 'File upload blocked',
+        message: 'The uploaded file contains potentially malicious content and cannot be processed.',
+        threats: result.threats,
+        scanMethod: result.scanMethod,
+      });
+    }
+
+    // File is clean, proceed
+    next();
+  } catch (error) {
+    console.error('[VirusScan] Scan failed:', error);
+
+    // Fail closed - reject upload if scan fails
+    // This is more secure but may cause false negatives
+    if (process.env.VIRUS_SCAN_FAIL_OPEN === 'true') {
+      console.warn('[VirusScan] VIRUS_SCAN_FAIL_OPEN is true, allowing file despite scan failure');
+      return next();
+    }
+
+    return res.status(500).json({
+      error: 'Security scan failed',
+      message: 'Unable to scan the uploaded file for security threats. Please try again later.',
+    });
+  }
 }

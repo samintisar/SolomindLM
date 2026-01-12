@@ -1,30 +1,12 @@
 import type { NotebookItem } from '@/shared/types/index';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
+import { apiGet, apiPost, apiPut, apiDelete } from '@/shared/utils/api';
 
 export const notebooksApi = {
   /**
    * Get all notebooks for the authenticated user
    */
   async getNotebooks(): Promise<NotebookItem[]> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet('/api/notebooks');
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -40,9 +22,7 @@ export const notebooksApi = {
    * Get a specific notebook by ID
    */
   async getNotebook(id: string): Promise<NotebookItem> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks/${id}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet(`/api/notebooks/${id}`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -66,11 +46,7 @@ export const notebooksApi = {
     icon?: string;
     isFeatured?: boolean;
   }): Promise<NotebookItem> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    });
+    const response = await apiPost('/api/notebooks', data);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -96,11 +72,7 @@ export const notebooksApi = {
       folderId?: string | null;
     }
   ): Promise<NotebookItem> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(updates),
-    });
+    const response = await apiPut(`/api/notebooks/${id}`, updates);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -120,10 +92,7 @@ export const notebooksApi = {
    * Delete a notebook
    */
   async deleteNotebook(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/notebooks/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
+    const response = await apiDelete(`/api/notebooks/${id}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -141,9 +110,7 @@ export const notebooksApi = {
    * Get notebooks for a specific folder
    */
   async getFolderNotebooks(folderId: string): Promise<NotebookItem[]> {
-    const response = await fetch(`${API_BASE_URL}/api/folders/${folderId}/notebooks`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet(`/api/folders/${folderId}/notebooks`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch folder notebooks: ${response.statusText}`);
@@ -159,4 +126,3 @@ export const notebooksApi = {
 export async function fetchFolderNotebooks(folderId: string): Promise<NotebookItem[]> {
   return notebooksApi.getFolderNotebooks(folderId);
 }
-

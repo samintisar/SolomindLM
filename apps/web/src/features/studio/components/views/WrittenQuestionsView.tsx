@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
 import { WrittenQuestionsNote, WrittenQuestionAnswer } from '@/shared/types/index';
 import { writtenQuestionsApi } from '@/features/studio/services/writtenQuestionsApi';
 
@@ -292,7 +293,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
           <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-6 text-lg md:text-xl">
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
+              rehypePlugins={[rehypeSanitize, rehypeKatex]}
               components={{
                 img: () => null,
                 a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,

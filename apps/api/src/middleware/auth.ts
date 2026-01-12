@@ -20,13 +20,23 @@ declare global {
 }
 
 /**
- * Extract Bearer token from Authorization header
+ * Extract token from Authorization header or cookies
+ * Priority: Authorization header > cookies
  */
-function extractBearerToken(authHeader: string | undefined): string | null {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+function extractToken(req: Request): string | null {
+  // First try Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
   }
-  return authHeader.substring(7);
+
+  // Fallback to cookies (for httpOnly cookie-based auth)
+  const accessToken = (req as any).cookies?.access_token;
+  if (accessToken) {
+    return accessToken;
+  }
+
+  return null;
 }
 
 /**
@@ -40,7 +50,7 @@ export async function authenticate(
   next: NextFunction
 ): Promise<void> {
   try {
-    const token = extractBearerToken(req.headers.authorization);
+    const token = extractToken(req);
 
     if (!token) {
       res.status(401).json({ error: 'Unauthorized: No token provided' });
@@ -78,7 +88,7 @@ export async function optionalAuth(
   next: NextFunction
 ): Promise<void> {
   try {
-    const token = extractBearerToken(req.headers.authorization);
+    const token = extractToken(req);
 
     if (!token) {
       next();

@@ -11,6 +11,7 @@ interface DiscoverSourcesModalProps {
   isAtLimit: boolean;
   userId?: string | null;
   noteId?: string | null;
+  onDocumentUploaded?: (documentId: string) => void;
 }
 
 interface WebResult {
@@ -29,6 +30,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   isAtLimit,
   userId,
   noteId,
+  onDocumentUploaded,
 }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<WebResult[]>([]);
@@ -64,7 +66,9 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   };
 
   const handleAddResult = async (result: WebResult) => {
-    if (isAtLimit || !userId || !noteId) return;
+    if (isAtLimit || !userId || !noteId) {
+      return;
+    }
 
     // Set loading state for this specific result
     setResults(prev => prev.map(r =>
@@ -85,6 +89,9 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       };
 
       onAddSource(newSource);
+      
+      // Trigger document upload callback to start polling for status updates
+      onDocumentUploaded?.(response.documentId);
 
       // Mark as added
       setResults(prev => prev.map(r =>

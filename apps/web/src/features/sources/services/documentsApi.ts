@@ -1,21 +1,5 @@
 import type { Document, UploadResponse, DiscoveryRequest, DiscoveryResponse } from '@/shared/types/index';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Get auth headers with access token
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    const user = JSON.parse(storedUser);
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${user.accessToken}`,
-    };
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from '@/shared/utils/api';
 
 export const documentsApi = {
   /**
@@ -26,6 +10,9 @@ export const documentsApi = {
     noteId: string,
     file: File
   ): Promise<UploadResponse> {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:8',message:'uploadFile entry',data:{userId,noteId,fileName:file.name,fileSize:file.size,fileType:file.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     if (!userId || !noteId) {
       throw new Error('userId and noteId are required');
     }
@@ -36,26 +23,28 @@ export const documentsApi = {
     formData.append('noteId', noteId);
     formData.append('type', 'file');
 
-    const storedUser = localStorage.getItem('solomind_user');
-    const accessToken = storedUser ? JSON.parse(storedUser).accessToken : null;
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:23',message:'Before apiUpload call',data:{url:'/api/documents/upload',formDataKeys:Array.from(formData.keys())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const response = await apiUpload('/api/documents/upload', formData);
 
-    const headers: HeadersInit = {};
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:25',message:'After apiUpload response',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     if (!response.ok) {
+      // #region agent log
+      const errorBody = await response.json().catch(()=>({}));
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:27',message:'Upload response not ok',data:{status:response.status,statusText:response.statusText,errorBody},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       const error = await response.json();
       throw new Error(error.error || 'Upload failed');
     }
 
-    return response.json();
+    const result = await response.json();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:32',message:'Upload success',data:{documentId:result.documentId,status:result.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    return result;
   },
 
   /**
@@ -71,15 +60,11 @@ export const documentsApi = {
       throw new Error('userId and noteId are required');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        userId,
-        noteId,
-        type,
-        source: url,
-      }),
+    const response = await apiPost('/api/documents/upload', {
+      userId,
+      noteId,
+      type,
+      source: url,
     });
 
     if (!response.ok) {
@@ -102,15 +87,11 @@ export const documentsApi = {
       throw new Error('userId and noteId are required');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        userId,
-        noteId,
-        type: 'text',
-        source: text,
-      }),
+    const response = await apiPost('/api/documents/upload', {
+      userId,
+      noteId,
+      type: 'text',
+      source: text,
     });
 
     if (!response.ok) {
@@ -125,9 +106,7 @@ export const documentsApi = {
    * Get a specific document by ID
    */
   async getDocument(id: string): Promise<Document> {
-    const response = await fetch(`${API_BASE_URL}/api/documents/${id}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await apiGet(`/api/documents/${id}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch document');
@@ -145,43 +124,37 @@ export const documentsApi = {
       params.append('noteId', noteId);
     }
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/documents?${params.toString()}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:104',message:'getDocuments request',data:{userId,noteId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    const response = await apiGet(`/api/documents?${params.toString()}`);
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:110',message:'getDocuments response',data:{status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
     if (!response.ok) {
       throw new Error('Failed to fetch documents');
     }
 
-    return response.json();
+    const docs = await response.json();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:116',message:'getDocuments parsed',data:{count:Array.isArray(docs)?docs.length:0,statuses:Array.isArray(docs)?docs.map((d:any)=>({id:d.id,status:d.status})):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    return docs;
   },
 
   /**
    * Delete a document by ID
    */
   async deleteDocument(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/documents/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to delete document');
-    }
+    await apiDelete(`/api/documents/${id}`);
   },
 
   /**
    * Rename a document by ID
    */
   async renameDocument(id: string, newTitle: string): Promise<Document> {
-    const response = await fetch(`${API_BASE_URL}/api/documents/${id}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ title: newTitle }),
-    });
+    const response = await apiPatch(`/api/documents/${id}`, { title: newTitle });
 
     if (!response.ok) {
       throw new Error('Failed to rename document');
@@ -194,11 +167,19 @@ export const documentsApi = {
    * Get the full content of a document (reconstructed from chunks)
    */
   async getDocumentContent(documentId: string): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/api/documents/${documentId}/content`, {
-      headers: getAuthHeaders(),
-    });
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:142',message:'getDocumentContent entry',data:{documentId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    const response = await apiGet(`/api/documents/${documentId}/content`);
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:145',message:'getDocumentContent response',data:{documentId,status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
     if (!response.ok) {
+      // #region agent log
+      const errorBody = await response.json().catch(()=>({}));
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'documentsApi.ts:147',message:'getDocumentContent error',data:{documentId,status:response.status,errorBody},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
       throw new Error('Failed to fetch document content');
     }
 
@@ -233,11 +214,7 @@ export const documentsApi = {
    * Discover web sources using Tavily Search API
    */
   async discoverSources(request: DiscoveryRequest): Promise<DiscoveryResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/sources/discover`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(request),
-    });
+    const response = await apiPost('/api/sources/discover', request);
 
     if (!response.ok) {
       const error = await response.json();

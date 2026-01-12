@@ -119,10 +119,11 @@ export function generateCsrfToken(
   req.csrfToken = () => token;
 
   // Set token in cookie for client-side access
+  // Match sameSite settings with auth cookies for cross-origin compatibility
   res.cookie('XSRF-TOKEN', token, {
     httpOnly: false, // Client needs to read this to include in requests
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production' ? true : false,
+    sameSite: process.env.NODE_ENV === 'production' ? ('strict' as const) : ('none' as const),
     maxAge: TOKEN_EXPIRY,
     path: '/',
   });

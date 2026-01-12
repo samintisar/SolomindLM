@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
 import { Source } from '@/shared/types/index';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
 import { documentsApi } from '../services/documentsApi';
@@ -109,16 +110,34 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // Fetch content when a source is being viewed
   useEffect(() => {
-    if (viewingSource && viewingSourceId && !contentCache[viewingSourceId]) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:112',message:'useEffect trigger',data:{viewingSourceId,hasViewingSource:!!viewingSource,sourceStatus:viewingSource?.status,hasCachedContent:!!contentCache[viewingSourceId]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    // Only fetch content once document processing is complete to avoid 404s
+    if (
+      viewingSource &&
+      viewingSourceId &&
+      viewingSource.status === 'completed' &&
+      !contentCache[viewingSourceId]
+    ) {
       const fetchContent = async () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:114',message:'fetchContent entry',data:{viewingSourceId,sourceStatus:viewingSource?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
         setLoadingContentId(viewingSourceId);
         try {
           const content = await documentsApi.getDocumentContent(viewingSourceId);
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:118',message:'Content fetch success',data:{viewingSourceId,contentLength:content?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+          // #endregion
           setContentCache(prev => ({
             ...prev,
             [viewingSourceId]: content,
           }));
         } catch (error) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:123',message:'Content fetch error',data:{viewingSourceId,errorMessage:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+          // #endregion
           console.error('Failed to load document content:', error);
         } finally {
           setLoadingContentId(null);
@@ -127,16 +146,22 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
       fetchContent();
     }
-  }, [viewingSourceId, contentCache]);
+  }, [viewingSourceId, contentCache, viewingSource]);
 
   const allSelected = sources.length > 0 && sources.every(s => s.selected);
   const selectedCount = sources.filter(s => s.selected).length;
 
   // Process files (used by both file input and drag & drop)
   const processFiles = async (files: File[]) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:137',message:'processFiles entry',data:{filesCount:files.length,userId:userId||null,noteId:noteId||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     if (files.length === 0) return;
 
     if (!userId || !noteId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:142',message:'Missing userId or noteId',data:{hasUserId:!!userId,hasNoteId:!!noteId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       alert('Please log in and select a notebook before uploading files.');
       return;
     }
@@ -144,11 +169,20 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     setIsUploading(true);
     try {
       for (const file of files) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:148',message:'Before uploadFile call',data:{fileName:file.name,fileSize:file.size,fileType:file.type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const response = await documentsApi.uploadFile(userId, noteId, file);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:151',message:'After uploadFile success',data:{documentId:response.documentId,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         onDocumentUploaded?.(response.documentId);
       }
       setIsModalOpen(false);
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/8fe05cda-53a6-4f10-9366-95f9d6180c7f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SourcesPanel.tsx:156',message:'Upload error caught',data:{errorMessage:err instanceof Error?err.message:String(err),errorName:err instanceof Error?err.name:'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.error('Upload failed:', err);
       alert(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -497,7 +531,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                 <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
+                    rehypePlugins={[rehypeSanitize, rehypeKatex]}
                     components={{
                       // Remove all images
                       img: () => null,
@@ -1039,6 +1073,7 @@ Separate multiple URLs with spaces or new lines"
         isAtLimit={sources.length >= MAX_SOURCES}
         userId={userId}
         noteId={noteId}
+        onDocumentUploaded={onDocumentUploaded}
       />
       <ConfirmDialogComponent />
     </>

@@ -1,15 +1,17 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import routes from './routes/index.js';
 import { errorHandler } from './middleware/error.js';
+import { csrfProtection } from './middleware/csrf.js';
 import { env } from './config/env.js';
 import { runMigrations } from 'graphile-worker';
 import { pgPool } from './config/worker.js';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables (override to ensure .env file takes precedence)
+dotenv.config({ override: true });
 
 // Ensure Graphile Worker schema is migrated before starting server
 async function ensureGraphileWorkerSchema() {
@@ -76,7 +78,8 @@ app.use(helmet({
 // CORS configuration with origin validation and wildcard support
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests without origin (direct browser navigation)
+    // Origin is only sent for cross-origin AJAX requests, not direct navigation
     if (!origin) {
       return callback(null, true);
     }
@@ -105,9 +108,9 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
+  credentials: true, // Required for cookies
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-XSRF-Token', 'x-xsrf-token', 'X-CSRF-Token', 'x-csrf-token'],
   maxAge: 86400, // 24 hours
 }));
 // JSON parser for all routes EXCEPT webhooks (webhooks need raw body for signature verification)
@@ -115,9 +118,12 @@ app.use((req, res, next) => {
   if (req.path === '/api/webhook/stripe') {
     return next();
   }
-  express.json({ limit: '50mb' })(req, res, next);
+  express.json({ limit: '1mb' })(req, res, next);
 });
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Parse cookies for httpOnly cookie-based authentication
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Simple request logging
 app.use((req, res, next) => {
@@ -125,11 +131,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// CSRF protection (optional - for state-changing operations)
-// Note: Since this uses JWT auth with Authorization headers, CSRF risk is minimal
-// Uncomment the following line to enable CSRF protection:
-// import { csrfProtection } from './middleware/csrf.js';
-// app.use('/api', csrfProtection);
+// CSRF protection for state-changing operations
+// Now required since we're using cookie-based authentication
+app.use('/api', csrfProtection);
 
 // Routes
 app.use('/api', routes);

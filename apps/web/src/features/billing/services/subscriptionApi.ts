@@ -3,6 +3,7 @@ import type {
   CheckoutSessionRequest,
   CheckoutSessionResponse,
 } from '../types';
+import { apiGet, apiPost } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -11,28 +12,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 // ============================================================
 
 /**
- * Get auth headers for API requests
- */
-function getAuthHeaders(): HeadersInit {
-  const storedUser = localStorage.getItem('solomind_user');
-  if (storedUser) {
-    try {
-      const user = JSON.parse(storedUser);
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.accessToken}`,
-      };
-    } catch {
-      // Invalid stored user
-    }
-  }
-  return {
-    'Content-Type': 'application/json',
-  };
-}
-
-/**
- * Get userId from localStorage
+ * Get userId from localStorage (for transition period)
+ * TODO: Replace with proper auth context after migration
  */
 function getUserId(): string | null {
   const storedUser = localStorage.getItem('solomind_user');
@@ -62,10 +43,7 @@ export const subscriptionApi = {
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/subscriptions/status?${params.toString()}`,
-      { headers: getAuthHeaders() }
-    );
+    const response = await apiGet(`/api/subscriptions/status?${params.toString()}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -95,11 +73,7 @@ export const subscriptionApi = {
       userId, // Include userId in body for validation
     };
 
-    const response = await fetch(`${API_BASE_URL}/api/subscriptions/create-checkout`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(requestBody),
-    });
+    const response = await apiPost('/api/subscriptions/create-checkout', requestBody);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -119,13 +93,10 @@ export const subscriptionApi = {
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/subscriptions/cancel?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await fetch(`${API_BASE_URL}/api/subscriptions/cancel?${params.toString()}`, {
+      method: 'POST',
+      credentials: 'include',
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -142,11 +113,7 @@ export const subscriptionApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/subscriptions/portal`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ userId, returnUrl }),
-    });
+    const response = await apiPost('/api/subscriptions/portal', { userId, returnUrl });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));

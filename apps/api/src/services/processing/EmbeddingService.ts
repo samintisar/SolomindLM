@@ -1,14 +1,20 @@
-import { CohereEmbeddings } from '@langchain/cohere';
+import { OpenAIEmbeddings } from '@langchain/openai';
 import { env } from '../../config/env';
 
+// Hardcoded OpenAI embedding configuration
+const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+const OPENAI_EMBEDDING_DIMENSIONS = 1536;
+const OPENAI_BATCH_SIZE = 512;
+
 export class EmbeddingService {
-  private embeddings: CohereEmbeddings;
+  private embeddings: OpenAIEmbeddings;
 
   constructor(apiKey: string) {
-    this.embeddings = new CohereEmbeddings({
+    this.embeddings = new OpenAIEmbeddings({
       apiKey,
-      model: env.COHERE_EMBEDDING_MODEL,
-      batchSize: 96, // Cohere handles max 96 texts per call
+      model: OPENAI_EMBEDDING_MODEL,
+      dimensions: OPENAI_EMBEDDING_DIMENSIONS,
+      batchSize: OPENAI_BATCH_SIZE,
     });
   }
 
