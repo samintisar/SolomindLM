@@ -84,6 +84,9 @@ importers:
       stripe:
         specifier: ^20.1.2
         version: 20.1.2(@types/node@25.0.6)
+      tiktoken:
+        specifier: ^1.0.22
+        version: 1.0.22
       zeroentropy:
         specifier: ^0.1.0-alpha.7
         version: 0.1.0-alpha.7
@@ -3725,6 +3728,9 @@ packages:
 
   thenify@3.3.1:
     resolution: {integrity: sha512-RVZSIV5IG10Hk3enotrhvz0T9em6cyHBLkH/YAZuKqd8hRkKhSfCGIcP2KUY0EPxndzANBmNllzWPwak+bheSw==}
+
+  tiktoken@1.0.22:
+    resolution: {integrity: sha512-PKvy1rVF1RibfF3JlXBSP0Jrcw2uq3yXdgcEXtKTYn3QJ/cBRBHDnrJ5jHky+MENZ6DIPwNUGWpkVx+7joCpNA==}
 
   tinyexec@0.3.2:
     resolution: {integrity: sha512-KQQR9yN7R5+OSwaK0XQoj22pwHoTlgYqmUscPYoknOoWCWfj/5/ABTMRi69FrKU5ffPVh5QcFikpWJI/P1ocHA==}
@@ -8098,6 +8104,8 @@ snapshots:
   thenify@3.3.1:
     dependencies:
       any-promise: 1.3.0
+
+  tiktoken@1.0.22: {}
 
   tinyexec@0.3.2: {}
 

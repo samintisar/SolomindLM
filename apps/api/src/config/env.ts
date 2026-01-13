@@ -1,10 +1,20 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load environment variables from .env file
-// Override existing environment variables to ensure .env file takes precedence
-// This is important because system env vars might have incorrect values
-dotenv.config({ override: true });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '../../');
+
+// Load environment variables from .env first, then .env.local
+// .env.local takes precedence (loaded last with override: true)
+dotenv.config({
+  override: true,
+  path: [
+    path.join(projectRoot, '.env'),
+    path.join(projectRoot, '.env.local'),
+  ],
+});
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

@@ -16,8 +16,9 @@ import { env } from '../../config/env.js';
 // Import extracted modules
 import { VectorSearchHandler } from './chat/vector-search.js';
 import { ChatLLMWrapper, type ChatResponse } from './chat/llm-wrapper.js';
-import { validateGrounding, isArtifactContent } from './chat/grounding-validator.js';
+import { validateGrounding, isArtifactContent, validateSemanticGrounding } from './chat/grounding-validator.js';
 import type { ReferenceChunk } from './chat/vector-search.js';
+import { EmbeddingService } from '../processing/EmbeddingService.js';
 
 // ============================================================
 // Types
@@ -62,6 +63,7 @@ export interface GroundingValidationResult {
 export class ChatAgent {
   private llmWrapper: ChatLLMWrapper;
   private vectorSearch: VectorSearchHandler;
+  private embeddingService: EmbeddingService;
 
   constructor() {
     // Initialize LLM wrapper
@@ -79,6 +81,9 @@ export class ChatAgent {
       rerankTopN: parseInt(env.CHAT_RERANK_TOP_N ?? '15', 10),
       maxResults: parseInt(env.CHAT_MAX_RESULTS ?? '7', 10),
     });
+
+    // Initialize embedding service for semantic grounding validation
+    this.embeddingService = new EmbeddingService(env.OPENAI_API_KEY);
   }
 
   /**
@@ -126,21 +131,34 @@ export class ChatAgent {
       console.log('[ChatAgent] Phase 2: Generating grounded response (structured output)');
       yield { type: 'status', status: 'thinking', message: 'Analyzing sources and formulating response...' };
 
-      // Generate structured response with citations
+      // Extract recent user questions for conversation context (last 3)
+      const recentUserQuestions = context.conversationHistory
+        .filter((msg) => msg.role === 'user')
+        .slice(-3)
+        .map((msg) => msg.content);
+
+      console.log(`[ChatAgent] Including ${recentUserQuestions.length} previous questions for context`);
+
+      // Generate structured response with citations and conversation context
       const structuredResponse = await this.llmWrapper.generateStructuredResponse(
         chunks,
         userMessage,
-        [] // Empty array - no conversation context in generation
+        recentUserQuestions
       );
 
       // Yield the answer as tokens for compatibility with existing streaming interface
       yield { type: 'status', status: 'generating', message: 'Generating response...' };
       const answerText = structuredResponse.answer_markdown;
-      const chunkSize = 50; // Send in chunks to simulate streaming
 
-      for (let i = 0; i < answerText.length; i += chunkSize) {
-        const chunk = answerText.slice(i, i + chunkSize);
-        yield { type: 'token', data: chunk };
+      // Stream by paragraphs/sentences for better Markdown rendering
+      // This preserves markdown formatting better than arbitrary character chunks
+      const paragraphs = answerText.split(/\n\n+/);
+      for (const para of paragraphs) {
+        if (para.trim().length > 0) {
+          yield { type: 'token', data: para + '\n\n' };
+          // Small delay for readability
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        }
       }
 
       console.log(`[ChatAgent] Generated response length: ${answerText.length} characters`);
@@ -149,25 +167,34 @@ export class ChatAgent {
       );
 
       // ============================================================
-      // PHASE 3: Validation
+      // PHASE 3: Validation (syntactic + semantic)
       // ============================================================
 
       console.log('[ChatAgent] Phase 3: Validating grounding');
 
-      const validation = validateGrounding(answerText, chunks);
+      // First, syntactic validation (citations exist and are valid)
+      const syntacticValidation = validateGrounding(answerText, chunks);
 
-      if (!validation.isGrounded) {
-        console.warn(`[ChatAgent] Grounding validation failed: ${validation.issues.join(', ')}`);
+      // Second, semantic validation (cited content actually supports claims)
+      console.log('[ChatAgent] Running semantic grounding validation...');
+      const semanticValidation = await validateSemanticGrounding(answerText, chunks, this.embeddingService);
+
+      // Combine both validation results
+      const allIssues = [...syntacticValidation.issues, ...semanticValidation.issues];
+      const isGrounded = syntacticValidation.isGrounded && semanticValidation.isGrounded;
+
+      if (!isGrounded) {
+        console.warn(`[ChatAgent] Grounding validation failed: ${allIssues.join(', ')}`);
         yield {
           type: 'grounding_check',
           data: {
             passed: false,
-            issues: validation.issues,
+            issues: allIssues,
             message: 'Note: This response may not be fully grounded in your documents',
           },
         };
       } else {
-        console.log('[ChatAgent] Grounding validation passed');
+        console.log('[ChatAgent] Grounding validation passed (syntactic + semantic)');
       }
 
       // Emit confidence score from structured output
@@ -186,7 +213,7 @@ export class ChatAgent {
 
       console.log(`[ChatAgent] ========== STREAM COMPLETE ==========`);
       console.log(
-        `[ChatAgent] Response: ${answerText.length} chars, Sources: ${chunks.length}, Validation: ${validation.isGrounded ? 'PASSED' : 'FAILED'}`
+        `[ChatAgent] Response: ${answerText.length} chars, Sources: ${chunks.length}, Validation: ${isGrounded ? 'PASSED' : 'FAILED'}`
       );
     } catch (error) {
       console.error('[ChatAgent] ========== ERROR ==========');
@@ -232,5 +259,5 @@ export class ChatAgent {
 // ============================================================
 
 export type { ChatResponse } from './chat/llm-wrapper.js';
-export { validateGrounding, isArtifactContent } from './chat/grounding-validator.js';
+export { validateGrounding, isArtifactContent, validateSemanticGrounding } from './chat/grounding-validator.js';
 export { VectorSearchHandler } from './chat/vector-search.js';

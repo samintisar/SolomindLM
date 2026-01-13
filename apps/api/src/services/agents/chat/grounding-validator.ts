@@ -6,6 +6,7 @@
  */
 
 import type { ReferenceChunk } from '../../storage/ChatHistoryService.js';
+import type { EmbeddingService } from '../../processing/EmbeddingService.js';
 
 // ============================================================
 // Types
@@ -171,4 +172,114 @@ export function isArtifactContent(content: string): boolean {
   }
 
   return false;
+}
+
+// ============================================================
+// Semantic Grounding Validation
+// ============================================================
+
+/**
+ * Cosine similarity between two vectors.
+ */
+function cosineSimilarity(vec1: number[], vec2: number[]): number {
+  if (vec1.length !== vec2.length) {
+    throw new Error('Vector dimensions must match');
+  }
+
+  let dotProduct = 0;
+  let norm1 = 0;
+  let norm2 = 0;
+
+  for (let i = 0; i < vec1.length; i++) {
+    dotProduct += vec1[i] * vec2[i];
+    norm1 += vec1[i] * vec1[i];
+    norm2 += vec2[i] * vec2[i];
+  }
+
+  const magnitude = Math.sqrt(norm1) * Math.sqrt(norm2);
+  if (magnitude === 0) return 0;
+
+  return dotProduct / magnitude;
+}
+
+/**
+ * Validates semantic grounding by checking if cited content actually supports the claims.
+ * Uses embedding similarity to verify that claims are grounded in their cited sources.
+ *
+ * @param response - The response text to validate
+ * @param sources - The source chunks that were used
+ * @param embeddingService - Embedding service for computing similarities
+ * @returns Promise resolving to grounding validation result
+ *
+ * @example
+ * ```typescript
+ * const validation = await validateSemanticGrounding(responseText, sourceChunks, embeddingService);
+ * if (!validation.isGrounded) {
+ *   console.warn('Semantic grounding issues:', validation.issues);
+ * }
+ * ```
+ */
+export async function validateSemanticGrounding(
+  response: string,
+  sources: ReferenceChunk[],
+  embeddingService: EmbeddingService
+): Promise<GroundingValidationResult> {
+  const issues: string[] = [];
+  const citationPattern = /\[(\d+)\]/g;
+
+  // Split response into sentences
+  const sentences = response
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 20); // Skip very short fragments
+
+  console.log(`[SemanticGrounding] Validating ${sentences.length} sentences against ${sources.length} sources`);
+
+  for (const sentence of sentences) {
+    // Find citations in this sentence
+    const citationMatches = [...sentence.matchAll(citationPattern)];
+    if (citationMatches.length === 0) continue;
+
+    // Extract cited source IDs (1-indexed)
+    const citedIds = citationMatches.map((c) => parseInt(c[1])).filter((id) => id >= 1 && id <= sources.length);
+
+    if (citedIds.length === 0) {
+      issues.push(`Sentence cites invalid source IDs: "${sentence.slice(0, 50)}..."`);
+      continue;
+    }
+
+    // Get the cited source content
+    const citedContent = citedIds.map((id) => sources[id - 1]?.content).filter(Boolean).join(' ');
+
+    if (!citedContent) {
+      issues.push(`Sentence cites sources with no content: "${sentence.slice(0, 50)}..."`);
+      continue;
+    }
+
+    try {
+      // Compute embedding similarity to verify claim is grounded
+      const sentenceEmbed = await embeddingService.embedText(sentence);
+      const sourceEmbed = await embeddingService.embedText(citedContent);
+
+      const similarity = cosineSimilarity(sentenceEmbed, sourceEmbed);
+      const threshold = 0.7; // Semantic similarity threshold
+
+      if (similarity < threshold) {
+        issues.push(
+          `Sentence "${sentence.slice(0, 60)}..." cites sources [${citedIds.join(', ')}] but claim may not be grounded (similarity: ${similarity.toFixed(2)})`
+        );
+      } else {
+        console.log(`[SemanticGrounding] Sentence validated (similarity: ${similarity.toFixed(2)})`);
+      }
+    } catch (error) {
+      console.error('[SemanticGrounding] Embedding computation failed:', error);
+      // Don't fail validation on embedding errors, just log and continue
+    }
+  }
+
+  return {
+    isGrounded: issues.length === 0,
+    missingCitations: false, // Semantic validation doesn't check for missing citations
+    issues,
+  };
 }

@@ -5,11 +5,13 @@
  * LLM API calls while preserving content integrity.
  */
 
+import { countTokens } from './tokenizer.js';
+
 /**
  * Configuration for chunk operations.
  */
 export interface ChunkConfig {
-  /** Target size in characters for packed chunks */
+  /** Target size in tokens for packed chunks */
   targetSize: number;
   /** Minimum length in characters for valid chunks (default: 50) */
   minChunkLength?: number;
@@ -61,27 +63,29 @@ export function packChunks(
 
   console.log(`\n[${agentName}] ===== CHUNK PACKING =====`);
   console.log(`[${agentName}] Original chunks: ${chunks.length}`);
-  console.log(`[${agentName}] Target size: ${targetSize} chars per packed chunk`);
+  console.log(`[${agentName}] Target size: ${targetSize} tokens per packed chunk`);
 
   const packed: string[] = [];
   const buffer: string[] = [];
-  let bufferSize = 0;
+  let bufferTokens = 0;
 
   for (const chunk of chunks) {
     if (!chunk?.trim()) continue;
 
-    // Calculate size with separator if not first item in buffer
-    const chunkSize = chunk.length + (buffer.length > 0 ? separator.length : 0);
+    // Calculate tokens with separator if not first item in buffer
+    const chunkTokens = countTokens(chunk);
+    const separatorTokens = buffer.length > 0 ? countTokens(separator) : 0;
+    const totalTokens = chunkTokens + separatorTokens;
 
     // If adding this chunk would exceed target size, flush buffer
-    if (bufferSize + chunkSize > targetSize && buffer.length > 0) {
+    if (bufferTokens + totalTokens > targetSize && buffer.length > 0) {
       packed.push(buffer.join(separator));
       buffer.splice(0); // Properly clear array references
-      bufferSize = 0;
+      bufferTokens = 0;
     }
 
     buffer.push(chunk);
-    bufferSize += chunkSize;
+    bufferTokens += totalTokens;
   }
 
   // Flush remaining buffer
@@ -228,15 +232,9 @@ export function splitBySentenceBoundaries(
 }
 
 /**
- * Estimates token count from character count.
- * Conservative estimation: ~3 characters per token.
- *
- * @param text - Text to estimate tokens for
- * @returns Estimated token count
+ * Re-export token counting function from tokenizer module.
  */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3);
-}
+export { countTokens } from './tokenizer.js';
 
 /**
  * Gets a preview of a chunk for logging/debugging.

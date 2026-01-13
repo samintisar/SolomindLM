@@ -9,9 +9,21 @@ import { csrfProtection } from './middleware/csrf.js';
 import { env } from './config/env.js';
 import { runMigrations } from 'graphile-worker';
 import { pgPool } from './config/worker.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load environment variables (override to ensure .env file takes precedence)
-dotenv.config({ override: true });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '../../');
+
+// Load environment variables from .env first, then .env.local
+// .env.local takes precedence (loaded last with override: true)
+dotenv.config({
+  override: true,
+  path: [
+    path.join(projectRoot, '.env'),
+    path.join(projectRoot, '.env.local'),
+  ],
+});
 
 // Ensure Graphile Worker schema is migrated before starting server
 async function ensureGraphileWorkerSchema() {

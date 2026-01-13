@@ -111,13 +111,21 @@ export class VectorSearchHandler {
     const queryEmbedding = await this.embeddingService.embedText(query);
 
     // Execute hybrid search (vector + keyword with RRF)
-    const results = await this.executeHybridSearch(
+    const initialResults = await this.executeHybridSearch(
       queryEmbedding,
       query,
       userId,
       noteId,
       documentIds
     );
+
+    // Apply adaptive thresholding based on result distribution
+    const adaptiveThreshold = this.determineOptimalThreshold(initialResults);
+    console.log(`[VectorSearch] Adaptive threshold: ${adaptiveThreshold.toFixed(3)} (base: ${this.config.vectorMatchThreshold})`);
+
+    // Filter results using adaptive threshold
+    const results = initialResults.filter((r) => (r.similarity || 0) >= adaptiveThreshold);
+    console.log(`[VectorSearch] After adaptive filtering: ${results.length} results`);
 
     // Deduplicate results
     const deduplicatedResults = this.deduplicateResults(results);
@@ -139,9 +147,26 @@ export class VectorSearchHandler {
     if (finalResults.length === 0) {
       const reason = results.length === 0 ? 'no matches above threshold' : 'all filtered by dedup/rerank';
       console.warn(`[VectorSearch] NO RESULTS: ${reason}`);
-      throw new Error(
-        `No results found in the ${documentIds?.length ?? 'all'} selected document(s). (${reason})`
-      );
+
+      // Build actionable error message with suggestions
+      let errorMessage = `No results found in ${documentIds?.length ?? 'all'} selected document(s).`;
+
+      // Add contextual suggestions
+      const suggestions: string[] = [];
+
+      if (documentIds && documentIds.length > 0) {
+        suggestions.push('try removing the document filter to search all documents');
+      }
+
+      suggestions.push('try broader or different search terms');
+
+      if (reason.includes('threshold')) {
+        suggestions.push('check if documents have been fully processed (embeddings generated)');
+      }
+
+      errorMessage += ` Suggestions: ${suggestions.map((s, i) => `(${i + 1}) ${s}`).join(', ')}.`;
+
+      throw new Error(errorMessage);
     }
 
     return finalResults as ReferenceChunk[];
@@ -374,7 +399,7 @@ export class VectorSearchHandler {
 
   /**
    * Removes exact and near-duplicate chunks using diversity checks.
-   * Prevents adjacent chunks from same document from dominating results.
+   * Uses Jaccard similarity to detect true content duplicates.
    */
   private deduplicateResults(results: VectorSearchResult[]): VectorSearchResult[] {
     const seen = new Set<string>();
@@ -387,22 +412,13 @@ export class VectorSearchHandler {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      // Check for adjacent chunks from same document (likely near-duplicates)
-      const adjacentChunk = diverse.find(
-        (existing) =>
-          existing.sourceId === result.sourceId &&
-          Math.abs(existing.chunkIndex - result.chunkIndex) === 1
+      // Check for content-based duplicates using Jaccard similarity
+      const isDuplicate = diverse.some((existing) =>
+        this.isDuplicateContent(result.content, existing.content)
       );
 
-      if (adjacentChunk) {
-        // Compare RRF scores - only replace if significantly better (>20% improvement)
-        const currentScore = result.rrfScore || 0;
-        const existingScore = adjacentChunk.rrfScore || 0;
-
-        if (currentScore > existingScore * 1.2) {
-          const index = diverse.indexOf(adjacentChunk);
-          diverse.splice(index, 1, result);
-        }
+      if (isDuplicate) {
+        console.log(`[VectorSearch] Skipping content duplicate (chunk ${result.chunkIndex} from "${result.sourceTitle}")`);
         continue;
       }
 
@@ -410,8 +426,67 @@ export class VectorSearchHandler {
     }
 
     console.log(
-      `[VectorSearch] Deduplication: ${results.length} → ${diverse.length} (removed ${results.length - diverse.length} near-duplicates)`
+      `[VectorSearch] Deduplication: ${results.length} → ${diverse.length} (removed ${results.length - diverse.length} duplicates)`
     );
     return diverse;
+  }
+
+  /**
+   * Checks if two content chunks are duplicates using Jaccard similarity.
+   * Jaccard similarity measures intersection over union of token sets.
+   *
+   * @param content1 - First content string
+   * @param content2 - Second content string
+   * @returns True if contents are duplicates (similarity > 0.85)
+   */
+  private isDuplicateContent(content1: string, content2: string): boolean {
+    const tokens1 = new Set(content1.toLowerCase().split(/\s+/));
+    const tokens2 = new Set(content2.toLowerCase().split(/\s+/));
+
+    // Skip if either content is empty
+    if (tokens1.size === 0 || tokens2.size === 0) return false;
+
+    const intersection = new Set([...tokens1].filter((x) => tokens2.has(x)));
+    const union = new Set([...tokens1, ...tokens2]);
+
+    const jaccardSimilarity = intersection.size / union.size;
+
+    // High threshold (0.85) for true duplicates only
+    // Adjacent chunks with complementary content will typically score 0.3-0.6
+    return jaccardSimilarity > 0.85;
+  }
+
+  /**
+   * Determines optimal threshold based on result distribution.
+   * Uses mean - 1 standard deviation as cutoff (keeps top ~84% of results).
+   * Falls back to base threshold if insufficient data.
+   *
+   * @param results - Array of search results with similarity scores
+   * @returns Adaptive threshold value
+   */
+  private determineOptimalThreshold(results: VectorSearchResult[]): number {
+    if (results.length === 0) return this.config.vectorMatchThreshold;
+
+    // Extract similarity scores
+    const scores = results.map((r) => r.similarity || 0).filter((s) => s > 0);
+
+    if (scores.length < 3) {
+      // Not enough data points, use base threshold
+      return this.config.vectorMatchThreshold;
+    }
+
+    // Calculate mean
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+    // Calculate standard deviation
+    const variance = scores.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / scores.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Use mean - 1 std dev as cutoff (keeps top ~84% of results)
+    const adaptiveThreshold = Math.max(0.25, mean - stdDev); // Minimum threshold of 0.25
+
+    console.log(`[VectorSearch] Score stats: mean=${mean.toFixed(3)}, stdDev=${stdDev.toFixed(3)}, adaptive=${adaptiveThreshold.toFixed(3)}`);
+
+    return adaptiveThreshold;
   }
 }

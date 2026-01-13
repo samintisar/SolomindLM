@@ -20,6 +20,7 @@ import {
   logPhaseComplete,
   logBanner,
   sanitizeUserInput,
+  countTokens,
 } from '../shared/index.js';
 import { createChunkHelpers, type ChunkHelpers } from '../shared/chunk-helper-factory.js';
 import { OverallState, type OverallStateType, type ChunkProcessState, type DialogueLine } from './state.js';
@@ -32,8 +33,8 @@ import { getMapPrompt, getReducePrompt, buildCoveredTopicsPrompt, TARGET_LINE_CO
 
 /** Configuration constants */
 const GRAPH_CONFIG = {
-  MAP_CHUNK_SIZE: parseInt(env.AUDIO_MAP_CHUNK_SIZE || '15000', 10),
-  REDUCE_CHUNK_SIZE: parseInt(env.AUDIO_REDUCE_CHUNK_SIZE || '40000', 10),
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_MAP_CHUNK_TOKENS || '3750', 10), // ~15K chars ≈ 3.75K tokens
+  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_REDUCE_CHUNK_TOKENS || '10000', 10), // ~40K chars ≈ 10K tokens
   MAP_TIMEOUT_MS: parseInt(env.AUDIO_MAP_TIMEOUT_MS || '180000', 10),
   REDUCE_TIMEOUT_MS: parseInt(env.AUDIO_REDUCE_TIMEOUT_MS || '300000', 10),
   TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS || '300000', 10),
@@ -51,7 +52,7 @@ const VOICES = {
 
 /** Chunk helpers using the shared factory */
 const { packChunks, validateChunks }: ChunkHelpers = createChunkHelpers('AudioOverviewGraph', {
-  targetSize: GRAPH_CONFIG.MAP_CHUNK_SIZE,
+  targetSize: GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS,
   minChunkLength: 50,
   maxChunkLength: 50000,
 });
@@ -61,24 +62,40 @@ const { packChunks, validateChunks }: ChunkHelpers = createChunkHelpers('AudioOv
 // ============================================================
 
 /**
- * Recursively collapses multiple outputs into fewer chunks.
+ * Recursively collapses multiple outputs into fewer chunks using actual token counting.
  */
 async function recursiveCollapse(outputs: string[], maxTokens: number): Promise<string[]> {
   if (outputs.length <= 3) {
     return outputs;
   }
 
-  const avgTokensPerOutput = 500;
-  const maxOutputsPerCollapse = Math.floor(maxTokens / avgTokensPerOutput);
+  // Calculate total tokens using actual counting
+  const totalTokens = outputs.reduce((sum, s) => sum + countTokens(s), 0);
 
-  if (outputs.length <= maxOutputsPerCollapse) {
+  // If already under the limit, no need to collapse
+  if (totalTokens <= maxTokens) {
     return outputs;
   }
 
+  // Group outputs to stay under token limit
   const collapsed: string[] = [];
-  for (let i = 0; i < outputs.length; i += maxOutputsPerCollapse) {
-    const batch = outputs.slice(i, i + maxOutputsPerCollapse);
-    collapsed.push(batch.join('\n\n---\n\n'));
+  let currentGroup: string[] = [];
+  let currentTokens = 0;
+
+  for (const output of outputs) {
+    const tokens = countTokens(output);
+    if (currentTokens + tokens > maxTokens && currentGroup.length > 0) {
+      collapsed.push(currentGroup.join('\n\n---\n\n'));
+      currentGroup = [output];
+      currentTokens = tokens;
+    } else {
+      currentGroup.push(output);
+      currentTokens += tokens;
+    }
+  }
+
+  if (currentGroup.length > 0) {
+    collapsed.push(currentGroup.join('\n\n---\n\n'));
   }
 
   logInfo({
@@ -86,7 +103,8 @@ async function recursiveCollapse(outputs: string[], maxTokens: number): Promise<
     phase: 'recursive_collapse',
     inputCount: outputs.length,
     outputCount: collapsed.length,
-  }, `Recursive collapse: ${outputs.length} -> ${collapsed.length}`);
+    totalTokens,
+  }, `Recursive collapse: ${outputs.length} -> ${collapsed.length} (${totalTokens} tokens)`);
 
   return collapsed;
 }
@@ -211,7 +229,7 @@ export async function collapse(
     inputCount: mapOutputs.length,
   });
 
-  const collapsed = await recursiveCollapse(mapOutputs, GRAPH_CONFIG.REDUCE_CHUNK_SIZE / 2);
+  const collapsed = await recursiveCollapse(mapOutputs, GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS / 2);
 
   logInfo({
     agent: 'AudioOverviewGraph',

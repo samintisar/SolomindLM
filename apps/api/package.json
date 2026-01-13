@@ -14,11 +14,10 @@
     "clear-jobs": "tsx src/utils/clearJobs.ts"
   },
   "dependencies": {
-    "@langchain/openai": "^0.4.0",
-    "zeroentropy": "^0.1.0-alpha.7",
     "@langchain/community": "^1.1.1",
     "@langchain/core": "^1.1.8",
     "@langchain/langgraph": "^1.0.7",
+    "@langchain/openai": "^0.4.0",
     "@langchain/textsplitters": "^1.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "@supadata/js": "^1.0.0",
@@ -36,6 +35,8 @@
     "openai": "^4.83.0",
     "pg": "^8.11.3",
     "stripe": "^20.1.2",
+    "tiktoken": "^1.0.22",
+    "zeroentropy": "^0.1.0-alpha.7",
     "zod": "^3.22.4"
   },
   "devDependencies": {

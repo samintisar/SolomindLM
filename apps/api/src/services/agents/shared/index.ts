@@ -43,10 +43,16 @@ export {
   validateChunks,
   calculateOptimalChunkSize,
   splitBySentenceBoundaries,
-  estimateTokens,
   getChunkPreview,
   type ChunkConfig,
 } from './chunk-operations.js';
+
+// Token counting utilities
+export {
+  countTokens,
+  countTokensBatch,
+  freeEncoder,
+} from './tokenizer.js';
 
 // Logging utilities
 export {
