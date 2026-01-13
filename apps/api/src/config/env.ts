@@ -67,6 +67,9 @@ const envSchema = z.object({
   REPORT_REDUCE_MAX_OUTPUT_TOKENS: z.string().default('32000'),
   // Max parallel API calls during collapse phase (prevents rate limits)
   REPORT_COLLAPSE_CONCURRENCY: z.string().default('5'),
+  // Timeout settings for LLM calls
+  REPORT_MAP_TIMEOUT_MS: z.string().default('200000'),
+  REPORT_REDUCE_TIMEOUT_MS: z.string().default('300000'),
   // Quiz Generation
   // Map phase: 5K tokens (~4% of 131K context)
   QUIZ_MAP_CHUNK_TOKENS: z.string().default('5000'),
