@@ -142,6 +142,9 @@ importers:
       '@stripe/stripe-js':
         specifier: ^8.6.0
         version: 8.6.0
+      '@supabase/supabase-js':
+        specifier: ^2.39.0
+        version: 2.89.0
       '@vercel/analytics':
         specifier: ^1.6.1
         version: 1.6.1(react@19.2.3)

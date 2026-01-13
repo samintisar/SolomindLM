@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { z } from 'zod';
 import { promisify } from 'util';
 import { createHash, randomBytes } from 'crypto';
+import { generateCsrfToken as setCsrfCookie } from '../middleware/csrf.js';
 
 // Simple in-memory rate limiter for auth endpoints
 const authRateLimiter = new Map<string, { count: number; resetTime: number }>();
@@ -124,12 +125,19 @@ const router = Router();
 // For production: Use 'none' with secure:true for cross-origin cookie sharing
 // 'strict' does NOT work for cross-origin requests (frontend and API on different domains)
 // 'none' requires secure:true (HTTPS) which production should have
+//
+// Safari ITP compatibility:
+// - 'partitioned' attribute enables CHIPS (Cookies Having Independent Partitioned State)
+// - This helps Safari accept cookies in cross-origin scenarios
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production' ? true : false,
   sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as 'strict' | 'lax' | 'none',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
+  // domain: undefined, // Don't set domain - let browser use current origin
+  // Note: 'partitioned' attribute is only supported in newer browsers (Safari 16.4+)
+  // Omitting for broader compatibility while maintaining sameSite: 'none' + secure
 };
 
 /**
@@ -150,7 +158,7 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email format'),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 /**
@@ -216,6 +224,9 @@ router.post('/register', async (req, res) => {
     // Set httpOnly cookies with tokens
     res.cookie('access_token', sessionData.session.access_token, COOKIE_OPTIONS);
     res.cookie('refresh_token', sessionData.session.refresh_token, COOKIE_OPTIONS);
+
+    // Set CSRF token for subsequent requests
+    setCsrfCookie(req, res, () => {});
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -293,6 +304,9 @@ router.post('/login', async (req, res) => {
     // Set httpOnly cookies with tokens
     res.cookie('access_token', data.session.access_token, COOKIE_OPTIONS);
     res.cookie('refresh_token', data.session.refresh_token, COOKIE_OPTIONS);
+
+    // Set CSRF token for subsequent requests
+    setCsrfCookie(req, res, () => {});
 
     res.json({
       message: 'Signed in successfully',
@@ -385,6 +399,8 @@ router.get('/me', async (req, res) => {
         const { data: { user: refreshedUser }, error: getUserError } = await supabase.auth.getUser(sessionData.session.access_token);
 
         if (!getUserError && refreshedUser) {
+          // Set CSRF token for subsequent requests
+          setCsrfCookie(req, res, () => {});
           return res.json({
             userId: refreshedUser.id,
             email: refreshedUser.email,
@@ -396,6 +412,9 @@ router.get('/me', async (req, res) => {
     if (error || !user) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
+
+    // Set CSRF token for subsequent requests
+    setCsrfCookie(req, res, () => {});
 
     res.json({
       userId: user.id,
@@ -458,6 +477,9 @@ router.post('/refresh', async (req, res) => {
     res.cookie('access_token', data.session.access_token, COOKIE_OPTIONS);
     res.cookie('refresh_token', data.session.refresh_token, COOKIE_OPTIONS);
 
+    // Set CSRF token for subsequent requests
+    setCsrfCookie(req, res, () => {});
+
     res.json({
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token,
@@ -471,138 +493,125 @@ router.post('/refresh', async (req, res) => {
 
 /**
  * GET /api/auth/google
- * Initiate Google OAuth flow with PKCE-compatible security
+ * @deprecated This endpoint is deprecated.
  *
- * Generates a secure state parameter containing:
- * - PKCE code verifier for token exchange
- * - Session identifier for CSRF protection
- * - Timestamp for expiration
+ * OAuth initiation should now happen on the frontend using the Supabase client
+ * directly. This ensures Supabase can set the necessary state cookies in the
+ * browser for CSRF protection.
  *
- * The state parameter is passed through OAuth and returned in the callback,
- * allowing us to verify the request hasn't been tampered with.
+ * New flow:
+ * 1. Frontend calls supabase.auth.signInWithOAuth() with redirectTo pointing to /auth/callback
+ * 2. Supabase sets state cookies in browser
+ * 3. User is redirected to Google, then back to frontend with authorization code
+ * 4. Frontend sends code to POST /api/auth/google/callback
+ * 5. Backend exchanges code for session and sets HttpOnly cookies
  */
 router.get('/google', async (req, res) => {
-  try {
-    const redirectUrl = req.query.redirect as string || `${req.protocol}://${req.get('host')}/auth/callback`;
-
-    // Generate PKCE code verifier and challenge
-    const codeVerifier = generateCodeVerifier();
-    const codeChallenge = generateCodeChallenge(codeVerifier);
-
-    // Generate a unique state parameter combining multiple security elements
-    const state = randomBytes(16).toString('base64url');
-
-    // Store the code verifier associated with this state (expires in 10 minutes)
-    storeCodeVerifier(state, codeVerifier);
-
-    // Initiate OAuth with Supabase (which supports PKCE)
-    // We add the state parameter which will be returned in the callback
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        // Pass our state through the OAuth flow
-        // Supabase will include this in the redirect URL
-        queryParams: {
-          state: state,
-          // Supabase automatically adds PKCE parameters when available
-          code_challenge: codeChallenge,
-          code_challenge_method: 'S256',
-        },
-      },
-    });
-
-    if (error) {
-      console.error('Google OAuth initiation error:', error);
-      return res.status(400).json({ error: error.message });
-    }
-
-    // Redirect user to Google OAuth consent screen
-    res.redirect(data.url);
-  } catch (error) {
-    console.error('Google OAuth error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.status(410).json({
+    error: 'This endpoint is deprecated.',
+    message: 'OAuth initiation now happens on the frontend. Please update your integration.',
+  });
 });
 
 
 /**
  * POST /api/auth/google/callback
- * Handle Google OAuth callback and verify tokens with PKCE state validation
+ * Handle Google OAuth callback - Exchange code or tokens for session
  *
- * This endpoint receives OAuth tokens after Google authentication.
- * It validates the state parameter to prevent CSRF attacks and verifies
- * the tokens with Supabase before establishing the user session.
+ * This endpoint handles two OAuth flows:
+ *
+ * 1. Authorization Code Flow (PKCE) - preferred, more secure:
+ *    - Frontend initiates OAuth with Supabase
+ *    - Frontend sends { code } to this endpoint
+ *    - Backend exchanges code for session with Supabase
+ *
+ * 2. Implicit Flow - fallback for backward compatibility:
+ *    - Frontend initiates OAuth with Supabase
+ *    - Supabase returns tokens in URL hash
+ *    - Frontend sends { accessToken, refreshToken } to this endpoint
+ *    - Backend verifies tokens and sets HttpOnly cookies
+ *
+ * Request body:
+ * - code: Authorization code (PKCE flow)
+ * - accessToken: Access token from implicit flow
+ * - refreshToken: Refresh token from implicit flow
  */
 router.post('/google/callback', async (req, res) => {
   try {
-    const { accessToken, refreshToken, state } = req.body;
-
-    if (!accessToken) {
-      return res.status(400).json({ error: 'Access token is required' });
-    }
+    const { code, accessToken, refreshToken } = req.body;
 
     // Set security headers for all auth responses
     setAuthSecurityHeaders(res);
 
-    // Validate state parameter if provided (PKCE flow)
-    // The state parameter should have been issued by our /api/auth/google endpoint
-    if (state) {
-      const codeVerifier = getCodeVerifier(state);
-      if (!codeVerifier) {
-        // State was not issued by us or has expired
-        console.warn('[Auth] OAuth callback with invalid or expired state parameter', {
-          ip: req.ip,
-          userAgent: req.get('user-agent'),
-        });
-        return res.status(401).json({
-          error: 'Invalid OAuth state. Please try the sign-in process again.'
-        });
+    // Handle Authorization Code Flow (preferred - PKCE)
+    if (code) {
+      // Exchange authorization code for session using Supabase
+      // Supabase handles PKCE verification internally using the code_verifier
+      // that was stored in a cookie when OAuth was initiated from the frontend
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (error || !data.session) {
+        console.error('[Auth] Code exchange error:', error);
+        return res.status(401).json({ error: 'Failed to exchange authorization code for session' });
       }
-      // State is valid - the code_verifier was consumed (one-time use)
-      // This prevents replay attacks
-    } else {
-      // For backwards compatibility, allow requests without state
-      // but log a warning to monitor usage
-      console.warn('[Auth] OAuth callback without state parameter - consider updating the frontend', {
-        ip: req.ip,
+
+      // Set httpOnly cookies with tokens (tokens never exposed to frontend)
+      res.cookie('access_token', data.session.access_token, COOKIE_OPTIONS);
+      res.cookie('refresh_token', data.session.refresh_token, COOKIE_OPTIONS);
+
+      // Set CSRF token for subsequent requests
+      setCsrfCookie(req, res, () => {});
+
+      return res.json({
+        message: 'Signed in with Google successfully',
+        userId: data.user?.id,
+        email: data.user?.email,
       });
     }
 
-    // Verify the access token with Supabase
-    const { data: { user }, error: getUserError } = await supabase.auth.getUser(accessToken);
+    // Handle Implicit Flow (fallback for backward compatibility)
+    if (accessToken) {
+      // Verify the access token with Supabase
+      const { data: { user }, error: getUserError } = await supabase.auth.getUser(accessToken);
 
-    if (getUserError || !user) {
-      console.error('Token verification error:', getUserError);
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
-    // Get a fresh session using the refresh token if available
-    let sessionAccessToken = accessToken;
-    let sessionRefreshToken = refreshToken;
-
-    if (refreshToken) {
-      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession({
-        refresh_token: refreshToken,
-      });
-
-      if (!sessionError && sessionData.session) {
-        sessionAccessToken = sessionData.session.access_token;
-        sessionRefreshToken = sessionData.session.refresh_token;
+      if (getUserError || !user) {
+        console.error('[Auth] Token verification error:', getUserError);
+        return res.status(401).json({ error: 'Invalid or expired access token' });
       }
+
+      // Get a fresh session using the refresh token if available
+      let sessionAccessToken = accessToken;
+      let sessionRefreshToken = refreshToken;
+
+      if (refreshToken) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession({
+          refresh_token: refreshToken,
+        });
+
+        if (!sessionError && sessionData.session) {
+          sessionAccessToken = sessionData.session.access_token;
+          sessionRefreshToken = sessionData.session.refresh_token;
+        }
+      }
+
+      // Set httpOnly cookies with tokens
+      res.cookie('access_token', sessionAccessToken, COOKIE_OPTIONS);
+      res.cookie('refresh_token', sessionRefreshToken || refreshToken, COOKIE_OPTIONS);
+
+      // Set CSRF token for subsequent requests
+      setCsrfCookie(req, res, () => {});
+
+      return res.json({
+        message: 'Signed in with Google successfully',
+        userId: user.id,
+        email: user.email,
+      });
     }
 
-    // Set httpOnly cookies with tokens
-    res.cookie('access_token', sessionAccessToken, COOKIE_OPTIONS);
-    res.cookie('refresh_token', sessionRefreshToken || refreshToken, COOKIE_OPTIONS);
-
-    res.json({
-      message: 'Signed in with Google successfully',
-      userId: user.id,
-      email: user.email,
-    });
+    // Neither code nor tokens provided
+    return res.status(400).json({ error: 'Authorization code or access token is required' });
   } catch (error) {
-    console.error('Google callback error:', error);
+    console.error('[Auth] Google callback error:', error);
     setAuthSecurityHeaders(res);
     res.status(500).json({ error: 'Internal server error' });
   }

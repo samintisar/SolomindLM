@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -137,9 +138,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    // Redirect to backend OAuth endpoint which will handle Supabase OAuth
-    const redirectUrl = `${window.location.origin}/auth/callback`;
-    window.location.href = `${API_BASE_URL}/api/auth/google?redirect=${encodeURIComponent(redirectUrl)}`;
+    // Initiate OAuth with Supabase directly from the browser
+    // This ensures state cookies are set properly in the browser
+    // Supabase will redirect back to /auth/callback with an authorization code
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Use PKCE flow (Authorization Code with PKCE)
+        // This is more secure than implicit flow
+        skipBrowserRedirect: false,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    // Supabase SDK will redirect to Google OAuth
+    // If data.url is available, we can manually redirect
+    if (data?.url) {
+      window.location.href = data.url;
+    }
   }, []);
 
   const refreshSession = useCallback(async () => {

@@ -1,109 +1,105 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /**
- * Helper to get CSRF token from cookie
+ * AuthCallback Component - Handles both Authorization Code and Implicit flows
+ *
+ * OAuth flows supported:
+ *
+ * 1. Authorization Code Flow (PKCE) - preferred, more secure:
+ *    - Frontend initiates OAuth with Supabase
+ *    - Supabase redirects back with ?code= in query params
+ *    - Frontend sends code to backend for secure token exchange
+ *
+ * 2. Implicit Flow - fallback, Supabase default:
+ *    - Frontend initiates OAuth with Supabase
+ *    - Supabase redirects back with #access_token= in hash fragment
+ *    - Frontend sends tokens to backend to set HttpOnly cookies
  */
-function getCsrfToken(): string | null {
-  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-/**
- * Parse query parameters from URL
- */
-function getQueryParams(): URLSearchParams {
-  return new URLSearchParams(window.location.search);
-}
-
 export function AuthCallback() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Parse hash fragment for OAuth tokens (Supabase implicit flow)
+        // Check for OAuth error in query params
+        const oauthError = searchParams.get('error');
+        const errorDescription = searchParams.get('error_description');
+
+        if (oauthError) {
+          setError(errorDescription || oauthError);
+          setTimeout(() => navigate('/', { replace: true }), 3000);
+          return;
+        }
+
+        // Try Authorization Code flow first (preferred - PKCE)
+        const code = searchParams.get('code');
+
+        if (code) {
+          // Authorization Code Flow: Send code to backend for secure exchange
+          const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to exchange authorization code');
+          }
+
+          // Success! Backend has set HttpOnly cookies
+          window.dispatchEvent(new CustomEvent('auth-change'));
+          navigate('/home', { replace: true });
+          return;
+        }
+
+        // Fallback: Check for Implicit Flow tokens in hash fragment
         const hashFragment = window.location.hash.substring(1); // Remove leading #
         const hashParams = new URLSearchParams(hashFragment);
-
-        // Parse query parameters for state (PKCE flow)
-        const queryParams = getQueryParams();
-
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
-        const state = queryParams.get('state') || hashParams.get('state');
-        const errorParam = queryParams.get('error') || hashParams.get('error');
-        const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
 
-        if (errorParam) {
-          setError(errorDescription || errorParam);
-          setTimeout(() => navigate('/'), 3000);
+        if (accessToken) {
+          // Implicit Flow: Send tokens to backend to set HttpOnly cookies
+          const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accessToken, refreshToken }),
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to establish session');
+          }
+
+          // Success! Backend has set HttpOnly cookies
+          window.dispatchEvent(new CustomEvent('auth-change'));
+          // Clean up URL hash
+          window.history.replaceState({}, '', window.location.pathname);
+          navigate('/home', { replace: true });
           return;
         }
 
-        if (!accessToken) {
-          setError('No authorization tokens received');
-          setTimeout(() => navigate('/'), 3000);
-          return;
-        }
-
-        // Get CSRF token from XSRF-TOKEN cookie for protection
-        const csrfToken = getCsrfToken();
-
-        // Verify tokens with backend and set cookies
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-
-        if (csrfToken) {
-          headers['X-XSRF-Token'] = csrfToken;
-        }
-
-        // Include state parameter for PKCE validation (if available)
-        const requestBody: { accessToken: string; refreshToken?: string | null; state?: string | null } = {
-          accessToken,
-          refreshToken,
-        };
-
-        if (state) {
-          requestBody.state = state;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-          credentials: 'include',
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Authentication failed');
-        }
-
-        // Small delay to ensure cookies are processed
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Dispatch event to notify AuthContext of login
-        window.dispatchEvent(new CustomEvent('auth-change'));
-
-        // Clean up URL hash and query params, then redirect to home
-        window.history.replaceState({}, '', window.location.pathname);
-        navigate('/home');
+        // Neither code nor tokens found
+        setError('No authorization code or tokens received from OAuth provider');
+        setTimeout(() => navigate('/', { replace: true }), 3000);
       } catch (err) {
         console.error('Auth callback error:', err);
         setError(err instanceof Error ? err.message : 'Authentication failed');
-        setTimeout(() => navigate('/'), 3000);
+        setTimeout(() => navigate('/', { replace: true }), 3000);
       }
     };
 
     handleCallback();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-background">

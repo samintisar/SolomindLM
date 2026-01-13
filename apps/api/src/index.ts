@@ -78,7 +78,7 @@ app.use(helmet({
 // CORS configuration with origin validation and wildcard support
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests without origin (direct browser navigation)
+    // Allow requests without origin (direct browser navigation, mobile apps)
     // Origin is only sent for cross-origin AJAX requests, not direct navigation
     if (!origin) {
       return callback(null, true);
@@ -112,7 +112,19 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-XSRF-Token', 'x-xsrf-token', 'X-CSRF-Token', 'x-csrf-token'],
   maxAge: 86400, // 24 hours
+  exposedHeaders: ['Set-Cookie'], // Expose Set-Cookie header for Safari compatibility
 }));
+
+// Safari/iPhone compatibility headers
+// These headers help with Safari's ITP (Intelligent Tracking Prevention)
+app.use((req, res, next) => {
+  // Set additional headers for Safari compatibility
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Ensure Vary header includes Origin for proper caching
+  res.setHeader('Vary', 'Origin');
+  next();
+});
+
 // JSON parser for all routes EXCEPT webhooks (webhooks need raw body for signature verification)
 app.use((req, res, next) => {
   if (req.path === '/api/webhook/stripe') {
