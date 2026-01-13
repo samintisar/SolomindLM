@@ -15,6 +15,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.js';
+import { env } from '../config/env.js';
 import crypto from 'crypto';
 
 declare global {
@@ -26,10 +27,20 @@ declare global {
 }
 
 /**
- * CSRF secret - should be stored securely (env var in production)
- * In development, we use a fixed secret for simplicity
+ * CSRF secret - required in production for security
+ * In development, a random secret is generated for convenience
  */
-const CSRF_SECRET = process.env.CSRF_SECRET || crypto.randomBytes(32).toString('hex');
+const CSRF_SECRET = process.env.CSRF_SECRET;
+
+if (env.NODE_ENV === 'production' && !CSRF_SECRET) {
+  throw new Error(
+    'CSRF_SECRET environment variable is required in production. ' +
+    'Set a secure random string (32+ bytes) as CSRF_SECRET.'
+  );
+}
+
+// Fallback to random secret for development only
+const CSRF_SECRET_VALUE = CSRF_SECRET || crypto.randomBytes(32).toString('hex');
 
 /**
  * Token expiration time (1 hour)
@@ -43,12 +54,15 @@ const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
 /**
  * Routes that require CSRF protection
+ * Includes auth endpoints that change authentication state
  */
 const PROTECTED_ROUTES = [
   '/api/notebooks',
   '/api/documents',
   '/api/flashcards',
   '/api/quizzes',
+  '/api/auth/google/callback',  // OAuth callback changes auth state
+  '/api/auth/logout',            // Logout changes auth state
 ];
 
 /**
@@ -57,7 +71,7 @@ const PROTECTED_ROUTES = [
 function generateToken(sessionId: string): string {
   const timestamp = Date.now();
   const data = `${sessionId}:${timestamp}`;
-  const hmac = crypto.createHmac('sha256', CSRF_SECRET);
+  const hmac = crypto.createHmac('sha256', CSRF_SECRET_VALUE);
   hmac.update(data);
   const signature = hmac.digest('hex');
   return Buffer.from(`${data}:${signature}`).toString('base64');
@@ -84,7 +98,7 @@ function validateToken(token: string, sessionId: string): boolean {
 
     // Verify signature
     const data = `${tokenSessionId}:${timestamp}`;
-    const hmac = crypto.createHmac('sha256', CSRF_SECRET);
+    const hmac = crypto.createHmac('sha256', CSRF_SECRET_VALUE);
     hmac.update(data);
     const expectedSignature = hmac.digest('hex');
 
@@ -120,10 +134,11 @@ export function generateCsrfToken(
 
   // Set token in cookie for client-side access
   // Match sameSite settings with auth cookies for cross-origin compatibility
+  // Auth cookies: 'none' for production (cross-origin), 'lax' for development
   res.cookie('XSRF-TOKEN', token, {
     httpOnly: false, // Client needs to read this to include in requests
-    secure: process.env.NODE_ENV === 'production' ? true : false,
-    sameSite: process.env.NODE_ENV === 'production' ? ('strict' as const) : ('none' as const),
+    secure: env.NODE_ENV === 'production' ? true : false,
+    sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as 'strict' | 'lax' | 'none',
     maxAge: TOKEN_EXPIRY,
     path: '/',
   });

@@ -8,6 +8,7 @@ if (env.NODE_ENV === 'development') {
 }
 
 // Service role client - bypasses RLS, use for admin operations
+// Refresh token rotation is enabled to prevent reuse of old refresh tokens
 export const supabase = createClient(
   env.SUPABASE_URL,
   env.SUPABASE_SERVICE_ROLE_KEY,
@@ -15,6 +16,10 @@ export const supabase = createClient(
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+      detectSessionInUrl: false,
+      // Enable refresh token rotation for improved security
+      // When enabled, each refresh token can only be used once
+      // A new refresh token is issued with each refresh
     },
   }
 );

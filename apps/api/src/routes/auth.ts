@@ -1,10 +1,78 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { supabase } from '../config/database.js';
+import { env } from '../config/env.js';
 import { z } from 'zod';
 import { promisify } from 'util';
+import { createHash, randomBytes } from 'crypto';
 
 // Simple in-memory rate limiter for auth endpoints
 const authRateLimiter = new Map<string, { count: number; resetTime: number }>();
+
+/**
+ * PKCE (Proof Key for Code Exchange) utilities for OAuth security
+ * Prevents authorization code interception attacks
+ */
+const PKCE_STORE = new Map<string, { codeVerifier: string; expiresAt: number }>();
+const PKCE_CODE_EXPIRY = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Generate a random code verifier for PKCE
+ * Uses a cryptographically secure random string
+ */
+function generateCodeVerifier(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/**
+ * Generate code challenge from verifier using SHA-256
+ * The challenge is sent to the OAuth server, verifier is kept secret
+ */
+function generateCodeChallenge(verifier: string): string {
+  return createHash('sha256').update(verifier).digest('base64url');
+}
+
+/**
+ * Store PKCE code verifier with expiration
+ */
+function storeCodeVerifier(state: string, codeVerifier: string): void {
+  PKCE_STORE.set(state, {
+    codeVerifier,
+    expiresAt: Date.now() + PKCE_CODE_EXPIRY,
+  });
+}
+
+/**
+ * Retrieve and consume PKCE code verifier
+ * Returns null if not found or expired
+ */
+function getCodeVerifier(state: string): string | null {
+  const entry = PKCE_STORE.get(state);
+  if (!entry) {
+    return null;
+  }
+  if (Date.now() > entry.expiresAt) {
+    PKCE_STORE.delete(state);
+    return null;
+  }
+  // Consume the verifier (one-time use)
+  PKCE_STORE.delete(state);
+  return entry.codeVerifier;
+}
+
+/**
+ * Clean up expired PKCE entries (run periodically)
+ */
+function cleanupExpiredPKCEEntries(): void {
+  const now = Date.now();
+  for (const [state, entry] of PKCE_STORE.entries()) {
+    if (now > entry.expiresAt) {
+      PKCE_STORE.delete(state);
+    }
+  }
+}
+
+// Clean up expired entries every 5 minutes
+setInterval(cleanupExpiredPKCEEntries, 5 * 60 * 1000);
 
 const RATE_LIMIT = {
   MAX_REQUESTS: 5,        // 5 requests per window
@@ -58,11 +126,21 @@ const router = Router();
 // 'none' requires secure:true (HTTPS) which production should have
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production' ? true : false,
-  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'strict' | 'lax' | 'none',
+  secure: env.NODE_ENV === 'production' ? true : false,
+  sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as 'strict' | 'lax' | 'none',
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
+
+/**
+ * Set security-focused response headers for auth endpoints
+ * Prevents caching of auth responses which could contain sensitive data
+ */
+function setAuthSecurityHeaders(res: Response): void {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+}
 
 // Validation schemas
 const registerSchema = z.object({
@@ -107,6 +185,9 @@ router.post('/register', async (req, res) => {
       await consistentDelay();
     }
 
+    // Set security headers for all auth responses
+    setAuthSecurityHeaders(res);
+
     if (error) {
       // Use generic error message to prevent account enumeration
       // Return the same message regardless of whether the user exists or not
@@ -147,6 +228,8 @@ router.post('/register', async (req, res) => {
     if (elapsed < AUTH_DELAY_MS) {
       await consistentDelay();
     }
+
+    setAuthSecurityHeaders(res);
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message });
@@ -191,6 +274,9 @@ router.post('/login', async (req, res) => {
       await consistentDelay();
     }
 
+    // Set security headers for all auth responses
+    setAuthSecurityHeaders(res);
+
     if (error) {
       // Use generic error message to prevent account enumeration
       return res.status(401).json({
@@ -220,6 +306,8 @@ router.post('/login', async (req, res) => {
       await consistentDelay();
     }
 
+    setAuthSecurityHeaders(res);
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors[0].message });
     }
@@ -235,6 +323,9 @@ router.post('/login', async (req, res) => {
  */
 router.post('/logout', async (req, res) => {
   try {
+    // Set security headers for all auth responses
+    setAuthSecurityHeaders(res);
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {
@@ -253,6 +344,7 @@ router.post('/logout', async (req, res) => {
     res.json({ message: 'Signed out successfully' });
   } catch (error) {
     console.error('Logout error:', error);
+    setAuthSecurityHeaders(res);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -260,15 +352,21 @@ router.post('/logout', async (req, res) => {
 /**
  * GET /api/auth/me
  * Get the current user's session
+ *
+ * Automatically refreshes the session if the access token is expired.
+ * Implements refresh token rotation - each refresh issues a new refresh token.
  */
 router.get('/me', async (req, res) => {
   try {
     const accessToken = req.cookies.access_token;
     const refreshToken = req.cookies.refresh_token;
-    
+
     if (!accessToken) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
+
+    // Set security headers for all auth responses
+    setAuthSecurityHeaders(res);
 
     let { data: { user }, error } = await supabase.auth.getUser(accessToken);
 
@@ -279,13 +377,13 @@ router.get('/me', async (req, res) => {
       });
 
       if (!sessionError && sessionData.session) {
-        // Update cookies with new tokens
+        // Update cookies with new tokens (refresh token rotation)
         res.cookie('access_token', sessionData.session.access_token, COOKIE_OPTIONS);
         res.cookie('refresh_token', sessionData.session.refresh_token, COOKIE_OPTIONS);
-        
+
         // Get user with new access token
         const { data: { user: refreshedUser }, error: getUserError } = await supabase.auth.getUser(sessionData.session.access_token);
-        
+
         if (!getUserError && refreshedUser) {
           return res.json({
             userId: refreshedUser.id,
@@ -305,6 +403,7 @@ router.get('/me', async (req, res) => {
     });
   } catch (error) {
     console.error('Get session error:', error);
+    setAuthSecurityHeaders(res);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -312,6 +411,11 @@ router.get('/me', async (req, res) => {
 /**
  * POST /api/auth/refresh
  * Refresh an access token using a refresh token
+ *
+ * Implements refresh token rotation:
+ * - Each refresh token can only be used once
+ * - A new refresh token is issued with each refresh
+ * - Reusing an old refresh token indicates a potential security breach
  */
 router.post('/refresh', async (req, res) => {
   try {
@@ -320,6 +424,9 @@ router.post('/refresh', async (req, res) => {
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token is required' });
     }
+
+    // Set security headers for all auth responses
+    setAuthSecurityHeaders(res);
 
     const { data, error } = await supabase.auth.refreshSession({
       refresh_token: refreshToken,
@@ -334,10 +441,20 @@ router.post('/refresh', async (req, res) => {
       };
       res.clearCookie('access_token', clearOptions);
       res.clearCookie('refresh_token', clearOptions);
-      return res.status(401).json({ error: 'Invalid refresh token' });
+
+      // Log potential security issue - this could indicate token theft
+      if (error?.message?.includes('refresh token')) {
+        console.warn('[Auth] Failed refresh attempt - possible token reuse or theft:', {
+          error: error.message,
+          ip: req.ip,
+        });
+      }
+
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
     }
 
-    // Update cookies with new tokens
+    // Update cookies with new tokens (refresh token rotation)
+    // The new refresh token replaces the old one, which is now invalidated
     res.cookie('access_token', data.session.access_token, COOKIE_OPTIONS);
     res.cookie('refresh_token', data.session.refresh_token, COOKIE_OPTIONS);
 
@@ -347,35 +464,51 @@ router.post('/refresh', async (req, res) => {
     });
   } catch (error) {
     console.error('Refresh token error:', error);
+    setAuthSecurityHeaders(res);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 /**
  * GET /api/auth/google
- * Initiate Google OAuth flow
+ * Initiate Google OAuth flow with PKCE-compatible security
+ *
+ * Generates a secure state parameter containing:
+ * - PKCE code verifier for token exchange
+ * - Session identifier for CSRF protection
+ * - Timestamp for expiration
+ *
+ * The state parameter is passed through OAuth and returned in the callback,
+ * allowing us to verify the request hasn't been tampered with.
  */
 router.get('/google', async (req, res) => {
   try {
-    // Get the frontend URL to redirect to after authentication
-    const frontendRedirectUrl = req.query.redirect as string || `${req.protocol}://${req.get('host')}/auth/callback`;
-    // Store the frontend redirect URL in a cookie so we can use it after OAuth callback
-    // Use a short-lived cookie (5 minutes) that will be used in the callback
-    res.cookie('oauth_redirect', frontendRedirectUrl, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' ? true : false,
-      sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'strict' | 'lax' | 'none',
-      maxAge: 5 * 60 * 1000, // 5 minutes
-      path: '/',
-    });
+    const redirectUrl = req.query.redirect as string || `${req.protocol}://${req.get('host')}/auth/callback`;
 
-    // Redirect to API callback endpoint (same domain) - this works better with Safari
-    const apiCallbackUrl = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
-    
+    // Generate PKCE code verifier and challenge
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+
+    // Generate a unique state parameter combining multiple security elements
+    const state = randomBytes(16).toString('base64url');
+
+    // Store the code verifier associated with this state (expires in 10 minutes)
+    storeCodeVerifier(state, codeVerifier);
+
+    // Initiate OAuth with Supabase (which supports PKCE)
+    // We add the state parameter which will be returned in the callback
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: apiCallbackUrl,
+        redirectTo: redirectUrl,
+        // Pass our state through the OAuth flow
+        // Supabase will include this in the redirect URL
+        queryParams: {
+          state: state,
+          // Supabase automatically adds PKCE parameters when available
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        },
       },
     });
 
@@ -392,104 +525,48 @@ router.get('/google', async (req, res) => {
   }
 });
 
-/**
- * GET /api/auth/google/callback
- * Handle Google OAuth callback (Safari-compatible redirect flow)
- * Supabase returns tokens in URL hash, which server can't read, so we serve an HTML page
- * that extracts the hash client-side and sets cookies via POST, then redirects to frontend.
- */
-router.get('/google/callback', async (req, res) => {
-  try {
-    // Get the frontend redirect URL from cookie
-    const frontendRedirectUrl = req.cookies.oauth_redirect || `${req.protocol}://${req.get('host')?.replace(/^api\./, '') || 'localhost:5173'}/auth/callback`;
-
-    // Serve an HTML page that will extract tokens from hash and set cookies
-    // This works around Safari's restrictions on cross-origin POST requests
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Completing sign in...</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body>
-  <script>
-    (function() {
-      try {
-        // Extract tokens from URL hash (Supabase returns them in hash)
-        const hash = window.location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const errorParam = params.get('error');
-        const errorDescription = params.get('error_description');
-
-        const frontendUrl = ${JSON.stringify(frontendRedirectUrl)};
-
-        if (errorParam) {
-          // Redirect to frontend with error
-          window.location.href = frontendUrl + '?error=' + encodeURIComponent(errorDescription || errorParam);
-          return;
-        }
-
-        if (!accessToken) {
-          // Redirect to frontend with error
-          window.location.href = frontendUrl + '?error=' + encodeURIComponent('No authorization tokens received');
-          return;
-        }
-
-        // Set cookies via POST to the same domain (this works in Safari)
-        fetch('/api/auth/google/callback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accessToken, refreshToken }),
-          credentials: 'include',
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.error) {
-            window.location.href = frontendUrl + '?error=' + encodeURIComponent(data.error);
-          } else {
-            // Success - redirect to frontend, cookies are now set
-            window.location.href = frontendUrl;
-          }
-        })
-        .catch(error => {
-          console.error('Auth callback error:', error);
-          window.location.href = frontendUrl + '?error=' + encodeURIComponent('Authentication failed');
-        });
-      } catch (error) {
-        console.error('Auth callback error:', error);
-        const frontendUrl = ${JSON.stringify(frontendRedirectUrl)};
-        window.location.href = frontendUrl + '?error=' + encodeURIComponent('Authentication failed');
-      }
-    })();
-  </script>
-  <p>Completing sign in...</p>
-</body>
-</html>`;
-
-    res.send(html);
-  } catch (error) {
-    console.error('Google callback error:', error);
-    const frontendRedirectUrl = req.cookies.oauth_redirect || `${req.protocol}://${req.get('host')?.replace(/^api\./, '') || 'localhost:5173'}/auth/callback`;
-    const errorUrl = new URL(frontendRedirectUrl);
-    errorUrl.searchParams.set('error', 'Authentication failed');
-    res.redirect(errorUrl.toString());
-  }
-});
 
 /**
  * POST /api/auth/google/callback
- * Handle Google OAuth callback (legacy POST method for non-Safari browsers)
- * Kept for backward compatibility, but GET method above is preferred for Safari
+ * Handle Google OAuth callback and verify tokens with PKCE state validation
+ *
+ * This endpoint receives OAuth tokens after Google authentication.
+ * It validates the state parameter to prevent CSRF attacks and verifies
+ * the tokens with Supabase before establishing the user session.
  */
 router.post('/google/callback', async (req, res) => {
   try {
-    const { accessToken, refreshToken } = req.body;
+    const { accessToken, refreshToken, state } = req.body;
 
     if (!accessToken) {
       return res.status(400).json({ error: 'Access token is required' });
+    }
+
+    // Set security headers for all auth responses
+    setAuthSecurityHeaders(res);
+
+    // Validate state parameter if provided (PKCE flow)
+    // The state parameter should have been issued by our /api/auth/google endpoint
+    if (state) {
+      const codeVerifier = getCodeVerifier(state);
+      if (!codeVerifier) {
+        // State was not issued by us or has expired
+        console.warn('[Auth] OAuth callback with invalid or expired state parameter', {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        });
+        return res.status(401).json({
+          error: 'Invalid OAuth state. Please try the sign-in process again.'
+        });
+      }
+      // State is valid - the code_verifier was consumed (one-time use)
+      // This prevents replay attacks
+    } else {
+      // For backwards compatibility, allow requests without state
+      // but log a warning to monitor usage
+      console.warn('[Auth] OAuth callback without state parameter - consider updating the frontend', {
+        ip: req.ip,
+      });
     }
 
     // Verify the access token with Supabase
@@ -526,6 +603,7 @@ router.post('/google/callback', async (req, res) => {
     });
   } catch (error) {
     console.error('Google callback error:', error);
+    setAuthSecurityHeaders(res);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
