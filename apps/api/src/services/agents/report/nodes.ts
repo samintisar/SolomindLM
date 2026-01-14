@@ -89,7 +89,7 @@ interface MapOutputInvoker {
  * type safety through the MapOutputInvoker interface.
  */
 function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutputInvoker {
-  // @ts-expect-error - Type instantiation is excessively deep with LangChain's withStructuredOutput
+  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(schema, {
     name: 'extract_topics_and_summary',
   }) as any;

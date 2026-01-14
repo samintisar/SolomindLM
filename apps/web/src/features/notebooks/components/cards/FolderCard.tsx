@@ -1,5 +1,5 @@
 import React from 'react';
-import { MoreVertical, Settings2, Trash2, Folder, ChevronDown, Book, BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb } from 'lucide-react';
+import { MoreVertical, Settings2, Trash2, Folder, Book, BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb } from 'lucide-react';
 import { FolderItem } from '@/shared/types/index';
 import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
@@ -11,8 +11,8 @@ interface FolderCardProps {
   folder: FolderItem;
   viewMode: 'grid' | 'list';
   isMenuOpen: boolean;
-  isExpanded: boolean;
-  onToggleExpansion: () => void;
+  isExpanded?: boolean; // Optional now since we're not using expansion
+  onSelectFolder: () => void;
   onOpenFolderCustomize: () => void;
   onDeleteFolder: (id: string) => void;
   onToggleMenu: () => void;
@@ -23,8 +23,8 @@ export const FolderCard: React.FC<FolderCardProps> = ({
   folder,
   viewMode,
   isMenuOpen,
-  isExpanded,
-  onToggleExpansion,
+  isExpanded = false, // Default to false since we're not using expansion
+  onSelectFolder,
   onOpenFolderCustomize,
   onDeleteFolder,
   onToggleMenu,
@@ -54,7 +54,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
         >
           {/* Top Decorative Half */}
           <div
-            onClick={() => onToggleExpansion()}
+            onClick={() => onSelectFolder()}
             className={`h-[55%] ${folder.color || 'bg-blue-500'} bg-opacity-[4%] group-hover:bg-opacity-[6%] transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
           >
             <FolderIcon className={`w-10 h-10 ${(folder.color || '').replace('bg-', 'text-')} opacity-55 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`} />
@@ -88,7 +88,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
 
           {/* Bottom Info Half */}
           <div
-            onClick={() => onToggleExpansion()}
+            onClick={() => onSelectFolder()}
             className="h-[45%] p-5 flex flex-col justify-end bg-card relative rounded-b-2xl"
           >
             <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-border to-transparent opacity-50" />
@@ -101,7 +101,6 @@ export const FolderCard: React.FC<FolderCardProps> = ({
                   <Folder className="w-3 h-3" />
                   <span>{folder.notebookCount}</span>
                 </div>
-                <ChevronDown className="w-4 h-4 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }} />
               </div>
             </div>
           </div>
@@ -119,7 +118,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
       <div
         className={`group grid grid-cols-[minmax(200px,1fr)_100px_48px] items-center gap-4 p-4 rounded-xl bg-card border border-border/50 hover:border-primary/30 hover:shadow-md cursor-pointer transition-all relative`}
       >
-        <div onClick={() => onToggleExpansion()} className="absolute inset-0 z-0 rounded-xl" />
+        <div onClick={() => onSelectFolder()} className="absolute inset-0 z-0 rounded-xl" />
 
         {/* Title Column */}
         <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">

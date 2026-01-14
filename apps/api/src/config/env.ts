@@ -76,6 +76,13 @@ const envSchema = z.object({
   // Reduce phase: 10K tokens (~4% of 261K context)
   QUIZ_REDUCE_CHUNK_TOKENS: z.string().default('10000'),
   QUIZ_MAX_TOKENS: z.string().default('16000'),
+  // Questions per chunk bounds for quality control
+  QUIZ_MIN_QUESTIONS_PER_CHUNK: z.string().default('2'),
+  QUIZ_MAX_QUESTIONS_PER_CHUNK: z.string().default('25'),
+  // Minimum chunks to process for diversity
+  QUIZ_MIN_CHUNKS: z.string().default('2'),
+  // Max OUTPUT tokens for reduce phase (selection/refinement)
+  QUIZ_REDUCE_MAX_TOKENS: z.string().default('24000'),
   // Timeout settings for LLM calls
   QUIZ_MAP_TIMEOUT_MS: z.string().default('180000'),
   QUIZ_REDUCE_TIMEOUT_MS: z.string().default('240000'),
@@ -84,6 +91,19 @@ const envSchema = z.object({
   WRITTEN_QUESTIONS_MAP_CHUNK_TOKENS: z.string().default('20000'),
   // Reduce phase: 40K tokens (~6% of 261K context)
   WRITTEN_QUESTIONS_REDUCE_CHUNK_TOKENS: z.string().default('40000'),
+  // Questions per chunk bounds for quality control
+  WRITTEN_QUESTIONS_MIN_QUESTIONS_PER_CHUNK: z.string().default('2'),
+  WRITTEN_QUESTIONS_MAX_QUESTIONS_PER_CHUNK: z.string().default('30'),
+  // Minimum chunks to process for diversity
+  WRITTEN_QUESTIONS_MIN_CHUNKS: z.string().default('2'),
+  // Max OUTPUT tokens for reduce phase (selection/refinement)
+  WRITTEN_QUESTIONS_REDUCE_MAX_TOKENS: z.string().default('32000'),
+  // Maximum collapse recursion depth
+  WRITTEN_QUESTIONS_MAX_COLLAPSE_DEPTH: z.string().default('3'),
+  // Dynamic buffer multiplier for target question count
+  WRITTEN_QUESTIONS_DYNAMIC_BUFFER_MULTIPLIER: z.string().default('1.5'),
+  // Minimum chunk coverage threshold (0-1)
+  WRITTEN_QUESTIONS_CHUNK_COVERAGE_THRESHOLD: z.string().default('0.7'),
   // Timeout settings for LLM calls
   WRITTEN_QUESTIONS_MAP_TIMEOUT_MS: z.string().default('180000'),
   WRITTEN_QUESTIONS_REDUCE_TIMEOUT_MS: z.string().default('240000'),

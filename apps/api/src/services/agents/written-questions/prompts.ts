@@ -6,20 +6,21 @@
  */
 
 import { z } from 'zod';
+import { env } from '../../../config/env.js';
 
 // ============================================================
 // SCHEMAS
 // ============================================================
 
 export const WrittenQuestionSchema = z.object({
-  id: z.string(),
-  question: z.string(),
+  id: z.string().describe("Unique identifier for the question"),
+  question: z.string().describe("The formulated question text"),
   questionType: z.enum(['short', 'essay']),
   rubric: z.object({
     maxPoints: z.number(),
-    criteria: z.array(z.string()),
+    criteria: z.array(z.string()).describe("Specific grading criteria or keywords required for full points"),
   }),
-  modelAnswer: z.string().nullable(),
+  modelAnswer: z.string().describe("A comprehensive, correct answer derived exclusively from the text"),
 });
 
 export const WrittenQuestionsArraySchema = z.object({
@@ -34,7 +35,7 @@ export interface WrittenQuestion {
     maxPoints: number;
     criteria: string[];
   };
-  modelAnswer: string | null;
+  modelAnswer: string | null; // Kept nullable in interface for UI safety, though Schema enforces string
 }
 
 export interface WrittenQuestionsResponse {
@@ -60,17 +61,22 @@ export const PROBLEMATIC_PHRASES = [
 // CONFIGURATION
 // ============================================================
 
+const WRITTEN_QUESTIONS_CONFIG = {
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.WRITTEN_QUESTIONS_MAP_CHUNK_TOKENS || '20000', 10),
+  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_CHUNK_TOKENS || '40000', 10),
+  MIN_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MIN_QUESTIONS_PER_CHUNK || '2', 10),
+  MAX_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MAX_QUESTIONS_PER_CHUNK || '30', 10),
+  MIN_CHUNKS: parseInt(env.WRITTEN_QUESTIONS_MIN_CHUNKS || '2', 10),
+  MAP_TIMEOUT_MS: parseInt(env.WRITTEN_QUESTIONS_MAP_TIMEOUT_MS || '180000', 10),
+  REDUCE_TIMEOUT_MS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_TIMEOUT_MS || '240000', 10),
+  REDUCE_MAX_TOKENS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_MAX_TOKENS || '32000', 10),
+  MAX_COLLAPSE_DEPTH: parseInt(env.WRITTEN_QUESTIONS_MAX_COLLAPSE_DEPTH || '3', 10),
+  DYNAMIC_BUFFER_MULTIPLIER: parseFloat(env.WRITTEN_QUESTIONS_DYNAMIC_BUFFER_MULTIPLIER || '1.5'),
+  CHUNK_COVERAGE_THRESHOLD: parseFloat(env.WRITTEN_QUESTIONS_CHUNK_COVERAGE_THRESHOLD || '0.7'),
+} as const;
+
 export const GRAPH_CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: 20000, // ~80K chars ≈ 20K tokens
-  REDUCE_CHUNK_SIZE_TOKENS: 40000, // ~160K chars ≈ 40K tokens
-  MIN_QUESTIONS_PER_CHUNK: 2,
-  MIN_CHUNKS: 2,
-  MAP_TIMEOUT_MS: 180000,
-  REDUCE_TIMEOUT_MS: 240000,
-  MAX_COLLAPSE_DEPTH: 3,
-  DYNAMIC_BUFFER_MULTIPLIER: 1.5,
-  MAX_QUESTIONS_PER_CHUNK: 30,
-  CHUNK_COVERAGE_THRESHOLD: 0.7,
+  ...WRITTEN_QUESTIONS_CONFIG,
 } as const;
 
 // ============================================================
@@ -96,38 +102,35 @@ export const getMapPrompt = (params: {
     hard: 'application and analysis - requires deeper thinking',
   };
 
-  const questionTypeSection = `**Question Type: ${questionType.toUpperCase()}**
-**Point Value: ${questionType === 'short' ? '5' : '12'}**
+  const isEssay = questionType === 'essay';
 
-${questionType === 'short'
-  ? `**SHORT-ANSWER QUESTIONS:**
-- A SINGLE, DIRECT QUESTION (not a list of tasks)
-- Answerable in 1-3 sentences
-- Worth EXACTLY 5 points`
-  : `**ESSAY QUESTIONS:**
-- Answerable in multiple paragraphs
-- Worth 12 points
-- Tests analysis, synthesis, and critical thinking`
-}`;
+  const typeSpecificInstructions = isEssay
+    ? `**ESSAY QUESTIONS (12 Points):**
+- Requires multi-paragraph synthesis
+- Tests deep understanding and critical analysis
+- RUBRIC: Generate 3-4 distinct evaluation criteria (e.g., Argument Strength, Evidence Use, Clarity)`
+    : `**SHORT-ANSWER QUESTIONS (5 Points):**
+- Direct, factual questions (1-3 sentences)
+- Tests specific knowledge or definitions
+- RUBRIC: Generate 2-3 specific keywords or facts required for full points`;
 
-  return `You are an expert educator creating HIGH-QUALITY written questions for assessment.
+  return `You are an expert educator creating a HIGH-QUALITY assessment.
 
-Generate exactly ${questionsPerChunk} questions from this section.
+Generate exactly ${questionsPerChunk} questions based **exclusively** on the text provided below.
 
-**Difficulty Level: ${difficulty.toUpperCase()}** (${difficultyGuidance[difficulty] || difficulty})
-${questionTypeSection}
-${focus ? `**Topic Focus:** ${focus}` : ''}
+**Configuration:**
+- Difficulty: ${difficulty.toUpperCase()} (${difficultyGuidance[difficulty] || difficulty})
+- Type: ${questionType.toUpperCase()}
+${focus ? `- Focus Topic: ${focus}` : ''}
 
-CRITICAL REQUIREMENTS:
-- You MUST generate exactly ${questionsPerChunk} questions
-- ALL questions MUST be based EXCLUSIVELY on the provided content
-- DO NOT use outside knowledge or generate questions about unrelated topics
-- Questions MUST BE COMPLETELY SELF-CONTAINED
-- Include all necessary context within the question itself
+${typeSpecificInstructions}
 
-**SELF-CONTAINED QUESTIONS:**
-Each question MUST include all necessary context. If referencing a formula, diagram, code snippet, or scenario, include or describe it thoroughly within the question.
+**CRITICAL GENERATION RULES:**
+1. **Model Answer:** You MUST generate a comprehensive model answer for every question. The answer must be found directly in the text.
+2. **Rubric:** Create specific grading criteria based on the model answer.
+3. **Self-Contained:** Questions must make sense in isolation. NEVER use phrases like "according to the text," "as shown above," or "in this chapter." If the text refers to a specific scenario, you must describe that scenario in the question itself.
+4. **Distribution:** Scan the **ENTIRE** provided text below. Do not cluster questions at the beginning. Ensure questions represent the full range of the content provided.
 
-Content to base questions on (READ THIS CAREFULLY - ONLY create questions about this content):
+**Input Text:**
 ${chunk}`;
 };

@@ -3,7 +3,6 @@ import { Plus, FolderInput } from 'lucide-react';
 import { NotebookItem, FolderItem } from '@/shared/types/index';
 import { NotebookCard } from '../cards/NotebookCard';
 import { FolderCard } from '../cards/FolderCard';
-import { FolderExpandedView } from './FolderExpandedView';
 import { ListHeader } from '../ListHeader';
 
 interface RecentSectionProps {
@@ -13,6 +12,7 @@ interface RecentSectionProps {
   onCreateNotebook: () => void;
   onCreateFolder?: () => void;
   onSelectNotebook: (notebook: NotebookItem) => void;
+  onSelectFolder: (folderId: string) => void;
   // Notebook handlers
   activeMenuId: string | null;
   onOpenCustomize: (id: string) => void;
@@ -24,11 +24,6 @@ interface RecentSectionProps {
   onOpenFolderCustomize: (id: string) => void;
   onDeleteFolder: (id: string) => void;
   setFolderActiveMenuId: (id: string | null) => void;
-  // Folder expansion
-  expandedFolderId: string | null;
-  folderNotebooks: Record<string, NotebookItem[]>;
-  loadingFolderNotebooks: Set<string>;
-  toggleFolderExpansion: (folderId: string) => Promise<void>;
   // Sorting
   getSortedNotebooks?: (items: NotebookItem[]) => NotebookItem[];
 }
@@ -40,6 +35,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
   onCreateNotebook,
   onCreateFolder,
   onSelectNotebook,
+  onSelectFolder,
   // Notebook handlers
   activeMenuId,
   onOpenCustomize,
@@ -51,11 +47,6 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
   onOpenFolderCustomize,
   onDeleteFolder,
   setFolderActiveMenuId,
-  // Folder expansion
-  expandedFolderId,
-  folderNotebooks,
-  loadingFolderNotebooks,
-  toggleFolderExpansion,
   // Sorting
   getSortedNotebooks,
 }) => {
@@ -94,42 +85,19 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
           </div>
 
           {/* Folder Cards */}
-          {folders.map((folder) => {
-            const isExpanded = expandedFolderId === folder.id;
-            const isLoading = loadingFolderNotebooks.has(folder.id);
-
-            return (
-              <div key={folder.id} className="relative">
-                <FolderCard
-                  folder={folder}
-                  viewMode={viewMode}
-                  isMenuOpen={folderActiveMenuId === folder.id}
-                  isExpanded={isExpanded}
-                  onToggleExpansion={() => toggleFolderExpansion(folder.id)}
-                  onOpenFolderCustomize={() => onOpenFolderCustomize(folder.id)}
-                  onDeleteFolder={onDeleteFolder}
-                  onToggleMenu={() => setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)}
-                  onCloseMenu={() => setFolderActiveMenuId(null)}
-                />
-
-                {/* Expanded Notebooks */}
-                {isExpanded && (
-                  <FolderExpandedView
-                    folder={folder}
-                    notebooks={getSortedNotebooks ? getSortedNotebooks(folderNotebooks[folder.id] || []) : (folderNotebooks[folder.id] || [])}
-                    isLoading={isLoading}
-                    viewMode={viewMode}
-                    onSelectNotebook={onSelectNotebook}
-                    activeMenuId={activeMenuId}
-                    onOpenCustomize={onOpenCustomize}
-                    onOpenMoveToFolder={onOpenMoveToFolder}
-                    onDeleteNotebook={onDeleteNotebook}
-                    setActiveMenuId={setActiveMenuId}
-                  />
-                )}
-              </div>
-            );
-          })}
+          {folders.map((folder) => (
+            <FolderCard
+              key={folder.id}
+              folder={folder}
+              viewMode={viewMode}
+              isMenuOpen={folderActiveMenuId === folder.id}
+              onSelectFolder={() => onSelectFolder(folder.id)}
+              onOpenFolderCustomize={() => onOpenFolderCustomize(folder.id)}
+              onDeleteFolder={onDeleteFolder}
+              onToggleMenu={() => setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)}
+              onCloseMenu={() => setFolderActiveMenuId(null)}
+            />
+          ))}
 
           {/* Notebook Cards */}
           {notebooksWithoutFolder.map((nb) => (
@@ -181,42 +149,20 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
           </div>
 
           {/* Folder Rows */}
-          {folders.map((folder) => {
-            const isExpanded = expandedFolderId === folder.id;
-            const isLoading = loadingFolderNotebooks.has(folder.id);
-
-            return (
-              <div key={folder.id} className="relative mb-2">
-                <FolderCard
-                  folder={folder}
-                  viewMode={viewMode}
-                  isMenuOpen={folderActiveMenuId === folder.id}
-                  isExpanded={isExpanded}
-                  onToggleExpansion={() => toggleFolderExpansion(folder.id)}
-                  onOpenFolderCustomize={() => onOpenFolderCustomize(folder.id)}
-                  onDeleteFolder={onDeleteFolder}
-                  onToggleMenu={() => setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)}
-                  onCloseMenu={() => setFolderActiveMenuId(null)}
-                />
-
-                {/* Expanded Notebooks */}
-                {isExpanded && (
-                  <FolderExpandedView
-                    folder={folder}
-                    notebooks={getSortedNotebooks ? getSortedNotebooks(folderNotebooks[folder.id] || []) : (folderNotebooks[folder.id] || [])}
-                    isLoading={isLoading}
-                    viewMode={viewMode}
-                    onSelectNotebook={onSelectNotebook}
-                    activeMenuId={activeMenuId}
-                    onOpenCustomize={onOpenCustomize}
-                    onOpenMoveToFolder={onOpenMoveToFolder}
-                    onDeleteNotebook={onDeleteNotebook}
-                    setActiveMenuId={setActiveMenuId}
-                  />
-                )}
-              </div>
-            );
-          })}
+          {folders.map((folder) => (
+            <div key={folder.id} className="mb-2">
+              <FolderCard
+                folder={folder}
+                viewMode={viewMode}
+                isMenuOpen={folderActiveMenuId === folder.id}
+                onSelectFolder={() => onSelectFolder(folder.id)}
+                onOpenFolderCustomize={() => onOpenFolderCustomize(folder.id)}
+                onDeleteFolder={onDeleteFolder}
+                onToggleMenu={() => setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)}
+                onCloseMenu={() => setFolderActiveMenuId(null)}
+              />
+            </div>
+          ))}
 
           {/* Notebook Rows */}
           {notebooksWithoutFolder.map((nb) => (

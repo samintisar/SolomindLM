@@ -9,6 +9,7 @@ import { StateGraph, START, END, Send } from '@langchain/langgraph';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { randomUUID } from 'crypto';
+import { z } from 'zod';
 import { env } from '../../../config/env.js';
 
 // Shared utilities
@@ -25,6 +26,7 @@ import {
   logBanner,
   sanitizeUserInput,
   countTokens,
+  clearStateKeys,
 } from '../shared/index.js';
 
 // Import from local modules
@@ -36,6 +38,28 @@ import {
   PROBLEMATIC_PHRASES,
   GRAPH_CONFIG,
 } from './prompts.js';
+
+// ============================================================
+// STRUCTURED OUTPUT SCHEMAS
+// ============================================================
+
+/**
+ * Interface for the structured LLM to avoid deep type instantiation.
+ * Follows the pattern from FlashcardGraph.
+ */
+interface WrittenQuestionsOutputInvoker {
+  invoke(messages: Array<SystemMessage | HumanMessage>): Promise<WrittenQuestionsResponse>;
+}
+
+/**
+ * Helper function to create a structured LLM without triggering deep type instantiation.
+ */
+function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): WrittenQuestionsOutputInvoker {
+  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
+  return llm.withStructuredOutput(schema, {
+    name: 'written_questions'
+  }) as any;
+}
 
 // ============================================================
 // CHUNK HELPERS
@@ -76,6 +100,7 @@ export function validateChunks(chunks: string[]): string[] {
 export class WrittenQuestionsGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
+  private fastLlmStructured: WrittenQuestionsOutputInvoker;
 
   constructor(apiKey: string, mapModel: string, reduceModel: string) {
     this.fastLlm = new ChatTogetherAI({
@@ -89,8 +114,11 @@ export class WrittenQuestionsGraph {
       apiKey,
       model: reduceModel,
       temperature: 0.3,
-      maxTokens: 24000,
+      maxTokens: GRAPH_CONFIG.REDUCE_MAX_TOKENS,
     });
+
+    // Create structured LLM instance
+    this.fastLlmStructured = createStructuredLLM(this.fastLlm, WrittenQuestionsArraySchema);
   }
 
   // Node: Split chunks for routing
@@ -148,20 +176,24 @@ export class WrittenQuestionsGraph {
     }
 
     const chunkCount = state.chunks.length;
+    const MIN_QUESTIONS_PER_CHUNK = 2;
+    const BUFFER_MULTIPLIER = 1.5;
+    const MAX_QUESTIONS_PER_CHUNK = 15;
 
-    const MAX_QUESTIONS_PER_CHUNK = 25;
+    // Calculate questions per chunk
+    // Process ALL chunks to ensure full document coverage (no front-loading bias)
     const questionsPerChunk = Math.max(
-      GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
+      MIN_QUESTIONS_PER_CHUNK,
       Math.min(
         MAX_QUESTIONS_PER_CHUNK,
-        Math.ceil(state.questionCount / chunkCount * GRAPH_CONFIG.DYNAMIC_BUFFER_MULTIPLIER)
+        Math.ceil(state.questionCount / chunkCount * BUFFER_MULTIPLIER)
       )
     );
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       phase: 'route_to_map',
-      packedChunks: chunkCount,
+      totalChunks: chunkCount,
       targetQuestionCount: state.questionCount,
       questionsPerChunk,
       difficulty: state.difficulty,
@@ -169,6 +201,7 @@ export class WrittenQuestionsGraph {
       focus: state.focus || 'none',
     }, null, 2));
 
+    console.log(`[WrittenQuestionsGraph] Processing all ${chunkCount} chunks for ${state.questionCount} target questions`);
     console.log(`[WrittenQuestionsGraph] Creating ${chunkCount} parallel map tasks (~${questionsPerChunk} questions/chunk)`);
 
     return state.chunks.map((chunk, idx) => {
@@ -236,14 +269,9 @@ export class WrittenQuestionsGraph {
     let questionsGenerated = 0;
 
     try {
-      const structuredLlm = this.fastLlm.withStructuredOutput<WrittenQuestionsResponse>(
-        WrittenQuestionsArraySchema,
-        { name: 'written_questions' }
-      );
-
       const response: WrittenQuestionsResponse = await invokeWithRetry(
         () => invokeWithTimeout(
-          () => structuredLlm.invoke([
+          () => this.fastLlmStructured.invoke([
             new SystemMessage('You are a professional educator creating written assessment questions.'),
             new HumanMessage(prompt),
           ]),
@@ -470,10 +498,20 @@ export class WrittenQuestionsGraph {
       successfulChunks,
     }, `Concatenated ${successfulChunks} successful chunks into ${allQuestions.length} questions`);
 
+    // Calculate memory to be freed
+    const mapOutputsSize = state.mapOutputs.reduce((sum, s) => sum + s.length * 2, 0);
+    logInfo({
+      agent: 'WrittenQuestionsGraph',
+      phase: 'collapse_cleanup',
+      memoryFreedKB: (mapOutputsSize / 1024).toFixed(2),
+    }, `Freeing ~${(mapOutputsSize / 1024).toFixed(2)} KB from mapOutputs`);
+
     return {
       ...state,
       collapsedOutputs: [JSON.stringify(allQuestions)],
       status: 'reducing',
+      // CRITICAL: Clear mapOutputs to free memory - prevents OOM on large documents
+      ...clearStateKeys<OverallStateType>(['mapOutputs']),
       progress: {
         phase: 'collapse',
         percentage: 70,
@@ -620,16 +658,37 @@ Return the complete selected questions as a JSON array.`;
 
     const retryCount = state.reduceRetryCount ?? 0;
 
+    // Safety cap: Randomly sample down to 50 questions if we have too many
+    // This prevents context window explosion and "lost in the middle" phenomenon
+    const MAX_QUESTIONS_FOR_LLM = 50;
+    let questionsForLLM = allQuestions;
+    
+    if (totalQuestionsBefore > MAX_QUESTIONS_FOR_LLM) {
+      // Randomly shuffle and take first 50 to ensure diversity
+      const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
+      questionsForLLM = shuffled.slice(0, MAX_QUESTIONS_FOR_LLM);
+      
+      logInfo({
+        agent: 'WrittenQuestionsGraph',
+        phase: 'reduce_safety_cap',
+        totalQuestionsBefore,
+        sampledDownTo: MAX_QUESTIONS_FOR_LLM,
+        targetQuestionCount: state.questionCount,
+        reason: 'Context window safety cap - prevents token limit issues and improves LLM attention',
+      }, `Randomly sampled ${totalQuestionsBefore} questions down to ${MAX_QUESTIONS_FOR_LLM} before LLM selection`);
+    }
+
     logInfo({
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce_llm_selection',
       totalQuestionsBefore,
+      questionsForLLM: questionsForLLM.length,
       targetQuestionCount: state.questionCount,
       retryAttempt: retryCount + 1,
       reason: 'Question count outside acceptable range, using LLM for selection',
-    }, `Using smart LLM for intelligent question selection from ${totalQuestionsBefore} questions [Attempt ${retryCount + 1}/2]...`);
+    }, `Using smart LLM for intelligent question selection from ${questionsForLLM.length} questions [Attempt ${retryCount + 1}/2]...`);
 
-    const similarQuestions = this.detectSimilarQuestions(allQuestions);
+    const similarQuestions = this.detectSimilarQuestions(questionsForLLM);
 
     if (similarQuestions.length > 0) {
       logInfo({
@@ -651,7 +710,7 @@ Return the complete selected questions as a JSON array.`;
       );
 
       const selectionPrompt = this.getSelectionPrompt({
-        questions: allQuestions,
+        questions: questionsForLLM,
         targetCount: state.questionCount,
         difficulty: state.difficulty,
         questionType: state.questionType,
@@ -771,10 +830,21 @@ Return the complete selected questions as a JSON array.`;
       'GENERATION COMPLETE'
     );
 
+    // Calculate memory to be freed
+    const collapsedOutputsSize = state.collapsedOutputs?.reduce((sum, s) => sum + s.length * 2, 0) ?? 0;
+    const chunksSize = (state.chunks || []).reduce((sum, s) => sum + s.length * 2, 0);
+    logInfo({
+      agent: 'WrittenQuestionsGraph',
+      phase: 'reduce_cleanup',
+      memoryFreedKB: ((collapsedOutputsSize + chunksSize) / 1024).toFixed(2),
+    }, `Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`);
+
     return {
       ...state,
       finalOutput: questionsWithIds,
       status: 'completed',
+      // CRITICAL: Clear collapsedOutputs and chunks to free memory
+      ...clearStateKeys<OverallStateType>(['collapsedOutputs', 'chunks']),
     };
   }
 
@@ -824,24 +894,28 @@ Return the complete selected questions as a JSON array.`;
 
   /**
    * Extract topic from a question for diversity enforcement.
+   * Patterns are ordered by specificity (most specific first) to prevent overlap issues.
+   * Broad patterns like "Explanations" are at the bottom to avoid catching specific cases.
    */
   private extractTopic(question: WrittenQuestion): string {
     const text = question.question.toLowerCase();
 
     const patterns: Array<{regex: RegExp; topic: string}> = [
-      { regex: /\b(compare|contrast|differences?|similarities?|versus|vs\.?|relative to)\b/i, topic: 'Comparisons' },
-      { regex: /\b(analyze|analysis|evaluate|assess|critique|examine)\b/i, topic: 'Analysis' },
-      { regex: /\b(explain|describe|elaborate|discuss|illustrate|demonstrate)\b/i, topic: 'Explanations' },
-      { regex: /\b(process|method|procedure|step|algorithm|technique|approach)\b/i, topic: 'Processes' },
-      { regex: /\bwhen\b.*\b(year|century|date|time|era|period)\b/i, topic: 'Timeline/Dates' },
+      // Most specific patterns first - these should match before broader ones
       { regex: /\b(in|during|before|after)\s+\d+\b/i, topic: 'Timeline/Dates' },
+      { regex: /\bwhen\b.*\b(year|century|date|time|era|period)\b/i, topic: 'Timeline/Dates' },
       { regex: /\bwho\b.*\b(invented|created|discovered|wrote|authored|developed)\b/i, topic: 'People' },
       { regex: /\b(credited to|attributed to|pioneered by)\b/i, topic: 'People' },
       { regex: /\bwhere\b.*\b(located|found|discovered|originated)\b/i, topic: 'Places' },
+      { regex: /\b(compare|contrast|differences?|similarities?|versus|vs\.?|relative to)\b/i, topic: 'Comparisons' },
+      { regex: /\b(process|method|procedure|step|algorithm|technique|approach)\b/i, topic: 'Processes' },
       { regex: /\b(why|because|reason|cause|lead to|result in|factor)\b/i, topic: 'Causes/Reasons' },
       { regex: /\b(define|definition|what is|what are|what does|meaning of)\b/i, topic: 'Definitions' },
       { regex: /\b(which|select|choose|identify|classify|categorize)\b/i, topic: 'Classification' },
       { regex: /\b(true|false|correct|incorrect|accurate)\b/i, topic: 'Facts' },
+      { regex: /\b(analyze|analysis|evaluate|assess|critique|examine)\b/i, topic: 'Analysis' },
+      // Broad patterns last - these catch general cases but won't override specific ones above
+      { regex: /\b(explain|describe|elaborate|discuss|illustrate|demonstrate)\b/i, topic: 'Explanations' },
     ];
 
     for (const { regex, topic } of patterns) {

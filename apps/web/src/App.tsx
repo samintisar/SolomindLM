@@ -7,6 +7,7 @@ import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
 import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
+import { FolderView } from './features/notebooks/components/views/FolderView';
 import { BillingPage } from './features/billing/components/BillingPage';
 import { LandingPage } from './features/landing/LandingPage';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
@@ -124,6 +125,8 @@ const AppContent: React.FC = () => {
     ? 'home'
     : location.pathname === '/billing'
     ? 'billing'
+    : location.pathname.startsWith('/folder/')
+    ? 'folder'
     : location.pathname.startsWith('/notebook/')
     ? 'notebook'
     : 'landing';
@@ -131,6 +134,11 @@ const AppContent: React.FC = () => {
   // Get notebook ID from URL pathname (e.g., /notebook/abc-123 -> abc-123)
   const urlNotebookId = location.pathname.startsWith('/notebook/')
     ? location.pathname.split('/notebook/')[1] || null
+    : null;
+
+  // Get folder ID from URL pathname (e.g., /folder/abc-123 -> abc-123)
+  const urlFolderId = location.pathname.startsWith('/folder/')
+    ? location.pathname.split('/folder/')[1] || null
     : null;
 
   // Notebook specific state
@@ -895,6 +903,14 @@ const AppContent: React.FC = () => {
     navigate(`/notebook/${notebook.id}`);
   };
 
+  const handleSelectFolder = (folderId: string) => {
+    navigate(`/folder/${folderId}`);
+  };
+
+  const handleFolderBack = () => {
+    navigate('/home');
+  };
+
   const handleCreateNotebook = async () => {
     if (!isAuthenticated || !user) {
       console.error('Cannot create notebook: not authenticated');
@@ -1067,7 +1083,7 @@ const AppContent: React.FC = () => {
               handleUpdateNotebook(activeNotebookId, { title: newTitle });
             }
           }}
-          isHome={location.pathname === '/home' || location.pathname === '/billing'}
+          isHome={location.pathname === '/home' || location.pathname === '/billing' || location.pathname.startsWith('/folder/')}
           onLogoClick={handleLogoClick}
           onBillingClick={handleBillingClick}
           hasSubscription={hasSubscription}
@@ -1087,6 +1103,7 @@ const AppContent: React.FC = () => {
               featuredNotebooks={featuredNotebooks}
               recentNotebooks={recentNotebooks}
               onSelectNotebook={handleSelectNotebook}
+              onSelectFolder={handleSelectFolder}
               onCreateNotebook={handleCreateNotebook}
               onUpdateNotebook={handleUpdateNotebook}
               onDeleteNotebook={handleDeleteNotebook}
@@ -1103,6 +1120,32 @@ const AppContent: React.FC = () => {
                 setShowLoginModal(true);
               }}
             />
+          }
+        />
+
+        <Route
+          path="/folder/:folderId"
+          element={
+            <ProtectedRoute>
+              <main className="flex-1 overflow-auto">
+                <FolderView
+                  folderId={urlFolderId || ''}
+                  viewMode="grid"
+                  onBack={handleFolderBack}
+                  onSelectNotebook={handleSelectNotebook}
+                  onCreateNotebook={handleCreateNotebook}
+                  onUpdateNotebook={handleUpdateNotebook}
+                  onDeleteNotebook={handleDeleteNotebook}
+                  onMoveNotebookToFolder={handleMoveNotebookToFolder}
+                  folders={folders}
+                  loadFolders={loadFolders}
+                  onRequireAuth={(errorMessage) => {
+                    setAuthError(errorMessage);
+                    setShowLoginModal(true);
+                  }}
+                />
+              </main>
+            </ProtectedRoute>
           }
         />
 

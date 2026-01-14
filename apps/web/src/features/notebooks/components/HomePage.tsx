@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, LayoutGrid, List, ChevronDown, Calendar, ArrowUpAZ, CheckCircle2 } from 'lucide-react';
+import { LayoutGrid, List, ChevronDown, Calendar, ArrowUpAZ, CheckCircle2 } from 'lucide-react';
 import { NotebookItem, FolderItem } from '@/shared/types/index';
 import { FeaturedSection, RecentSection } from './views';
 import { CustomizeNotebookModal, MoveToFolderModal, CustomizeFolderModal } from './modals';
-import { useNotebookHandlers, useFolderHandlers, useNotebookSorting, useFolderExpansion } from '../hooks';
+import { useNotebookHandlers, useFolderHandlers, useNotebookSorting } from '../hooks';
 import { notebooksApi } from '../services/notebooksApi';
 import { foldersApi } from '../services/foldersApi';
 
@@ -23,6 +23,7 @@ interface HomePageProps {
   featuredNotebooks: NotebookItem[];
   recentNotebooks: NotebookItem[];
   onSelectNotebook: (notebook: NotebookItem) => void;
+  onSelectFolder: (folderId: string) => void;
   onCreateNotebook: () => void;
   onUpdateNotebook: (id: string, updates: Partial<NotebookItem>) => void;
   onDeleteNotebook: (id: string) => void;
@@ -41,6 +42,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   featuredNotebooks,
   recentNotebooks,
   onSelectNotebook,
+  onSelectFolder,
   onCreateNotebook,
   onUpdateNotebook,
   onDeleteNotebook,
@@ -135,10 +137,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   const { sortOption, isSortMenuOpen, setSortOption, setIsSortMenuOpen, getSortedNotebooks } = useNotebookSorting();
-
-  const { expandedFolderId, folderNotebooks, loadingFolderNotebooks, toggleFolderExpansion } = useFolderExpansion({
-    folders,
-  });
 
   // Sort notebooks based on current sort option
   const sortedRecentNotebooks = getSortedNotebooks(recentNotebooks);
@@ -256,15 +254,6 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Create Button */}
-            <button
-              onClick={notebookHandlers.openCreateNotebook}
-              className="flex items-center gap-2 px-5 py-2.5 bg-card border border-border hover:bg-secondary hover:border-primary/30 text-foreground rounded-full font-bold shadow-sm transition-all active:scale-95"
-            >
-              <Plus className="w-4 h-4 shrink-0" />
-              <span className="whitespace-nowrap">Create new</span>
-            </button>
           </div>
         </div>
 
@@ -288,6 +277,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               onCreateNotebook={notebookHandlers.openCreateNotebook}
               onCreateFolder={folderHandlers.openCreateFolder}
               onSelectNotebook={onSelectNotebook}
+              onSelectFolder={onSelectFolder}
               // Notebook handlers
               activeMenuId={notebookHandlers.activeMenuId}
               onOpenCustomize={notebookHandlers.openCustomize}
@@ -299,11 +289,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               onOpenFolderCustomize={folderHandlers.openFolderCustomize}
               onDeleteFolder={onDeleteFolder}
               setFolderActiveMenuId={folderHandlers.setFolderActiveMenuId}
-              // Folder expansion
-              expandedFolderId={expandedFolderId}
-              folderNotebooks={folderNotebooks}
-              loadingFolderNotebooks={loadingFolderNotebooks}
-              toggleFolderExpansion={toggleFolderExpansion}
               // Sorting
               getSortedNotebooks={getSortedNotebooks}
             />

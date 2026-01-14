@@ -703,12 +703,8 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
       'FlashcardCollapseGroup'
     ) as FlashcardResponse;
 
-    // Clean the response flashcards
-    return response.flashcards.map(card => ({
-      front: cleanFrontText(card.front),
-      back: cleanBackText(card.back),
-      topic: card.topic,
-    }));
+    // Return flashcards directly - cleaning was done in Map phase
+    return response.flashcards;
   }
 
   /**
@@ -808,15 +804,7 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     );
 
     // Type assertion is safe now with proper schema configuration
-    let selected = (response as FlashcardResponse).flashcards;
-
-    // Clean up any trailing artifacts from structured output (defensive)
-    // Preserve topic if provided by LLM, otherwise will use keyword-based extraction
-    selected = selected.map(card => ({
-      front: cleanFrontText(card.front),
-      back: cleanBackText(card.back),
-      topic: card.topic, // Preserve LLM-provided topic if available
-    }));
+    const selected = (response as FlashcardResponse).flashcards;
 
     logInfo({
       agent: 'FlashcardGraph',
@@ -844,109 +832,37 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       return [];
     }
 
-    // If still over limit, apply intelligent trimming (respecting semantic diversity)
+    // Simple count adjustment (trust LLM's topic/diversity logic)
     if (selected.length > targetCount) {
-      logWarn({
+      logInfo({
         agent: 'FlashcardGraph',
-        phase: 'refine_selection',
+        phase: 'refine_selection_truncate',
         selectedCount: selected.length,
         targetCount,
-      }, `Got ${selected.length}, applying semantic-aware trimming to ${targetCount}`);
-      return await this.trimBySemanticDiversity(selected, targetCount);
+      }, `Truncating to ${targetCount} (LLM returned more than requested)`);
+      return selected.slice(0, targetCount);
     }
 
-    // If under limit, fill from remaining (also respecting semantic diversity)
     if (selected.length < targetCount) {
-      logWarn({
-        agent: 'FlashcardGraph',
-        phase: 'refine_selection',
-        selectedCount: selected.length,
-        targetCount,
-      }, `Got ${selected.length}, filling ${targetCount - selected.length} more with semantic awareness`);
-
       const remaining = flashcards.filter(f =>
         !selected.some(s => s.front === f.front && s.back === f.back)
       );
-      const additional = await this.trimBySemanticDiversity(remaining, targetCount - selected.length);
-      return [...selected, ...additional];
+      const needed = targetCount - selected.length;
+
+      if (remaining.length > 0) {
+        logInfo({
+          agent: 'FlashcardGraph',
+          phase: 'refine_selection_fill',
+          selectedCount: selected.length,
+          targetCount,
+        }, `Filling ${needed} more from remaining ${remaining.length}`);
+        return [...selected, ...remaining.slice(0, needed)];
+      }
     }
 
     return selected;
   }
 
-
-  /**
-   * Trim flashcards to target count while respecting semantic diversity.
-   * Prioritizes removing duplicates and keeping diverse concepts.
-   * Does NOT enforce strict topic limits - allows more cards on a topic if they test different concepts.
-   */
-  private async trimBySemanticDiversity(flashcards: Flashcard[], targetCount: number): Promise<Flashcard[]> {
-    if (flashcards.length <= targetCount) {
-      return flashcards;
-    }
-
-    logInfo({
-      agent: 'FlashcardGraph',
-      phase: 'trim_semantic_diversity',
-      inputCount: flashcards.length,
-      targetCount,
-    }, 'Trimming with semantic diversity...');
-
-    // Step 1: Detect duplicates and mark them for removal
-    const duplicateGroups = await this.detectSimilarFlashcards(flashcards);
-    const indicesToRemove = new Set<number>();
-
-    for (const group of duplicateGroups) {
-      // Keep the first card, mark rest for removal
-      for (let i = 1; i < group.flashcards.length; i++) {
-        indicesToRemove.add(group.flashcards[i].index);
-      }
-    }
-
-    // Step 2: Filter out duplicates
-    const deduplicated = flashcards.filter((_, idx) => !indicesToRemove.has(idx));
-
-    // Step 3: If still over count, select evenly from different topics
-    if (deduplicated.length <= targetCount) {
-      return deduplicated.slice(0, targetCount);
-    }
-
-    // Group by topic
-    const topicGroups: Record<string, Flashcard[]> = {};
-    for (const card of deduplicated) {
-      const topic = this.extractTopic(card);
-      if (!topicGroups[topic]) {
-        topicGroups[topic] = [];
-      }
-      topicGroups[topic].push(card);
-    }
-
-    // Select evenly from each topic (prioritizing diversity, but allowing concentration on user's topic)
-    const selected: Flashcard[] = [];
-    const topics = Object.keys(topicGroups);
-
-    // Take cards evenly from each topic
-    const cardsPerTopic = Math.ceil(targetCount / topics.length);
-
-    for (const topic of topics) {
-      const cards = topicGroups[topic].slice(0, cardsPerTopic);
-      selected.push(...cards);
-
-      if (selected.length >= targetCount) {
-        break;
-      }
-    }
-
-    logInfo({
-      agent: 'FlashcardGraph',
-      phase: 'trim_semantic_diversity_complete',
-      outputCount: selected.length,
-      duplicatesRemoved: indicesToRemove.size,
-      topicsRepresented: topics.length,
-    }, `Trimmed to ${selected.length} cards with semantic diversity`);
-
-    return selected.slice(0, targetCount);
-  }
 
   // Extract topic from a flashcard for topic distribution logging
   // Trusts LLM-provided topic entirely for flexibility and consistency
@@ -1370,13 +1286,9 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
 
     for (const flashcards of outputs) {
       for (const card of flashcards) {
-        // Validate each card before adding
+        // Validate each card before adding (no cleaning needed - done in Map phase)
         if (card.front && card.back && this.validateSelfContained(card)) {
-          allCards.push({
-            front: cleanFrontText(card.front),
-            back: cleanBackText(card.back),
-            topic: card.topic,
-          });
+          allCards.push(card);
         } else {
           failedValidationCount++;
         }

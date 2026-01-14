@@ -8,6 +8,9 @@
 import { StateGraph, START, END, Send } from '@langchain/langgraph';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { z } from 'zod';
+
+import { env } from '../../../config/env.js';
 
 // Shared utilities
 import {
@@ -31,10 +34,33 @@ import {
 import { OverallState, type OverallStateType, type ChunkProcessState, type QuizQuestion } from './state.js';
 import {
   getMapPrompt,
+  getSelectionPrompt,
   QuizQuestionArraySchema,
   type QuizQuestionResponse,
   GRAPH_CONFIG,
 } from './prompts.js';
+
+// ============================================================
+// STRUCTURED OUTPUT SCHEMAS
+// ============================================================
+
+/**
+ * Interface for the structured LLM to avoid deep type instantiation.
+ * Follows the pattern from FlashcardGraph.
+ */
+interface QuizQuestionOutputInvoker {
+  invoke(messages: Array<SystemMessage | HumanMessage>): Promise<QuizQuestionResponse>;
+}
+
+/**
+ * Helper function to create a structured LLM without triggering deep type instantiation.
+ */
+function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): QuizQuestionOutputInvoker {
+  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
+  return llm.withStructuredOutput(schema, {
+    name: 'quiz_questions'
+  }) as any;
+}
 
 // ============================================================
 // CHUNK HELPERS
@@ -75,6 +101,7 @@ export function validateChunks(chunks: string[]): string[] {
 export class QuizGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
+  private fastLlmStructured: QuizQuestionOutputInvoker;
 
   constructor(apiKey: string, mapModel: string, reduceModel: string) {
     this.fastLlm = new ChatTogetherAI({
@@ -88,8 +115,11 @@ export class QuizGraph {
       apiKey,
       model: reduceModel,
       temperature: 0.3,
-      maxTokens: 24000,
+      maxTokens: GRAPH_CONFIG.REDUCE_MAX_TOKENS,
     });
+
+    // Create structured LLM instance
+    this.fastLlmStructured = createStructuredLLM(this.fastLlm, QuizQuestionArraySchema);
   }
 
   private estimateTokens(text: string): number {
@@ -142,10 +172,13 @@ export class QuizGraph {
     const validatedChunks = validateChunks(state.chunks);
     const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS);
 
+    const MIN_QUESTIONS_PER_CHUNK = 2;
     const BUFFER_MULTIPLIER = 1.5;
     const MAX_QUESTIONS_PER_CHUNK = 25;
+
+    // Calculate questions per chunk
     const questionsPerChunk = Math.max(
-      GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
+      MIN_QUESTIONS_PER_CHUNK,
       Math.min(
         MAX_QUESTIONS_PER_CHUNK,
         Math.ceil(state.questionCount / packedChunks.length * BUFFER_MULTIPLIER)
@@ -213,14 +246,9 @@ export class QuizGraph {
     let questionsGenerated = 0;
 
     try {
-      const structuredLlm = this.fastLlm.withStructuredOutput<QuizQuestionResponse>(
-        QuizQuestionArraySchema,
-        { name: 'quiz_questions' }
-      );
-
       const response: QuizQuestionResponse = await invokeWithRetry(
         () => invokeWithTimeout(
-          () => structuredLlm.invoke([
+          () => this.fastLlmStructured.invoke([
             new SystemMessage('You are a professional educator creating multiple-choice quiz questions.'),
             new HumanMessage(prompt),
           ]),
@@ -447,7 +475,111 @@ export class QuizGraph {
     return this.recursiveCollapse(collapsed, depth + 1);
   }
 
+
+  /**
+   * Heuristic deduplication using text similarity.
+   * Compares questions for overlap and removes duplicates above threshold.
+   * This is much faster than LLM-based deduplication and works well for quiz questions.
+   */
+  private heuristicDedupe(questions: QuizQuestion[]): QuizQuestion[] {
+    if (questions.length <= 1) return questions;
+
+    const SIMILARITY_THRESHOLD = 0.8; // 80% similarity considered duplicate
+    const toRemove = new Set<number>();
+
+    for (let i = 0; i < questions.length; i++) {
+      if (toRemove.has(i)) continue;
+
+      for (let j = i + 1; j < questions.length; j++) {
+        if (toRemove.has(j)) continue;
+
+        const similarity = this.calculateSimilarity(questions[i], questions[j]);
+        if (similarity >= SIMILARITY_THRESHOLD) {
+          // Remove the second duplicate (keep the first one)
+          toRemove.add(j);
+        }
+      }
+    }
+
+    const uniqueCount = questions.length - toRemove.size;
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'heuristic_dedupe',
+      inputCount: questions.length,
+      duplicatesFound: toRemove.size,
+      outputCount: uniqueCount,
+    }, `Heuristic dedupe: ${questions.length} → ${uniqueCount} questions (removed ${toRemove.size} duplicates)`);
+
+    return questions.filter((_, idx) => !toRemove.has(idx));
+  }
+
+  /**
+   * Calculate text similarity between two quiz questions.
+   * Returns a value between 0 (no similarity) and 1 (identical).
+   */
+  private calculateSimilarity(q1: QuizQuestion, q2: QuizQuestion): number {
+    // Stop words to filter out for better similarity detection
+    const stopWords = new Set([
+      'the', 'is', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'by',
+      'for', 'with', 'from', 'as', 'are', 'was', 'were', 'be', 'been', 'being',
+      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+      'may', 'might', 'must', 'can', 'what', 'which', 'who', 'when', 'where', 'why', 'how'
+    ]);
+
+    // Extract words and filter stop words
+    const extractWords = (text: string): Set<string> => {
+      const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');
+      const words = (normalized.match(/\b\w+\b/g) || []);
+      return new Set(words.filter(w => !stopWords.has(w)));
+    };
+
+    const q1Text = q1.question;
+    const q2Text = q2.question;
+
+    // Calculate word overlap for question text (without stop words)
+    const words1 = extractWords(q1Text);
+    const words2 = extractWords(q2Text);
+
+    // If both questions have very few meaningful words, consider them less similar
+    if (words1.size <= 1 || words2.size <= 1) {
+      // Short questions need higher threshold to be considered similar
+      const textSimilarity = q1Text === q2Text ? 1 : 0;
+      return textSimilarity;
+    }
+
+    // Calculate Jaccard similarity: intersection / union
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    const union = new Set([...words1, ...words2]);
+    const questionSimilarity = union.size > 0 ? intersection.size / union.size : 0;
+
+    // Also check if options are similar (if question text is similar)
+    let optionsSimilarity = 0;
+    if (questionSimilarity > 0.5) {
+      const normalize = (text: string) => text.toLowerCase().trim().replace(/\s+/g, ' ');
+      const q1Options = q1.options.map(normalize);
+      const q2Options = q2.options.map(normalize);
+
+      let optionMatches = 0;
+      for (const opt1 of q1Options) {
+        for (const opt2 of q2Options) {
+          const optWords1 = extractWords(opt1);
+          const optWords2 = extractWords(opt2);
+          const optIntersection = new Set([...optWords1].filter(w => optWords2.has(w)));
+          const optUnion = new Set([...optWords1, ...optWords2]);
+          if (optUnion.size > 0 && optIntersection.size / optUnion.size > 0.7) {
+            optionMatches++;
+          }
+        }
+      }
+      optionsSimilarity = optionMatches / 4; // 4 options total
+    }
+
+    // Weight question similarity more heavily than options
+    return Math.max(questionSimilarity, questionSimilarity * 0.7 + optionsSimilarity * 0.3);
+  }
+
   private async collapseGroup(group: string[]): Promise<string> {
+    // Flatten all question arrays
     const allQuestions: QuizQuestion[] = [];
     for (const output of group) {
       try {
@@ -462,68 +594,13 @@ export class QuizGraph {
       }
     }
 
-    return JSON.stringify(allQuestions);
+    // Use heuristic deduplication to reduce tokens
+    // This is much faster than LLM and works well for quiz questions
+    const uniqueQuestions = this.heuristicDedupe(allQuestions);
+
+    return JSON.stringify(uniqueQuestions);
   }
 
-  // Helper method to create selection prompt
-  private getSelectionPrompt(params: {
-    questions: QuizQuestion[];
-    targetCount: number;
-    difficulty: string;
-    focus?: string;
-  }): string {
-    const { questions, targetCount, difficulty, focus } = params;
-
-    const questionsList = questions.map((q, idx) =>
-      `Q${idx + 1}: ${q.question.substring(0, 100)}...`
-    ).join('\n');
-
-    return `You are an expert educator selecting and refining quiz questions for an assessment.
-
-CRITICAL REQUIREMENTS:
-- Select approximately ${targetCount} questions (flexible: ±${Math.ceil(targetCount * 0.2)} is acceptable)
-- IDENTIFY AND MERGE similar or duplicate questions before selecting
-- Quality over quantity: Better to have ${Math.ceil(targetCount * 0.8)} unique questions than ${targetCount} with duplicates
-- Your goal is MAXIMUM SEMANTIC DIVERSITY - each question should test a distinct concept
-
-**ANSWER FORMAT CRITICAL:**
-- The "answer" field MUST be a NUMBER representing the 0-based index of the correct option
-- Option indices: 0 = first option, 1 = second option, 2 = third option, 3 = fourth option
-- Example: If the correct answer is the FIRST option, set answer: 0
-- Example: If the correct answer is the SECOND option, set answer: 1
-- DO NOT use letters (A, B, C, D) - use ONLY numbers (0, 1, 2, 3)
-
-SIMILARITY DETECTION GUIDELINES:
-Questions are considered similar if they:
-- Ask about the same concept using different wording (e.g., "What is X?" vs "Define X")
-- Test the same comparison/contrast (e.g., "Difference between A and B" vs "Compare A and B")
-- Have the same core answer despite surface-level differences
-- Cover overlapping content that could be combined
-
-MERGING STRATEGY:
-When you find similar questions:
-- Combine the best elements from each version (best question text, options, explanations)
-- Create a single, clearer question with proper distractors
-- Ensure the merged question is self-contained
-- Keep the most comprehensive explanation
-
-**EXPLANATION GUIDELINES:**
-- CRITICAL: Your explanation MUST be grounded in the provided source material
-- Reference specific concepts, facts, or quotes from the content above
-- DO NOT hallucinate or rely on outside knowledge
-- If the source doesn't support an explanation, create a different question
-- Example format: "According to the text, [concept]..." or "The material states that..."
-
-Return the FULL, COMPLETE question objects for your selections.
-
-Difficulty: ${difficulty}
-${focus ? `Focus: ${focus} (but maintain diversity)` : ''}
-
-AVAILABLE QUESTIONS (${questions.length} total):
-${questionsList}
-
-Return the complete selected questions as a JSON array.`;
-  }
 
   // Node: Reduce phase
   private async reduce(state: OverallStateType): Promise<Partial<OverallStateType> | Send> {
@@ -565,20 +642,14 @@ Return the complete selected questions as a JSON array.`;
       };
     }
 
-    const shouldSkipLLM = totalQuestionsBefore < state.questionCount;
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'reduce_after_flatten',
+      initialQuestionCount: totalQuestionsBefore,
+    }, `Flattened ${totalQuestionsBefore} questions - running LLM refinement...`);
 
-    if (shouldSkipLLM) {
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'reduce_skip_llm',
-        totalQuestionsExtracted: totalQuestionsBefore,
-        targetQuestionCount: state.questionCount,
-        reason: 'Fewer questions than target (LLM would hallucinate)',
-      }, `Skipping LLM reduce, using ${totalQuestionsBefore} questions directly...`);
-
-      return this.finalizeQuestions(allQuestions, state);
-    }
-
+    // ALWAYS run LLM refinement for quality control (deduplication, merging, semantic diversity)
+    // This ensures consistent behavior regardless of question count
     const retryCount = state.reduceRetryCount ?? 0;
 
     logInfo({
@@ -587,8 +658,8 @@ Return the complete selected questions as a JSON array.`;
       totalQuestionsBefore,
       targetQuestionCount: state.questionCount,
       retryAttempt: retryCount + 1,
-      reason: 'Question count exceeds target, using LLM for selection',
-    }, `Using smart LLM for intelligent question selection from ${totalQuestionsBefore} questions [Attempt ${retryCount + 1}/2]...`);
+      reason: 'Running LLM refinement for deduplication, quality selection, and topic diversity',
+    }, `Using smart LLM for intelligent question refinement from ${totalQuestionsBefore} questions [Attempt ${retryCount + 1}/2]...`);
 
     const similarQuestions = this.detectSimilarQuestions(allQuestions);
 
@@ -611,7 +682,7 @@ Return the complete selected questions as a JSON array.`;
         { name: 'quiz_selection' }
       );
 
-      const selectionPrompt = this.getSelectionPrompt({
+      const selectionPrompt = getSelectionPrompt({
         questions: allQuestions,
         targetCount: state.questionCount,
         difficulty: state.difficulty,
@@ -646,7 +717,8 @@ Return the complete selected questions as a JSON array.`;
         agent: 'QuizGraph',
         phase: 'reduce_llm_success',
         selectedCount: response.questions.length,
-      }, `LLM selection completed, selected ${response.questions.length} questions`);
+        originalCount: totalQuestionsBefore,
+      }, `LLM refinement complete: ${totalQuestionsBefore} → ${response.questions.length} questions`);
 
       if (response.questions.length === 0) {
         throw new Error('LLM returned zero questions');
