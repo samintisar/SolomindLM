@@ -6,7 +6,6 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 const chatAgent = new ChatAgent();
-const chatHistoryService = new ChatHistoryService();
 
 // ============================================================
 // Configuration
@@ -22,6 +21,28 @@ const CONFIG = {
     MAX_LIMIT: 100,
   },
 } as const;
+
+// ============================================================
+// Helper Functions
+// ============================================================
+
+/**
+ * Extract JWT token from request
+ */
+function extractToken(req: Request): string {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  
+  // Fallback to cookies
+  const accessToken = (req as any).cookies?.access_token;
+  if (accessToken) {
+    return accessToken;
+  }
+  
+  throw new Error('No authentication token found');
+}
 
 // ============================================================
 // Routes
@@ -78,6 +99,10 @@ router.post('/message', authenticate, rateLimiter('chat'), async (req: Request, 
   console.log('[Chat /message] SSE connection established, sent keep-alive');
 
   try {
+    // Create ChatHistoryService with user token for RLS-compliant operations
+    const userToken = extractToken(req);
+    const chatHistoryService = new ChatHistoryService(userToken);
+
     // Get or create conversation
     console.log('[Chat /message] Getting or creating conversation...');
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);
@@ -208,6 +233,10 @@ router.get('/history/:notebookId', authenticate, async (req: Request, res: Respo
   try {
     const limitClamped = Math.min(limit, CONFIG.HISTORY.MAX_LIMIT);
 
+    // Create ChatHistoryService with user token for RLS-compliant operations
+    const userToken = extractToken(req);
+    const chatHistoryService = new ChatHistoryService(userToken);
+
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);
     const messages = await chatHistoryService.getMessages(conversation.id, limitClamped);
 
@@ -235,6 +264,10 @@ router.delete('/history/:notebookId', authenticate, async (req: Request, res: Re
   console.log(`[Chat /history DELETE] notebookId=${notebookId}`);
 
   try {
+    // Create ChatHistoryService with user token for RLS-compliant operations
+    const userToken = extractToken(req);
+    const chatHistoryService = new ChatHistoryService(userToken);
+
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);
     await chatHistoryService.clearConversation(conversation.id, userId);
 
@@ -267,6 +300,10 @@ router.patch('/rename/:notebookId', authenticate, async (req: Request, res: Resp
   }
 
   try {
+    // Create ChatHistoryService with user token for RLS-compliant operations
+    const userToken = extractToken(req);
+    const chatHistoryService = new ChatHistoryService(userToken);
+
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);
     await chatHistoryService.renameConversation(conversation.id, userId, title);
 
@@ -290,6 +327,10 @@ router.delete('/conversation/:notebookId', authenticate, async (req: Request, re
   console.log(`[Chat /conversation DELETE] notebookId=${notebookId}`);
 
   try {
+    // Create ChatHistoryService with user token for RLS-compliant operations
+    const userToken = extractToken(req);
+    const chatHistoryService = new ChatHistoryService(userToken);
+
     const conversation = await chatHistoryService.getOrCreateConversation(userId, notebookId);
     await chatHistoryService.deleteConversation(conversation.id, userId);
 

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { EventEmitter } from 'events';
 import routes from './routes/index.js';
 import { errorHandler } from './middleware/error.js';
 import { csrfProtection } from './middleware/csrf.js';
@@ -11,6 +12,10 @@ import { runMigrations } from 'graphile-worker';
 import { pgPool } from './config/worker.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Increase the default max listeners to prevent warnings during concurrent operations
+// This is safe for I/O-bound operations like API calls and streaming responses
+EventEmitter.defaultMaxListeners = 20;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '../../');

@@ -1,4 +1,5 @@
-import { supabase } from '../../config/database.js';
+import { createUserClient } from '../../config/database.js';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================================
 // Types
@@ -43,12 +44,24 @@ export interface ConversationWithMessages extends Conversation {
 // ============================================================
 
 export class ChatHistoryService {
+  private userToken: string;
+  private client: SupabaseClient;
+
+  /**
+   * Create a new ChatHistoryService instance with user authentication
+   * @param userToken - The user's JWT token for RLS-compliant operations
+   */
+  constructor(userToken: string) {
+    this.userToken = userToken;
+    this.client = createUserClient(userToken);
+  }
+
   /**
    * Get or create a conversation for a notebook
    */
   async getOrCreateConversation(userId: string, notebookId: string): Promise<Conversation> {
     // Try to get existing conversation
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: fetchError } = await this.client
       .from('conversations')
       .select('*')
       .eq('user_id', userId)
@@ -61,7 +74,7 @@ export class ChatHistoryService {
     }
 
     // Create new conversation
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('conversations')
       .insert({
         user_id: userId,
@@ -84,7 +97,7 @@ export class ChatHistoryService {
    * Get messages for a conversation
    */
   async getMessages(conversationId: string, limit = 50): Promise<Message[]> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('messages')
       .select('*')
       .eq('conversation_id', conversationId)
@@ -131,7 +144,7 @@ export class ChatHistoryService {
     userId: string,
     content: string
   ): Promise<Message> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('messages')
       .insert({
         conversation_id: conversationId,
@@ -160,7 +173,7 @@ export class ChatHistoryService {
     references: ReferenceChunk[],
     metadata?: Record<string, any>
   ): Promise<Message> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('messages')
       .insert({
         conversation_id: conversationId,
@@ -187,7 +200,7 @@ export class ChatHistoryService {
    */
   async clearConversation(conversationId: string, userId: string): Promise<void> {
     // First verify ownership
-    const { data: conv } = await supabase
+    const { data: conv } = await this.client
       .from('conversations')
       .select('id, user_id')
       .eq('id', conversationId)
@@ -198,7 +211,7 @@ export class ChatHistoryService {
       throw new Error('Conversation not found or access denied');
     }
 
-    const { error } = await supabase
+    const { error } = await this.client
       .from('messages')
       .delete()
       .eq('conversation_id', conversationId);
@@ -216,7 +229,7 @@ export class ChatHistoryService {
    */
   async deleteConversation(conversationId: string, userId: string): Promise<void> {
     // Verify ownership
-    const { data: conv } = await supabase
+    const { data: conv } = await this.client
       .from('conversations')
       .select('id, user_id')
       .eq('id', conversationId)
@@ -228,7 +241,7 @@ export class ChatHistoryService {
     }
 
     // Messages will be cascade deleted
-    const { error } = await supabase
+    const { error } = await this.client
       .from('conversations')
       .delete()
       .eq('id', conversationId);
@@ -250,7 +263,7 @@ export class ChatHistoryService {
     title: string
   ): Promise<void> {
     // Verify ownership
-    const { data: conv } = await supabase
+    const { data: conv } = await this.client
       .from('conversations')
       .select('id, user_id')
       .eq('id', conversationId)
@@ -261,7 +274,7 @@ export class ChatHistoryService {
       throw new Error('Conversation not found or access denied');
     }
 
-    const { error } = await supabase
+    const { error } = await this.client
       .from('conversations')
       .update({ title })
       .eq('id', conversationId);
@@ -278,7 +291,7 @@ export class ChatHistoryService {
    * Get all conversations for a user
    */
   async getUserConversations(userId: string): Promise<Conversation[]> {
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from('conversations')
       .select('*')
       .eq('user_id', userId)
