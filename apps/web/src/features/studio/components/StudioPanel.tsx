@@ -17,8 +17,9 @@ import {
   Loader2,
   MessageSquareText,
   Download,
+  Presentation,
 } from 'lucide-react';
-import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote } from '@/shared/types/index';
+import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote, isSlideDeckNote } from '@/shared/types/index';
 import { flashcardsApi } from '../services/flashcardsApi';
 import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { CreateReportModal } from './CreateReportModal';
@@ -26,11 +27,13 @@ import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
 import { CustomizeQuizModal } from './CustomizeQuizModal';
 import { CustomizeAudioModal } from './CustomizeAudioModal';
 import { CustomizeWrittenQuestionsModal } from './CustomizeWrittenQuestionsModal';
+import { CustomizeSlidesModal } from './CustomizeSlidesModal';
 import { ReportView } from './views/ReportView';
 import { FlashcardView } from './views/FlashcardView';
 import { QuizView } from './views/QuizView';
 import { MindMapView } from './views/MindMapView';
 import { WrittenQuestionsView } from './views/WrittenQuestionsView';
+import { SlidesView } from './views/SlidesView';
 import { AudioPlayer } from '@/features/audio/components/AudioPlayer';
 import { MiniAudioPlayer } from '@/features/audio/components/MiniAudioPlayer';
 import { useStudioHandlers } from '../hooks/useStudioHandlers';
@@ -67,6 +70,7 @@ const IconMap: Record<string, React.FC<any>> = {
   FileText,
   Layers,
   HelpCircle,
+  Presentation,
   MessageSquareText,
 };
 
@@ -118,17 +122,20 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     isQuizModalOpen,
     isAudioModalOpen,
     isWrittenQuestionsModalOpen,
+    isSlidesModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
     setIsWrittenQuestionsModalOpen,
+    setIsSlidesModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
     handleCreateQuiz,
     handleCreateAudio,
     handleCreateWrittenQuestions,
+    handleCreateSlides,
   } = useStudioHandlers({
     notes,
     sources,
@@ -207,7 +214,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     if (note.status === 'generating') {
       return;
     }
-    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions') {
+    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions' || note.type === 'slides') {
         setActiveNoteId(note.id);
     }
   };
@@ -345,6 +352,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                   </div>
                 )}
                 {isWrittenQuestionsNote(activeNote) && <WrittenQuestionsView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
+                {isSlideDeckNote(activeNote) && <SlidesView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
             </div>
         ) : (
             <div className="p-4 space-y-8">
@@ -424,6 +432,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                 {note.type === 'writtenQuestions' && (
                                   <div className="shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                                     <MessageSquareText className="w-4 h-4 shrink-0" />
+                                  </div>
+                                )}
+                                {note.type === 'slides' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-violet-500/10 text-violet-600 flex items-center justify-center">
+                                    <Presentation className="w-4 h-4 shrink-0" />
                                   </div>
                                 )}
                               </>
@@ -551,6 +564,12 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         isOpen={isWrittenQuestionsModalOpen}
         onClose={() => setIsWrittenQuestionsModalOpen(false)}
         onGenerate={handleCreateWrittenQuestions}
+      />
+
+      <CustomizeSlidesModal
+        isOpen={isSlidesModalOpen}
+        onClose={() => setIsSlidesModalOpen(false)}
+        onGenerate={handleCreateSlides}
       />
       <ConfirmDialogComponent />
     </>);

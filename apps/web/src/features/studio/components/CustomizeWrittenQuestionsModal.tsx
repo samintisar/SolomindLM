@@ -28,7 +28,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-4xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col overflow-hidden font-sans">
@@ -46,19 +46,19 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
         </div>
 
         <div className="p-6 md:p-10 space-y-10 bg-card/50">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-8">
             <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Number of Questions</label>
-              <div className="flex flex-wrap gap-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans block">Number of Questions</label>
+              <div className="flex bg-background border border-border rounded-full p-1">
                 {(['fewer', 'standard', 'more'] as const).map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setCount(opt)}
                     className={`
-                      flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all border
+                      flex items-center justify-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all flex-1
                       ${count === opt
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                        : 'bg-background border-border text-muted-foreground hover:bg-secondary'}
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'}
                     `}
                   >
                     {count === opt && <Check className="w-3 h-3" />}
@@ -69,17 +69,17 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             </div>
 
             <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Question Type</label>
-              <div className="flex flex-wrap gap-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans block">Question Type</label>
+              <div className="flex bg-background border border-border rounded-full p-1">
                 {(['short', 'essay'] as const).map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setQuestionType(opt)}
                     className={`
-                      flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all border
+                      flex items-center justify-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all flex-1
                       ${questionType === opt
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                        : 'bg-background border-border text-muted-foreground hover:bg-secondary'}
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'}
                     `}
                   >
                     {questionType === opt && <Check className="w-3 h-3" />}
@@ -90,17 +90,17 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             </div>
 
             <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Difficulty Level</label>
-              <div className="flex flex-wrap gap-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans block">Difficulty Level</label>
+              <div className="flex bg-background border border-border rounded-full p-1">
                 {(['easy', 'medium', 'hard'] as const).map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setDifficulty(opt)}
                     className={`
-                      flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all border
+                      flex items-center justify-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all flex-1
                       ${difficulty === opt
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                        : 'bg-background border-border text-muted-foreground hover:bg-secondary'}
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'}
                     `}
                   >
                     {difficulty === opt && <Check className="w-3 h-3" />}

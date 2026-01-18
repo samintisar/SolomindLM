@@ -6,11 +6,13 @@ import { flashcardsApi } from '../services/flashcardsApi';
 import { quizzesApi } from '../services/quizzesApi';
 import { audioApi } from '@/features/audio/api/audioApi';
 import { writtenQuestionsApi } from '../services/writtenQuestionsApi';
+import { slidesApi } from '../services/slidesApi';
 import { getReportSubtitle } from '@/shared/types/reportTypes';
 import { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
 import { QuizConfig } from '../components/CustomizeQuizModal';
 import { AudioConfig } from '../components/CustomizeAudioModal';
 import { WrittenQuestionsConfig } from '../components/CustomizeWrittenQuestionsModal';
+import { SlideDeckConfig } from '../components/CustomizeSlidesModal';
 
 export interface UseStudioHandlersProps {
   notes: Note[];
@@ -36,12 +38,14 @@ export interface UseStudioHandlersReturn {
   isQuizModalOpen: boolean;
   isAudioModalOpen: boolean;
   isWrittenQuestionsModalOpen: boolean;
+  isSlidesModalOpen: boolean;
   // Modal setters
   setIsReportModalOpen: (open: boolean) => void;
   setIsFlashcardModalOpen: (open: boolean) => void;
   setIsQuizModalOpen: (open: boolean) => void;
   setIsAudioModalOpen: (open: boolean) => void;
   setIsWrittenQuestionsModalOpen: (open: boolean) => void;
+  setIsSlidesModalOpen: (open: boolean) => void;
   // Handlers
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
@@ -50,6 +54,7 @@ export interface UseStudioHandlersReturn {
   handleCreateMindMap: () => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
   handleCreateWrittenQuestions: (config: WrittenQuestionsConfig) => void;
+  handleCreateSlides: (config: SlideDeckConfig) => Promise<void>;
 }
 
 export function useStudioHandlers({
@@ -70,6 +75,7 @@ export function useStudioHandlers({
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [isWrittenQuestionsModalOpen, setIsWrittenQuestionsModalOpen] = useState(false);
+  const [isSlidesModalOpen, setIsSlidesModalOpen] = useState(false);
 
   const handleCreateFlashcards = useCallback(async (config: FlashcardConfig) => {
     setIsFlashcardModalOpen(false);
@@ -578,6 +584,8 @@ export function useStudioHandlers({
       setIsFlashcardModalOpen(true);
     } else if (toolId === 'quiz') {
       setIsQuizModalOpen(true);
+    } else if (toolId === 'slides') {
+      setIsSlidesModalOpen(true);
     } else if (toolId === 'audio') {
       setIsAudioModalOpen(true);
     } else if (toolId === 'mindmap') {
@@ -690,17 +698,118 @@ export function useStudioHandlers({
     }
   }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
+  const handleCreateSlides = useCallback(async (config: SlideDeckConfig) => {
+    setIsSlidesModalOpen(false);
+
+    // Get selected document IDs from sources
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    if (selectedDocumentIds.length === 0) {
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate a slide deck', { variant: 'warning' });
+      }
+      return;
+    }
+
+    if (!userId || !noteId) {
+      alert('Authentication error. Please log in again.');
+      return;
+    }
+
+    // Slide type and deck length labels
+    const typeLabel = config.slideType === 'detailed_deck' ? 'Detailed' : 'Presenter';
+    const lengthLabel = config.deckLength === 'short' ? 'Short' : 'Standard';
+
+    // Create placeholder note
+    const placeholderId = Math.random().toString(36).slice(2, 11);
+    const newNote: Note = {
+      id: placeholderId,
+      title: 'Slide Deck', // Initial placeholder - AI will generate descriptive title
+      preview: `${typeLabel} • ${lengthLabel} • Generating...`,
+      type: 'slides',
+      slides: [],
+      status: 'generating',
+      metadata: {
+        slideType: config.slideType,
+        deckLength: config.deckLength,
+        slideCount: 0,
+        customPrompt: config.customPrompt,
+      }
+    };
+
+    onAddNote(newNote);
+
+    try {
+      // Call API to create and queue slide deck generation
+      const { slideDeckId, slideDeck } = await slidesApi.createSlideDeck({
+        userId,
+        notebookId: noteId,
+        documentIds: selectedDocumentIds,
+        slideType: config.slideType,
+        deckLength: config.deckLength,
+        customPrompt: config.customPrompt || undefined,
+      });
+
+      // Update note ID with real slide deck ID
+      if (onUpdateNoteFull) {
+        onUpdateNoteFull(placeholderId, slideDeck);
+      }
+
+      // Start polling for status (longer maxAttempts for image generation)
+      slidesApi.pollSlideDeckStatus(
+        slideDeckId,
+        (updatedNote) => {
+          // Update note during polling
+          if (onUpdateNoteFull) {
+            onUpdateNoteFull(slideDeckId, updatedNote);
+          }
+        },
+        300 // 10 minutes @ 2s intervals (image generation takes time)
+      ).then(finalNote => {
+        // Final update when complete
+        if (onUpdateNoteFull) {
+          onUpdateNoteFull(slideDeckId, finalNote);
+        }
+      }).catch(error => {
+        console.error('Slide deck generation failed:', error);
+        // Update with failed status
+        if (onUpdateNoteFull) {
+          const failedNote = notes.find(n => n.id === slideDeckId) || newNote;
+          if (failedNote.type === 'slides') {
+            onUpdateNoteFull(slideDeckId, {
+              ...failedNote,
+              status: 'failed',
+              preview: `${typeLabel} • ${lengthLabel} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate slide deck',
+              }
+            });
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Failed to create slide deck:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create slide deck');
+      // Remove the placeholder note
+      onDeleteNote(placeholderId);
+    }
+  }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
+
   return {
     isReportModalOpen,
     isFlashcardModalOpen,
     isQuizModalOpen,
     isAudioModalOpen,
     isWrittenQuestionsModalOpen,
+    isSlidesModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
     setIsWrittenQuestionsModalOpen,
+    setIsSlidesModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
@@ -708,5 +817,6 @@ export function useStudioHandlers({
     handleCreateMindMap,
     handleCreateAudio,
     handleCreateWrittenQuestions,
+    handleCreateSlides,
   };
 }

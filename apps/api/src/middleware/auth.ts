@@ -6,6 +6,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/database.js';
+import { env } from '../config/env.js';
 
 // Extend Express Request type to include user
 declare global {
@@ -18,6 +19,19 @@ declare global {
     }
   }
 }
+
+// Cookie configuration (same as auth routes for consistency)
+const isProduction = env.NODE_ENV === 'production';
+const cookieDomain = isProduction ? env.COOKIE_DOMAIN : undefined;
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: 'lax' as 'strict' | 'lax' | 'none',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+  domain: cookieDomain,
+};
 
 /**
  * Extract token from Authorization header or cookies
@@ -41,6 +55,9 @@ function extractToken(req: Request): string | null {
 
 /**
  * Authentication middleware - validates JWT token and attaches user to request
+ * 
+ * Automatically attempts to refresh the session if the access token is expired
+ * but a valid refresh token is available in cookies.
  *
  * Usage: router.get('/protected', authenticate, (req, res) => {...})
  */
@@ -51,13 +68,51 @@ export async function authenticate(
 ): Promise<void> {
   try {
     const token = extractToken(req);
+    const refreshToken = (req as any).cookies?.refresh_token;
 
     if (!token) {
       res.status(401).json({ error: 'Unauthorized: No token provided' });
       return;
     }
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    let { data: { user }, error } = await supabase.auth.getUser(token);
+
+    // If token is expired/invalid but we have a refresh token, try to refresh
+    if ((error || !user) && refreshToken) {
+      const { data: sessionData, error: refreshError } = await supabase.auth.refreshSession({
+        refresh_token: refreshToken,
+      });
+
+      if (!refreshError && sessionData.session) {
+        // Update cookies with new tokens (refresh token rotation)
+        res.cookie('access_token', sessionData.session.access_token, COOKIE_OPTIONS);
+        res.cookie('refresh_token', sessionData.session.refresh_token, COOKIE_OPTIONS);
+
+        // Get user with new access token
+        const { data: userData, error: getUserError } = await supabase.auth.getUser(
+          sessionData.session.access_token
+        );
+
+        if (!getUserError && userData.user) {
+          // Attach refreshed user to request
+          req.user = {
+            id: userData.user.id,
+            email: userData.user.email,
+          };
+          next();
+          return;
+        }
+      }
+      
+      // Refresh failed - clear invalid cookies
+      const clearOptions = {
+        path: '/',
+        secure: COOKIE_OPTIONS.secure,
+        sameSite: COOKIE_OPTIONS.sameSite,
+      };
+      res.clearCookie('access_token', clearOptions);
+      res.clearCookie('refresh_token', clearOptions);
+    }
 
     if (error || !user) {
       res.status(401).json({ error: 'Unauthorized: Invalid token' });

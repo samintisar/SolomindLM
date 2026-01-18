@@ -22,7 +22,7 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
       <div className="relative w-full max-w-4xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col overflow-hidden font-sans">
@@ -43,16 +43,16 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Number of Cards</label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex bg-background border border-border rounded-full p-1 w-fit">
                 {(['fewer', 'standard', 'more'] as const).map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setCount(opt)}
                     className={`
-                      flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all border
+                      flex items-center justify-center gap-2 px-6 py-2 rounded-full text-xs font-bold transition-all
                       ${count === opt 
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
-                        : 'bg-background border-border text-muted-foreground hover:bg-secondary'}
+                        ? 'bg-primary text-primary-foreground shadow-sm' 
+                        : 'text-muted-foreground hover:text-foreground'}
                     `}
                   >
                     {count === opt && <Check className="w-3 h-3" />}
@@ -64,16 +64,16 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
 
             <div className="space-y-4">
               <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Difficulty Level</label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex bg-background border border-border rounded-full p-1 w-fit">
                 {(['easy', 'medium', 'hard'] as const).map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setDifficulty(opt)}
                     className={`
-                      flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all border
+                      flex items-center justify-center gap-2 px-6 py-2 rounded-full text-xs font-bold transition-all
                       ${difficulty === opt 
-                        ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
-                        : 'bg-background border-border text-muted-foreground hover:bg-secondary'}
+                        ? 'bg-primary text-primary-foreground shadow-sm' 
+                        : 'text-muted-foreground hover:text-foreground'}
                     `}
                   >
                     {difficulty === opt && <Check className="w-3 h-3" />}
@@ -85,7 +85,7 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
           </div>
 
           <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Specify Topic or Focus</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Area of Focus</label>
             <textarea
               value={topic}
               onChange={(e) => setTopic(e.target.value)}

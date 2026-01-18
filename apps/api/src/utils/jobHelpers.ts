@@ -19,6 +19,9 @@ export const JobPriority = {
   WRITTEN_QUESTIONS_GENERATION: 20,
   REPORT_GENERATION: 25,
 
+  // LOW: Slower, resource-intensive tasks (with image generation)
+  SLIDE_DECK_GENERATION: 18,
+
   // LOW: Slower, resource-intensive tasks
   MINDMAP_GENERATION: 40,
 
@@ -250,6 +253,28 @@ export async function scheduleAudioOverviewGeneration(
 ) {
   return scheduleJob('audioOverviewGeneration', payload, {
     priority: JobPriority.AUDIO_OVERVIEW_GENERATION,
+    ...options,
+  });
+}
+
+/**
+ * Schedule a slide deck generation job
+ * Priority: LOW (includes image generation which takes time)
+ */
+export async function scheduleSlideDeckGeneration(
+  payload: {
+    slideDeckId: string;
+    userId: string;
+    notebookId: string;
+    documentIds: string[];
+    slideType: 'detailed_deck' | 'presenter_slides';
+    deckLength: 'short' | 'default';
+    customPrompt?: string;
+  },
+  options?: JobScheduleOptions
+) {
+  return scheduleJob('slideDeckGeneration', payload, {
+    priority: JobPriority.SLIDE_DECK_GENERATION,
     ...options,
   });
 }

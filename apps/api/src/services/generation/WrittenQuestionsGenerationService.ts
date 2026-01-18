@@ -88,6 +88,7 @@ export class WrittenQuestionsGenerationService {
         finalOutput: [],
         status: 'generating',
         progress: { phase: 'initializing', percentage: 0, message: 'Starting...' },
+        onStatusUpdate: onStatusUpdate || undefined,
       }, {
         streamMode: 'values',
         ...traceConfig,

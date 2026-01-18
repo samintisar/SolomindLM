@@ -155,8 +155,22 @@ export class QuizGraph {
     return countTokens(text);
   }
 
+  /**
+   * Helper method to call the status update callback.
+   * Safely invokes the callback if it exists.
+   */
+  private async callStatusUpdate(state: OverallStateType, phase: string): Promise<void> {
+    if (state.onStatusUpdate) {
+      try {
+        await state.onStatusUpdate(phase);
+      } catch (error) {
+        console.error('[QuizGraph] Status update callback error:', error);
+      }
+    }
+  }
+
   // Node: Split chunks for routing
-  private splitChunks(state: OverallStateType): Partial<OverallStateType> {
+  private async splitChunks(state: OverallStateType): Promise<Partial<OverallStateType>> {
     console.log('\n' + '='.repeat(80));
     console.log('[QuizGraph] ===== SPLIT CHUNKS PHASE =====');
     console.log('='.repeat(80));
@@ -170,6 +184,9 @@ export class QuizGraph {
       difficulty: state.difficulty,
       focus: state.focus || 'none',
     }, null, 2));
+
+    // Call status update callback
+    await this.callStatusUpdate(state, 'split_chunks');
 
     return {
       ...state,
@@ -389,6 +406,7 @@ export class QuizGraph {
         phase: 'collapse',
         error: 'No mapOutputs received',
       }, 'Collapse: ERROR - No mapOutputs received!');
+      await this.callStatusUpdate(state, 'collapsing');
       return {
         ...state,
         collapsedOutputs: [],
@@ -407,6 +425,9 @@ export class QuizGraph {
       totalTokens,
       reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS,
     }, `Total tokens: ${totalTokens}, Reduce chunk size: ${GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS} tokens`);
+
+    // Call status update callback
+    await this.callStatusUpdate(state, 'collapsing');
 
     if (totalTokens <= GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS) {
       logInfo({
@@ -619,6 +640,9 @@ export class QuizGraph {
 
   // Node: Reduce phase
   private async reduce(state: OverallStateType): Promise<Partial<OverallStateType> | Send> {
+    // Call status update callback
+    await this.callStatusUpdate(state, 'reducing');
+
     logPhaseStart({
       agent: 'QuizGraph',
       phase: 'reduce',
@@ -650,6 +674,7 @@ export class QuizGraph {
         phase: 'reduce',
         error: 'No candidates generated',
       }, 'CRITICAL: No candidates in collapsed outputs!');
+      await this.callStatusUpdate(state, 'failed');
       return {
         ...state,
         finalOutput: [],
@@ -972,7 +997,7 @@ export class QuizGraph {
         phase: 'reduce',
         percentage: 100,
         message: `Completed: ${questions.length} quiz questions generated`,
-        questionsGenerated: questions.length,
+        itemsGenerated: questions.length,
       },
     };
   }

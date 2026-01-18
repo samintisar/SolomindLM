@@ -118,7 +118,6 @@ export {
 // State factory
 export {
   createGraphState,
-  type ProgressInfo,
   type ChunkProcessStateBase,
   type CreateChunkProcessState,
   type GraphStateType,
@@ -177,3 +176,18 @@ export {
   createLangSmithRunConfig,
   type LangSmithRunConfig,
 } from './langsmith.js';
+
+// Progress tracking utilities
+export {
+  createProgressTracker,
+  ProgressTracker,
+  PROGRESS_PHASES,
+  PHASE_NAMES,
+  calculateProgress,
+  createStateWithProgress,
+} from './progress.js';
+
+export type {
+  ProgressCallback,
+  ProgressInfo,
+} from './progress.js';

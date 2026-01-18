@@ -176,9 +176,26 @@ export function validateChunks(chunks: string[]): string[] {
 // ============================================================
 
 /**
+ * Helper function to call the status update callback.
+ * Safely invokes the callback if it exists.
+ */
+async function callStatusUpdate(
+  state: OverallStateType,
+  phase: string
+): Promise<void> {
+  if (state.onStatusUpdate) {
+    try {
+      await state.onStatusUpdate(phase);
+    } catch (error) {
+      console.error('[FlashcardGraph] Status update callback error:', error);
+    }
+  }
+}
+
+/**
  * Node: Split chunks for routing
  */
-function splitChunks(state: OverallStateType): Partial<OverallStateType> {
+async function splitChunks(state: OverallStateType): Promise<Partial<OverallStateType>> {
   // ============================================================
   // DEBUG: Input State Analysis
   // ============================================================
@@ -195,6 +212,9 @@ function splitChunks(state: OverallStateType): Partial<OverallStateType> {
     difficulty: state.difficulty,
     topic: state.topic || 'none',
   }, null, 2));
+
+  // Call status update callback
+  await callStatusUpdate(state, 'split_chunks');
 
   return {
     ...state,
@@ -465,6 +485,7 @@ async function collapse(
   // Safety check: if no mapOutputs, return early
   if (!state.mapOutputs || state.mapOutputs.length === 0) {
     console.error('[FlashcardGraph] Collapse: ERROR - No mapOutputs received!');
+    await callStatusUpdate(state, 'collapsing');
     return {
       ...state,
       collapsedOutputs: [],
@@ -486,6 +507,9 @@ async function collapse(
   // Progress: 10% (split) + 50% (map phase, based on completion) + 20% (collapse/reduce phases)
   const mapPhaseProgress = Math.min((chunksCompleted / Math.max(totalChunks, 1)) * 50, 50);
   const percentage = Math.min(10 + mapPhaseProgress + 10, 70); // 10% split + map progress + 10% for collapse start
+
+  // Call status update callback
+  await callStatusUpdate(state, 'collapsing');
 
   // Helper to format flashcards as text (matches collapseGroup prompt format)
   const formatFlashcardsAsText = (flashcards: Flashcard[]): string => {
@@ -1136,6 +1160,9 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
    * Node: Reduce phase
    */
   async reduce(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    // Call status update callback
+    await callStatusUpdate(state, 'reducing');
+
     // Structured logging start
     logPhaseStart({
       agent: 'FlashcardGraph',
@@ -1187,6 +1214,7 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
         error: 'No flashcards parsed',
         totalInputs,
       }, `CRITICAL: No flashcards parsed despite ${totalInputs} input cards!`);
+      await callStatusUpdate(state, 'failed');
       return {
         ...state,
         finalOutput: [],
@@ -1297,7 +1325,7 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
         phase: 'reduce',
         percentage: 100,
         message: `Completed: ${finalFlashcards.length} flashcards generated`,
-        cardsGenerated: finalFlashcards.length,
+        itemsGenerated: finalFlashcards.length,
       },
     };
   }

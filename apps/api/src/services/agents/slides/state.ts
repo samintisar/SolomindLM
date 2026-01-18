@@ -1,18 +1,19 @@
 /**
- * State definitions for WrittenQuestionsGraph.
+ * State definitions for SlideDeckGraph.
  *
  * Contains state interfaces using the LangGraph Annotation API.
  */
 
 import { Annotation } from '@langchain/langgraph';
-import type { WrittenQuestion } from './prompts.js';
+import type { ProgressInfo } from '../shared/index.js';
+import type { Slide } from './prompts.js';
 
 // ============================================================
 // STATE DEFINITIONS
 // ============================================================
 
 /**
- * Overall state for the written questions generation graph.
+ * Overall state for the slide deck generation graph.
  */
 export const OverallState = Annotation.Root({
   documentIds: Annotation<string[]>({
@@ -23,21 +24,21 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string[], y?: string[]) => y ?? _x,
     default: () => [],
   }),
-  questionCount: Annotation<number>({
-    reducer: (_x: number, y?: number) => y ?? _x,
-    default: () => 10,
+  slideType: Annotation<'detailed_deck' | 'presenter_slides'>({
+    reducer: (_x: 'detailed_deck' | 'presenter_slides', y?: 'detailed_deck' | 'presenter_slides') => y ?? _x,
+    default: () => 'detailed_deck',
   }),
-  difficulty: Annotation<string>({
-    reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => 'medium',
+  deckLength: Annotation<'short' | 'default'>({
+    reducer: (_x: 'short' | 'default', y?: 'short' | 'default') => y ?? _x,
+    default: () => 'default',
   }),
-  questionType: Annotation<'short' | 'essay'>({
-    reducer: (_x: 'short' | 'essay', y?: 'short' | 'essay') => y ?? _x,
-    default: () => 'short',
-  }),
-  focus: Annotation<string | undefined>({
+  customPrompt: Annotation<string | undefined>({
     reducer: (_x: string | undefined, y?: string | undefined) => y ?? _x,
     default: () => undefined,
+  }),
+  title: Annotation<string>({
+    reducer: (_x: string, y?: string) => y ?? _x,
+    default: () => 'Untitled Presentation',
   }),
   mapOutputs: Annotation<string[]>({
     reducer: (x: string[], y?: string[]) => y ? x.concat(y) : x,
@@ -47,28 +48,21 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string[], y?: string[]) => y ?? _x,
     default: () => [],
   }),
-  finalOutput: Annotation<WrittenQuestion[]>({
-    reducer: (_x: WrittenQuestion[], y?: WrittenQuestion[]) => y ?? _x,
+  finalOutput: Annotation<Slide[]>({
+    reducer: (_x: Slide[], y?: Slide[]) => y ?? _x,
+    default: () => [],
+  }),
+  slidesWithPrompts: Annotation<Slide[]>({
+    reducer: (_x: Slide[], y?: Slide[]) => y ?? _x,
     default: () => [],
   }),
   status: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'generating',
   }),
-  reduceRetryCount: Annotation<number>({
-    reducer: (_x: number, y?: number) => y ?? _x,
-    default: () => 0,
-  }),
   // Progress tracking for streaming
-  progress: Annotation<{
-    phase: string;
-    percentage: number;
-    message: string;
-    chunksCompleted?: number;
-    totalChunks?: number;
-    itemsGenerated?: number;
-  }>({
-    reducer: (_x, y?: any) => y ?? _x,
+  progress: Annotation<ProgressInfo>({
+    reducer: (_x, y?: ProgressInfo) => y ?? _x,
     default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
   }),
   // Callback for progress updates (not stored in state, passed through)
@@ -81,18 +75,17 @@ export const OverallState = Annotation.Root({
 export type OverallStateType = typeof OverallState.State;
 
 /**
- * Minimal state for parallel map processing - only what each chunk needs.
+ * Minimal state for parallel map processing.
  */
 export interface ChunkProcessState {
   chunk: string;
   chunkIndex?: number;
-  retryCount?: number;
-  questionCount: number;
-  difficulty: string;
-  questionType: string;
-  focus?: string;
-  questionsPerChunk: number;
+  slideType: 'detailed_deck' | 'presenter_slides';
+  deckLength: 'short' | 'default';
+  customPrompt?: string;
+  slidesPerChunk: number;
+  targetSlideCount: number;
 }
 
-// Re-export WrittenQuestion type for convenience
-export type { WrittenQuestion } from './prompts.js';
+// Re-export Slide type for convenience
+export type { Slide } from './prompts.js';

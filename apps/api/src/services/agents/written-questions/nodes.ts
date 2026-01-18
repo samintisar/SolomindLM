@@ -124,8 +124,22 @@ export class WrittenQuestionsGraph {
     this.fastLlmStructured = createStructuredLLM(this.fastLlm, WrittenQuestionsArraySchema);
   }
 
+  /**
+   * Helper method to call the status update callback.
+   * Safely invokes the callback if it exists.
+   */
+  private async callStatusUpdate(state: OverallStateType, phase: string): Promise<void> {
+    if (state.onStatusUpdate) {
+      try {
+        await state.onStatusUpdate(phase);
+      } catch (error) {
+        console.error('[WrittenQuestionsGraph] Status update callback error:', error);
+      }
+    }
+  }
+
   // Node: Split chunks for routing
-  private splitChunks(state: OverallStateType): Partial<OverallStateType> {
+  private async splitChunks(state: OverallStateType): Promise<Partial<OverallStateType>> {
     console.log('\n' + '='.repeat(80));
     console.log('[WrittenQuestionsGraph] ===== SPLIT CHUNKS PHASE =====');
     console.log('='.repeat(80));
@@ -150,6 +164,9 @@ export class WrittenQuestionsGraph {
       validatedChunks: validatedChunks.length,
       packedChunks: packedChunks.length,
     }, `Packed ${state.chunks.length} chunks into ${packedChunks.length} processed chunks`);
+
+    // Call status update callback
+    await this.callStatusUpdate(state, 'split_chunks');
 
     return {
       ...state,
@@ -409,6 +426,7 @@ export class WrittenQuestionsGraph {
         phase: 'collapse',
         error: 'No mapOutputs received',
       }, 'Collapse: ERROR - No mapOutputs received!');
+      await this.callStatusUpdate(state, 'collapsing');
       return {
         ...state,
         collapsedOutputs: [],
@@ -417,6 +435,10 @@ export class WrittenQuestionsGraph {
     }
 
     const totalChunksReceived = state.mapOutputs.length;
+
+    // Call status update callback
+    await this.callStatusUpdate(state, 'collapsing');
+
     const allQuestions: WrittenQuestion[] = [];
     const failures: Array<{output: string, error: string}> = [];
     const emptyChunks: number[] = [];
@@ -529,7 +551,7 @@ export class WrittenQuestionsGraph {
         phase: 'collapse',
         percentage: 70,
         message: `Collected ${allQuestions.length} questions from all chunks`,
-        questionsGenerated: allQuestions.length,
+        itemsGenerated: allQuestions.length,
       },
     };
   }
@@ -609,6 +631,9 @@ Return the complete selected questions as a JSON array.`;
 
   // Node: Reduce phase
   private async reduce(state: OverallStateType): Promise<Partial<OverallStateType> | Send> {
+    // Call status update callback
+    await this.callStatusUpdate(state, 'reducing');
+
     logPhaseStart({
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce',
@@ -641,6 +666,7 @@ Return the complete selected questions as a JSON array.`;
         phase: 'reduce',
         error: 'No questions generated',
       }, 'CRITICAL: No questions in collapsed outputs!');
+      await this.callStatusUpdate(state, 'failed');
       return {
         ...state,
         finalOutput: [],
@@ -664,7 +690,7 @@ Return the complete selected questions as a JSON array.`;
           phase: 'reduce',
           percentage: 100,
           message: `Completed: ${totalQuestionsBefore} questions generated`,
-          questionsGenerated: totalQuestionsBefore,
+          itemsGenerated: totalQuestionsBefore,
         },
       };
     }
@@ -781,7 +807,7 @@ Return the complete selected questions as a JSON array.`;
           phase: 'reduce',
           percentage: 100,
           message: `Completed: ${response.questions.length} unique questions (target: ${state.questionCount})`,
-          questionsGenerated: response.questions.length,
+          itemsGenerated: response.questions.length,
         },
       };
     } catch (error) {
@@ -816,7 +842,7 @@ Return the complete selected questions as a JSON array.`;
           phase: 'reduce',
           percentage: 100,
           message: `Completed: ${fallback.length} questions (target: ${state.questionCount}, fallback mode)`,
-          questionsGenerated: fallback.length,
+          itemsGenerated: fallback.length,
         },
       };
     }

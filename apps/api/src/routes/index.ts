@@ -14,6 +14,7 @@ import audioOverviewsRouter from './audio-overviews.js';
 import foldersRouter from './folders.js';
 import subscriptionsRouter from './subscriptions.js';
 import webhookRouter from './webhook.js';
+import slidesRouter from './slides.js';
 
 const router = Router();
 
@@ -32,6 +33,7 @@ router.use('/audio-overviews', audioOverviewsRouter);
 router.use('/folders', foldersRouter);
 router.use('/subscriptions', subscriptionsRouter);
 router.use('/webhook', webhookRouter);
+router.use('/slides', slidesRouter);
 
 // Health check
 router.get('/health', (req, res) => {

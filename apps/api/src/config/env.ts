@@ -28,6 +28,7 @@ const envSchema = z.object({
   ZEROENTROPY_RERANK_MODEL: z.string().default('zerank-2'),
   MISTRAL_API_KEY: z.string(),
   TOGETHER_AI_API_KEY: z.string(),
+  ZHIPUAI_API_KEY: z.string(),
   FAST_LLM: z.string().default('meta-llama/Llama-3.2-3B-Instruct-Turbo'),
   SMART_LLM: z.string().optional(), // Optional: smarter model for complex tasks
   IMAGE_LLM: z.string().default('Qwen/Qwen-Image'), // Image generation model
@@ -121,6 +122,21 @@ const envSchema = z.object({
   // OpenAI TTS-1 Voice Models
   AUDIO_VOICE_HOST_A: z.string().default('shimmer'),
   AUDIO_VOICE_HOST_B: z.string().default('echo'),
+  // Slides Generation
+  // Map phase: 3K tokens (~2% of 131K context)
+  SLIDES_MAP_CHUNK_TOKENS: z.string().default('3000'),
+  // Reduce phase: 12K tokens (~5% of 261K context)
+  SLIDES_REDUCE_CHUNK_TOKENS: z.string().default('12000'),
+  // Slides per chunk bounds for quality control
+  SLIDES_MIN_SLIDES_PER_CHUNK: z.string().default('1'),
+  SLIDES_MAX_SLIDES_PER_CHUNK: z.string().default('6'),
+  // Max tokens for output
+  SLIDES_MAX_TOKENS: z.string().default('8000'),
+  // Timeout settings for LLM calls
+  SLIDES_MAP_TIMEOUT_MS: z.string().default('180000'),
+  SLIDES_REDUCE_TIMEOUT_MS: z.string().default('240000'),
+  // Timeout for image generation (ZhipuAI can be slow, especially with rate limits)
+  SLIDES_IMAGE_TIMEOUT_MS: z.string().default('90000'),
   // Chat/RAG Configuration
   CHAT_LLM_TEMPERATURE: z.string().default('0.3'),
   CHAT_MAX_HISTORY_MESSAGES: z.string().default('20'),

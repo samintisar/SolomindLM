@@ -81,6 +81,16 @@ export interface MindMapNodeData {
   nodeData: MindMapNode;
 }
 
+// Slide deck slide
+export interface Slide {
+  slide_number: number;
+  slide_url: string;
+  title: string;
+  talking_points: string[];
+  prompt?: string;
+  metadata?: Record<string, any>;
+}
+
 // Base interface with shared properties for all note types
 interface BaseNote {
   id: string;
@@ -174,8 +184,21 @@ export interface WrittenQuestionsNote extends BaseNote {
   };
 }
 
+// Slide deck note - AI-generated presentation slides
+export interface SlideDeckNote extends BaseNote {
+  type: 'slides';
+  slides: Slide[];
+  metadata: {
+    slideType: 'detailed_deck' | 'presenter_slides';
+    deckLength: 'short' | 'default';
+    slideCount: number;
+    customPrompt?: string;
+    error?: string;
+  };
+}
+
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | WrittenQuestionsNote;
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
@@ -204,6 +227,10 @@ export function isMindMapNote(note: Note): note is MindMapNote {
 
 export function isWrittenQuestionsNote(note: Note): note is WrittenQuestionsNote {
   return note.type === 'writtenQuestions';
+}
+
+export function isSlideDeckNote(note: Note): note is SlideDeckNote {
+  return note.type === 'slides';
 }
 
 export interface NotebookItem {

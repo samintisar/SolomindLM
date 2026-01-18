@@ -9,24 +9,10 @@
  */
 
 import { Annotation } from '@langchain/langgraph';
+import type { ProgressInfo as ProgressInfoType } from './progress.js';
 
-// ============================================================
-// Types
-// ============================================================
-
-/**
- * Progress tracking information for streaming responses
- */
-export interface ProgressInfo {
-  phase: string;
-  percentage: number;
-  message: string;
-  chunksCompleted?: number;
-  totalChunks?: number;
-  dialogueLines?: number;
-  cardsGenerated?: number;
-  questionsGenerated?: number;
-}
+// Re-export ProgressInfo for backward compatibility
+export type ProgressInfo = ProgressInfoType;
 
 // ============================================================
 // State Factory Functions

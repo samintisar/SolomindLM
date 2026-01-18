@@ -9,6 +9,7 @@ type FlashcardGenerationJobPayload = import('../services/jobs/FlashcardGeneratio
 type QuizGenerationJobPayload = import('../services/jobs/QuizGenerationJob.js').QuizGenerationJobPayload;
 type AudioOverviewGenerationJobPayload = import('../services/jobs/AudioOverviewGenerationJob.js').AudioOverviewGenerationJobPayload;
 type WrittenQuestionsGenerationJobPayload = import('../services/jobs/WrittenQuestionsGenerationJob.js').WrittenQuestionsGenerationJobPayload;
+type SlideDeckGenerationJobPayload = import('../services/jobs/SlideDeckGenerationJob.js').SlideDeckGenerationJobPayload;
 
 // Lazy import tasks to catch import errors early
 async function loadTasks() {
@@ -19,7 +20,8 @@ async function loadTasks() {
   const { quizGenerationJob } = await import('../services/jobs/QuizGenerationJob.js');
   const { audioOverviewGenerationJob } = await import('../services/jobs/AudioOverviewGenerationJob.js');
   const { writtenQuestionsGenerationJob } = await import('../services/jobs/WrittenQuestionsGenerationJob.js');
-  return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob, quizGenerationJob, audioOverviewGenerationJob, writtenQuestionsGenerationJob };
+  const { slideDeckGenerationJob } = await import('../services/jobs/SlideDeckGenerationJob.js');
+  return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob, quizGenerationJob, audioOverviewGenerationJob, writtenQuestionsGenerationJob, slideDeckGenerationJob };
 }
 
 // Heartbeat function to monitor worker health
@@ -134,7 +136,7 @@ async function startWorker() {
   for (const [task, limit] of Object.entries(taskConcurrencyLimits)) {
     console.log(`[Worker]   - ${task}: ${limit}`);
   }
-  console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration, quizGeneration, audioOverviewGeneration, writtenQuestionsGeneration');
+  console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration, quizGeneration, audioOverviewGeneration, writtenQuestionsGeneration, slideDeckGeneration');
 
   // Start heartbeat in parallel (don't await it)
   startHeartbeat();
@@ -221,6 +223,17 @@ async function startWorker() {
           console.log(`[Worker] [${new Date().toISOString()}] writtenQuestionsGeneration task (Job ID: ${jobId}) completed successfully`);
         } catch (error) {
           console.error(`[Worker] [${new Date().toISOString()}] writtenQuestionsGeneration task (Job ID: ${jobId}) failed:`, error);
+          throw error;
+        }
+      },
+      slideDeckGeneration: async (payload, helpers) => {
+        const jobId = helpers?.job?.id || 'unknown';
+        console.log(`[Worker] [${new Date().toISOString()}] Received slideDeckGeneration task (Job ID: ${jobId})`);
+        try {
+          await tasks.slideDeckGenerationJob(payload as SlideDeckGenerationJobPayload);
+          console.log(`[Worker] [${new Date().toISOString()}] slideDeckGeneration task (Job ID: ${jobId}) completed successfully`);
+        } catch (error) {
+          console.error(`[Worker] [${new Date().toISOString()}] slideDeckGeneration task (Job ID: ${jobId}) failed:`, error);
           throw error;
         }
       },

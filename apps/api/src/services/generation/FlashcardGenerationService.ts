@@ -84,6 +84,7 @@ export class FlashcardGenerationService {
         collapsedOutputs: [],
         finalOutput: [],
         status: 'generating',
+        onStatusUpdate: onStatusUpdate || undefined,
       }, traceConfig) as unknown as OverallStateType;
 
       console.log(

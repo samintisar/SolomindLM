@@ -9,7 +9,8 @@ export type ServiceType =
   | 'mindmap'
   | 'report'
   | 'audio_overview'
-  | 'written_questions';
+  | 'written_questions'
+  | 'slides';
 
 export type UserTier = 'free' | 'pro';
 

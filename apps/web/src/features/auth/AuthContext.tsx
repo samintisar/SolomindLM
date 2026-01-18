@@ -77,6 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [checkSession]);
 
+  // Listen for session expired events from API calls
+  // This handles the case where the refresh token has also expired
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      console.log('[Auth] Session expired, logging out user');
+      setUserAndSync(null);
+    };
+
+    window.addEventListener('auth-session-expired', handleSessionExpired);
+
+    return () => {
+      window.removeEventListener('auth-session-expired', handleSessionExpired);
+    };
+  }, [setUserAndSync]);
+
   const signIn = useCallback(async (email: string, password: string): Promise<User> => {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',

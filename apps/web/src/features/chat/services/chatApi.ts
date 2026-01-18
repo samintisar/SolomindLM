@@ -1,5 +1,6 @@
 import { ReferenceChunk } from '@/shared/types/index';
 import { getUserId } from '@/shared/utils/auth';
+import { apiGet, apiDelete, apiPatch } from '@/shared/utils/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -43,12 +44,14 @@ export interface SendMessageCallbacks {
 export const chatApi = {
   /**
    * Send a message and stream the response via SSE
+   * Includes automatic token refresh on 401 errors
    */
   async sendMessage(
     notebookId: string,
     message: string,
     callbacks: SendMessageCallbacks,
-    documentIds?: string[]
+    documentIds?: string[],
+    isRetry = false
   ): Promise<void> {
     const userId = getUserId();
 
@@ -72,6 +75,29 @@ export const chatApi = {
         credentials: 'include',
         body: JSON.stringify(requestBody),
       });
+
+      // Handle 401 with automatic token refresh
+      if (response.status === 401 && !isRetry) {
+        try {
+          const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          if (refreshResponse.ok) {
+            // Retry the request with the new token
+            return this.sendMessage(notebookId, message, callbacks, documentIds, true);
+          }
+        } catch (refreshError) {
+          console.error('[Chat] Token refresh failed:', refreshError);
+        }
+
+        // Refresh failed, notify the app
+        window.dispatchEvent(new CustomEvent('auth-session-expired'));
+        callbacks.onError('Session expired. Please log in again.');
+        return;
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -149,10 +175,7 @@ export const chatApi = {
       limit: limit.toString(),
     });
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/chat/history/${notebookId}?${params.toString()}`,
-      { credentials: 'include' }
-    );
+    const response = await apiGet(`/api/chat/history/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -174,13 +197,7 @@ export const chatApi = {
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/chat/history/${notebookId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        credentials: 'include',
-      }
-    );
+    const response = await apiDelete(`/api/chat/history/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -199,13 +216,7 @@ export const chatApi = {
     }
 
     const params = new URLSearchParams({ userId });
-    const response = await fetch(
-      `${API_BASE_URL}/api/chat/conversation/${notebookId}?${params.toString()}`,
-      {
-        method: 'DELETE',
-        credentials: 'include',
-      }
-    );
+    const response = await apiDelete(`/api/chat/conversation/${notebookId}?${params.toString()}`);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -223,12 +234,7 @@ export const chatApi = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/chat/rename/${notebookId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ userId, title }),
-    });
+    const response = await apiPatch(`/api/chat/rename/${notebookId}`, { userId, title });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));

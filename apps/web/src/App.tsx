@@ -27,6 +27,7 @@ import { mindMapApi } from './features/studio/services/mindMapApi';
 import { flashcardsApi } from './features/studio/services/flashcardsApi';
 import { quizzesApi } from './features/studio/services/quizzesApi';
 import { writtenQuestionsApi } from './features/studio/services/writtenQuestionsApi';
+import { slidesApi } from './features/studio/services/slidesApi';
 import { audioApi } from './features/audio/api/audioApi';
 import { chatApi } from './features/chat/services/chatApi';
 import { subscriptionApi } from './features/billing/services/subscriptionApi';
@@ -385,6 +386,8 @@ const AppContent: React.FC = () => {
         await quizzesApi.renameQuiz(id, newTitle);
       } else if (noteToUpdate?.type === 'writtenQuestions') {
         await writtenQuestionsApi.renameWrittenQuestions(id, newTitle);
+      } else if (noteToUpdate?.type === 'slides') {
+        await slidesApi.renameSlideDeck(id, newTitle);
       } else if (noteToUpdate?.type === 'audio') {
         await audioApi.renameAudioOverview(id, newTitle);
       } else {
@@ -415,13 +418,17 @@ const AppContent: React.FC = () => {
             console.error('Failed to load written questions:', err);
             return [];
           }),
+          slidesApi.getSlideDecks(activeNotebookId).catch(err => {
+            console.error('Failed to load slide decks:', err);
+            return [];
+          }),
           audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
             console.error('Failed to load audio overviews:', err);
             return [];
           }),
         ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedAudio].sort((a, b) => {
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedAudio]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedAudio].sort((a, b) => {
               const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
               const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
               return bDate.localeCompare(aDate);
@@ -456,6 +463,8 @@ const AppContent: React.FC = () => {
         await quizzesApi.deleteQuiz(id);
       } else if (noteToDelete?.type === 'writtenQuestions') {
         await writtenQuestionsApi.deleteWrittenQuestions(id);
+      } else if (noteToDelete?.type === 'slides') {
+        await slidesApi.deleteSlideDeck(id);
       } else if (noteToDelete?.type === 'audio') {
         await audioApi.deleteAudioOverview(id);
       } else {
@@ -486,13 +495,17 @@ const AppContent: React.FC = () => {
             console.error('Failed to load written questions:', err);
             return [];
           }),
+          slidesApi.getSlideDecks(activeNotebookId).catch(err => {
+            console.error('Failed to load slide decks:', err);
+            return [];
+          }),
           audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
             console.error('Failed to load audio overviews:', err);
             return [];
           }),
         ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedAudio].sort((a, b) => {
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedAudio]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedAudio].sort((a, b) => {
               const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
               const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
               return bDate.localeCompare(aDate);
@@ -722,7 +735,7 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated, user, activeNotebookId, currentView]);
 
-  // Load notes, mind maps, flashcards, quizzes, written questions, and audio overviews from API when authenticated and notebook is active
+  // Load notes, mind maps, flashcards, quizzes, written questions, slides, and audio overviews from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
       // Fetch all content types in parallel
@@ -747,14 +760,18 @@ const AppContent: React.FC = () => {
           console.error('Failed to load written questions:', err);
           return [];
         }),
+        slidesApi.getSlideDecks(activeNotebookId).catch(err => {
+          console.error('Failed to load slide decks:', err);
+          return [];
+        }),
         audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
           console.error('Failed to load audio overviews:', err);
           return [];
         }),
       ])
-        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedAudio]) => {
+        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedAudio]) => {
           // Merge all content types, sort by created_at descending
-          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedAudio].sort((a, b) => {
+          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedAudio].sort((a, b) => {
             const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
             const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
             return bDate.localeCompare(aDate);

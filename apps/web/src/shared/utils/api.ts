@@ -1,6 +1,11 @@
 /**
  * Shared API utility for making authenticated requests
  * Automatically includes credentials for cookie-based authentication
+ * 
+ * Features:
+ * - Automatic token refresh on 401 errors
+ * - CSRF token handling for state-changing operations
+ * - Retry logic for expired tokens
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -28,12 +33,43 @@ function getCookie(name: string): string | undefined {
 }
 
 /**
+ * Attempt to refresh the session using the refresh token
+ * Returns true if refresh was successful, false otherwise
+ */
+async function tryRefreshSession(): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.ok) {
+      // Session refreshed successfully, new cookies have been set
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('[API] Failed to refresh session:', error);
+    return false;
+  }
+}
+
+// Track if a refresh is currently in progress to avoid multiple simultaneous refreshes
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
  * Wrapper around fetch with default options for authenticated requests
  * Automatically includes CSRF token for state-changing operations
+ * Automatically retries on 401 after attempting token refresh
  */
 export async function apiFetch(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  skipRetry = false
 ): Promise<Response> {
   const mergedOptions: RequestInit = {
     ...defaultOptions,
@@ -54,7 +90,29 @@ export async function apiFetch(
     }
   }
 
-  return fetch(`${API_BASE_URL}${url}`, mergedOptions);
+  const response = await fetch(`${API_BASE_URL}${url}`, mergedOptions);
+
+  // If we get a 401 and haven't already retried, try to refresh the session
+  if (response.status === 401 && !skipRetry) {
+    // Use a shared promise to avoid multiple simultaneous refresh attempts
+    if (!refreshPromise) {
+      refreshPromise = tryRefreshSession().finally(() => {
+        refreshPromise = null;
+      });
+    }
+
+    const refreshed = await refreshPromise;
+
+    if (refreshed) {
+      // Retry the original request with skipRetry=true to prevent infinite loops
+      return apiFetch(url, options, true);
+    }
+    
+    // Refresh failed - dispatch an event so the app can handle logout
+    window.dispatchEvent(new CustomEvent('auth-session-expired'));
+  }
+
+  return response;
 }
 
 /**

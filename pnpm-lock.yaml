@@ -96,6 +96,9 @@ importers:
       zeroentropy:
         specifier: ^0.1.0-alpha.7
         version: 0.1.0-alpha.7
+      zhipuai-sdk-nodejs-v4:
+        specifier: ^0.1.12
+        version: 0.1.12
       zod:
         specifier: ^3.22.4
         version: 3.25.76
@@ -4070,6 +4073,9 @@ packages:
 
   zeroentropy@0.1.0-alpha.7:
     resolution: {integrity: sha512-T17yfhO0pJZ0yj7P9STEn1/b6e+yiPdxRgHuFOjU/vXdivpOv96vmadbfYbKJoBMgoDIo/WmPXxUIcS29/Ui0w==}
+
+  zhipuai-sdk-nodejs-v4@0.1.12:
+    resolution: {integrity: sha512-UaxTvhIZiJOhwHjCx8WwZjkiQzQvSE/yq7uEEeM8zjZ1D1lX+SIDsTnRhnhVqsvpTnFdD9AcwY15mvjtmRy1ug==}
 
   zod-to-json-schema@3.25.0:
     resolution: {integrity: sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ==}
@@ -8424,6 +8430,13 @@ snapshots:
       node-fetch: 2.7.0
     transitivePeerDependencies:
       - encoding
+
+  zhipuai-sdk-nodejs-v4@0.1.12:
+    dependencies:
+      axios: 1.13.2(debug@4.4.3)
+      jsonwebtoken: 9.0.3
+    transitivePeerDependencies:
+      - debug
 
   zod-to-json-schema@3.25.0(zod@4.2.1):
     dependencies:
