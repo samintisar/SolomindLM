@@ -61,6 +61,15 @@ const PROTECTED_ROUTES = [
   '/api/documents',
   '/api/flashcards',
   '/api/quizzes',
+  '/api/spreadsheets',           // Spreadsheet creation requires auth
+  '/api/slides',                 // Slide deck generation
+  '/api/mindmaps',               // Mind map generation
+  '/api/reports',                 // Report generation
+  '/api/audio-overviews',         // Audio overview generation
+  '/api/written-questions',       // Written questions generation
+  '/api/chat',                    // Chat messages and history management
+  '/api/folders',                 // Folder creation and management
+  '/api/subscriptions',           // Subscription management
   '/api/auth/google/callback',  // OAuth callback changes auth state
   '/api/auth/logout',            // Logout changes auth state
 ];

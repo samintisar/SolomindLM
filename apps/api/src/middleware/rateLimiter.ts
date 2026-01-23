@@ -18,8 +18,9 @@ import type { ServiceType, RateLimitErrorResponse } from '../types/rateLimit.js'
  */
 export function rateLimiter(serviceType: ServiceType) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    // Extract userId from request (following existing pattern in codebase)
-    const userId = req.body?.userId || req.query?.userId || req.headers['x-user-id'];
+    // Extract userId from request
+    // Priority: req.user.id (from authenticate middleware) > body/query/headers
+    const userId = (req as any).user?.id || req.body?.userId || req.query?.userId || req.headers['x-user-id'];
 
     if (!userId || typeof userId !== 'string') {
       return res.status(401).json({

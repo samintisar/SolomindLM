@@ -3,6 +3,7 @@ import { supabase } from '../config/database.js';
 import { scheduleReportGeneration } from '../utils/jobHelpers.js';
 import { ReportGenerationService } from '../services/generation/ReportGenerationService.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 const reportService = new ReportGenerationService();
@@ -98,9 +99,10 @@ async function addReportJob(
 }
 
 // POST /api/reports - Create report and queue job
-router.post('/', rateLimiter('report'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('report'), async (req: Request, res: Response) => {
   try {
-    const { userId, noteId, documentIds, reportType, customPrompt } = req.body;
+    const userId = req.user!.id;
+    const { noteId, documentIds, reportType, customPrompt } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -111,10 +113,7 @@ router.post('/', rateLimiter('report'), async (req: Request, res: Response) => {
       reportType,
     }));
 
-    // Validation: userId and notebookId
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
+    // Validation: noteId
     if (typeof noteId !== 'string' || !isValidUUID(noteId)) {
       return res.status(400).json({ error: 'Invalid noteId format' });
     }

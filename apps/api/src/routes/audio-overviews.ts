@@ -4,6 +4,7 @@ import { scheduleAudioOverviewGeneration } from '../utils/jobHelpers.js';
 import { AudioOverviewGenerationService } from '../services/generation/AudioOverviewGenerationService.js';
 import { SupabaseStorageService } from '../services/storage/SupabaseStorageService.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 const audioOverviewService = new AudioOverviewGenerationService();
@@ -99,9 +100,10 @@ async function addAudioOverviewJob(
 }
 
 // POST /api/audio-overviews - Create audio overview and queue job
-router.post('/', rateLimiter('audio_overview'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('audio_overview'), async (req: Request, res: Response) => {
   try {
-    const { userId, notebookId, documentIds, audioType, length, focus } = req.body;
+    const userId = req.user!.id;
+    const { notebookId, documentIds, audioType, length, focus } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -113,10 +115,7 @@ router.post('/', rateLimiter('audio_overview'), async (req: Request, res: Respon
       length,
     }));
 
-    // Validation: userId and notebookId
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
+    // Validation: notebookId
     if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
       return res.status(400).json({ error: 'Invalid notebookId format' });
     }

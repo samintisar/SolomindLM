@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleWrittenQuestionsGeneration } from '../utils/jobHelpers.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -221,9 +222,10 @@ async function addWrittenQuestionsJob(
 }
 
 // POST /api/written-questions - Create written questions and queue job
-router.post('/', rateLimiter('written_questions'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('written_questions'), async (req: Request, res: Response) => {
   try {
-    const { userId, notebookId, documentIds, questionCount, difficulty, questionType, focus } = req.body;
+    const userId = req.user!.id;
+    const { notebookId, documentIds, questionCount, difficulty, questionType, focus } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -237,10 +239,7 @@ router.post('/', rateLimiter('written_questions'), async (req: Request, res: Res
       focus,
     }));
 
-    // Validation: userId and notebookId
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
+    // Validation: notebookId
     if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
       return res.status(400).json({ error: 'Invalid notebookId format' });
     }

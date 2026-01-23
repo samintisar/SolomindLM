@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../config/database.js';
 import { scheduleMindmapGeneration } from '../utils/jobHelpers.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -77,9 +78,10 @@ async function addMindMapJob(
 }
 
 // POST /api/mindmaps - Create mindmap and queue job
-router.post('/', rateLimiter('mindmap'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('mindmap'), async (req: Request, res: Response) => {
   try {
-    const { userId, notebookId, documentIds } = req.body;
+    const userId = req.user!.id;
+    const { notebookId, documentIds } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -94,10 +96,7 @@ router.post('/', rateLimiter('mindmap'), async (req: Request, res: Response) => 
     console.log('[DEBUG] mindmaps.ts:90 - POST /api/mindmaps entry', JSON.stringify({location:'mindmaps.ts:90',message:'POST /api/mindmaps entry',data:{notebookId,documentIds,documentIdsType:typeof documentIds,documentIdsIsArray:Array.isArray(documentIds),documentIdsLength:Array.isArray(documentIds)?documentIds.length:undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'}));
     // #endregion
 
-    // Validation: userId and notebookId
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
+    // Validation: notebookId
     if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
       return res.status(400).json({ error: 'Invalid notebookId format' });
     }

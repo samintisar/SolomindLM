@@ -3,6 +3,7 @@ import { supabase } from '../config/database.js';
 import { scheduleSlideDeckGeneration } from '../utils/jobHelpers.js';
 import { SlideDeckGenerationService } from '../services/generation/SlideDeckGenerationService.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 const slideDeckService = new SlideDeckGenerationService();
@@ -114,9 +115,10 @@ async function addSlideDeckJob(
 }
 
 // POST /api/slides - Create slide deck and queue job
-router.post('/', rateLimiter('slides'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('slides'), async (req: Request, res: Response) => {
   try {
-    const { userId, notebookId, documentIds, slideType, deckLength, customPrompt } = req.body;
+    const userId = req.user!.id;
+    const { notebookId, documentIds, slideType, deckLength, customPrompt } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -129,10 +131,7 @@ router.post('/', rateLimiter('slides'), async (req: Request, res: Response) => {
       customPrompt,
     }));
 
-    // Validation: userId and notebookId
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
+    // Validation: notebookId
     if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
       return res.status(400).json({ error: 'Invalid notebookId format' });
     }

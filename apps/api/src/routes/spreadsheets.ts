@@ -97,7 +97,7 @@ async function addSpreadsheetJob(
 }
 
 // POST /api/spreadsheets - Create spreadsheet and queue job
-router.post('/', rateLimiter('spreadsheet'), authenticate, async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('spreadsheet'), async (req: Request, res: Response) => {
   try {
     const { notebookId, documentIds, spreadsheetType, customPrompt } = req.body;
     const userId = req.user!.id;

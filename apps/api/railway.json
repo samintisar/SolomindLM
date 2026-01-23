@@ -2,12 +2,12 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "pnpm install && pnpm --filter @solomindlm/api build",
+    "buildCommand": "bun install && bun run --filter @solomindlm/api build:worker",
     "watchPatterns": ["apps/api/**"],
-    "packageManager": "pnpm"
+    "packageManager": "bun"
   },
   "deploy": {
-    "startCommand": "node apps/api/dist/index.js",
+    "startCommand": "bun apps/api/dist/worker.js",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",

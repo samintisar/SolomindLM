@@ -3,6 +3,7 @@ import { supabase } from '../config/database.js';
 import { scheduleQuizGeneration } from '../utils/jobHelpers.js';
 import { QuizGenerationService } from '../services/generation/QuizGenerationService.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 const quizService = new QuizGenerationService();
@@ -135,9 +136,10 @@ async function addQuizJob(
 }
 
 // POST /api/quizzes - Create quiz and queue job
-router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
+router.post('/', authenticate, rateLimiter('quiz'), async (req: Request, res: Response) => {
   try {
-    const { userId, notebookId, documentIds, questionCount, difficulty, focus } = req.body;
+    const userId = req.user!.id;
+    const { notebookId, documentIds, questionCount, difficulty, focus } = req.body;
 
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -150,10 +152,7 @@ router.post('/', rateLimiter('quiz'), async (req: Request, res: Response) => {
       focus,
     }));
 
-    // Validation: userId and notebookId
-    if (typeof userId !== 'string' || !isValidUUID(userId)) {
-      return res.status(400).json({ error: 'Invalid userId format' });
-    }
+    // Validation: notebookId
     if (typeof notebookId !== 'string' || !isValidUUID(notebookId)) {
       return res.status(400).json({ error: 'Invalid notebookId format' });
     }
