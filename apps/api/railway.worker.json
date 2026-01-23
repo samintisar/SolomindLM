@@ -6,7 +6,7 @@
     "watchPatterns": ["apps/api/**"]
   },
   "deploy": {
-    "startCommand": "cd apps/api && bun run start:worker",
+    "startCommand": "bun apps/api/dist/worker.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
     "numReplicas": 2

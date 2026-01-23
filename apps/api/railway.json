@@ -6,7 +6,7 @@
     "watchPatterns": ["apps/api/**"]
   },
   "deploy": {
-    "startCommand": "cd apps/api && bun run start",
+    "startCommand": "bun apps/api/dist/index.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
