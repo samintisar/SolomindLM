@@ -10,7 +10,8 @@ export type ServiceType =
   | 'report'
   | 'audio_overview'
   | 'written_questions'
-  | 'slides';
+  | 'slides'
+  | 'spreadsheet';
 
 export type UserTier = 'free' | 'pro';
 

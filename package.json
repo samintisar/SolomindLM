@@ -2,24 +2,32 @@
   "name": "solomindlm-monorepo",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "bun@1.2.2",
+  "workspaces": {
+    "packages": ["apps/*"]
+  },
   "engines": {
     "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "bun": ">=1.2.2"
   },
   "scripts": {
-    "dev": "pnpm --filter \"./apps/**\" dev",
-    "dev:web": "pnpm --filter @solomindlm/web dev",
-    "dev:api": "pnpm --filter @solomindlm/api dev",
-    "build": "pnpm --filter \"./apps/**\" build",
-    "start:api": "pnpm --filter @solomindlm/api start",
-    "jobs:api": "pnpm --filter @solomindlm/api jobs"
+    "dev": "bun run --elide-lines=0 --filter \"./apps/**\" dev",
+    "dev:web": "bun run --elide-lines=0 --filter @solomindlm/web dev",
+    "dev:api": "bun run --elide-lines=0 --filter @solomindlm/api dev",
+    "build": "bun run --filter \"./apps/**\" build",
+    "build:prod": "bun run --filter @solomindlm/web build:prod && bun run --filter @solomindlm/api build",
+    "start:api": "bun run --elide-lines=0 --filter @solomindlm/api start",
+    "start:worker": "bun run --elide-lines=0 --filter @solomindlm/api start:worker",
+    "worker": "bun run --elide-lines=0 --filter @solomindlm/api worker",
+    "clear-jobs": "bun run --elide-lines=0 --filter @solomindlm/api clear-jobs"
   },
   "devDependencies": {
+    "@types/bun": "^1.2.2",
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "react-router-dom": "7.12.0"
   }
 }

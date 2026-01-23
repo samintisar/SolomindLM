@@ -1,7 +1,7 @@
 # Database Schema & RLS Policies Overview
 
-**Generated:** 2026-01-11  
-**Total Tables:** 18  
+**Generated:** 2026-01-19  
+**Total Tables:** 19  
 **RLS Enabled:** All tables have RLS enabled
 
 ---
@@ -224,7 +224,26 @@ Quiz sets generated from notebooks.
 
 ---
 
-### 12. `rate_limit_config`
+### 12. `spreadsheets`
+AI-generated spreadsheets from notebooks.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | uuid | NO | `gen_random_uuid()` | Primary key |
+| `user_id` | uuid | NO | - | User owner |
+| `notebook_id` | uuid | NO | - | Foreign key → `notebooks.id` |
+| `title` | text | NO | - | Spreadsheet title |
+| `data` | jsonb | NO | `'{}'` | Spreadsheet structure data |
+| `status` | text | NO | `'draft'` | Status: draft, generating, completed, failed |
+| `metadata` | jsonb | YES | `'{}'` | Additional metadata |
+| `created_at` | timestamptz | YES | `now()` | Creation timestamp |
+| `updated_at` | timestamptz | YES | `now()` | Update timestamp |
+
+**RLS:** ✅ Enabled
+
+---
+
+### 14. `rate_limit_config`
 Configuration for rate limiting by tier and service type.
 
 | Column | Type | Nullable | Default | Description |
@@ -240,7 +259,7 @@ Configuration for rate limiting by tier and service type.
 
 ---
 
-### 13. `rate_limit_usage`
+### 15. `rate_limit_usage`
 Tracks daily usage per user and service type.
 
 | Column | Type | Nullable | Default | Description |
@@ -258,7 +277,7 @@ Tracks daily usage per user and service type.
 
 ---
 
-### 14. `stripe_payment_history`
+### 15. `stripe_payment_history`
 Payment history from Stripe invoices.
 
 | Column | Type | Nullable | Default | Description |
@@ -305,7 +324,7 @@ Stripe subscription records.
 
 ---
 
-### 16. `stripe_webhook_events`
+### 17. `stripe_webhook_events`
 Stripe webhook event tracking.
 
 | Column | Type | Nullable | Default | Description |
@@ -322,7 +341,7 @@ Stripe webhook event tracking.
 
 ---
 
-### 17. `user_profiles`
+### 18. `user_profiles`
 User profile and subscription tier information.
 
 | Column | Type | Nullable | Default | Description |
@@ -338,7 +357,7 @@ User profile and subscription tier information.
 
 ---
 
-### 18. `written_questions`
+### 19. `written_questions`
 Written question sets (short answer or essay) generated from notebooks.
 
 | Column | Type | Nullable | Default | Description |
@@ -485,6 +504,17 @@ All tables have RLS enabled. Policies are organized by table and operation type.
 
 ---
 
+### `spreadsheets`
+
+| Policy Name | Operation | Expression |
+|-------------|-----------|------------|
+| Users can view their own spreadsheets | SELECT | `auth.uid() = user_id` |
+| Users can insert their own spreadsheets | INSERT | `auth.uid() = user_id` (WITH CHECK) |
+| Users can update their own spreadsheets | UPDATE | `auth.uid() = user_id` (USING & WITH CHECK) |
+| Users can delete their own spreadsheets | DELETE | `auth.uid() = user_id` |
+
+---
+
 ### `rate_limit_config`
 
 | Policy Name | Operation | Expression |
@@ -585,7 +615,8 @@ user_profiles (user_id → auth.users.id)
           ├── quizzes (notebook_id → notebooks.id)
           ├── mindmaps (notebook_id → notebooks.id)
           ├── audio_overviews (notebook_id → notebooks.id)
-          └── written_questions (notebook_id → notebooks.id)
+          ├── written_questions (notebook_id → notebooks.id)
+          └── spreadsheets (notebook_id → notebooks.id)
 ```
 
 ### Billing Hierarchy
@@ -641,8 +672,9 @@ stripe_webhook_events (independent, tracks Stripe events)
 
 ---
 
-**Last Updated:** 2026-01-11  
-**Recent Fixes:** 
+**Last Updated:** 2026-01-19  
+**Recent Changes:** 
+- Added `spreadsheets` table for AI-generated spreadsheets from notebooks
 - Storage policies and messages security policies updated to match code structure and best practices
 - Documents table schema fixed: `note_id` renamed to `notebook_id` with foreign key constraint to `notebooks.id`
 - `document_chunks` table updated: `note_id` renamed to `notebook_id`

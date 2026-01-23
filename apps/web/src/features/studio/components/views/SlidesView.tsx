@@ -5,7 +5,6 @@ import {
   Maximize2,
   Minimize2,
   MessageSquare,
-  Sparkles,
   ArrowLeft,
   Download,
 } from 'lucide-react';
@@ -98,18 +97,11 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate, onBa
     };
   }, [handleNext, handlePrev, toggleFullscreen]);
 
-  // Loading state
+  // Empty state
   if (slides.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center animate-spin">
-          <Sparkles className="w-6 h-6 text-primary" />
-        </div>
-        <p className="text-muted-foreground font-serif italic">
-          {note.status === 'generating'
-            ? 'Generating slide deck with AI... (this may take a few minutes)'
-            : 'No slides available'}
-        </p>
+        <p className="text-muted-foreground font-serif italic">No slides available</p>
       </div>
     );
   }
@@ -136,8 +128,8 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate, onBa
       )}
 
       {/* Main Slide Display Area */}
-      <div className={`flex-1 flex flex-col items-center justify-center overflow-hidden ${
-        isFullscreen ? 'p-2' : 'p-4 md:p-8'
+      <div className={`flex-1 flex flex-col items-center justify-center ${
+        isFullscreen ? 'p-2' : 'p-4 md:p-8 bg-card border-t border-border'
       }`}>
         <div className={`w-full relative bg-black overflow-hidden shadow-2xl ${
           isFullscreen 

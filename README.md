@@ -29,12 +29,12 @@ AI-powered research platform with multi-source content ingestion, RAG-based chat
 ## Tech Stack
 
 ### Frontend
-- React 18, Vite, TypeScript
+- React 19, Vite, TypeScript
 - TailwindCSS, Radix UI components
 - Mind Elixir (mind maps), React Flip Toolkit (flashcards)
 
 ### Backend
-- Express, TypeScript, LangChain
+- Bun runtime, Express, TypeScript, LangChain
 - Supabase (PostgreSQL + pgvector)
 - Graphile Worker (background jobs)
 
@@ -69,15 +69,18 @@ SolomindLM/
 │           │   ├── generation/ # Report & mind map generation
 │           │   └── jobs/       # Background jobs (Graphile Worker)
 │           └── utils/          # Worker utilities
-├── pnpm-workspace.yaml
-└── package.json
+├── bun.lock
+└── package.json                # Workspace configuration
 ```
 
 ## Setup
 
+### Prerequisites
+- **Bun** v1.0+ (install: `curl -fsSL https://bun.sh/install | bash`)
+
 ### 1. Install dependencies
 ```bash
-pnpm install
+bun install
 ```
 
 ### 2. Configure environment
@@ -117,16 +120,29 @@ REPORT_MAX_TOKENS=24000
 
 ```bash
 # Terminal 1: API
-pnpm dev:api
+bun run dev:api
 
 # Terminal 2: Background worker
-pnpm --filter @solomindlm/api worker
+bun run worker
 
 # Terminal 3: Web
-pnpm dev:web
+bun run dev:web
 ```
 
 Open http://localhost:5173
+
+### Additional Commands
+
+```bash
+# Clear all pending jobs from the queue
+bun run clear-jobs
+
+# Build for production
+bun run build:prod
+
+# Type checking
+cd apps/api && bun run type-check
+```
 
 ## Architecture
 

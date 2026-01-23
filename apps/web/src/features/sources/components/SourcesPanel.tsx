@@ -378,7 +378,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                 
               animationFrameId = requestAnimationFrame(() => {
                 const delta = moveEvent.clientX - startX;
-                const newWidth = Math.max(220, Math.min(900, startWidth + delta));
+                // Max width is 70% of screen width or 1400px, whichever is smaller
+                const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
+                const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
                   // Dispatch custom event that parent can listen to
                   window.dispatchEvent(new CustomEvent('resizeSourcesPanel', { detail: { width: newWidth } }));
                 });

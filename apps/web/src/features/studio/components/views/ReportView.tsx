@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
-import { XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { XCircle, ArrowLeft } from 'lucide-react';
 import { ReportNote } from '@/shared/types/index';
 
 export interface ReportViewProps {
@@ -14,11 +14,6 @@ export interface ReportViewProps {
 
 export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
   const isFailed = note.status === 'failed';
-  const isCompleted = note.status === 'completed';
-  const isGenerating = note.status === 'generating' ||
-                        note.metadata?.phase === 'mapping' ||
-                        note.metadata?.phase === 'collapsing' ||
-                        note.metadata?.phase === 'reducing';
 
   return (
       <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300">
@@ -50,8 +45,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
              </div>
            )}
 
-           <div className="flex-1 overflow-y-auto p-6 md:p-8">
-               <div className="max-w-3xl mx-auto bg-card border border-border shadow-sm p-8 rounded-sm min-h-[500px]">
+           <div className="flex-1 p-6 md:p-8 bg-card border-t border-border">
+               <div className="max-w-3xl mx-auto">
                    <div className="prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed select-text">
                       {note.content ? (
                           <ReactMarkdown
@@ -80,12 +75,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
                           <p className="text-muted-foreground">Report generation failed</p>
                         </div>
                       ) : (
-                          <div className="space-y-4">
-                            <div className="h-8 bg-muted/50 rounded w-3/4 animate-pulse"></div>
-                            <div className="h-4 bg-muted/50 rounded w-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="h-4 bg-muted/50 rounded w-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                            <div className="h-4 bg-muted/50 rounded w-5/6 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
-                          </div>
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <p className="text-muted-foreground">No content available</p>
+                        </div>
                       )}
                    </div>
                </div>

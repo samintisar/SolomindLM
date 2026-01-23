@@ -15,6 +15,7 @@ import foldersRouter from './folders.js';
 import subscriptionsRouter from './subscriptions.js';
 import webhookRouter from './webhook.js';
 import slidesRouter from './slides.js';
+import spreadsheetsRouter from './spreadsheets.js';
 
 const router = Router();
 
@@ -34,6 +35,7 @@ router.use('/folders', foldersRouter);
 router.use('/subscriptions', subscriptionsRouter);
 router.use('/webhook', webhookRouter);
 router.use('/slides', slidesRouter);
+router.use('/spreadsheets', spreadsheetsRouter);
 
 // Health check
 router.get('/health', (req, res) => {

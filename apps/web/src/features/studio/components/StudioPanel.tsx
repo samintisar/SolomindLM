@@ -18,8 +18,9 @@ import {
   MessageSquareText,
   Download,
   Presentation,
+  Table2,
 } from 'lucide-react';
-import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote, isSlideDeckNote } from '@/shared/types/index';
+import { StudioTool, Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote, isSlideDeckNote, isSpreadsheetNote } from '@/shared/types/index';
 import { flashcardsApi } from '../services/flashcardsApi';
 import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { CreateReportModal } from './CreateReportModal';
@@ -28,12 +29,14 @@ import { CustomizeQuizModal } from './CustomizeQuizModal';
 import { CustomizeAudioModal } from './CustomizeAudioModal';
 import { CustomizeWrittenQuestionsModal } from './CustomizeWrittenQuestionsModal';
 import { CustomizeSlidesModal } from './CustomizeSlidesModal';
+import { CustomizeSpreadsheetsModal } from './CustomizeSpreadsheetsModal';
 import { ReportView } from './views/ReportView';
 import { FlashcardView } from './views/FlashcardView';
 import { QuizView } from './views/QuizView';
 import { MindMapView } from './views/MindMapView';
 import { WrittenQuestionsView } from './views/WrittenQuestionsView';
 import { SlidesView } from './views/SlidesView';
+import { SpreadsheetView } from './views/SpreadsheetView';
 import { AudioPlayer } from '@/features/audio/components/AudioPlayer';
 import { MiniAudioPlayer } from '@/features/audio/components/MiniAudioPlayer';
 import { useStudioHandlers } from '../hooks/useStudioHandlers';
@@ -72,6 +75,7 @@ const IconMap: Record<string, React.FC<any>> = {
   HelpCircle,
   Presentation,
   MessageSquareText,
+  Table2,
 };
 
 export const StudioPanel: React.FC<StudioPanelProps> = ({
@@ -123,12 +127,14 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     isAudioModalOpen,
     isWrittenQuestionsModalOpen,
     isSlidesModalOpen,
+    isSpreadsheetsModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
     setIsWrittenQuestionsModalOpen,
     setIsSlidesModalOpen,
+    setIsSpreadsheetsModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
@@ -136,6 +142,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     handleCreateAudio,
     handleCreateWrittenQuestions,
     handleCreateSlides,
+    handleCreateSpreadsheet,
   } = useStudioHandlers({
     notes,
     sources,
@@ -165,7 +172,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       const noteId = customEvent.detail?.noteId;
       if (noteId) {
         const note = notes.find(n => n.id === noteId);
-        if (note) {
+        // Prevent setting generating notes as active
+        if (note && note.status !== 'generating') {
           setActiveNoteId(noteId);
         }
       }
@@ -214,7 +222,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     if (note.status === 'generating') {
       return;
     }
-    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions' || note.type === 'slides') {
+    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' || note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions' || note.type === 'slides' || note.type === 'spreadsheet') {
         setActiveNoteId(note.id);
     }
   };
@@ -265,7 +273,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               animationFrameId = requestAnimationFrame(() => {
                 // When dragging left, positive movement expands, negative contracts
                 const delta = -(moveEvent.clientX - startX);
-                const newWidth = Math.max(220, Math.min(900, startWidth + delta));
+                // Max width is 70% of screen width or 1400px, whichever is smaller
+                const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
+                const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
                 // Dispatch custom event that parent can listen to
                 window.dispatchEvent(new CustomEvent('resizeStudioPanel', { detail: { width: newWidth } }));
               });
@@ -318,9 +328,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         )}
       </div>
 
-      <div className={`flex-1 overflow-y-auto w-full relative ${miniPlayerVisible ? 'overflow-hidden' : ''}`}>
+      <div className={`flex-1 w-full relative ${miniPlayerVisible ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {activeNote ? (
-            <div className="h-full p-4">
+            <div className="h-full">
                 {isReportNote(activeNote) && <ReportView note={activeNote} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
                 {isFlashcardNote(activeNote) && <FlashcardView note={activeNote} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
                 {isQuizNote(activeNote) && <QuizView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
@@ -353,6 +363,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                 )}
                 {isWrittenQuestionsNote(activeNote) && <WrittenQuestionsView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
                 {isSlideDeckNote(activeNote) && <SlidesView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
+                {isSpreadsheetNote(activeNote) && <SpreadsheetView note={activeNote} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
             </div>
         ) : (
             <div className="p-4 space-y-8">
@@ -382,11 +393,17 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest font-sans">Saved</h3>
                   </div>
                   <div className="space-y-3">
-                    {notes.map((note) => (
+                    {notes.map((note) => {
+                      const isGenerating = note.status === 'generating';
+                      return (
                       <div
                         key={note.id}
                         onClick={() => handleNoteClick(note)}
-                        className="relative bg-card border-l-4 border-l-primary border-y border-r border-border p-3 pl-4 shadow-sm hover:shadow-md transition-shadow group rounded-r-sm cursor-pointer"
+                        className={`relative bg-card border-l-4 border-l-primary border-y border-r border-border p-3 pl-4 shadow-sm transition-shadow group rounded-r-sm ${
+                          isGenerating 
+                            ? 'opacity-60 cursor-not-allowed' 
+                            : 'hover:shadow-md cursor-pointer'
+                        }`}
                       >
                         <div className="flex justify-between items-start gap-3">
                           <div className="flex-1 flex gap-3 min-w-0">
@@ -410,7 +427,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                   </button>
                                 )}
                                 {note.type === 'flashcard' && (
-                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-red-500/10 text-red-700 flex items-center justify-center">
                                     <Layers className="w-4 h-4 shrink-0" />
                                   </div>
                                 )}
@@ -420,7 +437,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                   </div>
                                 )}
                                 {note.type === 'quiz' && (
-                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center">
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/10 text-blue-700 flex items-center justify-center">
                                     <HelpCircle className="w-4 h-4 shrink-0" />
                                   </div>
                                 )}
@@ -430,13 +447,18 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                   </div>
                                 )}
                                 {note.type === 'writtenQuestions' && (
-                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-green-500/10 text-green-700 flex items-center justify-center">
                                     <MessageSquareText className="w-4 h-4 shrink-0" />
                                   </div>
                                 )}
                                 {note.type === 'slides' && (
                                   <div className="shrink-0 w-8 h-8 rounded-lg bg-violet-500/10 text-violet-600 flex items-center justify-center">
                                     <Presentation className="w-4 h-4 shrink-0" />
+                                  </div>
+                                )}
+                                {note.type === 'spreadsheet' && (
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center">
+                                    <Table2 className="w-4 h-4 shrink-0" />
                                   </div>
                                 )}
                               </>
@@ -453,7 +475,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                                         className="w-full bg-transparent border-b border-primary text-sm font-bold text-foreground font-serif focus:outline-none mb-1 p-0 rounded-none"
                                     />
                                 ) : (
-                                    <h4 className="text-sm font-bold text-foreground font-serif truncate leading-tight mb-1 group-hover:text-primary transition-colors">{note.title}</h4>
+                                    <h4 className={`text-sm font-bold text-foreground font-serif truncate leading-tight mb-1 transition-colors ${
+                                      isGenerating ? '' : 'group-hover:text-primary'
+                                    }`}>{note.title}</h4>
                                 )}
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                   {note.status === 'generating' ? (
@@ -493,7 +517,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
             </div>
@@ -570,6 +595,12 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         isOpen={isSlidesModalOpen}
         onClose={() => setIsSlidesModalOpen(false)}
         onGenerate={handleCreateSlides}
+      />
+
+      <CustomizeSpreadsheetsModal
+        isOpen={isSpreadsheetsModalOpen}
+        onClose={() => setIsSpreadsheetsModalOpen(false)}
+        onGenerate={handleCreateSpreadsheet}
       />
       <ConfirmDialogComponent />
     </>);

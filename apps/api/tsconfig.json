@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
+    "types": ["@types/bun"],
     "lib": ["ES2023"],
     "moduleResolution": "bundler",
     "esModuleInterop": true,
@@ -16,7 +17,8 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "incremental": true
+    "incremental": true,
+    "noEmit": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -4,9 +4,10 @@
 	"version": "0.0.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite",
+		"kill-port": "bun run scripts/kill-port.ts",
+		"dev": "bun run kill-port && vite",
 		"build": "vite build",
-		"build:prod": "VITE_API_URL=https://solomindlmapi-production.up.railway.app vite build",
+		"build:prod": "VITE_API_URL=https://api.solomindlm.com vite build",
 		"preview": "vite preview"
 	},
 	"dependencies": {

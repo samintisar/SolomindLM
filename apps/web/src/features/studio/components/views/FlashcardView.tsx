@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, RotateCw, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { RotateCw, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -29,17 +29,14 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
 
     if (cards.length === 0) return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center animate-spin">
-          <Sparkles className="w-6 h-6 text-primary" />
-        </div>
-        <p className="text-muted-foreground font-serif italic">Generating flashcards from your sources...</p>
+        <p className="text-muted-foreground font-serif italic">No flashcards available</p>
       </div>
     );
 
     const currentCard = cards[currentIndex];
 
     return (
-        <div className={`flex flex-col h-full items-center justify-center p-4 sm:p-6 bg-secondary/10 animate-in fade-in slide-in-from-right-4 duration-300 gap-4 sm:gap-6 overflow-y-auto relative ${onBack ? 'md:pt-0 pt-16' : ''}`}>
+        <div className={`flex flex-col h-full items-center justify-center p-4 sm:p-6 bg-secondary/10 animate-in fade-in slide-in-from-right-4 duration-300 gap-4 sm:gap-6 relative ${onBack ? 'md:pt-0 pt-16' : ''}`}>
             {/* Mobile Back Button */}
             {onBack && (
                 <div className="md:hidden absolute top-0 left-0 right-0 flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm z-20">

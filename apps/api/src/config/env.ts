@@ -137,6 +137,22 @@ const envSchema = z.object({
   SLIDES_REDUCE_TIMEOUT_MS: z.string().default('240000'),
   // Timeout for image generation (ZhipuAI can be slow, especially with rate limits)
   SLIDES_IMAGE_TIMEOUT_MS: z.string().default('90000'),
+  // Spreadsheet Generation
+  // Map phase: 5K tokens (~4% of 131K context)
+  SPREADSHEET_MAP_CHUNK_TOKENS: z.string().default('5000'),
+  // Reduce phase: 15K tokens (~6% of 261K context)
+  SPREADSHEET_REDUCE_CHUNK_TOKENS: z.string().default('15000'),
+  // Max OUTPUT tokens for map phase (data extraction)
+  SPREADSHEET_MAP_MAX_OUTPUT_TOKENS: z.string().default('8192'),
+  // Max OUTPUT tokens for reduce phase (final table generation)
+  SPREADSHEET_REDUCE_MAX_OUTPUT_TOKENS: z.string().default('32000'),
+  // Max tokens overall
+  SPREADSHEET_MAX_TOKENS: z.string().default('64000'),
+  // Max parallel API calls during collapse phase
+  SPREADSHEET_COLLAPSE_CONCURRENCY: z.string().default('5'),
+  // Timeout settings for LLM calls
+  SPREADSHEET_MAP_TIMEOUT_MS: z.string().default('200000'),
+  SPREADSHEET_REDUCE_TIMEOUT_MS: z.string().default('300000'),
   // Chat/RAG Configuration
   CHAT_LLM_TEMPERATURE: z.string().default('0.3'),
   CHAT_MAX_HISTORY_MESSAGES: z.string().default('20'),

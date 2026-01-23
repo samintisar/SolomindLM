@@ -9,8 +9,8 @@
  * WHERE tier = '<free|pro>' AND service_type = '<service_type>';
  * 
  * Current limits (as of last sync):
- * Free tier: chat=50, flashcard=10, quiz=10, mindmap=10, report=5, audio_overview=1, written_questions=5
- * Pro tier: chat=1000, flashcard=500, quiz=500, mindmap=500, report=200, audio_overview=100, written_questions=200
+ * Free tier: chat=50, flashcard=10, quiz=10, mindmap=10, report=5, audio_overview=1, written_questions=5, slides=3, spreadsheet=5
+ * Pro tier: chat=1000, flashcard=500, quiz=500, mindmap=500, report=200, audio_overview=15, written_questions=200, slides=15, spreadsheet=100
  */
 
 import { UserTier } from '../types/rateLimit.js';

@@ -40,13 +40,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
   const questions = note.questions || [];
   const currentQuestion = questions[currentIndex];
 
-  // If no questions, show loading state
+  // If no questions, show empty state
   if (questions.length === 0) {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Generating questions...</p>
+          <p className="text-muted-foreground">No questions available</p>
         </div>
       </div>
     );
@@ -238,8 +237,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
           <span className="text-sm font-semibold text-foreground truncate">{note.title}</span>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto w-full p-8 md:p-12 min-h-full flex flex-col">
+      <div className="flex-1 bg-card border-t border-border min-h-0">
+        <div className="max-w-3xl mx-auto w-full h-full p-8 md:p-12 flex flex-col">
           {/* Review Mode Banner */}
           {reviewMode && (
             <div className="mb-6 p-4 bg-vintage-amber-50 dark:bg-vintage-amber-900/20 border border-vintage-amber-200 dark:border-vintage-amber-800 rounded-xl flex items-center gap-3">
@@ -322,7 +321,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
 
           {/* Answer Input or Graded Result */}
           {!isGraded ? (
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               <textarea
                 value={currentAnswer}
                 onChange={(e) => handleAnswerChange(e.target.value)}
@@ -335,9 +334,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                 className={`flex-1 w-full bg-background border-2 rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/40 ${
                   isAnswered ? 'border-primary' : 'border-border'
                 } ${reviewMode ? 'opacity-70 cursor-not-allowed bg-muted/30' : ''}`}
-                style={{ minHeight: currentQuestion.questionType === 'short' ? '120px' : '280px' }}
               />
-              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 font-mono">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 font-mono shrink-0">
                 <span>{currentAnswer.length} characters</span>
                 <span>{currentAnswer.split(/\s+/).filter(Boolean).length} words</span>
               </div>

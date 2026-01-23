@@ -197,8 +197,21 @@ export interface SlideDeckNote extends BaseNote {
   };
 }
 
+// Spreadsheet note - structured table data
+export interface SpreadsheetNote extends BaseNote {
+  type: 'spreadsheet';
+  content: string; // Markdown table content
+  metadata: {
+    spreadsheetType: 'data_extraction' | 'comparison_table' | 'timeline' | 'financial_summary' | 'custom';
+    documentIds: string[];
+    phase?: string;
+    error?: string;
+    customPrompt?: string;
+  };
+}
+
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote;
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote | SpreadsheetNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
@@ -231,6 +244,10 @@ export function isWrittenQuestionsNote(note: Note): note is WrittenQuestionsNote
 
 export function isSlideDeckNote(note: Note): note is SlideDeckNote {
   return note.type === 'slides';
+}
+
+export function isSpreadsheetNote(note: Note): note is SpreadsheetNote {
+  return note.type === 'spreadsheet';
 }
 
 export interface NotebookItem {

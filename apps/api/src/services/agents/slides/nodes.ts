@@ -460,8 +460,6 @@ export class SlideDeckGraph {
 
     // Initialize image generation service
     this.imageService = new SlideImageGenerationService(zhipuAiApiKey, supabaseUrl, supabaseKey);
-    
-    console.log(`[SlideDeckGraph] Initialized with FAST_LLM: ${fastModel}, SMART_LLM: ${smartModel}`);
   }
 
   private estimateTokens(text: string): number {

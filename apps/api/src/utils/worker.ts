@@ -10,6 +10,7 @@ type QuizGenerationJobPayload = import('../services/jobs/QuizGenerationJob.js').
 type AudioOverviewGenerationJobPayload = import('../services/jobs/AudioOverviewGenerationJob.js').AudioOverviewGenerationJobPayload;
 type WrittenQuestionsGenerationJobPayload = import('../services/jobs/WrittenQuestionsGenerationJob.js').WrittenQuestionsGenerationJobPayload;
 type SlideDeckGenerationJobPayload = import('../services/jobs/SlideDeckGenerationJob.js').SlideDeckGenerationJobPayload;
+type SpreadsheetGenerationJobPayload = import('../services/jobs/SpreadsheetGenerationJob.js').SpreadsheetGenerationJobPayload;
 
 // Lazy import tasks to catch import errors early
 async function loadTasks() {
@@ -21,7 +22,8 @@ async function loadTasks() {
   const { audioOverviewGenerationJob } = await import('../services/jobs/AudioOverviewGenerationJob.js');
   const { writtenQuestionsGenerationJob } = await import('../services/jobs/WrittenQuestionsGenerationJob.js');
   const { slideDeckGenerationJob } = await import('../services/jobs/SlideDeckGenerationJob.js');
-  return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob, quizGenerationJob, audioOverviewGenerationJob, writtenQuestionsGenerationJob, slideDeckGenerationJob };
+  const { spreadsheetGenerationJob } = await import('../services/jobs/SpreadsheetGenerationJob.js');
+  return { docEmbeddingJob, reportGenerationJob, mindMapGenerationJob, flashcardGenerationJob, quizGenerationJob, audioOverviewGenerationJob, writtenQuestionsGenerationJob, slideDeckGenerationJob, spreadsheetGenerationJob };
 }
 
 // Heartbeat function to monitor worker health
@@ -136,7 +138,7 @@ async function startWorker() {
   for (const [task, limit] of Object.entries(taskConcurrencyLimits)) {
     console.log(`[Worker]   - ${task}: ${limit}`);
   }
-  console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration, quizGeneration, audioOverviewGeneration, writtenQuestionsGeneration, slideDeckGeneration');
+  console.log('[Worker] Registered tasks: docEmbedding, reportGeneration, mindmapGeneration, flashcardGeneration, quizGeneration, audioOverviewGeneration, writtenQuestionsGeneration, slideDeckGeneration, spreadsheetGeneration');
 
   // Start heartbeat in parallel (don't await it)
   startHeartbeat();
@@ -234,6 +236,17 @@ async function startWorker() {
           console.log(`[Worker] [${new Date().toISOString()}] slideDeckGeneration task (Job ID: ${jobId}) completed successfully`);
         } catch (error) {
           console.error(`[Worker] [${new Date().toISOString()}] slideDeckGeneration task (Job ID: ${jobId}) failed:`, error);
+          throw error;
+        }
+      },
+      spreadsheetGeneration: async (payload, helpers) => {
+        const jobId = helpers?.job?.id || 'unknown';
+        console.log(`[Worker] [${new Date().toISOString()}] Received spreadsheetGeneration task (Job ID: ${jobId})`);
+        try {
+          await tasks.spreadsheetGenerationJob(payload as SpreadsheetGenerationJobPayload);
+          console.log(`[Worker] [${new Date().toISOString()}] spreadsheetGeneration task (Job ID: ${jobId}) completed successfully`);
+        } catch (error) {
+          console.error(`[Worker] [${new Date().toISOString()}] spreadsheetGeneration task (Job ID: ${jobId}) failed:`, error);
           throw error;
         }
       },

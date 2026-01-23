@@ -35,7 +35,7 @@ export class SlideDeckGenerationService {
   constructor() {
     // Use FAST_LLM for map phase, SMART_LLM for reduce phases
     const smartModel = env.SMART_LLM || env.FAST_LLM; // Fallback to FAST_LLM if SMART_LLM not configured
-    
+
     this.slideDeckGraph = new SlideDeckGraph(
       env.TOGETHER_AI_API_KEY,
       env.FAST_LLM,      // Fast model for map phase (extracting concepts)
@@ -44,8 +44,6 @@ export class SlideDeckGenerationService {
       env.SUPABASE_URL,
       env.SUPABASE_SERVICE_ROLE_KEY
     );
-    
-    console.log(`[SlideDeckGenerationService] Using FAST_LLM: ${env.FAST_LLM}, SMART_LLM: ${smartModel}`);
   }
 
   async generateSlideDeck(params: SlideDeckGenerationParams): Promise<SlideDeckResult> {

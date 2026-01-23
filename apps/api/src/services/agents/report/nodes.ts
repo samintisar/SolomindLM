@@ -202,7 +202,7 @@ export class ReportGraph {
     timeoutMs: number,
     phase: string
   ): Promise<T> {
-    let timeoutId!: NodeJS.Timeout;
+    let timeoutId!: Timer;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {

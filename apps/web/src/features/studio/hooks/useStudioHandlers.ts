@@ -7,12 +7,14 @@ import { quizzesApi } from '../services/quizzesApi';
 import { audioApi } from '@/features/audio/api/audioApi';
 import { writtenQuestionsApi } from '../services/writtenQuestionsApi';
 import { slidesApi } from '../services/slidesApi';
+import { spreadsheetsApi, getSpreadsheetTypeLabel } from '../services/spreadsheetsApi';
 import { getReportSubtitle } from '@/shared/types/reportTypes';
 import { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
 import { QuizConfig } from '../components/CustomizeQuizModal';
 import { AudioConfig } from '../components/CustomizeAudioModal';
 import { WrittenQuestionsConfig } from '../components/CustomizeWrittenQuestionsModal';
 import { SlideDeckConfig } from '../components/CustomizeSlidesModal';
+import { SpreadsheetConfig } from '../components/CustomizeSpreadsheetsModal';
 
 export interface UseStudioHandlersProps {
   notes: Note[];
@@ -39,6 +41,7 @@ export interface UseStudioHandlersReturn {
   isAudioModalOpen: boolean;
   isWrittenQuestionsModalOpen: boolean;
   isSlidesModalOpen: boolean;
+  isSpreadsheetsModalOpen: boolean;
   // Modal setters
   setIsReportModalOpen: (open: boolean) => void;
   setIsFlashcardModalOpen: (open: boolean) => void;
@@ -46,6 +49,7 @@ export interface UseStudioHandlersReturn {
   setIsAudioModalOpen: (open: boolean) => void;
   setIsWrittenQuestionsModalOpen: (open: boolean) => void;
   setIsSlidesModalOpen: (open: boolean) => void;
+  setIsSpreadsheetsModalOpen: (open: boolean) => void;
   // Handlers
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
@@ -55,6 +59,7 @@ export interface UseStudioHandlersReturn {
   handleCreateAudio: (config: AudioConfig) => void;
   handleCreateWrittenQuestions: (config: WrittenQuestionsConfig) => void;
   handleCreateSlides: (config: SlideDeckConfig) => Promise<void>;
+  handleCreateSpreadsheet: (config: SpreadsheetConfig) => Promise<void>;
 }
 
 export function useStudioHandlers({
@@ -76,6 +81,7 @@ export function useStudioHandlers({
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [isWrittenQuestionsModalOpen, setIsWrittenQuestionsModalOpen] = useState(false);
   const [isSlidesModalOpen, setIsSlidesModalOpen] = useState(false);
+  const [isSpreadsheetsModalOpen, setIsSpreadsheetsModalOpen] = useState(false);
 
   const handleCreateFlashcards = useCallback(async (config: FlashcardConfig) => {
     setIsFlashcardModalOpen(false);
@@ -592,6 +598,8 @@ export function useStudioHandlers({
       handleCreateMindMap();
     } else if (toolId === 'writtenQuestions') {
       setIsWrittenQuestionsModalOpen(true);
+    } else if (toolId === 'spreadsheets') {
+      setIsSpreadsheetsModalOpen(true);
     }
   }, [handleCreateMindMap]);
 
@@ -797,6 +805,100 @@ export function useStudioHandlers({
     }
   }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
 
+  const handleCreateSpreadsheet = useCallback(async (config: SpreadsheetConfig) => {
+    setIsSpreadsheetsModalOpen(false);
+
+    // Get selected document IDs from sources
+    let selectedDocumentIds = sources.filter(s => s.selected).map(s => s.id);
+
+    if (selectedDocumentIds.length === 0) {
+      if (confirm) {
+        await confirm('No Sources Selected', 'Please select at least one source to generate a spreadsheet', { variant: 'warning' });
+      }
+      return;
+    }
+
+    if (!userId || !noteId) {
+      alert('Authentication error. Please log in again.');
+      return;
+    }
+
+    // Get type label for display
+    const typeLabel = getSpreadsheetTypeLabel(config.spreadsheetType);
+
+    // Create placeholder note
+    const placeholderId = Math.random().toString(36).slice(2, 11);
+    const newNote: Note = {
+      id: placeholderId,
+      title: 'Spreadsheet', // Initial placeholder - AI will generate descriptive title
+      preview: `Spreadsheet • ${typeLabel} • Generating...`,
+      type: 'spreadsheet',
+      content: '',
+      status: 'generating',
+      metadata: {
+        spreadsheetType: config.spreadsheetType,
+        documentIds: selectedDocumentIds,
+        customPrompt: config.customPrompt,
+      }
+    };
+
+    onAddNote(newNote);
+
+    try {
+      // Call API to create and queue spreadsheet generation
+      const { spreadsheetId, spreadsheet } = await spreadsheetsApi.createSpreadsheet({
+        notebookId: noteId,
+        documentIds: selectedDocumentIds,
+        spreadsheetType: config.spreadsheetType,
+        customPrompt: config.customPrompt || undefined,
+      });
+
+      // Update note ID with real spreadsheet ID
+      if (onUpdateNoteFull) {
+        onUpdateNoteFull(placeholderId, spreadsheet);
+      }
+
+      // Start polling for status
+      spreadsheetsApi.pollSpreadsheetStatus(
+        spreadsheetId,
+        (updatedNote) => {
+          // Update note during polling
+          if (onUpdateNoteFull) {
+            onUpdateNoteFull(spreadsheetId, updatedNote);
+          }
+        }
+      ).then(finalNote => {
+        // Final update when complete
+        if (onUpdateNoteFull) {
+          onUpdateNoteFull(spreadsheetId, finalNote);
+        }
+      }).catch(error => {
+        console.error('Spreadsheet generation failed:', error);
+        // Update with failed status
+        if (onUpdateNoteFull) {
+          const failedNote = notes.find(n => n.id === spreadsheetId) || newNote;
+          if (failedNote.type === 'spreadsheet') {
+            onUpdateNoteFull(spreadsheetId, {
+              ...failedNote,
+              status: 'failed',
+              preview: `Spreadsheet • ${typeLabel} • Failed`,
+              metadata: {
+                ...failedNote.metadata,
+                error: error instanceof Error ? error.message : 'Failed to generate spreadsheet',
+              }
+            });
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Failed to create spreadsheet:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create spreadsheet');
+      // Remove the placeholder note
+      onDeleteNote(placeholderId);
+    }
+  }, [sources, userId, noteId, notes, onAddNote, onSetActiveNoteId, onUpdateNoteFull, onDeleteNote]);
+
   return {
     isReportModalOpen,
     isFlashcardModalOpen,
@@ -804,12 +906,14 @@ export function useStudioHandlers({
     isAudioModalOpen,
     isWrittenQuestionsModalOpen,
     isSlidesModalOpen,
+    isSpreadsheetsModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
     setIsWrittenQuestionsModalOpen,
     setIsSlidesModalOpen,
+    setIsSpreadsheetsModalOpen,
     handleToolClick,
     handleCreateReport,
     handleCreateFlashcards,
@@ -818,5 +922,6 @@ export function useStudioHandlers({
     handleCreateAudio,
     handleCreateWrittenQuestions,
     handleCreateSlides,
+    handleCreateSpreadsheet,
   };
 }

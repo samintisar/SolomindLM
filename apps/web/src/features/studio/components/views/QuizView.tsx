@@ -117,10 +117,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
     if (questions.length === 0) return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center animate-spin">
-          <Sparkles className="w-6 h-6 text-primary" />
-        </div>
-        <p className="text-muted-foreground font-serif italic">Generating quiz from your sources...</p>
+        <p className="text-muted-foreground font-serif italic">No questions available</p>
       </div>
     );
 
@@ -188,8 +185,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                     <span className="text-sm font-semibold text-foreground truncate">{note.title}</span>
                 </div>
             )}
-            <div className="flex-1 overflow-y-auto">
-                <div className="max-w-2xl mx-auto w-full p-8 md:p-12 min-h-full flex flex-col">
+            <div className="flex-1 bg-card border-t border-border">
+                <div className="max-w-2xl mx-auto w-full p-8 md:p-12 flex flex-col">
                     {/* Review Mode Banner */}
                         {reviewMode && (
                             <div className="mb-6 p-4 bg-vintage-amber-50 dark:bg-vintage-amber-900/20 border border-vintage-amber-200 dark:border-vintage-amber-800 rounded-xl flex items-center gap-3">

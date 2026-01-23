@@ -18,12 +18,12 @@ export const FeaturesGrid: React.FC = () => {
 
   const getColorForFeature = (id: string) => {
     switch (id) {
-      case 'audio': return 'text-indigo-600';
+      case 'audio': return 'text-purple-700';
       case 'mindmap': return 'text-fuchsia-600';
       case 'reports': return 'text-amber-600';
-      case 'flashcards': return 'text-orange-600';
-      case 'quiz': return 'text-sky-600';
-      case 'writtenQuestions': return 'text-emerald-600';
+      case 'flashcards': return 'text-red-700';
+      case 'quiz': return 'text-blue-700';
+      case 'writtenQuestions': return 'text-green-700';
       case 'rag': return 'text-violet-600';
       default: return 'text-primary';
     }

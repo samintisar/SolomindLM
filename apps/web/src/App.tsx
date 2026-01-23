@@ -28,13 +28,14 @@ import { flashcardsApi } from './features/studio/services/flashcardsApi';
 import { quizzesApi } from './features/studio/services/quizzesApi';
 import { writtenQuestionsApi } from './features/studio/services/writtenQuestionsApi';
 import { slidesApi } from './features/studio/services/slidesApi';
+import { spreadsheetsApi } from './features/studio/services/spreadsheetsApi';
 import { audioApi } from './features/audio/api/audioApi';
 import { chatApi } from './features/chat/services/chatApi';
 import { subscriptionApi } from './features/billing/services/subscriptionApi';
 import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
-const MAX_PANEL_WIDTH = 900;
+const getMaxPanelWidth = () => Math.min(window.innerWidth * 0.7, 1400);
 
 // Transform Document API type to Source UI type
 function documentToSource(doc: Document): Source {
@@ -388,6 +389,8 @@ const AppContent: React.FC = () => {
         await writtenQuestionsApi.renameWrittenQuestions(id, newTitle);
       } else if (noteToUpdate?.type === 'slides') {
         await slidesApi.renameSlideDeck(id, newTitle);
+      } else if (noteToUpdate?.type === 'spreadsheet') {
+        await spreadsheetsApi.renameSpreadsheet(id, newTitle);
       } else if (noteToUpdate?.type === 'audio') {
         await audioApi.renameAudioOverview(id, newTitle);
       } else {
@@ -422,13 +425,17 @@ const AppContent: React.FC = () => {
             console.error('Failed to load slide decks:', err);
             return [];
           }),
+          spreadsheetsApi.getSpreadsheets(activeNotebookId).catch(err => {
+            console.error('Failed to load spreadsheets:', err);
+            return [];
+          }),
           audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
             console.error('Failed to load audio overviews:', err);
             return [];
           }),
         ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedAudio].sort((a, b) => {
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedSpreadsheets, loadedAudio]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedSpreadsheets, ...loadedAudio].sort((a, b) => {
               const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
               const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
               return bDate.localeCompare(aDate);
@@ -465,6 +472,8 @@ const AppContent: React.FC = () => {
         await writtenQuestionsApi.deleteWrittenQuestions(id);
       } else if (noteToDelete?.type === 'slides') {
         await slidesApi.deleteSlideDeck(id);
+      } else if (noteToDelete?.type === 'spreadsheet') {
+        await spreadsheetsApi.deleteSpreadsheet(id);
       } else if (noteToDelete?.type === 'audio') {
         await audioApi.deleteAudioOverview(id);
       } else {
@@ -499,13 +508,17 @@ const AppContent: React.FC = () => {
             console.error('Failed to load slide decks:', err);
             return [];
           }),
+          spreadsheetsApi.getSpreadsheets(activeNotebookId).catch(err => {
+            console.error('Failed to load spreadsheets:', err);
+            return [];
+          }),
           audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
             console.error('Failed to load audio overviews:', err);
             return [];
           }),
         ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedAudio].sort((a, b) => {
+          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedSpreadsheets, loadedAudio]) => {
+            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedSpreadsheets, ...loadedAudio].sort((a, b) => {
               const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
               const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
               return bDate.localeCompare(aDate);
@@ -589,15 +602,16 @@ const AppContent: React.FC = () => {
 
   const resize = useCallback(
     (mouseMoveEvent: MouseEvent) => {
+      const maxWidth = getMaxPanelWidth();
       if (isResizingLeft) {
         const newWidth = mouseMoveEvent.clientX;
-        if (newWidth >= MIN_PANEL_WIDTH && newWidth <= MAX_PANEL_WIDTH) {
+        if (newWidth >= MIN_PANEL_WIDTH && newWidth <= maxWidth) {
           setLeftWidth(newWidth);
         }
       }
       if (isResizingRight) {
         const newWidth = window.innerWidth - mouseMoveEvent.clientX;
-        if (newWidth >= MIN_PANEL_WIDTH && newWidth <= MAX_PANEL_WIDTH) {
+        if (newWidth >= MIN_PANEL_WIDTH && newWidth <= maxWidth) {
           setRightWidth(newWidth);
         }
       }
@@ -735,7 +749,7 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated, user, activeNotebookId, currentView]);
 
-  // Load notes, mind maps, flashcards, quizzes, written questions, slides, and audio overviews from API when authenticated and notebook is active
+  // Load notes, mind maps, flashcards, quizzes, written questions, slides, spreadsheets, and audio overviews from API when authenticated and notebook is active
   useEffect(() => {
     if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
       // Fetch all content types in parallel
@@ -764,14 +778,18 @@ const AppContent: React.FC = () => {
           console.error('Failed to load slide decks:', err);
           return [];
         }),
+        spreadsheetsApi.getSpreadsheets(activeNotebookId).catch(err => {
+          console.error('Failed to load spreadsheets:', err);
+          return [];
+        }),
         audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
           console.error('Failed to load audio overviews:', err);
           return [];
         }),
       ])
-        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedAudio]) => {
+        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedSpreadsheets, loadedAudio]) => {
           // Merge all content types, sort by created_at descending
-          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedAudio].sort((a, b) => {
+          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedSpreadsheets, ...loadedAudio].sort((a, b) => {
             const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
             const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
             return bDate.localeCompare(aDate);

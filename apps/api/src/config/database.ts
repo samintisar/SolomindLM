@@ -1,12 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { env } from './env.js';
 
-// Only log in development mode and without sensitive data
-if (env.NODE_ENV === 'development') {
-  console.log('[Database] SUPABASE_URL:', env.SUPABASE_URL);
-  console.log('[Database] Supabase client configured');
-}
-
 // Service role client - bypasses RLS, use for admin operations
 // Refresh token rotation is enabled to prevent reuse of old refresh tokens
 export const supabase = createClient(

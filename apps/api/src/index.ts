@@ -33,9 +33,7 @@ dotenv.config({
 // Ensure Graphile Worker schema is migrated before starting server
 async function ensureGraphileWorkerSchema() {
   try {
-    console.log('[API] Running Graphile Worker schema migration...');
     await runMigrations({ pgPool });
-    console.log('[API] Graphile Worker schema migration completed');
 
     // Verify the schema is installed by checking for the add_job function
     const verifyResult = await pgPool.query(`
@@ -48,16 +46,9 @@ async function ensureGraphileWorkerSchema() {
     if (!verifyResult.rows[0].exists) {
       throw new Error('Graphile Worker schema verification failed - add_job function not found');
     }
-    console.log('[API] Graphile Worker schema verified successfully');
   } catch (error) {
     console.error('[API] CRITICAL: Graphile Worker schema migration failed:', error);
-    if (error instanceof Error) {
-      console.error('[API] Error details:', {
-        message: error.message,
-        code: (error as any).code,
-      });
-    }
-    // Still attempt to start, but flashcard creation will fail
+    // Still attempt to start, but background jobs will fail
   }
 }
 
@@ -184,27 +175,11 @@ app.use(errorHandler);
 // Start server
 async function startServer() {
   try {
-    console.log('[API] 🚀 Starting SolomindLM API...');
-    console.log('[API] Environment:', env.NODE_ENV);
-    console.log('[API] Port:', PORT);
-    console.log('[API] Database URL:', env.DATABASE_URL ? 'Set' : 'MISSING');
-    console.log('[API] Supabase URL:', env.SUPABASE_URL ? 'Set' : 'MISSING');
-
     // Ensure Graphile Worker schema exists
     await ensureGraphileWorkerSchema();
 
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`
-╔═════════════════════════════════════════════════════════╗
-║                                                         ║
-║        SolomindLM Ingestion Pipeline API               ║
-║                                                         ║
-║        Server running on 0.0.0.0:${PORT}                  ║
-║        Environment: ${env.NODE_ENV}                       ║
-║        Background: Graphile Worker (PostgreSQL)        ║
-║                                                         ║
-╚═════════════════════════════════════════════════════════╝
-      `);
+      console.log(`🚀 SolomindLM API running on http://0.0.0.0:${PORT} (${env.NODE_ENV})`);
     });
   } catch (error) {
     console.error('[API] ❌ Failed to start server:');

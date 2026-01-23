@@ -16,6 +16,7 @@ export const JobPriority = {
   QUIZ_GENERATION: 15,
 
   // MEDIUM: Medium duration tasks
+  SPREADSHEET_GENERATION: 22,
   WRITTEN_QUESTIONS_GENERATION: 20,
   REPORT_GENERATION: 25,
 
@@ -275,6 +276,27 @@ export async function scheduleSlideDeckGeneration(
 ) {
   return scheduleJob('slideDeckGeneration', payload, {
     priority: JobPriority.SLIDE_DECK_GENERATION,
+    ...options,
+  });
+}
+
+/**
+ * Schedule a spreadsheet generation job
+ * Priority: MEDIUM
+ */
+export async function scheduleSpreadsheetGeneration(
+  payload: {
+    spreadsheetId: string;
+    userId: string;
+    notebookId: string;
+    documentIds: string[];
+    spreadsheetType: string;
+    customPrompt?: string;
+  },
+  options?: JobScheduleOptions
+) {
+  return scheduleJob('spreadsheetGeneration', payload, {
+    priority: JobPriority.SPREADSHEET_GENERATION,
     ...options,
   });
 }
