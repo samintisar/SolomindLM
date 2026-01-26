@@ -165,3 +165,4 @@ cd apps/api && bun run type-check
 3. **Processing**: LangChain agent generates content using RAG
 4. **Polling**: Frontend polls job status
 5. **Delivery**: Generated content displayed when complete
+test
