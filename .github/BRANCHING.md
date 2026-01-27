@@ -83,11 +83,11 @@ chore: upgrade dependencies
 
 ## Setting Up Branch Protection
 
-### Option 1: Using the Provided Script (Recommended)
+### Option 1: Using the Provided PowerShell Script (Windows/PowerShell, Recommended)
 
-```bash
-chmod +x .github/branch-protection.sh
-.github/branch-protection.sh
+```powershell
+# Run this from a PowerShell prompt
+pwsh -File .github/branch-protection.ps1
 ```
 
 ### Option 2: Manual Setup via GitHub UI
