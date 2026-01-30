@@ -80,7 +80,7 @@ export async function streamChatResponse(
 ): Promise<{ fullResponse: string; references: unknown[]; hasError: boolean }> {
   const notebookIdTyped = notebookId as Id<"notebooks">;
 
-  console.log("[ChatStreamV2] Starting stream:", streamId);
+  console.log("[ChatStream] Starting stream:", streamId);
 
   // Ensure conversation exists
   const conversationId = await ctx.runMutation(internal.chat.ensureConversation, {
@@ -207,7 +207,7 @@ export async function streamChatResponse(
       }
     }
   } catch (error) {
-    console.error("[ChatStreamV2] Error during generation:", error);
+    console.error("[ChatStream] Error during generation:", error);
     hasError = true;
     await chunkAppender(`\n__ERROR:${JSON.stringify({ message: error instanceof Error ? error.message : "Unknown error" })}\n`);
   }
@@ -220,7 +220,7 @@ export async function streamChatResponse(
     references,
   });
 
-  console.log("[ChatStreamV2] Stream complete:", streamId);
+  console.log("[ChatStream] Stream complete:", streamId);
 
   return {
     fullResponse,

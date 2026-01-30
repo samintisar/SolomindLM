@@ -26,6 +26,7 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+      {/* Move App inside the provider - it contains BrowserRouter */}
       <App />
     </ConvexBetterAuthProvider>
   </React.StrictMode>

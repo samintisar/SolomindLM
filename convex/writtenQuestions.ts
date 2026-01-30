@@ -297,3 +297,35 @@ export const patch = internalMutation({
     });
   },
 });
+
+/**
+ * Internal: Update a specific user's answer (merges with existing answers)
+ */
+export const patchUserAnswer = internalMutation({
+  args: {
+    writtenQuestionId: v.id("writtenQuestions"),
+    questionId: v.string(),
+    answerData: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
+    if (!writtenQuestion) {
+      throw new Error("Written question set not found");
+    }
+
+    // Get existing user answers or initialize empty object
+    const existingUserAnswers = (writtenQuestion.metadata as any)?.userAnswers || {};
+
+    // Merge the new answer with existing ones
+    await ctx.db.patch(args.writtenQuestionId, {
+      metadata: {
+        ...writtenQuestion.metadata,
+        userAnswers: {
+          ...existingUserAnswers,
+          [args.questionId]: args.answerData,
+        },
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});

@@ -199,19 +199,13 @@ export function useDeleteWrittenQuestions() {
  * Submit an answer for grading
  */
 export function useSubmitWrittenAnswer() {
-  const update = useMutation(api.writtenQuestions.update);
+  const submitAndGrade = useAction(api.writtenQuestionActions.submitAndGrade);
 
   return async (params: SubmitAnswerParams) => {
-    return await update({
-      id: params.writtenQuestionsId as Id<'writtenQuestions'>,
-      metadata: {
-        userAnswers: {
-          [params.questionId]: {
-            answer: params.answer,
-            submittedAt: Date.now(),
-          },
-        },
-      },
+    return await submitAndGrade({
+      writtenQuestionsId: params.writtenQuestionsId as Id<'writtenQuestions'>,
+      questionId: params.questionId,
+      answer: params.answer,
     });
   };
 }

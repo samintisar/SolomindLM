@@ -34,12 +34,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
   const resetAnswersMutation = useResetWrittenAnswers();
   const latestNote = useWrittenQuestionSet(note.id);
 
-  // Sync userAnswers with note.userAnswers
+  // Sync userAnswers with latestNote.userAnswers (reactive to database updates)
   useEffect(() => {
-    if (note.userAnswers) {
-      setUserAnswers(note.userAnswers);
+    if (latestNote?.userAnswers) {
+      setUserAnswers(latestNote.userAnswers);
     }
-  }, [note.userAnswers]);
+  }, [latestNote?.userAnswers]);
 
   // Use questions from the note
   const questions = note.questions || [];
@@ -81,24 +81,17 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
     setIsSubmitting(true);
 
     try {
-      // Submit answer for grading
-      await submitAnswerMutation({
+      // Submit answer for grading - now synchronous, returns graded result
+      const result = await submitAnswerMutation({
         writtenQuestionsId: note.id,
         questionId: currentQuestion.id,
         answer: currentAnswer,
       });
 
-      // Poll for graded result - pass a function that returns the latest note
-      await writtenQuestionsApi.pollGradedResult(
-        () => latestNote,
-        currentQuestion.id,
-        (graded) => {
-          // Optionally show polling state
-          console.log('Grading status:', graded ? 'Complete' : 'In progress...');
-        }
-      );
+      console.log('Grading complete:', result);
 
-      // Refresh the note to get the graded result
+      // The useEffect will sync userAnswers from latestNote when the database updates
+      // Just notify parent of the update
       if (latestNote && onNoteUpdate) {
         onNoteUpdate(latestNote);
       }

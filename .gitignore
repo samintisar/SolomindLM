@@ -141,3 +141,6 @@ dist
 
 # Convex debug bundle (local only)
 debug-bundle/
+
+# Convex snapshot exports (dev-to-prod backups); keep convex-exports/ folder
+convex-exports/*.zip

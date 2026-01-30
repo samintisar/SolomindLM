@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { User, Loader2, Info, Mail, Lock, X } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { authClient } from "@/lib/auth-client";
@@ -16,6 +17,7 @@ const inputBase =
   "w-full rounded-lg border border-border bg-secondary/50 px-3 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent font-serif text-sm transition-colors";
 
 export function LoginModal({ onClose, authError, initialMode = "signIn" }: LoginModalProps) {
+  const navigate = useNavigate();
   const { signIn, signUp, resetPassword, forgetPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [error, setError] = useState("");
@@ -55,6 +57,7 @@ export function LoginModal({ onClose, authError, initialMode = "signIn" }: Login
       if (mode === "signIn") {
         await signIn(email, password);
         onClose();
+        navigate("/home", { replace: true });
       } else if (mode === "signUp") {
         if (password.length < 8) {
           setError("Password must be at least 8 characters");
@@ -82,13 +85,16 @@ export function LoginModal({ onClose, authError, initialMode = "signIn" }: Login
     try {
       setIsLoading(true);
       setError("");
+      // Set flag to track OAuth in progress
+      sessionStorage.setItem('oauth_in_progress', 'true');
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: window.location.href,
+        callbackURL: `${window.location.origin}/home`, // Redirect to /home after OAuth
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
       setIsLoading(false);
+      sessionStorage.removeItem('oauth_in_progress');
     }
   };
 

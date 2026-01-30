@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { X, Search, Globe, Plus, Loader2, ExternalLink } from 'lucide-react';
 import { Source } from '@/shared/types/index';
-import { useDiscoverSources, uploadUrl } from '../services/documentsApi';
+import { useDiscoverSources, useCreateDocument } from '../services/documentsApi';
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
@@ -37,6 +37,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const discoverSources = useDiscoverSources();
+  const createDocument = useCreateDocument();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +78,12 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
     ));
 
     try {
-      const response = await uploadUrl(noteId, result.url, 'url');
+      const response = await createDocument({
+        notebookId: noteId,
+        type: 'url',
+        source: result.url,
+        fileName: result.title || result.url,
+      });
 
       // Create a Source object for the frontend
       const newSource: Source = {

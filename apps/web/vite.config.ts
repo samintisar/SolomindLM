@@ -51,15 +51,6 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
-      // Proxy /auth to Convex in dev so requests are same-origin and CORS is avoided (only when Convex URL is set)
-      ...(convexSiteUrl && {
-        proxy: {
-          '/auth': {
-            target: convexSiteUrl,
-            changeOrigin: true,
-          },
-        },
-      }),
     },
     resolve: {
       alias: {

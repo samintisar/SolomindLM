@@ -21,12 +21,30 @@ export const authComponent = createClient<DataModel>(
 );
 
 export function createAuth(ctx: GenericCtx<DataModel>) {
+  const options = createAuthOptions();
+  const isDev = siteUrl.includes('localhost') || siteUrl.includes('127.0.0.1');
+
+  if (isDev) {
+    console.log("[AuthComponent] Creating auth with config:", {
+      baseURL: options.baseURL,
+      basePath: options.basePath,
+      trustedOrigins: options.trustedOrigins,
+      siteUrl,
+    });
+  }
+
   return betterAuth({
-    ...createAuthOptions(),
+    ...options,
     database: authComponent.adapter(ctx),
     plugins: [
+      // crossDomain IS needed for local development (localhost → Convex)
+      // This allows the session to work across different origins
       crossDomain({ siteUrl }),
       convex({ authConfig, options: { basePath: "/auth" } }),
     ],
+    // Enable debug logging only in dev
+    _debug: {
+      log: isDev,
+    },
   });
 }

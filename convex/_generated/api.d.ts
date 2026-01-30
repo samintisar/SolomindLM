@@ -57,6 +57,7 @@ import type * as storage_VectorStoreService from "../storage/VectorStoreService.
 import type * as stripeWebhook from "../stripeWebhook.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as titleGenerator from "../titleGenerator.js";
+import type * as writtenQuestionActions from "../writtenQuestionActions.js";
 import type * as writtenQuestions from "../writtenQuestions.js";
 
 import type {
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   stripeWebhook: typeof stripeWebhook;
   subscriptions: typeof subscriptions;
   titleGenerator: typeof titleGenerator;
+  writtenQuestionActions: typeof writtenQuestionActions;
   writtenQuestions: typeof writtenQuestions;
 }>;
 

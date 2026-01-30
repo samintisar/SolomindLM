@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { useQuery, useConvexAuth } from 'convex/react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@convex/_generated/api';
@@ -14,6 +14,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  authError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
@@ -21,6 +22,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  clearAuthError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const currentUser = useQuery(api.auth.getCurrentUser);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Note: OAuth callback handling is done by ConvexBetterAuthProvider in index.tsx
+  // It automatically verifies OTT, fetches Convex token, and sets auth
+  // We just need to provide the auth context and handle navigation if needed
 
   const user: User | null = currentUser
     ? {
@@ -80,16 +87,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async (): Promise<void> => {
+    setAuthError(null);
+    sessionStorage.setItem('oauth_in_progress', 'true');
     await authClient.signIn.social({
       provider: 'google',
-      callbackURL: window.location.href,
+      callbackURL: `${window.location.origin}/home`,
     });
   };
 
   const signOut = async (): Promise<void> => {
     await authClient.signOut();
+    sessionStorage.removeItem('oauth_in_progress');
     // Immediate redirect to home page to prevent queries from running without auth
     navigate('/home', { replace: true });
+  };
+
+  const clearAuthError = (): void => {
+    setAuthError(null);
   };
 
   const refreshSession = async (): Promise<void> => {
@@ -102,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated,
+        authError,
         signIn,
         signUp,
         resetPassword,
@@ -109,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signOut,
         refreshSession,
+        clearAuthError,
       }}
     >
       {children}

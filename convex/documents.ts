@@ -468,6 +468,7 @@ export const discoverSources = action({
   args: {
     query: v.string(),
     maxResults: v.optional(v.number()),
+    scoreThreshold: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -479,6 +480,7 @@ export const discoverSources = action({
     }
 
     const maxResults = args.maxResults || 5;
+    const scoreThreshold = args.scoreThreshold ?? 0.5;
 
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST",
@@ -501,14 +503,16 @@ export const discoverSources = action({
 
     const data = await response.json();
 
-    // Transform Tavily results to our format
-    const sources = (data.results || []).map((result: any) => ({
-      url: result.url,
-      title: result.title,
-      snippet: result.content || "",
-      publishedDate: result.published_date || null,
-      score: result.score || 0,
-    }));
+    // Transform Tavily results to our format and filter by score
+    const sources = (data.results || [])
+      .map((result: any) => ({
+        url: result.url,
+        title: result.title,
+        snippet: result.content || "",
+        publishedDate: result.published_date || null,
+        score: result.score || 0,
+      }))
+      .filter((source: { score: number }) => source.score >= scoreThreshold);
 
     return {
       sources,

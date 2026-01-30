@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { components, internal } from "./_generated/api";
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
+import { corsRouter } from "convex-helpers/server/cors";
 
 const http = httpRouter();
 
@@ -24,20 +25,17 @@ const getAllowedOrigins = (): string[] => {
   return [...new Set([...DEV_ORIGINS, ...fromEnv])];
 };
 
-// better-auth cross-domain client sends "Better-Auth-Cookie"; allow both casings for gateways that match case-sensitive.
-const CORS_ALLOW_HEADERS =
-  "Content-Type, Authorization, X-Requested-With, better-auth-cookie, Better-Auth-Cookie";
-
+// CORS for non-auth routes (health, chat/stream)
 const getCorsHeaders = (origin?: string | null): Record<string, string> => {
   const allowedOrigins = getAllowedOrigins();
   const allowOrigin = origin && allowedOrigins.includes(origin)
     ? origin
     : allowedOrigins[0];
-
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Requested-With, better-auth-cookie, Better-Auth-Cookie",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     "Vary": "origin",
@@ -46,16 +44,10 @@ const getCorsHeaders = (origin?: string | null): Record<string, string> => {
 
 // ============================================================
 // Auth Routes (forward to Node so isolate never imports better-auth)
+// Use corsRouter so CORS matches @convex-dev/better-auth (Better-Auth-Cookie, Set-Better-Auth-Cookie).
 // ============================================================
 
 const authHandler = httpAction(async (ctx, request) => {
-  // Never forward OPTIONS to Node; return CORS here so preflight always has ok status
-  if (request.method === "OPTIONS") {
-    const origin = request.headers.get("origin");
-    const headers = new Headers(getCorsHeaders(origin));
-    headers.set("Cache-Control", "no-store"); // avoid cached preflight with stale Allow-Headers
-    return new Response("", { status: 200, headers });
-  }
   const url = request.url;
   const method = request.method;
   const headers: Record<string, string> = {};
@@ -69,55 +61,28 @@ const authHandler = httpAction(async (ctx, request) => {
     headers,
     body,
   });
-  // Auth runs in Node and does not set CORS; add them so browser from localhost works
-  const origin = request.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-  const responseHeaders = new Headers({ ...corsHeaders, ...result.headers });
   return new Response(result.body, {
     status: result.status,
-    headers: responseHeaders,
+    headers: new Headers(result.headers),
   });
 });
 
-// Convex .convex.site does NOT route /api/* to this httpRouter (returns "No matching routes").
-// Auth must live at /auth/*; client and server basePath are set to /auth.
-// pathPrefix must end with "/" per Convex docs. OPTIONS must be registered first for preflight.
-
-const authOptionsHandler = httpAction(async (_ctx, request) => {
-  try {
-    console.log("[OPTIONS] Preflight request received:", request.url);
-    const origin = request.headers.get("origin");
-    console.log("[OPTIONS] Origin:", origin);
-    const corsHeaders = getCorsHeaders(origin);
-    const headers = new Headers(corsHeaders);
-    headers.set("Cache-Control", "no-store");
-    console.log("[OPTIONS] CORS headers:", corsHeaders);
-    // Use 200 (not 204) so browsers/proxies that require "HTTP ok status" accept the preflight
-    return new Response("", { status: 200, headers });
-  } catch (error) {
-    console.error("[OPTIONS] Error handling preflight:", error);
-    const headers = new Headers(getCorsHeaders(request.headers.get("origin")));
-    headers.set("Cache-Control", "no-store");
-    return new Response("", { status: 200, headers });
-  }
+const authCors = corsRouter(http, {
+  allowedOrigins: async () => getAllowedOrigins(),
+  allowCredentials: true,
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "better-auth-cookie",
+    "Better-Auth-Cookie",
+  ],
+  exposedHeaders: ["Set-Better-Auth-Cookie"],
+  browserCacheMaxAge: 0,
 });
 
-// Auth routes: OPTIONS first so preflight is matched, then GET/POST
-http.route({
-  pathPrefix: "/auth/",
-  method: "OPTIONS",
-  handler: authOptionsHandler,
-});
-http.route({
-  pathPrefix: "/auth/",
-  method: "GET",
-  handler: authHandler,
-});
-http.route({
-  pathPrefix: "/auth/",
-  method: "POST",
-  handler: authHandler,
-});
+authCors.route({ pathPrefix: "/auth/", method: "GET", handler: authHandler });
+authCors.route({ pathPrefix: "/auth/", method: "POST", handler: authHandler });
 
 // ============================================================
 // Stripe Webhook (Forward to Node Action)
