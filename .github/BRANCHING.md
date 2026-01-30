@@ -57,7 +57,7 @@ git push -u origin feature/your-feature-name
 
 - `main` branch deploys automatically to production
 - Web → Vercel
-- API → Railway
+- Backend → Convex
 
 ## Branch Naming Conventions
 
@@ -102,7 +102,7 @@ chmod +x .github/branch-protection.sh
    | Require a pull request | ✅ (1 approval) |
    | Require status checks | ✅ |
    | Require branches to be up to date | ✅ |
-   | Require status checks to pass | `Type Check (API)`, `Build (Web)`, `Build (API)` |
+   | Require status checks to pass | `Build (Web)`, `Type Check` (as configured) |
    | Do not allow bypassing the settings | ✅ |
    | Require resolution of conversations | Optional |
 
@@ -115,9 +115,8 @@ The `.github/workflows/ci.yml` runs on:
 - Pull requests targeting `main`
 
 Jobs:
-1. **Type Check (API)** - Validates TypeScript types in `apps/api`
-2. **Build (Web)** - Builds the React frontend
-3. **Build (API)** - Builds the Express backend
+1. **Build (Web)** - Builds the React frontend
+2. **Type Check** - Validates TypeScript (when configured)
 
 ## Best Practices
 

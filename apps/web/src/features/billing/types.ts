@@ -8,6 +8,9 @@ export type SubscriptionStatus =
 export interface SubscriptionStatusResponse {
   hasSubscription: boolean;
   status?: SubscriptionStatus;
+  plan?: 'free' | 'premium';
+  notebookLimit?: number;
+  sourceLimit?: number;
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
   interval?: SubscriptionInterval;
@@ -22,6 +25,6 @@ export interface CheckoutSessionRequest {
 }
 
 export interface CheckoutSessionResponse {
-  checkoutUrl: string;
+  url: string;
   sessionId: string;
 }

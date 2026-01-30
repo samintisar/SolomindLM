@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, LayoutGrid, List, ChevronDown, Calendar, ArrowUpAZ, CheckCircle2, Plus } from 'lucide-react';
 import { NotebookItem, FolderItem } from '@/shared/types/index';
 import { NotebookCard } from '../cards/NotebookCard';
 import { useNotebookHandlers, useNotebookSorting } from '../../hooks';
-import { foldersApi } from '../../services/foldersApi';
+import { useFolderNotebooks } from '../../services/foldersApi';
+import { useCreateNotebook, useUpdateNotebook } from '../../services/notebooksApi';
 import { CustomizeNotebookModal, MoveToFolderModal } from '../modals';
+import { PageSkeleton } from '@/shared/components/PageSkeleton';
+import { ItemSkeleton } from '@/shared/components/ItemSkeleton';
 
 interface FolderViewProps {
   folderId: string;
@@ -33,40 +36,24 @@ export const FolderView: React.FC<FolderViewProps> = ({
   loadFolders,
   onRequireAuth,
 }) => {
-  const [folder, setFolder] = useState<FolderItem | null>(null);
-  const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
 
-  // Load folder and notebooks
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [folderData, notebooksData] = await Promise.all([
-          foldersApi.getFolder(folderId),
-          foldersApi.getFolderNotebooks(folderId),
-        ]);
-        setFolder(folderData);
-        setNotebooks(notebooksData);
-      } catch (err) {
-        console.error('Failed to load folder:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load folder');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Use Convex hooks - undefined means loading, empty array means no results
+  const folderNotebooks = useFolderNotebooks(folderId);
+  const createNotebook = useCreateNotebook();
+  const updateNotebook = useUpdateNotebook();
 
-    if (folderId) {
-      loadData();
+  // Find folder from props - use useMemo to avoid recalculating
+  const folder = useMemo(() => {
+    if (folders.length > 0) {
+      return folders.find(f => f.id === folderId) || null;
     }
-  }, [folderId]);
+    return null;
+  }, [folders, folderId]);
 
   // Custom hooks for state and handlers
   const notebookHandlers = useNotebookHandlers({
-    notebooks,
+    notebooks: folderNotebooks ?? [],
     onUpdateNotebook,
     onDeleteNotebook,
   });
@@ -74,53 +61,30 @@ export const FolderView: React.FC<FolderViewProps> = ({
   const { sortOption, isSortMenuOpen, setSortOption, setIsSortMenuOpen, getSortedNotebooks } = useNotebookSorting();
 
   // Sort notebooks based on current sort option
-  const sortedNotebooks = getSortedNotebooks(notebooks);
+  const sortedNotebooks = getSortedNotebooks(folderNotebooks ?? []);
 
-  // Click outside to close menus
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (notebookHandlers.activeMenuId && !(e.target as Element).closest('.kebab-menu')) {
-        notebookHandlers.setActiveMenuId(null);
-      }
-    };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [notebookHandlers.activeMenuId, notebookHandlers.setActiveMenuId]);
+  // Handler for deleting notebooks in folder view
+  const handleDeleteNotebook = async (notebookId: string) => {
+    // Call the parent's delete handler
+    await onDeleteNotebook(notebookId);
+    // Note: Convex hooks will auto-update, but App.tsx handles navigation
+  };
 
-  const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
+  const handleMoveNotebook = async (notebookId: string, targetFolderId: string | null) => {
     if (onMoveNotebookToFolder) {
-      onMoveNotebookToFolder(notebookId, folderId);
-      // Reload notebooks after moving
-      foldersApi.getFolderNotebooks(folderId || '').then(setNotebooks).catch(console.error);
-      if (loadFolders) loadFolders();
+      await onMoveNotebookToFolder(notebookId, targetFolderId);
+      // Optimistic updates handle the UI update automatically
     }
     notebookHandlers.closeMoveToFolder();
   };
 
-  const handleDeleteNotebook = async (notebookId: string) => {
-    // Call the parent's delete handler
-    await onDeleteNotebook(notebookId);
-    
-    // Update local state to remove the deleted notebook
-    setNotebooks(prev => prev.filter(nb => nb.id !== notebookId));
-    
-    // Reload folders to update the notebook count
-    if (loadFolders) loadFolders();
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 overflow-y-auto bg-background p-6 md:p-12 font-serif">
-        <div className="max-w-[1600px] mx-auto">
-          <div className="flex items-center justify-center py-20">
-            <div className="text-muted-foreground">Loading folder...</div>
-          </div>
-        </div>
-      </div>
-    );
+  // Loading state
+  if (folderNotebooks === undefined) {
+    return <PageSkeleton />;
   }
 
-  if (error || !folder) {
+  // Error/Not found state
+  if (!folder) {
     return (
       <div className="flex-1 overflow-y-auto bg-background p-6 md:p-12 font-serif">
         <div className="max-w-[1600px] mx-auto">
@@ -132,7 +96,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
             <span>Back</span>
           </button>
           <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm">
-            {error || 'Folder not found'}
+            Folder not found
           </div>
         </div>
       </div>
@@ -276,28 +240,23 @@ export const FolderView: React.FC<FolderViewProps> = ({
       {(notebookHandlers.customizingId || notebookHandlers.isCreatingNotebook) && (
         <CustomizeNotebookModal
           notebook={
-            notebookHandlers.isCreatingNotebook 
-              ? undefined 
-              : notebooks.find(n => n.id === notebookHandlers.customizingId)
+            notebookHandlers.isCreatingNotebook
+              ? undefined
+              : sortedNotebooks.find(n => n.id === notebookHandlers.customizingId)
           }
           onClose={notebookHandlers.closeCustomize}
           onSave={async (data) => {
             if (notebookHandlers.isCreatingNotebook) {
               try {
-                // Create notebook
-                const { notebooksApi } = await import('../../services/notebooksApi');
-                const newNotebook = await notebooksApi.createNotebook({
+                // Create notebook using hook
+                await createNotebook({
                   title: data.title,
                   coverColor: data.coverColor,
                   icon: data.icon,
+                  folderId: folderId,
                 });
-                // Move to folder using updateNotebook
-                await notebooksApi.updateNotebook(newNotebook.id, { folderId });
                 notebookHandlers.closeCustomize();
-                // Reload notebooks
-                const updatedNotebooks = await foldersApi.getFolderNotebooks(folderId);
-                setNotebooks(updatedNotebooks);
-                if (loadFolders) loadFolders();
+                // Optimistic updates handle the UI update automatically
               } catch (error) {
                 console.error('Failed to create notebook:', error);
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -309,9 +268,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
             } else {
               await onUpdateNotebook(notebookHandlers.customizingId!, data);
               notebookHandlers.closeCustomize();
-              // Reload notebooks
-              const updatedNotebooks = await foldersApi.getFolderNotebooks(folderId);
-              setNotebooks(updatedNotebooks);
+              // Optimistic updates handle the UI update automatically
             }
           }}
         />

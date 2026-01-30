@@ -229,10 +229,10 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   const handleExportFlashcards = async () => {
     if (!activeNote || !isFlashcardNote(activeNote)) return;
-    
+
     try {
       setIsExporting(true);
-      await flashcardsApi.exportFlashcardsCSV(activeNote.id, activeNote.title);
+      await flashcardsApi.exportFlashcardsCSV(activeNote.id, activeNote.title, activeNote.flashcards);
     } catch (error) {
       console.error('Failed to export flashcards:', error);
       alert('Failed to export flashcards. Please try again.');
@@ -524,14 +524,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             </div>
         )}
       </div>
-
-      {!activeNote && !miniPlayerVisible && (
-          <div className="p-4 border-t border-border bg-sidebar/30 mt-auto">
-            <button className="w-full py-2 bg-sidebar-accent border border-sidebar-border text-sidebar-foreground text-xs font-bold uppercase tracking-wide rounded-sm hover:bg-sidebar-accent/80 transition-colors shadow-sm">
-              + Add New Note
-            </button>
-          </div>
-      )}
 
       {activeNote && isFlashcardNote(activeNote) && !miniPlayerVisible && (
           <div className="p-4 border-t border-border bg-sidebar/30 mt-auto">

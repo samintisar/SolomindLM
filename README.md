@@ -34,9 +34,8 @@ AI-powered research platform with multi-source content ingestion, RAG-based chat
 - Mind Elixir (mind maps), React Flip Toolkit (flashcards)
 
 ### Backend
-- Bun runtime, Express, TypeScript, LangChain
-- Supabase (PostgreSQL + pgvector)
-- Graphile Worker (background jobs)
+- Convex (backend, auth, storage, real-time)
+- Bun runtime, TypeScript, LangChain
 
 ### AI Services
 - **Cohere**: Embeddings, text generation
@@ -59,16 +58,11 @@ SolomindLM/
 │   │       │   └── studio/     # AI generation tools (reports, flashcards, quizzes, mind maps)
 │   │       └── shared/
 │   │           └── types/      # Shared TypeScript types
-│   └── api/                    # Express backend
-│       └── src/
-│           ├── routes/         # API endpoints
-│           ├── services/
-│           │   ├── agents/     # LangChain agents (ReportGraph, MindMapGraph)
-│           │   ├── discovery/  # Tavily web search
-│           │   ├── extraction/ # Supadata content extraction
-│           │   ├── generation/ # Report & mind map generation
-│           │   └── jobs/       # Background jobs (Graphile Worker)
-│           └── utils/          # Worker utilities
+├── convex/                     # Convex backend
+│   ├── jobs/                   # Generation jobs (reports, flashcards, quizzes, etc.)
+│   ├── storage/                # Vector store, chat history
+│   └── *.ts                    # Functions, auth, schema
+├── lib/                        # Shared agents & utilities (used by Convex)
 ├── bun.lock
 └── package.json                # Workspace configuration
 ```
@@ -85,47 +79,20 @@ bun install
 
 ### 2. Configure environment
 
-Copy `apps/api/.env.example` to `apps/api/.env`:
+- **Convex**: Copy `.env.example` to `.env` in the project root and set Convex + AI keys (see Convex dashboard and docs).
+- **Web**: Copy `apps/web/.env.example` to `apps/web/.env` and set:
+  - `VITE_CONVEX_URL` – your Convex deployment URL (e.g. `https://your-deployment.convex.cloud`)
+  - `VITE_CONVEX_SITE_URL` – Convex site URL for HTTP actions (e.g. `https://your-deployment.convex.site`), or omit and it will be derived from `VITE_CONVEX_URL`.
 
-```bash
-# Server
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
-
-# Supabase (from Dashboard → Settings → API)
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-# Database (from Dashboard → Settings → Database → Connection String - Transaction mode)
-DATABASE_URL=
-
-# AI Services
-OPENAI_API_KEY=                          # Embeddings
-ZEROENTROPY_API_KEY=                     # Reranking
-MISTRAL_API_KEY=                         # OCR for images
-TOGETHER_AI_API_KEY=                     # LLM & title generation
-TOGETHER_AI_MODEL=
-
-# Content Discovery & Extraction
-TAVILY_API_KEY=                          # Web source discovery
-SUPADATA_API_KEY=                        # YouTube, TikTok, Instagram, X transcripts
-
-# Generation
-REPORT_MAX_TOKENS=24000
-```
+**Dev vs prod:** Convex dev and prod deployments have different URLs. Use dev URLs in `apps/web/.env.local` when running locally; set **prod** `VITE_CONVEX_URL` and `VITE_CONVEX_SITE_URL` in your production hosting (e.g. Vercel env vars) so the production build talks to your prod Convex deployment.
 
 ### 3. Start the application
 
 ```bash
-# Terminal 1: API
-bun run dev:api
+# Terminal 1: Convex
+bunx convex dev
 
-# Terminal 2: Background worker
-bun run worker
-
-# Terminal 3: Web
+# Terminal 2: Web
 bun run dev:web
 ```
 
@@ -134,35 +101,31 @@ Open http://localhost:5173
 ### Additional Commands
 
 ```bash
-# Clear all pending jobs from the queue
-bun run clear-jobs
-
 # Build for production
 bun run build:prod
 
-# Type checking
-cd apps/api && bun run type-check
+# Push Convex env vars (from .env)
+bun run convex:env:push
 ```
 
 ## Architecture
 
 ### Content Processing Pipeline
 
-1. **Ingestion**: Upload file/URL/text → Stored in Supabase Storage
-2. **Extraction**: Background job extracts content
+1. **Ingestion**: Upload file/URL/text → Stored in Convex storage
+2. **Extraction**: Convex job extracts content
    - Images → Mistral OCR
    - Videos/Social → Supadata (transcripts)
    - Web → Supadata (scraping)
 3. **Splitting**: Chunk content (1000 chars, 200 overlap)
 4. **Title Generation**: Together AI generates source title
-5. **Embedding**: Cohere creates vector embeddings
-6. **Storage**: Vectors stored in Supabase pgvector
+5. **Embedding**: Embeddings stored and queried via Convex
+6. **Storage**: Vectors and documents in Convex
 
 ### Generation Pipeline
 
 1. **Request**: User selects format and sources
-2. **Job Creation**: Background job queued via Graphile Worker
+2. **Job Creation**: Convex action/mutation queues the job
 3. **Processing**: LangChain agent generates content using RAG
-4. **Polling**: Frontend polls job status
+4. **Real-time**: Frontend subscribes to Convex for status and results
 5. **Delivery**: Generated content displayed when complete
-test

@@ -1,13 +1,12 @@
 import type { Note, SpreadsheetNote } from '@/shared/types/index';
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export interface CreateSpreadsheetParams {
   notebookId: string;
   documentIds: string[];
-  spreadsheetType: 'data_extraction' | 'comparison_table' | 'timeline' | 'financial_summary' | 'custom';
-  customPrompt?: string;
+  title?: string;
 }
 
 export interface CreateSpreadsheetResponse {
@@ -50,16 +49,16 @@ export function getSpreadsheetSubtitle(
 /**
  * Map a database spreadsheet response to the frontend SpreadsheetNote interface
  */
-function mapDatabaseSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
+function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
   const spreadsheetType = dbSpreadsheet.metadata?.spreadsheetType || 'custom';
   const preview = getSpreadsheetSubtitle(spreadsheetType, dbSpreadsheet.status);
 
   return {
-    id: dbSpreadsheet.id,
+    id: dbSpreadsheet._id,
     title: dbSpreadsheet.title,
     preview,
     type: 'spreadsheet',
-    content: dbSpreadsheet.content || '',
+    content: typeof dbSpreadsheet.data === 'string' ? dbSpreadsheet.data : JSON.stringify(dbSpreadsheet.data || {}, null, 2),
     status: dbSpreadsheet.status,
     metadata: {
       spreadsheetType,
@@ -71,88 +70,160 @@ function mapDatabaseSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
   };
 }
 
-export const spreadsheetsApi = {
-  /**
-   * Create a new spreadsheet and queue generation
-   */
-  async createSpreadsheet(params: CreateSpreadsheetParams): Promise<CreateSpreadsheetResponse> {
-    const response = await apiPost('/api/spreadsheets', params);
+/**
+ * Get all spreadsheets for a notebook
+ * Returns undefined while loading, empty array when loaded but no results
+ */
+export function useSpreadsheets(notebookId: string | null) {
+  const spreadsheets = useQuery(
+    api.spreadsheets.list,
+    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+  );
+  return spreadsheets?.map(mapSpreadsheetToNote);
+}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create spreadsheet');
-    }
+/**
+ * Get a specific spreadsheet by ID
+ */
+export function useSpreadsheet(spreadsheetId: string | null) {
+  const spreadsheet = useQuery(
+    api.spreadsheets.get,
+    spreadsheetId ? { id: spreadsheetId as Id<'spreadsheets'> } : 'skip'
+  );
+  return spreadsheet ? mapSpreadsheetToNote(spreadsheet) : null;
+}
 
-    const result = await response.json();
+/**
+ * Create a new spreadsheet and queue generation
+ */
+export function useCreateSpreadsheet() {
+  const generate = useMutation(api.spreadsheets.generateSpreadsheet);
+
+  return async (params: CreateSpreadsheetParams): Promise<CreateSpreadsheetResponse> => {
+    const result = await generate({
+      notebookId: params.notebookId as Id<'notebooks'>,
+      documentIds: params.documentIds as Id<'documents'>[],
+      title: params.title,
+    });
+
     return {
-      spreadsheetId: result.spreadsheetId,
-      status: result.status,
-      spreadsheet: mapDatabaseSpreadsheetToNote(result.spreadsheet),
+      spreadsheetId: result,
+      status: 'pending',
+      spreadsheet: mapSpreadsheetToNote({ _id: result, status: 'pending', title: params.title || 'Spreadsheet' }),
     };
-  },
+  };
+}
 
-  /**
-   * Get a specific spreadsheet by ID
-   */
-  async getSpreadsheet(spreadsheetId: string): Promise<SpreadsheetNote> {
-    const response = await apiGet(`/api/spreadsheets/${spreadsheetId}`);
+/**
+ * Rename a spreadsheet by ID with optimistic update
+ */
+export function useRenameSpreadsheet() {
+  const update = useMutation(api.spreadsheets.update).withOptimisticUpdate((localStore, args) => {
+    const { id, title } = args;
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch spreadsheet');
-    }
+    // Read the current spreadsheet to get its notebookId
+    const spreadsheet = localStore.getQuery(api.spreadsheets.get, { id });
+    if (spreadsheet) {
+      // Update detail view
+      localStore.setQuery(
+        api.spreadsheets.get,
+        { id },
+        { ...spreadsheet, title }
+      );
 
-    const dbSpreadsheet = await response.json();
-    return mapDatabaseSpreadsheetToNote(dbSpreadsheet);
-  },
-
-  /**
-   * Poll spreadsheet status until completion
-   */
-  async pollSpreadsheetStatus(
-    spreadsheetId: string,
-    onUpdate?: (note: SpreadsheetNote) => void,
-    maxAttempts = 180, // 6 minutes @ 2s intervals
-    interval = 2000
-  ): Promise<SpreadsheetNote> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const note = await this.getSpreadsheet(spreadsheetId);
-
-      if (note.status === 'completed' || note.status === 'failed') {
-        return note;
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.spreadsheets.list, { notebookId: spreadsheet.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.spreadsheets.list,
+          { notebookId: spreadsheet.notebookId },
+          listResult.map(ss =>
+            ss._id === id
+              ? { ...ss, title }
+              : ss
+          )
+        );
       }
+    }
+  });
 
-      onUpdate?.(note);
-      await new Promise((resolve) => setTimeout(resolve, interval));
+  return async (spreadsheetId: string, newTitle: string) => {
+    return await update({
+      id: spreadsheetId as Id<'spreadsheets'>,
+      title: newTitle,
+    });
+  };
+}
+
+/**
+ * Delete a spreadsheet by ID with optimistic update
+ */
+export function useDeleteSpreadsheet() {
+  const remove = useMutation(api.spreadsheets.remove).withOptimisticUpdate((localStore, args) => {
+    // Read the current spreadsheet to get its notebookId
+    const spreadsheet = localStore.getQuery(api.spreadsheets.get, { id: args.id });
+    if (spreadsheet) {
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.spreadsheets.list, { notebookId: spreadsheet.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.spreadsheets.list,
+          { notebookId: spreadsheet.notebookId },
+          listResult.filter(ss => ss._id !== args.id)
+        );
+      }
     }
 
-    throw new Error('Spreadsheet generation timed out');
-  },
+    // Clear detail view
+    localStore.setQuery(api.spreadsheets.get, { id: args.id }, null);
+  });
 
-  /**
-   * Get all spreadsheets for a notebook
-   */
-  async getSpreadsheets(notebookId: string): Promise<SpreadsheetNote[]> {
-    const response = await apiGet(`/api/spreadsheets/notebook/${notebookId}`);
+  return async (spreadsheetId: string) => {
+    await remove({ id: spreadsheetId as Id<'spreadsheets'> });
+  };
+}
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch spreadsheets');
+/**
+ * Poll spreadsheet status until completion.
+ * Pass initialNote from the create response so the first poll succeeds before
+ * Convex query reactivity has added the new item to the notes list.
+ */
+export async function pollSpreadsheetStatus(
+  getSpreadsheet: () => SpreadsheetNote | null | undefined,
+  onUpdate?: (note: SpreadsheetNote) => void,
+  maxAttempts = 180, // 6 minutes @ 2s intervals
+  interval = 2000,
+  initialNote?: SpreadsheetNote
+): Promise<SpreadsheetNote> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const note = getSpreadsheet() ?? initialNote;
+
+    if (!note) {
+      throw new Error('Spreadsheet not found');
     }
 
-    const dbSpreadsheets = await response.json();
-    return dbSpreadsheets.map(mapDatabaseSpreadsheetToNote);
-  },
+    if (note.status === 'completed' || note.status === 'failed') {
+      return note;
+    }
 
-  /**
-   * Rename a spreadsheet
-   */
-  async renameSpreadsheet(spreadsheetId: string, title: string): Promise<void> {
-    await apiPatch(`/api/spreadsheets/${spreadsheetId}`, { title });
-  },
+    onUpdate?.(note);
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 
-  /**
-   * Delete a spreadsheet by ID
-   */
-  async deleteSpreadsheet(spreadsheetId: string): Promise<void> {
-    await apiDelete(`/api/spreadsheets/${spreadsheetId}`);
-  },
+  throw new Error('Spreadsheet generation timed out');
+}
+
+/**
+ * Legacy API object for backward compatibility
+ * @deprecated Use individual hooks instead
+ */
+export const spreadsheetsApi = {
+  useSpreadsheets,
+  useSpreadsheet,
+  useCreateSpreadsheet,
+  useRenameSpreadsheet,
+  useDeleteSpreadsheet,
+  pollSpreadsheetStatus,
+  getSpreadsheetTypeLabel,
+  getSpreadsheetSubtitle,
 };

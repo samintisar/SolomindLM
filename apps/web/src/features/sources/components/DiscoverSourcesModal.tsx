@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { X, Search, Globe, Plus, Loader2, ExternalLink } from 'lucide-react';
 import { Source } from '@/shared/types/index';
-import { documentsApi } from '../services/documentsApi';
+import { useDiscoverSources, uploadUrl } from '../services/documentsApi';
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
@@ -36,6 +36,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   const [results, setResults] = useState<WebResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const discoverSources = useDiscoverSources();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +47,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
     setResults([]);
 
     try {
-      const response = await documentsApi.discoverSources({
+      const response = await discoverSources({
         query: query.trim(),
         scoreThreshold: 0.5,
         maxResults: 10,
@@ -76,7 +77,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
     ));
 
     try {
-      const response = await documentsApi.uploadUrl(userId, noteId, result.url, 'url');
+      const response = await uploadUrl(noteId, result.url, 'url');
 
       // Create a Source object for the frontend
       const newSource: Source = {
@@ -131,7 +132,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-110 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative w-full max-w-4xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col max-h-[90vh] overflow-hidden font-sans">

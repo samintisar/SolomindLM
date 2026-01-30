@@ -98,7 +98,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
          │          ▼           │
          │ ┌──────────────────┐ │
          │ │ Upload to        │ │
-         │ │ Supabase Storage │ │
+         │ │ Convex storage   │ │
          │ └──────────────────┘ │
          │                      │
          │ Sequential (30s delay)│
@@ -222,10 +222,9 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
   - 30-second delays between requests
   - 1 retry on failure
 
-#### Upload to Supabase
-- **Bucket**: `slide-decks`
-- **Path**: `{slideDeckId}/slide-{number}-{timestamp}.png`
-- **Access**: Public URLs for frontend display
+#### Upload to Convex storage
+- **Path**: `{slideDeckId}/slide-{number}-{timestamp}.png` (or equivalent)
+- **Access**: Convex storage URLs for frontend display
 
 ## Slide Types
 
@@ -342,9 +341,7 @@ FAST_LLM=meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
 # Image Generation
 ZHIPUAI_API_KEY=xxx
 
-# Storage
-SUPABASE_URL=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
+# Storage: Convex (configured via Convex dashboard / env)
 
 # Tuning (optional)
 SLIDES_MAP_CHUNK_TOKENS=3000
@@ -377,7 +374,7 @@ SLIDES_IMAGE_TIMEOUT_MS=60000
       slideNumber: 1,
       title: "How Machine Learning Transforms Data Analysis",
       prompt: "Professional presentation slide in vintage academia aesthetic...",
-      imageUrl: "https://supabase.co/storage/v1/object/public/slide-decks/...",
+      imageUrl: "<Convex storage URL>",
       talkingPoints: [
         "Traditional analysis requires manual pattern recognition",
         "ML algorithms automatically discover insights from data",

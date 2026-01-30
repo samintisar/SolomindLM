@@ -1,10 +1,6 @@
 import React from 'react';
 import { LogIn, LogOut, Sun, Moon } from 'lucide-react';
-
-interface User {
-  id: string;
-  email: string;
-}
+import type { User } from '../AuthContext';
 
 interface AvatarDropdownProps {
   user: User | null;
@@ -32,7 +28,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
       {/* User Section (when authenticated) */}
       {isAuthenticated && user && (
         <div className="px-4 py-3 border-b border-border/50">
-          <p className="text-sm font-medium text-foreground truncate">{user.email}</p>
+          <p className="text-sm font-medium text-foreground truncate">{user.email || user.name || 'User'}</p>
         </div>
       )}
 

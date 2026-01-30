@@ -1,186 +1,211 @@
 import type { Note, MindMapNote } from '@/shared/types/index';
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
-import { getUserId } from '@/shared/utils/auth';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export interface CreateMindMapParams {
-  userId: string;
   notebookId: string;
   documentIds: string[];
+  title?: string;
 }
 
 export interface CreateMindMapResponse {
   mindMapId: string;
   status: string;
-  mindmap: MindMapData;
-}
-
-export interface MindMapData {
-  id: string;
-  user_id: string;
-  notebook_id: string;
-  title: string;
-  description: string | null;
-  data: any;
-  status: string;
-  metadata: any;
-  created_at: string;
-  updated_at: string;
+  mindmap: MindMapNote;
 }
 
 /**
  * Map a database mindmap response to the frontend MindMapNote interface
  */
-function mapMindMapToNote(mindmap: MindMapData, type: 'mindmap' = 'mindmap'): MindMapNote {
+function mapMindMapToNote(dbMindMap: any): MindMapNote {
   let preview = '';
 
   // Determine preview based on status
-  if (mindmap.status === 'generating' || mindmap.status === 'mapping' || mindmap.status === 'collapsing' || mindmap.status === 'reducing') {
+  if (dbMindMap.status === 'generating' || dbMindMap.status === 'mapping' || dbMindMap.status === 'collapsing' || dbMindMap.status === 'reducing') {
     preview = 'Mind Map • Generating...';
-  } else if (mindmap.status === 'completed') {
+  } else if (dbMindMap.status === 'completed') {
     preview = 'Mind Map • Visual Overview';
-  } else if (mindmap.status === 'failed') {
+  } else if (dbMindMap.status === 'failed') {
     preview = 'Mind Map • Failed';
   } else {
     preview = 'Mind Map • Visual Overview';
   }
 
+  // Parse data if it's a string
+  let mindMapData = dbMindMap.data;
+  if (typeof dbMindMap.data === 'string') {
+    try {
+      mindMapData = JSON.parse(dbMindMap.data);
+    } catch {
+      mindMapData = { nodes: [], edges: [] };
+    }
+  }
+
   return {
-    id: mindmap.id,
-    title: mindmap.title,
+    id: dbMindMap._id,
+    title: dbMindMap.title,
     preview,
-    type,
-    content: JSON.stringify(mindmap.data, null, 2),
-    status: mindmap.status as MindMapNote['status'],
-    metadata: mindmap.metadata || {},
-    mindMapData: mindmap.data,
+    type: 'mindmap' as const,
+    content: typeof dbMindMap.data === 'string' ? dbMindMap.data : JSON.stringify(dbMindMap.data, null, 2),
+    status: dbMindMap.status as MindMapNote['status'],
+    metadata: dbMindMap.metadata || {},
+    mindMapData,
   };
 }
 
-export const mindMapApi = {
-  /**
-   * Create a new mind map and queue generation
-   */
-  async generateMindMap(params: CreateMindMapParams): Promise<CreateMindMapResponse> {
-    const response = await apiPost('/api/mindmaps', params);
+/**
+ * Get all mind maps for a notebook
+ * Returns undefined while loading, empty array when loaded but no results
+ */
+export function useMindMaps(notebookId: string | null) {
+  const mindMaps = useQuery(
+    api.mindmaps.list,
+    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+  );
+  return mindMaps?.map(mapMindMapToNote);
+}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to generate mind map');
-    }
+/**
+ * Get a specific mind map by ID
+ */
+export function useMindMap(mindMapId: string | null) {
+  const mindMap = useQuery(
+    api.mindmaps.get,
+    mindMapId ? { id: mindMapId as Id<'mindmaps'> } : 'skip'
+  );
+  return mindMap ? mapMindMapToNote(mindMap) : null;
+}
 
-    const result = await response.json();
+/**
+ * Create a new mind map and queue generation
+ */
+export function useCreateMindMap() {
+  const generate = useMutation(api.mindmaps.generateMindMap);
+
+  return async (params: CreateMindMapParams): Promise<CreateMindMapResponse> => {
+    const result = await generate({
+      notebookId: params.notebookId as Id<'notebooks'>,
+      documentIds: params.documentIds as Id<'documents'>[],
+      title: params.title,
+    });
+
     return {
-      mindMapId: result.mindMapId,
-      status: result.status,
-      mindmap: result.mindmap,
+      mindMapId: result,
+      status: 'pending',
+      mindmap: mapMindMapToNote({ _id: result, status: 'pending', title: params.title || 'Mind Map' }),
     };
-  },
+  };
+}
 
-  /**
-   * Get a specific mind map by ID
-   */
-  async getMindMap(mindMapId: string): Promise<MindMapNote> {
-    const userId = getUserId();
+/**
+ * Rename a mind map by ID with optimistic update
+ */
+export function useRenameMindMap() {
+  const update = useMutation(api.mindmaps.update).withOptimisticUpdate((localStore, args) => {
+    const { id, title } = args;
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
+    // Read the current mind map to get its notebookId
+    const mindMap = localStore.getQuery(api.mindmaps.get, { id });
+    if (mindMap) {
+      // Update detail view
+      localStore.setQuery(
+        api.mindmaps.get,
+        { id },
+        { ...mindMap, title }
+      );
 
-    const queryParams = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/mindmaps/${mindMapId}?${queryParams.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch mind map');
-    }
-
-    const mindmap = await response.json();
-    return mapMindMapToNote(mindmap);
-  },
-
-  /**
-   * Poll mind map status until completion
-   */
-  async pollMindMapStatus(
-    mindMapId: string,
-    onUpdate?: (note: MindMapNote) => void,
-    maxAttempts = 180, // 6 minutes @ 2s intervals
-    interval = 2000
-  ): Promise<MindMapNote> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const note = await this.getMindMap(mindMapId);
-
-      if (note.status === 'completed' || note.status === 'failed') {
-        return note;
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.mindmaps.list, { notebookId: mindMap.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.mindmaps.list,
+          { notebookId: mindMap.notebookId },
+          listResult.map(mm =>
+            mm._id === id
+              ? { ...mm, title }
+              : mm
+          )
+        );
       }
+    }
+  });
 
-      onUpdate?.(note);
-      await new Promise((resolve) => setTimeout(resolve, interval));
+  return async (mindMapId: string, newTitle: string) => {
+    return await update({
+      id: mindMapId as Id<'mindmaps'>,
+      title: newTitle,
+    });
+  };
+}
+
+/**
+ * Delete a mind map by ID with optimistic update
+ */
+export function useDeleteMindMap() {
+  const remove = useMutation(api.mindmaps.remove).withOptimisticUpdate((localStore, args) => {
+    // Read the current mind map to get its notebookId
+    const mindMap = localStore.getQuery(api.mindmaps.get, { id: args.id });
+    if (mindMap) {
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.mindmaps.list, { notebookId: mindMap.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.mindmaps.list,
+          { notebookId: mindMap.notebookId },
+          listResult.filter(mm => mm._id !== args.id)
+        );
+      }
     }
 
-    throw new Error('Mind map generation timed out');
-  },
+    // Clear detail view
+    localStore.setQuery(api.mindmaps.get, { id: args.id }, null);
+  });
 
-  /**
-   * Get all mind maps for a notebook
-   */
-  async getMindMaps(notebookId: string): Promise<MindMapNote[]> {
-    const userId = getUserId();
+  return async (mindMapId: string) => {
+    await remove({ id: mindMapId as Id<'mindmaps'> });
+  };
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
+/**
+ * Poll mind map status until completion.
+ * Pass initialNote from the create response so the first poll succeeds before
+ * Convex query reactivity has added the new item to the notes list.
+ */
+export async function pollMindMapStatus(
+  getMindMap: () => MindMapNote | null | undefined,
+  onUpdate?: (note: MindMapNote) => void,
+  maxAttempts = 180, // 6 minutes @ 2s intervals
+  interval = 2000,
+  initialNote?: MindMapNote
+): Promise<MindMapNote> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const note = getMindMap() ?? initialNote;
+
+    if (!note) {
+      throw new Error('Mind map not found');
     }
 
-    const queryParams = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/mindmaps/notebook/${notebookId}?${queryParams.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch mind maps');
+    if (note.status === 'completed' || note.status === 'failed') {
+      return note;
     }
 
-    const mindmaps = await response.json();
-    return mindmaps.map((mindmap: MindMapData) => mapMindMapToNote(mindmap));
-  },
+    onUpdate?.(note);
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 
-  /**
-   * Rename a mind map by ID
-   */
-  async renameMindMap(mindMapId: string, newTitle: string): Promise<{ success: boolean; title: string }> {
-    const userId = getUserId();
+  throw new Error('Mind map generation timed out');
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    const response = await apiPatch(
-      `/api/mindmaps/${mindMapId}?${params.toString()}`,
-      { title: newTitle }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to rename mind map');
-    }
-
-    return await response.json();
-  },
-
-  /**
-   * Delete a mind map by ID
-   */
-  async deleteMindMap(mindMapId: string): Promise<void> {
-    const userId = getUserId();
-
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    const response = await apiDelete(`/api/mindmaps/${mindMapId}?${params.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to delete mind map');
-    }
-  },
+/**
+ * Legacy API object for backward compatibility
+ * @deprecated Use individual hooks instead
+ */
+export const mindMapApi = {
+  useMindMaps,
+  useMindMap,
+  useCreateMindMap,
+  useRenameMindMap,
+  useDeleteMindMap,
+  pollMindMapStatus,
 };

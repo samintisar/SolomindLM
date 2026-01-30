@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../features/auth/AuthContext';
-import { notebooksApi } from '../../features/notebooks/services/notebooksApi';
+import { useQuery, Authenticated, Unauthenticated, AuthLoading } from 'convex/react';
+import { api } from '@convex/_generated/api';
 import { LoginModal } from '../../features/auth/components/LoginModal';
 
 interface ProtectedRouteProps {
@@ -10,79 +10,58 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireNotebookAccess = false }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
-  const [notebookCheckLoading, setNotebookCheckLoading] = useState(false);
-  const [notebookAccessDenied, setNotebookAccessDenied] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Get user from Convex (Better Auth)
+  const user = useQuery(api.auth.getCurrentUser);
+
+  // Extract notebook ID from URL path if needed
+  const notebookId = useMemo(() => {
+    if (requireNotebookAccess) {
+      const match = location.pathname.match(/^\/notebook\/([^/]+)$/);
+      return match && match[1] ? match[1] : null;
+    }
+    return null;
+  }, [requireNotebookAccess, location.pathname]);
 
   // Check notebook ownership if required
-  useEffect(() => {
-    if (requireNotebookAccess && isAuthenticated && user) {
-      // Extract notebook ID from URL path
-      const match = location.pathname.match(/^\/notebook\/([^/]+)$/);
-      if (match && match[1]) {
-        const notebookId = match[1];
-        setNotebookCheckLoading(true);
+  const notebook = useQuery(
+    api.notebooks.get,
+    notebookId ? { id: notebookId as any } : "skip"
+  );
 
-        notebooksApi.getNotebook(notebookId)
-          .then(() => {
-            // Notebook exists and user has access
-            setNotebookAccessDenied(false);
-          })
-          .catch((error) => {
-            console.error('Notebook access check failed:', error);
-            // Notebook doesn't exist or user doesn't have access
-            setNotebookAccessDenied(true);
-          })
-          .finally(() => {
-            setNotebookCheckLoading(false);
-          });
-      }
-    }
-  }, [requireNotebookAccess, isAuthenticated, user, location.pathname]);
+  // Determine if access is denied (notebook not found - explicitly null after loading)
+  // Note: undefined means still loading, but with Convex cache this is typically instant
+  const notebookAccessDenied = requireNotebookAccess && notebookId && notebook === null;
 
-  // Show login modal for unauthenticated users (not redirecting)
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      setShowLoginModal(true);
-    } else if (isAuthenticated) {
-      setShowLoginModal(false);
-    }
-  }, [isAuthenticated, isLoading]);
-
-  // Loading state
-  if (isLoading || notebookCheckLoading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+  return (
+    <>
+      {/* Loading state - auth loading */}
+      <AuthLoading>
+        <div className="flex h-screen w-full items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
+      </AuthLoading>
 
-  // Redirect to home if notebook access is denied
-  if (notebookAccessDenied) {
-    return <Navigate to="/home" replace />;
-  }
-
-  // Not authenticated - show login modal but DON'T render children
-  if (!isAuthenticated) {
-    return (
-      <>
-        {showLoginModal && (
-          <LoginModal
-            onClose={() => setShowLoginModal(false)}
-            authError="Please sign in to continue"
-          />
+      {/* Authenticated */}
+      <Authenticated>
+        {notebookAccessDenied ? (
+          <Navigate to="/home" replace />
+        ) : (
+          children
         )}
-        {/* Empty placeholder - protected content is not rendered */}
-      </>
-    );
-  }
+      </Authenticated>
 
-  // Authenticated and has access
-  return <>{children}</>;
+      {/* Not authenticated - show login modal */}
+      <Unauthenticated>
+        <LoginModal
+          onClose={() => {}}
+          authError="Please sign in to continue"
+        />
+      </Unauthenticated>
+    </>
+  );
 }

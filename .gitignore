@@ -39,6 +39,7 @@ bower_components
 build/Release
 
 # Dependency directories
+.bun/
 node_modules/
 jspm_packages/
 
@@ -137,3 +138,6 @@ dist
 
 # Claude
 .claude/
+
+# Convex debug bundle (local only)
+debug-bundle/

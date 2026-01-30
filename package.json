@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "bun@1.2.2",
   "workspaces": {
-    "packages": ["apps/*"]
+    "packages": ["apps/web"]
   },
   "engines": {
     "node": ">=20.0.0",
@@ -13,21 +13,41 @@
   "scripts": {
     "dev": "bun run --elide-lines=0 --filter \"./apps/**\" dev",
     "dev:web": "bun run --elide-lines=0 --filter @solomindlm/web dev",
-    "dev:api": "bun run --elide-lines=0 --filter @solomindlm/api dev",
     "build": "bun run --filter \"./apps/**\" build",
-    "build:prod": "bun run --filter @solomindlm/web build:prod && bun run --filter @solomindlm/api build",
-    "start:api": "bun run --elide-lines=0 --filter @solomindlm/api start",
-    "start:worker": "bun run --elide-lines=0 --filter @solomindlm/api start:worker",
-    "worker": "bun run --elide-lines=0 --filter @solomindlm/api worker",
-    "clear-jobs": "bun run --elide-lines=0 --filter @solomindlm/api clear-jobs"
+    "build:prod": "bun run --filter @solomindlm/web build",
+    "postinstall": "node scripts/patch-better-auth.mjs",
+    "convex:env:push": "node scripts/push-convex-env.js",
+    "convex:env:push:prod": "node scripts/push-convex-env.js --prod",
+    "convex:env:push:dry": "node scripts/push-convex-env.js --dry-run"
   },
   "devDependencies": {
-    "@types/bun": "^1.2.2",
-    "@types/node": "^20.11.0",
-    "typescript": "^5.3.3"
+    "@types/bun": "^1.3.6",
+    "@types/node": "^25.0.10",
+    "@typescript/native-preview": "^7.0.0-dev.20260130.1",
+    "convex": "^1.31.7",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@convex-dev/action-cache": "^0.3.0",
+    "@convex-dev/better-auth": "0.10.10",
+    "@convex-dev/persistent-text-streaming": "^0.3.0",
+    "@convex-dev/stripe": "^0.1.3",
+    "@convex-dev/workpool": "^0.3.1",
+    "@langchain/community": "^1.1.8",
+    "@langchain/core": "^1.1.17",
+    "@langchain/langgraph": "^1.1.2",
+    "@langchain/openai": "^1.2.3",
+    "@langchain/textsplitters": "^1.0.1",
     "@standard-schema/spec": "^1.1.0",
-    "react-router-dom": "7.12.0"
+    "@supadata/js": "^1.3.2",
+    "better-auth": "1.4.9",
+    "langsmith": "^0.4.10",
+    "openai": "^4.62.1",
+    "p-limit": "^7.2.0",
+    "resend": "^6.9.1",
+    "stripe": "^20.0.0",
+    "zeroentropy": "^0.1.0-alpha.7",
+    "zhipuai-sdk-nodejs-v4": "^0.1.12",
+    "zod": "^3.23.8"
   }
 }

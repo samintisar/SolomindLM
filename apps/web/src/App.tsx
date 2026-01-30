@@ -1,7 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import { Id } from '@convex/_generated/dataModel';
 import { Header } from './shared/ui/Header';
 import { SourcesPanel } from './features/sources/components/SourcesPanel';
 import { ChatPanel } from './features/chat/components/ChatPanel';
@@ -10,82 +13,75 @@ import { HomePage } from './features/notebooks/components/HomePage';
 import { FolderView } from './features/notebooks/components/views/FolderView';
 import { BillingPage } from './features/billing/components/BillingPage';
 import { LandingPage } from './features/landing/LandingPage';
-import { AuthProvider, useAuth } from './features/auth/AuthContext';
+import { useAuth, AuthProvider } from './features/auth/AuthContext';
 import { LoginModal } from './features/auth/components/LoginModal';
-import { AuthCallback } from './features/auth/components/AuthCallback';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
+import { ToastProvider } from './shared/contexts/ToastContext';
+import { ToastContainer } from './shared/components/ToastContainer';
 import { ProtectedRoute } from './shared/components/ProtectedRoute';
 import { PrivacyPolicy } from './features/legal/components/PrivacyPolicy';
 import { TermsOfService } from './features/legal/components/TermsOfService';
 import { STUDIO_TOOLS } from './shared/constants';
-import { Source, Note, NotebookItem, Document, Message, FolderItem } from '@/shared/types/index';
-import { documentsApi } from './features/sources/services/documentsApi';
-import { notebooksApi } from './features/notebooks/services/notebooksApi';
-import { foldersApi } from './features/notebooks/services/foldersApi';
-import { notesApi } from './features/notebooks/services/notesApi';
-import { mindMapApi } from './features/studio/services/mindMapApi';
-import { flashcardsApi } from './features/studio/services/flashcardsApi';
-import { quizzesApi } from './features/studio/services/quizzesApi';
-import { writtenQuestionsApi } from './features/studio/services/writtenQuestionsApi';
-import { slidesApi } from './features/studio/services/slidesApi';
-import { spreadsheetsApi } from './features/studio/services/spreadsheetsApi';
-import { audioApi } from './features/audio/api/audioApi';
-import { chatApi } from './features/chat/services/chatApi';
-import { subscriptionApi } from './features/billing/services/subscriptionApi';
+import { Source, Note, NotebookItem, Message, FolderItem } from '@/shared/types/index';
+import { useNotes } from './features/studio/services/notesApi';
+import { useUpdateReport, useDeleteReport } from './features/studio/services/reportsApi';
+import { useRenameFlashcards, useDeleteFlashcards } from './features/studio/services/flashcardsApi';
+import { useRenameQuiz, useDeleteQuiz } from './features/studio/services/quizzesApi';
+import { useRenameMindMap, useDeleteMindMap } from './features/studio/services/mindMapApi';
+import { useUpdateAudioOverview, useDeleteAudioOverview } from './features/studio/services/audioApi';
+import { useRenameWrittenQuestions, useDeleteWrittenQuestions } from './features/studio/services/writtenQuestionsApi';
+import { useRenameSlideDeck, useDeleteSlideDeck } from './features/studio/services/slidesApi';
+import { useRenameSpreadsheet, useDeleteSpreadsheet } from './features/studio/services/spreadsheetsApi';
+import { useNotebooks, useCreateNotebook, useUpdateNotebook, useDeleteNotebook } from './features/notebooks/services/notebooksApi';
+import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder } from './features/notebooks/services/foldersApi';
+import { useGenerateUploadUrl, useCreateDocument, useUpdateDocument, useDeleteDocument } from './features/sources/services/documentsApi';
+import { useSubscriptionStatus } from './features/billing/services/subscriptionApi';
+import { chatApi, type SendMessageCallbacks } from './features/chat/services/chatApi';
 import 'mind-elixir/style.css';
+
+// ============================================================
+// Types for Optimistic Chat
+// ============================================================
+
+interface OptimisticMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  createdAt: number;
+  references?: unknown[];
+  isOptimistic?: true;
+}
 
 const MIN_PANEL_WIDTH = 220;
 const getMaxPanelWidth = () => Math.min(window.innerWidth * 0.7, 1400);
 
-// Transform Document API type to Source UI type
-function documentToSource(doc: Document): Source {
+// Transform Convex Document type to Source UI type
+function documentToSource(doc: any): Source {
   // Extract file extension and determine type
   let type: Source['type'] = 'PDF';
-  
-  if (doc.file_type === 'youtube') {
+
+  if (doc.fileType === 'youtube') {
     type = 'WEB';
-  } else if (doc.file_type === 'url') {
+  } else if (doc.fileType === 'url') {
     type = 'WEB';
-  } else if (doc.file_type === 'file') {
-    // Extract extension from file_name
-    const ext = doc.file_name.split('.').pop()?.toLowerCase() || '';
-    
+  } else if (doc.fileType === 'file') {
+    // Extract extension from fileName
+    const ext = doc.fileName.split('.').pop()?.toLowerCase() || '';
+
     // Map extensions to types
     switch (ext) {
-      case 'pdf':
-        type = 'PDF';
-        break;
-      case 'docx':
-        type = 'DOCX';
-        break;
-      case 'doc':
-        type = 'DOC';
-        break;
-      case 'pptx':
-        type = 'PPTX';
-        break;
-      case 'ppt':
-        type = 'PPT';
-        break;
-      case 'xlsx':
-        type = 'XLSX';
-        break;
-      case 'xls':
-        type = 'XLS';
-        break;
-      case 'txt':
-        type = 'TXT';
-        break;
+      case 'pdf': type = 'PDF'; break;
+      case 'docx': type = 'DOCX'; break;
+      case 'doc': type = 'DOC'; break;
+      case 'pptx': type = 'PPTX'; break;
+      case 'ppt': type = 'PPT'; break;
+      case 'xlsx': type = 'XLSX'; break;
+      case 'xls': type = 'XLS'; break;
+      case 'txt': type = 'TXT'; break;
       case 'md':
-      case 'markdown':
-        type = 'MD';
-        break;
-      case 'json':
-        type = 'JSON';
-        break;
-      case 'csv':
-        type = 'CSV';
-        break;
+      case 'markdown': type = 'MD'; break;
+      case 'json': type = 'JSON'; break;
+      case 'csv': type = 'CSV'; break;
       case 'png':
       case 'jpg':
       case 'jpeg':
@@ -93,19 +89,16 @@ function documentToSource(doc: Document): Source {
       case 'webp':
       case 'bmp':
       case 'svg':
-      case 'avif':
-        type = 'IMG';
-        break;
-      default:
-        type = 'PDF'; // Default fallback
+      case 'avif': type = 'IMG'; break;
+      default: type = 'PDF';
     }
   }
-  
+
   return {
-    id: doc.id,
-    title: doc.title || doc.file_name,
+    id: doc._id,
+    title: doc.fileName,
     type,
-    date: new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    date: new Date(doc.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     selected: true,
     content: '',
     status: doc.status,
@@ -120,38 +113,93 @@ const AppContent: React.FC = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // Convex hooks for notebooks and folders
+  const notebooks = useNotebooks();
+  const folders = useFolders();
+  const documents = useQuery(
+    api.documents.list,
+    activeNotebookId && activeNotebookId !== 'new'
+      ? { notebookId: activeNotebookId as Id<'notebooks'> }
+      : 'skip'
+  ) ?? [];
+  const messages = useQuery(
+    api.messages.listByNotebook,
+    activeNotebookId && activeNotebookId !== 'new'
+      ? { notebookId: activeNotebookId as Id<'notebooks'> }
+      : 'skip'
+  ) ?? [];
+  const notes = useNotes(
+    activeNotebookId && activeNotebookId !== 'new' ? activeNotebookId : null
+  );
+
+  // Mutation hooks
+  const createNotebook = useCreateNotebook();
+  const updateNotebook = useUpdateNotebook();
+  const deleteNotebook = useDeleteNotebook();
+  const createFolder = useCreateFolder();
+  const updateFolder = useUpdateFolder();
+  const deleteFolder = useDeleteFolder();
+  const generateUploadUrl = useGenerateUploadUrl();
+  const createDocument = useCreateDocument();
+  const updateDocument = useUpdateDocument();
+  const deleteDocumentMutation = useDeleteDocument();
+  const clearChatHistoryMutation = useMutation(api.messages.clearHistory);
+
+  // Studio note update/delete (reports, flashcards, quizzes, etc.)
+  const updateReport = useUpdateReport();
+  const deleteReport = useDeleteReport();
+  const renameFlashcards = useRenameFlashcards();
+  const deleteFlashcards = useDeleteFlashcards();
+  const renameQuiz = useRenameQuiz();
+  const deleteQuiz = useDeleteQuiz();
+  const renameMindMap = useRenameMindMap();
+  const deleteMindMap = useDeleteMindMap();
+  const updateAudioOverview = useUpdateAudioOverview();
+  const deleteAudioOverview = useDeleteAudioOverview();
+  const renameWrittenQuestions = useRenameWrittenQuestions();
+  const deleteWrittenQuestions = useDeleteWrittenQuestions();
+  const renameSlideDeck = useRenameSlideDeck();
+  const deleteSlideDeck = useDeleteSlideDeck();
+  const renameSpreadsheet = useRenameSpreadsheet();
+  const deleteSpreadsheet = useDeleteSpreadsheet();
+
   // Determine current view from URL
-  const currentView = location.pathname === '/'
-    ? 'landing'
-    : location.pathname === '/home'
-    ? 'home'
-    : location.pathname === '/billing'
-    ? 'billing'
-    : location.pathname.startsWith('/folder/')
-    ? 'folder'
-    : location.pathname.startsWith('/notebook/')
-    ? 'notebook'
-    : 'landing';
+  const currentView = useMemo(() => {
+    if (location.pathname === '/') return 'landing';
+    if (location.pathname === '/home') return 'home';
+    if (location.pathname === '/billing') return 'billing';
+    if (location.pathname.startsWith('/folder/')) return 'folder';
+    if (location.pathname.startsWith('/notebook/')) return 'notebook';
+    return 'landing';
+  }, [location.pathname]);
 
   // Get notebook ID from URL pathname (e.g., /notebook/abc-123 -> abc-123)
-  const urlNotebookId = location.pathname.startsWith('/notebook/')
-    ? location.pathname.split('/notebook/')[1] || null
-    : null;
+  const urlNotebookId = useMemo(() => {
+    if (location.pathname.startsWith('/notebook/')) {
+      return location.pathname.split('/notebook/')[1] || null;
+    }
+    return null;
+  }, [location.pathname]);
 
-  // Get folder ID from URL pathname (e.g., /folder/abc-123 -> abc-123)
-  const urlFolderId = location.pathname.startsWith('/folder/')
-    ? location.pathname.split('/folder/')[1] || null
-    : null;
+  // Get folder ID from URL pathname
+  const urlFolderId = useMemo(() => {
+    if (location.pathname.startsWith('/folder/')) {
+      return location.pathname.split('/folder/')[1] || null;
+    }
+    return null;
+  }, [location.pathname]);
 
   // Notebook specific state
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
   const [isStudioOpen, setIsStudioOpen] = useState(true);
   const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'chat' | 'studio'>('sources');
   const [sources, setSources] = useState<Source[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
   const [notebookTitle, setNotebookTitle] = useState("Notebook");
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isChatStreaming, setIsChatStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingReferences, setStreamingReferences] = useState<unknown[] | null>(null);
+  const [streamingJustFinished, setStreamingJustFinished] = useState(false);
+  const messagesLengthWhenStreamCompleteRef = useRef(0);
 
   // Mini Audio Player state
   const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
@@ -161,22 +209,16 @@ const AppContent: React.FC = () => {
     transcript?: string;
   } | null>(null);
 
-  // Notebooks State
-  const [notebooks, setNotebooks] = useState<NotebookItem[]>([]);
-  const [notebooksLoading, setNotebooksLoading] = useState(false);
-  const [notebooksError, setNotebooksError] = useState<string | null>(null);
+  // Subscription status
+  const subscriptionStatus = useSubscriptionStatus();
 
-  // Folders State
-  const [folders, setFolders] = useState<FolderItem[]>([]);
-  const [, setFoldersLoading] = useState(false);
-  const [, setFoldersError] = useState<string | null>(null);
+  // Chat: use V2 sender so stream is parsed correctly (__DONE) and onComplete always runs
+  const sendChatMessage = chatApi.useSendMessageV2();
 
-  // Subscription State
-  const [hasSubscription, setHasSubscription] = useState(false);
-
-  // Filter notebooks for home page
-  const featuredNotebooks = notebooks.filter(nb => nb.isFeatured);
-  const recentNotebooks = notebooks.filter(nb => !nb.isFeatured);
+  // Filter notebooks for home page (notebooks may be undefined while loading)
+  const notebookList = notebooks ?? [];
+  const featuredNotebooks = useMemo(() => notebookList.filter(nb => nb.isFeatured), [notebookList]);
+  const recentNotebooks = useMemo(() => notebookList.filter(nb => !nb.isFeatured), [notebookList]);
 
   // Resize State
   const [leftWidth, setLeftWidth] = useState(360);
@@ -184,179 +226,150 @@ const AppContent: React.FC = () => {
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
 
-  // Ref to track the polling interval for document status updates
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Use a ref to track previous documents for comparison
+  const prevDocumentsRef = useRef<any[]>([]);
 
   // Sync activeNotebookId with URL params
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
       setActiveNotebookId(urlNotebookId);
     }
-    // Update notebook title when the notebook in the URL is found in the loaded notebooks
-    if (urlNotebookId && notebooks.length > 0) {
-      const notebook = notebooks.find(nb => nb.id === urlNotebookId);
+    if (!urlNotebookId && currentView !== 'notebook') {
+      setActiveNotebookId(null);
+    }
+  }, [urlNotebookId, currentView]);
+
+  // Update notebook title when the notebook changes
+  useEffect(() => {
+    if (urlNotebookId && notebookList.length > 0) {
+      const notebook = notebookList.find(nb => nb.id === urlNotebookId);
       if (notebook) {
         setNotebookTitle(notebook.title);
       }
-    } else if (!urlNotebookId && currentView !== 'notebook') {
-      setActiveNotebookId(null);
     }
-  }, [urlNotebookId, currentView, notebooks]);
+  }, [urlNotebookId, notebookList]);
+
+  // Sync sources with documents from Convex (updates when documents change, including status)
+  useEffect(() => {
+    // Check if documents actually changed by comparing IDs AND statuses
+    const currentSignature = documents.map(d => `${d._id}:${d.status}`).join(',');
+    const prevSignature = prevDocumentsRef.current.map(d => `${d._id}:${d.status}`).join(',');
+
+    if (currentSignature !== prevSignature) {
+      // Preserve selection state when updating
+      setSources(prev => {
+        const newSources = documents.map(documentToSource);
+        // Merge selection state from previous sources
+        return newSources.map(source => ({
+          ...source,
+          selected: prev.find(s => s.id === source.id)?.selected ?? true,
+        }));
+      });
+      prevDocumentsRef.current = documents;
+    }
+  }, [documents]);
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
 
   const handleClearChatHistory = async () => {
-    if (!activeNotebookId) return;
-
+    if (!activeNotebookId || activeNotebookId === 'new') return;
     try {
-      await chatApi.clearHistory(activeNotebookId);
-      setMessages([]);
+      await clearChatHistoryMutation({
+        notebookId: activeNotebookId as Id<'notebooks'>,
+      });
+      setIsChatStreaming(false);
+      setStreamingContent('');
+      setStreamingReferences(null);
+      setStreamingJustFinished(false);
+      // Convex reactivity will update `messages` automatically
     } catch (error) {
-      console.error('Failed to clear chat history:', error);
-      alert(error instanceof Error ? error.message : 'Failed to clear chat history');
+      console.error('Failed to clear chat history', error);
+      setIsChatStreaming(false);
+      setStreamingContent('');
+      setStreamingReferences(null);
+      setStreamingJustFinished(false);
     }
   };
 
-  // Load chat history when notebook changes
-  useEffect(() => {
-    if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
-      chatApi.getHistory(activeNotebookId)
-        .then(data => {
-          // Transform API messages to UI format
-          const uiMessages = data.messages.map(msg => {
-            const transformed = {
-              id: msg.id,
-              role: msg.role as 'user' | 'assistant',
-              content: msg.content,
-              timestamp: new Date(msg.created_at),
-              references: msg.references,
-            };
-            // Log assistant messages with citations
-            if (msg.role === 'assistant' && msg.content.match(/\[\d+\]/)) {
-              console.log(`[App] Loaded assistant message ${msg.id} with citations:`, {
-                hasReferences: !!msg.references,
-                referencesCount: Array.isArray(msg.references) ? msg.references.length : 0,
-                references: msg.references
-              });
-            }
-            return transformed;
-          });
-          setMessages(uiMessages);
-        })
-        .catch(err => {
-          console.error('Failed to load chat history:', err);
-          // Set empty messages on error (not critical, user can start fresh)
-          setMessages([]);
-        });
-    } else if (currentView === 'home') {
-      // Clear messages when going to home
-      setMessages([]);
-    }
-  }, [isAuthenticated, user, activeNotebookId, currentView]);
-
-  // Handle sending a chat message
+  // Handle sending a chat message — only uses the user's selected sources
   const handleSendMessage = async (messageText: string) => {
     if (!activeNotebookId || isChatStreaming) return;
 
-    // Add user message immediately
-    const userMessage = {
-      id: `temp-${Date.now()}`,
-      role: 'user' as const,
-      content: messageText,
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMessage]);
-
-    // Create a placeholder assistant message for streaming
-    const tempAssistantId = `temp-assistant-${Date.now()}`;
-    const assistantMessage = {
-      id: tempAssistantId,
-      role: 'assistant' as const,
-      content: '',
-      timestamp: new Date(),
-      references: undefined,
-    };
-    setMessages(prev => [...prev, assistantMessage]);
-
     setIsChatStreaming(true);
-
-    // Get selected document IDs
+    setStreamingContent('');
+    setStreamingReferences(null);
     const selectedDocumentIds = sources
-      .filter(source => source.selected)
-      .map(source => source.id);
+      .filter((source) => source.selected)
+      .map((source) => source.id);
+
+    const clearStreaming = () => {
+      setIsChatStreaming(false);
+      setStreamingContent('');
+      setStreamingReferences(null);
+      setStreamingJustFinished(false);
+    };
+
+    const onStreamComplete = () => {
+      setIsChatStreaming(false);
+      setStreamingJustFinished(true);
+      messagesLengthWhenStreamCompleteRef.current = messages.length;
+    };
 
     try {
-      await chatApi.sendMessage(
+      await sendChatMessage(
         activeNotebookId,
         messageText,
         {
-          onToken: (token: string) => {
-            setMessages(prev => prev.map(msg =>
-              msg.id === tempAssistantId
-                ? { ...msg, content: msg.content + token }
-                : msg
-            ));
-          },
-          onReferences: (references: any[]) => {
-            console.log('[App] Received references:', references);
-            setMessages(prev => prev.map(msg =>
-              msg.id === tempAssistantId
-                ? { ...msg, references }
-                : msg
-            ));
-          },
-          onComplete: () => {
-            setIsChatStreaming(false);
-            // Reload chat history to get the persisted message with proper ID
-            chatApi.getHistory(activeNotebookId)
-              .then(data => {
-                const uiMessages = data.messages.map(msg => ({
-                  id: msg.id,
-                  role: msg.role as 'user' | 'assistant',
-                  content: msg.content,
-                  timestamp: new Date(msg.created_at),
-                  references: msg.references,
-                }));
-                setMessages(uiMessages);
-              })
-              .catch(err => console.error('Failed to reload chat history:', err));
-          },
-          onError: (error: string | { message: string; type?: string }) => {
-            console.error('Chat error:', error);
-            setIsChatStreaming(false);
-
-            // Handle no_documents error with a helpful AI message
-            const errorMessage = typeof error === 'string' ? error : error.message;
-            const errorType = typeof error === 'string' ? undefined : error.type;
-
-            if (errorType === 'no_documents') {
-              // Replace the temporary assistant message with a helpful response
-              const helpfulMessage = "I couldn't find any relevant information in your selected documents to answer this question. This could happen if:\n\n• The documents don't contain information related to your question\n• The search terms don't match the language used in the documents\n• The documents are still being processed\n\nTry rephrasing your question, selecting different documents, or adding more relevant sources to your notebook.";
-              setMessages(prev => prev.map(msg =>
-                msg.id === tempAssistantId
-                  ? { ...msg, content: helpfulMessage }
-                  : msg
-              ));
-            } else {
-              // For other errors, remove the temporary message and show alert
-              setMessages(prev => prev.filter(msg => msg.id !== tempAssistantId));
-              alert(`Chat error: ${errorMessage}`);
-            }
-          },
+          onToken: (token) => setStreamingContent((prev) => prev + token),
+          onReferences: (refs) => setStreamingReferences(refs),
+          onStatus: () => {},
+          onComplete: onStreamComplete,
+          onError: clearStreaming,
         },
         selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined
       );
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setIsChatStreaming(false);
-      setMessages(prev => prev.filter(msg => msg.id !== tempAssistantId));
-      alert(error instanceof Error ? error.message : 'Failed to send message');
+    } catch {
+      clearStreaming();
     }
   };
 
+  // Once stream completes, keep showing streaming content until DB has the new assistant message, then clear to avoid duplicate/flash
+  useEffect(() => {
+    if (
+      streamingJustFinished &&
+      messages.length > messagesLengthWhenStreamCompleteRef.current &&
+      messages[messages.length - 1]?.role === 'assistant'
+    ) {
+      setStreamingContent('');
+      setStreamingReferences(null);
+      setStreamingJustFinished(false);
+    }
+  }, [streamingJustFinished, messages]);
+
+  // Chat list: DB messages + in-flight streaming assistant message so tokens appear as they arrive
+  const chatDisplayMessages = useMemo((): Message[] => {
+    const list: Message[] = messages.map((msg) => ({
+      id: msg._id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      timestamp: new Date(msg.createdAt),
+      references: msg.references,
+    }));
+    if (streamingContent) {
+      list.push({
+        id: '__streaming__',
+        role: 'assistant',
+        content: streamingContent,
+        timestamp: new Date(),
+        references: (streamingReferences as Message['references']) ?? undefined,
+      });
+    }
+    return list;
+  }, [messages, streamingContent, streamingReferences]);
+
   const handleToggleSource = (id: string) => {
-    setSources(prev => prev.map(source => 
+    setSources(prev => prev.map(source =>
       source.id === id ? { ...source, selected: !source.selected } : source
     ));
   };
@@ -371,167 +384,87 @@ const AppContent: React.FC = () => {
   };
 
   const handleUpdateNote = async (id: string, newTitle: string) => {
+    const note = notes.find((n) => n.id === id);
+    if (!note || !newTitle.trim()) return;
     try {
-      // Find the note to check its type
-      const noteToUpdate = notes.find(n => n.id === id);
-
-      // Optimistically update UI
-      setNotes(prev => prev.map(n => n.id === id ? { ...n, title: newTitle } : n));
-
-      // Sync with backend - route to correct API based on type
-      if (noteToUpdate?.type === 'mindmap') {
-        await mindMapApi.renameMindMap(id, newTitle);
-      } else if (noteToUpdate?.type === 'flashcard') {
-        await flashcardsApi.renameFlashcard(id, newTitle);
-      } else if (noteToUpdate?.type === 'quiz') {
-        await quizzesApi.renameQuiz(id, newTitle);
-      } else if (noteToUpdate?.type === 'writtenQuestions') {
-        await writtenQuestionsApi.renameWrittenQuestions(id, newTitle);
-      } else if (noteToUpdate?.type === 'slides') {
-        await slidesApi.renameSlideDeck(id, newTitle);
-      } else if (noteToUpdate?.type === 'spreadsheet') {
-        await spreadsheetsApi.renameSpreadsheet(id, newTitle);
-      } else if (noteToUpdate?.type === 'audio') {
-        await audioApi.renameAudioOverview(id, newTitle);
-      } else {
-        await notesApi.renameNote(id, newTitle);
+      switch (note.type) {
+        case 'report':
+          await updateReport(id, { title: newTitle.trim() });
+          break;
+        case 'flashcard':
+          await renameFlashcards(id, newTitle.trim());
+          break;
+        case 'quiz':
+          await renameQuiz(id, newTitle.trim());
+          break;
+        case 'mindmap':
+          await renameMindMap(id, newTitle.trim());
+          break;
+        case 'audio':
+          await updateAudioOverview(id, { title: newTitle.trim() });
+          break;
+        case 'writtenQuestions':
+          await renameWrittenQuestions(id, newTitle.trim());
+          break;
+        case 'slides':
+          await renameSlideDeck(id, newTitle.trim());
+          break;
+        case 'spreadsheet':
+          await renameSpreadsheet(id, newTitle.trim());
+          break;
+        default:
+          console.warn('Unknown note type for update:', (note as Note).type);
       }
     } catch (error) {
-      console.error('Failed to rename note:', error);
-      // Reload notes on error
-      if (activeNotebookId) {
-        Promise.all([
-          notesApi.getNotes(activeNotebookId).catch(err => {
-            console.error('Failed to load notes:', err);
-            return [];
-          }),
-          mindMapApi.getMindMaps(activeNotebookId).catch(err => {
-            console.error('Failed to load mind maps:', err);
-            return [];
-          }),
-          flashcardsApi.getFlashcards(activeNotebookId).catch(err => {
-            console.error('Failed to load flashcards:', err);
-            return [];
-          }),
-          quizzesApi.getQuizzes(activeNotebookId).catch(err => {
-            console.error('Failed to load quizzes:', err);
-            return [];
-          }),
-          writtenQuestionsApi.getWrittenQuestionsByNotebook(activeNotebookId).catch(err => {
-            console.error('Failed to load written questions:', err);
-            return [];
-          }),
-          slidesApi.getSlideDecks(activeNotebookId).catch(err => {
-            console.error('Failed to load slide decks:', err);
-            return [];
-          }),
-          spreadsheetsApi.getSpreadsheets(activeNotebookId).catch(err => {
-            console.error('Failed to load spreadsheets:', err);
-            return [];
-          }),
-          audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
-            console.error('Failed to load audio overviews:', err);
-            return [];
-          }),
-        ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedSpreadsheets, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedSpreadsheets, ...loadedAudio].sort((a, b) => {
-              const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
-              const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
-              return bDate.localeCompare(aDate);
-            });
-            setNotes(allNotes);
-          })
-          .catch(err => console.error('Failed to reload notes:', err));
-      }
+      console.error('Failed to update note:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update note');
     }
   };
 
   const handleUpdateNoteFull = (id: string, note: Note) => {
-    setNotes(prev => {
-      return prev.map(n => n.id === id ? { ...note } : n);
-    });
+    // Notes will be automatically updated via Convex query reactivity
   };
 
   const handleDeleteNote = async (id: string) => {
+    const note = notes.find((n) => n.id === id);
+    if (!note) return;
     try {
-      // Find the note to check its type
-      const noteToDelete = notes.find(n => n.id === id);
-
-      // Optimistically remove from UI
-      setNotes(prev => prev.filter(n => n.id !== id));
-
-      // Delete from backend - route to correct API based on type
-      if (noteToDelete?.type === 'mindmap') {
-        await mindMapApi.deleteMindMap(id);
-      } else if (noteToDelete?.type === 'flashcard') {
-        await flashcardsApi.deleteFlashcard(id);
-      } else if (noteToDelete?.type === 'quiz') {
-        await quizzesApi.deleteQuiz(id);
-      } else if (noteToDelete?.type === 'writtenQuestions') {
-        await writtenQuestionsApi.deleteWrittenQuestions(id);
-      } else if (noteToDelete?.type === 'slides') {
-        await slidesApi.deleteSlideDeck(id);
-      } else if (noteToDelete?.type === 'spreadsheet') {
-        await spreadsheetsApi.deleteSpreadsheet(id);
-      } else if (noteToDelete?.type === 'audio') {
-        await audioApi.deleteAudioOverview(id);
-      } else {
-        await notesApi.deleteNote(id);
+      switch (note.type) {
+        case 'report':
+          await deleteReport(id);
+          break;
+        case 'flashcard':
+          await deleteFlashcards(id);
+          break;
+        case 'quiz':
+          await deleteQuiz(id);
+          break;
+        case 'mindmap':
+          await deleteMindMap(id);
+          break;
+        case 'audio':
+          await deleteAudioOverview(id);
+          break;
+        case 'writtenQuestions':
+          await deleteWrittenQuestions(id);
+          break;
+        case 'slides':
+          await deleteSlideDeck(id);
+          break;
+        case 'spreadsheet':
+          await deleteSpreadsheet(id);
+          break;
+        default:
+          console.warn('Unknown note type for delete:', (note as Note).type);
       }
     } catch (error) {
       console.error('Failed to delete note:', error);
-      // Reload notes on error
-      if (activeNotebookId) {
-        Promise.all([
-          notesApi.getNotes(activeNotebookId).catch(err => {
-            console.error('Failed to load notes:', err);
-            return [];
-          }),
-          mindMapApi.getMindMaps(activeNotebookId).catch(err => {
-            console.error('Failed to load mind maps:', err);
-            return [];
-          }),
-          flashcardsApi.getFlashcards(activeNotebookId).catch(err => {
-            console.error('Failed to load flashcards:', err);
-            return [];
-          }),
-          quizzesApi.getQuizzes(activeNotebookId).catch(err => {
-            console.error('Failed to load quizzes:', err);
-            return [];
-          }),
-          writtenQuestionsApi.getWrittenQuestionsByNotebook(activeNotebookId).catch(err => {
-            console.error('Failed to load written questions:', err);
-            return [];
-          }),
-          slidesApi.getSlideDecks(activeNotebookId).catch(err => {
-            console.error('Failed to load slide decks:', err);
-            return [];
-          }),
-          spreadsheetsApi.getSpreadsheets(activeNotebookId).catch(err => {
-            console.error('Failed to load spreadsheets:', err);
-            return [];
-          }),
-          audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
-            console.error('Failed to load audio overviews:', err);
-            return [];
-          }),
-        ])
-          .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedSpreadsheets, loadedAudio]) => {
-            const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedSpreadsheets, ...loadedAudio].sort((a, b) => {
-              const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
-              const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
-              return bDate.localeCompare(aDate);
-            });
-            setNotes(allNotes);
-          })
-          .catch(err => console.error('Failed to reload notes:', err));
-      }
+      alert(error instanceof Error ? error.message : 'Failed to delete note');
     }
   };
 
   const handleAddNote = (note: Note) => {
-    setNotes(prev => [note, ...prev]);
+    // Notes will be automatically added via Convex query reactivity
   };
 
   const handleUpdateNotebook = async (id: string, updates: Partial<NotebookItem>) => {
@@ -541,32 +474,20 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      // Optimistically update UI
-      setNotebooks(prev => prev.map(nb => nb.id === id ? { ...nb, ...updates } : nb));
-      if (activeNotebookId === id && updates.title) {
-        setNotebookTitle(updates.title);
-      }
-
-      // Sync with Supabase
       const updatePayload: any = {};
       if (updates.title !== undefined) updatePayload.title = updates.title;
       if (updates.coverColor !== undefined) updatePayload.coverColor = updates.coverColor;
       if (updates.icon !== undefined) updatePayload.icon = updates.icon;
       if (updates.isFeatured !== undefined) updatePayload.isFeatured = updates.isFeatured;
 
-      const updatedNotebook = await notebooksApi.updateNotebook(id, updatePayload);
-      
-      // Update with server response to ensure consistency
-      setNotebooks(prev => prev.map(nb => nb.id === id ? updatedNotebook : nb));
-      
-      if (activeNotebookId === id) {
-        setNotebookTitle(updatedNotebook.title);
+      await updateNotebook(id, updatePayload);
+
+      if (activeNotebookId === id && updates.title) {
+        setNotebookTitle(updates.title);
       }
     } catch (error) {
       console.error('Failed to update notebook:', error);
-      // Revert optimistic update on error
-      loadNotebooks();
-      setNotebooksError(error instanceof Error ? error.message : 'Failed to update notebook');
+      alert(error instanceof Error ? error.message : 'Failed to update notebook');
     }
   };
 
@@ -577,19 +498,13 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      // Optimistically remove from UI
-      setNotebooks(prev => prev.filter(nb => nb.id !== id));
+      await deleteNotebook(id);
       if (activeNotebookId === id) {
         handleLogoClick();
       }
-
-      // Sync with Supabase
-      await notebooksApi.deleteNotebook(id);
     } catch (error) {
       console.error('Failed to delete notebook:', error);
-      // Revert optimistic update on error
-      loadNotebooks();
-      setNotebooksError(error instanceof Error ? error.message : 'Failed to delete notebook');
+      alert(error instanceof Error ? error.message : 'Failed to delete notebook');
     }
   };
 
@@ -644,81 +559,20 @@ const AppContent: React.FC = () => {
       const customEvent = e as CustomEvent;
       setLeftWidth(customEvent.detail.width);
     };
-    
+
     const handleStudioPanelResize = (e: Event) => {
       const customEvent = e as CustomEvent;
       setRightWidth(customEvent.detail.width);
     };
-    
+
     window.addEventListener('resizeSourcesPanel', handleSourcesPanelResize);
     window.addEventListener('resizeStudioPanel', handleStudioPanelResize);
-    
+
     return () => {
       window.removeEventListener('resizeSourcesPanel', handleSourcesPanelResize);
       window.removeEventListener('resizeStudioPanel', handleStudioPanelResize);
     };
   }, []);
-
-  // Load notebooks from API when authenticated
-  const loadNotebooks = useCallback(async () => {
-    if (!isAuthenticated || !user) {
-      setNotebooks([]);
-      return;
-    }
-
-    setNotebooksLoading(true);
-    setNotebooksError(null);
-    try {
-      const fetchedNotebooks = await notebooksApi.getNotebooks();
-      setNotebooks(fetchedNotebooks);
-    } catch (error) {
-      console.error('Failed to load notebooks:', error);
-      setNotebooksError(error instanceof Error ? error.message : 'Failed to load notebooks');
-      setNotebooks([]);
-    } finally {
-      setNotebooksLoading(false);
-    }
-  }, [isAuthenticated, user]);
-
-  useEffect(() => {
-    loadNotebooks();
-  }, [loadNotebooks]);
-
-  // Load folders from API when authenticated
-  const loadFolders = useCallback(async () => {
-    if (!isAuthenticated || !user) {
-      setFolders([]);
-      return;
-    }
-
-    setFoldersLoading(true);
-    setFoldersError(null);
-    try {
-      const fetchedFolders = await foldersApi.getFolders();
-      setFolders(fetchedFolders);
-    } catch (error) {
-      console.error('Failed to load folders:', error);
-      setFoldersError(error instanceof Error ? error.message : 'Failed to load folders');
-      setFolders([]);
-    } finally {
-      setFoldersLoading(false);
-    }
-  }, [isAuthenticated, user]);
-
-  useEffect(() => {
-    loadFolders();
-  }, [loadFolders]);
-
-  // Load subscription status when authenticated
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      subscriptionApi.getStatus()
-        .then(status => setHasSubscription(status.hasSubscription))
-        .catch(err => console.error('Failed to load subscription status:', err));
-    } else {
-      setHasSubscription(false);
-    }
-  }, [isAuthenticated, user]);
 
   // Handle redirect from Stripe checkout
   useEffect(() => {
@@ -727,175 +581,32 @@ const AppContent: React.FC = () => {
     const canceled = urlParams.get('canceled');
 
     if ((success === 'true' || canceled === 'true') && isAuthenticated && user) {
-      // Refresh subscription status after returning from Stripe
-      subscriptionApi.getStatus()
-        .then(status => setHasSubscription(status.hasSubscription))
-        .catch(err => console.error('Failed to load subscription status:', err))
-        .finally(() => {
-          // Navigate to billing page after refreshing status
-          navigate('/billing');
-          // Clean up URL
-          window.history.replaceState({}, '', window.location.pathname);
-        });
+      navigate('/billing');
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [isAuthenticated, user, navigate]);
-
-  // Load documents from API when authenticated and notebook is active
-  useEffect(() => {
-    if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
-      documentsApi.getDocuments(user.id, activeNotebookId)
-        .then(docs => setSources(docs.map(documentToSource)))
-        .catch(err => console.error('Failed to load documents:', err));
-    }
-  }, [isAuthenticated, user, activeNotebookId, currentView]);
-
-  // Load notes, mind maps, flashcards, quizzes, written questions, slides, spreadsheets, and audio overviews from API when authenticated and notebook is active
-  useEffect(() => {
-    if (isAuthenticated && user && activeNotebookId && activeNotebookId !== 'new' && currentView === 'notebook') {
-      // Fetch all content types in parallel
-      Promise.all([
-        notesApi.getNotes(activeNotebookId).catch(err => {
-          console.error('Failed to load notes:', err);
-          return [];
-        }),
-        mindMapApi.getMindMaps(activeNotebookId).catch(err => {
-          console.error('Failed to load mind maps:', err);
-          return [];
-        }),
-        flashcardsApi.getFlashcards(activeNotebookId).catch(err => {
-          console.error('Failed to load flashcards:', err);
-          return [];
-        }),
-        quizzesApi.getQuizzes(activeNotebookId).catch(err => {
-          console.error('Failed to load quizzes:', err);
-          return [];
-        }),
-        writtenQuestionsApi.getWrittenQuestionsByNotebook(activeNotebookId).catch(err => {
-          console.error('Failed to load written questions:', err);
-          return [];
-        }),
-        slidesApi.getSlideDecks(activeNotebookId).catch(err => {
-          console.error('Failed to load slide decks:', err);
-          return [];
-        }),
-        spreadsheetsApi.getSpreadsheets(activeNotebookId).catch(err => {
-          console.error('Failed to load spreadsheets:', err);
-          return [];
-        }),
-        audioApi.getAudioOverviewsByNotebook(activeNotebookId).catch(err => {
-          console.error('Failed to load audio overviews:', err);
-          return [];
-        }),
-      ])
-        .then(([loadedNotes, loadedMindMaps, loadedFlashcards, loadedQuizzes, loadedWrittenQuestions, loadedSlides, loadedSpreadsheets, loadedAudio]) => {
-          // Merge all content types, sort by created_at descending
-          const allNotes = [...loadedNotes, ...loadedMindMaps, ...loadedFlashcards, ...loadedQuizzes, ...loadedWrittenQuestions, ...loadedSlides, ...loadedSpreadsheets, ...loadedAudio].sort((a, b) => {
-            const aDate = a.metadata?.generatedAt || a.metadata?.createdAt || '';
-            const bDate = b.metadata?.generatedAt || b.metadata?.createdAt || '';
-            return bDate.localeCompare(aDate);
-          });
-          setNotes(allNotes);
-        })
-        .catch(err => console.error('Failed to load notes:', err));
-    } else if (currentView === 'home') {
-      // Clear notes when going to home
-      setNotes([]);
-    }
-  }, [isAuthenticated, user, activeNotebookId, currentView]);
-
-  // Cleanup polling interval on unmount or when switching notebooks
-  useEffect(() => {
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [activeNotebookId]);
-
-  // Handle document upload - trigger a refresh and start polling if needed
-  const handleDocumentUploaded = useCallback(() => {
-    if (user && activeNotebookId) {
-      documentsApi.getDocuments(user.id, activeNotebookId)
-        .then(docs => {
-          const mappedSources = docs.map(documentToSource);
-          setSources(mappedSources);
-
-          // Check if any documents are still processing and start polling
-          const hasProcessing = docs.some(doc => doc.status === 'pending' || doc.status === 'processing');
-          if (hasProcessing) {
-            // Clear any existing polling interval
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-            }
-
-            // Poll every 2 seconds until all documents are completed/failed
-            pollingIntervalRef.current = setInterval(async () => {
-              try {
-                const updatedDocs = await documentsApi.getDocuments(user.id, activeNotebookId);
-                const allDone = updatedDocs.every(doc => doc.status === 'completed' || doc.status === 'failed');
-
-                setSources(updatedDocs.map(documentToSource));
-
-                if (allDone) {
-                  if (pollingIntervalRef.current) {
-                    clearInterval(pollingIntervalRef.current);
-                    pollingIntervalRef.current = null;
-                  }
-                }
-              } catch (err) {
-                console.error('Failed to poll document status:', err);
-                if (pollingIntervalRef.current) {
-                  clearInterval(pollingIntervalRef.current);
-                  pollingIntervalRef.current = null;
-                }
-              }
-            }, 2000);
-          }
-        })
-        .catch(err => console.error('Failed to load documents:', err));
-    }
-  }, [user, activeNotebookId]);
 
   // Handle source deletion
   const handleDeleteSource = useCallback(async (sourceId: string) => {
     try {
-      // Optimistically remove from UI
       setSources(prev => prev.filter(s => s.id !== sourceId));
-      
-      // Delete from backend (which will also delete from storage and database)
-      await documentsApi.deleteDocument(sourceId);
+      await deleteDocumentMutation(sourceId);
     } catch (error) {
       console.error('Failed to delete source:', error);
       alert(error instanceof Error ? error.message : 'Failed to delete source');
-      // Reload sources on error
-      if (user && activeNotebookId) {
-        documentsApi.getDocuments(user.id, activeNotebookId)
-          .then(docs => setSources(docs.map(documentToSource)))
-          .catch(err => console.error('Failed to load documents:', err));
-      }
     }
-  }, [user, activeNotebookId]);
+  }, [deleteDocumentMutation]);
 
   // Handle source rename
   const handleRenameSource = useCallback(async (sourceId: string, newTitle: string) => {
     try {
-      // Optimistically update UI
       setSources(prev => prev.map(s => s.id === sourceId ? { ...s, title: newTitle } : s));
-      
-      // Sync with backend
-      await documentsApi.renameDocument(sourceId, newTitle);
+      await updateDocument(sourceId, { title: newTitle });
     } catch (error) {
       console.error('Failed to rename source:', error);
       alert(error instanceof Error ? error.message : 'Failed to rename source');
-      // Reload sources on error
-      if (user && activeNotebookId) {
-        documentsApi.getDocuments(user.id, activeNotebookId)
-          .then(docs => setSources(docs.map(documentToSource)))
-          .catch(err => console.error('Failed to load documents:', err));
-      }
     }
-  }, [user, activeNotebookId]);
+  }, [updateDocument]);
 
   // Show login modal only for protected routes when not authenticated
   useEffect(() => {
@@ -925,12 +636,6 @@ const AppContent: React.FC = () => {
   };
 
   const handleBillingBack = () => {
-    // Refresh subscription status when returning from billing page
-    if (isAuthenticated && user) {
-      subscriptionApi.getStatus()
-        .then(status => setHasSubscription(status.hasSubscription))
-        .catch(err => console.error('Failed to load subscription status:', err));
-    }
     navigate('/home');
   };
 
@@ -953,17 +658,16 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      const newNotebook = await notebooksApi.createNotebook({
+      const newNotebook = await createNotebook({
         title: 'Untitled Notebook',
         coverColor: 'bg-yellow-500',
         icon: 'Folder',
       });
 
-      setNotebooks(prev => [newNotebook, ...prev]);
       navigate(`/notebook/${newNotebook.id}`);
     } catch (error) {
       console.error('Failed to create notebook:', error);
-      setNotebooksError(error instanceof Error ? error.message : 'Failed to create notebook');
+      alert(error instanceof Error ? error.message : 'Failed to create notebook');
     }
   };
 
@@ -974,16 +678,14 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      const newFolder = await foldersApi.createFolder({
+      await createFolder({
         name: 'New Folder',
         color: 'bg-blue-500',
         icon: 'Folder',
       });
-
-      setFolders(prev => [newFolder, ...prev]);
     } catch (error) {
       console.error('Failed to create folder:', error);
-      setFoldersError(error instanceof Error ? error.message : 'Failed to create folder');
+      alert(error instanceof Error ? error.message : 'Failed to create folder');
     }
   };
 
@@ -994,23 +696,15 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      // Optimistically update UI
-      setFolders(prev => prev.map(f => f.id === id ? ({ ...f, ...updates }) : f));
-
-      // Sync with backend
-      const updatedFolder = await foldersApi.updateFolder(id, {
+      await updateFolder(id, {
         name: updates.name,
         description: updates.description,
         color: updates.color,
         icon: updates.icon,
       });
-
-      // Update with server response
-      setFolders(prev => prev.map(f => f.id === id ? updatedFolder : f));
     } catch (error) {
       console.error('Failed to update folder:', error);
-      loadFolders();
-      setFoldersError(error instanceof Error ? error.message : 'Failed to update folder');
+      alert(error instanceof Error ? error.message : 'Failed to update folder');
     }
   };
 
@@ -1021,18 +715,10 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      // Optimistically remove from UI
-      setFolders(prev => prev.filter(f => f.id !== id));
-
-      // Sync with backend (this will also set notebooks' folder_id to null)
-      await foldersApi.deleteFolder(id);
-
-      // Reload notebooks to get updated folder_id values
-      loadNotebooks();
+      await deleteFolder(id);
     } catch (error) {
       console.error('Failed to delete folder:', error);
-      loadFolders();
-      setFoldersError(error instanceof Error ? error.message : 'Failed to delete folder');
+      alert(error instanceof Error ? error.message : 'Failed to delete folder');
     }
   };
 
@@ -1043,34 +729,16 @@ const AppContent: React.FC = () => {
     }
 
     try {
-      // Optimistically update UI - remove from notebooks list (it will be in folder now)
-      setNotebooks(prev => prev.map(nb => {
-        if (nb.id === notebookId) {
-          return { ...nb, folderId: folderId || undefined };
-        }
-        return nb;
-      }));
-
-      // Sync with backend
-      const updatedNotebook = await notebooksApi.updateNotebook(notebookId, { folderId });
-
-      // Update with server response
-      setNotebooks(prev => prev.map(nb => nb.id === notebookId ? updatedNotebook : nb));
-
-      // Reload folders to update notebook counts
-      loadFolders();
+      await updateNotebook(notebookId, { folderId });
     } catch (error) {
       console.error('Failed to move notebook:', error);
-      loadNotebooks();
-      loadFolders();
-      setNotebooksError(error instanceof Error ? error.message : 'Failed to move notebook');
+      alert(error instanceof Error ? error.message : 'Failed to move notebook');
     }
   };
 
   const handlePlayAudio = (audioUrl: string, title: string, transcript?: string, noteId?: string) => {
     setMiniPlayerData({ audioUrl, title, transcript });
     setMiniPlayerVisible(true);
-    // Store the current playing audio note ID for expand functionality
     if (noteId) {
       (window as any).__currentPlayingAudioNoteId = noteId;
     }
@@ -1081,13 +749,11 @@ const AppContent: React.FC = () => {
   };
 
   const handleExpandAudioPlayer = () => {
-    // Close mini player and open the full player in studio panel
     setMiniPlayerVisible(false);
     const noteId = (window as any).__currentPlayingAudioNoteId;
     if (noteId) {
       const note = notes.find(n => n.id === noteId);
       if (note) {
-        // Trigger the note click by setting it as active
         const event = new CustomEvent('setActiveNote', { detail: { noteId } });
         window.dispatchEvent(event);
       }
@@ -1096,7 +762,6 @@ const AppContent: React.FC = () => {
 
   return (
     <>
-      {/* Login Modal */}
       {showLoginModal && !isAuthenticated && (
         <LoginModal
           onClose={() => {
@@ -1113,7 +778,6 @@ const AppContent: React.FC = () => {
           title={notebookTitle}
           onRename={(newTitle: string) => {
             setNotebookTitle(newTitle);
-            // If we're in a notebook view, sync the rename with Supabase
             if (activeNotebookId && activeNotebookId !== 'new' && isAuthenticated) {
               handleUpdateNotebook(activeNotebookId, { title: newTitle });
             }
@@ -1121,13 +785,12 @@ const AppContent: React.FC = () => {
           isHome={location.pathname === '/home' || location.pathname === '/billing' || location.pathname.startsWith('/folder/')}
           onLogoClick={handleLogoClick}
           onBillingClick={handleBillingClick}
-          hasSubscription={hasSubscription}
+          hasSubscription={subscriptionStatus.hasSubscription}
         />
       )}
 
       <Routes>
         <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
 
@@ -1142,14 +805,11 @@ const AppContent: React.FC = () => {
               onCreateNotebook={handleCreateNotebook}
               onUpdateNotebook={handleUpdateNotebook}
               onDeleteNotebook={handleDeleteNotebook}
-              isLoading={notebooksLoading}
-              error={notebooksError}
               folders={folders}
               onCreateFolder={handleCreateFolder}
               onUpdateFolder={handleUpdateFolder}
               onDeleteFolder={handleDeleteFolder}
               onMoveNotebookToFolder={handleMoveNotebookToFolder}
-              loadFolders={loadFolders}
               onRequireAuth={(errorMessage) => {
                 setAuthError(errorMessage);
                 setShowLoginModal(true);
@@ -1173,7 +833,6 @@ const AppContent: React.FC = () => {
                   onDeleteNotebook={handleDeleteNotebook}
                   onMoveNotebookToFolder={handleMoveNotebookToFolder}
                   folders={folders}
-                  loadFolders={loadFolders}
                   onRequireAuth={(errorMessage) => {
                     setAuthError(errorMessage);
                     setShowLoginModal(true);
@@ -1201,7 +860,7 @@ const AppContent: React.FC = () => {
             <ProtectedRoute requireNotebookAccess={true}>
               <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
                 {/* Mobile Navigation Bar */}
-                <div className="md:hidden flex items-center justify-around border-b border-border bg-background sticky top-0 z-[60] h-12">
+                <div className="md:hidden flex items-center justify-around border-b border-border bg-background sticky top-0 z-60 h-12">
                   <button
                     onClick={() => setMobileActiveTab('sources')}
                     className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
@@ -1251,10 +910,9 @@ const AppContent: React.FC = () => {
                     isResizing={isResizingLeft}
                     userId={user?.id}
                     noteId={activeNotebookId}
-                    onDocumentUploaded={handleDocumentUploaded}
+                    onDocumentUploaded={() => {}}
                   />
 
-                  {/* Left Drag Handle */}
                   {isSourcesOpen && (
                     <div
                       className="w-1 hover:w-1.5 -ml-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
@@ -1263,7 +921,7 @@ const AppContent: React.FC = () => {
                   )}
 
                   <ChatPanel
-                    messages={messages}
+                    messages={chatDisplayMessages}
                     isLeftOpen={isSourcesOpen}
                     isRightOpen={isStudioOpen}
                     toggleLeft={toggleSources}
@@ -1274,7 +932,6 @@ const AppContent: React.FC = () => {
                     notebookId={activeNotebookId}
                   />
 
-                  {/* Right Drag Handle */}
                   {isStudioOpen && (
                     <div
                       className="w-1 hover:w-1.5 -mr-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
@@ -1321,14 +978,14 @@ const AppContent: React.FC = () => {
                         isResizing={false}
                         userId={user?.id}
                         noteId={activeNotebookId}
-                        onDocumentUploaded={handleDocumentUploaded}
+                        onDocumentUploaded={() => {}}
                       />
                     </div>
                   )}
                   {mobileActiveTab === 'chat' && (
                     <div className="flex-1 w-full overflow-hidden">
                       <ChatPanel
-                        messages={messages}
+                        messages={chatDisplayMessages}
                         isLeftOpen={false}
                         isRightOpen={false}
                         toggleLeft={() => {}}
@@ -1375,7 +1032,7 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Wrapper component with AuthProvider and BrowserRouter
+// Wrapper component with BrowserRouter
 const App: React.FC = () => {
   return (
     <>
@@ -1384,7 +1041,10 @@ const App: React.FC = () => {
       <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>
-            <AppContent />
+            <ToastProvider>
+              <AppContent />
+              <ToastContainer />
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </BrowserRouter>

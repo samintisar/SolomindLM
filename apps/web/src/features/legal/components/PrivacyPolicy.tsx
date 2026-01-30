@@ -172,7 +172,7 @@ export const PrivacyPolicy: React.FC = () => {
               <div className="bg-card border border-border rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-3">Infrastructure & Data Storage</h3>
                 <ul className="space-y-2 text-muted-foreground text-sm">
-                  <li>• <strong>Supabase:</strong> Database hosting, authentication, and file storage</li>
+                  <li>• <strong>Convex:</strong> Backend, database, authentication, and file storage</li>
                   <li>• <strong>Supadata:</strong> Video transcription and web scraping</li>
                   <li>• <strong>Tavily:</strong> Web search and source discovery</li>
                 </ul>

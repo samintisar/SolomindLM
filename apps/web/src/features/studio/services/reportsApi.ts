@@ -1,13 +1,11 @@
 import type { Note, ReportNote } from '@/shared/types/index';
 import { getReportSubtitle, normalizeReportTypeId } from '@/shared/types/reportTypes';
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
-import { getUserId } from '@/shared/utils/auth';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useQuery, useMutation, useAction } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export interface CreateReportParams {
-  userId: string;
-  noteId: string;
+  notebookId: string;
   documentIds: string[];
   reportType: string;
   customPrompt?: string;
@@ -20,136 +18,201 @@ export interface CreateReportResponse {
 }
 
 /**
- * Map a database note response to the frontend ReportNote interface with proper preview
+ * Map a database report response to the frontend ReportNote interface with proper preview
  */
-function mapDatabaseNoteToNote(dbNote: any): ReportNote {
-  const reportType = normalizeReportTypeId(dbNote.metadata?.reportType || 'custom');
+function mapDatabaseReportToNote(dbReport: any): ReportNote {
+  const reportType = normalizeReportTypeId(dbReport.reportType || dbReport.metadata?.reportType || 'custom');
   let preview = '';
 
   // Determine preview based on status
-  if (dbNote.status === 'generating' || dbNote.status === 'mapping' || dbNote.status === 'collapsing' || dbNote.status === 'reducing') {
+  if (dbReport.status === 'generating' || dbReport.status === 'mapping' || dbReport.status === 'collapsing' || dbReport.status === 'reducing') {
+    preview = getReportSubtitle(reportType) + ' • Generating...';
+  } else if (dbReport.status === 'completed') {
     preview = getReportSubtitle(reportType);
-  } else if (dbNote.status === 'completed') {
-    preview = getReportSubtitle(reportType);
-  } else if (dbNote.status === 'failed') {
+  } else if (dbReport.status === 'failed') {
     preview = `${getReportSubtitle(reportType)} • Failed`;
   } else {
     preview = getReportSubtitle(reportType);
   }
 
   return {
-    id: dbNote.id,
-    title: dbNote.title,
+    id: dbReport._id,
+    title: dbReport.title,
     preview,
     type: 'report',
-    content: dbNote.content || '',
-    status: dbNote.status,
+    content: dbReport.content || '',
+    status: dbReport.status,
     metadata: {
       reportType,
-      documentIds: dbNote.metadata?.documentIds || [],
-      phase: dbNote.metadata?.phase,
-      error: dbNote.metadata?.error,
-      chunksProcessed: dbNote.metadata?.chunksProcessed,
+      documentIds: dbReport.metadata?.documentIds || [],
+      phase: dbReport.metadata?.phase,
+      error: dbReport.metadata?.error,
+      chunksProcessed: dbReport.metadata?.chunksProcessed,
     },
   };
 }
 
-export const reportsApi = {
-  /**
-   * Create a new report and queue generation
-   */
-  async createReport(params: CreateReportParams): Promise<CreateReportResponse> {
-    const response = await apiPost('/api/reports', params);
+/**
+ * Get all reports for a notebook
+ * Returns undefined while loading, empty array when loaded but no results
+ */
+export function useReports(notebookId: string | null) {
+  const reports = useQuery(
+    api.reports.list,
+    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+  );
+  return reports?.map(mapDatabaseReportToNote);
+}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create report');
-    }
+/**
+ * Get a specific report by ID
+ */
+export function useReport(reportId: string | null) {
+  const report = useQuery(
+    api.reports.get,
+    reportId ? { id: reportId as Id<'reports'> } : 'skip'
+  );
+  return report ? mapDatabaseReportToNote(report) : null;
+}
 
-    const result = await response.json();
+/**
+ * Create a new report and queue generation
+ */
+export function useCreateReport() {
+  const schedule = useAction(api.contentGeneration.scheduleReport);
+
+  return async (params: CreateReportParams): Promise<CreateReportResponse> => {
+    const result = await schedule({
+      notebookId: params.notebookId as Id<'notebooks'>,
+      documentIds: params.documentIds as Id<'documents'>[],
+      reportType: params.reportType,
+      customPrompt: params.customPrompt,
+    });
+
     return {
       reportId: result.reportId,
       status: result.status,
-      note: mapDatabaseNoteToNote(result.note),
+      note: mapDatabaseReportToNote({
+        ...result.report,
+        _id: result.reportId,
+        reportType: params.reportType,
+        metadata: { documentIds: params.documentIds },
+      }),
     };
-  },
+  };
+}
 
-  /**
-   * Get a specific report by ID
-   */
-  async getReport(reportId: string): Promise<ReportNote> {
-    const userId = getUserId();
+/**
+ * Update a report (e.g. title) with optimistic update
+ */
+export function useUpdateReport() {
+  const update = useMutation(api.reports.update).withOptimisticUpdate((localStore, args) => {
+    const { id, title } = args;
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
+    // Read the current report to get its notebookId
+    const report = localStore.getQuery(api.reports.get, { id });
+    if (report) {
+      // Update detail view
+      localStore.setQuery(
+        api.reports.get,
+        { id },
+        { ...report, ...(title !== undefined && { title }) }
+      );
 
-    const params = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/reports/${reportId}?${params.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch report');
-    }
-
-    const dbNote = await response.json();
-    return mapDatabaseNoteToNote(dbNote);
-  },
-
-  /**
-   * Poll report status until completion
-   */
-  async pollReportStatus(
-    reportId: string,
-    onUpdate?: (note: ReportNote) => void,
-    maxAttempts = 180, // 6 minutes @ 2s intervals
-    interval = 2000
-  ): Promise<ReportNote> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const note = await this.getReport(reportId);
-
-      if (note.status === 'completed' || note.status === 'failed') {
-        return note;
+      // Update list view using the notebookId from the item (if title is being updated)
+      if (title !== undefined) {
+        const listResult = localStore.getQuery(api.reports.list, { notebookId: report.notebookId });
+        if (listResult) {
+          localStore.setQuery(
+            api.reports.list,
+            { notebookId: report.notebookId },
+            listResult.map(r =>
+              r._id === id
+                ? { ...r, title }
+                : r
+            )
+          );
+        }
       }
+    }
+  });
 
-      onUpdate?.(note);
-      await new Promise((resolve) => setTimeout(resolve, interval));
+  return async (reportId: string, updates: { title?: string }) => {
+    await update({
+      id: reportId as Id<'reports'>,
+      ...updates,
+    });
+  };
+}
+
+/**
+ * Delete a report by ID with optimistic update
+ */
+export function useDeleteReport() {
+  const remove = useMutation(api.reports.remove).withOptimisticUpdate((localStore, args) => {
+    // Read the current report to get its notebookId
+    const report = localStore.getQuery(api.reports.get, { id: args.id });
+    if (report) {
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.reports.list, { notebookId: report.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.reports.list,
+          { notebookId: report.notebookId },
+          listResult.filter(r => r._id !== args.id)
+        );
+      }
     }
 
-    throw new Error('Report generation timed out');
-  },
+    // Clear detail view
+    localStore.setQuery(api.reports.get, { id: args.id }, null);
+  });
 
-  /**
-   * Get all reports for a notebook
-   */
-  async getReports(notebookId: string): Promise<ReportNote[]> {
-    const userId = getUserId();
+  return async (reportId: string) => {
+    await remove({ id: reportId as Id<'reports'> });
+  };
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
+/**
+ * Poll report status until completion
+ * Note: With Convex, you can also use useQuery with real-time updates
+ * This polling function is kept for compatibility
+ * @param initialNote - Optional note to use when getReport() hasn't returned yet (e.g. before Convex reactivity updates)
+ */
+export async function pollReportStatus(
+  getReport: () => ReportNote | null | undefined,
+  onUpdate?: (note: ReportNote) => void,
+  maxAttempts = 180, // 6 minutes @ 2s intervals
+  interval = 2000,
+  initialNote?: ReportNote
+): Promise<ReportNote> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const note = getReport() ?? initialNote;
+
+    if (!note) {
+      throw new Error('Report not found');
     }
 
-    const params = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/reports/notebook/${notebookId}?${params.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch reports');
+    if (note.status === 'completed' || note.status === 'failed') {
+      return note;
     }
 
-    const dbNotes = await response.json();
-    return dbNotes.map(mapDatabaseNoteToNote);
-  },
+    onUpdate?.(note);
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 
-  /**
-   * Delete a report by ID
-   */
-  async deleteReport(reportId: string): Promise<void> {
-    const userId = getUserId();
+  throw new Error('Report generation timed out');
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    await apiDelete(`/api/reports/${reportId}?${params.toString()}`);
-  },
+/**
+ * Legacy API object for backward compatibility
+ * @deprecated Use individual hooks instead
+ */
+export const reportsApi = {
+  useReports,
+  useReport,
+  useCreateReport,
+  useUpdateReport,
+  useDeleteReport,
+  pollReportStatus,
 };

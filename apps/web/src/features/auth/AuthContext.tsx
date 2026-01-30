@@ -1,20 +1,23 @@
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { setStoredUser } from '@/shared/utils/auth';
+import { createContext, useContext, ReactNode } from 'react';
+import { useQuery, useConvexAuth } from 'convex/react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '@convex/_generated/api';
+import { authClient } from '@/lib/auth-client';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-interface User {
+export interface User {
   id: string;
-  email: string;
+  email?: string;
+  name?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<User>;
-  signUp: (email: string, password: string) => Promise<User>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  forgetPassword: (email: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -23,194 +26,86 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const currentUser = useQuery(api.auth.getCurrentUser);
 
-  // Wrapper to set user and sync to localStorage synchronously
-  const setUserAndSync = useCallback((newUser: User | null) => {
-    setUser(newUser);
-    setStoredUser(newUser);
-  }, []);
-
-  // Check for existing session (cookies are set by backend)
-  const checkSession = useCallback(async () => {
-    try {
-      // Verify session is still valid by calling /me endpoint
-      // Cookies are automatically sent by the browser
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUserAndSync({ id: data.userId, email: data.email });
-      } else {
-        // Session expired or not authenticated (expected if user hasn't logged in)
-        setUserAndSync(null);
+  const user: User | null = currentUser
+    ? {
+        id: currentUser.id,
+        email: currentUser.email ?? undefined,
+        name: currentUser.name ?? undefined,
       }
-    } catch (error) {
-      // Only log unexpected errors, not expected 401s
-      if (error instanceof Error && !error.message.includes('401')) {
-        console.error('Session check error:', error);
-      }
-      setUserAndSync(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setUserAndSync]);
+    : null;
 
-  // Check for existing session on mount
-  useEffect(() => {
-    checkSession();
-  }, [checkSession]);
-
-  // Listen for custom auth events (for OAuth callback handling)
-  useEffect(() => {
-    const handleAuthChange = () => {
-      checkSession();
-    };
-
-    window.addEventListener('auth-change', handleAuthChange);
-
-    return () => {
-      window.removeEventListener('auth-change', handleAuthChange);
-    };
-  }, [checkSession]);
-
-  // Listen for session expired events from API calls
-  // This handles the case where the refresh token has also expired
-  useEffect(() => {
-    const handleSessionExpired = () => {
-      console.log('[Auth] Session expired, logging out user');
-      setUserAndSync(null);
-    };
-
-    window.addEventListener('auth-session-expired', handleSessionExpired);
-
-    return () => {
-      window.removeEventListener('auth-session-expired', handleSessionExpired);
-    };
-  }, [setUserAndSync]);
-
-  const signIn = useCallback(async (email: string, password: string): Promise<User> => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include',
+  const signIn = async (email: string, password: string): Promise<void> => {
+    const result = await authClient.signIn.email({
+      email,
+      password,
+      callbackURL: window.location.href,
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Sign in failed');
+    if (result.error) {
+      throw new Error(result.error.message || "Sign in failed");
     }
+  };
 
-    // Verify session after login to ensure cookies are set and working
-    await checkSession();
-
-    // Return user from session check or fallback to login response
-    const newUser: User = {
-      id: data.userId,
-      email: data.email,
-    };
-
-    setUserAndSync(newUser);
-    return newUser;
-  }, [checkSession, setUserAndSync]);
-
-  const signUp = useCallback(async (email: string, password: string): Promise<User> => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include',
+  const signUp = async (email: string, password: string, name?: string): Promise<void> => {
+    const result = await authClient.signUp.email({
+      email,
+      password,
+      name,
+      callbackURL: window.location.href,
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || 'Sign up failed');
+    if (result.error) {
+      throw new Error(result.error.message || "Sign up failed");
     }
+    // Session should be automatically set, trigger refresh
+    await refreshSession();
+  };
 
-    // If email confirmation is needed
-    if (data.needsConfirmation) {
-      throw new Error('Please check your email to confirm your account before signing in.');
+  const forgetPassword = async (email: string): Promise<void> => {
+    const result = await (authClient as any).forgetPassword({ email });
+    if (result.error) {
+      throw new Error(result.error.message || "Failed to send reset email");
     }
+    // Show success message even if email doesn't exist (security best practice)
+    // "If an account exists with this email, you'll receive a reset link."
+  };
 
-    const newUser: User = {
-      id: data.userId,
-      email: data.email,
-    };
-
-    setUserAndSync(newUser);
-    return newUser;
-  }, [setUserAndSync]);
-
-  const signOut = useCallback(async () => {
-    try {
-      await fetch(`${API_BASE_URL}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setUserAndSync(null);
+  const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+    const result = await authClient.resetPassword({ token, newPassword });
+    if (result.error) {
+      throw new Error(result.error.message || "Failed to reset password");
     }
-  }, [setUserAndSync]);
+  };
 
-  const signInWithGoogle = useCallback(async () => {
-    // Initiate OAuth with Supabase directly from the browser
-    // This ensures state cookies are set properly in the browser
-    // Supabase will redirect back to /auth/callback with an authorization code
-    const { data, error } = await supabase.auth.signInWithOAuth({
+  const signInWithGoogle = async (): Promise<void> => {
+    await authClient.signIn.social({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        // Use PKCE flow (Authorization Code with PKCE)
-        // This is more secure than implicit flow
-        skipBrowserRedirect: false,
-      },
+      callbackURL: window.location.href,
     });
+  };
 
-    if (error) {
-      throw error;
-    }
+  const signOut = async (): Promise<void> => {
+    await authClient.signOut();
+    // Immediate redirect to home page to prevent queries from running without auth
+    navigate('/home', { replace: true });
+  };
 
-    // Supabase SDK will redirect to Google OAuth
-    // If data.url is available, we can manually redirect
-    if (data?.url) {
-      window.location.href = data.url;
-    }
-  }, []);
-
-  const refreshSession = useCallback(async () => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      // Session is truly invalid, clear user state
-      setUserAndSync(null);
-      throw new Error('Session refresh failed');
-    }
-
-    // Cookies are automatically updated by the backend
-    // Re-check session to get updated user info
-    await checkSession();
-  }, [checkSession, setUserAndSync]);
+  const refreshSession = async (): Promise<void> => {
+    // Better Auth handles session refresh via Convex
+  };
 
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user,
+        isAuthenticated,
         signIn,
         signUp,
+        resetPassword,
+        forgetPassword,
         signInWithGoogle,
         signOut,
         refreshSession,

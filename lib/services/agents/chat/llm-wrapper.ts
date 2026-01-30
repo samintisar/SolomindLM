@@ -1,0 +1,408 @@
+"use node"
+/**
+ * LLM wrapper for chat agent.
+ *
+ * Handles structured output generation with citations using TogetherAI.
+ * Optimized for token efficiency and reliable structured output.
+ */
+
+import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { z } from 'zod';
+import type { ReferenceChunk } from '../../storage/ChatHistoryService.js';
+import { createLangSmithRunConfig } from '../shared/index.js';
+
+// ============================================================
+// Types
+// ============================================================
+
+/**
+ * Structured chat response with citations.
+ */
+export interface ChatResponse {
+  /** The answer in markdown format with inline citation markers */
+  answer_markdown: string;
+  /** Array of citation indices used in the answer (1-indexed) */
+  cited_indices: number[];
+  /** Confidence level based on source coverage */
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Configuration for the LLM wrapper.
+ */
+export interface LLMWrapperConfig {
+  /** TogetherAI API key */
+  apiKey: string;
+  /** Model to use for generation */
+  model: string;
+  /** Temperature for generation (default: 0.1) */
+  temperature?: number;
+}
+
+// ============================================================
+// Schemas
+// ============================================================
+
+/**
+ * Schema for structured chat response with citations.
+ * This ensures the LLM returns properly formatted output.
+ */
+export const ChatResponseSchema = z.object({
+  answer_markdown: z
+    .string()
+    .describe(
+      'The answer in markdown format with inline citation markers like [1], [2], etc. ' +
+        'Start with a direct answer, then provide supporting details from sources.'
+    ),
+  cited_indices: z
+    .array(z.number())
+    .describe('Array of citation indices used in the answer (1-indexed)'),
+  confidence: z
+    .enum(['high', 'medium', 'low'])
+    .describe(
+      'Confidence level: ' +
+        'high = question directly addressed by 2+ sources with consistent information, ' +
+        'medium = question partially addressed or single source only, ' +
+        'low = tangential information or contradictory sources'
+    ),
+});
+
+// ============================================================
+// Constants
+// ============================================================
+
+/**
+ * Streamlined core system prompt (optimized from ~2500 to ~800 tokens).
+ */
+const CORE_SYSTEM_PROMPT = `You are an expert research and learning assistant helping users understand their uploaded documents, notes, and study materials.
+
+# ULTRA-STRICT GROUNDING RULES
+1. ONLY use information EXPLICITLY stated in the provided excerpts
+2. Do NOT add examples, algorithm names, or technical terms not present in sources
+3. Do NOT paraphrase heavily - stay close to source wording when citing
+4. Do NOT make reasonable inferences - only state what sources directly say
+5. If you want to mention something not in sources, say: "While not covered in your documents, [topic] typically involves..."
+
+# CITATION RULES (CRITICAL)
+1. EVERY factual claim MUST cite sources: [1], [2], etc.
+2. Citations must be for EXACT information from that source
+3. Missing info? State: "Your documents don't cover [topic]"
+4. NEVER cite a source for information you're inferring
+
+# WHEN CREATING TABLES
+- Only include rows for information EXPLICITLY in sources
+- Do NOT fill in cells with general knowledge
+- If sources don't provide comparative data, say so instead of creating a table
+
+# FORBIDDEN ADDITIONS
+- Algorithm names not mentioned in sources (e.g., "logistic regression", "k-means")
+- Metric names not mentioned in sources (e.g., "silhouette score", "F1 score")
+- Mathematical notation not in sources ($x$, $y$ unless sources use it)
+- Examples not provided by sources
+- "Typical" or "common" practices unless sources state them
+
+# PARAPHRASING RULES
+When paraphrasing, stay VERY close to original wording:
+- BAD: "The model is optimized to reproduce mappings [1]" (if source says "learns from labeled examples")
+- GOOD: "The model learns from labeled examples [1]"
+
+Your job is to REFLECT what the documents say, not enhance them with your training data.`;
+
+/**
+ * Minimal few-shot examples (only used for first query or complex patterns).
+ * Aligned with actual schema - no extra fields.
+ */
+const MINIMAL_FEW_SHOT = `
+# EXAMPLES - Study these response patterns:
+
+EXAMPLE 1: Conceptual Explanation
+Q: "How does photosynthesis work?"
+A: {
+  "answer_markdown": "Photosynthesis is the process where plants convert light energy into chemical energy [1]. This occurs in two main stages: the light-dependent reactions and the Calvin cycle [1][2].\\n\\nDuring light-dependent reactions, chlorophyll absorbs photons and uses that energy to split water molecules, releasing oxygen as a byproduct [1]. This process generates ATP and NADPH [2], which serve as energy carriers.\\n\\nThe Calvin cycle uses this energy to fix atmospheric CO₂ into glucose [2]. It involves three phases: carbon fixation, reduction, and regeneration [2][3].\\n\\nYour documents explain the biochemical mechanisms [1][2] but don't discuss environmental factors affecting photosynthesis rates.",
+  "cited_indices": [1, 2, 3],
+  "confidence": "high"
+}
+
+EXAMPLE 2: Insufficient Information
+Q: "What are the long-term effects of this drug?"
+A: {
+  "answer_markdown": "Your documents discuss the drug's mechanism of action [1] and short-term efficacy [2], but do not provide information about long-term effects.\\n\\nThe sources explain that the drug inhibits enzyme X [1], leading to reduced symptom severity in 70% of patients within 4 weeks [2]. However, studies longer than 12 weeks are not covered in these materials.",
+  "cited_indices": [1, 2],
+  "confidence": "low"
+}
+
+EXAMPLE 3: Comparative Analysis
+Q: "What's the difference between mitosis and meiosis?"
+A: {
+  "answer_markdown": "Mitosis and meiosis are both cell division processes but serve different purposes [1].\\n\\n**Key Differences:**\\n| Aspect | Mitosis | Meiosis |\\n|--------|---------|---------|\\n| Purpose | Growth and repair [1] | Sexual reproduction [2] |\\n| Divisions | One division [1] | Two divisions [2] |\\n| Daughter Cells | 2 identical cells [1] | 4 genetically unique cells [2] |\\n| Chromosome Number | Maintained [1] | Halved [2] |\\n\\nMitosis produces diploid cells genetically identical to the parent [1], while meiosis creates haploid gametes with genetic variation through crossing over [2][3].",
+  "cited_indices": [1, 2, 3],
+  "confidence": "high"
+}
+`;
+
+// ============================================================
+// LLM Wrapper Class
+// ============================================================
+
+/**
+ * Handles LLM response generation with structured output and citations.
+ */
+export class ChatLLMWrapper {
+  private llm: ChatTogetherAI;
+  private tokenBudget: number = 7000; // Reserve tokens for generation
+
+  constructor(config: LLMWrapperConfig) {
+    this.llm = new ChatTogetherAI({
+      apiKey: config.apiKey,
+      model: config.model,
+      temperature: config.temperature ?? 0.1,
+    });
+  }
+
+  /**
+   * Generates a structured response with citations using tool calling.
+   *
+   * @param chunks - Reference chunks to use as context
+   * @param userMessage - The user's question
+   * @param userQuestions - Previous user questions for context
+   * @returns Structured chat response with citations
+   */
+  async generateStructuredResponse(
+    chunks: ReferenceChunk[],
+    userMessage: string,
+    userQuestions: string[] = []
+  ): Promise<ChatResponse> {
+    console.log('[ChatLLMWrapper] Generating structured response with citations');
+
+    // Conditional few-shot: only for first query or complex patterns
+    const needsExamples = userQuestions.length === 0 || this.isComplexQuery(userMessage);
+    const systemPrompt = needsExamples
+      ? `${MINIMAL_FEW_SHOT}\n\n${CORE_SYSTEM_PROMPT}`
+      : CORE_SYSTEM_PROMPT;
+
+    // Create model with structured output
+    // Use 'any' to avoid deep type instantiation issues
+    const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
+      name: 'chat_response',
+    });
+
+    const groundedPrompt = this.buildGroundingPrompt(chunks, userMessage, userQuestions);
+
+    // Token monitoring
+    const systemTokens = this.estimateTokens(systemPrompt);
+    const userTokens = this.estimateTokens(groundedPrompt);
+    const totalTokens = systemTokens + userTokens;
+
+    console.log(
+      `[ChatLLMWrapper] Token usage: system=${systemTokens}, user=${userTokens}, total=${totalTokens}`
+    );
+
+    if (totalTokens > this.tokenBudget) {
+      console.warn(
+        `[ChatLLMWrapper] High token usage (${totalTokens}/${this.tokenBudget}). Consider reducing chunk count.`
+      );
+    }
+
+    const messages = [new SystemMessage(systemPrompt), new HumanMessage(groundedPrompt)];
+    const traceConfig = createLangSmithRunConfig({
+      runName: 'ChatAgentStructuredResponse',
+      tags: ['agent', 'chat'],
+      metadata: {
+        chunksCount: chunks.length,
+        userQuestionsCount: userQuestions.length,
+      },
+    });
+
+    try {
+      const response: any = await structuredLlm.invoke(messages, traceConfig);
+
+      // Validate the response matches our schema
+      const validated = ChatResponseSchema.safeParse(response);
+
+      if (!validated.success) {
+        console.warn(
+          '[ChatLLMWrapper] Structured output validation failed:',
+          validated.error.issues
+        );
+
+        // Attempt to salvage the response
+        const salvaged = this.salvageResponse(response);
+        if (salvaged) {
+          console.log('[ChatLLMWrapper] Successfully salvaged response after validation failure');
+          return salvaged;
+        }
+
+        // True failure - return error response
+        return {
+          answer_markdown: 'I encountered an error. Please rephrase your question or try again.',
+          cited_indices: [],
+          confidence: 'low',
+        };
+      }
+
+      console.log('[ChatLLMWrapper] Structured response generated successfully');
+      console.log(
+        `[ChatLLMWrapper] Citations: [${validated.data.cited_indices.join(', ')}], Confidence: ${validated.data.confidence}`
+      );
+
+      // Ensure all required fields are present
+      return {
+        answer_markdown: validated.data.answer_markdown ?? '',
+        cited_indices: validated.data.cited_indices ?? [],
+        confidence: validated.data.confidence ?? 'low',
+      } as ChatResponse;
+    } catch (error) {
+      console.error('[ChatLLMWrapper] Structured output generation failed:', error);
+      return {
+        answer_markdown:
+          'I apologize, but I encountered an error generating a response. Please try again.',
+        cited_indices: [],
+        confidence: 'low',
+      };
+    }
+  }
+
+  /**
+   * Builds grounding prompt optimized for research/learning contexts.
+   * Removed duplicate instructions that are already in system prompt.
+   */
+  private buildGroundingPrompt(
+    chunks: ReferenceChunk[],
+    userMessage: string,
+    userQuestions: string[]
+  ): string {
+    // Simplified chunk formatting (removed excessive metadata)
+    const formattedChunks = chunks
+      .map((chunk, index) => {
+        const docType = this.inferDocumentType(chunk.sourceTitle);
+        const typeLabel = docType ? ` (${docType})` : '';
+
+        return `[${index + 1}] From "${chunk.sourceTitle}"${typeLabel}:\n${chunk.content}`;
+      })
+      .join('\n\n---\n\n');
+
+    // Conversation context
+    let contextSection = '';
+    if (userQuestions.length > 0) {
+      const recentQuestions = userQuestions.slice(-3).map((q, i) => `${i + 1}. ${q}`).join('\n');
+      contextSection = `# PREVIOUS QUESTIONS\n${recentQuestions}\n\n`;
+    }
+
+    // Ultra-concise query type hint
+    const structureHint = this.getStructureHint(userMessage);
+
+    return `# SOURCE DOCUMENTS
+${formattedChunks}
+
+${contextSection}# CURRENT QUESTION
+${userMessage}
+
+${structureHint}`;
+  }
+
+  /**
+   * Provides ultra-concise structure hint based on query type.
+   */
+  private getStructureHint(query: string): string {
+    const lower = query.toLowerCase();
+
+    if (lower.match(/compare|contrast|difference|vs|versus/)) {
+      return 'Hint: Use table or structured comparison with citations';
+    }
+    if (lower.match(/^(how|why|explain)/)) {
+      return 'Hint: Definition → mechanism → examples (if available)';
+    }
+    if (lower.match(/summarize|overview|main points|key takeaways/)) {
+      return 'Hint: Main themes → agreements/disagreements → gaps';
+    }
+
+    return '';
+  }
+
+  /**
+   * Checks if query is complex and needs few-shot examples.
+   */
+  private isComplexQuery(query: string): boolean {
+    const complexPatterns = [
+      'compare',
+      'contrast',
+      'explain how',
+      'why does',
+      'difference between',
+    ];
+    const lower = query.toLowerCase();
+    return complexPatterns.some((pattern) => lower.includes(pattern));
+  }
+
+  /**
+   * Infers document type from title for better context.
+   */
+  private inferDocumentType(title: string): string | null {
+    const lower = title.toLowerCase();
+
+    if (lower.includes('chapter') || lower.includes('textbook')) return 'Textbook';
+    if (lower.includes('lecture')) return 'Lecture';
+    if (lower.includes('paper') || lower.includes('journal')) return 'Paper';
+    if (lower.includes('notes')) return 'Notes';
+    if (lower.includes('slides')) return 'Slides';
+
+    return null;
+  }
+
+  /**
+   * Estimates token count (rough approximation: 1 token ≈ 4 characters).
+   */
+  private estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * Attempts to salvage a malformed response by extracting usable parts.
+   */
+  private salvageResponse(response: any): ChatResponse | null {
+    try {
+      // Extract answer text from various possible formats
+      let answerText = '';
+      if (typeof response === 'string') {
+        answerText = response;
+      } else if (response?.answer_markdown) {
+        answerText = String(response.answer_markdown);
+      } else if (response?.answer) {
+        answerText = String(response.answer);
+      } else {
+        return null;
+      }
+
+      // Extract citation indices from the text
+      const citationMatches = [...answerText.matchAll(/\[(\d+)\]/g)];
+      const citedIndices = [...new Set(citationMatches.map((m) => parseInt(m[1])))]
+        .filter((n) => !isNaN(n))
+        .sort((a, b) => a - b);
+
+      // Determine confidence from text patterns
+      const hasHedging = /\b(probably|might|maybe|perhaps|possibly|could be|it seems)\b/i.test(
+        answerText
+      );
+      const hasMissingInfo = /don't have information|not covered|doesn't (explain|discuss|address)/i.test(
+        answerText
+      );
+
+      const confidence =
+        citedIndices.length >= 3 && !hasHedging
+          ? 'high'
+          : citedIndices.length >= 1 && !hasMissingInfo
+            ? 'medium'
+            : 'low';
+
+      return {
+        answer_markdown: answerText,
+        cited_indices: citedIndices,
+        confidence,
+      };
+    } catch (error) {
+      console.error('[ChatLLMWrapper] Salvage attempt failed:', error);
+      return null;
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Ignore Bun cache
+../.bun/
+../node_modules/.bun/
+
+# Other common ignores
+*.log
+*.test.ts
+*.test.js
+__tests__/

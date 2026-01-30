@@ -4,8 +4,8 @@ import { NotebookItem, FolderItem } from '@/shared/types/index';
 import { FeaturedSection, RecentSection } from './views';
 import { CustomizeNotebookModal, MoveToFolderModal, CustomizeFolderModal } from './modals';
 import { useNotebookHandlers, useFolderHandlers, useNotebookSorting } from '../hooks';
-import { notebooksApi } from '../services/notebooksApi';
-import { foldersApi } from '../services/foldersApi';
+import { useCreateNotebook, useUpdateNotebook } from '../services/notebooksApi';
+import { useCreateFolder, useUpdateFolder } from '../services/foldersApi';
 
 interface NotebookCreateData {
   title: string;
@@ -27,14 +27,11 @@ interface HomePageProps {
   onCreateNotebook: () => void;
   onUpdateNotebook: (id: string, updates: Partial<NotebookItem>) => void;
   onDeleteNotebook: (id: string) => void;
-  isLoading?: boolean;
-  error?: string | null;
   folders?: FolderItem[];
   onCreateFolder?: () => void;
   onUpdateFolder?: (id: string, updates: Partial<FolderItem>) => void;
   onDeleteFolder?: (id: string) => void;
   onMoveNotebookToFolder?: (notebookId: string, folderId: string | null) => void;
-  loadFolders?: () => void;
   onRequireAuth?: (errorMessage: string) => void;
 }
 
@@ -46,14 +43,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   onCreateNotebook,
   onUpdateNotebook,
   onDeleteNotebook,
-  isLoading = false,
-  error = null,
   folders = [],
   onCreateFolder,
   onUpdateFolder,
   onDeleteFolder,
   onMoveNotebookToFolder,
-  loadFolders,
   onRequireAuth,
 }) => {
   const [activeTab, setActiveTab] = useState('All');
@@ -71,17 +65,22 @@ export const HomePage: React.FC<HomePageProps> = ({
     onDeleteFolder,
   });
 
+  // Convex hooks for mutations
+  const createNotebookHook = useCreateNotebook();
+  const updateNotebookHook = useUpdateNotebook();
+  const createFolderHook = useCreateFolder();
+  const updateFolderHook = useUpdateFolder();
+
   // Handlers for creating notebooks and folders via modal
   const handleCreateNotebookFromModal = async (data: NotebookCreateData) => {
     try {
-      await notebooksApi.createNotebook({
+      await createNotebookHook({
         title: data.title,
         coverColor: data.coverColor,
         icon: data.icon,
       });
       notebookHandlers.closeCustomize();
-      // Refresh the notebook list
-      window.location.reload();
+      // Optimistic updates handle the UI update automatically
     } catch (error) {
       console.error('Failed to create notebook:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -105,14 +104,13 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const handleCreateFolderFromModal = async (data: FolderCreateData) => {
     try {
-      await foldersApi.createFolder({
+      await createFolderHook({
         name: data.name,
         color: data.color,
         icon: data.icon,
       });
       folderHandlers.closeFolderCustomize();
-      // Refresh the folder list
-      if (loadFolders) loadFolders();
+      // Optimistic updates handle the UI update automatically
     } catch (error) {
       console.error('Failed to create folder:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -159,7 +157,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
     if (onMoveNotebookToFolder) {
       onMoveNotebookToFolder(notebookId, folderId);
-      if (loadFolders) loadFolders();
     }
     notebookHandlers.closeMoveToFolder();
   };
@@ -167,20 +164,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   return (
     <div className="flex-1 overflow-y-auto bg-background p-6 md:p-12 font-serif animate-in fade-in duration-500">
       <div className="max-w-[1600px] mx-auto space-y-10">
-
-        {/* Error Message */}
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Loading State */}
-        {isLoading && recentNotebooks.length === 0 && featuredNotebooks.length === 0 && (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-muted-foreground">Loading notebooks...</div>
-          </div>
-        )}
 
         {/* Top Navigation Bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">

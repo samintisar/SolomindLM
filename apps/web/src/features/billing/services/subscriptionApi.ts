@@ -2,104 +2,149 @@ import type {
   SubscriptionStatusResponse,
   CheckoutSessionRequest,
   CheckoutSessionResponse,
+  SubscriptionInterval,
 } from '../types';
-import { apiGet, apiPost } from '@/shared/utils/api';
-import { getUserId } from '@/shared/utils/auth';
+import { useQuery, useAction } from 'convex/react';
+import { api } from '@convex/_generated/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+/**
+ * Get subscription status for current user
+ */
+export function useSubscriptionStatus(): SubscriptionStatusResponse {
+  const subscription = useQuery(api.subscriptions.getCurrent);
 
-// ============================================================
-// Subscription API Service
-// ============================================================
+  if (!subscription) {
+    return {
+      hasSubscription: false,
+      plan: 'free',
+      notebookLimit: 5,
+      sourceLimit: 20,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+    };
+  }
 
-export const subscriptionApi = {
-  /**
-   * Get subscription status for current user
-   */
-  async getStatus(): Promise<SubscriptionStatusResponse> {
-    const userId = getUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
+  return {
+    hasSubscription: subscription.status === 'active',
+    status: subscription.status as any,
+    plan: subscription.status === 'active' ? 'premium' : 'free',
+    notebookLimit: subscription.status === 'active' ? 100 : 5,
+    sourceLimit: subscription.status === 'active' ? 500 : 20,
+    currentPeriodEnd: new Date(subscription.currentPeriodEnd * 1000).toISOString(),
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    interval: subscription.interval as SubscriptionInterval,
+    amount: subscription.amount,
+  };
+}
 
-    const params = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/subscriptions/status?${params.toString()}`);
+/**
+ * Create a Stripe Checkout session
+ */
+export function useCreateCheckout() {
+  const create = useAction(api.subscriptions.createCheckoutSession);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || 'Failed to get subscription status');
-    }
-
-    return response.json();
-  },
-
-  /**
-   * Create a Stripe Checkout session
-   */
-  async createCheckout(
+  return async (
     interval: 'month' | 'year',
     successUrl: string,
     cancelUrl: string
-  ): Promise<CheckoutSessionResponse> {
-    const userId = getUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const requestBody: any = {
+  ): Promise<CheckoutSessionResponse> => {
+    const result = await create({
       interval,
       successUrl,
       cancelUrl,
-      userId, // Include userId in body for validation
-    };
-
-    const response = await apiPost('/api/subscriptions/create-checkout', requestBody);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || 'Failed to create checkout session');
-    }
-
-    return response.json();
-  },
-
-  /**
-   * Cancel subscription at period end
-   */
-  async cancelSubscription(): Promise<void> {
-    const userId = getUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    const response = await fetch(`${API_BASE_URL}/api/subscriptions/cancel?${params.toString()}`, {
-      method: 'POST',
-      credentials: 'include',
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || 'Failed to cancel subscription');
-    }
-  },
+    return {
+      url: result.url,
+      sessionId: result.sessionId,
+    };
+  };
+}
 
-  /**
-   * Create customer portal session
-   */
-  async createPortalSession(returnUrl: string): Promise<{ url: string }> {
-    const userId = getUserId();
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
+/**
+ * Cancel subscription at period end
+ */
+export function useCancelSubscription() {
+  const cancel = useAction(api.subscriptions.cancelAtPeriodEnd);
 
-    const response = await apiPost('/api/subscriptions/portal', { userId, returnUrl });
+  return async () => {
+    return await cancel({});
+  };
+}
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || 'Failed to create portal session');
-    }
+/**
+ * Reactivate subscription (if canceled but still active)
+ */
+export function useReactivateSubscription() {
+  const reactivate = useAction(api.subscriptions.removeCancelAtPeriodEnd);
 
-    return response.json();
-  },
+  return async () => {
+    return await reactivate({});
+  };
+}
+
+/**
+ * Create customer portal session
+ */
+export function useCreatePortalSession() {
+  const create = useAction(api.subscriptions.createPortalSession);
+
+  return async (returnUrl: string): Promise<{ url: string }> => {
+    const result = await create({ returnUrl });
+    return { url: result.url };
+  };
+}
+
+/**
+ * Check if user is subscribed (convenience hook)
+ */
+export function useIsSubscribed(): boolean {
+  const subscription = useQuery(api.subscriptions.getCurrent);
+  return subscription?.status === 'active' || false;
+}
+
+/**
+ * Get limits for current user (convenience hook)
+ */
+export function useUserLimits() {
+  const subscription = useQuery(api.subscriptions.getCurrent);
+
+  if (subscription?.status === 'active') {
+    return {
+      notebookLimit: 100,
+      sourceLimit: 500,
+      isPremium: true,
+    };
+  }
+
+  return {
+    notebookLimit: 5,
+    sourceLimit: 20,
+    isPremium: false,
+  };
+}
+
+// ============================================================
+// Legacy API object for backward compatibility
+// ============================================================
+
+/**
+ * Legacy API object for backward compatibility
+ * @deprecated Use individual hooks instead
+ */
+export const subscriptionApi = {
+  // Hooks
+  useSubscriptionStatus,
+  useCreateCheckout,
+  useCancelSubscription,
+  useReactivateSubscription,
+  useCreatePortalSession,
+  useIsSubscribed,
+  useUserLimits,
+
+  // Legacy methods (deprecated)
+  getStatus: useSubscriptionStatus,
+  createCheckout: useCreateCheckout,
+  cancelSubscription: useCancelSubscription,
+  createPortalSession: useCreatePortalSession,
 };

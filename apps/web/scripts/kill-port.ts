@@ -15,24 +15,42 @@ async function findProcessesOnPort(port: string): Promise<string[]> {
   const isWindows = process.platform === 'win32';
   
   if (isWindows) {
-    // Windows: Use netstat to find PID
-    const proc = Bun.spawn(['netstat', '-ano', '-p', 'TCP'], {
+    // Windows: Use netstat -ano (no -p TCP to avoid locale/format issues)
+    const proc = Bun.spawn(['netstat', '-ano'], {
       stdout: 'pipe',
       stderr: 'pipe',
     });
 
     const output = await new Response(proc.stdout).text();
-    const lines = output.split('\n');
+    await proc.exited;
+    const lines = output.split(/\r?\n/);
     
     const pids = new Set<string>();
+    // Match lines that contain :port and LISTENING; PID is last column
+    const portPattern = new RegExp(`:${port}(?:\\s|$)`);
     for (const line of lines) {
-      // Look for lines with the port in LISTENING state
-      if (line.includes(`:${port} `) && line.includes('LISTENING')) {
+      if (portPattern.test(line) && line.includes('LISTENING')) {
         const parts = line.trim().split(/\s+/);
         const pid = parts[parts.length - 1];
         if (pid && pid !== '0' && /^\d+$/.test(pid)) {
           pids.add(pid);
         }
+      }
+    }
+    
+    // Fallback: try PowerShell Get-NetTCPConnection if netstat found nothing
+    if (pids.size === 0) {
+      try {
+        const psProc = Bun.spawn([
+          'powershell', '-NoProfile', '-Command',
+          `Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { $_.OwningProcess }`,
+        ], { stdout: 'pipe', stderr: 'pipe' });
+        const psOut = await new Response(psProc.stdout).text();
+        await psProc.exited;
+        const psPids = psOut.trim().split(/\r?\n/).filter((s) => /^\d+$/.test(s.trim()));
+        psPids.forEach((p) => pids.add(p.trim()));
+      } catch {
+        // ignore
       }
     }
     

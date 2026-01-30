@@ -1,7 +1,11 @@
 {
   "css.lint.unknownAtRules": "ignore",
   "cSpell.words": [
+    "MINDMAP",
     "solomind",
-    "solomindlm"
+    "solomindlm",
+    "Supadata",
+    "zerank",
+    "ZEROENTROPY"
   ]
 }

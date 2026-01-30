@@ -13,7 +13,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
 import { WrittenQuestionsNote, WrittenQuestionAnswer } from '@/shared/types/index';
-import { writtenQuestionsApi } from '@/features/studio/services/writtenQuestionsApi';
+import { writtenQuestionsApi, useSubmitWrittenAnswer, useResetWrittenAnswers, useWrittenQuestionSet } from '@/features/studio/services/writtenQuestionsApi';
 
 export interface WrittenQuestionsViewProps {
   note: WrittenQuestionsNote;
@@ -28,6 +28,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  // Hooks for mutations
+  const submitAnswerMutation = useSubmitWrittenAnswer();
+  const resetAnswersMutation = useResetWrittenAnswers();
+  const latestNote = useWrittenQuestionSet(note.id);
 
   // Sync userAnswers with note.userAnswers
   useEffect(() => {
@@ -77,15 +82,15 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
 
     try {
       // Submit answer for grading
-      await writtenQuestionsApi.submitAnswer({
+      await submitAnswerMutation({
         writtenQuestionsId: note.id,
         questionId: currentQuestion.id,
         answer: currentAnswer,
       });
 
-      // Poll for graded result
+      // Poll for graded result - pass a function that returns the latest note
       await writtenQuestionsApi.pollGradedResult(
-        note.id,
+        () => latestNote,
         currentQuestion.id,
         (graded) => {
           // Optionally show polling state
@@ -94,9 +99,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
       );
 
       // Refresh the note to get the graded result
-      const updatedNote = await writtenQuestionsApi.getWrittenQuestions(note.id);
-      if (onNoteUpdate) {
-        onNoteUpdate(updatedNote);
+      if (latestNote && onNoteUpdate) {
+        onNoteUpdate(latestNote);
       }
     } catch (error) {
       console.error('Failed to submit answer:', error);
@@ -131,15 +135,16 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
     setIsResetting(true);
     try {
       // Call API to reset all answers on the server
-      const updatedNote = await writtenQuestionsApi.resetAnswers(note.id);
-      if (onNoteUpdate) {
-        onNoteUpdate(updatedNote);
-      }
+      await resetAnswersMutation(note.id);
       // Reset local state
       setCurrentIndex(0);
       setShowResults(false);
       setReviewMode(false);
       setUserAnswers({});
+      // Notify parent to refresh note
+      if (latestNote && onNoteUpdate) {
+        onNoteUpdate(latestNote);
+      }
     } catch (error) {
       console.error('Failed to reset answers:', error);
       alert(error instanceof Error ? error.message : 'Failed to reset answers');

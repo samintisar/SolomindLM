@@ -1,0 +1,13 @@
+{
+  "functions": "convex/",
+  "node": {
+    "externalPackages": [
+      "better-auth",
+      "openai",
+      "@langchain/core",
+      "@langchain/openai",
+      "stripe"
+    ]
+  }
+}
+

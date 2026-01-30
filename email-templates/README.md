@@ -1,10 +1,10 @@
 # SolomindLM Email Templates
 
-Professional, conversion-optimized email templates for Supabase authentication flows, designed to match SolomindLM's warm, vintage aesthetic and drive user engagement.
+Professional, conversion-optimized email templates for authentication (Better Auth), designed to match SolomindLM's warm, vintage aesthetic and drive user engagement.
 
 ## 📧 Templates Included
 
-This directory contains HTML email templates for all six Supabase authentication email types:
+This directory contains HTML email templates for authentication email types:
 
 1. **confirm-signup.html** - Welcome email for new user signups
 2. **invite-user.html** - Invitation email for team/user invites
@@ -23,19 +23,18 @@ This directory contains HTML email templates for all six Supabase authentication
 
 ## 🚀 Setup Instructions
 
-### 1. Access Supabase Email Templates
+### 1. Access email template configuration
 
-1. Log in to your [Supabase Dashboard](https://app.supabase.com)
-2. Navigate to **Authentication** → **Email Templates**
+1. Log in to your auth provider / dashboard (e.g. Resend, or wherever templates are configured)
+2. Navigate to **Authentication** → **Email Templates** (or equivalent)
 3. Select the template you want to configure
 
-### 2. Copy Template Content
+### 2. Copy template content
 
 1. Open the corresponding HTML file from this directory
 2. Copy the entire HTML content
-3. In Supabase, go to the **Body** section
-4. Click the **Source** tab
-5. Paste the HTML content, replacing the default template
+3. In your dashboard, go to the **Body** section
+4. Paste the HTML content, replacing the default template
 
 ### 3. Configure Subject Lines
 
@@ -49,7 +48,7 @@ This directory contains HTML email templates for all six Supabase authentication
 
 ## 📝 Template Variables
 
-Each template uses Supabase's built-in variables. Here's what's available for each:
+Each template uses auth provider variables. Here's what's typically available:
 
 ### Common Variables (Most Templates)
 - `{{ .ConfirmationURL }}` - The confirmation/action URL
@@ -144,11 +143,11 @@ To add the SolomindLM logo or other images:
 
 ### Before Going Live
 
-1. **Send test emails** to yourself using Supabase's test feature
+1. **Send test emails** to yourself using your auth provider's test feature
 2. **Check on mobile devices** - Test on iOS and Android
 3. **Test in multiple email clients** - Gmail, Outlook, Apple Mail
 4. **Verify all links** - Ensure `{{ .ConfirmationURL }}` works correctly
-5. **Check variable rendering** - Make sure Supabase variables are replaced
+5. **Check variable rendering** - Make sure template variables are replaced
 
 ### Testing Checklist
 
@@ -174,7 +173,7 @@ To add the SolomindLM logo or other images:
 
 - Ensure you're using the correct variable syntax: `{{ .VariableName }}`
 - Check that variables are available for the template type
-- Verify in Supabase docs for template-specific variables
+- Verify in your auth provider's docs for template-specific variables
 
 ### Styling Issues
 
@@ -185,13 +184,13 @@ To add the SolomindLM logo or other images:
 ### Links Not Working
 
 - Verify `{{ .ConfirmationURL }}` is correct
-- Check Supabase redirect URL settings
+- Check redirect URL settings in your auth dashboard
 - Ensure HTTPS is used for security
 
 ## 📚 Resources
 
-- [Supabase Email Templates Documentation](https://supabase.com/docs/guides/auth/auth-email-templates)
-- [Supabase Auth Variables Reference](https://supabase.com/docs/guides/auth/auth-email-templates#variables)
+- [Better Auth documentation](https://www.better-auth.com/docs) (if using Better Auth)
+- Your auth provider's email template and variable reference
 - [Email Client Compatibility Guide](https://www.caniemail.com/)
 
 ## 📄 License

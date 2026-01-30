@@ -1,16 +1,13 @@
 import type { Note, Slide, SlideDeckNote } from '@/shared/types/index';
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
-import { getUserId } from '@/shared/utils/auth';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export interface CreateSlideDeckParams {
-  userId: string;
   notebookId: string;
   documentIds: string[];
-  slideType: 'detailed_deck' | 'presenter_slides';
-  deckLength: 'short' | 'default';
-  customPrompt?: string;
+  slideCount: number;
+  title?: string;
 }
 
 export interface CreateSlideDeckResponse {
@@ -55,27 +52,39 @@ function getPreviewText(status: string, metadata?: any): string {
  * Map a database slide deck response to the frontend SlideDeckNote interface
  */
 function mapSlideDeckToNote(dbSlideDeck: any): SlideDeckNote {
-  const slides: Slide[] = (dbSlideDeck.slides || []).map((slide: any) => ({
-    slide_number: slide.slide_number,
-    slide_url: slide.slide_url || '',
-    title: slide.title,
-    talking_points: slide.talking_points || [],
-    prompt: slide.prompt,
-    metadata: slide.metadata || {},
-  }));
+  // Parse slides from data
+  let slides: Slide[] = [];
+  if (dbSlideDeck.data) {
+    try {
+      const parsedData = typeof dbSlideDeck.data === 'string'
+        ? JSON.parse(dbSlideDeck.data)
+        : dbSlideDeck.data;
+
+      slides = (parsedData.slides || []).map((slide: any) => ({
+        slide_number: slide.slide_number,
+        slide_url: slide.slide_url || '',
+        title: slide.title,
+        talking_points: slide.talking_points || [],
+        prompt: slide.prompt,
+        metadata: slide.metadata || {},
+      }));
+    } catch {
+      slides = [];
+    }
+  }
 
   const slideCount = slides.length;
 
   return {
-    id: dbSlideDeck.id,
+    id: dbSlideDeck._id,
     title: dbSlideDeck.title,
     preview: getPreviewText(dbSlideDeck.status, dbSlideDeck.metadata),
     type: 'slides',
     slides,
     status: dbSlideDeck.status,
     metadata: {
-      slideType: dbSlideDeck.slideType || dbSlideDeck.slide_type || 'detailed_deck',
-      deckLength: dbSlideDeck.metadata?.deckLength || dbSlideDeck.metadata?.deck_length || 'default',
+      slideType: dbSlideDeck.metadata?.slideType || 'detailed_deck',
+      deckLength: dbSlideDeck.metadata?.deckLength || 'default',
       slideCount,
       customPrompt: dbSlideDeck.metadata?.customPrompt,
       error: dbSlideDeck.metadata?.error,
@@ -83,121 +92,160 @@ function mapSlideDeckToNote(dbSlideDeck: any): SlideDeckNote {
   };
 }
 
-export const slidesApi = {
-  /**
-   * Create a new slide deck and queue generation
-   */
-  async createSlideDeck(params: CreateSlideDeckParams): Promise<CreateSlideDeckResponse> {
-    const response = await apiPost('/api/slides', params);
+/**
+ * Get all slide decks for a notebook
+ * Returns undefined while loading, empty array when loaded but no results
+ */
+export function useSlideDecks(notebookId: string | null) {
+  const slideDecks = useQuery(
+    api.slides.list,
+    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+  );
+  return slideDecks?.map(mapSlideDeckToNote);
+}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create slide deck');
-    }
+/**
+ * Get a specific slide deck by ID
+ */
+export function useSlideDeck(slideDeckId: string | null) {
+  const slideDeck = useQuery(
+    api.slides.get,
+    slideDeckId ? { id: slideDeckId as Id<'slides'> } : 'skip'
+  );
+  return slideDeck ? mapSlideDeckToNote(slideDeck) : null;
+}
 
-    const result = await response.json();
+/**
+ * Create a new slide deck and queue generation
+ */
+export function useCreateSlideDeck() {
+  const generate = useMutation(api.slides.generateSlideDeck);
+
+  return async (params: CreateSlideDeckParams): Promise<CreateSlideDeckResponse> => {
+    const result = await generate({
+      notebookId: params.notebookId as Id<'notebooks'>,
+      documentIds: params.documentIds as Id<'documents'>[],
+      slideCount: params.slideCount,
+      title: params.title,
+    });
+
     return {
-      slideDeckId: result.slideDeckId,
-      status: result.status,
-      slideDeck: mapSlideDeckToNote(result.slideDeck),
+      slideDeckId: result,
+      status: 'pending',
+      slideDeck: mapSlideDeckToNote({ _id: result, status: 'pending', title: params.title || 'Slide Deck' }),
     };
-  },
+  };
+}
 
-  /**
-   * Get a specific slide deck by ID
-   */
-  async getSlideDeck(slideDeckId: string): Promise<SlideDeckNote> {
-    const userId = getUserId();
+/**
+ * Rename a slide deck by ID with optimistic update
+ */
+export function useRenameSlideDeck() {
+  const update = useMutation(api.slides.update).withOptimisticUpdate((localStore, args) => {
+    const { id, title } = args;
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
+    // Read the current slide deck to get its notebookId
+    const slideDeck = localStore.getQuery(api.slides.get, { id });
+    if (slideDeck) {
+      // Update detail view
+      localStore.setQuery(
+        api.slides.get,
+        { id },
+        { ...slideDeck, title }
+      );
 
-    const queryParams = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/slides/${slideDeckId}?${queryParams.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch slide deck');
-    }
-
-    const dbSlideDeck = await response.json();
-    return mapSlideDeckToNote(dbSlideDeck);
-  },
-
-  /**
-   * Poll slide deck status until completion
-   * Uses higher maxAttempts for image generation (up to 10 minutes)
-   */
-  async pollSlideDeckStatus(
-    slideDeckId: string,
-    onUpdate?: (note: SlideDeckNote) => void,
-    maxAttempts = 300, // 10 minutes @ 2s intervals (image generation takes time)
-    interval = 2000
-  ): Promise<SlideDeckNote> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const note = await this.getSlideDeck(slideDeckId);
-
-      if (note.status === 'completed' || note.status === 'failed') {
-        return note;
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.slides.list, { notebookId: slideDeck.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.slides.list,
+          { notebookId: slideDeck.notebookId },
+          listResult.map(sd =>
+            sd._id === id
+              ? { ...sd, title }
+              : sd
+          )
+        );
       }
+    }
+  });
 
-      onUpdate?.(note);
-      await new Promise((resolve) => setTimeout(resolve, interval));
+  return async (slideDeckId: string, newTitle: string) => {
+    return await update({
+      id: slideDeckId as Id<'slides'>,
+      title: newTitle,
+    });
+  };
+}
+
+/**
+ * Delete a slide deck by ID with optimistic update
+ */
+export function useDeleteSlideDeck() {
+  const remove = useMutation(api.slides.remove).withOptimisticUpdate((localStore, args) => {
+    // Read the current slide deck to get its notebookId
+    const slideDeck = localStore.getQuery(api.slides.get, { id: args.id });
+    if (slideDeck) {
+      // Update list view using the notebookId from the item
+      const listResult = localStore.getQuery(api.slides.list, { notebookId: slideDeck.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.slides.list,
+          { notebookId: slideDeck.notebookId },
+          listResult.filter(sd => sd._id !== args.id)
+        );
+      }
     }
 
-    throw new Error('Slide deck generation timed out');
-  },
+    // Clear detail view
+    localStore.setQuery(api.slides.get, { id: args.id }, null);
+  });
 
-  /**
-   * Get all slide decks for a notebook
-   */
-  async getSlideDecks(notebookId: string): Promise<SlideDeckNote[]> {
-    const userId = getUserId();
+  return async (slideDeckId: string) => {
+    await remove({ id: slideDeckId as Id<'slides'> });
+  };
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
+/**
+ * Poll slide deck status until completion.
+ * Uses higher maxAttempts for image generation (up to 10 minutes).
+ * Pass initialNote from the create response so the first poll succeeds before
+ * Convex query reactivity has added the new item to the notes list.
+ */
+export async function pollSlideDeckStatus(
+  getSlideDeck: () => SlideDeckNote | null | undefined,
+  onUpdate?: (note: SlideDeckNote) => void,
+  maxAttempts = 300, // 10 minutes @ 2s intervals (image generation takes time)
+  interval = 2000,
+  initialNote?: SlideDeckNote
+): Promise<SlideDeckNote> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const note = getSlideDeck() ?? initialNote;
+
+    if (!note) {
+      throw new Error('Slide deck not found');
     }
 
-    const params = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/slides/notebook/${notebookId}?${params.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch slide decks');
+    if (note.status === 'completed' || note.status === 'failed') {
+      return note;
     }
 
-    const dbSlideDecks = await response.json();
-    return dbSlideDecks.map(mapSlideDeckToNote);
-  },
+    onUpdate?.(note);
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 
-  /**
-   * Rename a slide deck by ID
-   */
-  async renameSlideDeck(slideDeckId: string, newTitle: string): Promise<void> {
-    const userId = getUserId();
+  throw new Error('Slide deck generation timed out');
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    const response = await apiPatch(`/api/slides/${slideDeckId}?${params.toString()}`, { title: newTitle });
-
-    if (!response.ok) {
-      throw new Error('Failed to rename slide deck');
-    }
-  },
-
-  /**
-   * Delete a slide deck by ID
-   */
-  async deleteSlideDeck(slideDeckId: string): Promise<void> {
-    const userId = getUserId();
-
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    await apiDelete(`/api/slides/${slideDeckId}?${params.toString()}`);
-  },
+/**
+ * Legacy API object for backward compatibility
+ * @deprecated Use individual hooks instead
+ */
+export const slidesApi = {
+  useSlideDecks,
+  useSlideDeck,
+  useCreateSlideDeck,
+  useRenameSlideDeck,
+  useDeleteSlideDeck,
+  pollSlideDeckStatus,
 };

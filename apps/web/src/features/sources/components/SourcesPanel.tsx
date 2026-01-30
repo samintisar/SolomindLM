@@ -12,8 +12,8 @@ import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
 import { Source } from '@/shared/types/index';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
-import { documentsApi } from '../services/documentsApi';
-import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
+import { useUploadDocument, useCreateDocument, useDocumentContent } from '../services/documentsApi';
+import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
 const MAX_SOURCES = 100;
 
@@ -48,6 +48,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   noteId,
   onDocumentUploaded,
 }) => {
+  // Use the upload document hook (authenticated Convex client)
+  const uploadDocument = useUploadDocument();
+  const createDocument = useCreateDocument();
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
@@ -63,6 +66,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [renameValue, setRenameValue] = useState('');
   const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
   const [contentCache, setContentCache] = useState<Record<string, string>>({});
+  const [contentErrors, setContentErrors] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const [isMobile, setIsMobile] = useState(false);
@@ -108,33 +112,40 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
   };
 
-  // Fetch content when a source is being viewed
-  useEffect(() => {
-    // Only fetch content once document processing is complete to avoid 404s
-    if (
-      viewingSource &&
-      viewingSourceId &&
-      viewingSource.status === 'completed' &&
-      !contentCache[viewingSourceId]
-    ) {
-      const fetchContent = async () => {
-        setLoadingContentId(viewingSourceId);
-        try {
-          const content = await documentsApi.getDocumentContent(viewingSourceId);
-          setContentCache(prev => ({
-            ...prev,
-            [viewingSourceId]: content,
-          }));
-        } catch (error) {
-          console.error('Failed to load document content:', error);
-        } finally {
-          setLoadingContentId(null);
-        }
-      };
+  // Use reactive hook for document content when viewing a source
+  const documentContent = useDocumentContent(
+    viewingSource && viewingSource.status === 'completed' ? viewingSourceId : null
+  );
 
-      fetchContent();
+  // Normalize newlines so markdown parses correctly (e.g. \r\n -> \n; preserve structure)
+  const normalizeContentNewlines = (raw: string) =>
+    raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Update content cache when documentContent changes
+  useEffect(() => {
+    if (viewingSourceId && documentContent) {
+      if (documentContent.content) {
+        const normalized = normalizeContentNewlines(documentContent.content);
+        setContentCache(prev => ({
+          ...prev,
+          [viewingSourceId]: normalized,
+        }));
+        // Clear any previous errors
+        setContentErrors(prev => {
+          const next = { ...prev };
+          delete next[viewingSourceId];
+          return next;
+        });
+        setLoadingContentId(null);
+      }
+    } else if (viewingSourceId && viewingSource?.status === 'completed') {
+      // Check if we've been waiting too long (might be an error)
+      // The hook will automatically retry, so we just show loading
+      if (documentContent === undefined) {
+        setLoadingContentId(viewingSourceId);
+      }
     }
-  }, [viewingSourceId, contentCache, viewingSource]);
+  }, [viewingSourceId, documentContent, viewingSource?.status]);
 
   const allSelected = sources.length > 0 && sources.every(s => s.selected);
   const selectedCount = sources.filter(s => s.selected).length;
@@ -151,7 +162,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     setIsUploading(true);
     try {
       for (const file of files) {
-        const response = await documentsApi.uploadFile(userId, noteId, file);
+        const response = await uploadDocument(file, noteId);
         onDocumentUploaded?.(response.documentId);
       }
       setIsModalOpen(false);
@@ -246,8 +257,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       const errors: string[] = [];
       for (const url of urls) {
         try {
-          const response = await documentsApi.uploadUrl(userId, noteId, url, 'url');
-          onDocumentUploaded?.(response.documentId);
+          const result = await createDocument({
+            notebookId: noteId,
+            type: 'url',
+            source: url,
+            fileName: url,
+          });
+          onDocumentUploaded?.(result.documentId);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Upload failed';
           errors.push(`${url}: ${errorMsg}`);
@@ -294,8 +310,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       const errors: string[] = [];
       for (const url of urls) {
         try {
-          const response = await documentsApi.uploadUrl(userId, noteId, url, 'youtube');
-          onDocumentUploaded?.(response.documentId);
+          const result = await createDocument({
+            notebookId: noteId,
+            type: 'youtube',
+            source: url,
+            fileName: 'YouTube Video',
+          });
+          onDocumentUploaded?.(result.documentId);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Upload failed';
           errors.push(`${url}: ${errorMsg}`);
@@ -333,8 +354,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
     setIsUploading(true);
     try {
-      const response = await documentsApi.uploadText(userId, noteId, textInput);
-      onDocumentUploaded?.(response.documentId);
+      const result = await createDocument({
+        notebookId: noteId,
+        type: 'text',
+        source: textInput,
+        fileName: 'Pasted text',
+      });
+      onDocumentUploaded?.(result.documentId);
       setShowTextInput(false);
       setTextInput('');
       setIsModalOpen(false);
@@ -476,21 +502,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                 </div>
               )}
 
-              {/* Progress Steps for Processing Documents */}
-              {viewingSource.status === 'processing' && (
-                <div className="bg-secondary/30 rounded-lg p-6 space-y-3">
-                  <div className="flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  </div>
-                  <p className="text-sm font-medium text-center text-muted-foreground">
-                    Processing document...
-                  </p>
-                  <p className="text-xs text-center text-muted-foreground/60">
-                    This may take a moment
-                  </p>
-                </div>
-              )}
-
               {/* Loading State */}
               {loadingContentId === viewingSourceId && (
                 <div className="flex items-center justify-center py-12">
@@ -501,8 +512,24 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                 </div>
               )}
 
+              {/* Error State for Content Loading */}
+              {contentErrors[viewingSourceId] && loadingContentId !== viewingSourceId && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-5 h-5 text-destructive shrink-0" />
+                    <p className="text-sm font-medium text-destructive">Failed to load content</p>
+                  </div>
+                  <p className="text-xs text-destructive/80">
+                    {contentErrors[viewingSourceId]}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    The content will automatically reload when available. Please ensure you are logged in.
+                  </p>
+                </div>
+              )}
+
               {/* Content Display */}
-              {loadingContentId !== viewingSourceId && (
+              {loadingContentId !== viewingSourceId && !contentErrors[viewingSourceId] && (
                 <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
@@ -584,7 +611,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
                       <div
                         key={source.id}
                         className="group flex flex-col bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer overflow-visible relative"
-                        onClick={() => !isRenaming && setViewingSourceId(source.id)}
+                        onClick={() => !isRenaming && source.status !== 'processing' && setViewingSourceId(source.id)}
                       >
                         <div className="flex items-center gap-3 p-3">
                           <div className="text-muted-foreground shrink-0 flex items-center justify-center">

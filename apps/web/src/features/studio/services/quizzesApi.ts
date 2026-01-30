@@ -1,11 +1,9 @@
 import type { Note, QuizQuestion, QuizNote } from '@/shared/types/index';
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/shared/utils/api';
-import { getUserId } from '@/shared/utils/auth';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { useQuery, useMutation, useAction } from 'convex/react';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export interface CreateQuizParams {
-  userId: string;
   notebookId: string;
   documentIds: string[];
   questionCount: 'fewer' | 'standard' | 'more'; // 10, 20, 30
@@ -14,9 +12,15 @@ export interface CreateQuizParams {
 }
 
 export interface CreateQuizResponse {
-  quizId: string;
+  noteId: string;
   status: string;
-  quiz: QuizNote;
+  note: { _id: string; title: string; status: string };
+}
+
+/** Map 'fewer' | 'standard' | 'more' to API question count (10, 20, 30) */
+function questionCountToNumber(count: 'fewer' | 'standard' | 'more'): number {
+  const map: Record<string, number> = { fewer: 10, standard: 20, more: 30 };
+  return map[count] ?? 20;
 }
 
 /**
@@ -61,16 +65,17 @@ function getPreviewText(status: string, metadata?: any): string {
  * Map a database quiz response to the frontend QuizNote interface
  */
 function mapQuizToNote(dbQuiz: any): QuizNote {
-  const questions: QuizQuestion[] = dbQuiz.questions || [];
+  // Quizzes are stored in the questionsData field
+  const questions: QuizQuestion[] = dbQuiz.questionsData || [];
   const questionCount = questions.length;
 
   return {
-    id: dbQuiz.id,
+    id: dbQuiz._id,
     title: dbQuiz.title,
     preview: getPreviewText(dbQuiz.status, dbQuiz.metadata),
     type: 'quiz',
     questions,
-    userAnswers: dbQuiz.userAnswers || {},
+    userAnswers: dbQuiz.metadata?.userAnswers || {},
     status: dbQuiz.status,
     metadata: {
       questionCount,
@@ -80,156 +85,194 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
   };
 }
 
-export const quizzesApi = {
-  /**
-   * Create a new quiz and queue generation
-   */
-  async createQuiz(params: CreateQuizParams): Promise<CreateQuizResponse> {
-    const response = await apiPost('/api/quizzes', params);
+/**
+ * Get all quizzes for a notebook
+ * Returns undefined while loading, empty array when loaded but no results
+ */
+export function useQuizzes(notebookId: string | null) {
+  const quizzes = useQuery(
+    api.quizzes.list,
+    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+  );
+  return quizzes?.map(mapQuizToNote);
+}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create quiz');
-    }
+/**
+ * Get a specific quiz by ID
+ */
+export function useQuiz(quizId: string | null) {
+  const quiz = useQuery(
+    api.quizzes.get,
+    quizId ? { id: quizId as Id<'quizzes'> } : 'skip'
+  );
+  return quiz ? mapQuizToNote(quiz) : null;
+}
 
-    const result = await response.json();
+/**
+ * Create a new quiz and queue generation
+ */
+export function useCreateQuiz() {
+  const schedule = useAction(api.contentGeneration.scheduleQuiz);
+
+  return async (params: CreateQuizParams): Promise<CreateQuizResponse> => {
+    const result = await schedule({
+      notebookId: params.notebookId as Id<'notebooks'>,
+      documentIds: params.documentIds as Id<'documents'>[],
+      questionCount: questionCountToNumber(params.questionCount),
+      difficulty: params.difficulty,
+      focus: params.focus,
+    });
+
     return {
-      quizId: result.quizId,
+      noteId: result.quizId,
       status: result.status,
-      quiz: mapQuizToNote(result.quiz),
+      note: { _id: result.quizId, title: result.quiz?.title ?? '', status: result.status },
     };
-  },
+  };
+}
 
-  /**
-   * Get a specific quiz by ID
-   */
-  async getQuiz(quizId: string): Promise<QuizNote> {
-    const userId = getUserId();
+/**
+ * Rename a quiz by ID with optimistic update
+ */
+export function useRenameQuiz() {
+  const update = useMutation(api.quizzes.update).withOptimisticUpdate((localStore, args) => {
+    const { id, title } = args;
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const queryParams = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/quizzes/${quizId}?${queryParams.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch quiz');
-    }
-
-    const dbQuiz = await response.json();
-    return mapQuizToNote(dbQuiz);
-  },
-
-  /**
-   * Poll quiz status until completion
-   */
-  async pollQuizStatus(
-    quizId: string,
-    onUpdate?: (note: QuizNote) => void,
-    maxAttempts = 180, // 6 minutes @ 2s intervals
-    interval = 2000
-  ): Promise<QuizNote> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const note = await this.getQuiz(quizId);
-
-      if (note.status === 'completed' || note.status === 'failed') {
-        return note;
+    // Get current quiz (has notebookId for list query)
+    const quiz = localStore.getQuery(api.quizzes.get, { id });
+    if (quiz) {
+      // Update list view
+      const listResult = localStore.getQuery(api.quizzes.list, { notebookId: quiz.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.quizzes.list,
+          { notebookId: quiz.notebookId },
+          listResult.map(q =>
+            q._id === id
+              ? { ...q, title }
+              : q
+          )
+        );
       }
 
-      onUpdate?.(note);
-      await new Promise((resolve) => setTimeout(resolve, interval));
+      // Update detail view
+      localStore.setQuery(
+        api.quizzes.get,
+        { id },
+        { ...quiz, title }
+      );
+    }
+  });
+
+  return async (quizId: string, newTitle: string) => {
+    return await update({
+      id: quizId as Id<'quizzes'>,
+      title: newTitle,
+    });
+  };
+}
+
+/**
+ * Delete a quiz by ID with optimistic update
+ */
+export function useDeleteQuiz() {
+  const remove = useMutation(api.quizzes.remove).withOptimisticUpdate((localStore, args) => {
+    const quiz = localStore.getQuery(api.quizzes.get, { id: args.id });
+    if (quiz) {
+      const listResult = localStore.getQuery(api.quizzes.list, { notebookId: quiz.notebookId });
+      if (listResult) {
+        localStore.setQuery(
+          api.quizzes.list,
+          { notebookId: quiz.notebookId },
+          listResult.filter(q => q._id !== args.id)
+        );
+      }
     }
 
-    throw new Error('Quiz generation timed out');
-  },
+    // Clear detail view
+    localStore.setQuery(api.quizzes.get, { id: args.id }, null);
+  });
 
-  /**
-   * Get all quizzes for a notebook
-   */
-  async getQuizzes(notebookId: string): Promise<QuizNote[]> {
-    const userId = getUserId();
+  return async (quizId: string) => {
+    await remove({ id: quizId as Id<'quizzes'> });
+  };
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
+/**
+ * Submit an answer for a quiz question
+ */
+export function useSubmitQuizAnswer() {
+  const update = useMutation(api.quizzes.update);
+
+  return async (quizId: string, questionIndex: number, selectedOption: number) => {
+    return await update({
+      id: quizId as Id<'quizzes'>,
+      metadata: {
+        userAnswers: {
+          [questionIndex]: selectedOption,
+        },
+      },
+    });
+  };
+}
+
+/**
+ * Reset all answers for a quiz
+ */
+export function useResetQuizAnswers() {
+  const update = useMutation(api.quizzes.update);
+
+  return async (quizId: string) => {
+    return await update({
+      id: quizId as Id<'quizzes'>,
+      metadata: {
+        userAnswers: {},
+      },
+    });
+  };
+}
+
+/**
+ * Poll quiz status until completion.
+ * Pass initialNote from the create response so the first poll succeeds before
+ * Convex query reactivity has added the new quiz to the notes list.
+ */
+export async function pollQuizStatus(
+  getQuiz: () => QuizNote | null | undefined,
+  onUpdate?: (note: QuizNote) => void,
+  maxAttempts = 180, // 6 minutes @ 2s intervals
+  interval = 2000,
+  initialNote?: QuizNote
+): Promise<QuizNote> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const note = getQuiz() ?? initialNote;
+
+    if (!note) {
+      throw new Error('Quiz not found');
     }
 
-    const params = new URLSearchParams({ userId });
-    const response = await apiGet(`/api/quizzes/notebook/${notebookId}?${params.toString()}`);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch quizzes');
+    if (note.status === 'completed' || note.status === 'failed') {
+      return note;
     }
 
-    const dbQuizzes = await response.json();
-    return dbQuizzes.map(mapQuizToNote);
-  },
+    onUpdate?.(note);
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 
-  /**
-   * Rename a quiz by ID
-   */
-  async renameQuiz(quizId: string, newTitle: string): Promise<void> {
-    const userId = getUserId();
+  throw new Error('Quiz generation timed out');
+}
 
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    const response = await apiPatch(`/api/quizzes/${quizId}?${params.toString()}`, { title: newTitle });
-
-    if (!response.ok) {
-      throw new Error('Failed to rename quiz');
-    }
-  },
-
-  /**
-   * Delete a quiz by ID
-   */
-  async deleteQuiz(quizId: string): Promise<void> {
-    const userId = getUserId();
-
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    await apiDelete(`/api/quizzes/${quizId}?${params.toString()}`);
-  },
-
-  /**
-   * Submit an answer for a quiz question
-   */
-  async submitAnswer(quizId: string, questionIndex: number, selectedOption: number): Promise<void> {
-    const userId = getUserId();
-
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    const response = await apiPost(`/api/quizzes/${quizId}/submit?${params.toString()}`, { questionIndex, selectedOption });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to submit answer');
-    }
-  },
-
-  /**
-   * Reset all answers for a quiz
-   */
-  async resetAnswers(quizId: string): Promise<QuizNote> {
-    const userId = getUserId();
-
-    if (!userId) {
-      throw new Error('User not authenticated');
-    }
-
-    const params = new URLSearchParams({ userId });
-    await apiPost(`/api/quizzes/${quizId}/reset?${params.toString()}`, {});
-
-    // Fetch and return the updated quiz
-    return this.getQuiz(quizId);
-  },
+/**
+ * Legacy API object for backward compatibility
+ * @deprecated Use individual hooks instead
+ */
+export const quizzesApi = {
+  useQuizzes,
+  useQuiz,
+  useCreateQuiz,
+  useRenameQuiz,
+  useDeleteQuiz,
+  useSubmitQuizAnswer,
+  useResetQuizAnswers,
+  pollQuizStatus,
 };

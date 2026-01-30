@@ -1,6 +1,6 @@
 # Email Template Subject Lines
 
-Optimized subject lines for each Supabase email template to maximize open rates and conversions.
+Optimized subject lines for each authentication email template to maximize open rates and conversions.
 
 ## Confirm Signup
 
@@ -115,14 +115,14 @@ Optimized subject lines for each Supabase email template to maximize open rates 
 
 ---
 
-## Supabase Configuration
+## Configuration
 
-To set these subject lines in Supabase:
+To set these subject lines:
 
-1. Go to **Authentication** → **Email Templates**
+1. Go to your auth dashboard → **Email Templates** (or equivalent)
 2. Select the template you want to configure
 3. Paste the subject line into the **Subject** field
-4. Click **Save changes**
+4. Save changes
 
 You can also use dynamic variables in subject lines:
 

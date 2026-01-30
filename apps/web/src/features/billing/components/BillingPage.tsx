@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Check } from 'lucide-react';
-import { subscriptionApi } from '../services/subscriptionApi';
+import { useSubscriptionStatus, useCreateCheckout, useCancelSubscription } from '../services/subscriptionApi';
 import type { SubscriptionStatusResponse } from '../types';
 import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
@@ -31,25 +31,10 @@ const proFeatures = [
 ];
 
 export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
-  const [status, setStatus] = useState<SubscriptionStatusResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
+  const status = useSubscriptionStatus();
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
-  const loadStatus = async () => {
-    try {
-      const data = await subscriptionApi.getStatus();
-      setStatus(data);
-    } catch (error) {
-      console.error('Failed to load subscription status:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const createCheckout = useCreateCheckout();
+  const cancelSubscription = useCancelSubscription();
 
   const handleUpgrade = async (interval: 'month' | 'year') => {
     try {
@@ -57,8 +42,8 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
       const successUrl = `${window.location.origin}?success=true`;
       const cancelUrl = `${window.location.origin}?canceled=true`;
 
-      const session = await subscriptionApi.createCheckout(interval, successUrl, cancelUrl);
-      window.location.href = session.checkoutUrl;
+      const session = await createCheckout(interval, successUrl, cancelUrl);
+      window.location.href = session.url;
     } catch (error) {
       console.error('Failed to create checkout:', error);
       alert(error instanceof Error ? error.message : 'Failed to start checkout');
@@ -73,25 +58,13 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
     );
     if (!confirmed) return;
 
-    setCancelling(true);
     try {
-      await subscriptionApi.cancelSubscription();
-      await loadStatus();
+      await cancelSubscription();
     } catch (error) {
       console.error('Failed to cancel subscription:', error);
       alert(error instanceof Error ? error.message : 'Failed to cancel subscription');
-    } finally {
-      setCancelling(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -109,7 +82,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
             Choose Your Plan
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {status?.hasSubscription 
+            {status?.hasSubscription
               ? 'Manage your subscription and billing information below'
               : 'Unlock unlimited access to all SolomindLM features'}
           </p>
@@ -160,10 +133,9 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                 {!status.cancelAtPeriodEnd && (
                   <button
                     onClick={handleCancel}
-                    disabled={cancelling}
                     className="mt-6 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 disabled:opacity-50 transition-colors"
                   >
-                    {cancelling ? 'Canceling...' : 'Cancel Subscription'}
+                    Cancel Subscription
                   </button>
                 )}
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, RefreshCw, Loader2, Search, FileText, Brain } from 'lucide-react';
+import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, RefreshCw, Loader2, Search, FileText, Brain, Copy, Check } from 'lucide-react';
 import { ConfirmDialog, useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Virtuoso } from 'react-virtuoso';
 import ReactMarkdown from 'react-markdown';
@@ -40,6 +40,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -215,6 +216,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [messages.length]);
 
+  const copyMessageAsMarkdown = useCallback(async (message: Message) => {
+    const toCopy = message.role === 'assistant' ? stripReferencesSection(message.content) : message.content;
+    try {
+      await navigator.clipboard.writeText(toCopy);
+      setCopiedMessageId(message.id);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch {
+      // clipboard API not available or denied
+    }
+  }, []);
+
   // Strip "References:" section from message content (LLM sometimes adds it)
   const stripReferencesSection = (content: string): string => {
     // Match "References:" or "Reference:" followed by a list of references
@@ -233,7 +245,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // Strip any "References:" section that the LLM might have added
     const cleanContent = stripReferencesSection(content);
 
-    // Handle references that might be an object (from Supabase JSONB) instead of array
+    // Handle references that might be an object instead of array
     const refsArray = Array.isArray(references) ? references : [];
 
     // Convert citation markers [1] to inline code markers `CITE:1` for ReactMarkdown to process
@@ -329,20 +341,57 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     message: Message;
     onRefHover: (refId: number, messageId: string, event: React.MouseEvent) => void;
     onRefLeave: () => void;
-  }>(({ message, onRefHover, onRefLeave }) => {
+    onCopyMessage: (message: Message) => void;
+    copiedMessageId: string | null;
+  }>(({ message, onRefHover, onRefLeave, onCopyMessage, copiedMessageId }) => {
     const isUser = message.role === 'user';
+    const isCopied = copiedMessageId === message.id;
+
+    // Extensible action list: add new entries here to show more message actions
+    const messageActions = [
+      {
+        id: 'copy',
+        label: isCopied ? 'Copied' : 'Copy',
+        icon: isCopied ? Check : Copy,
+        onClick: () => onCopyMessage(message),
+        className: isCopied ? 'text-green-600' : '',
+      },
+      // Future: { id: 'regenerate', label: 'Regenerate', icon: RefreshCw, onClick: () => {} },
+      // Future: { id: 'thumbs-up', label: 'Good response', icon: ThumbsUp, onClick: () => {} },
+    ];
+
+    const ActionBar = () => (
+      <div
+        className="flex items-center rounded-full border border-border/80 bg-card/90 shadow-sm backdrop-blur-sm overflow-hidden opacity-0 group-hover/message:opacity-100 transition-opacity duration-200"
+        role="toolbar"
+        aria-label="Message actions"
+      >
+        {messageActions.map(({ id, label, icon: Icon, onClick, className = '' }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={onClick}
+            title={label}
+            aria-label={label}
+            className={`p-2 text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors touch-manipulation first:pl-2.5 last:pr-2.5 ${className}`}
+          >
+            <Icon className="w-4 h-4" aria-hidden />
+          </button>
+        ))}
+      </div>
+    );
 
     return (
-      <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1`} data-message-id={message.id}>
+      <div className={`group/message flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1`} data-message-id={message.id}>
         {isUser ? (
-          <>
-            <div className="max-w-[75%] relative p-4 rounded-xl font-serif text-lg leading-relaxed bg-primary/10 text-foreground shadow-sm">
+          <div className="flex flex-row items-start gap-2 max-w-[75%]">
+            <div className="shrink-0 pt-4">
+              <ActionBar />
+            </div>
+            <div className="p-4 rounded-xl font-serif text-lg leading-relaxed bg-primary/10 text-foreground shadow-sm">
               {renderMessageWithReferences(message.id, message.content, message.references)}
             </div>
-            <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
-              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </>
+          </div>
         ) : (
           <>
             {/* Status indicator for assistant messages */}
@@ -354,21 +403,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
             <div className="max-w-[90%] font-serif text-lg leading-relaxed text-foreground">
               {renderMessageWithReferences(message.id, message.content, message.references)}
+              <div className="flex justify-start mt-3">
+                <ActionBar />
+              </div>
             </div>
-            <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest px-1">
-              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
           </>
         )}
       </div>
     );
   }, (prev, next) => {
-    // Only re-render if content, status, or references change
+    // Only re-render if content, status, references, or copy state change
     return (
       prev.message.id === next.message.id &&
       prev.message.content === next.message.content &&
       prev.message.status === next.message.status &&
-      prev.message.references === next.message.references
+      prev.message.references === next.message.references &&
+      prev.copiedMessageId === next.copiedMessageId
     );
   });
 
@@ -434,6 +484,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 message={message}
                 onRefHover={handleRefHover}
                 onRefLeave={handleRefLeave}
+                onCopyMessage={copyMessageAsMarkdown}
+                copiedMessageId={copiedMessageId}
               />
             </div>
           )}
@@ -449,7 +501,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           // Find the message being hovered
           const hoveredMessage = messages.find(msg => msg.id === hoveredMessageId);
 
-          // Normalize references to array (handles Supabase JSONB objects)
+          // Normalize references to array
           const refsArray = Array.isArray(hoveredMessage?.references) ? hoveredMessage.references : [];
 
           // Only look for references within that specific message

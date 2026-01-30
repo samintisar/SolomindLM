@@ -157,6 +157,18 @@ export interface AudioNote extends BaseNote {
   };
 }
 
+// Audio overview note - studio audio overview (id, title, transcript, audioUrl)
+export interface AudioOverviewNote {
+  id: string;
+  title: string;
+  preview: string;
+  type: 'audioOverview';
+  audioUrl: string;
+  transcript: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
+}
+
 // Mind map note - hierarchical knowledge graph
 export interface MindMapNote extends BaseNote {
   type: 'mindmap';
@@ -211,7 +223,7 @@ export interface SpreadsheetNote extends BaseNote {
 }
 
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote | SpreadsheetNote;
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | AudioOverviewNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote | SpreadsheetNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
@@ -232,6 +244,10 @@ export function isQuizNote(note: Note): note is QuizNote {
 
 export function isAudioNote(note: Note): note is AudioNote {
   return note.type === 'audio';
+}
+
+export function isAudioOverviewNote(note: Note): note is AudioOverviewNote {
+  return note.type === 'audioOverview';
 }
 
 export function isMindMapNote(note: Note): note is MindMapNote {
@@ -260,8 +276,8 @@ export interface NotebookItem {
   icon?: string;
   isFeatured?: boolean;
   folderId?: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at?: string | number;
+  updated_at?: string | number;
 }
 
 export interface FolderItem {
@@ -271,8 +287,8 @@ export interface FolderItem {
   color?: string; // e.g. 'bg-blue-500'
   icon?: string;
   notebookCount: number;
-  created_at: string;
-  updated_at: string;
+  created_at: string | number;
+  updated_at: string | number;
 }
 
 // Union type for rendering mixed lists

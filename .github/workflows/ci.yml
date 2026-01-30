@@ -10,24 +10,6 @@ env:
   NODE_VERSION: "20"
 
 jobs:
-  type-check-api:
-    name: Type Check (API)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: "1.2.2"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Type check API
-        run: bun run --filter @solomindlm/api type-check
-
   build-web:
     name: Build (Web)
     runs-on: ubuntu-latest
@@ -45,21 +27,3 @@ jobs:
 
       - name: Build Web
         run: bun run --filter @solomindlm/web build
-
-  build-api:
-    name: Build (API)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: "1.2.2"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build API
-        run: bun run --filter @solomindlm/api build

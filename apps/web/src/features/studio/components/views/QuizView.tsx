@@ -15,7 +15,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
 import { QuizNote } from '@/shared/types/index';
-import { quizzesApi } from '@/features/studio/services/quizzesApi';
+import { useSubmitQuizAnswer, useResetQuizAnswers } from '@/features/studio/services/quizzesApi';
 
 export interface QuizViewProps {
   note: QuizNote;
@@ -30,6 +30,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     const [showHint, setShowHint] = useState(false);
     const [reviewMode, setReviewMode] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+
+    const submitAnswer = useSubmitQuizAnswer();
+    const resetAnswers = useResetQuizAnswers();
 
     // Sync userAnswers with note.userAnswers
     useEffect(() => {
@@ -53,12 +56,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
         // Submit to server in the background
         try {
-            await quizzesApi.submitAnswer(note.id, currentIndex, index);
-            // Fetch updated note to sync with server state
-            const updatedNote = await quizzesApi.getQuiz(note.id);
-            if (onNoteUpdate) {
-                onNoteUpdate(updatedNote);
-            }
+            await submitAnswer(note.id, currentIndex, index);
         } catch (error) {
             console.error('Failed to submit answer:', error);
             // Revert the local state on error
@@ -90,10 +88,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
         setIsResetting(true);
         try {
             // Call API to reset all answers on the server
-            const updatedNote = await quizzesApi.resetAnswers(note.id);
-            if (onNoteUpdate) {
-                onNoteUpdate(updatedNote);
-            }
+            await resetAnswers(note.id);
             // Reset local state
             setCurrentIndex(0);
             setUserAnswers({});
