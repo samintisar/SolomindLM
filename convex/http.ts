@@ -10,7 +10,7 @@ const streaming = new PersistentTextStreaming(
   components.persistentTextStreaming
 );
 
-// CORS configuration - support multiple origins (Vite default 5173, alternate 5174)
+// CORS configuration - dev origins + SITE_URL from Convex (e.g. https://www.solomindlm.com, comma-separated for multiple).
 const DEV_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:5174",
@@ -24,6 +24,10 @@ const getAllowedOrigins = (): string[] => {
   return [...new Set([...DEV_ORIGINS, ...fromEnv])];
 };
 
+// better-auth cross-domain client sends "Better-Auth-Cookie"; allow both casings for gateways that match case-sensitive.
+const CORS_ALLOW_HEADERS =
+  "Content-Type, Authorization, X-Requested-With, better-auth-cookie, Better-Auth-Cookie";
+
 const getCorsHeaders = (origin?: string | null): Record<string, string> => {
   const allowedOrigins = getAllowedOrigins();
   const allowOrigin = origin && allowedOrigins.includes(origin)
@@ -33,7 +37,7 @@ const getCorsHeaders = (origin?: string | null): Record<string, string> => {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, better-auth-cookie",
+    "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     "Vary": "origin",
@@ -48,10 +52,9 @@ const authHandler = httpAction(async (ctx, request) => {
   // Never forward OPTIONS to Node; return CORS here so preflight always has ok status
   if (request.method === "OPTIONS") {
     const origin = request.headers.get("origin");
-    return new Response("", {
-      status: 200,
-      headers: new Headers(getCorsHeaders(origin)),
-    });
+    const headers = new Headers(getCorsHeaders(origin));
+    headers.set("Cache-Control", "no-store"); // avoid cached preflight with stale Allow-Headers
+    return new Response("", { status: 200, headers });
   }
   const url = request.url;
   const method = request.method;
@@ -85,19 +88,17 @@ const authOptionsHandler = httpAction(async (_ctx, request) => {
     console.log("[OPTIONS] Preflight request received:", request.url);
     const origin = request.headers.get("origin");
     console.log("[OPTIONS] Origin:", origin);
-    const headers = getCorsHeaders(origin);
-    console.log("[OPTIONS] CORS headers:", headers);
+    const corsHeaders = getCorsHeaders(origin);
+    const headers = new Headers(corsHeaders);
+    headers.set("Cache-Control", "no-store");
+    console.log("[OPTIONS] CORS headers:", corsHeaders);
     // Use 200 (not 204) so browsers/proxies that require "HTTP ok status" accept the preflight
-    return new Response("", {
-      status: 200,
-      headers: new Headers(headers),
-    });
+    return new Response("", { status: 200, headers });
   } catch (error) {
     console.error("[OPTIONS] Error handling preflight:", error);
-    return new Response("", {
-      status: 200,
-      headers: new Headers(getCorsHeaders(request.headers.get("origin"))),
-    });
+    const headers = new Headers(getCorsHeaders(request.headers.get("origin")));
+    headers.set("Cache-Control", "no-store");
+    return new Response("", { status: 200, headers });
   }
 });
 
