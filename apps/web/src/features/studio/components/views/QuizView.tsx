@@ -13,9 +13,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import rehypeSanitize from 'rehype-sanitize';
 import { QuizNote } from '@/shared/types/index';
 import { useSubmitQuizAnswer, useResetQuizAnswers } from '@/features/studio/services/quizzesApi';
+import { sanitizeMarkdown } from '@/shared/utils';
 
 export interface QuizViewProps {
   note: QuizNote;
@@ -213,7 +213,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                     <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-10 text-lg md:text-2xl">
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm, remarkMath]}
-                            rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                            rehypePlugins={[rehypeKatex]}
                             components={{
                                 img: () => null,
                                 a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
@@ -228,7 +228,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                 td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
                             }}
                         >
-                            {currentQuestion.question}
+                            {sanitizeMarkdown(currentQuestion.question)}
                         </ReactMarkdown>
                     </div>
 
@@ -260,7 +260,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                     <div className="flex-1 prose prose-stone dark:prose-invert max-w-none font-serif text-base md:text-lg">
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm, remarkMath]}
-                                            rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                                            rehypePlugins={[rehypeKatex]}
                                             components={{
                                                 img: () => null,
                                                 a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
@@ -276,7 +276,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                                 p: ({ children }) => <span className="font-medium">{children}</span>,
                                             }}
                                         >
-                                            {option}
+                                            {sanitizeMarkdown(option)}
                                         </ReactMarkdown>
                                     </div>
                                     {isAnswered && idx === currentQuestion.answer && <CheckCircle2 className="w-5 h-5 text-success" />}
@@ -296,7 +296,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                     <div className="text-base mt-2 leading-relaxed prose prose-base prose-stone dark:prose-invert max-w-none text-vintage-blue-700 dark:text-vintage-blue-700">
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm, remarkMath]}
-                                            rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                                            rehypePlugins={[rehypeKatex]}
                                             components={{
                                                 img: () => null,
                                                 a: ({ node, children, ...props }) => <span className="text-vintage-blue-700 dark:text-vintage-blue-700">{children}</span>,
@@ -312,7 +312,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                                 p: ({ children }) => <p className="text-base text-vintage-blue-700 dark:text-vintage-blue-700">{children}</p>,
                                             }}
                                         >
-                                            {currentQuestion.explanation}
+                                            {sanitizeMarkdown(currentQuestion.explanation)}
                                         </ReactMarkdown>
                                     </div>
                                 </div>

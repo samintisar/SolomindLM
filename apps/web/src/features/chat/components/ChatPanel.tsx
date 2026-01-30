@@ -6,9 +6,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import rehypeSanitize from 'rehype-sanitize';
 import { Message, ReferenceChunk } from '@/shared/types/index';
 import { chatApi } from '../services/chatApi';
+import { sanitizeMarkdown } from '@/shared/utils';
 
 interface ChatPanelProps {
   messages: Message[];
@@ -245,17 +245,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // Strip any "References:" section that the LLM might have added
     const cleanContent = stripReferencesSection(content);
 
+    // Sanitize markdown content to prevent XSS
+    const sanitizedContent = sanitizeMarkdown(cleanContent);
+
     // Handle references that might be an object instead of array
     const refsArray = Array.isArray(references) ? references : [];
 
     // Convert citation markers [1] to inline code markers `CITE:1` for ReactMarkdown to process
-    const processedContent = cleanContent.replace(/\[(\d+)\]/g, '`CITE:$1`');
+    const processedContent = sanitizedContent.replace(/\[(\d+)\]/g, '`CITE:$1`');
 
     return (
       <div className="font-serif text-base leading-relaxed space-y-2">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeSanitize, rehypeKatex]}
+          rehypePlugins={[rehypeKatex]}
           components={{
             img: () => null,
             a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,

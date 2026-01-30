@@ -3,9 +3,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import rehypeSanitize from 'rehype-sanitize';
 import { XCircle, ArrowLeft } from 'lucide-react';
 import { ReportNote } from '@/shared/types/index';
+import { sanitizeMarkdown } from '@/shared/utils';
 
 export interface ReportViewProps {
   note: ReportNote;
@@ -51,7 +51,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
                       {note.content ? (
                           <ReactMarkdown
                               remarkPlugins={[remarkGfm, remarkMath]}
-                              rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                              rehypePlugins={[rehypeKatex]}
                               components={{
                                   img: () => null,
                                   a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
@@ -67,7 +67,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
                                   td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
                               }}
                           >
-                              {note.content}
+                              {sanitizeMarkdown(note.content)}
                           </ReactMarkdown>
                       ) : isFailed ? (
                         <div className="flex flex-col items-center justify-center py-12">

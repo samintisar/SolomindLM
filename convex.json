@@ -1,5 +1,6 @@
 {
   "functions": "convex/",
+  "typescriptCompiler": "tsgo",
   "node": {
     "externalPackages": [
       "better-auth",

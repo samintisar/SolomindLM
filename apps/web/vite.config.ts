@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    optimizeDeps: {
+      include: ['react-markdown', 'remark-gfm', 'remark-math', 'rehype-katex'],
+    },
     server: {
       port: 5173,
       strictPort: true,
