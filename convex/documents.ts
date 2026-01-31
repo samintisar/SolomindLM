@@ -441,7 +441,7 @@ export const getDocumentDetails = internalQuery({
 export const storeChunk = internalMutation({
   args: {
     documentId: v.id('documents'),
-    userId: v.string(),
+    userId: v.id('users'),
     notebookId: v.id('notebooks'),
     content: v.string(),
     chunkIndex: v.number(),

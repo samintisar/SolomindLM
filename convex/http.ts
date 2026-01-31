@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { components, internal } from "./_generated/api";
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
 import { corsRouter } from "convex-helpers/server/cors";
+import { auth } from "./auth";
 
 const http = httpRouter();
 
@@ -10,6 +11,9 @@ const http = httpRouter();
 const streaming = new PersistentTextStreaming(
   components.persistentTextStreaming
 );
+
+// Add Convex Auth HTTP routes
+auth.addHttpRoutes(http);
 
 // CORS configuration - dev origins + SITE_URL from Convex (e.g. https://www.solomindlm.com, comma-separated for multiple).
 const DEV_ORIGINS = [
@@ -34,56 +38,12 @@ const getCorsHeaders = (origin?: string | null): Record<string, string> => {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, X-Requested-With, better-auth-cookie, Better-Auth-Cookie",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     "Vary": "origin",
   };
 };
-
-// ============================================================
-// Auth Routes (forward to Node so isolate never imports better-auth)
-// Use corsRouter so CORS matches @convex-dev/better-auth (Better-Auth-Cookie, Set-Better-Auth-Cookie).
-// ============================================================
-
-const authHandler = httpAction(async (ctx, request) => {
-  const url = request.url;
-  const method = request.method;
-  const headers: Record<string, string> = {};
-  request.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
-  const body = await request.text();
-
-  const result = await ctx.runAction(internal.authHttpHandler.handle, {
-    url,
-    method,
-    headers,
-    body,
-  });
-
-  return new Response(result.body, {
-    status: result.status,
-    headers: new Headers(result.headers),
-  });
-});
-
-const authCors = corsRouter(http, {
-  allowedOrigins: async () => getAllowedOrigins(),
-  allowCredentials: true,
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    // SAME-DOMAIN: No custom auth headers needed
-  ],
-  exposedHeaders: [], // SAME-DOMAIN: No custom headers to expose
-  browserCacheMaxAge: 0,
-});
-
-authCors.route({ pathPrefix: "/auth/", method: "GET", handler: authHandler });
-authCors.route({ pathPrefix: "/auth/", method: "POST", handler: authHandler });
 
 // ============================================================
 // Stripe Webhook (Forward to Node Action)
@@ -138,12 +98,12 @@ http.route({
 
     return new Response(
       JSON.stringify({ status: "ok", timestamp: Date.now() }),
-      { 
-        status: 200, 
-        headers: { 
+      {
+        status: 200,
+        headers: {
           ...corsHeaders,
-          "Content-Type": "application/json" 
-        } 
+          "Content-Type": "application/json"
+        }
       }
     );
   }),
@@ -160,10 +120,10 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const origin = request.headers.get("origin");
     const corsHeaders = getCorsHeaders(origin);
-    
-    return new Response(null, { 
-      status: 204, 
-      headers: corsHeaders 
+
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
     });
   }),
 });
@@ -190,30 +150,12 @@ http.route({
       );
     };
 
-    // Auth: try cookies first (same-origin), then Bearer token (cross-origin from localhost)
-    let userId: string | null = null;
-    try {
-      const { authComponent } = await import("./authComponent");
-      const user = await authComponent.getAuthUser(ctx);
-      userId = user?._id != null ? String(user._id) : null;
-      console.log("[Chat] Auth via cookies, user:", userId);
-    } catch (authError: unknown) {
-      const authHeader = request.headers.get("authorization");
-      if (authHeader?.startsWith("Bearer ")) {
-        const identity = await ctx.auth.getUserIdentity();
-        if (identity?.subject) {
-          userId = identity.subject;
-          console.log("[Chat] Auth via Bearer token, user:", userId);
-        }
-      }
-      if (!userId) {
-        console.error("[Chat] Auth failed:", authError);
-        return errorResponse("Please log in to use chat", 401);
-      }
-    }
+    // Simplified auth check with Convex Auth
+    const identity = await ctx.auth.getUserIdentity();
+    const userId = identity?.subject;
 
     if (!userId) {
-      return errorResponse("No user session found", 401);
+      return errorResponse("Please log in to use chat", 401);
     }
 
     try {
@@ -253,7 +195,7 @@ http.route({
       // Conversation and user message already added by client via sendMessageOptimistic
       const conversationId = await ctx.runMutation(internal.chat.ensureConversation, {
         notebookId: notebookId as any,
-        userId,
+        userId: userId as any,
       });
 
       // Chunks are added *during* generation by the node action (runWithStreamId) via

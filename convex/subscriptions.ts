@@ -91,7 +91,7 @@ export const isPremium = query({
  * Internal query to get subscription by user ID
  */
 export const getByUserIdInternal = internalQuery({
-  args: { userId: v.string() },
+  args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("stripeSubscriptions")
@@ -150,7 +150,7 @@ export const updateCancelAtPeriodEndInternal = internalMutation({
  */
 export const upsertSubscription = internalMutation({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
     stripeSubscriptionId: v.string(),
     stripeCustomerId: v.string(),
     stripePriceId: v.string(),

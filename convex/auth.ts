@@ -1,22 +1,36 @@
+import { convexAuth } from "@convex-dev/auth/server";
+import Google from "@auth/core/providers/google";
 import { query, type QueryCtx, type MutationCtx, type ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
+  providers: [
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+    }),
+  ],
+});
 
 /**
- * Auth utilities for queries/mutations/actions (isolate runtime).
- * Uses Convex native auth - better-auth is only used in HTTP routes.
+ * Auth utilities for queries/mutations/actions.
+ * Uses Convex Auth (@convex-dev/auth).
  */
 
+const AUTH_SUB_DIVIDER = "|";
+
 /**
- * Get the authenticated user's ID using Convex native auth.
- * Better-Auth sets the identity subject field with the user ID.
+ * Get the authenticated user's ID using Convex Auth.
+ * Convex Auth stores subject as "userId|sessionId"; we need the userId part.
  */
-export const getAuthUserId = async (ctx: QueryCtx | MutationCtx | ActionCtx): Promise<string | null> => {
+export const getAuthUserId = async (ctx: QueryCtx | MutationCtx | ActionCtx): Promise<Id<"users"> | null> => {
   try {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-
-    // Better-Auth stores user ID in the subject field
-    return identity.subject;
-  } catch {
+    if (!identity?.subject) return null;
+    const [userId] = identity.subject.split(AUTH_SUB_DIVIDER);
+    return (userId ?? null) as Id<"users"> | null;
+  } catch (error) {
+    console.error("Auth error:", error);
     return null;
   }
 };
@@ -28,14 +42,20 @@ export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
     try {
-      // Use Convex native auth instead of better-auth
       const identity = await ctx.auth.getUserIdentity();
-      if (!identity) return null;
+      if (!identity?.subject) return null;
+
+      // Subject is "userId|sessionId"; we need the userId to fetch the user document
+      const [userId] = identity.subject.split(AUTH_SUB_DIVIDER);
+      if (!userId) return null;
+
+      const user = await ctx.db.get(userId as Id<"users">);
+      if (!user) return null;
 
       return {
-        id: identity.subject,
-        email: identity.email ?? undefined,
-        name: identity.name ?? undefined,
+        id: user._id.toString(),
+        email: user.email ?? undefined,
+        name: user.name ?? undefined,
       };
     } catch {
       return null;

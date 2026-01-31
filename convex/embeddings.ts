@@ -103,7 +103,7 @@ export const searchWithEmbedding = action({
 export const processDocumentEmbeddings = internalMutation({
   args: {
     documentId: v.id("documents"),
-    userId: v.string(),
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     content: v.string(),
   },

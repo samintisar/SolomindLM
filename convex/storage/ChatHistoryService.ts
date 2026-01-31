@@ -28,7 +28,7 @@ export interface ReferenceChunk {
  */
 export const getOrCreateConversation = internalMutation({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
     notebookId: v.id('notebooks'),
   },
   handler: async (ctx, args) => {
@@ -121,7 +121,7 @@ export const getConversationWithMessages = internalAction({
     // Get or create conversation
     const conversationId: Id<'conversations'> = await ctx.runMutation(
       internal.storage.ChatHistoryService.getOrCreateConversation,
-      { userId, notebookId }
+      { userId: userId as any, notebookId }
     );
 
     // Get conversation details (internal, no auth)
@@ -290,7 +290,7 @@ export const renameConversation = internalMutation({
  */
 export const getUserConversations = internalQuery({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     const { userId } = args;

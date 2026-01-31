@@ -2,9 +2,9 @@ import { ReferenceChunk } from '@/shared/types/index';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { authClient } from '@/lib/auth-client';
 import { useStream } from '@convex-dev/persistent-text-streaming/react';
 import { useRef, useState, useCallback } from 'react';
+import { useConvexAuth } from 'convex/react';
 
 // Convex HTTP actions use the .site URL. Derive from .cloud if only VITE_CONVEX_URL is set.
 const CONVEX_SITE_URL =
@@ -205,6 +205,7 @@ export function useClearHistory(notebookId: string | null) {
  */
 export function useSendMessageV2() {
   const sendMessageMutation = useMutation(api.messages.sendMessageOptimistic);
+  const { isAuthenticated } = useConvexAuth();
 
   const sendMessage = useCallback(async (
     notebookId: string,
@@ -226,24 +227,17 @@ export function useSendMessageV2() {
       tempMessageId = result.tempMessageId;
 
       // Step 2: Get auth token for cross-origin requests
-      let authHeader: Record<string, string> = {};
-      try {
-        const { data } = await authClient.convex.token();
-        if (data?.token) {
-          authHeader = { Authorization: `Bearer ${data.token}` };
-        }
-      } catch {
-        // No token (e.g. not logged in)
-      }
+      // With @convex-dev/auth, cookies are automatically handled by the Convex client
+      // For cross-origin requests, we rely on cookies being sent
+      let headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
 
       // Step 3: Start streaming the response
       const response = await fetch(CHAT_STREAM_URL, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        },
+        headers,
         body: JSON.stringify({
           notebookId,
           message,
@@ -339,23 +333,12 @@ export async function sendMessage(
   documentIds?: string[]
 ): Promise<void> {
   try {
-    // Cross-origin: cookies aren't sent from localhost to .convex.site. Send JWT in header.
-    let authHeader: Record<string, string> = {};
-    try {
-      const { data } = await authClient.convex.token();
-      if (data?.token) {
-        authHeader = { Authorization: `Bearer ${data.token}` };
-      }
-    } catch {
-      // No token (e.g. not logged in); request may still succeed if same-origin cookies sent
-    }
-
+    // With @convex-dev/auth, cookies are automatically handled
     const response = await fetch(CHAT_STREAM_URL, {
       method: 'POST',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        ...authHeader,
       },
       body: JSON.stringify({
         notebookId,

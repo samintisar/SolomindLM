@@ -128,7 +128,7 @@ export async function streamChatResponse(
     const chunkMap = new Map<Id<"documentChunks">, DocumentChunkDoc>(
       (fullChunks as (DocumentChunkDoc | null)[])
         .filter((c: DocumentChunkDoc | null): c is DocumentChunkDoc => c !== null)
-        .map((c: DocumentChunkDoc) => [c._id, c])
+        .map((c: DocumentChunkDoc) => [c._id, c] as [Id<"documentChunks">, DocumentChunkDoc])
     );
 
     const rows: VectorSearchResult[] = (results as VectorSearchHit[])

@@ -178,7 +178,7 @@ export const docEmbedding = internalAction({
       for (let i = 0; i < chunks.length; i++) {
         await ctx.runMutation(internal.documents.storeChunk, {
           documentId,
-          userId,
+          userId: userId as any,
           notebookId,
           content: chunks[i],
           chunkIndex: i,

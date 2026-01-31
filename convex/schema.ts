@@ -1,14 +1,14 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-
-// Better Auth manages these tables automatically:
-// - users, sessions, accounts, verificationTokens
-// userId throughout schema is v.string() (Better Auth format)
+import { authTables } from "@convex-dev/auth/server";
 
 export default defineSchema({
+  // Convex Auth tables (users, sessions, accounts, verificationTokens)
+  ...authTables,
+
   // Notebooks table
   notebooks: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     title: v.string(),
     coverColor: v.optional(v.string()),
     icon: v.optional(v.string()),
@@ -26,7 +26,7 @@ export default defineSchema({
 
   // Folders table
   folders: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     name: v.string(),
     description: v.optional(v.string()),
     color: v.optional(v.string()),
@@ -38,7 +38,7 @@ export default defineSchema({
 
   // Documents table
   documents: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     fileName: v.string(),
     fileType: v.string(), // 'file' | 'url' | 'youtube' | 'text'
@@ -58,7 +58,7 @@ export default defineSchema({
   // Vector search for RAG
   documentChunks: defineTable({
     documentId: v.id("documents"),
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     content: v.string(),
     chunkIndex: v.number(),
@@ -76,7 +76,7 @@ export default defineSchema({
 
   // Reports table
   reports: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     content: v.optional(v.any()), // Report content (can be structured data)
@@ -92,7 +92,7 @@ export default defineSchema({
 
   // Audio Overviews table
   audioOverviews: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     transcript: v.optional(v.string()),
@@ -109,7 +109,7 @@ export default defineSchema({
 
   // Flashcards table
   flashcards: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
@@ -124,7 +124,7 @@ export default defineSchema({
 
   // Mindmaps table
   mindmaps: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     data: v.any(), // Mind map structure data
@@ -139,7 +139,7 @@ export default defineSchema({
 
   // Quizzes table
   quizzes: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
@@ -154,7 +154,7 @@ export default defineSchema({
 
   // Slides table
   slides: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     data: v.any(), // Slide deck structure data
@@ -170,7 +170,7 @@ export default defineSchema({
 
   // Spreadsheets table
   spreadsheets: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     data: v.any(), // Spreadsheet structure data
@@ -185,7 +185,7 @@ export default defineSchema({
 
   // Written Questions table
   writtenQuestions: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
@@ -201,7 +201,7 @@ export default defineSchema({
 
   // Chat
   conversations: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.optional(v.string()),
     createdAt: v.number(),
@@ -221,7 +221,7 @@ export default defineSchema({
 
   // Stripe
   stripeSubscriptions: defineTable({
-    userId: v.string(), // Better Auth user ID
+    userId: v.id("users"),
     stripeSubscriptionId: v.string(),
     stripeCustomerId: v.string(),
     stripePriceId: v.string(),
@@ -249,7 +249,7 @@ export default defineSchema({
     .index("stripe_event", ["stripeEventId"]),
 
   stripePaymentHistory: defineTable({
-    userId: v.string(),
+    userId: v.id("users"),
     subscriptionId: v.id("stripeSubscriptions"),
     stripeInvoiceId: v.string(),
     stripePaymentIntentId: v.optional(v.string()),
@@ -267,7 +267,7 @@ export default defineSchema({
 
   // Rate limiting
   rateLimits: defineTable({
-    userId: v.string(),
+    userId: v.id("users"),
     endpoint: v.string(),
     count: v.number(),
     windowStart: v.number(),

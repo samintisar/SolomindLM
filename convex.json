@@ -3,7 +3,8 @@
   "typescriptCompiler": "tsgo",
   "node": {
     "externalPackages": [
-      "better-auth",
+      "@auth/core",
+      "@auth/core/providers/google",
       "openai",
       "@langchain/core",
       "@langchain/openai",

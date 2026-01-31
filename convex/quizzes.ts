@@ -82,7 +82,7 @@ export const create = mutation({
  */
 export const createInternal = internalMutation({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
     questionsData: v.optional(v.array(v.any())),

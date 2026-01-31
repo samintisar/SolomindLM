@@ -16,7 +16,7 @@ export interface ChunkWithEmbedding {
 export const storeChunks = internalMutation({
   args: {
     documentId: v.id('documents'),
-    userId: v.string(),
+    userId: v.id('users'),
     notebookId: v.id('notebooks'),
     chunks: v.array(
       v.object({

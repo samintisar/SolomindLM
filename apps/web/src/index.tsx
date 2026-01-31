@@ -1,32 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ConvexReactClient } from 'convex/react';
-import { ConvexBetterAuthProvider } from '@convex-dev/better-auth/react';
-import { authClient } from '@/lib/auth-client';
+import { ConvexAuthProvider } from '@convex-dev/auth/react';
 import App from './App';
 import './index.css';
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
-if (!convexUrl || typeof convexUrl !== 'string') {
-  throw new Error(
-    'VITE_CONVEX_URL is required. Set it in apps/web/.env.local (dev) or in your hosting env (prod) to your Convex deployment URL (e.g. https://your-deployment.convex.cloud).'
-  );
-}
+if (!convexUrl) throw new Error('VITE_CONVEX_URL is required');
 
-const convex = new ConvexReactClient(convexUrl, {
-  expectAuth: true,
-});
+const convex = new ConvexReactClient(convexUrl);
 
 const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
+if (!rootElement) throw new Error("Could not find root element");
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+    <ConvexAuthProvider client={convex}>
       <App />
-    </ConvexBetterAuthProvider>
+    </ConvexAuthProvider>
   </React.StrictMode>
 );

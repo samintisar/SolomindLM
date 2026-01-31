@@ -8,7 +8,7 @@ import { getAuthUserId } from "./auth";
 export const ensureConversation = internalMutation({
   args: {
     notebookId: v.id("notebooks"),
-    userId: v.string(),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     // Look for existing conversation

@@ -3,11 +3,13 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "bun install",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "https://tame-gecko-736.convex.site/:path*"
-    },
+      "src": "/api/(.*)",
+      "dest": "https://tame-gecko-736.convex.site/api/$1"
+    }
+  ],
+  "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"

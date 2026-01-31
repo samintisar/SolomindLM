@@ -23,12 +23,17 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
     await onLogout();
   };
 
+  const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? 'Signed in' : null);
+
   return (
     <>
-      {/* User Section (when authenticated) */}
-      {isAuthenticated && user && (
+      {/* User Section (when authenticated) - show email/name at top */}
+      {isAuthenticated && displayLabel && (
         <div className="px-4 py-3 border-b border-border/50">
-          <p className="text-sm font-medium text-foreground truncate">{user.email || user.name || 'User'}</p>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Account</p>
+          <p className="text-sm font-medium text-foreground truncate mt-0.5" title={displayLabel}>
+            {displayLabel}
+          </p>
         </div>
       )}
 

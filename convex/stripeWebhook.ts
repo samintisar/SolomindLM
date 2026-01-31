@@ -176,7 +176,7 @@ async function handleInvoicePaid(ctx: ActionCtx, event: { data: { object: any } 
   if (!existing?.userId) return;
 
   await ctx.runMutation(internal.subscriptions.upsertSubscription, {
-    userId: existing.userId,
+    userId: existing.userId as any,
     stripeSubscriptionId: subscriptionId,
     stripeCustomerId:
       typeof invoice.customer === "string"

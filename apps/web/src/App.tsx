@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { useQuery, useMutation, useConvexAuth } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import { Id } from '@convex/_generated/dataModel';
 import { Header } from './shared/ui/Header';
@@ -38,55 +38,6 @@ import { useGenerateUploadUrl, useCreateDocument, useUpdateDocument, useDeleteDo
 import { useSubscriptionStatus } from './features/billing/services/subscriptionApi';
 import { chatApi, type SendMessageCallbacks } from './features/chat/services/chatApi';
 import 'mind-elixir/style.css';
-
-// ============================================================
-// Auth Debugger - TEMPORARY: Remove after fixing auth
-// ============================================================
-function AuthDebugger() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-
-  useEffect(() => {
-    // Intercept fetch to see if /auth/convex/token is being called
-    const originalFetch = window.fetch;
-    window.fetch = async (...args) => {
-      const [url, init] = args;
-      const urlStr = typeof url === 'string' ? url : (url as Request).url;
-
-      if (urlStr.includes('/auth/')) {
-        console.log('🔑 Auth request:', {
-          url: urlStr,
-          method: init?.method || 'GET',
-          credentials: init?.credentials,
-        });
-      }
-
-      const response = await originalFetch(...args);
-
-      if (urlStr.includes('/auth/')) {
-        console.log('🔑 Auth response:', {
-          url: urlStr,
-          status: response.status,
-          ok: response.ok,
-        });
-      }
-
-      return response;
-    };
-
-    return () => {
-      window.fetch = originalFetch;
-    };
-  }, []);
-
-  useEffect(() => {
-    console.log('📊 Convex auth state:', { isAuthenticated, isLoading });
-  }, [isAuthenticated, isLoading]);
-
-  return null;
-}
-// ============================================================
-// End Auth Debugger
-// ============================================================
 
 // ============================================================
 // Types for Optimistic Chat
@@ -657,6 +608,13 @@ const AppContent: React.FC = () => {
     }
   }, [updateDocument]);
 
+  // Redirect authenticated users from landing (/) to /home
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && location.pathname === '/') {
+      navigate('/home', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, location.pathname, navigate]);
+
   // Show login modal only for protected routes when not authenticated
   useEffect(() => {
     const isProtectedRoute =
@@ -1090,7 +1048,6 @@ const App: React.FC = () => {
       <BrowserRouter>
         <ThemeProvider>
           <AuthProvider>
-            <AuthDebugger />
             <ToastProvider>
               <AppContent />
               <ToastContainer />

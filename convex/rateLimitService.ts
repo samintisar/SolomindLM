@@ -16,7 +16,7 @@ import { v } from 'convex/values';
  */
 export const checkAndIncrement = internalMutation({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
     endpoint: v.string(),
     limit: v.number(),
     windowMs: v.number(),
@@ -80,7 +80,7 @@ export const checkAndIncrement = internalMutation({
  */
 export const getStatus = internalQuery({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
     endpoint: v.string(),
   },
   handler: async (ctx, args) => {
@@ -126,7 +126,7 @@ export const getStatus = internalQuery({
  */
 export const resetUsage = internalMutation({
   args: {
-    userId: v.string(),
+    userId: v.id("users"),
     endpoint: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
