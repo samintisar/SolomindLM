@@ -1,5 +1,14 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
+import {
+  FileText,
+  AudioLines,
+  GitFork,
+  Layers,
+  HelpCircle,
+  Presentation,
+  MessageSquareText,
+  Table2,
+} from 'lucide-react';
 import { StudioTool } from '@/shared/types/index';
 
 interface ToolGridProps {
@@ -10,14 +19,14 @@ interface ToolGridProps {
 
 // Icon map for tool icons
 const IconMap: Record<string, React.FC<any>> = {
-  AudioLines: require('lucide-react').AudioLines,
-  GitFork: require('lucide-react').GitFork,
+  AudioLines,
+  GitFork,
   FileText,
-  Layers: require('lucide-react').Layers,
-  HelpCircle: require('lucide-react').HelpCircle,
-  Presentation: require('lucide-react').Presentation,
-  MessageSquareText: require('lucide-react').MessageSquareText,
-  Table2: require('lucide-react').Table2,
+  Layers,
+  HelpCircle,
+  Presentation,
+  MessageSquareText,
+  Table2,
 };
 
 /**
