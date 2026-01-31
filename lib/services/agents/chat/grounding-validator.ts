@@ -277,7 +277,7 @@ export async function validateSemanticGrounding(
       const sourceEmbed = await embeddingService.embedText(citedTrunc);
 
       const similarity = cosineSimilarity(sentenceEmbed, sourceEmbed);
-      const threshold = 0.45; // Semantic similarity threshold
+      const threshold = 0.38; // Semantic similarity threshold (relaxed from 0.45 to reduce false positives)
 
       if (similarity < threshold) {
         issues.push(

@@ -305,16 +305,21 @@ export class ChatLLMWrapper {
     // Ultra-concise query type hint
     const structureHint = this.getStructureHint(userMessage);
 
+    // Always include citation format reminder at the TOP of the user prompt
+    // This ensures it's seen even for follow-up questions where few-shot isn't used
+    const citationReminder = `# CITATION FORMAT (MANDATORY)
+- Place [1], [2] DIRECTLY AFTER each fact within sentences
+- Example: "uv is a Python package [1] designed for speed [2]."
+- DO NOT add "Sources:" or "References:" at the end
+- Every factual claim needs its inline citation
+
+`;
+
     return `# SOURCE DOCUMENTS
 ${formattedChunks}
 
-${contextSection}# CURRENT QUESTION
+${contextSection}${citationReminder}# CURRENT QUESTION
 ${userMessage}
-
-# CRITICAL REMINDER
-- Use INLINE citations only: place [1], [2] directly after each fact within sentences
-- DO NOT add a "Sources:" or "References:" footer
-- Every factual claim must have its inline citation immediately following it
 
 ${structureHint}`;
   }

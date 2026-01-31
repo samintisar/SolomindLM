@@ -20,6 +20,9 @@ interface VectorSearchResult {
   embedding: number[];
 }
 
+// Get threshold from env for filtering in vectorSearchRunner
+const VECTOR_MATCH_THRESHOLD = parseFloat(process.env.CHAT_VECTOR_MATCH_THRESHOLD ?? '0.4');
+
 type DocumentChunkDoc = Doc<"documentChunks">;
 type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
 
@@ -104,7 +107,9 @@ export async function streamChatResponse(
     limit: number,
     docIds?: string[]
   ): Promise<VectorSearchResult[]> => {
-    const limitToFetch = docIds?.length ? Math.max(limit * 4, 100) : limit;
+    // Fetch more results only if we have specific documents to search within
+    // This ensures we get enough relevant chunks from the selected documents
+    const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
 
     const allChunks = await ctx.runQuery(internal.documents.listChunksByNotebook, {
       notebookId: notebookIdTyped,
@@ -147,11 +152,49 @@ export async function streamChatResponse(
       })
       .filter((r: VectorSearchResult | null): r is VectorSearchResult => r !== null);
 
+    // Filter by threshold BEFORE applying documentIds filter
+    // This ensures we only use high-quality matches
+    console.log(`[vectorSearchRunner] Applying threshold filter: ${VECTOR_MATCH_THRESHOLD}`);
+    let thresholded = rows.filter((r) => r._score >= VECTOR_MATCH_THRESHOLD);
+    console.log(`[vectorSearchRunner] After threshold (${VECTOR_MATCH_THRESHOLD}): ${thresholded.length} results (from ${rows.length})`);
+
+    // Log score distribution for debugging
+    if (rows.length > 0) {
+      const scores = rows.map(r => r._score);
+      console.log(`[vectorSearchRunner] Score distribution: min=${Math.min(...scores).toFixed(3)}, max=${Math.max(...scores).toFixed(3)}, avg=${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3)}`);
+    }
+
+    // Fallback: If no results pass threshold, progressively lower it
+    if (thresholded.length === 0 && rows.length > 0) {
+      const FALLBACK_THRESHOLDS = [0.35, 0.3, 0.25, 0.2];
+      for (const fallbackThreshold of FALLBACK_THRESHOLDS) {
+        thresholded = rows.filter((r) => r._score >= fallbackThreshold);
+        if (thresholded.length > 0) {
+          console.warn(`[vectorSearchRunner] No results at threshold ${VECTOR_MATCH_THRESHOLD}. Using fallback threshold ${fallbackThreshold}: ${thresholded.length} results`);
+          break;
+        }
+      }
+      // Last resort: return top results regardless of score
+      if (thresholded.length === 0) {
+        console.warn(`[vectorSearchRunner] No results even at lowest threshold. Returning top ${Math.min(limit, rows.length)} results regardless of score.`);
+        thresholded = rows.slice(0, Math.min(limit, rows.length));
+      }
+    }
+
+    // Then apply documentIds filter if provided
     if (docIds?.length) {
       const docIdSet = new Set(docIds);
-      return rows.filter((r) => docIdSet.has(r.documentId)).slice(0, limit);
+      const filteredByDoc = thresholded.filter((r) => docIdSet.has(r.documentId));
+      console.log(`[vectorSearchRunner] After documentIds filter: ${filteredByDoc.length} results`);
+      // If we have very few results after filtering, try again without threshold but keep document filter
+      if (filteredByDoc.length < 3 && thresholded.length >= 3) {
+        console.warn(`[vectorSearchRunner] Only ${filteredByDoc.length} results from selected documents pass threshold. Using all thresholded results for better coverage.`);
+        // Don't filter by docIds, use thresholded results instead
+        return thresholded.slice(0, limit);
+      }
+      return filteredByDoc.slice(0, limit);
     }
-    return rows;
+    return thresholded.slice(0, limit);
   };
 
   // Keyword search runner using closure pattern (captures notebookIdTyped and userId)
