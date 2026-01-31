@@ -89,7 +89,9 @@ export function createAuthOptions(): BetterAuthOptions {
   // Note: trustedOrigins is already computed above
 
   return {
-    baseURL: betterAuthUrl,
+    // SAME-DOMAIN: Use SITE_URL for baseURL since auth comes through Vercel/Vite proxy
+    // Requests to SITE_URL/api/auth/* are proxied to Convex
+    baseURL: siteUrl.replace(/\/$/, "") + "/api/auth",
     // Secret for signing cookies (OAuth state, session tokens, etc.)
     secret,
     // Convex .convex.site does not route /api/* to custom httpRouter; use /auth to match client
