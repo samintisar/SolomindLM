@@ -1,15 +1,13 @@
 {
-  "buildCommand": "bun run build",
+  "buildCommand": "cd ../.. && bunx convex codegen --cmd=run && cd apps/web && bun run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "bun install",
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "https://tame-gecko-736.convex.site/api/$1"
-    }
-  ],
+  "installCommand": "cd ../.. && bun install && cd apps/web && bun install",
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://tame-gecko-736.convex.site/api/:path*"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
@@ -21,17 +19,8 @@
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" }
-      ]
-    },
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Credentials", "value": "true" },
-        { "key": "Access-Control-Allow-Origin", "value": "https://www.solomindlm.com" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization,Cookie" },
-        { "key": "Access-Control-Expose-Headers", "value": "Set-Cookie" }
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     }
   ]
