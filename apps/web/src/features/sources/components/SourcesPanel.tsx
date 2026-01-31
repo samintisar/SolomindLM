@@ -1,20 +1,18 @@
-import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
-import {
-  Plus, Search, FileText, Globe, CheckSquare, Square, ChevronLeft,
-  X, Upload, Link as LinkIcon, Youtube, Clipboard, File,
-  FileStack, Loader2, XCircle, MoreVertical, Edit2, Trash2, Copy, Download
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Source } from '@/shared/types/index';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
-import { sanitizeMarkdown } from '@/shared/utils';
-
-const MarkdownRenderer = lazy(() =>
-  import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
-);
-import { useUploadDocument, useCreateDocument, useDocumentContent } from '../services/documentsApi';
+import { AddSourceModal } from './AddSourceModal';
+import { UrlInputModal } from './UrlInputModal';
+import { SocialMediaInputModal } from './SocialMediaInputModal';
+import { TextInputModal } from './TextInputModal';
+import { SourceList } from './SourceList';
+import { SourceViewer } from './SourceViewer';
+import { SourcesPanelHeader } from './SourcesPanelHeader';
+import { useSourceUpload } from '../hooks/useSourceUpload';
+import { useSourceContent } from '../hooks/useSourceContent';
+import { useSourceSearch } from '../hooks/useSourceSearch';
+import { useDocumentContent } from '../services/documentsApi';
 import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
-
-const MAX_SOURCES = 100;
 
 interface SourcesPanelProps {
   isOpen: boolean;
@@ -42,35 +40,57 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   onDeleteSource,
   onRenameSource,
   width,
-  isResizing,
   userId,
   noteId,
   onDocumentUploaded,
 }) => {
-  // Use the upload document hook (authenticated Convex client)
-  const uploadDocument = useUploadDocument();
-  const createDocument = useCreateDocument();
+  // View state
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [showSocialMediaInput, setShowSocialMediaInput] = useState(false);
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [urlInput, setUrlInput] = useState('');
-  const [textInput, setTextInput] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
-  const [contentCache, setContentCache] = useState<Record<string, string>>({});
-  const [contentErrors, setContentErrors] = useState<Record<string, string>>({});
-  const [searchQuery, setSearchQuery] = useState('');
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const [isMobile, setIsMobile] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
+  // Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showSocialMediaInput, setShowSocialMediaInput] = useState(false);
+  const [showTextInput, setShowTextInput] = useState(false);
+
+  // Custom hooks
+  const sourceUpload = useSourceUpload({
+    sourcesCount: sources.length,
+    userId,
+    noteId,
+    onDocumentUploaded,
+  });
+
+  const { searchQuery, setSearchQuery, filteredSources } = useSourceSearch(sources);
+
+  const sourceContent = useSourceContent();
+
+  // Fetch document content using the reactive hook
+  const viewingSource = useMemo(
+    () => sources.find(s => s.id === viewingSourceId) || null,
+    [sources, viewingSourceId]
+  );
+  const documentContent = useDocumentContent(
+    viewingSource && viewingSource.status === 'completed' ? viewingSourceId : null
+  );
+
+  // Update content cache when documentContent changes
+  useEffect(() => {
+    if (viewingSourceId && documentContent?.content) {
+      sourceContent.onContentUpdate(viewingSourceId, documentContent.content);
+    } else if (viewingSourceId && viewingSource?.status === 'completed' && documentContent === undefined) {
+      sourceContent.onLoadingStart(viewingSourceId);
+    }
+  }, [viewingSourceId, documentContent, viewingSource?.status, sourceContent]);
+
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+
+  // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -80,26 +100,18 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Reset dragging state when modal closes
-  useEffect(() => {
-    if (!isModalOpen) {
-      setIsDragging(false);
-    }
-  }, [isModalOpen]);
+  // Computed values
+  const allSelected = sources.length > 0 && sources.every(s => s.selected);
+  const selectedCount = sources.filter(s => s.selected).length;
 
-  const viewingSource = useMemo(() =>
-    sources.find(s => s.id === viewingSourceId),
-    [sources, viewingSourceId]
+  const markdownContent = viewingSourceId
+    ? sourceContent.getContent(viewingSourceId)
+    : undefined;
+  const canCopyOrDownload = Boolean(
+    markdownContent && !sourceContent.hasError(viewingSourceId ?? '')
   );
 
-  const filteredSources = useMemo(() => {
-    if (!searchQuery.trim()) return sources;
-    const query = searchQuery.toLowerCase();
-    return sources.filter(source =>
-      source.title.toLowerCase().includes(query)
-    );
-  }, [sources, searchQuery]);
-
+  // Handlers
   const handleDeleteSource = async (sourceId: string, sourceTitle: string) => {
     const confirmed = await confirm(
       'Delete Source',
@@ -111,296 +123,103 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
   };
 
-  // Use reactive hook for document content when viewing a source
-  const documentContent = useDocumentContent(
-    viewingSource && viewingSource.status === 'completed' ? viewingSourceId : null
-  );
-
-  // Normalize newlines so markdown parses correctly (e.g. \r\n -> \n; preserve structure)
-  const normalizeContentNewlines = (raw: string) =>
-    raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  // Update content cache when documentContent changes
-  useEffect(() => {
-    if (viewingSourceId && documentContent) {
-      if (documentContent.content) {
-        const normalized = normalizeContentNewlines(documentContent.content);
-        setContentCache(prev => ({
-          ...prev,
-          [viewingSourceId]: normalized,
-        }));
-        // Clear any previous errors
-        setContentErrors(prev => {
-          const next = { ...prev };
-          delete next[viewingSourceId];
-          return next;
-        });
-        setLoadingContentId(null);
-      }
-    } else if (viewingSourceId && viewingSource?.status === 'completed') {
-      // Check if we've been waiting too long (might be an error)
-      // The hook will automatically retry, so we just show loading
-      if (documentContent === undefined) {
-        setLoadingContentId(viewingSourceId);
-      }
-    }
-  }, [viewingSourceId, documentContent, viewingSource?.status]);
-
-  const allSelected = sources.length > 0 && sources.every(s => s.selected);
-  const selectedCount = sources.filter(s => s.selected).length;
-
-  const markdownContent = viewingSourceId ? contentCache[viewingSourceId] : undefined;
-  const canCopyOrDownload = Boolean(markdownContent && !contentErrors[viewingSourceId ?? '']);
-
-  const handleCopySourceMarkdown = async () => {
-    if (!markdownContent || !viewingSourceId) return;
-    try {
-      await navigator.clipboard.writeText(markdownContent);
-    } catch (err) {
-      console.error('Copy failed:', err);
-    }
+  const handleToggleSource = (sourceId: string) => {
+    onToggleSource(sourceId);
   };
 
-  const handleDownloadSourceMarkdown = () => {
-    if (!markdownContent || !viewingSource) return;
-    const safeName = viewingSource.title.replace(/[\\/:*?"<>|]/g, '_').trim() || 'source';
-    const filename = `${safeName}.md`;
-    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleViewSource = (sourceId: string) => {
+    setViewingSourceId(sourceId);
   };
 
-  // Process files (used by both file input and drag & drop)
-  const processFiles = async (files: File[]) => {
-    if (files.length === 0) return;
+  const handleRenameSource = (id: string, newTitle: string) => {
+    onRenameSource(id, newTitle);
+    setRenamingId(null);
+  };
 
-    if (!userId || !noteId) {
-      alert('Please log in and select a notebook before uploading files.');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      for (const file of files) {
-        const response = await uploadDocument(file, noteId);
-        onDocumentUploaded?.(response.documentId);
+  const handleMenuOpen = (id: string) => {
+    if (renamingId !== null) {
+      // Save rename if active
+      if (renameValue.trim()) {
+        handleRenameSource(renamingId, renameValue);
       }
-      setIsModalOpen(false);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      setRenamingId(null);
+    }
+    setOpenMenuId(id === openMenuId ? null : id);
+    if (id) {
+      setRenamingId(id);
+      const source = sources.find(s => s.id === id);
+      if (source) {
+        setRenameValue(source.title);
       }
     }
   };
 
-  // File upload handler
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    await processFiles(files);
+  const handleBack = () => {
+    if (viewingSource && renamingId !== viewingSource.id) {
+      setRenamingId(viewingSource.id);
+      setRenameValue(viewingSource.title);
+    } else {
+      setViewingSourceId(null);
+      setRenamingId(null);
+    }
   };
 
-  // Drag and drop handlers
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleCopy = async () => {
+    if (viewingSource) {
+      await sourceContent.handleCopySourceMarkdown(viewingSource.id, viewingSource.title);
+    }
+  };
+
+  const handleDownload = () => {
+    if (viewingSource) {
+      sourceContent.handleDownloadSourceMarkdown(viewingSource.id, viewingSource.title);
+    }
+  };
+
+  const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (userId && noteId && sources.length < MAX_SOURCES) {
-      setIsDragging(true);
-    }
-  };
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Only set dragging to false if we're leaving the drop zone itself
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragging(false);
-    }
-  };
+    const startX = e.clientX;
+    const startWidth = width;
+    let animationFrameId: number | null = null;
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (!userId || !noteId || sources.length >= MAX_SOURCES) {
-      return;
-    }
-
-    const files = Array.from(e.dataTransfer.files).filter(file => {
-      const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-      const acceptedTypes = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.json', '.csv', '.png', '.jpg', '.jpeg', '.avif'];
-      return acceptedTypes.includes(extension);
-    });
-
-    if (files.length === 0) {
-      alert('No supported files found. Supported types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF');
-      return;
-    }
-
-    await processFiles(files);
-  };
-
-  // Helper function to parse multiple URLs from input
-  const parseUrls = (input: string): string[] => {
-    return input
-      .split(/\s+/)
-      .map(url => url.trim())
-      .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
-  };
-
-  // URL upload handler
-  const handleUrlUpload = async () => {
-    if (!urlInput) return;
-
-    if (!userId || !noteId) {
-      alert('Please log in and select a notebook before uploading URLs.');
-      return;
-    }
-
-    const urls = parseUrls(urlInput);
-    if (urls.length === 0) {
-      alert('Please enter at least one valid URL (starting with http:// or https://).');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const errors: string[] = [];
-      for (const url of urls) {
-        try {
-          const result = await createDocument({
-            notebookId: noteId,
-            type: 'url',
-            source: url,
-            fileName: url,
-          });
-          onDocumentUploaded?.(result.documentId);
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : 'Upload failed';
-          errors.push(`${url}: ${errorMsg}`);
-          console.error(`URL upload failed for ${url}:`, err);
-        }
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
-      
-      if (errors.length > 0 && errors.length === urls.length) {
-        alert(`Failed to upload all URLs:\n${errors.join('\n')}`);
-      } else if (errors.length > 0) {
-        alert(`Some URLs failed to upload:\n${errors.join('\n')}`);
-      }
-      
-      if (errors.length < urls.length) {
-        setShowUrlInput(false);
-        setUrlInput('');
-        setIsModalOpen(false);
-      }
-    } catch (err) {
-      console.error('URL upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
-  // Social Media upload handler (YouTube, TikTok, Instagram, X)
-  const handleSocialMediaUpload = async () => {
-    if (!urlInput) return;
-
-    if (!userId || !noteId) {
-      alert('Please log in and select a notebook before uploading social media content.');
-      return;
-    }
-
-    const urls = parseUrls(urlInput);
-    if (urls.length === 0) {
-      alert('Please enter at least one valid URL (starting with http:// or https://).');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const errors: string[] = [];
-      for (const url of urls) {
-        try {
-          const result = await createDocument({
-            notebookId: noteId,
-            type: 'youtube',
-            source: url,
-            fileName: 'YouTube Video',
-          });
-          onDocumentUploaded?.(result.documentId);
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : 'Upload failed';
-          errors.push(`${url}: ${errorMsg}`);
-          console.error(`Social media upload failed for ${url}:`, err);
-        }
-      }
-      
-      if (errors.length > 0 && errors.length === urls.length) {
-        alert(`Failed to upload all URLs:\n${errors.join('\n')}`);
-      } else if (errors.length > 0) {
-        alert(`Some URLs failed to upload:\n${errors.join('\n')}`);
-      }
-      
-      if (errors.length < urls.length) {
-        setShowSocialMediaInput(false);
-        setUrlInput('');
-        setIsModalOpen(false);
-      }
-    } catch (err) {
-      console.error('Social media upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Text upload handler
-  const handleTextUpload = async () => {
-    if (!textInput) return;
-
-    if (!userId || !noteId) {
-      alert('Please log in and select a notebook before uploading text.');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const result = await createDocument({
-        notebookId: noteId,
-        type: 'text',
-        source: textInput,
-        fileName: 'Pasted text',
+      animationFrameId = requestAnimationFrame(() => {
+        const delta = moveEvent.clientX - startX;
+        const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
+        const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
+        window.dispatchEvent(
+          new CustomEvent('resizeSourcesPanel', { detail: { width: newWidth } })
+        );
       });
-      onDocumentUploaded?.(result.documentId);
-      setShowTextInput(false);
-      setTextInput('');
-      setIsModalOpen(false);
-    } catch (err) {
-      console.error('Text upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-    }
+    };
+
+    const handleMouseUp = () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   return (
     <>
       <div
-        style={{ 
-          width: isOpen ? (isMobile ? '100%' : width) : 0 
+        style={{
+          width: isOpen ? (isMobile ? '100%' : width) : 0,
         }}
         className={`
           relative shrink-0 bg-sidebar border-r-2 border-border h-full flex flex-col
@@ -409,760 +228,124 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           md:w-auto w-full max-w-full
         `}
       >
-        {/* Resize Handle */}
-        {isOpen && (
-          <div
-            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 z-50 transition-colors active:bg-primary/70"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              
-              const startX = e.clientX;
-              const startWidth = width;
-              let animationFrameId: number | null = null;
-              
-              const handleMouseMove = (moveEvent: MouseEvent) => {
-                if (animationFrameId) {
-                  cancelAnimationFrame(animationFrameId);
-                }
-                
-              animationFrameId = requestAnimationFrame(() => {
-                const delta = moveEvent.clientX - startX;
-                // Max width is 70% of screen width or 1400px, whichever is smaller
-                const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
-                const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
-                  // Dispatch custom event that parent can listen to
-                  window.dispatchEvent(new CustomEvent('resizeSourcesPanel', { detail: { width: newWidth } }));
-                });
-              };
-              
-              const handleMouseUp = () => {
-                if (animationFrameId) {
-                  cancelAnimationFrame(animationFrameId);
-                }
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
-                document.body.style.userSelect = '';
-                document.body.style.cursor = '';
-              };
-              
-              document.body.style.userSelect = 'none';
-              document.body.style.cursor = 'col-resize';
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-            }}
-          />
-        )}
-        
-        {/* Header */}
-        <div className="hidden md:flex items-center justify-between p-4 border-b border-border bg-sidebar/50 backdrop-blur-sm sticky top-0 z-10 h-14">
-          {viewingSource ? (
-            <>
-              <div className="flex items-center gap-2 text-sidebar-foreground overflow-hidden min-w-0 flex-1">
-                <button 
-                  onClick={() => setViewingSourceId(null)}
-                  className="p-1 -ml-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground shrink-0"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                {renamingId === viewingSource.id ? (
-                  <input
-                    type="text"
-                    value={renameValue}
-                    spellCheck={false}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && renameValue.trim()) {
-                        onRenameSource(viewingSource.id, renameValue.trim());
-                        setRenamingId(null);
-                      } else if (e.key === 'Escape') {
-                        setRenameValue(viewingSource.title);
-                        setRenamingId(null);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (renameValue.trim()) {
-                        onRenameSource(viewingSource.id, renameValue.trim());
-                      } else {
-                        setRenameValue(viewingSource.title);
-                      }
-                      setRenamingId(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex-1 min-w-0 font-sans font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                    autoFocus
-                    aria-label="Rename source"
-                  />
-                ) : (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setRenamingId(viewingSource.id);
-                      setRenameValue(viewingSource.title);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setRenamingId(viewingSource.id);
-                        setRenameValue(viewingSource.title);
-                      }
-                    }}
-                    className="font-sans font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
-                    title="Click to rename"
-                  >
-                    {viewingSource.title}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleCopySourceMarkdown}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Copy content as Markdown"
-                  aria-label="Copy content as Markdown"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadSourceMarkdown}
-                  disabled={!canCopyOrDownload}
-                  className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download as Markdown file"
-                  aria-label="Download as Markdown file"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-sidebar-foreground">
-                <FileStack className="w-4 h-4" />
-                <span className="font-sans font-bold text-sm tracking-wide uppercase">Sources</span>
-                <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-full font-mono">
-                  {selectedCount}
-                </span>
-              </div>
-              <button 
-                onClick={onClose}
-                className="p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </>
-          )}
-        </div>
+        <SourcesPanelHeader
+          viewingSource={viewingSource}
+          onBack={handleBack}
+          onClose={onClose}
+          selectedCount={selectedCount}
+          onCopy={handleCopy}
+          onDownload={handleDownload}
+          canCopyOrDownload={canCopyOrDownload}
+          isRenaming={viewingSource ? renamingId === viewingSource.id : false}
+          renameValue={renameValue}
+          onRenameChange={setRenameValue}
+          onRenameSubmit={handleRenameSource}
+          onResizeStart={handleResizeStart}
+        />
 
         <div className="flex-1 overflow-y-auto w-full">
           {viewingSource ? (
-            <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50">
-                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm">
-                    {viewingSource.type} • {viewingSource.date}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => onToggleSource(viewingSource.id)}
-                    className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer select-none"
-                    aria-pressed={viewingSource.selected}
-                    aria-label={viewingSource.selected ? 'Included (click to exclude)' : 'Excluded (click to include)'}
-                  >
-                    {viewingSource.selected ? (
-                      <CheckSquare className="w-4 h-4 shrink-0" aria-hidden />
-                    ) : (
-                      <Square className="w-4 h-4 shrink-0 opacity-60" aria-hidden />
-                    )}
-                    <span>Included</span>
-                  </button>
-              </div>
-
-              {/* Error State */}
-              {viewingSource.status === 'failed' && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="w-5 h-5 text-destructive shrink-0" />
-                    <p className="text-sm font-medium text-destructive">Failed to process document</p>
-                  </div>
-                  <p className="text-xs text-destructive/80">
-                    There was an error while processing this document. Please try uploading it again.
-                  </p>
-                </div>
-              )}
-
-              {/* Loading State */}
-              {loadingContentId === viewingSourceId && (
-                <div className="flex items-center justify-center py-12">
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
-                    <p className="text-sm text-muted-foreground">Loading content...</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Error State for Content Loading */}
-              {contentErrors[viewingSourceId] && loadingContentId !== viewingSourceId && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="w-5 h-5 text-destructive shrink-0" />
-                    <p className="text-sm font-medium text-destructive">Failed to load content</p>
-                  </div>
-                  <p className="text-xs text-destructive/80">
-                    {contentErrors[viewingSourceId]}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    The content will automatically reload when available. Please ensure you are logged in.
-                  </p>
-                </div>
-              )}
-
-              {/* Content Display */}
-              {loadingContentId !== viewingSourceId && !contentErrors[viewingSourceId] && (
-                <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
-                  <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
-                    <MarkdownRenderer
-                      components={{
-                        img: () => null,
-                        a: ({ node, children, ...props }) => <span className="text-foreground">{children}</span>,
-                        video: () => null,
-                        audio: () => null,
-                        iframe: () => null,
-                        table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
-                        thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                        tbody: ({ children }) => <tbody>{children}</tbody>,
-                        tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                        th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
-                        td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
-                      }}
-                    >
-                      {sanitizeMarkdown(contentCache[viewingSourceId] || "No content available.")}
-                    </MarkdownRenderer>
-                  </Suspense>
-                </div>
-              )}
-            </div>
+            <SourceViewer
+              source={viewingSource}
+              onToggle={handleToggleSource}
+              content={markdownContent}
+              isLoading={sourceContent.isLoading(viewingSourceId ?? '')}
+              error={
+                sourceContent.hasError(viewingSourceId ?? '')
+                  ? 'Failed to load content'
+                  : undefined
+              }
+            />
           ) : (
-            <div className="p-4 space-y-5">
-              {/* Refined Action Bar */}
-              <div className="flex gap-2 p-1.5 bg-background/50 border border-border rounded-lg shadow-inner">
-                <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all font-sans font-bold text-[11px] uppercase tracking-wider ${width < 300 ? 'px-3' : ''}`}
-                  title={width < 300 ? 'Add Source' : ''}
-                >
-                  <Plus className="w-4 h-4 shrink-0" />
-                  {width >= 300 && <span>Add Source</span>}
-                </button>
-                <button 
-                  onClick={() => setIsDiscoverOpen(true)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-card border border-border text-foreground rounded-md shadow-xs hover:bg-secondary hover:border-primary/30 transition-all font-sans font-bold text-[11px] uppercase tracking-wider ${width < 300 ? 'px-3' : ''}`}
-                  title={width < 300 ? 'Discover' : ''}
-                >
-                  <Search className="w-4 h-4 text-primary shrink-0" />
-                  {width >= 300 && <span>Discover</span>}
-                </button>
-              </div>
-
-              {/* Search & List */}
-              <div className="space-y-3">
-                <div className="relative flex items-center">
-                  <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none shrink-0" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search sources..."
-                    className="w-full pl-9 pr-3 py-2 bg-background border border-input rounded-md text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring font-serif shadow-xs"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-1 font-sans">
-                    <span>{filteredSources.length} {searchQuery.trim() ? `of ${sources.length}` : ''} items</span>
-                    <button
-                      onClick={onToggleAll}
-                      className="hover:text-primary transition-colors cursor-pointer select-none font-medium"
-                    >
-                      {allSelected ? 'Deselect all' : 'Select all'}
-                    </button>
-                  </div>
-                  {filteredSources.map((source) => {
-                    const status = source.status || 'completed';
-                    const isRenaming = renamingId === source.id;
-                    return (
-                      <div
-                        key={source.id}
-                        className="group flex flex-col bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer overflow-visible relative"
-                        onClick={() => !isRenaming && source.status !== 'processing' && setViewingSourceId(source.id)}
-                      >
-                        <div className="flex items-center gap-3 p-3">
-                          <div className="text-muted-foreground shrink-0 flex items-center justify-center">
-                            {source.type === 'WEB' ? (
-                              <Globe className="w-5 h-5" />
-                            ) : source.type === 'IMG' ? (
-                              <File className="w-5 h-5" />
-                            ) : (
-                              <FileText className="w-5 h-5" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              {isRenaming ? (
-                                <input
-                                  type="text"
-                                  value={renameValue}
-                                  onChange={(e) => setRenameValue(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && renameValue.trim()) {
-                                      onRenameSource(source.id, renameValue.trim());
-                                      setRenamingId(null);
-                                    } else if (e.key === 'Escape') {
-                                      setRenamingId(null);
-                                    }
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="flex-1 px-2 py-1 text-sm bg-background border border-primary rounded font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                                  autoFocus
-                                />
-                              ) : (
-                                <h4 className="text-sm font-medium text-foreground truncate leading-tight">{source.title}</h4>
-                              )}
-                              {/* Status badge */}
-                              {status === 'processing' && (
-                                <div className="flex items-center gap-1 text-[10px] font-medium text-warning font-sans shrink-0">
-                                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                                  <span>Processing</span>
-                                </div>
-                              )}
-                              {status === 'failed' && (
-                                <div className="flex items-center gap-1 text-[10px] font-medium text-destructive font-sans shrink-0">
-                                  <XCircle className="w-3 h-3 shrink-0" />
-                                  <span>Failed</span>
-                                </div>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-sans">{source.type} • {source.date}</p>
-                          </div>
-                          {!isRenaming && (
-                            <div className="flex items-center gap-2 shrink-0">
-                              <div
-                                className="text-primary p-1.5 hover:bg-secondary rounded-full transition-colors flex items-center justify-center"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onToggleSource(source.id);
-                                }}
-                              >
-                                {source.selected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 opacity-50 group-hover:opacity-100" />}
-                              </div>
-                              <div className="relative z-50">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuId(openMenuId === source.id ? null : source.id);
-                                  }}
-                                  className={`p-1.5 hover:bg-secondary rounded-full transition-colors flex items-center justify-center ${
-                                    openMenuId === source.id
-                                      ? 'text-foreground bg-secondary'
-                                      : 'text-muted-foreground group-hover:text-foreground opacity-0 group-hover:opacity-100'
-                                  }`}
-                                  title="More options"
-                                >
-                                  <MoreVertical className="w-5 h-5" />
-                                </button>
-                                {openMenuId === source.id && (
-                                  <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
-                                    <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-xl z-50 min-w-[140px]">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setRenamingId(source.id);
-                                          setRenameValue(source.title);
-                                          setOpenMenuId(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary first:rounded-t-lg transition-colors"
-                                      >
-                                        <Edit2 className="w-4 h-4" />
-                                        Rename
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteSource(source.id, source.title);
-                                          setOpenMenuId(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 last:rounded-b-lg transition-colors"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <SourceList
+              sources={sources}
+              filteredSources={filteredSources}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onToggleAll={onToggleAll}
+              onToggleSource={handleToggleSource}
+              onViewSource={handleViewSource}
+              onDeleteSource={handleDeleteSource}
+              onRenameSource={handleRenameSource}
+              allSelected={allSelected}
+              renamingId={renamingId}
+              renameValue={renameValue}
+              onRenameChange={setRenameValue}
+              openMenuId={openMenuId}
+              onMenuOpen={handleMenuOpen}
+              width={width}
+              onAddSource={() => setIsAddModalOpen(true)}
+              onDiscoverClick={() => setIsDiscoverOpen(true)}
+            />
           )}
         </div>
       </div>
 
-      {/* Add Source Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-5xl bg-card text-card-foreground border border-border rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden font-sans">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center justify-center">
-                    <FileStack className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-xl font-bold">SolomindLM</h2>
-                </div>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
-                    <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* Modals */}
+      <AddSourceModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onFileUpload={sourceUpload.processFiles}
+        onUrlClick={() => {
+          setIsAddModalOpen(false);
+          setShowUrlInput(true);
+        }}
+        onSocialMediaClick={() => {
+          setIsAddModalOpen(false);
+          setShowSocialMediaInput(true);
+        }}
+        onTextClick={() => {
+          setIsAddModalOpen(false);
+          setShowTextInput(true);
+        }}
+        onDiscoverClick={() => {
+          setIsAddModalOpen(false);
+          setIsDiscoverOpen(true);
+        }}
+        isDragging={sourceUpload.isDragging}
+        onDragEnter={sourceUpload.handleDragEnter}
+        onDragLeave={sourceUpload.handleDragLeave}
+        onDragOver={sourceUpload.handleDragOver}
+        onDrop={sourceUpload.handleDrop}
+        sourcesCount={sources.length}
+        userId={userId}
+        noteId={noteId}
+        isUploading={sourceUpload.isUploading}
+        fileInputRef={sourceUpload.fileInputRef}
+        onFileSelect={sourceUpload.handleFileSelect}
+      />
 
-              <div className="overflow-y-auto p-6 md:p-10 space-y-8 bg-card/50">
-                  <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-2xl font-medium">Add sources</h3>
-                        <button 
-                          onClick={() => { setIsModalOpen(false); setIsDiscoverOpen(true); }}
-                          className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-secondary/50 transition-colors text-sm font-medium"
-                        >
-                            <Search className="w-4 h-4" />
-                            Discover sources
-                        </button>
-                      </div>
-                      <p className="text-muted-foreground text-sm leading-relaxed max-w-3xl">
-                          Sources let SolomindLM base its responses on the information that matters most to you.<br/>
-                          (Examples: marketing plans, course reading, research notes, meeting transcripts, sales documents, etc.)
-                      </p>
-                  </div>
+      <UrlInputModal
+        isOpen={showUrlInput}
+        onClose={() => setShowUrlInput(false)}
+        onUpload={sourceUpload.handleUrlUpload}
+        isUploading={sourceUpload.isUploading}
+      />
 
-                  {/* Hidden File Input */}
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    onChange={handleFileSelect}
-                    accept=".pdf,.docx,.pptx,.txt,.md,.json,.csv,.png,.jpg,.jpeg,.avif"
-                    multiple
-                  />
+      <SocialMediaInputModal
+        isOpen={showSocialMediaInput}
+        onClose={() => setShowSocialMediaInput(false)}
+        onUpload={sourceUpload.handleSocialMediaUpload}
+        isUploading={sourceUpload.isUploading}
+      />
 
-                  {/* Upload Area */}
-                  <div
-                    onClick={() => userId && noteId && sources.length < MAX_SOURCES && fileInputRef.current?.click()}
-                    onDragEnter={handleDragEnter}
-                    onDragLeave={handleDragLeave}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-4 transition-all group ${
-                      !userId || !noteId || sources.length >= MAX_SOURCES 
-                        ? 'opacity-50 cursor-not-allowed border-border bg-secondary/5' 
-                        : isDragging
-                        ? 'border-primary bg-primary/10 cursor-pointer scale-[1.02]'
-                        : 'border-border bg-secondary/5 hover:bg-secondary/10 cursor-pointer'
-                    }`}
-                  >
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0">
-                          <Upload className="w-6 h-6 text-primary shrink-0" />
-                      </div>
-                      <div className="text-center space-y-2">
-                          <h3 className="text-lg font-bold text-primary">Upload sources</h3>
-                          <p className="text-sm text-muted-foreground">Drag & drop or <span className="text-primary underline decoration-dotted font-medium">choose file</span> to upload</p>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground/60 text-center max-w-xl mt-4 font-mono">
-                          Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF
-                      </p>
-                  </div>
+      <TextInputModal
+        isOpen={showTextInput}
+        onClose={() => setShowTextInput(false)}
+        onUpload={sourceUpload.handleTextUpload}
+        isUploading={sourceUpload.isUploading}
+      />
 
-                  {/* Grid Options */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Column 1 */}
-                      <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                              <LinkIcon className="w-4 h-4" />
-                              Link
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                              <button
-                                onClick={() => userId && noteId && sources.length < MAX_SOURCES ? setShowUrlInput(true) : null}
-                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
-                                className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                  <Globe className="w-4 h-4 text-chart-3 group-hover:scale-110 transition-transform shrink-0" />
-                                  <span className="text-sm font-medium">Website</span>
-                              </button>
-                              <button
-                                onClick={() => userId && noteId && sources.length < MAX_SOURCES ? setShowSocialMediaInput(true) : null}
-                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
-                                className="flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                  <Youtube className="w-4 h-4 text-destructive group-hover:scale-110 transition-transform shrink-0" />
-                                  <span className="text-sm font-medium">Transcripts</span>
-                              </button>
-                          </div>
-                      </div>
-
-                      {/* Column 3 */}
-                      <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                              <Clipboard className="w-4 h-4" />
-                              Paste text
-                          </div>
-                          <div className="space-y-2">
-                              <button
-                                onClick={() => userId && noteId && sources.length < MAX_SOURCES ? setShowTextInput(true) : null}
-                                disabled={!userId || !noteId || sources.length >= MAX_SOURCES}
-                                className="w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                  <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
-                                      <FileText className="w-4 h-4 text-chart-4" />
-                                  </div>
-                                  <span className="text-sm font-medium">Copied text</span>
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Warnings */}
-                  {!userId || !noteId ? (
-                    <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
-                      <XCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-warning">Authentication required</p>
-                        <p className="text-xs text-warning/80 mt-1">
-                          Please log in and select a notebook to upload sources.
-                        </p>
-                      </div>
-                    </div>
-                  ) : sources.length >= MAX_SOURCES ? (
-                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-start gap-3">
-                      <XCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-destructive">Source limit reached</p>
-                        <p className="text-xs text-destructive/80 mt-1">
-                          You've reached the maximum of {MAX_SOURCES} sources. Remove some sources to add new ones.
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
-              </div>
-
-              {/* Footer Limit */}
-              <div className="p-4 bg-secondary/10 border-t border-border flex items-center gap-4 text-xs">
-                  <div className="flex items-center gap-2 text-muted-foreground shrink-0 font-medium">
-                      <File className="w-4 h-4 shrink-0" />
-                      <span>Source limit</span>
-                  </div>
-                  <div className="flex-1 h-2 bg-secondary/50 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          sources.length >= MAX_SOURCES ? 'bg-destructive' : 'bg-primary'
-                        }`}
-                        style={{ width: `${Math.min((sources.length / MAX_SOURCES) * 100, 100)}%` }}
-                      />
-                  </div>
-                  <span className={`font-mono font-medium ${
-                    sources.length >= MAX_SOURCES ? 'text-destructive' : 'text-muted-foreground'
-                  }`}>
-                    {sources.length} / {MAX_SOURCES}
-                  </span>
-              </div>
-          </div>
-        </div>
-      )}
-
-      {/* URL Input Modal */}
-      {showUrlInput && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowUrlInput(false)} />
-          <div className="relative w-full max-w-md bg-card rounded-xl shadow-2xl border border-border">
-            <div className="flex items-center justify-between p-6 border-b border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Globe className="w-5 h-5 text-primary" />
-                </div>
-                <h2 className="text-xl font-bold font-sans">Add Website</h2>
-              </div>
-              <button onClick={() => setShowUrlInput(false)} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <textarea
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://example.com
-https://another-example.com
-
-Separate multiple URLs with spaces or new lines"
-                className="w-full h-32 px-4 py-3 bg-background border-2 border-border rounded-xl font-serif focus:border-primary focus:outline-none transition-colors resize-none"
-                disabled={isUploading}
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowUrlInput(false)}
-                  disabled={isUploading}
-                  className="flex-1 py-3 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 font-bold font-sans transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUrlUpload}
-                  disabled={!urlInput || isUploading}
-                  className="flex-1 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold font-sans transition-colors flex items-center justify-center gap-2"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                      Adding...
-                    </>
-                  ) : (
-                    'Add Sources'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Social Media Input Modal */}
-      {showSocialMediaInput && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSocialMediaInput(false)} />
-          <div className="relative w-full max-w-md bg-card rounded-xl shadow-2xl border border-border">
-            <div className="flex items-center justify-between p-6 border-b border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Youtube className="w-5 h-5 text-primary" />
-                </div>
-                <h2 className="text-xl font-bold font-sans">Add Video URL</h2>
-              </div>
-              <button onClick={() => setShowSocialMediaInput(false)} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Paste video URLs to extract their transcripts. Supports YouTube, TikTok, Instagram, and X (Twitter). Separate multiple URLs with spaces or new lines.
-              </p>
-              <textarea
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="Paste URL from YouTube, TikTok, Instagram, or X...
-
-Separate multiple URLs with spaces or new lines"
-                className="w-full h-32 px-4 py-3 bg-background border-2 border-border rounded-xl font-serif focus:border-primary focus:outline-none transition-colors resize-none"
-                disabled={isUploading}
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSocialMediaInput(false)}
-                  disabled={isUploading}
-                  className="flex-1 py-3 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 font-bold font-sans transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSocialMediaUpload}
-                  disabled={!urlInput || isUploading}
-                  className="flex-1 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold font-sans transition-colors flex items-center justify-center gap-2"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                      Adding...
-                    </>
-                  ) : (
-                    'Add Sources'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Text Input Modal */}
-      {showTextInput && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTextInput(false)} />
-          <div className="relative w-full max-w-2xl bg-card rounded-xl shadow-2xl border border-border">
-            <div className="flex items-center justify-between p-6 border-b border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-primary" />
-                </div>
-                <h2 className="text-xl font-bold font-sans">Paste Text</h2>
-              </div>
-              <button onClick={() => setShowTextInput(false)} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <textarea
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder="Paste your text here..."
-                className="w-full h-48 px-4 py-3 bg-background border-2 border-border rounded-xl font-serif focus:border-primary focus:outline-none transition-colors resize-none"
-                disabled={isUploading}
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowTextInput(false)}
-                  disabled={isUploading}
-                  className="flex-1 py-3 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 font-bold font-sans transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleTextUpload}
-                  disabled={!textInput || isUploading}
-                  className="flex-1 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold font-sans transition-colors flex items-center justify-center gap-2"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                      Adding...
-                    </>
-                  ) : (
-                    'Add Source'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Discover Modal */}
       <DiscoverSourcesModal
         isOpen={isDiscoverOpen}
         onClose={() => setIsDiscoverOpen(false)}
         onAddSource={onAddSource}
-        isAtLimit={sources.length >= MAX_SOURCES}
+        isAtLimit={sources.length >= 100}
         userId={userId}
         noteId={noteId}
         onDocumentUploaded={onDocumentUploaded}
       />
+
       <ConfirmDialogComponent />
     </>
   );

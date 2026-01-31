@@ -1,0 +1,304 @@
+import { useRef, useState, useEffect } from 'react';
+import { useUploadDocument, useCreateDocument } from '../services/documentsApi';
+
+const MAX_SOURCES = 100;
+const ACCEPTED_FILE_TYPES = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.json', '.csv', '.png', '.jpg', '.jpeg', '.avif'];
+
+interface UseSourceUploadProps {
+  sourcesCount: number;
+  userId?: string | null;
+  noteId?: string | null;
+  onDocumentUploaded?: (documentId: string) => void;
+}
+
+interface UseSourceUploadResult {
+  // State
+  isUploading: boolean;
+  isDragging: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+
+  // File upload handlers
+  handleFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  processFiles: (files: File[]) => Promise<void>;
+
+  // URL/Social/Text upload handlers
+  handleUrlUpload: (urls: string[]) => Promise<void>;
+  handleSocialMediaUpload: (urls: string[]) => Promise<void>;
+  handleTextUpload: (text: string) => Promise<void>;
+
+  // Drag and drop handlers
+  handleDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
+  handleDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
+  handleDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
+  handleDrop: (e: React.DragEvent<HTMLDivElement>) => Promise<void>;
+
+  // Helper
+  parseUrls: (input: string) => string[];
+}
+
+/**
+ * Custom hook for handling source uploads (files, URLs, social media, text)
+ */
+export function useSourceUpload({
+  sourcesCount,
+  userId,
+  noteId,
+  onDocumentUploaded,
+}: UseSourceUploadProps): UseSourceUploadResult {
+  const uploadDocument = useUploadDocument();
+  const createDocument = useCreateDocument();
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset dragging state when modal closes
+  useEffect(() => {
+    return () => {
+      setIsDragging(false);
+    };
+  }, []);
+
+  // Helper function to parse multiple URLs from input
+  const parseUrls = (input: string): string[] => {
+    return input
+      .split(/\s+/)
+      .map(url => url.trim())
+      .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
+  };
+
+  // Process files (used by both file input and drag & drop)
+  const processFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading files.');
+      return;
+    }
+
+    if (sourcesCount >= MAX_SOURCES) {
+      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        const response = await uploadDocument(file, noteId);
+        onDocumentUploaded?.(response.documentId);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // File upload handler
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    await processFiles(files);
+  };
+
+  // URL upload handler
+  const handleUrlUpload = async (urls: string[]) => {
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading URLs.');
+      return;
+    }
+
+    if (sourcesCount >= MAX_SOURCES) {
+      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+      return;
+    }
+
+    if (urls.length === 0) {
+      alert('Please enter at least one valid URL (starting with http:// or https://).');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const errors: string[] = [];
+      for (const url of urls) {
+        try {
+          const result = await createDocument({
+            notebookId: noteId,
+            type: 'url',
+            source: url,
+            fileName: url,
+          });
+          onDocumentUploaded?.(result.documentId);
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+          errors.push(`${url}: ${errorMsg}`);
+          console.error(`URL upload failed for ${url}:`, err);
+        }
+      }
+
+      if (errors.length > 0 && errors.length === urls.length) {
+        alert(`Failed to upload all URLs:\n${errors.join('\n')}`);
+        return;
+      } else if (errors.length > 0) {
+        alert(`Some URLs failed to upload:\n${errors.join('\n')}`);
+      }
+    } catch (err) {
+      console.error('URL upload failed:', err);
+      alert(err instanceof Error ? err.message : 'Upload failed');
+      throw err;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Social Media upload handler (YouTube, TikTok, Instagram, X)
+  const handleSocialMediaUpload = async (urls: string[]) => {
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading social media content.');
+      return;
+    }
+
+    if (sourcesCount >= MAX_SOURCES) {
+      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+      return;
+    }
+
+    if (urls.length === 0) {
+      alert('Please enter at least one valid URL (starting with http:// or https://).');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const errors: string[] = [];
+      for (const url of urls) {
+        try {
+          const result = await createDocument({
+            notebookId: noteId,
+            type: 'youtube',
+            source: url,
+            fileName: 'YouTube Video',
+          });
+          onDocumentUploaded?.(result.documentId);
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+          errors.push(`${url}: ${errorMsg}`);
+          console.error(`Social media upload failed for ${url}:`, err);
+        }
+      }
+
+      if (errors.length > 0 && errors.length === urls.length) {
+        alert(`Failed to upload all URLs:\n${errors.join('\n')}`);
+        return;
+      } else if (errors.length > 0) {
+        alert(`Some URLs failed to upload:\n${errors.join('\n')}`);
+      }
+    } catch (err) {
+      console.error('Social media upload failed:', err);
+      alert(err instanceof Error ? err.message : 'Upload failed');
+      throw err;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Text upload handler
+  const handleTextUpload = async (text: string) => {
+    if (!userId || !noteId) {
+      alert('Please log in and select a notebook before uploading text.');
+      return;
+    }
+
+    if (sourcesCount >= MAX_SOURCES) {
+      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const result = await createDocument({
+        notebookId: noteId,
+        type: 'text',
+        source: text,
+        fileName: 'Pasted text',
+      });
+      onDocumentUploaded?.(result.documentId);
+    } catch (err) {
+      console.error('Text upload failed:', err);
+      alert(err instanceof Error ? err.message : 'Upload failed');
+      throw err;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (userId && noteId && sourcesCount < MAX_SOURCES) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set dragging to false if we're leaving the drop zone itself
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (!userId || !noteId || sourcesCount >= MAX_SOURCES) {
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files).filter(file => {
+      const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+      return ACCEPTED_FILE_TYPES.includes(extension);
+    });
+
+    if (files.length === 0) {
+      alert(`No supported files found. Supported types: ${ACCEPTED_FILE_TYPES.map(t => t.slice(1)).join(', ')}`);
+      return;
+    }
+
+    await processFiles(files);
+  };
+
+  return {
+    // State
+    isUploading,
+    isDragging,
+    fileInputRef,
+
+    // Handlers
+    handleFileSelect,
+    processFiles,
+    handleUrlUpload,
+    handleSocialMediaUpload,
+    handleTextUpload,
+    handleDragEnter,
+    handleDragLeave,
+    handleDragOver,
+    handleDrop,
+
+    // Helper
+    parseUrls,
+  };
+}

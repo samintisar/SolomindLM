@@ -325,6 +325,114 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         />
       )}
       
+      {/* Mobile Header */}
+      <div className="flex md:hidden items-center justify-between gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0">
+        {activeNote ? (
+          <>
+            <div className="flex items-center gap-2 text-foreground overflow-hidden min-w-0 flex-1">
+              <button
+                onClick={() => setActiveNoteId(null)}
+                className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
+                aria-label="Back to Studio"
+              >
+                <ArrowLeft className="w-5 h-5 shrink-0" />
+              </button>
+              {editingId === activeNote.id ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editTitle}
+                  spellCheck={false}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && editTitle.trim()) {
+                      onUpdateNote(activeNote.id, editTitle.trim());
+                      setEditingId(null);
+                    } else if (e.key === 'Escape') {
+                      setEditTitle(activeNote.title);
+                      setEditingId(null);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (editTitle.trim()) {
+                      onUpdateNote(activeNote.id, editTitle.trim());
+                    } else {
+                      setEditTitle(activeNote.title);
+                    }
+                    setEditingId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 min-w-0 font-sans font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                  aria-label="Rename"
+                  autoFocus
+                />
+              ) : (
+                <span className="font-sans font-bold text-sm tracking-wide truncate text-foreground">
+                  {activeNote.title}
+                </span>
+              )}
+            </div>
+            {isReportNote(activeNote) && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCopyReport}
+                  disabled={!canCopyOrDownloadReport}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Copy report as Markdown"
+                  aria-label="Copy report as Markdown"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  disabled={!canCopyOrDownloadReport}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download report as Markdown file"
+                  aria-label="Download report as Markdown file"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            {isFlashcardNote(activeNote) && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleExportFlashcards}
+                  disabled={isExporting}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download flashcards as CSV"
+                  aria-label="Download flashcards as CSV"
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-foreground">
+              <PenTool className="w-4 h-4 shrink-0" />
+              <span className="font-sans font-bold text-sm tracking-wide uppercase">Studio</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground flex items-center justify-center shrink-0"
+              aria-label="Close Studio panel"
+            >
+              <ChevronRight className="w-5 h-5 shrink-0" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Desktop Header */}
       <div className="hidden md:flex items-center justify-between p-4 border-b border-border bg-sidebar/50 backdrop-blur-sm sticky top-0 z-10 h-14">
         {activeNote ? (
             <>
@@ -444,8 +552,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       <div className={`flex-1 w-full relative ${miniPlayerVisible ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {activeNote ? (
             <div className="h-full">
-                {isReportNote(activeNote) && <ReportView note={activeNote} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
-                {isFlashcardNote(activeNote) && <FlashcardView note={activeNote} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
+                {isReportNote(activeNote) && <ReportView note={activeNote} onBack={undefined} />}
+                {isFlashcardNote(activeNote) && <FlashcardView note={activeNote} onBack={undefined} />}
                 {isQuizNote(activeNote) && <QuizView note={activeNote} onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)} onBack={isMobile ? () => setActiveNoteId(null) : undefined} />}
                 {isMindMapNote(activeNote) && (
                   <MindMapView
