@@ -23,8 +23,6 @@ export const authClient = createAuthClient({
     convexClient(),
     crossDomainClient(),
   ],
-  fetchOptions: {
-    credentials: "include",
-    // Do NOT set mode explicitly - let Better Auth handle CORS properly
-  },
+  // Remove global fetchOptions - let crossDomainClient plugin manage credentials
+  // The plugin sets credentials: "omit" and sends cookie via Better-Auth-Cookie header
 });

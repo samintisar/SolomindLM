@@ -21,6 +21,7 @@ export const handle = internalAction({
     const isOauthCallback = url.searchParams.has("ott") || url.pathname.includes("/callback");
     const isGetSession = url.pathname === "/auth/get-session";
     const isConvexToken = url.pathname === "/auth/convex/token";
+    const isOttVerify = url.pathname === "/auth/cross-domain/one-time-token/verify";
 
     console.log("[AuthHandler] Incoming request:", {
       method: args.method,
@@ -30,6 +31,7 @@ export const handle = internalAction({
       hasOtt: url.searchParams.has("ott"),
       isGetSession,
       isConvexToken,
+      isOttVerify,
     });
 
     // Log incoming cookies for debugging
@@ -96,6 +98,19 @@ export const handle = internalAction({
       if (response.status !== 200) {
         console.log("[AuthHandler] Convex token error body:", body);
       }
+    }
+
+    // Log OTT verify response
+    if (isOttVerify) {
+      console.log("[AuthHandler] OTT verify response:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+        hasSetBetterAuthCookie: Object.keys(headers).some(k =>
+          k.toLowerCase().includes("set-better-auth-cookie")
+        ),
+        bodyPreview: body.substring(0, 500),
+      });
     }
 
     return { status: response.status, headers, body };

@@ -24,14 +24,13 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
   const options = createAuthOptions();
   const isDev = siteUrl.includes('localhost') || siteUrl.includes('127.0.0.1');
 
-  if (isDev) {
-    console.log("[AuthComponent] Creating auth with config:", {
-      baseURL: options.baseURL,
-      basePath: options.basePath,
-      trustedOrigins: options.trustedOrigins,
-      siteUrl,
-    });
-  }
+  console.log("[AuthComponent] Creating auth with config:", {
+    baseURL: options.baseURL,
+    basePath: options.basePath,
+    trustedOrigins: options.trustedOrigins,
+    siteUrl,
+    isDev,
+  });
 
   return betterAuth({
     ...options,
@@ -42,9 +41,9 @@ export function createAuth(ctx: GenericCtx<DataModel>) {
       crossDomain({ siteUrl }),
       convex({ authConfig, options: { basePath: "/auth" } }),
     ],
-    // Enable debug logging only in dev
+    // Enable debug logging for both dev and prod to debug auth issues
     _debug: {
-      log: isDev,
+      log: true,
     },
   });
 }
