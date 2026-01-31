@@ -22,29 +22,82 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Custom OTT handler to fix race condition in cross-domain auth
+// Custom OTT handler to fix cross-domain auth cookie storage issue
 function OttHandler({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       const url = new URL(window.location.href);
       const ott = url.searchParams.get('ott');
       if (ott) {
+        console.log('[OTT Handler] Processing OTT...');
+
         // Remove OTT from URL to prevent re-processing
         url.searchParams.delete('ott');
         window.history.replaceState({}, '', url.toString());
 
-        // Verify OTT and wait for cookie to be stored
-        const result = await (authClient as any).crossDomain.oneTimeToken.verify({ token: ott });
-        if (result.data?.session) {
-          // Add a small delay to ensure the onSuccess hook completes
-          // and the cookie is stored in localStorage
-          await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          // Verify OTT manually to get the session token
+          const authBaseURL = import.meta.env.VITE_CONVEX_SITE_URL?.replace(/\/$/, '') + '/auth';
+          const verifyResponse = await fetch(`${authBaseURL}/cross-domain/one-time-token/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ token: ott }),
+          });
 
-          // Then refresh the session to use the new cookie
+          if (!verifyResponse.ok) {
+            console.error('[OTT Handler] Verification failed:', verifyResponse.status);
+            return;
+          }
+
+          // Extract the session token from the custom header
+          const customCookie = verifyResponse.headers.get('set-better-auth-cookie');
+          if (customCookie) {
+            console.log('[OTT Handler] Found session cookie, storing...');
+
+            // Parse the cookie: "__Secure-better-auth.session_token=VALUE; Max-Age=...; ..."
+            const [nameValue, ...attrs] = customCookie.split(';');
+            const [name, value] = nameValue.split('=');
+
+            if (name && value) {
+              // Store the cookie with proper format for crossDomainClient
+              const cookieName = 'better-auth_cookie'; // The storage key used by crossDomainClient
+
+              // Parse the cookie attributes (Max-Age, Path, etc.)
+              const cookieData: Record<string, { value: string; expires?: Date | null }> = {};
+              cookieData[name.trim()] = {
+                value: value.trim(),
+                expires: null, // Session cookies or we'll parse Max-Age if needed
+              };
+
+              // Merge with existing cookies in localStorage
+              const existing = localStorage.getItem(cookieName);
+              if (existing) {
+                try {
+                  const parsed = JSON.parse(existing);
+                  Object.assign(cookieData, parsed);
+                } catch (e) {
+                  console.warn('[OTT Handler] Failed to parse existing cookies:', e);
+                }
+              }
+
+              // Store merged cookies
+              localStorage.setItem(cookieName, JSON.stringify(cookieData));
+              console.log('[OTT Handler] Session cookie stored successfully');
+            }
+          } else {
+            console.warn('[OTT Handler] No set-better-auth-cookie header in response!');
+          }
+
+          // Now fetch the session using the new cookie
+          console.log('[OTT Handler] Fetching session...');
           await authClient.getSession();
+          console.log('[OTT Handler] Session established');
 
           // Notify the session signal to update React state
           (authClient as any).updateSession();
+        } catch (error) {
+          console.error('[OTT Handler] Error:', error);
         }
       }
     })();
