@@ -43,10 +43,36 @@ export const handle = internalAction({
       betterAuthCookiePreview: betterAuthCookieHeader ? betterAuthCookieHeader.substring(0, 100) : undefined,
     });
 
+    // CRITICAL FIX: Convert Better-Auth-Cookie header to standard Cookie header
+    // Better Auth only reads from the "cookie" header, not from custom headers
+    // The cross-domain plugin sends cookies via "Better-Auth-Cookie" header for cross-origin requests
+    // We need to convert it to the standard format that Better Auth expects
+    const requestHeaders = new Headers(args.headers);
+
+    if (betterAuthCookieHeader) {
+      // Parse the Better-Auth-Cookie header value
+      // Format: "; __Secure-better-auth.session_token=VAL; __Secure-better-auth.state=VAL"
+      const cookieValue = betterAuthCookieHeader
+        .split(';')
+        .map(c => c.trim())
+        .filter(c => c && !c.startsWith(';')) // Remove empty strings and leading semicolons
+        .join('; ');
+
+      // Combine with existing browser cookies (if any)
+      const combinedCookies = cookieHeader
+        ? `${cookieHeader}; ${cookieValue}`
+        : cookieValue;
+
+      requestHeaders.set('cookie', combinedCookies);
+      console.log("[AuthHandler] Converted Better-Auth-Cookie to Cookie header", {
+        combinedCookiesPreview: combinedCookies.substring(0, 150),
+      });
+    }
+
     const auth = createAuth(ctx as any);
     const request = new Request(args.url, {
       method: args.method,
-      headers: new Headers(args.headers),
+      headers: requestHeaders,
       body: args.method !== "GET" && args.method !== "HEAD" ? args.body : undefined,
     });
 
