@@ -209,11 +209,11 @@ export const FolderView: React.FC<FolderViewProps> = ({
               onClick={notebookHandlers.openCreateNotebook}
               className="grid grid-cols-[minmax(200px,1fr)_140px_100px_48px] gap-4 items-center p-4 mb-2 rounded-lg border border-dashed border-border/50 hover:bg-secondary/20 hover:border-primary/50 cursor-pointer group transition-all"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-md bg-secondary text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                  <Plus className="w-4 h-4" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 shrink-0 rounded-md bg-secondary text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <Plus className="w-4 h-4 shrink-0" />
                 </div>
-                <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors font-sans">Create new notebook</span>
+                <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors font-sans whitespace-nowrap">Create new notebook</span>
               </div>
             </div>
 

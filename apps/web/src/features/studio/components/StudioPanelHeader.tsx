@@ -143,19 +143,10 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
             )}
           </>
         ) : (
-          <>
-            <div className="flex items-center gap-2 text-foreground">
-              <PenTool className="w-4 h-4 shrink-0" />
-              <span className="font-sans font-bold text-sm tracking-wide uppercase">Studio</span>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground flex items-center justify-center shrink-0"
-              aria-label="Close Studio panel"
-            >
-              <ChevronRight className="w-5 h-5 shrink-0" />
-            </button>
-          </>
+          <div className="flex items-center gap-2 text-foreground">
+            <PenTool className="w-4 h-4 shrink-0" />
+            <span className="font-sans font-bold text-sm tracking-wide uppercase">Studio</span>
+          </div>
         )}
       </div>
     );
@@ -266,7 +257,8 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
         <>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0"
+            className="hidden md:flex p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground items-center justify-center shrink-0"
+            aria-label="Close Studio panel"
           >
             <ChevronRight className="w-5 h-5 shrink-0" />
           </button>

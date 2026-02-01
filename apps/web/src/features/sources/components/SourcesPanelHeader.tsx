@@ -226,13 +226,22 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-2 text-sidebar-foreground">
-            <FileStack className="w-4 h-4" />
-            <span className="font-sans font-bold text-sm tracking-wide uppercase">Sources</span>
-            <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-full font-mono">
-              {selectedCount}
-            </span>
-          </div>
+          <>
+            <div className="flex items-center gap-2 text-sidebar-foreground">
+              <FileStack className="w-4 h-4 shrink-0" />
+              <span className="font-sans font-bold text-sm tracking-wide uppercase">Sources</span>
+              <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-full font-mono">
+                {selectedCount}
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0"
+              aria-label="Close Sources panel"
+            >
+              <ChevronLeft className="w-5 h-5 shrink-0" />
+            </button>
+          </>
         )}
       </div>
     </>
