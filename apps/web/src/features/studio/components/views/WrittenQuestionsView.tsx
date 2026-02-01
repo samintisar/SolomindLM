@@ -8,7 +8,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { WrittenQuestionsNote, WrittenQuestionAnswer } from '@/shared/types/index';
-import { writtenQuestionsApi, useSubmitWrittenAnswer, useResetWrittenAnswers, useWrittenQuestionSet } from '@/features/studio/services/writtenQuestionsApi';
+import { useSubmitWrittenAnswer, useResetWrittenAnswers, useWrittenQuestionSet } from '@/features/studio/services/writtenQuestionsApi';
 import { sanitizeMarkdown } from '@/shared/utils';
 
 const MarkdownRenderer = lazy(() =>

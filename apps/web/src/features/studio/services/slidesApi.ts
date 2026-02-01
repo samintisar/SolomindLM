@@ -236,16 +236,3 @@ export async function pollSlideDeckStatus(
 
   throw new Error('Slide deck generation timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const slidesApi = {
-  useSlideDecks,
-  useSlideDeck,
-  useCreateSlideDeck,
-  useRenameSlideDeck,
-  useDeleteSlideDeck,
-  pollSlideDeckStatus,
-};

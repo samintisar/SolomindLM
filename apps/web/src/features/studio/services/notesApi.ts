@@ -110,7 +110,7 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         title: dbNote.title,
         preview: getSpreadsheetPreview(dbNote),
         type: 'spreadsheet',
-        content: dbNote.data?.content || '',
+        content: typeof dbNote.data === 'string' ? dbNote.data : (dbNote.data?.content || ''),
         status: dbNote.status,
         metadata: {
           spreadsheetType: dbNote.metadata?.spreadsheetType || 'custom',

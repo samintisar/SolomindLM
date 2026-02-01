@@ -198,20 +198,3 @@ export async function fetchFolderNotebooks(folderId: string): Promise<NotebookIt
   console.warn('fetchFolderNotebooks is deprecated. Use useFolderNotebooks hook instead.');
   return [];
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const notebooksApi = {
-  // Hooks
-  useNotebooks,
-  useNotebook,
-  useCreateNotebook,
-  useUpdateNotebook,
-  useDeleteNotebook,
-  useNotebookReports,
-
-  // Imperative functions (deprecated)
-  fetchFolderNotebooks,
-};

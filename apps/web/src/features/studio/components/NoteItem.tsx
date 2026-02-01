@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { Note } from '@/shared/types/index';
 import { NoteIcon } from './NoteIcon';
@@ -41,12 +42,38 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   onMenuClose,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isEditing]);
+
+  // Position dropdown via portal so it isn't clipped by sidebar overflow-y-auto
+  useLayoutEffect(() => {
+    if (!isMenuOpen || !menuButtonRef.current) {
+      setMenuPosition(null);
+      return;
+    }
+    const updatePosition = () => {
+      if (menuButtonRef.current) {
+        const rect = menuButtonRef.current.getBoundingClientRect();
+        setMenuPosition({
+          top: rect.bottom + 4,
+          right: window.innerWidth - rect.right,
+        });
+      }
+    };
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isMenuOpen]);
 
   const isGenerating = note.status === 'generating';
 
@@ -90,6 +117,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
         </div>
         <div className="relative kebab-menu shrink-0">
           <button
+            ref={menuButtonRef}
             onClick={(e) => {
               e.stopPropagation();
               onMenuToggle();
@@ -100,30 +128,40 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           >
             <MoreVertical className="w-3.5 h-3.5 shrink-0" />
           </button>
-          {isMenuOpen && (
-            <div className="absolute right-0 top-6 w-36 bg-popover border border-border shadow-lg rounded-md z-50 py-1 animate-in fade-in zoom-in-95 duration-100">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditStart();
-                  onMenuClose();
+          {isMenuOpen &&
+            menuPosition &&
+            createPortal(
+              <div
+                data-note-item-menu
+                className="fixed w-36 bg-popover border border-border shadow-lg rounded-md z-100 py-1 animate-in fade-in zoom-in-95 duration-100"
+                style={{
+                  top: menuPosition.top,
+                  right: menuPosition.right,
                 }}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-accent text-popover-foreground flex items-center gap-2"
               >
-                <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                  onMenuClose();
-                }}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
-              >
-                <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
-              </button>
-            </div>
-          )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEditStart();
+                    onMenuClose();
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-accent text-popover-foreground flex items-center gap-2"
+                >
+                  <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                    onMenuClose();
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
+                </button>
+              </div>,
+              document.body
+            )}
         </div>
       </div>
     </div>

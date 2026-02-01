@@ -293,12 +293,3 @@ export async function uploadText(
     status: 'success',
   };
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks or functions instead
- */
-export const documentsApi = {
-  discoverSources,
-  uploadUrl,
-};

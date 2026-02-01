@@ -123,28 +123,3 @@ export function useUserLimits() {
     isPremium: false,
   };
 }
-
-// ============================================================
-// Legacy API object for backward compatibility
-// ============================================================
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const subscriptionApi = {
-  // Hooks
-  useSubscriptionStatus,
-  useCreateCheckout,
-  useCancelSubscription,
-  useReactivateSubscription,
-  useCreatePortalSession,
-  useIsSubscribed,
-  useUserLimits,
-
-  // Legacy methods (deprecated)
-  getStatus: useSubscriptionStatus,
-  createCheckout: useCreateCheckout,
-  cancelSubscription: useCancelSubscription,
-  createPortalSession: useCreatePortalSession,
-};

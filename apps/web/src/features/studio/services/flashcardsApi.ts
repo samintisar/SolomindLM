@@ -300,17 +300,3 @@ export async function getFlashcards(notebookId: string): Promise<FlashcardNote[]
   });
   return dbFlashcards?.map(mapFlashcardToNote) ?? [];
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks or functions instead
- */
-export const flashcardsApi = {
-  createFlashcards: useCreateFlashcards,
-  getFlashcard,
-  getFlashcards,
-  renameFlashcard,
-  deleteFlashcard,
-  pollFlashcardStatus,
-  exportFlashcardsCSV,
-};

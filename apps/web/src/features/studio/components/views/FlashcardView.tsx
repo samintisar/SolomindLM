@@ -42,7 +42,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                 <div className="md:hidden absolute top-0 left-0 right-0 flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm z-20">
                     <button
                         onClick={onBack}
-                        className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
+                        className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
                         aria-label="Back to Studio"
                     >
                         <ArrowLeft className="w-5 h-5 shrink-0" />
@@ -112,13 +112,13 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
             </div>
 
             <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-                <button onClick={handlePrev} className="p-2 sm:p-3 rounded-full hover:bg-card border border-transparent hover:border-border transition-all shrink-0">
+                <button onClick={handlePrev} className="p-2 sm:p-3 rounded-full hover:bg-card active:bg-card/80 active:scale-[0.97] border border-transparent hover:border-border transition-all shrink-0 touch-manipulation">
                     <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <span className="font-mono text-xs sm:text-sm font-medium whitespace-nowrap">
                     {currentIndex + 1} / {cards.length}
                 </span>
-                <button onClick={handleNext} className="p-2 sm:p-3 rounded-full hover:bg-card border border-transparent hover:border-border transition-all shrink-0">
+                <button onClick={handleNext} className="p-2 sm:p-3 rounded-full hover:bg-card active:bg-card/80 active:scale-[0.97] border border-transparent hover:border-border transition-all shrink-0 touch-manipulation">
                     <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
             </div>

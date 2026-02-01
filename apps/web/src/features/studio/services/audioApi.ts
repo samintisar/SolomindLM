@@ -146,16 +146,3 @@ export async function pollAudioOverviewStatus(
 
   throw new Error('Audio overview generation timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const audioApi = {
-  useAudioOverviews,
-  useAudioOverview,
-  useCreateAudioOverview,
-  useUpdateAudioOverview,
-  useDeleteAudioOverview,
-  pollAudioOverviewStatus,
-};

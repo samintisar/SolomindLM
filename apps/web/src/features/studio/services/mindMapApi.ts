@@ -196,16 +196,3 @@ export async function pollMindMapStatus(
 
   throw new Error('Mind map generation timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const mindMapApi = {
-  useMindMaps,
-  useMindMap,
-  useCreateMindMap,
-  useRenameMindMap,
-  useDeleteMindMap,
-  pollMindMapStatus,
-};

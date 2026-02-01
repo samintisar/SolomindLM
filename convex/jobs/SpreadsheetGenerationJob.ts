@@ -14,15 +14,19 @@ export const generateSpreadsheetInternal = internalAction({
   args: {
     chunks: v.array(v.string()),
     status: v.string(),
+    spreadsheetType: v.string(),
+    customPrompt: v.optional(v.string()),
   },
-  handler: async (ctx, { chunks, status }) => {
+  handler: async (ctx, { chunks, status, spreadsheetType, customPrompt }) => {
     const agent = new SpreadsheetGraph(env.TOGETHER_AI_API_KEY, env.FAST_LLM, env.SMART_LLM);
     const graph = agent.buildGraph();
     const result = await graph.invoke({
       chunks,
       status,
+      spreadsheetType,
+      customPrompt: customPrompt ?? undefined,
     });
-    return result;
+    return result.finalOutput || '';
   },
 });
 
@@ -43,11 +47,13 @@ export const spreadsheetGeneration = internalAction({
     userId: v.string(),
     notebookId: v.id('notebooks'),
     documentIds: v.array(v.id('documents')),
+    spreadsheetType: v.optional(v.string()),
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
 
-    const { spreadsheetId, userId, notebookId, documentIds } = args;
+    const { spreadsheetId, userId, notebookId, documentIds, spreadsheetType, customPrompt } = args;
 
     console.log('[SpreadsheetGenerationJob] Starting:', {
       spreadsheetId,
@@ -75,6 +81,8 @@ export const spreadsheetGeneration = internalAction({
       const spreadsheet = await spreadsheetCache.fetch(ctx, {
         chunks,
         status: "generating",
+        spreadsheetType: spreadsheetType || 'custom',
+        customPrompt: customPrompt ?? undefined,
       });
 
       // Generate title from first chunk

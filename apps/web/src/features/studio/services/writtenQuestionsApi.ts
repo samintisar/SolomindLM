@@ -317,19 +317,3 @@ export async function pollGradedResult(
 
   throw new Error('Grading timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const writtenQuestionsApi = {
-  useWrittenQuestions,
-  useWrittenQuestionSet,
-  useCreateWrittenQuestions,
-  useRenameWrittenQuestions,
-  useDeleteWrittenQuestions,
-  useSubmitWrittenAnswer,
-  useResetWrittenAnswers,
-  pollWrittenQuestionsStatus,
-  pollGradedResult,
-};

@@ -152,21 +152,3 @@ export function useDeleteFolder() {
     return await remove({ id: id as any });
   };
 }
-
-// ============================================================
-// Legacy API object for backward compatibility
-// ============================================================
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const foldersApi = {
-  // Hooks
-  useFolders,
-  useFolder,
-  useFolderNotebooks,
-  useCreateFolder,
-  useUpdateFolder,
-  useDeleteFolder,
-};

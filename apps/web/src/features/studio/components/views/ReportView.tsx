@@ -22,7 +22,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ note, onBack }) => {
              <div className="md:hidden flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
                <button
                  onClick={onBack}
-                 className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
+                 className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
                  aria-label="Back to Studio"
                >
                  <ArrowLeft className="w-5 h-5 shrink-0" />

@@ -45,6 +45,8 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
           notebookId: ctx.noteId,
           documentIds: selectedDocumentIds,
           title: 'Spreadsheet',
+          spreadsheetType: config.spreadsheetType,
+          customPrompt: config.customPrompt,
         });
 
         const initialNote: SpreadsheetNote = {

@@ -131,12 +131,14 @@ export const generateSpreadsheet = mutation({
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
     title: v.optional(v.string()),
+    spreadsheetType: v.optional(v.string()),
+    customPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const { notebookId, documentIds, title } = args;
+    const { notebookId, documentIds, title, spreadsheetType, customPrompt } = args;
     if (documentIds.length === 0) {
       throw new Error("Please select at least one source. Content generation uses only your selected sources.");
     }
@@ -148,7 +150,10 @@ export const generateSpreadsheet = mutation({
       title: title || "Spreadsheet",
       data: {},
       status: "generating",
-      metadata: {},
+      metadata: {
+        spreadsheetType: spreadsheetType || 'custom',
+        customPrompt: customPrompt || '',
+      },
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -159,6 +164,8 @@ export const generateSpreadsheet = mutation({
       userId,
       notebookId,
       documentIds,
+      spreadsheetType: spreadsheetType || 'custom',
+      customPrompt: customPrompt || '',
     });
 
     return spreadsheetId;
@@ -264,5 +271,37 @@ export const patch = internalMutation({
       ...args.patch,
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Internal: Create a spreadsheet (used by action for best practices)
+ */
+export const createInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
+    title: v.string(),
+    spreadsheetType: v.string(),
+    customPrompt: v.string(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const spreadsheetId = await ctx.db.insert("spreadsheets", {
+      userId: args.userId,
+      notebookId: args.notebookId,
+      title: args.title,
+      data: {},
+      status: "generating",
+      metadata: {
+        spreadsheetType: args.spreadsheetType,
+        customPrompt: args.customPrompt,
+        ...args.metadata,
+      },
+      createdAt: now,
+      updatedAt: now,
+    });
+    return await ctx.db.get("spreadsheets", spreadsheetId);
   },
 });

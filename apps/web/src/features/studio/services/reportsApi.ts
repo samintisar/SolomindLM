@@ -203,16 +203,3 @@ export async function pollReportStatus(
 
   throw new Error('Report generation timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const reportsApi = {
-  useReports,
-  useReport,
-  useCreateReport,
-  useUpdateReport,
-  useDeleteReport,
-  pollReportStatus,
-};

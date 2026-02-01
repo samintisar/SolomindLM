@@ -1,5 +1,5 @@
 import type { Note, SpreadsheetNote } from '@/shared/types/index';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 
@@ -7,12 +7,14 @@ export interface CreateSpreadsheetParams {
   notebookId: string;
   documentIds: string[];
   title?: string;
+  spreadsheetType?: string;
+  customPrompt?: string;
 }
 
 export interface CreateSpreadsheetResponse {
   spreadsheetId: string;
   status: string;
-  spreadsheet: SpreadsheetNote;
+  spreadsheet: any; // Full database object
 }
 
 /**
@@ -97,19 +99,24 @@ export function useSpreadsheet(spreadsheetId: string | null) {
  * Create a new spreadsheet and queue generation
  */
 export function useCreateSpreadsheet() {
-  const generate = useMutation(api.spreadsheets.generateSpreadsheet);
+  const schedule = useAction(api.contentGeneration.scheduleSpreadsheet);
 
   return async (params: CreateSpreadsheetParams): Promise<CreateSpreadsheetResponse> => {
-    const result = await generate({
+    const result = await schedule({
       notebookId: params.notebookId as Id<'notebooks'>,
       documentIds: params.documentIds as Id<'documents'>[],
       title: params.title,
+      spreadsheetType: params.spreadsheetType,
+      customPrompt: params.customPrompt,
     });
 
     return {
-      spreadsheetId: result,
-      status: 'pending',
-      spreadsheet: mapSpreadsheetToNote({ _id: result, status: 'pending', title: params.title || 'Spreadsheet' }),
+      spreadsheetId: result.spreadsheetId,
+      status: result.status,
+      spreadsheet: mapSpreadsheetToNote({
+        ...result.spreadsheet,
+        metadata: { spreadsheetType: params.spreadsheetType, documentIds: params.documentIds },
+      }),
     };
   };
 }
@@ -212,18 +219,3 @@ export async function pollSpreadsheetStatus(
 
   throw new Error('Spreadsheet generation timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const spreadsheetsApi = {
-  useSpreadsheets,
-  useSpreadsheet,
-  useCreateSpreadsheet,
-  useRenameSpreadsheet,
-  useDeleteSpreadsheet,
-  pollSpreadsheetStatus,
-  getSpreadsheetTypeLabel,
-  getSpreadsheetSubtitle,
-};

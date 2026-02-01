@@ -96,12 +96,13 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ content, noteTitle 
           {dataRows.length} {dataRows.length === 1 ? 'row' : 'rows'} · {columnCount} {columnCount === 1 ? 'column' : 'columns'}
         </div>
         <button
+          type="button"
           onClick={handleDownload}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors"
+          className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground/70 hover:text-foreground touch-manipulation"
           title="Download as CSV"
+          aria-label="Download as CSV"
         >
           <Download className="w-4 h-4" />
-          Download CSV
         </button>
       </div>
 

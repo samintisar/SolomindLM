@@ -36,7 +36,7 @@ import { useNotebooks, useCreateNotebook, useUpdateNotebook, useDeleteNotebook }
 import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder } from './features/notebooks/services/foldersApi';
 import { useGenerateUploadUrl, useCreateDocument, useUpdateDocument, useDeleteDocument } from './features/sources/services/documentsApi';
 import { useSubscriptionStatus } from './features/billing/services/subscriptionApi';
-import { chatApi, type SendMessageCallbacks } from './features/chat/services/chatApi';
+import { useSendMessage, type SendMessageCallbacks } from './features/chat/services/chatApi';
 import 'mind-elixir/style.css';
 
 // ============================================================
@@ -212,8 +212,8 @@ const AppContent: React.FC = () => {
   // Subscription status
   const subscriptionStatus = useSubscriptionStatus();
 
-  // Chat: use V2 sender so stream is parsed correctly (__DONE) and onComplete always runs
-  const sendChatMessage = chatApi.useSendMessageV2();
+  // Chat: stream messages with optimistic updates
+  const sendChatMessage = useSendMessage();
 
   // Filter notebooks for home page (notebooks may be undefined while loading)
   const notebookList = notebooks ?? [];

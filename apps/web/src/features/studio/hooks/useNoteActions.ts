@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Note, isReportNote, isFlashcardNote } from '@/shared/types/index';
-import { flashcardsApi } from '../services/flashcardsApi';
+import { exportFlashcardsCSV } from '../services/flashcardsApi';
 
 interface ConfirmOptions {
   confirmText?: string;
@@ -131,7 +131,7 @@ export const useNoteActions = ({
 
     try {
       setIsExporting(true);
-      await flashcardsApi.exportFlashcardsCSV(activeNote.id, activeNote.title, activeNote.flashcards);
+      await exportFlashcardsCSV(activeNote.id, activeNote.title, activeNote.flashcards);
     } catch (error) {
       console.error('Failed to export flashcards:', error);
       alert('Failed to export flashcards. Please try again.');

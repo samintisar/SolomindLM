@@ -261,18 +261,3 @@ export async function pollQuizStatus(
 
   throw new Error('Quiz generation timed out');
 }
-
-/**
- * Legacy API object for backward compatibility
- * @deprecated Use individual hooks instead
- */
-export const quizzesApi = {
-  useQuizzes,
-  useQuiz,
-  useCreateQuiz,
-  useRenameQuiz,
-  useDeleteQuiz,
-  useSubmitQuizAnswer,
-  useResetQuizAnswers,
-  pollQuizStatus,
-};

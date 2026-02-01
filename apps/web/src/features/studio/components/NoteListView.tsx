@@ -44,10 +44,13 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
 }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-  // Handle click outside to close menus
+  // Handle click outside to close menus (portal menu has data-note-item-menu so clicks on Rename/Delete count as inside)
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (activeMenuId && !(event.target as Element).closest('.kebab-menu')) {
+      const target = event.target as Element;
+      const insideMenu =
+        target.closest('.kebab-menu') || target.closest('[data-note-item-menu]');
+      if (activeMenuId && !insideMenu) {
         setActiveMenuId(null);
       }
     };

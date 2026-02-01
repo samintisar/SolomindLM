@@ -234,3 +234,59 @@ export const scheduleWrittenQuestions = action({
     return { writtenQuestionId, status: "generating", writtenQuestion: { _id: writtenQuestionId, title: "Written Questions", status: "generating" } };
   },
 });
+
+interface ScheduleSpreadsheetResult {
+  spreadsheetId: string;
+  status: string;
+  spreadsheet: { _id: string; title: string; status: string };
+}
+
+/**
+ * Public API: Schedule a spreadsheet generation
+ */
+export const scheduleSpreadsheet = action({
+  args: {
+    notebookId: v.id("notebooks"),
+    documentIds: v.optional(v.array(v.id("documents"))),
+    title: v.optional(v.string()),
+    spreadsheetType: v.optional(v.string()),
+    customPrompt: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<ScheduleSpreadsheetResult> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const documentIds = args.documentIds ?? [];
+    if (documentIds.length === 0) {
+      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+    }
+
+    const spreadsheet = await ctx.runMutation(internal.spreadsheets.createInternal, {
+      userId,
+      notebookId: args.notebookId,
+      title: args.title || "Spreadsheet",
+      spreadsheetType: args.spreadsheetType || "custom",
+      customPrompt: args.customPrompt || "",
+      metadata: {
+        status: "generating",
+        documentIds,
+      },
+    });
+    if (!spreadsheet) {
+      throw new Error("Failed to create spreadsheet");
+    }
+    const spreadsheetId = spreadsheet._id;
+
+    // Schedule the job directly — uses only the provided (selected) document IDs
+    await ctx.scheduler.runAfter(0, internal.jobs.SpreadsheetGenerationJob.spreadsheetGeneration, {
+      spreadsheetId,
+      userId,
+      notebookId: args.notebookId,
+      documentIds,
+      spreadsheetType: args.spreadsheetType || "custom",
+      customPrompt: args.customPrompt,
+    });
+
+    return { spreadsheetId, status: "generating", spreadsheet };
+  },
+});
