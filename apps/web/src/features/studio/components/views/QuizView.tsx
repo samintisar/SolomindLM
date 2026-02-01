@@ -10,7 +10,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { QuizNote } from '@/shared/types/index';
-import { useSubmitQuizAnswer, useResetQuizAnswers } from '@/features/studio/services/quizzesApi';
+import { useSubmitQuizAnswer, useResetQuizAnswers, useQuiz } from '@/features/studio/services/quizzesApi';
 import { sanitizeMarkdown } from '@/shared/utils';
 
 const MarkdownRenderer = lazy(() =>
@@ -33,13 +33,16 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
     const submitAnswer = useSubmitQuizAnswer();
     const resetAnswers = useResetQuizAnswers();
+    const latestNote = useQuiz(note.id);
 
     // Sync userAnswers with note.userAnswers
+    // Using a serialized key prevents the effect from running on every render
+    const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
     useEffect(() => {
-        if (note.userAnswers) {
-            setUserAnswers(note.userAnswers);
+        if (latestNote?.userAnswers) {
+            setUserAnswers(latestNote.userAnswers);
         }
-    }, [note.userAnswers]);
+    }, [serverUserAnswersKey]);
 
     const questions = note.questions;
     const currentQuestion = questions[currentIndex];
@@ -57,6 +60,10 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
         // Submit to server in the background
         try {
             await submitAnswer(note.id, currentIndex, index);
+            // Notify parent of the update (syncs with notes list)
+            if (latestNote && onNoteUpdate) {
+                onNoteUpdate(latestNote);
+            }
         } catch (error) {
             console.error('Failed to submit answer:', error);
             // Revert the local state on error
@@ -95,6 +102,10 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
             setShowResults(false);
             setShowHint(false);
             setReviewMode(false);
+            // Notify parent of the update
+            if (latestNote && onNoteUpdate) {
+                onNoteUpdate(latestNote);
+            }
         } catch (error) {
             console.error('Failed to reset answers:', error);
             alert(error instanceof Error ? error.message : 'Failed to reset answers');
@@ -288,12 +299,12 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
                     {/* Explanation shown after answering */}
                     {isAnswered && (
-                        <div className="mt-6 p-5 bg-vintage-blue-50 dark:bg-vintage-blue-50 rounded-xl border border-vintage-blue-200 dark:border-vintage-blue-200 animate-in fade-in slide-in-from-bottom-2">
-                            <div className="flex items-start gap-3">
+                        <div className="mt-6 p-5 bg-vintage-blue-50 dark:bg-vintage-blue-50 rounded-xl border border-vintage-blue-200 dark:border-vintage-blue-200 animate-in fade-in slide-in-from-bottom-2 overflow-hidden">
+                            <div className="flex items-start gap-3 min-w-0">
                                 <Info className="w-6 h-6 shrink-0 mt-1 text-vintage-blue-700 dark:text-vintage-blue-700" />
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                     <span className="font-semibold text-base text-vintage-blue-700 dark:text-vintage-blue-700">Explanation</span>
-                                    <div className="text-base mt-2 leading-relaxed prose prose-base prose-stone dark:prose-invert max-w-none text-vintage-blue-700 dark:text-vintage-blue-700">
+                                    <div className="text-base mt-2 leading-relaxed prose prose-base prose-stone dark:prose-invert max-w-none wrap-break-word text-vintage-blue-700 dark:text-vintage-blue-700">
                                         <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
                                             <MarkdownRenderer
                                                 components={{
@@ -308,7 +319,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                                                     tr: ({ children }) => <tr className="border-b border-vintage-blue-300 dark:border-vintage-blue-300">{children}</tr>,
                                                     th: ({ children }) => <th className="px-4 py-2 text-left font-semibold border-r border-vintage-blue-300 dark:border-vintage-blue-300 last:border-r-0 text-vintage-blue-700 dark:text-vintage-blue-700">{children}</th>,
                                                     td: ({ children }) => <td className="px-4 py-2 border-r border-vintage-blue-300 dark:border-vintage-blue-300 last:border-r-0 text-vintage-blue-700 dark:text-vintage-blue-700">{children}</td>,
-                                                    p: ({ children }) => <p className="text-base text-vintage-blue-700 dark:text-vintage-blue-700">{children}</p>,
+                                                    p: ({ children }) => <p className="text-base wrap-break-word text-vintage-blue-700 dark:text-vintage-blue-700">{children}</p>,
                                                 }}
                                             >
                                                 {sanitizeMarkdown(currentQuestion.explanation)}

@@ -206,3 +206,74 @@ export const patch = internalMutation({
     });
   },
 });
+
+/**
+ * Internal: Update a specific user's answer (merges with existing answers)
+ * Follows the same pattern as writtenQuestions.patchUserAnswer
+ */
+export const patchUserAnswer = internalMutation({
+  args: {
+    quizId: v.id("quizzes"),
+    questionIndex: v.number(),
+    selectedOption: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const quiz = await ctx.db.get(args.quizId);
+    if (!quiz) {
+      throw new Error("Quiz not found");
+    }
+
+    // Get existing user answers or initialize empty object
+    const existingUserAnswers = (quiz.metadata as any)?.userAnswers || {};
+
+    // Merge the new answer with existing ones
+    await ctx.db.patch(args.quizId, {
+      metadata: {
+        ...quiz.metadata,
+        userAnswers: {
+          ...existingUserAnswers,
+          [args.questionIndex]: args.selectedOption,
+        },
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Submit an answer for a quiz question
+ * Merges the new answer with existing answers (does not replace them)
+ */
+export const submitAnswer = mutation({
+  args: {
+    id: v.id("quizzes"),
+    questionIndex: v.number(),
+    selectedOption: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const quiz = await ctx.db.get(args.id);
+    if (!quiz || quiz.userId !== userId) {
+      throw new Error("Quiz not found");
+    }
+
+    // Get existing user answers or initialize empty object
+    const existingUserAnswers = (quiz.metadata as any)?.userAnswers || {};
+
+    // Merge the new answer with existing ones
+    await ctx.db.patch(args.id, {
+      metadata: {
+        ...quiz.metadata,
+        userAnswers: {
+          ...existingUserAnswers,
+          [args.questionIndex]: args.selectedOption,
+        },
+      },
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(args.id);
+  },
+});

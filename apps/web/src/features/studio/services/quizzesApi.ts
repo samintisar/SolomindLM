@@ -202,16 +202,13 @@ export function useDeleteQuiz() {
  * Submit an answer for a quiz question
  */
 export function useSubmitQuizAnswer() {
-  const update = useMutation(api.quizzes.update);
+  const submitAnswer = useMutation(api.quizzes.submitAnswer);
 
   return async (quizId: string, questionIndex: number, selectedOption: number) => {
-    return await update({
+    return await submitAnswer({
       id: quizId as Id<'quizzes'>,
-      metadata: {
-        userAnswers: {
-          [questionIndex]: selectedOption,
-        },
-      },
+      questionIndex,
+      selectedOption,
     });
   };
 }
