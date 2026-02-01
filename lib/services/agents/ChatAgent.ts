@@ -169,8 +169,14 @@ export class ChatAgent {
       }
 
       console.log(`[ChatAgent] Generated response length: ${answerText.length} characters`);
+
+      // Extract citations from markdown for logging
+      const citationMatches = [...answerText.matchAll(/\[(\d+)\]/g)];
+      const citedIndices = [...new Set(citationMatches.map((m) => parseInt(m[1])))]
+        .filter((n) => !isNaN(n))
+        .sort((a, b) => a - b);
       console.log(
-        `[ChatAgent] Cited indices: [${structuredResponse.cited_indices.join(', ')}], Confidence: ${structuredResponse.confidence}`
+        `[ChatAgent] Cited indices: [${citedIndices.join(', ')}], Confidence: ${structuredResponse.confidence}`
       );
 
       // ============================================================
