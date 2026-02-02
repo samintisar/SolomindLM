@@ -134,15 +134,65 @@ export const reportGeneration = internalAction({
       // USE CACHED INVOCATION - This is where the magic happens
       // ============================================================
       console.log('[ReportGenerationJob] BEFORE reportCache.fetch - reportId:', reportId);
-      const content = (await reportCache.fetch(ctx, {
-        chunks,
-        status: 'generating',
-        reportType: reportType || 'summary',
-        customPrompt: customPrompt ?? undefined,
-      })) as string;
-      console.log('[ReportGenerationJob] AFTER reportCache.fetch - reportId:', reportId);
-      console.log('[ReportGenerationJob] reportId verified after cache fetch:', reportId);
-      console.log('[ReportGenerationJob] Content length:', content.length);
+
+      let content: string;
+      let generationPhase = 'llm_generation';
+      try {
+        console.log('[ReportGenerationJob] Starting reportCache.fetch...');
+        console.log('[ReportGenerationJob] Input:', {
+          chunkCount: chunks.length,
+          totalChars: chunks.reduce((sum: number, c: string) => sum + c.length, 0),
+          reportType: reportType || 'summary',
+        });
+
+        content = (await reportCache.fetch(ctx, {
+          chunks,
+          status: 'generating',
+          reportType: reportType || 'summary',
+          customPrompt: customPrompt ?? undefined,
+        })) as string;
+
+        console.log('[ReportGenerationJob] AFTER reportCache.fetch - reportId:', reportId);
+        console.log('[ReportGenerationJob] reportId verified after cache fetch:', reportId);
+        console.log('[ReportGenerationJob] Content length:', content.length);
+      } catch (error) {
+        // Detailed error handling with phase context
+        const errorInfo = {
+          phase: generationPhase,
+          timestamp: new Date().toISOString(),
+          errorName: error instanceof Error ? error.name : 'Unknown',
+          errorMessage: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5).join('\n') : undefined,
+          chunkCount: chunks.length,
+          totalChars: chunks.reduce((sum: number, c: string) => sum + c.length, 0),
+          reportType: reportType || 'summary',
+          isTimeout: error instanceof Error && (
+            error.message.includes('timeout') ||
+            error.message.includes('Timeout') ||
+            error.message.includes('exceeded')
+          ),
+        };
+
+        console.error('[ReportGenerationJob] ==================================================');
+        console.error('[ReportGenerationJob] GENERATION FAILED WITH DETAILED ERROR INFO');
+        console.error('[ReportGenerationJob] Error Info:', JSON.stringify(errorInfo, null, 2));
+        console.error('[ReportGenerationJob] ==================================================');
+
+        // Re-throw with enhanced error message
+        const enhancedMessage = `Report generation failed in phase "${generationPhase}"` +
+          (errorInfo.isTimeout ? ' due to timeout' : '') +
+          `: ${errorInfo.errorMessage}`;
+
+        const enhancedError = new Error(enhancedMessage);
+        (enhancedError as any).phase = generationPhase;
+        (enhancedError as any).isTimeout = errorInfo.isTimeout;
+        (enhancedError as any).errorInfo = errorInfo;
+        if (error instanceof Error) {
+          (enhancedError as any).originalError = error;
+        }
+
+        throw enhancedError;
+      }
 
       // Update: Finalizing
       console.log('[ReportGenerationJob] Calling updateReportStatus (finalizing) with reportId:', reportId);
@@ -198,15 +248,36 @@ export const reportGeneration = internalAction({
       console.log('[ReportGenerationJob] About to call markReportFailed with reportId:', reportId);
       console.log('[ReportGenerationJob] ==================================================');
 
-      // Mark as failed
+      // Extract enhanced error info if available
+      const phase = (error as any).phase || 'unknown';
+      const isTimeout = (error as any).isTimeout || false;
+      const errorInfo = (error as any).errorInfo;
+
+      // Build enhanced metadata for debugging
+      const failureMetadata: any = {
+        phase: 'failed',
+        progress: 0,
+        failedAt: Date.now(),
+        errorPhase: phase,
+        isTimeout: isTimeout,
+        errorName: error instanceof Error ? error.name : 'Unknown',
+      };
+
+      // Include error info if available
+      if (errorInfo) {
+        failureMetadata.errorInfo = errorInfo;
+      }
+
+      // Include stack trace if available
+      if (error instanceof Error && error.stack) {
+        failureMetadata.stack = error.stack.split('\n').slice(0, 5).join('\n');
+      }
+
+      // Mark as failed with enhanced metadata
       const result = await ctx.runMutation(internal.jobs.helpers.markReportFailed, {
         reportId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        metadata: {
-          phase: 'failed',
-          progress: 0,
-          failedAt: Date.now(),
-        },
+        metadata: failureMetadata,
       });
 
       // If result is null, the document was deleted by the user - exit gracefully

@@ -119,7 +119,7 @@ export const update = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const { id, ...updates } = args;
+    const { id, metadata, ...otherUpdates } = args;
 
     // Verify ownership
     const existing = await ctx.db.get(id);
@@ -128,9 +128,17 @@ export const update = mutation({
     }
 
     const updateData: any = {
-      ...updates,
+      ...otherUpdates,
       updatedAt: Date.now(),
     };
+
+    // Merge metadata instead of replacing
+    if (metadata) {
+      updateData.metadata = {
+        ...(existing.metadata || {}),
+        ...metadata,
+      };
+    }
 
     await ctx.db.patch(id, updateData);
 

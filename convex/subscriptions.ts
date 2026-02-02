@@ -1,12 +1,10 @@
 import { v } from "convex/values";
 import {
   query,
-  mutation,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
 import { getAuthUserId } from "./auth";
-import { internal } from "./_generated/api";
 
 // Re-export actions from subscriptions.actions.ts
 export {
@@ -14,7 +12,7 @@ export {
   createPortalSession,
   cancelAtPeriodEnd,
   removeCancelAtPeriodEnd,
-} from "./subscriptions.actions.js";
+} from "./subscriptionsActions";
 
 /**
  * Get subscription for the current user (from custom table)

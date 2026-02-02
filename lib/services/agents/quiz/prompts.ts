@@ -26,7 +26,7 @@ export const QuizQuestionSchema = z.object({
     .max(4)
     .describe('Zero-based index of the correct option (0 = First Option). MUST match the index in the options array.'),
   hint: z.string().describe('A helpful hint that guides logic without giving the answer'),
-  explanation: z.string().describe('Detailed explanation citing the context, optionally including  tags'),
+  explanation: z.string().describe('Concise explanation citing the context. Explain why the correct answer is right and why each distractor is wrong. Be precise and on-point.'),
 });
 
 // 2. Intermediate Candidate Schema (The Draft)
@@ -111,11 +111,33 @@ export const getCandidateMapPrompt = (params: {
 }): string => {
   const { chunk, questionsPerChunk, difficulty, focus } = params;
 
+  // Difficulty-specific guidance
+  const difficultyGuidance: Record<string, string> = {
+    easy: `**EASY MODE:**
+- Focus: Basic recall, definitions, and direct facts
+- Question style: Direct questions with clear, unambiguous answers
+- Distractor strategy: Use obviously incorrect options (opposites, unrelated concepts)
+- Example: "What is the primary function of X?" or "Which term means Y?"`,
+    medium: `**MEDIUM MODE:**
+- Focus: Concepts, relationships, and understanding
+- Question style: Understanding-based questions requiring some thought
+- Distractor strategy: Use plausible but incorrect options (common misconceptions)
+- Example: "How does X affect Y?" or "Which relationship best describes..."`,
+    hard: `**HARD MODE:**
+- Focus: Application, analysis, synthesis, and complex scenarios
+- Question style: Complex scenarios requiring multi-step reasoning
+- Distractor strategy: Use subtle, nuanced options that require careful analysis
+- Example: "In a scenario where X occurs, what is the most likely outcome when..."`,
+  };
+
   return `You are an expert analyst extracting "Testable Concepts" from a document.
 
 TARGET: Identify approximately ${questionsPerChunk} key concepts.
 
 **Difficulty: ${difficulty.toUpperCase()}**
+
+${difficultyGuidance[difficulty] || difficultyGuidance.medium}
+
 ${focus ? `**Focus:** ${focus}` : ''}
 
 CRITICAL RULES (DO NOT IGNORE):
@@ -128,6 +150,7 @@ For each concept, provide:
 - **Topic:** Short category name.
 - **Question:** A draft question testing the concept (hypothetical scenarios are best).
 - **Context Snippet:** Extract a RICH text segment (3-5 sentences) that explains the concept AND mentions related concepts (this is crucial for generating wrong answers later).
+- **Difficulty:** Must match target difficulty ("easy", "medium", or "hard").
 
 Content to analyze:
 ${chunk}`;
@@ -137,28 +160,66 @@ ${chunk}`;
 // EXPAND PROMPT (THE POLISH) - NEW!
 // ============================================================
 
+/**
+ * Difficulty-specific settings for expand phase
+ */
+interface ExpandSettings {
+  scenarioComplexity: string;
+  distractorQuality: string;
+  explanationLength: string;
+  questionStyle: string;
+}
+
+const EXPAND_SETTINGS: Record<string, ExpandSettings> = {
+  easy: {
+    scenarioComplexity: 'Simple, direct scenarios. One clear step to the answer.',
+    distractorQuality: 'Obviously incorrect distractors (opposites, clearly unrelated concepts).',
+    explanationLength: '1-2 sentences total. State the correct answer and briefly mention one key reason why distractors are wrong.',
+    questionStyle: 'Direct questions: "What is X?" or "Which term describes Y?"',
+  },
+  medium: {
+    scenarioComplexity: 'Moderate scenarios. May require connecting 2-3 concepts.',
+    distractorQuality: 'Plausible distractors (common misconceptions, related but wrong concepts).',
+    explanationLength: '1-2 sentences total. Focus on the key distinction between correct and incorrect options.',
+    questionStyle: 'Understanding-based: "How does X affect Y?" or "Which relationship describes..."',
+  },
+  hard: {
+    scenarioComplexity: 'Complex scenarios requiring analysis. May involve multi-step reasoning or synthesis.',
+    distractorQuality: 'Subtle distractors (nuanced differences, partially correct but incomplete answers).',
+    explanationLength: '1-2 sentences total. Cut to the core conceptual distinction - be precise.',
+    questionStyle: 'Application-based: "In scenario X, what is the most likely outcome?" or complex analysis.',
+  },
+};
+
 export const getExpandPrompt = (candidate: QuizCandidate): string => {
+  const settings = EXPAND_SETTINGS[candidate.difficulty] || EXPAND_SETTINGS.medium;
+
   return `You are a Professor creating a high-quality exam question.
 
-CONTEXT: 
+CONTEXT:
 "${candidate.contextSnippet}"
 
-TASK: Refine this draft into a difficult, scenario-based multiple-choice question.
+TASK: Refine this draft into a ${candidate.difficulty.toUpperCase()}, scenario-based multiple-choice question.
+
+**DIFFICULTY: ${candidate.difficulty.toUpperCase()}**
+
+**Scenario Complexity:** ${settings.scenarioComplexity}
+**Distractor Quality:** ${settings.distractorQuality}
+**Explanation Length:** ${settings.explanationLength}
+**Question Style:** ${settings.questionStyle}
 
 Draft Question: "${candidate.question}"
 Correct Answer: "${candidate.correctAnswer}"
 
 INSTRUCTIONS:
-1. **SCENARIO-BASED:** Do not ask "What is X?". Instead, create a hypothetical scenario: "A user observes X... what does this imply?" or "You run function Y... what is the output?".
-2. **DISTRACTORS:** Use the CONTEXT to find related but incorrect concepts. Common misconceptions make the best distractors.
-3. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like 
-
+1. **SCENARIO-BASED:** ${settings.questionStyle} Create a hypothetical scenario that fits the ${candidate.difficulty} difficulty level.
+2. **DISTRACTORS:** Use the CONTEXT to find ${candidate.difficulty === 'easy' ? 'obviously incorrect' : candidate.difficulty === 'medium' ? 'plausible but wrong' : 'subtle and nuanced'} options. ${settings.distractorQuality}
+3. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like
 [Image of linear regression plot]
- or 
-
+ or
 [Image of mitosis stages]
  in the explanation. Only do this if it aids understanding.
-4. **EXPLANATION:** Explain *why* the answer is correct and *why* the distractors are wrong, citing the context.
+4. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. BE CONCISE - 1-2 sentences maximum.
 
 Output full JSON.`;
 };
@@ -185,11 +246,16 @@ FILTERS (DISCARD THESE IMMEDIATELY):
 - Questions that rely on "the table below" or "the following list" if that context is missing.
 - Duplicate concepts (keep only the strongest version).
 
+DIFFICULTY FILTERING (CRITICAL):
+- Target Difficulty: ${difficulty.toUpperCase()}
+- PRIORITIZE candidates where difficulty matches "${difficulty}" - aim for at least 70% of your selections to match the target difficulty
+- If insufficient candidates match the target difficulty, you may select from adjacent difficulty levels (easy↔medium↔hard)
+- DO NOT select candidates whose difficulty is completely inappropriate (e.g., selecting "easy" candidates when "hard" is requested)
+
 DIVERSITY:
 - Select questions across different topics.
 - Do not pick more than 3 questions for the same narrow concept.
 
-Difficulty: ${difficulty}
 ${focus ? `Focus: ${focus}` : ''}
 
 CANDIDATES POOL:

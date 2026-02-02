@@ -41,12 +41,12 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     return <FlashcardView note={activeNote} onBack={undefined} />;
   }
 
-  // Quiz view
+  // Quiz view (no onBack on mobile - StudioPanelHeader provides single header)
   if (isQuizNote(activeNote)) {
     return <QuizView
       note={activeNote}
       onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
-      onBack={isMobile ? onBack : undefined}
+      onBack={undefined}
     />;
   }
 
@@ -90,12 +90,12 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     }
   }
 
-  // Written questions view
+  // Written questions view (no onBack on mobile - StudioPanelHeader provides single header)
   if (isWrittenQuestionsNote(activeNote)) {
     return <WrittenQuestionsView
       note={activeNote}
       onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
-      onBack={isMobile ? onBack : undefined}
+      onBack={undefined}
     />;
   }
 
@@ -108,11 +108,11 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     />;
   }
 
-  // Spreadsheet view
+  // Spreadsheet view (no onBack on mobile - StudioPanelHeader provides single header)
   if (isSpreadsheetNote(activeNote)) {
     return <SpreadsheetView
       note={activeNote}
-      onBack={isMobile ? onBack : undefined}
+      onBack={undefined}
     />;
   }
 

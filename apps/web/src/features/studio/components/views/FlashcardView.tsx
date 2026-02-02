@@ -1,6 +1,7 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, lazy, Suspense, useMemo, useRef, useEffect } from 'react';
 import { RotateCw, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { FlashcardNote } from '@/shared/types/index';
+import { useUpdateFlashcardProgress, useFlashcard } from '@/features/studio/services/flashcardsApi';
 import { sanitizeMarkdown } from '@/shared/utils';
 
 const MarkdownRenderer = lazy(() =>
@@ -13,9 +14,34 @@ export interface FlashcardViewProps {
 }
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+    // Initialize currentIndex from note.metadata.lastViewedIndex if available
+    const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
+    const [currentIndex, setCurrentIndex] = useState(Math.min(initialIndex, Math.max(0, note.flashcards.length - 1)));
     const [isFlipped, setIsFlipped] = useState(false);
     const cards = note.flashcards;
+
+    // Get latest flashcard data from server (for restoring saved progress)
+    const latestNote = useFlashcard(note.id);
+
+    // Track if we've initialized the index from saved progress
+    const hasInitializedIndex = useRef(false);
+
+    // Restore saved index on mount (from latestNote which has the latest data from server)
+    useEffect(() => {
+        if (!hasInitializedIndex.current && latestNote) {
+            const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
+            const boundedIndex = Math.min(savedIndex, Math.max(0, cards.length - 1));
+            if (savedIndex > 0) {
+                setCurrentIndex(boundedIndex);
+            }
+            hasInitializedIndex.current = true;
+        }
+    }, [latestNote, cards.length]);
+
+    // Persist progress - track last viewed index
+    // Use useMemo to prevent re-initializing when other state changes
+    const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
+    useUpdateFlashcardProgress(note.id, stableCurrentIndex);
 
     const handleNext = () => {
         setIsFlipped(false);

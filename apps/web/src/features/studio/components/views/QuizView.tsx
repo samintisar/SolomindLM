@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useMemo, useRef } from 'react';
 import {
   Sparkles,
   Lightbulb,
@@ -10,7 +10,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { QuizNote } from '@/shared/types/index';
-import { useSubmitQuizAnswer, useResetQuizAnswers, useQuiz } from '@/features/studio/services/quizzesApi';
+import { useSubmitQuizAnswer, useResetQuizAnswers, useQuiz, useUpdateQuizProgress } from '@/features/studio/services/quizzesApi';
 import { sanitizeMarkdown } from '@/shared/utils';
 
 const MarkdownRenderer = lazy(() =>
@@ -24,7 +24,9 @@ export interface QuizViewProps {
 }
 
 export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+    // Initialize currentIndex from note.metadata.lastViewedIndex if available
+    const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
+    const [currentIndex, setCurrentIndex] = useState(Math.min(initialIndex, Math.max(0, note.questions.length - 1)));
     const [userAnswers, setUserAnswers] = useState<Record<number, number>>(note.userAnswers || {});
     const [showResults, setShowResults] = useState(false);
     const [showHint, setShowHint] = useState(false);
@@ -34,6 +36,26 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     const submitAnswer = useSubmitQuizAnswer();
     const resetAnswers = useResetQuizAnswers();
     const latestNote = useQuiz(note.id);
+
+    // Track if we've initialized the index from saved progress
+    const hasInitializedIndex = useRef(false);
+
+    // Restore saved index on mount (from latestNote which has the latest data from server)
+    useEffect(() => {
+        if (!hasInitializedIndex.current && latestNote) {
+            const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
+            const boundedIndex = Math.min(savedIndex, Math.max(0, note.questions.length - 1));
+            if (savedIndex > 0) {
+                setCurrentIndex(boundedIndex);
+            }
+            hasInitializedIndex.current = true;
+        }
+    }, [latestNote, note.questions.length]);
+
+    // Persist progress - track last viewed index
+    // Use useMemo to prevent re-initializing when other state changes
+    const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
+    useUpdateQuizProgress(note.id, stableCurrentIndex);
 
     // Sync userAnswers with note.userAnswers
     // Using a serialized key prevents the effect from running on every render
@@ -94,7 +116,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
     const resetQuiz = async () => {
         setIsResetting(true);
         try {
-            // Call API to reset all answers on the server
+            // Call API to reset all answers on the server (also resets lastViewedIndex)
             await resetAnswers(note.id);
             // Reset local state
             setCurrentIndex(0);

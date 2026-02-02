@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useMemo, useRef } from 'react';
 import {
   MessageSquareText,
   CheckCircle2,
@@ -8,7 +8,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { WrittenQuestionsNote, WrittenQuestionAnswer } from '@/shared/types/index';
-import { useSubmitWrittenAnswer, useResetWrittenAnswers, useWrittenQuestionSet } from '@/features/studio/services/writtenQuestionsApi';
+import { useSubmitWrittenAnswer, useResetWrittenAnswers, useWrittenQuestionSet, useUpdateWrittenQuestionsProgress } from '@/features/studio/services/writtenQuestionsApi';
 import { sanitizeMarkdown } from '@/shared/utils';
 
 const MarkdownRenderer = lazy(() =>
@@ -22,7 +22,10 @@ export interface WrittenQuestionsViewProps {
 }
 
 export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note, onNoteUpdate, onBack }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Initialize currentIndex from note.metadata.lastViewedIndex if available
+  const questions = note.questions || [];
+  const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
+  const [currentIndex, setCurrentIndex] = useState(Math.min(initialIndex, Math.max(0, questions.length - 1)));
   const [userAnswers, setUserAnswers] = useState<Record<string, WrittenQuestionAnswer>>(note.userAnswers || {});
   const [showResults, setShowResults] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,6 +37,26 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
   const resetAnswersMutation = useResetWrittenAnswers();
   const latestNote = useWrittenQuestionSet(note.id);
 
+  // Track if we've initialized the index from saved progress
+  const hasInitializedIndex = useRef(false);
+
+  // Restore saved index on mount (from latestNote which has the latest data from server)
+  useEffect(() => {
+    if (!hasInitializedIndex.current && latestNote) {
+      const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
+      const boundedIndex = Math.min(savedIndex, Math.max(0, questions.length - 1));
+      if (savedIndex > 0) {
+        setCurrentIndex(boundedIndex);
+      }
+      hasInitializedIndex.current = true;
+    }
+  }, [latestNote, questions.length]);
+
+  // Persist progress - track last viewed index
+  // Use useMemo to prevent re-initializing when other state changes
+  const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
+  useUpdateWrittenQuestionsProgress(note.id, stableCurrentIndex);
+
   // Sync userAnswers from server only when server data actually changes (e.g. after submit/reset).
   // Using a serialized key prevents the effect from running on every render (latestNote?.userAnswers
   // can get a new reference each time), which would overwrite local typing with server state.
@@ -44,8 +67,6 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
     }
   }, [serverUserAnswersKey]);
 
-  // Use questions from the note
-  const questions = note.questions || [];
   const currentQuestion = questions[currentIndex];
 
   // If no questions, show empty state

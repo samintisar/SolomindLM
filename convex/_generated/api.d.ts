@@ -52,6 +52,7 @@ import type * as storage_ConvexStorageService from "../storage/ConvexStorageServ
 import type * as storage_VectorStoreService from "../storage/VectorStoreService.js";
 import type * as stripeWebhook from "../stripeWebhook.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as subscriptionsActions from "../subscriptionsActions.js";
 import type * as titleGenerator from "../titleGenerator.js";
 import type * as writtenQuestionActions from "../writtenQuestionActions.js";
 import type * as writtenQuestions from "../writtenQuestions.js";
@@ -107,6 +108,7 @@ declare const fullApi: ApiFromModules<{
   "storage/VectorStoreService": typeof storage_VectorStoreService;
   stripeWebhook: typeof stripeWebhook;
   subscriptions: typeof subscriptions;
+  subscriptionsActions: typeof subscriptionsActions;
   titleGenerator: typeof titleGenerator;
   writtenQuestionActions: typeof writtenQuestionActions;
   writtenQuestions: typeof writtenQuestions;

@@ -203,23 +203,50 @@ export class ReportGraph {
     timeoutMs: number,
     phase: string
   ): Promise<T> {
-    let timeoutId!: ReturnType<typeof setTimeout>;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const startTime = Date.now();
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        reject(new Error(`${phase} timeout after ${timeoutMs}ms`));
+        const timeoutError = new Error(`${phase} timeout after ${timeoutMs}ms`);
+        (timeoutError as any).phase = phase;
+        (timeoutError as any).isTimeout = true;
+        (timeoutError as any).timeoutMs = timeoutMs;
+        reject(timeoutError);
       }, timeoutMs);
     });
 
     try {
       const result = await Promise.race([invokeFn(), timeoutPromise]);
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
+      const elapsed = Date.now() - startTime;
+      console.log(`[ReportGraph] ${phase} completed in ${elapsed}ms`);
       return result;
     } catch (error) {
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
+      const elapsed = Date.now() - startTime;
+
       if (error instanceof Error && error.message.includes('timeout')) {
-        throw new Error(`${phase} phase exceeded timeout of ${timeoutMs}ms`);
+        const enhancedError = new Error(`${phase} phase exceeded timeout of ${timeoutMs}ms`);
+        (enhancedError as any).phase = phase;
+        (enhancedError as any).isTimeout = true;
+        (enhancedError as any).timeoutMs = timeoutMs;
+        (enhancedError as any).elapsedTime = elapsed;
+        (enhancedError as any).originalError = error;
+
+        console.error(`[ReportGraph] ${phase} TIMEOUT after ${elapsed}ms (limit: ${timeoutMs}ms)`);
+        console.error(`[ReportGraph] Error context:`, {
+          phase,
+          timeoutMs,
+          elapsed,
+          timestamp: new Date().toISOString(),
+        });
+
+        throw enhancedError;
       }
+
+      // Log other errors with context
+      console.error(`[ReportGraph] ${phase} error after ${elapsed}ms:`, error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -247,6 +274,7 @@ export class ReportGraph {
     phase: string
   ): Promise<T> {
     let lastError: Error | undefined;
+    const startTime = Date.now();
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -254,15 +282,22 @@ export class ReportGraph {
       } catch (error) {
         lastError = error as Error;
 
+        // Don't retry on validation errors or timeouts
         if (error instanceof Error &&
             (error.message.includes('Invalid') ||
              error.message.includes('validation') ||
+             (error as any).isTimeout === true ||
              error.message.includes('timeout'))) {
+          // Enhance error with retry context
+          (error as any).phase = phase;
+          (error as any).attempt = attempt + 1;
+          (error as any).maxRetries = maxRetries;
           throw error;
         }
 
+        const elapsed = Date.now() - startTime;
         console.warn(
-          `[ReportGraph] ${phase} attempt ${attempt + 1}/${maxRetries} failed:`,
+          `[ReportGraph] ${phase} attempt ${attempt + 1}/${maxRetries} failed after ${elapsed}ms:`,
           error instanceof Error ? error.message : String(error)
         );
 
@@ -274,7 +309,14 @@ export class ReportGraph {
       }
     }
 
-    throw lastError || new Error(`${phase} failed after ${maxRetries} attempts`);
+    const elapsed = Date.now() - startTime;
+    const finalError = lastError || new Error(`${phase} failed after ${maxRetries} attempts`);
+    (finalError as any).phase = phase;
+    (finalError as any).totalAttempts = maxRetries;
+    (finalError as any).totalElapsedTime = elapsed;
+
+    console.error(`[ReportGraph] ${phase} failed after ${maxRetries} attempts and ${elapsed}ms`);
+    throw finalError;
   }
 
   // Group map outputs by extracted topics for analysis
@@ -613,19 +655,52 @@ IMPORTANT: Respond with a JSON object containing:
         `Map ${chunkId}`
       );
     } catch (error) {
+      const elapsed = Date.now() - startTime;
+      const isTimeout = (error as any).isTimeout || error instanceof Error && (
+        error.message.includes('timeout') ||
+        error.message.includes('Timeout') ||
+        error.message.includes('exceeded')
+      );
+
       const errorContext = {
         timestamp: new Date().toISOString(),
+        phase: 'map_process',
         chunkId,
+        chunkIndex: chunkIndex,
         chunkLength: chunk.length,
         reportType,
+        elapsedTime: elapsed,
+        isTimeout: isTimeout,
+        timeoutLimit: GRAPH_CONFIG.MAP_TIMEOUT_MS,
         error: error instanceof Error ? {
           name: error.name,
           message: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+          stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+          phase: (error as any).phase,
+          isTimeout: (error as any).isTimeout,
         } : String(error),
       };
-      console.error('[ReportGraph] Map process error:', JSON.stringify(errorContext, null, 2));
-      throw error;
+      console.error('[ReportGraph] ===== MAP PROCESS ERROR =====');
+      console.error('[ReportGraph] Error context:', JSON.stringify(errorContext, null, 2));
+      console.error('[ReportGraph] =====================================');
+
+      // Enhance error with phase information and re-throw
+      const enhancedError = error instanceof Error
+        ? new Error(`Map process failed for ${chunkId}: ${error.message}${isTimeout ? ' (timeout)' : ''}`)
+        : new Error(`Map process failed for ${chunkId} with unknown error`);
+
+      (enhancedError as any).phase = 'map_process';
+      (enhancedError as any).isTimeout = isTimeout;
+      (enhancedError as any).chunkIndex = chunkIndex;
+      (enhancedError as any).reportType = reportType;
+      (enhancedError as any).elapsedTime = elapsed;
+      (enhancedError as any).errorContext = errorContext;
+      if (error instanceof Error) {
+        (enhancedError as any).originalError = error;
+        (enhancedError as any).stack = error.stack;
+      }
+
+      throw enhancedError;
     }
 
     const elapsed = Date.now() - startTime;
@@ -914,29 +989,53 @@ Do NOT combine topics or focus primarily on one.
         }
       }
     } catch (error) {
+      const elapsed = Date.now() - startTime;
+      const isTimeout = (error as any).isTimeout || error instanceof Error && (
+        error.message.includes('timeout') ||
+        error.message.includes('Timeout') ||
+        error.message.includes('exceeded')
+      );
+
       const errorContext = {
         timestamp: new Date().toISOString(),
+        phase: 'reduce',
         reportType: state.reportType,
         collapsedOutputsCount: state.collapsedOutputs.length,
         contentLength: combined.length,
+        elapsedTime: elapsed,
+        isTimeout: isTimeout,
+        timeoutLimit: GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
         error: error instanceof Error ? {
           name: error.name,
           message: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+          stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+          phase: (error as any).phase,
+          isTimeout: (error as any).isTimeout,
+          timeoutMs: (error as any).timeoutMs,
         } : String(error),
       };
-      console.error('[ReportGraph] Reduce phase error:', JSON.stringify(errorContext, null, 2));
+      console.error('[ReportGraph] ===== REDUCE PHASE ERROR =====');
+      console.error('[ReportGraph] Error context:', JSON.stringify(errorContext, null, 2));
+      console.error('[ReportGraph] =====================================');
 
-      finalOutput = `# Report Generation Error
+      // Enhance error with phase information and re-throw
+      const enhancedError = error instanceof Error
+        ? new Error(`Reduce phase failed: ${error.message}${isTimeout ? ' (timeout)' : ''}`)
+        : new Error('Reduce phase failed with unknown error');
 
-**Error:** ${error instanceof Error ? error.message : 'Unknown error'}
+      (enhancedError as any).phase = 'reduce';
+      (enhancedError as any).isTimeout = isTimeout;
+      (enhancedError as any).reportType = state.reportType;
+      (enhancedError as any).elapsedTime = elapsed;
+      (enhancedError as any).errorContext = errorContext;
+      if (error instanceof Error) {
+        (enhancedError as any).originalError = error;
+        (enhancedError as any).stack = error.stack;
+      }
 
-**Details:**
-- Report Type: ${state.reportType}
-- Input Size: ${combined.length} characters
-- Processed Chunks: ${collapsedOutputsCount}
-
-The report generation could not be completed due to a timeout or error. Please try again with fewer documents or a shorter report type.`;
+      // Instead of returning an error message as output, throw the enhanced error
+      // so it can be caught by the job handler
+      throw enhancedError;
     }
 
     const elapsed = Date.now() - startTime;

@@ -127,6 +127,7 @@ export interface FlashcardNote extends BaseNote {
     cardCount: number;
     topic?: string;
     error?: string;
+    lastViewedIndex?: number;
   };
 }
 
@@ -140,6 +141,7 @@ export interface QuizNote extends BaseNote {
     difficulty: string;
     focusArea?: string;
     error?: string;
+    lastViewedIndex?: number;
   };
 }
 
@@ -193,6 +195,7 @@ export interface WrittenQuestionsNote extends BaseNote {
     focusArea?: string;
     totalPoints?: number;
     error?: string;
+    lastViewedIndex?: number;
   };
 }
 

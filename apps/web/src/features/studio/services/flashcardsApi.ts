@@ -2,6 +2,7 @@ import type { Note, Flashcard, FlashcardNote } from '@/shared/types/index';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
+import { useEffect, useRef } from 'react';
 
 export interface CreateFlashcardsParams {
   notebookId: string;
@@ -44,13 +45,14 @@ function mapFlashcardToNote(dbFlashcard: any): FlashcardNote {
     id: dbFlashcard._id,
     title: dbFlashcard.title,
     preview: getPreviewText(dbFlashcard.status, actualCardCount, dbFlashcard.metadata),
-    type: 'flashcard',
+    type: 'flashcard' as const,
     flashcards,
     status: dbFlashcard.status,
     metadata: {
       difficulty: dbFlashcard.metadata?.difficulty || 'medium',
       cardCount: actualCardCount,
       topic: dbFlashcard.metadata?.topic,
+      lastViewedIndex: dbFlashcard.metadata?.lastViewedIndex,
     },
   };
 }
@@ -168,6 +170,34 @@ export function useDeleteFlashcards() {
   return async (flashcardId: string) => {
     await remove({ id: flashcardId as Id<'flashcards'> });
   };
+}
+
+/**
+ * Persist flashcard progress (last viewed card index)
+ * Note: Does NOT use optimistic updates to avoid interfering with flashcard state
+ */
+export function useUpdateFlashcardProgress(flashcardId: string | null, currentIndex: number) {
+  const update = useMutation(api.flashcards.update);
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (flashcardId == null) return;
+
+    // Debounce the update to avoid excessive API calls during navigation
+    timeoutRef.current = setTimeout(() => {
+      update({
+        id: flashcardId as Id<'flashcards'>,
+        metadata: { lastViewedIndex: currentIndex },
+      });
+    }, 500);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [flashcardId, currentIndex, update]);
 }
 
 /**

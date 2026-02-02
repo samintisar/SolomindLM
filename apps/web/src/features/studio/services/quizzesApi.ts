@@ -2,6 +2,7 @@ import type { Note, QuizQuestion, QuizNote } from '@/shared/types/index';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
+import { useEffect, useRef } from 'react';
 
 export interface CreateQuizParams {
   notebookId: string;
@@ -73,7 +74,7 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
     id: dbQuiz._id,
     title: dbQuiz.title,
     preview: getPreviewText(dbQuiz.status, dbQuiz.metadata),
-    type: 'quiz',
+    type: 'quiz' as const,
     questions,
     userAnswers: dbQuiz.metadata?.userAnswers || {},
     status: dbQuiz.status,
@@ -81,6 +82,7 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
       questionCount,
       difficulty: dbQuiz.metadata?.difficulty || 'medium',
       focusArea: dbQuiz.metadata?.focus,
+      lastViewedIndex: dbQuiz.metadata?.lastViewedIndex,
     },
   };
 }
@@ -224,9 +226,38 @@ export function useResetQuizAnswers() {
       id: quizId as Id<'quizzes'>,
       metadata: {
         userAnswers: {},
+        lastViewedIndex: 0,
       },
     });
   };
+}
+
+/**
+ * Persist quiz progress (last viewed question index)
+ * Note: Does NOT use optimistic updates to avoid interfering with quiz state
+ */
+export function useUpdateQuizProgress(quizId: string | null, currentIndex: number) {
+  const update = useMutation(api.quizzes.update);
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (quizId == null) return;
+
+    // Debounce the update to avoid excessive API calls during navigation
+    timeoutRef.current = setTimeout(() => {
+      update({
+        id: quizId as Id<'quizzes'>,
+        metadata: { lastViewedIndex: currentIndex },
+      });
+    }, 500);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [quizId, currentIndex, update]);
 }
 
 /**

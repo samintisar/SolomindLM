@@ -412,17 +412,31 @@ export const markReportFailed = internalMutation({
     console.log('[markReportFailed] Document exists, proceeding to patch');
     console.log('[markReportFailed] Current document status:', report.status);
 
+    // Build enhanced error metadata for debugging
+    const enhancedMetadata: any = {
+      ...metadata,
+      // Structured error information
+      error: {
+        message: error,
+        phase: metadata?.errorPhase || metadata?.phase || 'unknown',
+        errorName: metadata?.errorName || 'Unknown',
+        isTimeout: metadata?.isTimeout || false,
+        failedAt: metadata?.failedAt || Date.now(),
+      },
+      // Include diagnostic info if available
+      ...(metadata?.errorInfo && { errorInfo: metadata.errorInfo }),
+      ...(metadata?.stack && { stack: metadata.stack }),
+    };
+
+    console.log('[markReportFailed] Enhanced error metadata:', JSON.stringify(enhancedMetadata, null, 2));
+
     await ctx.db.patch(reportId, {
       status: 'failed',
       updatedAt: Date.now(),
-      metadata: {
-        error: args.error,
-        failedAt: Date.now(),
-        ...args.metadata,
-      },
+      metadata: enhancedMetadata,
     });
 
-    console.log('[markReportFailed] Successfully patched document');
+    console.log('[markReportFailed] Successfully patched document with enhanced error metadata');
     return reportId;
   },
 });

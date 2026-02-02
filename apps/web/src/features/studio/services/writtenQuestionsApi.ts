@@ -2,6 +2,7 @@ import type { Note, WrittenQuestion, WrittenQuestionsNote } from '@/shared/types
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
+import { useEffect, useRef } from 'react';
 
 export interface CreateWrittenQuestionsParams {
   notebookId: string;
@@ -66,7 +67,7 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
     id: dbWQ._id,
     title: dbWQ.title,
     preview: getPreviewText(dbWQ.status, questionCount, questionType),
-    type: 'writtenQuestions',
+    type: 'writtenQuestions' as const,
     questions,
     userAnswers: dbWQ.metadata?.userAnswers || {},
     status: dbWQ.status,
@@ -75,6 +76,7 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
       difficulty: dbWQ.metadata?.difficulty || 'medium',
       questionType,
       focusArea: dbWQ.metadata?.focus,
+      lastViewedIndex: dbWQ.metadata?.lastViewedIndex,
     },
   };
 }
@@ -221,6 +223,7 @@ export function useResetWrittenAnswers() {
       id: id as Id<'writtenQuestions'>,
       metadata: {
         userAnswers: {},
+        lastViewedIndex: 0,
       },
     });
   };
@@ -249,6 +252,34 @@ export function useGradedResult(writtenQuestionsId: string | null, questionId: s
     strengths: answer.strengths || [],
     improvements: answer.improvements || [],
   };
+}
+
+/**
+ * Persist written questions progress (last viewed question index)
+ * Note: Does NOT use optimistic updates to avoid interfering with questions state
+ */
+export function useUpdateWrittenQuestionsProgress(writtenQuestionsId: string | null, currentIndex: number) {
+  const update = useMutation(api.writtenQuestions.update);
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (writtenQuestionsId == null) return;
+
+    // Debounce the update to avoid excessive API calls during navigation
+    timeoutRef.current = setTimeout(() => {
+      update({
+        id: writtenQuestionsId as Id<'writtenQuestions'>,
+        metadata: { lastViewedIndex: currentIndex },
+      });
+    }, 500);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [writtenQuestionsId, currentIndex, update]);
 }
 
 /**

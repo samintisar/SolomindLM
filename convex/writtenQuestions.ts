@@ -158,7 +158,7 @@ export const update = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const { id, ...updates } = args;
+    const { id, metadata, ...otherUpdates } = args;
 
     // Verify ownership
     const writtenQuestion = await ctx.db.get(id);
@@ -166,10 +166,20 @@ export const update = mutation({
       throw new Error("Written question set not found or access denied");
     }
 
-    await ctx.db.patch(id, {
-      ...updates,
+    const updateData: any = {
+      ...otherUpdates,
       updatedAt: Date.now(),
-    });
+    };
+
+    // Merge metadata instead of replacing
+    if (metadata) {
+      updateData.metadata = {
+        ...(writtenQuestion.metadata || {}),
+        ...metadata,
+      };
+    }
+
+    await ctx.db.patch(id, updateData);
 
     return await ctx.db.get(id);
   },
