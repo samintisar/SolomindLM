@@ -169,6 +169,8 @@ export const getCandidateMapPrompt = (params: {
 
   return `You are an expert instructional designer and presentation architect analyzing educational content.
 
+**Math Notation:** Use $...$ for inline math and $$...$$ for display math.
+
 **Slide Strategy:** ${slideTypeDescription}
 **Deck Scope:** ${deckLengthDescription}
 ${customPrompt ? `**Custom Focus:** ${customPrompt}` : ''}

@@ -96,7 +96,9 @@ export const MAP_CANDIDATES_SYSTEM_PROMPT = 'You are a professional educator dra
 export const REDUCE_SELECT_SYSTEM_PROMPT = 'You are a quiz curator selecting diverse, high-quality candidate questions for study sets.';
 
 /** System prompt for expand phase distractor generation */
-export const EXPAND_QUESTION_SYSTEM_PROMPT = 'You are a professional educator creating rigorous multiple-choice questions.';
+export const EXPAND_QUESTION_SYSTEM_PROMPT = `You are a professional educator creating rigorous multiple-choice questions.
+
+**Math Notation:** Use $...$ for inline math and $$...$$ for display math.`;
 
 // ============================================================
 // MAP PROMPT (THE DRAFT)

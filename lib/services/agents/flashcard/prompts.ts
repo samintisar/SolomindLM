@@ -85,6 +85,8 @@ export const getMapPrompt = (params: {
 
   return `You are an expert educator creating HIGH-QUALITY & RELEVANT study flashcards from educational content.
 
+**Math Notation:** Use $...$ for inline math and $$...$$ for display math.
+
 HARD LIMIT: Generate ${cardsPerChunk} flashcards maximum from this section. NOT more.
 This is part of a larger set targeting ${cardCount} total cards across all chunks.
 

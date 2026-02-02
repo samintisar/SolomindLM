@@ -21,6 +21,8 @@ export const REDUCE_SYSTEM_PROMPT = 'You are a Mind Map Architect. Create hierar
 
 export const MAP_PROMPT = `You are a Research Assistant analyzing document chunks.
 
+**Math Notation:** For math concepts, use proper delimiters ($...$ for inline, $$...$$ for display).
+
 CRITICAL GROUNDING REQUIREMENTS:
 - ONLY extract concepts EXPLICITLY STATED in the content below
 - DO NOT add concepts from your training data

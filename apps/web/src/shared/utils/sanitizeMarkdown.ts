@@ -1,6 +1,16 @@
 import DOMPurify from 'dompurify';
 
 /**
+ * Strips ANSI escape codes from text (e.g., [1m, [0m, [31m).
+ * These can leak into LLM output and cause KaTeX parse errors.
+ */
+function stripAnsiCodes(text: string): string {
+  // Matches ANSI escape sequences like \x1b[...m or \[...\d
+  return text.replace(/\x1b\[[0-9;]*m/g, '')
+              .replace(/\[[0-9;]*[mK]/g, '');
+}
+
+/**
  * Sanitizes markdown content using DOMPurify before rendering with ReactMarkdown.
  * This prevents XSS attacks while allowing safe markdown elements.
  *
@@ -8,10 +18,13 @@ import DOMPurify from 'dompurify';
  * ReactMarkdown will parse the sanitized markdown and render it safely.
  */
 export function sanitizeMarkdown(content: string): string {
+  // First strip ANSI codes that can cause KaTeX parse errors
+  const withoutAnsi = stripAnsiCodes(content);
+
   // DOMPurify sanitizes HTML, but we're using it on markdown source text
   // This strips any HTML tags that might be embedded in the markdown
   // ReactMarkdown will then parse the clean markdown and render it
-  return DOMPurify.sanitize(content, {
+  return DOMPurify.sanitize(withoutAnsi, {
     // Allow only safe text content - no HTML tags in markdown source
     ALLOWED_TAGS: [], // Empty array means no HTML tags allowed in markdown source
     ALLOWED_ATTR: [],

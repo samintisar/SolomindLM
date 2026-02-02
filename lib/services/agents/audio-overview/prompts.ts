@@ -148,6 +148,8 @@ TEXT TO ANALYZE:
 /** Main reduce prompt for generating dialogue scripts */
 export const REDUCE_PROMPT = `You are an expert podcast scriptwriter. Convert the following "dialogue beats" into a lively, natural conversation script between two hosts.
 
+**Math Notation:** When discussing math concepts, use proper delimiters ($...$ for inline, $$...$$ for display).
+
 CRITICAL REQUIREMENT:
 Output ONLY a valid JSON array of dialogue lines with this exact format:
 [

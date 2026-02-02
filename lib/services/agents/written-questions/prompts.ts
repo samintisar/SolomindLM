@@ -127,6 +127,8 @@ export const getMapPrompt = (params: {
 
   return `You are an expert educator creating a HIGH-QUALITY assessment.
 
+**Math Notation:** Use $...$ for inline math and $$...$$ for display math.
+
 Generate exactly ${questionsPerChunk} questions based **exclusively** on the text provided below.
 
 **Configuration:**
