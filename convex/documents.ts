@@ -70,8 +70,10 @@ export const upload = mutation({
       updatedAt: now,
     });
 
-    // Schedule embedding job using the new job handler
-    await ctx.scheduler.runAfter(0, internal.jobs.DocEmbeddingJob.docEmbedding, {
+    // Schedule embedding job; stagger YouTube jobs to avoid Supadata "Limit Exceeded" when uploading multiple at once
+    const delayMs =
+      args.type === 'youtube' ? Math.floor(Math.random() * 8000) : 0;
+    await ctx.scheduler.runAfter(delayMs, internal.jobs.DocEmbeddingJob.docEmbedding, {
       documentId,
       userId,
       notebookId: args.notebookId,
@@ -446,28 +448,6 @@ export const keywordSearch = internalQuery({
       documentId: r.documentId,
       sourceTitle: docTitleMap.get(r.documentId) ?? "Document",
     }));
-  },
-});
-
-/**
- * Internal: Process a document for embedding (deprecated - use DocEmbeddingJob instead)
- * @deprecated Use internal.jobs.DocEmbeddingJob.docEmbedding instead
- */
-export const processDocument = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    userId: v.string(),
-    notebookId: v.id("notebooks"),
-    type: v.string(),
-    source: v.string(),
-  },
-  handler: async (ctx, args) => {
-    // Redirect to new job handler
-    await ctx.scheduler.runAfter(0, internal.jobs.DocEmbeddingJob.docEmbedding, {
-      documentId: args.documentId,
-      userId: args.userId,
-      notebookId: args.notebookId,
-    });
   },
 });
 

@@ -2,6 +2,7 @@
 import { Supadata, SupadataError } from '@supadata/js';
 import { env } from '../../helpers/env';
 import { validateUrl } from '../../utils/urlValidation.js';
+import { invokeWithRetry } from '../agents/shared/retry.js';
 
 /**
  * SupadataLoaderService handles content extraction from:
@@ -92,35 +93,47 @@ export class SupadataLoaderService {
 
     console.log(`[Supadata] Fetching transcript for: ${url} (lang: ${lang})`);
 
-    try {
-      const transcriptResult = await this.supadata.transcript({
-        url,
-        lang,
-        text: true, // Return plain text instead of timestamped chunks
-        mode: 'auto', // 'native', 'auto', or 'generate'
-      });
+    const fetchOne = async (): Promise<string> => {
+      try {
+        const transcriptResult = await this.supadata.transcript({
+          url,
+          lang,
+          text: true, // Return plain text instead of timestamped chunks
+          mode: 'auto', // 'native', 'auto', or 'generate'
+        });
 
-      // Check if we got a transcript directly or a job ID for async processing
-      if ('jobId' in transcriptResult) {
-        // For large files, we need to poll for results
-        console.log(`[Supadata] Started transcript job: ${transcriptResult.jobId}`);
-        return this.stripMedia(await this.pollForTranscript(transcriptResult.jobId));
-      } else {
-        // For smaller files, we get the transcript directly
-        const text = typeof transcriptResult === 'string'
-          ? transcriptResult
-          : JSON.stringify(transcriptResult);
-        console.log(`[Supadata] Successfully fetched transcript (${text.length} chars)`);
-        return this.stripMedia(text);
+        // Check if we got a transcript directly or a job ID for async processing
+        if ('jobId' in transcriptResult) {
+          // For large files, we need to poll for results
+          console.log(`[Supadata] Started transcript job: ${transcriptResult.jobId}`);
+          return this.stripMedia(await this.pollForTranscript(transcriptResult.jobId));
+        } else {
+          // For smaller files, we get the transcript directly
+          const text = typeof transcriptResult === 'string'
+            ? transcriptResult
+            : JSON.stringify(transcriptResult);
+          console.log(`[Supadata] Successfully fetched transcript (${text.length} chars)`);
+          return this.stripMedia(text);
+        }
+      } catch (e) {
+        if (e instanceof SupadataError) {
+          console.error(`[Supadata] Error (${e.error}): ${e.message}`);
+          throw new Error(`Failed to fetch transcript: ${e.message}`);
+        }
+        throw e;
       }
+    };
 
-    } catch (e) {
-      if (e instanceof SupadataError) {
-        console.error(`[Supadata] Error (${e.error}): ${e.message}`);
-        throw new Error(`Failed to fetch transcript: ${e.message}`);
-      }
-      throw e;
-    }
+    // Retry on rate limit (e.g. "Limit Exceeded") when multiple transcripts are fetched at once
+    return invokeWithRetry(fetchOne, {
+      maxAttempts: 5,
+      baseDelayMs: 2000,
+      jitter: true,
+      retryableErrors: (err) =>
+        /limit exceeded|rate limit|too many requests|429/i.test(err.message),
+      onRetry: (attempt, error, delayMs) =>
+        console.warn(`[Supadata] Rate limited, retry ${attempt} in ${delayMs}ms: ${error.message}`),
+    }, 'loadTranscript');
   }
 
   /**
