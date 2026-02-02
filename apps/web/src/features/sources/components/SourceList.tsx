@@ -19,6 +19,7 @@ interface SourceListProps {
   onRenameChange: (value: string) => void;
   openMenuId: string | null;
   onMenuOpen: (id: string) => void;
+  onStartRename: (sourceId: string) => void;
   width: number;
   onAddSource: () => void;
   onDiscoverClick: () => void;
@@ -40,6 +41,7 @@ export const SourceList: React.FC<SourceListProps> = ({
   onRenameChange,
   openMenuId,
   onMenuOpen,
+  onStartRename,
   width,
   onAddSource,
   onDiscoverClick,
@@ -125,6 +127,7 @@ export const SourceList: React.FC<SourceListProps> = ({
                 onView={onViewSource}
                 onDelete={onDeleteSource}
                 onMenuOpen={onMenuOpen}
+                onStartRename={onStartRename}
                 isMenuOpen={openMenuId === source.id}
               />
             ))

@@ -145,12 +145,14 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setRenamingId(null);
     }
     setOpenMenuId(id === openMenuId ? null : id);
-    if (id) {
-      setRenamingId(id);
-      const source = sources.find(s => s.id === id);
-      if (source) {
-        setRenameValue(source.title);
-      }
+  };
+
+  const handleStartRename = (sourceId: string) => {
+    const source = sources.find(s => s.id === sourceId);
+    if (source) {
+      setRenamingId(sourceId);
+      setRenameValue(source.title);
+      setOpenMenuId(null);
     }
   };
 
@@ -281,6 +283,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               onRenameChange={setRenameValue}
               openMenuId={openMenuId}
               onMenuOpen={handleMenuOpen}
+              onStartRename={handleStartRename}
               width={width}
               onAddSource={() => setIsAddModalOpen(true)}
               onDiscoverClick={() => setIsDiscoverOpen(true)}

@@ -15,6 +15,7 @@ interface SourceListItemProps {
   onView: (id: string) => void;
   onDelete: (id: string, title: string) => void;
   onMenuOpen: (id: string) => void;
+  onStartRename: (sourceId: string) => void;
   isMenuOpen: boolean;
 }
 
@@ -29,6 +30,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   onView,
   onDelete,
   onMenuOpen,
+  onStartRename,
   isMenuOpen,
 }) => {
   const status = source.status || 'completed';
@@ -50,7 +52,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
 
   return (
     <div
-      className="group flex flex-col bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer overflow-visible relative"
+      className={`group flex flex-col bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer overflow-visible relative ${isMenuOpen ? 'z-[200]' : ''}`}
       onClick={() => canClick && onView(source.id)}
     >
       <div className="flex items-center gap-3 p-3">
@@ -114,9 +116,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                   onMenuOpen(source.id);
                 }}
                 className={`p-1.5 hover:bg-secondary rounded-full transition-colors flex items-center justify-center ${
-                  isMenuOpen
-                    ? 'text-foreground bg-secondary'
-                    : 'text-muted-foreground group-hover:text-foreground opacity-0 group-hover:opacity-100'
+                  isMenuOpen ? 'text-foreground bg-secondary' : 'text-muted-foreground'
                 }`}
                 title="More options"
               >
@@ -124,13 +124,19 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               </button>
               {isMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => onMenuOpen('')} />
-                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-xl z-50 min-w-[140px]">
+                  <div
+                    className="fixed inset-0 z-[100]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onMenuOpen('');
+                    }}
+                  />
+                  <div className="absolute right-0 top-full mt-1 z-[110] min-w-[140px] rounded-lg border border-border bg-card shadow-xl">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onRenameChange(source.title);
-                        onMenuOpen('');
+                        onStartRename(source.id);
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary first:rounded-t-lg transition-colors"
                     >
