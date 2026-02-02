@@ -197,7 +197,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
     }
   }, [inputMessage]);
 
@@ -386,7 +386,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return (
       <div className={`group/message flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1`} data-message-id={message.id}>
         {isUser ? (
-          <div className="flex flex-row items-start gap-2 max-w-[95%] sm:max-w-[75%]">
+          <div className="flex flex-row items-start gap-2 w-full max-w-[85%]">
             <div className="shrink-0 pt-4">
               <ActionBar />
             </div>
@@ -403,7 +403,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <span className="animate-pulse">{getStatusMessage(message.status)}</span>
               </div>
             )}
-            <div className="max-w-[90%] font-serif text-lg leading-relaxed text-foreground">
+            <div className="w-full max-w-[88%] font-serif text-lg leading-relaxed text-foreground">
               {renderMessageWithReferences(message.id, message.content, message.references)}
               <div className="flex justify-start mt-3">
                 <ActionBar />
@@ -480,7 +480,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           style={{ height: '100%' }}
           data={memoizedMessages}
           itemContent={(index, message) => (
-            <div className="px-4 py-3 sm:px-12 md:px-20 lg:px-32">
+            <div className="px-3 py-3 sm:px-4 md:px-6">
               <MessageBubble
                 key={message.id}
                 message={message}
@@ -568,24 +568,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
       {/* Input Area */}
       <div className="absolute bottom-8 left-0 right-0 px-4 flex justify-center z-20">
-        <div className="w-full max-w-3xl bg-card border-2 border-border shadow-lg rounded-2xl p-2 flex flex-col gap-2 relative">
+        <div className="w-full max-w-3xl bg-card border-2 border-border shadow-lg rounded-2xl py-1.5 px-2 flex flex-col gap-1 relative">
 
            <textarea
              ref={textareaRef}
              placeholder="Ask a question about your sources..."
-             className="w-full bg-transparent border-none p-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[60px] max-h-[200px] font-serif text-lg"
-             rows={2}
+             className="w-full bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-lg"
+             rows={1}
              value={inputMessage}
              onChange={(e) => setInputMessage(e.target.value)}
              onKeyDown={handleKeyDown}
              disabled={isSending || isLoading}
            />
 
-           <div className="flex justify-end items-center px-2 pb-1">
+           <div className="flex justify-end items-center px-1.5 pb-0.5">
              <button
                onClick={handleSendMessage}
                disabled={!inputMessage.trim() || isSending || isLoading || !notebookId}
-               className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+               className="p-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                title={inputMessage.trim() ? 'Send message (Enter)' : 'Type a message to send'}
              >
                {isSending || isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
