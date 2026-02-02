@@ -76,13 +76,13 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                     <span className="text-sm font-semibold text-foreground truncate">{note.title}</span>
                 </div>
             )}
-            <div className="w-full max-w-lg min-h-0 shrink-0 perspective-1000 group cursor-pointer" style={{ aspectRatio: '3 / 2' }} onClick={() => setIsFlipped(!isFlipped)}>
+            <div className="w-full max-w-lg min-h-[52vh] sm:min-h-0 shrink-0 perspective-1000 group cursor-pointer aspect-3/2" onClick={() => setIsFlipped(!isFlipped)}>
                 <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d shadow-xl rounded-xl border border-border ${isFlipped ? 'rotate-y-180' : ''}`}>
 
                     {/* Front */}
-                    <div className="absolute inset-0 backface-hidden bg-card rounded-xl flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 text-center">
-                         <span className="text-xs uppercase tracking-widest text-muted-foreground absolute top-4 sm:top-6 shrink-0">Front</span>
-                         <div className="text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)] w-full prose prose-stone dark:prose-invert max-w-none">
+                    <div className="absolute inset-0 backface-hidden bg-card rounded-xl flex flex-col items-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
+                         <span className="text-xs uppercase tracking-widest text-muted-foreground shrink-0">Front</span>
+                         <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center justify-center text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground prose prose-stone dark:prose-invert max-w-none py-1">
                              <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
                                  <MarkdownRenderer
                                      components={{
@@ -103,15 +103,15 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                                  </MarkdownRenderer>
                              </Suspense>
                          </div>
-                         <div className="absolute bottom-4 sm:bottom-6 text-xs text-muted-foreground/50 flex items-center gap-2 shrink-0">
+                         <div className="text-xs text-muted-foreground/50 flex items-center gap-2 shrink-0 mt-1">
                              <RotateCw className="w-3 h-3" /> Click to flip
                          </div>
                     </div>
 
                     {/* Back */}
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary rounded-xl flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
-                         <span className="text-xs uppercase tracking-widest text-secondary-foreground/60 absolute top-4 sm:top-6 shrink-0">Back</span>
-                         <div className="text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground line-clamp-6 overflow-y-auto max-h-[calc(100%-3rem)] w-full prose prose-stone dark:prose-invert max-w-none">
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary rounded-xl flex flex-col items-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
+                         <span className="text-xs uppercase tracking-widest text-secondary-foreground/60 shrink-0">Back</span>
+                         <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center justify-center text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground prose prose-stone dark:prose-invert max-w-none py-1">
                              <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
                                  <MarkdownRenderer
                                      components={{
