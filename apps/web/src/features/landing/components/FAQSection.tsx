@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
-import { SEOMeta, generateFAQStructuredData } from '@/shared/seo/SEOMeta';
 
-interface FAQItem {
+export interface FAQItem {
   question: string;
   answer: string;
 }
 
-const faqs: FAQItem[] = [
+export const LANDING_FAQS: FAQItem[] = [
   {
     question: "How accurate is the AI-generated content?",
     answer: "All generated content is grounded directly in your uploaded sources—whether it's a PDF, article, or video—rather than relying solely on general knowledge. This means the chances of AI hallucinations are extremely low, ensuring the flashcards, quizzes, and summaries accurately reflect your original materials."
@@ -48,12 +47,6 @@ export const FAQSection: React.FC = () => {
 
   return (
     <>
-      <SEOMeta
-        title="Frequently Asked Questions - SolomindLM"
-        description="Find answers to common questions about SolomindLM's AI-powered study materials, including pricing, features, data privacy, and export options."
-        canonical="/#faq"
-        structuredData={generateFAQStructuredData(faqs)}
-      />
       <section id="faq" className="py-20 px-6 bg-background">
       <div className="max-w-3xl mx-auto">
         {/* Section Header */}
@@ -68,7 +61,7 @@ export const FAQSection: React.FC = () => {
 
         {/* FAQ List */}
         <div className="space-y-4">
-          {faqs.map((faq, index) => (
+          {LANDING_FAQS.map((faq, index) => (
             <div
               key={index}
               className="bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-md"

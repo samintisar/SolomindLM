@@ -386,7 +386,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return (
       <div className={`group/message flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1`} data-message-id={message.id}>
         {isUser ? (
-          <div className="flex flex-row items-start gap-2 w-full max-w-[85%]">
+          <div className="flex flex-row items-start gap-2 max-w-[85%]">
             <div className="shrink-0 pt-4">
               <ActionBar />
             </div>

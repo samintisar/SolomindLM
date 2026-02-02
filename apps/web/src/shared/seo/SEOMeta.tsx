@@ -4,12 +4,13 @@ interface SEOMetaProps {
   title?: string;
   description?: string;
   canonical?: string;
+  keywords?: string;
   ogType?: 'website' | 'article';
   ogImage?: string;
   ogImageAlt?: string;
   twitterCard?: 'summary' | 'summary_large_image';
   noindex?: boolean;
-  structuredData?: Record<string, unknown>;
+  structuredData?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 const BASE_URL = 'https://solomindlm.com';
@@ -20,6 +21,7 @@ export const SEOMeta: React.FC<SEOMetaProps> = ({
   title = DEFAULT_TITLE,
   description = DEFAULT_DESCRIPTION,
   canonical,
+  keywords,
   ogType = 'website',
   ogImage,
   ogImageAlt,
@@ -33,6 +35,10 @@ export const SEOMeta: React.FC<SEOMetaProps> = ({
 
     // Update or create meta description
     setMetaTag('name', 'description', description);
+
+    if (keywords !== undefined) {
+      setMetaTag('name', 'keywords', keywords);
+    }
 
     // Open Graph tags
     setMetaTag('property', 'og:title', title);
@@ -78,7 +84,7 @@ export const SEOMeta: React.FC<SEOMetaProps> = ({
     return () => {
       removeMetaTags();
     };
-  }, [title, description, canonical, ogType, ogImage, ogImageAlt, twitterCard, noindex, structuredData]);
+  }, [title, description, canonical, keywords, ogType, ogImage, ogImageAlt, twitterCard, noindex, structuredData]);
 
   return null; // This component doesn't render anything
 };
@@ -89,6 +95,7 @@ function setMetaTag(attrName: string, attrValue: string, content: string): void 
   if (!element) {
     element = document.createElement('meta');
     element.setAttribute(attrName, attrValue);
+    element.setAttribute('data-dynamic', 'true');
     document.head.appendChild(element);
   }
   element.setAttribute('content', content);
@@ -99,32 +106,39 @@ function setLinkTag(rel: string, href: string): void {
   if (!element) {
     element = document.createElement('link');
     element.setAttribute('rel', rel);
+    element.setAttribute('data-dynamic', 'true');
     document.head.appendChild(element);
   }
   element.setAttribute('href', href);
 }
 
-let structuredDataElement: HTMLScriptElement | null = null;
+const structuredDataScripts: HTMLScriptElement[] = [];
 
-function setStructuredData(data: Record<string, unknown>): void {
-  if (!structuredDataElement) {
-    structuredDataElement = document.createElement('script');
-    structuredDataElement.type = 'application/ld+json';
-    document.head.appendChild(structuredDataElement);
-  }
-  structuredDataElement.textContent = JSON.stringify(data);
+function setStructuredData(data: Record<string, unknown> | Record<string, unknown>[]): void {
+  structuredDataScripts.splice(0, structuredDataScripts.length).forEach((script) => {
+    if (script.parentNode) script.parentNode.removeChild(script);
+  });
+  const items = Array.isArray(data) ? data : [data];
+  items.forEach((item) => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify(item);
+    script.setAttribute('data-dynamic', 'true');
+    document.head.appendChild(script);
+    structuredDataScripts.push(script);
+  });
 }
 
 function removeMetaTags(): void {
-  // Remove dynamically created meta tags on cleanup
   const dynamicMetaTags = document.querySelectorAll('meta[data-dynamic="true"]');
-  dynamicMetaTags.forEach(tag => tag.remove());
-
-  // Remove structured data
-  if (structuredDataElement && structuredDataElement.parentNode) {
-    structuredDataElement.parentNode.removeChild(structuredDataElement);
-    structuredDataElement = null;
-  }
+  dynamicMetaTags.forEach((tag) => tag.remove());
+  const dynamicLinks = document.querySelectorAll('link[data-dynamic="true"]');
+  dynamicLinks.forEach((tag) => tag.remove());
+  structuredDataScripts.splice(0, structuredDataScripts.length).forEach((script) => {
+    if (script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+  });
 }
 
 // Predefined structured data generators
@@ -169,5 +183,19 @@ export const generateWebSiteStructuredData = () => ({
     '@type': 'SearchAction',
     target: `${BASE_URL}/search?q={search_term_string}`,
     'query-input': 'required name=search_term_string',
+  },
+});
+
+export const generateSoftwareApplicationStructuredData = () => ({
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'SolomindLM',
+  applicationCategory: 'https://schema.org/ResearchTool',
+  url: BASE_URL,
+  description: DEFAULT_DESCRIPTION,
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
   },
 });
