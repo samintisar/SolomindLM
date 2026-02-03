@@ -1,5 +1,5 @@
 import React from 'react';
-import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText, Brain } from 'lucide-react';
+import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText, Brain, Table2 } from 'lucide-react';
 import { LANDING_CONTENT } from '../constants';
 
 export const FeaturesGrid: React.FC = () => {
@@ -12,6 +12,7 @@ export const FeaturesGrid: React.FC = () => {
       case 'quiz': return HelpCircle;
       case 'writtenQuestions': return MessageSquareText;
       case 'rag': return Brain;
+      case 'spreadsheets': return Table2;
       default: return HelpCircle;
     }
   };
@@ -25,6 +26,7 @@ export const FeaturesGrid: React.FC = () => {
       case 'quiz': return 'text-blue-700';
       case 'writtenQuestions': return 'text-green-700';
       case 'rag': return 'text-violet-600';
+      case 'spreadsheets': return 'text-cyan-600';
       default: return 'text-primary';
     }
   };
@@ -35,7 +37,7 @@ export const FeaturesGrid: React.FC = () => {
         {/* Section Header */}
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
-            Powerful Study Tools
+            Powerful Learning Tools
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             AI-powered tools designed to help you learn faster and retain more
