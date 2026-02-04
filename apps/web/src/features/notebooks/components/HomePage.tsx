@@ -6,6 +6,7 @@ import { CustomizeNotebookModal, MoveToFolderModal, CustomizeFolderModal } from 
 import { useNotebookHandlers, useFolderHandlers, useNotebookSorting } from '../hooks';
 import { useCreateNotebook, useUpdateNotebook } from '../services/notebooksApi';
 import { useCreateFolder, useUpdateFolder } from '../services/foldersApi';
+import { useLimitErrorToast } from '@/shared/hooks/useLimitErrorToast';
 
 interface NotebookCreateData {
   title: string;
@@ -53,6 +54,9 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [activeTab, setActiveTab] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // Limit error handling
+  const { handleLimitError } = useLimitErrorToast();
+
   // Custom hooks for state and handlers
   const notebookHandlers = useNotebookHandlers({
     notebooks: recentNotebooks,
@@ -83,11 +87,15 @@ export const HomePage: React.FC<HomePageProps> = ({
       // Optimistic updates handle the UI update automatically
     } catch (error) {
       console.error('Failed to create notebook:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const handled = await handleLimitError(error);
 
-      if (errorMessage.includes('Unauthorized')) {
-        notebookHandlers.closeCustomize();
-        if (onRequireAuth) onRequireAuth('You need to sign in to create a notebook.');
+      if (!handled.isLimitError) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        if (errorMessage.includes('Unauthorized')) {
+          notebookHandlers.closeCustomize();
+          if (onRequireAuth) onRequireAuth('You need to sign in to create a notebook.');
+        }
       }
     }
   };

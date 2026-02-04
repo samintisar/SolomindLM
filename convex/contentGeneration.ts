@@ -26,6 +26,12 @@ export const scheduleReport = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
+    // Check daily report limit
+    await ctx.runMutation(internal.lib.limits.checkDailyLimitInternal, {
+      userId,
+      feature: "report",
+    });
+
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
       throw new Error("Please select at least one source. Content generation uses only your selected sources.");
@@ -81,6 +87,12 @@ export const scheduleFlashcards = action({
   handler: async (ctx, args): Promise<ScheduleFlashcardsResult> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
+
+    // Check daily flashcard limit
+    await ctx.runMutation(internal.lib.limits.checkDailyLimitInternal, {
+      userId,
+      feature: "flashcard",
+    });
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
@@ -138,6 +150,12 @@ export const scheduleQuiz = action({
   handler: async (ctx, args): Promise<ScheduleQuizResult> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
+
+    // Check daily quiz limit
+    await ctx.runMutation(internal.lib.limits.checkDailyLimitInternal, {
+      userId,
+      feature: "quiz",
+    });
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
@@ -197,6 +215,12 @@ export const scheduleWrittenQuestions = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
+    // Check daily written question limit
+    await ctx.runMutation(internal.lib.limits.checkDailyLimitInternal, {
+      userId,
+      feature: "writtenQuestion",
+    });
+
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
       throw new Error("Please select at least one source. Content generation uses only your selected sources.");
@@ -255,6 +279,12 @@ export const scheduleSpreadsheet = action({
   handler: async (ctx, args): Promise<ScheduleSpreadsheetResult> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
+
+    // Check daily spreadsheet limit
+    await ctx.runMutation(internal.lib.limits.checkDailyLimitInternal, {
+      userId,
+      feature: "spreadsheet",
+    });
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {

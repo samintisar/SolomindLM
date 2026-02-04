@@ -45,6 +45,12 @@ export const runWithStreamId = internalAction({
     documentIds: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    // Check daily chat limit
+    await ctx.runMutation(internal.lib.limits.checkDailyLimitInternal, {
+      userId: args.userId,
+      feature: "chat",
+    });
+
     const chunkAppender = async (text: string) => {
       await ctx.runMutation(components.persistentTextStreaming.lib.addChunk, {
         streamId: args.streamId as any,

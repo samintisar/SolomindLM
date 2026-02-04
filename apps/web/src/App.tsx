@@ -37,6 +37,7 @@ import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder } from '.
 import { useGenerateUploadUrl, useCreateDocument, useUpdateDocument, useDeleteDocument } from './features/sources/services/documentsApi';
 import { useSubscriptionStatus } from './features/billing/services/subscriptionApi';
 import { useSendMessage, type SendMessageCallbacks } from './features/chat/services/chatApi';
+import { useLimitErrorToast } from './shared/hooks/useLimitErrorToast';
 import 'mind-elixir/style.css';
 
 // ============================================================
@@ -211,6 +212,9 @@ const AppContent: React.FC = () => {
 
   // Subscription status
   const subscriptionStatus = useSubscriptionStatus();
+
+  // Limit error handling
+  const { handleLimitError } = useLimitErrorToast();
 
   // Chat: stream messages with optimistic updates
   const sendChatMessage = useSendMessage();
@@ -674,7 +678,10 @@ const AppContent: React.FC = () => {
       navigate(`/notebook/${newNotebook.id}`);
     } catch (error) {
       console.error('Failed to create notebook:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create notebook');
+      const handled = await handleLimitError(error);
+      if (!handled.isLimitError) {
+        alert(error instanceof Error ? error.message : 'Failed to create notebook');
+      }
     }
   };
 

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
+import { checkDailyLimit } from "./lib/limits";
 
 /**
  * List all audio overviews for a notebook
@@ -135,6 +136,9 @@ export const generateAudioOverview = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    // Check daily audio limit
+    await checkDailyLimit(ctx, userId, "audio");
 
     const { notebookId, documentIds, title } = args;
     if (documentIds.length === 0) {

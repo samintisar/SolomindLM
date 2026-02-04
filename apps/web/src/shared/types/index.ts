@@ -350,3 +350,41 @@ export interface DiscoveryRequest {
   excludeDomains?: string[];
   maxResults?: number;
 }
+
+/**
+ * Features that have daily limits
+ */
+export type DailyFeature =
+  | 'chat'
+  | 'flashcard'
+  | 'quiz'
+  | 'report'
+  | 'audio'
+  | 'writtenQuestion'
+  | 'spreadsheet'
+  | 'slide';
+
+/**
+ * Error codes for different types of limit errors
+ */
+export type ErrorCode =
+  | 'NOTEBOOK_LIMIT_REACHED'
+  | 'SOURCE_LIMIT_REACHED'
+  | 'DAILY_LIMIT_REACHED';
+
+/**
+ * Types of limits that can be enforced
+ */
+export type LimitType = 'notebook' | 'source' | 'daily';
+
+/**
+ * Structured error data that can be serialized through Convex
+ */
+export interface LimitErrorData {
+  code: ErrorCode;
+  limit: number;
+  current: number;
+  limitType: LimitType;
+  feature?: DailyFeature;
+  isPro?: boolean;
+}

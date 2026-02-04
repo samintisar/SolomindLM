@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
+import { checkDailyLimit } from "./lib/limits";
 
 /**
  * List all slide decks for a notebook
@@ -138,6 +139,9 @@ export const generateSlideDeck = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    // Check daily slide limit
+    await checkDailyLimit(ctx, userId, "slide");
 
     const { notebookId, documentIds, slideCount, title } = args;
     if (documentIds.length === 0) {

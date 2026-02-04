@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { useUploadDocument, useCreateDocument } from '../services/documentsApi';
+import { useUserLimits } from '@/features/billing/services/subscriptionApi';
+import { useLimitErrorToast } from '@/shared/hooks/useLimitErrorToast';
 
-const MAX_SOURCES = 100;
 const ACCEPTED_FILE_TYPES = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.json', '.csv', '.png', '.jpg', '.jpeg', '.avif'];
 
 interface UseSourceUploadProps {
@@ -9,6 +10,7 @@ interface UseSourceUploadProps {
   userId?: string | null;
   noteId?: string | null;
   onDocumentUploaded?: (documentId: string) => void;
+  sourceLimit?: number;
 }
 
 interface UseSourceUploadResult {
@@ -44,9 +46,15 @@ export function useSourceUpload({
   userId,
   noteId,
   onDocumentUploaded,
+  sourceLimit,
 }: UseSourceUploadProps): UseSourceUploadResult {
   const uploadDocument = useUploadDocument();
   const createDocument = useCreateDocument();
+  const userLimits = useUserLimits();
+  const { handleLimitError } = useLimitErrorToast();
+
+  // Use provided limit or get from subscription
+  const maxSources = sourceLimit ?? userLimits.sourceLimit;
 
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -76,8 +84,14 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= MAX_SOURCES) {
-      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+    if (sourcesCount >= maxSources) {
+      await handleLimitError(
+        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        {
+          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
+          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+        }
+      );
       return;
     }
 
@@ -89,7 +103,10 @@ export function useSourceUpload({
       }
     } catch (err) {
       console.error('Upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
+      const handled = await handleLimitError(err);
+      if (!handled.isLimitError) {
+        alert(err instanceof Error ? err.message : 'Upload failed');
+      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -111,8 +128,14 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= MAX_SOURCES) {
-      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+    if (sourcesCount >= maxSources) {
+      await handleLimitError(
+        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        {
+          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
+          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+        }
+      );
       return;
     }
 
@@ -148,7 +171,10 @@ export function useSourceUpload({
       }
     } catch (err) {
       console.error('URL upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
+      const handled = await handleLimitError(err);
+      if (!handled.isLimitError) {
+        alert(err instanceof Error ? err.message : 'Upload failed');
+      }
       throw err;
     } finally {
       setIsUploading(false);
@@ -162,8 +188,14 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= MAX_SOURCES) {
-      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+    if (sourcesCount >= maxSources) {
+      await handleLimitError(
+        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        {
+          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
+          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+        }
+      );
       return;
     }
 
@@ -199,7 +231,10 @@ export function useSourceUpload({
       }
     } catch (err) {
       console.error('Social media upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
+      const handled = await handleLimitError(err);
+      if (!handled.isLimitError) {
+        alert(err instanceof Error ? err.message : 'Upload failed');
+      }
       throw err;
     } finally {
       setIsUploading(false);
@@ -213,8 +248,14 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= MAX_SOURCES) {
-      alert(`You've reached the maximum of ${MAX_SOURCES} sources. Remove some sources to add new ones.`);
+    if (sourcesCount >= maxSources) {
+      await handleLimitError(
+        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        {
+          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
+          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+        }
+      );
       return;
     }
 
@@ -229,7 +270,10 @@ export function useSourceUpload({
       onDocumentUploaded?.(result.documentId);
     } catch (err) {
       console.error('Text upload failed:', err);
-      alert(err instanceof Error ? err.message : 'Upload failed');
+      const handled = await handleLimitError(err);
+      if (!handled.isLimitError) {
+        alert(err instanceof Error ? err.message : 'Upload failed');
+      }
       throw err;
     } finally {
       setIsUploading(false);
@@ -240,7 +284,7 @@ export function useSourceUpload({
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    if (userId && noteId && sourcesCount < MAX_SOURCES) {
+    if (userId && noteId && sourcesCount < maxSources) {
       setIsDragging(true);
     }
   };
@@ -264,7 +308,7 @@ export function useSourceUpload({
     e.stopPropagation();
     setIsDragging(false);
 
-    if (!userId || !noteId || sourcesCount >= MAX_SOURCES) {
+    if (!userId || !noteId || sourcesCount >= maxSources) {
       return;
     }
 
