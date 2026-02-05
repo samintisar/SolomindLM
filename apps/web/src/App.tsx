@@ -578,14 +578,14 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  // Handle redirect from Stripe checkout
+  // Handle redirect from Stripe checkout (go to billing and clear query so subscription state can load)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const canceled = urlParams.get('canceled');
 
     if ((success === 'true' || canceled === 'true') && isAuthenticated && user) {
-      navigate('/billing');
+      navigate('/billing', { replace: true });
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [isAuthenticated, user, navigate]);
@@ -612,12 +612,14 @@ const AppContent: React.FC = () => {
     }
   }, [updateDocument]);
 
-  // Redirect authenticated users from landing (/) to /home
+  // Redirect authenticated users from landing (/) to /home (skip when returning from Stripe so success handler can send to /billing)
   useEffect(() => {
-    if (!isLoading && isAuthenticated && location.pathname === '/') {
+    const params = new URLSearchParams(location.search);
+    const fromStripe = params.get('success') === 'true' || params.get('canceled') === 'true';
+    if (!isLoading && isAuthenticated && location.pathname === '/' && !fromStripe) {
       navigate('/home', { replace: true });
     }
-  }, [isLoading, isAuthenticated, location.pathname, navigate]);
+  }, [isLoading, isAuthenticated, location.pathname, location.search, navigate]);
 
   // Show login modal only for protected routes when not authenticated
   useEffect(() => {

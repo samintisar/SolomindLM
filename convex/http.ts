@@ -49,6 +49,21 @@ const getCorsHeaders = (origin?: string | null): Record<string, string> => {
 // Stripe Webhook (Forward to Node Action)
 // ============================================================
 
+// GET so you can verify the endpoint is deployed (browser hits GET; Stripe sends POST)
+http.route({
+  path: "/stripe/webhook",
+  method: "GET",
+  handler: httpAction(async () => {
+    return new Response(
+      JSON.stringify({
+        message: "Stripe webhook endpoint. Stripe sends POST here.",
+        method: "POST",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }),
+});
+
 http.route({
   path: "/stripe/webhook",
   method: "POST",

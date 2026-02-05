@@ -1,6 +1,5 @@
 import type {
   SubscriptionStatusResponse,
-  CheckoutSessionRequest,
   CheckoutSessionResponse,
   SubscriptionInterval,
 } from '../types';

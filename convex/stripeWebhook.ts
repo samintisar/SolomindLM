@@ -75,7 +75,24 @@ async function handleCheckoutCompleted(
   const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
     expand: ["items.data.price"],
   });
-  const userId = subscription.metadata?.userId ?? session.metadata?.userId;
+  let userId =
+    subscription.metadata?.userId ??
+    session.metadata?.userId ??
+    (session.client_reference_id as string | undefined);
+
+  // Fallback: resolve userId from Stripe customer metadata (e.g. convexUserId) if component or session didn't pass it
+  if (!userId && customerId) {
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer.deleted && customer.metadata?.convexUserId) {
+        userId = customer.metadata.convexUserId;
+        console.log("[Stripe webhook] Resolved userId from customer metadata:", userId);
+      }
+    } catch (e) {
+      console.warn("[Stripe webhook] Could not retrieve customer for userId fallback:", e);
+    }
+  }
+
   const interval = subscription.metadata?.interval ?? session.metadata?.interval;
 
   if (!subscriptionId || !customerId || !userId) {
