@@ -125,16 +125,6 @@ export function useDeleteDocument() {
 }
 
 /**
- * Set file extension for a source that was ingested without one (fixes "DOC" label for Markdown/PDF).
- */
-export function useSetFileExtension() {
-  const setExt = useMutation(api.documents.setFileExtension);
-  return async (id: string, extension: 'md' | 'pdf' | 'txt') => {
-    return await setExt({ id: id as Id<'documents'>, extension });
-  };
-}
-
-/**
  * Get the full content of a document (reconstructed from chunks)
  */
 export function useDocumentContent(documentId: string | null) {

@@ -253,51 +253,6 @@ export const update = mutation({
   },
 });
 
-/** Allowed extensions for "Set type" (fix mislabeled ingested files) */
-const SET_TYPE_EXTENSIONS = new Set(['md', 'pdf', 'txt']);
-
-/**
- * Set file extension for a document that was ingested without one.
- * Use this to fix sources that show as "DOC" but are actually Markdown or PDF.
- * Only applies to file documents; only adds extension if the current fileName has no known extension.
- */
-export const setFileExtension = mutation({
-  args: {
-    id: v.id("documents"),
-    extension: v.string(), // e.g. 'md', 'pdf', 'txt'
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-
-    const ext = args.extension.toLowerCase();
-    if (!SET_TYPE_EXTENSIONS.has(ext)) {
-      throw new Error(`Invalid extension. Use one of: ${[...SET_TYPE_EXTENSIONS].join(', ')}`);
-    }
-
-    const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) throw new Error("Document not found");
-    if (doc.fileType !== "file") throw new Error("Only file sources can have their type set");
-
-    const lastDot = doc.fileName.lastIndexOf(".");
-    const existingExt = lastDot >= 0 ? doc.fileName.slice(lastDot + 1).toLowerCase() : "";
-    if (existingExt && FILE_EXTENSIONS.has(existingExt)) {
-      return await ctx.db.get(args.id); // already has a known extension, no change
-    }
-
-    const newFileName = doc.fileName.trim().endsWith(`.${ext}`)
-      ? doc.fileName.trim()
-      : `${doc.fileName.trim()}.${ext}`;
-
-    await ctx.db.patch(args.id, {
-      fileName: newFileName,
-      updatedAt: Date.now(),
-    });
-
-    return await ctx.db.get(args.id);
-  },
-});
-
 /**
  * Delete a document
  */
@@ -314,7 +269,7 @@ export const remove = mutation({
 
     // Delete file from storage if it exists
     if (document.storageId) {
-      await ctx.storage.delete(document.storageId);
+      await ctx.storage.delete(document.storageId as Id<'_storage'>);
     }
 
     // Delete from database (chunks will need to be deleted separately)

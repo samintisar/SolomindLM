@@ -13,7 +13,6 @@ interface SourceListProps {
   onViewSource: (id: string) => void;
   onDeleteSource: (id: string, title: string) => void;
   onRenameSource: (id: string, newTitle: string) => void;
-  onSetSourceType: (id: string, extension: 'md' | 'pdf' | 'txt') => void;
   allSelected: boolean;
   renamingId: string | null;
   renameValue: string;
@@ -36,7 +35,6 @@ export const SourceList: React.FC<SourceListProps> = ({
   onViewSource,
   onDeleteSource,
   onRenameSource,
-  onSetSourceType,
   allSelected,
   renamingId,
   renameValue,
@@ -128,7 +126,6 @@ export const SourceList: React.FC<SourceListProps> = ({
                 onToggle={onToggleSource}
                 onView={onViewSource}
                 onDelete={onDeleteSource}
-                onSetSourceType={onSetSourceType}
                 onMenuOpen={onMenuOpen}
                 onStartRename={onStartRename}
                 isMenuOpen={openMenuId === source.id}

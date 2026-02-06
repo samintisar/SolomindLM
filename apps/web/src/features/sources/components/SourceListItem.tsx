@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  FileText, Globe, File, CheckSquare, Square, Loader2, XCircle, MoreVertical, Edit2, Trash2, FileCode,
+  FileText, Globe, File, CheckSquare, Square, Loader2, XCircle, MoreVertical, Edit2, Trash2,
 } from 'lucide-react';
 import { Source } from '@/shared/types';
 
@@ -14,7 +14,6 @@ interface SourceListItemProps {
   onToggle: (id: string) => void;
   onView: (id: string) => void;
   onDelete: (id: string, title: string) => void;
-  onSetSourceType?: (id: string, extension: 'md' | 'pdf' | 'txt') => void;
   onMenuOpen: (id: string) => void;
   onStartRename: (sourceId: string) => void;
   isMenuOpen: boolean;
@@ -30,7 +29,6 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   onToggle,
   onView,
   onDelete,
-  onSetSourceType,
   onMenuOpen,
   onStartRename,
   isMenuOpen,
@@ -145,32 +143,6 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                       <Edit2 className="w-4 h-4" />
                       Rename
                     </button>
-                    {source.type === 'DOC' && onSetSourceType && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSetSourceType(source.id, 'md');
-                            onMenuOpen('');
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
-                        >
-                          <FileCode className="w-4 h-4" />
-                          Mark as Markdown
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSetSourceType(source.id, 'pdf');
-                            onMenuOpen('');
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
-                        >
-                          <FileText className="w-4 h-4" />
-                          Mark as PDF
-                        </button>
-                      </>
-                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -11,7 +11,7 @@ import { SourcesPanelHeader } from './SourcesPanelHeader';
 import { useSourceUpload } from '../hooks/useSourceUpload';
 import { useSourceContent } from '../hooks/useSourceContent';
 import { useSourceSearch } from '../hooks/useSourceSearch';
-import { useDocumentContent, useDocument, useSetFileExtension } from '../services/documentsApi';
+import { useDocumentContent, useDocument } from '../services/documentsApi';
 import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 
 interface SourcesPanelProps {
@@ -96,7 +96,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   }, [viewingSourceId, documentContent, viewingSource?.status]);
 
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-  const setFileExtension = useSetFileExtension();
 
   // Mobile detection
   useEffect(() => {
@@ -161,15 +160,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setRenamingId(sourceId);
       setRenameValue(source.title);
       setOpenMenuId(null);
-    }
-  };
-
-  const handleSetSourceType = async (sourceId: string, extension: 'md' | 'pdf' | 'txt') => {
-    try {
-      await setFileExtension(sourceId, extension);
-      setOpenMenuId(null);
-    } catch (e) {
-      console.error('Failed to set source type:', e);
     }
   };
 
@@ -295,7 +285,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               onViewSource={handleViewSource}
               onDeleteSource={handleDeleteSource}
               onRenameSource={handleRenameSource}
-              onSetSourceType={handleSetSourceType}
               allSelected={allSelected}
               renamingId={renamingId}
               renameValue={renameValue}
