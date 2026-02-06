@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery, internalAction, action } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
 import { checkSourceLimit } from "./lib/limits";
@@ -27,6 +28,7 @@ export const upload = mutation({
     storageId: v.optional(v.string()),
     fileName: v.string(),
     fileSize: v.optional(v.number()),
+    contentType: v.optional(v.string()), // e.g. application/pdf — used when fileName has no extension
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -64,6 +66,7 @@ export const upload = mutation({
       fileType: args.type,
       fileSize: args.fileSize,
       storageId: args.storageId,
+      contentType: args.contentType,
       fileUrl: (args.type === "url" || args.type === "youtube" || args.type === "text") ? args.source : undefined,
       status: "pending",
       createdAt: now,
@@ -195,12 +198,20 @@ export const getSignedUrl = mutation({
       throw new Error("Document not found");
     }
 
-    return await ctx.storage.getUrl(args.storageId);
+    return await ctx.storage.getUrl(args.storageId as Id<"_storage">);
   },
 });
 
+// Known file extensions so we can preserve them when renaming (keeps PDF/DOCX etc. labels correct)
+const FILE_EXTENSIONS = new Set([
+  'pdf', 'docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'txt', 'md', 'markdown',
+  'json', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif',
+]);
+
 /**
- * Update a document title
+ * Update a document title.
+ * For file documents, preserves the existing extension if the new title doesn't include one,
+ * so the source continues to display as PDF/DOCX etc. instead of falling back to DOC.
  */
 export const update = mutation({
   args: {
@@ -219,12 +230,71 @@ export const update = mutation({
       throw new Error("Document not found");
     }
 
+    let newFileName = title.trim();
+
+    if (existing.fileType === "file" && existing.fileName) {
+      const lastDot = existing.fileName.lastIndexOf(".");
+      const existingExt = lastDot >= 0 ? existing.fileName.slice(lastDot + 1).toLowerCase() : "";
+      if (existingExt && FILE_EXTENSIONS.has(existingExt)) {
+        const newLastDot = newFileName.lastIndexOf(".");
+        const newExt = newLastDot >= 0 ? newFileName.slice(newLastDot + 1).toLowerCase() : "";
+        if (!newExt || !FILE_EXTENSIONS.has(newExt)) {
+          newFileName = newFileName + (newFileName.endsWith(".") ? "" : ".") + existingExt;
+        }
+      }
+    }
+
     await ctx.db.patch(id, {
-      fileName: title.trim(),
+      fileName: newFileName,
       updatedAt: Date.now(),
     });
 
     return await ctx.db.get(id);
+  },
+});
+
+/** Allowed extensions for "Set type" (fix mislabeled ingested files) */
+const SET_TYPE_EXTENSIONS = new Set(['md', 'pdf', 'txt']);
+
+/**
+ * Set file extension for a document that was ingested without one.
+ * Use this to fix sources that show as "DOC" but are actually Markdown or PDF.
+ * Only applies to file documents; only adds extension if the current fileName has no known extension.
+ */
+export const setFileExtension = mutation({
+  args: {
+    id: v.id("documents"),
+    extension: v.string(), // e.g. 'md', 'pdf', 'txt'
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const ext = args.extension.toLowerCase();
+    if (!SET_TYPE_EXTENSIONS.has(ext)) {
+      throw new Error(`Invalid extension. Use one of: ${[...SET_TYPE_EXTENSIONS].join(', ')}`);
+    }
+
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.userId !== userId) throw new Error("Document not found");
+    if (doc.fileType !== "file") throw new Error("Only file sources can have their type set");
+
+    const lastDot = doc.fileName.lastIndexOf(".");
+    const existingExt = lastDot >= 0 ? doc.fileName.slice(lastDot + 1).toLowerCase() : "";
+    if (existingExt && FILE_EXTENSIONS.has(existingExt)) {
+      return await ctx.db.get(args.id); // already has a known extension, no change
+    }
+
+    const newFileName = doc.fileName.trim().endsWith(`.${ext}`)
+      ? doc.fileName.trim()
+      : `${doc.fileName.trim()}.${ext}`;
+
+    await ctx.db.patch(args.id, {
+      fileName: newFileName,
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(args.id);
   },
 });
 

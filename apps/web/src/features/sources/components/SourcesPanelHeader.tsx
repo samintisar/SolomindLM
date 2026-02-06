@@ -39,7 +39,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
     <>
       {/* Resize Handle (desktop only) */}
       <div
-        className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 z-50 transition-colors transition-transform active:bg-primary/70 hidden md:block"
+        className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 z-50 transition-colors active:bg-primary/70 hidden md:block"
         onMouseDown={onResizeStart}
       />
 
@@ -50,7 +50,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
             <div className="flex items-center gap-3 text-foreground overflow-hidden min-w-0 flex-1">
               <button
                 onClick={onBackToList}
-                className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
+                className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
                 aria-label="Back to sources"
               >
                 <ChevronLeft className="w-5 h-5 shrink-0" />
@@ -123,7 +123,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 type="button"
                 onClick={onCopy}
                 disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-transform text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
                 title="Copy content as Markdown"
                 aria-label="Copy content as Markdown"
               >
@@ -133,7 +133,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 type="button"
                 onClick={onDownload}
                 disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-transform text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
                 title="Download as Markdown file"
                 aria-label="Download as Markdown file"
               >
@@ -159,7 +159,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
             <div className="flex items-center gap-3 text-sidebar-foreground overflow-hidden min-w-0 flex-1">
               <button
                 onClick={onBackToList}
-                className="p-1 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-colors transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground shrink-0 touch-manipulation"
+                className="p-1 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground shrink-0 touch-manipulation"
               >
                 <ChevronLeft className="w-5 h-5 shrink-0" />
               </button>
@@ -231,7 +231,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 type="button"
                 onClick={onCopy}
                 disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-colors transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                className="p-2 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
                 title="Copy content as Markdown"
                 aria-label="Copy content as Markdown"
               >
@@ -241,7 +241,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 type="button"
                 onClick={onDownload}
                 disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-colors transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                className="p-2 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
                 title="Download as Markdown file"
                 aria-label="Download as Markdown file"
               >
@@ -260,7 +260,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-colors transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0 touch-manipulation"
+              className="p-1 hover:bg-sidebar-accent active:bg-sidebar-accent/80 active:scale-[0.97] rounded-sm transition-transform text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0 touch-manipulation"
               aria-label="Close Sources panel"
             >
               <ChevronLeft className="w-5 h-5 shrink-0" />

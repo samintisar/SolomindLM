@@ -93,7 +93,17 @@ function documentToSource(doc: any): Source {
       case 'bmp':
       case 'svg':
       case 'avif': type = 'IMG'; break;
-      default: type = 'DOC'; // unknown or no extension (e.g. renamed file) — avoid mislabeling as PDF
+      default: {
+        // No extension or unknown — use contentType so PDFs etc. are labeled correctly
+        const ct = (doc.contentType || '').toLowerCase();
+        if (ct.includes('pdf')) type = 'PDF';
+        else if (ct.includes('wordprocessingml') || ct.includes('msword')) type = ext === 'doc' ? 'DOC' : 'DOCX';
+        else if (ct.includes('presentationml') || ct.includes('ms-powerpoint')) type = ext === 'ppt' ? 'PPT' : 'PPTX';
+        else if (ct.includes('spreadsheetml') || ct.includes('ms-excel')) type = ext === 'xls' ? 'XLS' : 'XLSX';
+        else if (ct.includes('text/plain') || ct.includes('text/markdown')) type = 'TXT';
+        else if (ct.includes('image/')) type = 'IMG';
+        else type = 'DOC'; // unknown
+      }
     }
   }
 

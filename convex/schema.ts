@@ -45,6 +45,7 @@ export default defineSchema({
     fileSize: v.optional(v.number()),
     fileUrl: v.optional(v.string()),
     storageId: v.optional(v.string()), // Convex Storage ID
+    contentType: v.optional(v.string()), // e.g. application/pdf — used when fileName has no extension so UI can show PDF/DOCX etc.
     status: v.string(), // 'pending' | 'processing' | 'completed' | 'failed'
     error: v.optional(v.string()),
     metadata: v.optional(v.any()),

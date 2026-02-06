@@ -49,6 +49,7 @@ export function useCreateDocument() {
     fileName: string;
     fileSize?: number;
     storageId?: string;
+    contentType?: string;
   }) => {
     return await upload({
       notebookId: data.notebookId as Id<'notebooks'>,
@@ -57,6 +58,7 @@ export function useCreateDocument() {
       storageId: data.storageId,
       fileName: data.fileName,
       fileSize: data.fileSize,
+      contentType: data.contentType,
     });
   };
 }
@@ -119,6 +121,16 @@ export function useDeleteDocument() {
 
   return async (id: string) => {
     return await remove({ id: id as Id<'documents'> });
+  };
+}
+
+/**
+ * Set file extension for a source that was ingested without one (fixes "DOC" label for Markdown/PDF).
+ */
+export function useSetFileExtension() {
+  const setExt = useMutation(api.documents.setFileExtension);
+  return async (id: string, extension: 'md' | 'pdf' | 'txt') => {
+    return await setExt({ id: id as Id<'documents'>, extension });
   };
 }
 
@@ -206,13 +218,14 @@ export function useUploadDocument() {
 
     const { storageId } = await uploadResponse.json();
 
-    // 3. Create document record
+    // 3. Create document record (include contentType so PDFs stay labeled correctly if renamed without extension)
     const result = await createDocument({
       notebookId: notebookId as Id<'notebooks'>,
       type: 'file',
       storageId,
       fileName: file.name,
       fileSize: file.size,
+      contentType: file.type || undefined,
     });
 
     return { documentId: result.documentId };
