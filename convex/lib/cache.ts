@@ -6,7 +6,7 @@ import crypto from "crypto";
 export const CACHE_TTL = {
   agent: 60 * 60 * 1000, // 1 hour for agent runs
   embedding: 7 * 24 * 60 * 60 * 1000, // 7 days for embeddings
-  vectorSearch: 5 * 60 * 1000, // 5 minutes for vector search results
+  
 } as const;
 
 /**

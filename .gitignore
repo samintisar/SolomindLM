@@ -144,3 +144,6 @@ debug-bundle/
 
 # Convex snapshot exports (dev-to-prod backups); keep convex-exports/ folder
 convex-exports/*.zip
+
+# Serena
+.serena/

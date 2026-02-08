@@ -53,21 +53,49 @@ const embeddingCache = createCachedAction(
 export const generateEmbedding = action({
   args: { text: v.string() },
   handler: async (ctx, args): Promise<number[]> => {
-    const result = await embeddingCache.fetch(ctx, args);
+    // Normalize text to improve cache hit rate
+    const normalizedText = args.text.trim();
+    const result = await embeddingCache.fetch(ctx, { text: normalizedText });
     return result as number[];
   },
 });
 
 // ============================================================
-// 4. Batch version (optional optimization)
+// 4. Batch version (optimized with deduplication)
 // ============================================================
 export const generateEmbeddingsBatch = action({
   args: { texts: v.array(v.string()) },
   handler: async (ctx, args): Promise<number[][]> => {
-    // Process in parallel, each using cache independently
-    const results = await Promise.all(
-      args.texts.map((text) => embeddingCache.fetch(ctx, { text }))
+    // Normalize texts to improve cache hit rate
+    const normalizedTexts = args.texts.map((text) => text.trim());
+
+    // Deduplicate texts to avoid redundant API calls
+    const uniqueTexts = Array.from(new Set(normalizedTexts));
+
+    // Create a map of text to index for reordering results
+    const textToIndex = new Map<string, number[]>();
+    normalizedTexts.forEach((text, idx) => {
+      if (!textToIndex.has(text)) {
+        textToIndex.set(text, []);
+      }
+      textToIndex.get(text)!.push(idx);
+    });
+
+    // Generate embeddings for unique texts only (cache coalescing)
+    const uniqueResults = await Promise.all(
+      uniqueTexts.map((text) => embeddingCache.fetch(ctx, { text }))
     );
-    return results as number[][];
+
+    // Map results back to original order
+    const results: number[][] = new Array(normalizedTexts.length);
+    uniqueTexts.forEach((text, uniqueIdx) => {
+      const originalIndices = textToIndex.get(text)!;
+      const embedding = uniqueResults[uniqueIdx] as number[];
+      originalIndices.forEach((idx) => {
+        results[idx] = embedding;
+      });
+    });
+
+    return results;
   },
 });

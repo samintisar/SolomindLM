@@ -17,6 +17,10 @@ export const vectorSearch = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    // Normalize query at entry point to improve cache hit rate
+    // Trim whitespace but preserve semantic meaning (don't lowercase)
+    const normalizedQuery = args.query.trim();
+
     // Verify user owns the notebook
     const notebook = await ctx.db.get(args.notebookId);
     if (!notebook || notebook.userId !== userId) {
