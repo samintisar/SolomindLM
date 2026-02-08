@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
 import { checkSourceLimit } from "./lib/limits";
+import { TavilySearchService } from "./lib/discovery/TavilySearchService";
 
 /**
  * Get a presigned URL for uploading a file to Convex Storage
@@ -555,45 +556,22 @@ export const discoverSources = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
-    if (!TAVILY_API_KEY) {
-      throw new Error("Tavily API key not configured");
-    }
-
-    const maxResults = args.maxResults || 5;
+    const maxResults = args.maxResults ?? 5;
     const scoreThreshold = args.scoreThreshold ?? 0.5;
-
-    const response = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        api_key: TAVILY_API_KEY,
-        query: args.query,
-        search_depth: "basic",
-        max_results: maxResults,
-        include_answer: false,
-        include_raw_content: false,
-      }),
+    const tavily = new TavilySearchService();
+    const discovered = await tavily.discoverSources({
+      query: args.query,
+      maxResults,
+      scoreThreshold,
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to discover sources");
-    }
-
-    const data = await response.json();
-
-    // Transform Tavily results to our format and filter by score
-    const sources = (data.results || [])
-      .map((result: any) => ({
-        url: result.url,
-        title: result.title,
-        snippet: result.content || "",
-        publishedDate: result.published_date || null,
-        score: result.score || 0,
-      }))
-      .filter((source: { score: number }) => source.score >= scoreThreshold);
+    const sources = discovered.map((s) => ({
+      url: s.url,
+      title: s.title,
+      snippet: s.snippet,
+      publishedDate: null as string | null,
+      score: s.score,
+    }));
 
     return {
       sources,

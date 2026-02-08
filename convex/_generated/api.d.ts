@@ -33,6 +33,7 @@ import type * as jobs_helpers from "../jobs/helpers.js";
 import type * as lib_cache from "../lib/cache.js";
 import type * as lib_cacheMetrics from "../lib/cacheMetrics.js";
 import type * as lib_cachedAgent from "../lib/cachedAgent.js";
+import type * as lib_discovery_TavilySearchService from "../lib/discovery/TavilySearchService.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_extraction_MistralOCRService from "../lib/extraction/MistralOCRService.js";
@@ -93,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   "lib/cache": typeof lib_cache;
   "lib/cacheMetrics": typeof lib_cacheMetrics;
   "lib/cachedAgent": typeof lib_cachedAgent;
+  "lib/discovery/TavilySearchService": typeof lib_discovery_TavilySearchService;
   "lib/embeddings": typeof lib_embeddings;
   "lib/errors": typeof lib_errors;
   "lib/extraction/MistralOCRService": typeof lib_extraction_MistralOCRService;
