@@ -25,6 +25,7 @@
 		"mind-elixir": "^5.3.8",
 		"react": "19.2.4",
 		"react-dom": "19.2.4",
+		"react-fast-marquee": "^1.6.5",
 		"react-markdown": "^9.0.1",
 		"react-pdf": "^10.3.0",
 		"react-router-dom": "7.13.0",

@@ -41,7 +41,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onGetStarted }) => {
         <Button
           onClick={onGetStarted}
           size="lg"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-bold shadow-lg hover:shadow-xl px-12 py-6 text-lg transition-all active:scale-95"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-bold shadow-lg hover:shadow-xl px-12 py-6 text-lg transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
         >
           Create Your Free Account
           <ArrowRight className="w-5 h-5 ml-2" />

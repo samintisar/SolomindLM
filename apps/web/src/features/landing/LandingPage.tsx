@@ -34,7 +34,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
           generateFAQStructuredData(LANDING_FAQS),
         ]}
       />
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen landing-grid-pattern">
         <NavigationHeader onGetStarted={onGetStarted} />
         <HeroSection onGetStarted={onGetStarted} />
         <FeaturesGrid />

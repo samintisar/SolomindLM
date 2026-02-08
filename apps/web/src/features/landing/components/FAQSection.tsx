@@ -47,10 +47,10 @@ export const FAQSection: React.FC = () => {
 
   return (
     <>
-      <section id="faq" className="py-20 px-6 bg-background">
+      <section id="faq" className="py-32 px-6">
       <div className="max-w-3xl mx-auto">
         {/* Section Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-20">
           <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
             Frequently Asked Questions
           </h2>
@@ -103,7 +103,7 @@ export const FAQSection: React.FC = () => {
           <Button
             variant="outline"
             size="lg"
-            className="rounded-full"
+            className="rounded-full transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
             onClick={() => {
               // Open contact form or email
               window.location.href = 'mailto:support@solomindlm.com';

@@ -62,14 +62,14 @@ export const LANDING_CONTENT = {
 
 function getFeatureDescription(id: string): string {
   const descriptions: Record<string, string> = {
-    audio: "Listen to AI-generated summaries on the go",
-    mindmap: "Visualize connections and concepts with interactive mind maps",
-    reports: "Get comprehensive study guides and detailed reports",
-    flashcards: "Generate flashcards automatically from any content",
-    quiz: "Test your knowledge with AI-generated quizzes",
-    writtenQuestions: "Practice with written questions and detailed feedback",
-    rag: "AI answers grounded in your sources for accurate, source-based learning",
-    spreadsheets: "Turn your sources into structured tables and data summaries"
+    audio: "AI summaries you can listen to anywhere",
+    mindmap: "Map concepts and connections visually",
+    reports: "Study guides and reports, on demand",
+    flashcards: "Auto-generated cards from any content",
+    quiz: "Test yourself with AI-built quizzes",
+    writtenQuestions: "Written Q&A with instant feedback",
+    rag: "Answers grounded in your sources",
+    spreadsheets: "Sources turned into tables and data"
   };
   return descriptions[id] || "";
 }

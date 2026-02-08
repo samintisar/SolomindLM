@@ -1,4 +1,5 @@
 import React from 'react';
+import Marquee from 'react-fast-marquee';
 import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText, Brain, Table2 } from 'lucide-react';
 import { LANDING_CONTENT } from '../constants';
 
@@ -31,9 +32,33 @@ export const FeaturesGrid: React.FC = () => {
     }
   };
 
+  const renderCard = (feature: (typeof LANDING_CONTENT.features)[0]) => {
+    const Icon = getIconForFeature(feature.id);
+    const colorClass = getColorForFeature(feature.id);
+    return (
+      <div
+        key={feature.id}
+        className="group flex-shrink-0 w-[280px] h-[220px] rounded-2xl bg-card border border-border shadow-sm p-6 flex flex-col items-center justify-center text-center mx-3"
+      >
+        <Icon className={`w-10 h-10 flex-shrink-0 ${colorClass} mb-2 group-hover:scale-105 transition-transform duration-300`} />
+        <h3 className="text-lg font-sans font-bold text-foreground mb-1 line-clamp-1">
+          {feature.title}
+        </h3>
+        <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
+          {feature.description}
+        </p>
+      </div>
+    );
+  };
+
+  const featureCardsRow1 = LANDING_CONTENT.features.map(renderCard);
+  const featureCardsRow2 = LANDING_CONTENT.features.map(renderCard);
+
+  const marqueeClass = "[mask-image:linear-gradient(to_right,transparent,black_64px,black_calc(100%-64px),transparent)]";
+
   return (
-    <section id="features" className="py-20 px-6 bg-background">
-      <div className="max-w-6xl mx-auto">
+    <section id="features" className="py-32 px-6 overflow-hidden">
+      <div className="max-w-[1500px] w-full mx-auto">
         {/* Section Header */}
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
@@ -44,28 +69,30 @@ export const FeaturesGrid: React.FC = () => {
           </p>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {LANDING_CONTENT.features.map((feature) => {
-            const Icon = getIconForFeature(feature.id);
-            const colorClass = getColorForFeature(feature.id);
+        {/* Row 1: scrolls left */}
+        <Marquee
+          speed={40}
+          pauseOnHover
+          gradient
+          gradientColor="var(--background)"
+          gradientWidth={64}
+          className={marqueeClass}
+        >
+          {featureCardsRow1}
+        </Marquee>
 
-            return (
-              <div
-                key={feature.id}
-                className="group aspect-[4/3] rounded-2xl bg-card border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 p-8 flex flex-col items-center justify-center text-center"
-              >
-                <Icon className={`w-12 h-12 ${colorClass} mb-4 group-hover:scale-110 transition-transform duration-300`} />
-                <h3 className="text-xl font-sans font-bold text-foreground mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+        {/* Row 2: scrolls right */}
+        <Marquee
+          speed={40}
+          direction="right"
+          pauseOnHover
+          gradient
+          gradientColor="var(--background)"
+          gradientWidth={64}
+          className={`mt-4 ${marqueeClass}`}
+        >
+          {featureCardsRow2}
+        </Marquee>
       </div>
     </section>
   );

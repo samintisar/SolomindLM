@@ -6,8 +6,8 @@ export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-background border-t border-border">
-      <div className="max-w-6xl mx-auto px-6 py-8">
+    <footer className="border-t border-border">
+      <div className="max-w-[1500px] w-full mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Brand */}
           <div className="text-sm text-muted-foreground">

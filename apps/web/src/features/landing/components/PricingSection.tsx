@@ -78,10 +78,10 @@ const pricingPlans: PricingPlan[] = [
 
 export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) => {
   return (
-    <section id="pricing" className="py-20 px-6 bg-background">
-      <div className="max-w-6xl mx-auto">
+    <section id="pricing" className="py-32 px-6">
+      <div className="max-w-[1500px] w-full mx-auto">
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-24">
           <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
             Simple, Transparent Pricing
           </h2>
@@ -161,7 +161,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
                 {/* CTA Button */}
                 <Button
                   onClick={onGetStarted}
-                  className={`w-full rounded-full font-semibold ${
+                  className={`w-full rounded-full font-semibold transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98] ${
                     plan.highlighted
                       ? 'bg-white !text-gray-900 hover:bg-gray-100'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90'

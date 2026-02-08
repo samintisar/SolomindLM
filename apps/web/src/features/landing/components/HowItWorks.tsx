@@ -13,10 +13,10 @@ export const HowItWorks: React.FC = () => {
   };
 
   return (
-    <section className="py-20 px-6 bg-background">
-      <div className="max-w-5xl mx-auto">
+    <section className="py-32 px-6 bg-background">
+      <div className="max-w-[1500px] w-full mx-auto">
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-24">
           <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
             {LANDING_CONTENT.howItWorks.title}
           </h2>
