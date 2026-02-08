@@ -35,6 +35,8 @@ import type * as lib_cacheMetrics from "../lib/cacheMetrics.js";
 import type * as lib_cachedAgent from "../lib/cachedAgent.js";
 import type * as lib_embeddings from "../lib/embeddings.js";
 import type * as lib_errors from "../lib/errors.js";
+import type * as lib_extraction_MistralOCRService from "../lib/extraction/MistralOCRService.js";
+import type * as lib_extraction_SupadataLoaderService from "../lib/extraction/SupadataLoaderService.js";
 import type * as lib_extractors from "../lib/extractors.js";
 import type * as lib_limits from "../lib/limits.js";
 import type * as lib_llm from "../lib/llm.js";
@@ -93,6 +95,8 @@ declare const fullApi: ApiFromModules<{
   "lib/cachedAgent": typeof lib_cachedAgent;
   "lib/embeddings": typeof lib_embeddings;
   "lib/errors": typeof lib_errors;
+  "lib/extraction/MistralOCRService": typeof lib_extraction_MistralOCRService;
+  "lib/extraction/SupadataLoaderService": typeof lib_extraction_SupadataLoaderService;
   "lib/extractors": typeof lib_extractors;
   "lib/limits": typeof lib_limits;
   "lib/llm": typeof lib_llm;
