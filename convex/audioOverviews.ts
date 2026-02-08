@@ -3,6 +3,8 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
 import { checkDailyLimit } from "./lib/limits";
+import * as Notebooks from "./model/notebooks";
+import * as AudioOverviews from "./model/audioOverviews";
 
 /**
  * List all audio overviews for a notebook
@@ -13,12 +15,7 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query("audioOverviews")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await AudioOverviews.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
@@ -31,7 +28,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const audioOverview = await ctx.db.get(args.id);
+    const audioOverview = await AudioOverviews.getAudioOverview(ctx, args.id);
 
     if (!audioOverview || audioOverview.userId !== userId) {
       return null;
@@ -54,22 +51,17 @@ export const create = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const notebook = await ctx.db.get(args.notebookId);
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
     if (!notebook || notebook.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    const audioOverviewId = await ctx.db.insert("audioOverviews", {
+    return await AudioOverviews.createAudioOverviewAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
       metadata: args.metadata,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     });
-
-    return await ctx.db.get(audioOverviewId);
   },
 });
 
@@ -90,17 +82,14 @@ export const update = mutation({
 
     const { id, ...updates } = args;
 
-    const existing = await ctx.db.get(id);
+    const existing = await AudioOverviews.getAudioOverview(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Audio overview not found");
     }
 
-    await ctx.db.patch(id, {
-      ...updates,
-      updatedAt: Date.now(),
-    });
+    await AudioOverviews.updateAudioOverview(ctx, id, updates);
 
-    return await ctx.db.get(id);
+    return await AudioOverviews.getAudioOverview(ctx, id);
   },
 });
 
@@ -113,12 +102,12 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const audioOverview = await ctx.db.get(args.id);
+    const audioOverview = await AudioOverviews.getAudioOverview(ctx, args.id);
     if (!audioOverview || audioOverview.userId !== userId) {
       throw new Error("Audio overview not found");
     }
 
-    await ctx.db.delete(args.id);
+    await AudioOverviews.deleteAudioOverview(ctx, args.id);
 
     return { message: "Audio overview deleted successfully" };
   },
@@ -146,14 +135,12 @@ export const generateAudioOverview = mutation({
     }
 
     // Create audio overview record
-    const audioOverviewId = await ctx.db.insert("audioOverviews", {
+    const audioOverviewId = await AudioOverviews.createAudioOverview(ctx, {
       userId,
       notebookId,
       title: title || "Audio Overview",
-      status: "generating",
       metadata: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "generating",
     });
 
     // Schedule the generation job
@@ -185,18 +172,18 @@ export const updateAudioOverview = mutation({
     const { audioOverviewId, transcript, audioUrl, title } = args;
 
     // Verify ownership
-    const audioOverview = await ctx.db.get(audioOverviewId);
+    const audioOverview = await AudioOverviews.getAudioOverview(ctx, audioOverviewId);
     if (!audioOverview || audioOverview.userId !== userId) {
       throw new Error("Audio overview not found or access denied");
     }
 
     // Update
-    const updates: any = { updatedAt: Date.now() };
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
     if (transcript !== undefined) updates.transcript = transcript;
     if (audioUrl !== undefined) updates.audioUrl = audioUrl;
     if (title !== undefined) updates.title = title;
 
-    await ctx.db.patch(audioOverviewId, updates);
+    await AudioOverviews.updateAudioOverview(ctx, audioOverviewId, updates);
 
     return audioOverviewId;
   },
@@ -214,12 +201,12 @@ export const deleteAudioOverview = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     // Verify ownership
-    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    const audioOverview = await AudioOverviews.getAudioOverview(ctx, args.audioOverviewId);
     if (!audioOverview || audioOverview.userId !== userId) {
       throw new Error("Audio overview not found or access denied");
     }
 
-    await ctx.db.delete(args.audioOverviewId);
+    await AudioOverviews.deleteAudioOverview(ctx, args.audioOverviewId);
   },
 });
 
@@ -232,10 +219,7 @@ export const updateStatus = internalMutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.audioOverviewId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await AudioOverviews.updateAudioOverviewStatus(ctx, args.audioOverviewId, args.status);
   },
 });
 
@@ -249,12 +233,7 @@ export const updateData = internalMutation({
     audioUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.audioOverviewId, {
-      transcript: args.transcript,
-      audioUrl: args.audioUrl,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await AudioOverviews.updateAudioOverviewData(ctx, args.audioOverviewId, args.transcript, args.audioUrl);
   },
 });
 
@@ -267,9 +246,6 @@ export const patch = internalMutation({
     patch: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.audioOverviewId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await AudioOverviews.patchAudioOverview(ctx, args.audioOverviewId, args.patch);
   },
 });

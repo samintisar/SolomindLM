@@ -1,22 +1,23 @@
-import { query, internalQuery } from './_generated/server';
-import { v } from 'convex/values';
-import { getAuthUserId } from './auth';
+import { query, internalQuery } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthUserId } from "./auth";
+import * as Conversations from "./model/conversations";
 
 /**
  * Get a conversation by ID
  */
 export const get = query({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error('Unauthenticated');
+    if (!userId) throw new Error("Unauthenticated");
 
-    const conversation = await ctx.db.get(args.conversationId);
+    const conversation = await Conversations.getConversation(ctx, args.conversationId);
 
     if (!conversation || conversation.userId !== userId) {
-      throw new Error('Conversation not found');
+      throw new Error("Conversation not found");
     }
 
     return conversation;
@@ -28,19 +29,18 @@ export const get = query({
  */
 export const getOrCreate = query({
   args: {
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error('Unauthenticated');
+    if (!userId) throw new Error("Unauthenticated");
 
     // Try to find existing conversation
-    const existing = await ctx.db
-      .query('conversations')
-      .withIndex('by_user_notebook', (q) =>
-        q.eq('userId', userId).eq('notebookId', args.notebookId)
-      )
-      .first();
+    const existing = await Conversations.getConversationByUserAndNotebook(
+      ctx,
+      userId,
+      args.notebookId
+    );
 
     if (existing) {
       return existing;
@@ -60,11 +60,7 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query('conversations')
-      .withIndex('by_user_notebook', (q) => q.eq('userId', userId))
-      .order('desc')
-      .collect();
+    return await Conversations.getUserConversations(ctx, userId);
   },
 });
 
@@ -73,9 +69,9 @@ export const list = query({
  */
 export const getInternal = internalQuery({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.conversationId);
+    return await Conversations.getConversation(ctx, args.conversationId);
   },
 });

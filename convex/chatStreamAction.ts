@@ -6,8 +6,8 @@ import { Id, Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
-import { ChatAgent } from "../lib/services/agents/ChatAgent";
-import { HybridSearchHandler } from "../lib/services/agents/chat/hybrid-search";
+import { ChatAgent } from "./lib/agents/ChatAgent";
+import { HybridSearchHandler } from "./lib/agents/chat/hybrid_search.js";
 import { EmbeddingService } from "./lib/processing/EmbeddingServiceClient";
 
 interface VectorSearchResult {

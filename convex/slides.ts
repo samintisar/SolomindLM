@@ -3,47 +3,30 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
 import { checkDailyLimit } from "./lib/limits";
+import * as Notebooks from "./model/notebooks";
+import * as Slides from "./model/slides";
 
-/**
- * List all slide decks for a notebook
- */
+// List, get, create, update, remove use model functions
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    return await ctx.db
-      .query("slides")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Slides.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
-/**
- * Get a specific slide deck by ID
- */
 export const get = query({
   args: { id: v.id("slides") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-
-    const slideDeck = await ctx.db.get(args.id);
-
-    if (!slideDeck || slideDeck.userId !== userId) {
-      return null;
-    }
-
+    const slideDeck = await Slides.getSlideDeck(ctx, args.id);
+    if (!slideDeck || slideDeck.userId !== userId) return null;
     return slideDeck;
   },
 });
 
-/**
- * Create a new slide deck
- */
 export const create = mutation({
   args: {
     notebookId: v.id("notebooks"),
@@ -54,31 +37,18 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-
-    const notebook = await ctx.db.get(args.notebookId);
-    if (!notebook || notebook.userId !== userId) {
-      throw new Error("Notebook not found");
-    }
-
-    const slideDeckId = await ctx.db.insert("slides", {
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
+    if (!notebook || notebook.userId !== userId) throw new Error("Notebook not found");
+    return await Slides.createSlideDeckAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      data: {},
       slideCount: args.slideCount,
       metadata: args.metadata,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     });
-
-    return await ctx.db.get(slideDeckId);
   },
 });
 
-/**
- * Update a slide deck
- */
 export const update = mutation({
   args: {
     id: v.id("slides"),
@@ -89,46 +59,26 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-
     const { id, ...updates } = args;
-
-    const existing = await ctx.db.get(id);
-    if (!existing || existing.userId !== userId) {
-      throw new Error("Slide deck not found");
-    }
-
-    await ctx.db.patch(id, {
-      ...updates,
-      updatedAt: Date.now(),
-    });
-
-    return await ctx.db.get(id);
+    const existing = await Slides.getSlideDeck(ctx, id);
+    if (!existing || existing.userId !== userId) throw new Error("Slide deck not found");
+    await Slides.updateSlideDeck(ctx, id, updates);
+    return await Slides.getSlideDeck(ctx, id);
   },
 });
 
-/**
- * Delete a slide deck
- */
 export const remove = mutation({
   args: { id: v.id("slides") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-
-    const slideDeck = await ctx.db.get(args.id);
-    if (!slideDeck || slideDeck.userId !== userId) {
-      throw new Error("Slide deck not found");
-    }
-
-    await ctx.db.delete(args.id);
-
+    const slideDeck = await Slides.getSlideDeck(ctx, args.id);
+    if (!slideDeck || slideDeck.userId !== userId) throw new Error("Slide deck not found");
+    await Slides.deleteSlideDeck(ctx, args.id);
     return { message: "Slide deck deleted successfully" };
   },
 });
 
-/**
- * Generate a slide deck for a notebook
- */
 export const generateSlideDeck = mutation({
   args: {
     notebookId: v.id("notebooks"),
@@ -139,29 +89,20 @@ export const generateSlideDeck = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
-    // Check daily slide limit
     await checkDailyLimit(ctx, userId, "slide");
-
     const { notebookId, documentIds, slideCount, title } = args;
     if (documentIds.length === 0) {
       throw new Error("Please select at least one source. Content generation uses only your selected sources.");
     }
-
-    // Create slide deck record
-    const slideDeckId = await ctx.db.insert("slides", {
+    const slideDeckId = await Slides.createSlideDeck(ctx, {
       userId,
       notebookId,
       title: title || "Slide Deck",
       data: {},
-      status: "generating",
       slideCount,
       metadata: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "generating",
     });
-
-    // Schedule the generation job
     await ctx.scheduler.runAfter(0, internal.jobs.SlideDeckGenerationJob.slideDeckGeneration, {
       slideDeckId,
       userId,
@@ -169,14 +110,10 @@ export const generateSlideDeck = mutation({
       documentIds,
       slideCount,
     });
-
     return slideDeckId;
   },
 });
 
-/**
- * Update a slide deck
- */
 export const updateSlideDeck = mutation({
   args: {
     slideDeckId: v.id("slides"),
@@ -186,92 +123,46 @@ export const updateSlideDeck = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
     const { slideDeckId, data, title } = args;
-
-    // Verify ownership
-    const slideDeck = await ctx.db.get(slideDeckId);
-    if (!slideDeck || slideDeck.userId !== userId) {
-      throw new Error("Slide deck not found or access denied");
-    }
-
-    // Update
-    const updates: any = { updatedAt: Date.now() };
+    const slideDeck = await Slides.getSlideDeck(ctx, slideDeckId);
+    if (!slideDeck || slideDeck.userId !== userId) throw new Error("Slide deck not found or access denied");
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
     if (data !== undefined) updates.data = data;
     if (title !== undefined) updates.title = title;
-
-    await ctx.db.patch(slideDeckId, updates);
-
+    await Slides.updateSlideDeck(ctx, slideDeckId, updates);
     return slideDeckId;
   },
 });
 
-/**
- * Delete a slide deck
- */
 export const deleteSlideDeck = mutation({
-  args: {
-    slideDeckId: v.id("slides"),
-  },
+  args: { slideDeckId: v.id("slides") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
-    // Verify ownership
-    const slideDeck = await ctx.db.get(args.slideDeckId);
-    if (!slideDeck || slideDeck.userId !== userId) {
-      throw new Error("Slide deck not found or access denied");
-    }
-
-    await ctx.db.delete(args.slideDeckId);
+    const slideDeck = await Slides.getSlideDeck(ctx, args.slideDeckId);
+    if (!slideDeck || slideDeck.userId !== userId) throw new Error("Slide deck not found or access denied");
+    await Slides.deleteSlideDeck(ctx, args.slideDeckId);
   },
 });
 
-/**
- * Internal: Update slide deck status
- */
+// Internal mutations delegate to model
 export const updateStatus = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    status: v.string(),
-  },
+  args: { slideDeckId: v.id("slides"), status: v.string() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.slideDeckId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await Slides.updateSlideDeckStatus(ctx, args.slideDeckId, args.status);
   },
 });
 
-/**
- * Internal: Update slide deck data
- */
 export const updateData = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    data: v.any(),
-  },
+  args: { slideDeckId: v.id("slides"), data: v.any() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.slideDeckId, {
-      data: args.data,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await Slides.updateSlideDeckData(ctx, args.slideDeckId, args.data);
   },
 });
 
-/**
- * Internal: Update slide deck with partial updates
- */
 export const patch = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    patch: v.any(),
-  },
+  args: { slideDeckId: v.id("slides"), patch: v.any() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.slideDeckId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await Slides.patchSlideDeck(ctx, args.slideDeckId, args.patch);
   },
 });

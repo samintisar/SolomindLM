@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "./auth";
+import * as Notebooks from "./model/notebooks";
+import * as Quizzes from "./model/quizzes";
 
 /**
  * List all quizzes for a notebook
@@ -11,12 +13,7 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query("quizzes")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Quizzes.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
@@ -29,7 +26,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const quiz = await ctx.db.get(args.id);
+    const quiz = await Quizzes.getQuiz(ctx, args.id);
 
     if (!quiz || quiz.userId !== userId) {
       return null;
@@ -54,25 +51,18 @@ export const create = mutation({
     if (!userId) throw new Error("Unauthenticated");
 
     // Verify user owns the notebook
-    const notebook = await ctx.db.get(args.notebookId);
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
     if (!notebook || notebook.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    const now = Date.now();
-
-    const quizId = await ctx.db.insert("quizzes", {
+    return await Quizzes.createQuizAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      questionsData: args.questionsData || [],
+      questionsData: args.questionsData,
       metadata: args.metadata,
-      createdAt: now,
-      updatedAt: now,
     });
-
-    return await ctx.db.get("quizzes", quizId);
   },
 });
 
@@ -89,18 +79,13 @@ export const createInternal = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const quizId = await ctx.db.insert("quizzes", {
+    return await Quizzes.createQuizAndFetch(ctx, {
       userId: args.userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      questionsData: args.questionsData || [],
+      questionsData: args.questionsData,
       metadata: args.metadata,
-      createdAt: now,
-      updatedAt: now,
     });
-    return await ctx.db.get("quizzes", quizId);
   },
 });
 
@@ -119,30 +104,24 @@ export const update = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const { id, metadata, ...otherUpdates } = args;
+    const { id, ...rest } = args;
+    const metadata = rest.metadata;
+    const otherUpdates: Omit<typeof rest, "metadata"> = rest;
 
     // Verify ownership
-    const existing = await ctx.db.get(id);
+    const existing = await Quizzes.getQuiz(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Quiz not found");
     }
 
-    const updateData: any = {
-      ...otherUpdates,
-      updatedAt: Date.now(),
-    };
+    await Quizzes.updateQuiz(ctx, id, otherUpdates, !!metadata);
 
-    // Merge metadata instead of replacing
+    // Merge metadata if provided
     if (metadata) {
-      updateData.metadata = {
-        ...(existing.metadata || {}),
-        ...metadata,
-      };
+      await Quizzes.patchQuiz(ctx, id, { metadata });
     }
 
-    await ctx.db.patch(id, updateData);
-
-    return await ctx.db.get(id);
+    return await Quizzes.getQuiz(ctx, id);
   },
 });
 
@@ -155,12 +134,12 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const quiz = await ctx.db.get(args.id);
+    const quiz = await Quizzes.getQuiz(ctx, args.id);
     if (!quiz || quiz.userId !== userId) {
       throw new Error("Quiz not found");
     }
 
-    await ctx.db.delete(args.id);
+    await Quizzes.deleteQuiz(ctx, args.id);
 
     return { message: "Quiz deleted successfully" };
   },
@@ -175,10 +154,7 @@ export const updateStatus = internalMutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.quizId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await Quizzes.updateQuizStatus(ctx, args.quizId, args.status);
   },
 });
 
@@ -191,11 +167,7 @@ export const updateData = internalMutation({
     questionsData: v.array(v.any()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.quizId, {
-      questionsData: args.questionsData,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await Quizzes.updateQuizData(ctx, args.quizId, args.questionsData);
   },
 });
 
@@ -208,10 +180,7 @@ export const patch = internalMutation({
     patch: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.quizId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await Quizzes.patchQuiz(ctx, args.quizId, args.patch);
   },
 });
 
@@ -226,25 +195,7 @@ export const patchUserAnswer = internalMutation({
     selectedOption: v.number(),
   },
   handler: async (ctx, args) => {
-    const quiz = await ctx.db.get(args.quizId);
-    if (!quiz) {
-      throw new Error("Quiz not found");
-    }
-
-    // Get existing user answers or initialize empty object
-    const existingUserAnswers = (quiz.metadata as any)?.userAnswers || {};
-
-    // Merge the new answer with existing ones
-    await ctx.db.patch(args.quizId, {
-      metadata: {
-        ...quiz.metadata,
-        userAnswers: {
-          ...existingUserAnswers,
-          [args.questionIndex]: args.selectedOption,
-        },
-      },
-      updatedAt: Date.now(),
-    });
+    await Quizzes.patchQuizUserAnswer(ctx, args.quizId, args.questionIndex, args.selectedOption);
   },
 });
 
@@ -262,26 +213,13 @@ export const submitAnswer = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const quiz = await ctx.db.get(args.id);
+    const quiz = await Quizzes.getQuiz(ctx, args.id);
     if (!quiz || quiz.userId !== userId) {
       throw new Error("Quiz not found");
     }
 
-    // Get existing user answers or initialize empty object
-    const existingUserAnswers = (quiz.metadata as any)?.userAnswers || {};
+    await Quizzes.patchQuizUserAnswer(ctx, args.id, args.questionIndex, args.selectedOption);
 
-    // Merge the new answer with existing ones
-    await ctx.db.patch(args.id, {
-      metadata: {
-        ...quiz.metadata,
-        userAnswers: {
-          ...existingUserAnswers,
-          [args.questionIndex]: args.selectedOption,
-        },
-      },
-      updatedAt: Date.now(),
-    });
-
-    return await ctx.db.get(args.id);
+    return await Quizzes.getQuiz(ctx, args.id);
   },
 });

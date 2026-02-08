@@ -1,5 +1,5 @@
 "use node"
-import { env } from '../../../lib/helpers/env';
+import { env } from '../helpers/env';
 
 /**
  * Source discovery result from Tavily

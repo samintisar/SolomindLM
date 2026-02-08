@@ -1,6 +1,28 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { getAuthUserId } from "./auth";
+import * as Folders from "./model/folders";
+
+/** Shape folder + notebook count for API response */
+function toFolderDTO(
+  folder: Pick<
+    Doc<"folders">,
+    "_id" | "name" | "description" | "color" | "icon" | "createdAt" | "updatedAt"
+  >,
+  notebookCount: number
+) {
+  return {
+    id: folder._id,
+    name: folder.name,
+    description: folder.description,
+    color: folder.color ?? "bg-blue-500",
+    icon: folder.icon ?? "Folder",
+    notebookCount,
+    created_at: folder.createdAt,
+    updated_at: folder.updatedAt,
+  };
+}
 
 /**
  * Get all folders for the authenticated user with notebook counts
@@ -10,30 +32,13 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const folders = await ctx.db
-      .query("folders")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
+    const folders = await Folders.getUserFolders(ctx, userId);
 
     // Get notebook counts for each folder
     const foldersWithCounts = await Promise.all(
       folders.map(async (folder) => {
-        const notebooks = await ctx.db
-          .query("notebooks")
-          .withIndex("by_folder", (q) => q.eq("folderId", folder._id))
-          .collect();
-
-        return {
-          id: folder._id,
-          name: folder.name,
-          description: folder.description,
-          color: folder.color || "bg-blue-500",
-          icon: folder.icon || "Folder",
-          notebookCount: notebooks.length,
-          created_at: folder.createdAt,
-          updated_at: folder.updatedAt,
-        };
+        const notebookCount = await Folders.getNotebookCountByFolder(ctx, folder._id);
+        return toFolderDTO(folder, notebookCount);
       })
     );
 
@@ -50,27 +55,11 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const folder = await ctx.db.get(args.id);
+    const folder = await Folders.getFolder(ctx, args.id);
+    if (!folder || folder.userId !== userId) return null;
 
-    if (!folder || folder.userId !== userId) {
-      return null;
-    }
-
-    const notebooks = await ctx.db
-      .query("notebooks")
-      .withIndex("by_folder", (q) => q.eq("folderId", folder._id))
-      .collect();
-
-    return {
-      id: folder._id,
-      name: folder.name,
-      description: folder.description,
-      color: folder.color || "bg-blue-500",
-      icon: folder.icon || "Folder",
-      notebookCount: notebooks.length,
-      created_at: folder.createdAt,
-      updated_at: folder.updatedAt,
-    };
+    const notebookCount = await Folders.getNotebookCountByFolder(ctx, folder._id);
+    return toFolderDTO(folder, notebookCount);
   },
 });
 
@@ -84,15 +73,10 @@ export const getNotebooks = query({
     if (!userId) return [];
 
     // Verify folder exists and belongs to user
-    const folder = await ctx.db.get(args.folderId);
-    if (!folder || folder.userId !== userId) {
-      return [];
-    }
+    const folder = await Folders.getFolder(ctx, args.folderId);
+    if (!folder || folder.userId !== userId) return [];
 
-    const notebooks = await ctx.db
-      .query("notebooks")
-      .withIndex("by_folder", (q) => q.eq("folderId", args.folderId))
-      .collect();
+    const notebooks = await Folders.getNotebooksInFolder(ctx, args.folderId);
 
     // Get source counts for each notebook
     const notebooksWithCounts = await Promise.all(
@@ -111,9 +95,9 @@ export const getNotebooks = query({
             year: "numeric",
           }),
           sourceCount: documents.length,
-          coverColor: notebook.coverColor || "bg-yellow-500",
-          icon: notebook.icon || "Folder",
-          isFeatured: notebook.isFeatured || false,
+          coverColor: notebook.coverColor ?? "bg-yellow-500",
+          icon: notebook.icon ?? "Folder",
+          isFeatured: notebook.isFeatured ?? false,
           folderId: notebook.folderId,
           created_at: notebook.createdAt,
           updated_at: notebook.updatedAt,
@@ -139,24 +123,21 @@ export const create = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const now = Date.now();
-
-    const folderId = await ctx.db.insert("folders", {
+    const folderId = await Folders.createFolder(ctx, {
       userId,
-      name: args.name.trim(),
+      name: args.name,
       description: args.description,
-      color: args.color || "bg-blue-500",
-      icon: args.icon || "Folder",
-      createdAt: now,
-      updatedAt: now,
+      color: args.color,
+      icon: args.icon,
     });
 
+    const now = Date.now();
     return {
       id: folderId,
       name: args.name,
       description: args.description,
-      color: args.color || "bg-blue-500",
-      icon: args.icon || "Folder",
+      color: args.color ?? "bg-blue-500",
+      icon: args.icon ?? "Folder",
       notebookCount: 0,
       created_at: now,
       updated_at: now,
@@ -182,38 +163,19 @@ export const update = mutation({
     const { id, ...updates } = args;
 
     // Verify ownership
-    const existing = await ctx.db.get(id);
+    const existing = await Folders.getFolder(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Folder not found");
     }
 
-    const updateData: any = {
-      ...updates,
-      updatedAt: Date.now(),
-    };
+    await Folders.updateFolder(ctx, id, updates);
 
-    if (updates.name) {
-      updateData.name = updates.name.trim();
-    }
+    // Get updated folder and notebook count
+    const updated = await Folders.getFolder(ctx, id);
+    if (!updated) throw new Error("Folder not found");
 
-    await ctx.db.patch(id, updateData);
-
-    // Get notebook count
-    const notebooks = await ctx.db
-      .query("notebooks")
-      .withIndex("by_folder", (q) => q.eq("folderId", id))
-      .collect();
-
-    return {
-      id,
-      name: updateData.name || existing.name,
-      description: updateData.description ?? existing.description,
-      color: updateData.color || existing.color || "bg-blue-500",
-      icon: updateData.icon || existing.icon || "Folder",
-      notebookCount: notebooks.length,
-      created_at: existing.createdAt,
-      updated_at: updateData.updatedAt,
-    };
+    const notebookCount = await Folders.getNotebookCountByFolder(ctx, id);
+    return toFolderDTO(updated, notebookCount);
   },
 });
 
@@ -227,23 +189,16 @@ export const remove = mutation({
     if (!userId) throw new Error("Unauthenticated");
 
     // Verify ownership
-    const existing = await ctx.db.get(args.id);
+    const existing = await Folders.getFolder(ctx, args.id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Folder not found");
     }
 
-    // Set folderId to undefined for all notebooks in this folder
-    const notebooks = await ctx.db
-      .query("notebooks")
-      .withIndex("by_folder", (q) => q.eq("folderId", args.id))
-      .collect();
-
-    for (const notebook of notebooks) {
-      await ctx.db.patch(notebook._id, { folderId: undefined });
-    }
+    // Unlink notebooks from folder
+    await Folders.unlinkNotebooksFromFolder(ctx, args.id);
 
     // Delete the folder
-    await ctx.db.delete(args.id);
+    await Folders.deleteFolder(ctx, args.id);
 
     return { message: "Folder deleted successfully" };
   },

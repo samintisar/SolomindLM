@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
+import * as Notebooks from "./model/notebooks";
+import * as Mindmaps from "./model/mindmaps";
 
 /**
  * List all mindmaps for a notebook
@@ -12,12 +14,7 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query("mindmaps")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Mindmaps.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
@@ -30,7 +27,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const mindmap = await ctx.db.get(args.id);
+    const mindmap = await Mindmaps.getMindmap(ctx, args.id);
 
     if (!mindmap || mindmap.userId !== userId) {
       return null;
@@ -53,23 +50,18 @@ export const create = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const notebook = await ctx.db.get(args.notebookId);
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
     if (!notebook || notebook.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    const mindmapId = await ctx.db.insert("mindmaps", {
+    return await Mindmaps.createMindmapAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
       data: {},
       metadata: args.metadata,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     });
-
-    return await ctx.db.get(mindmapId);
   },
 });
 
@@ -89,17 +81,14 @@ export const update = mutation({
 
     const { id, ...updates } = args;
 
-    const existing = await ctx.db.get(id);
+    const existing = await Mindmaps.getMindmap(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Mindmap not found");
     }
 
-    await ctx.db.patch(id, {
-      ...updates,
-      updatedAt: Date.now(),
-    });
+    await Mindmaps.updateMindmap(ctx, id, updates);
 
-    return await ctx.db.get(id);
+    return await Mindmaps.getMindmap(ctx, id);
   },
 });
 
@@ -112,12 +101,12 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const mindmap = await ctx.db.get(args.id);
+    const mindmap = await Mindmaps.getMindmap(ctx, args.id);
     if (!mindmap || mindmap.userId !== userId) {
       throw new Error("Mindmap not found");
     }
 
-    await ctx.db.delete(args.id);
+    await Mindmaps.deleteMindmap(ctx, args.id);
 
     return { message: "Mindmap deleted successfully" };
   },
@@ -142,15 +131,13 @@ export const generateMindMap = mutation({
     }
 
     // Create mindmap record
-    const mindmapId = await ctx.db.insert("mindmaps", {
+    const mindmapId = await Mindmaps.createMindmap(ctx, {
       userId,
       notebookId,
       title: title || "Mind Map",
       data: {},
-      status: "generating",
       metadata: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "generating",
     });
 
     // Schedule the generation job
@@ -181,17 +168,17 @@ export const updateMindMap = mutation({
     const { mindmapId, data, title } = args;
 
     // Verify ownership
-    const mindmap = await ctx.db.get(mindmapId);
+    const mindmap = await Mindmaps.getMindmap(ctx, mindmapId);
     if (!mindmap || mindmap.userId !== userId) {
       throw new Error("Mindmap not found or access denied");
     }
 
     // Update
-    const updates: any = { updatedAt: Date.now() };
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
     if (data !== undefined) updates.data = data;
     if (title !== undefined) updates.title = title;
 
-    await ctx.db.patch(mindmapId, updates);
+    await Mindmaps.updateMindmap(ctx, mindmapId, updates);
 
     return mindmapId;
   },
@@ -209,12 +196,12 @@ export const deleteMindMap = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     // Verify ownership
-    const mindmap = await ctx.db.get(args.mindmapId);
+    const mindmap = await Mindmaps.getMindmap(ctx, args.mindmapId);
     if (!mindmap || mindmap.userId !== userId) {
       throw new Error("Mindmap not found or access denied");
     }
 
-    await ctx.db.delete(args.mindmapId);
+    await Mindmaps.deleteMindmap(ctx, args.mindmapId);
   },
 });
 
@@ -227,10 +214,7 @@ export const updateStatus = internalMutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.mindmapId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await Mindmaps.updateMindmapStatus(ctx, args.mindmapId, args.status);
   },
 });
 
@@ -243,11 +227,7 @@ export const updateData = internalMutation({
     data: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.mindmapId, {
-      data: args.data,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await Mindmaps.updateMindmapData(ctx, args.mindmapId, args.data);
   },
 });
 
@@ -260,9 +240,6 @@ export const patch = internalMutation({
     patch: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.mindmapId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await Mindmaps.patchMindmap(ctx, args.mindmapId, args.patch);
   },
 });

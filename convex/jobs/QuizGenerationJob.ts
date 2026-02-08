@@ -2,10 +2,10 @@
 import { internalAction } from '../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../_generated/api';
-import { QuizGraph } from '../../lib/services/agents/QuizGraph';
+import { QuizGraph } from '../lib/agents/QuizGraph';
 import { createCachedAction } from '../lib/cachedAgent';
 import { CACHE_TTL } from '../lib/cache';
-import { env } from '../../lib/helpers/env';
+import { env } from '../lib/helpers/env';
 
 // ============================================================
 // 1. Extract core generation logic into cacheable action

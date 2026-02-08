@@ -1,7 +1,35 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { getAuthUserId } from "./auth";
 import { checkNotebookLimit } from "./lib/limits";
+import * as Notebooks from "./model/notebooks";
+
+/** Shape notebook + source count for API response */
+function toNotebookDTO(
+  notebook: Pick<
+    Doc<"notebooks">,
+    "_id" | "title" | "updatedAt" | "coverColor" | "icon" | "isFeatured" | "folderId" | "createdAt"
+  >,
+  sourceCount: number
+) {
+  return {
+    id: notebook._id,
+    title: notebook.title,
+    date: new Date(notebook.updatedAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    sourceCount,
+    coverColor: notebook.coverColor ?? "bg-yellow-500",
+    icon: notebook.icon ?? "Folder",
+    isFeatured: notebook.isFeatured ?? false,
+    folderId: notebook.folderId,
+    created_at: notebook.createdAt,
+    updated_at: notebook.updatedAt,
+  };
+}
 
 /**
  * Get all notebooks for the authenticated user with source counts
@@ -11,39 +39,13 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const notebooks = await ctx.db
-      .query("notebooks")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
-
-    // Get source counts for each notebook
+    const notebooks = await Notebooks.getUserNotebooks(ctx, userId);
     const notebooksWithCounts = await Promise.all(
       notebooks.map(async (notebook) => {
-        const documents = await ctx.db
-          .query("documents")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
-          .collect();
-
-        return {
-          id: notebook._id,
-          title: notebook.title,
-          date: new Date(notebook.updatedAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }),
-          sourceCount: documents.length,
-          coverColor: notebook.coverColor || "bg-yellow-500",
-          icon: notebook.icon || "Folder",
-          isFeatured: notebook.isFeatured || false,
-          folderId: notebook.folderId,
-          created_at: notebook.createdAt,
-          updated_at: notebook.updatedAt,
-        };
+        const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
+        return toNotebookDTO(notebook, sourceCount);
       })
     );
-
     return notebooksWithCounts;
   },
 });
@@ -57,33 +59,11 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const notebook = await ctx.db.get(args.id);
+    const notebook = await Notebooks.getNotebook(ctx, args.id);
+    if (!notebook || notebook.userId !== userId) return null;
 
-    if (!notebook || notebook.userId !== userId) {
-      return null;
-    }
-
-    const documents = await ctx.db
-      .query("documents")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
-      .collect();
-
-    return {
-      id: notebook._id,
-      title: notebook.title,
-      date: new Date(notebook.updatedAt).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      sourceCount: documents.length,
-      coverColor: notebook.coverColor || "bg-yellow-500",
-      icon: notebook.icon || "Folder",
-      isFeatured: notebook.isFeatured || false,
-      folderId: notebook.folderId,
-      created_at: notebook.createdAt,
-      updated_at: notebook.updatedAt,
-    };
+    const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, notebook._id);
+    return toNotebookDTO(notebook, sourceCount);
   },
 });
 
@@ -102,22 +82,18 @@ export const create = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    // Check notebook limit
     await checkNotebookLimit(ctx);
 
-    const now = Date.now();
-
-    const notebookId = await ctx.db.insert("notebooks", {
+    const notebookId = await Notebooks.createNotebook(ctx, {
       userId,
-      title: args.title.trim(),
+      title: args.title,
       coverColor: args.coverColor,
       icon: args.icon,
-      isFeatured: args.isFeatured || false,
+      isFeatured: args.isFeatured,
       folderId: args.folderId,
-      createdAt: now,
-      updatedAt: now,
     });
 
+    const now = Date.now();
     return {
       id: notebookId,
       title: args.title,
@@ -127,9 +103,9 @@ export const create = mutation({
         year: "numeric",
       }),
       sourceCount: 0,
-      coverColor: args.coverColor || "bg-yellow-500",
-      icon: args.icon || "Folder",
-      isFeatured: args.isFeatured || false,
+      coverColor: args.coverColor ?? "bg-yellow-500",
+      icon: args.icon ?? "Folder",
+      isFeatured: args.isFeatured ?? false,
       folderId: args.folderId,
       created_at: now,
       updated_at: now,
@@ -155,45 +131,18 @@ export const update = mutation({
 
     const { id, ...updates } = args;
 
-    // Verify ownership
-    const existing = await ctx.db.get(id);
+    const existing = await Notebooks.getNotebook(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    const updateData: any = {
-      ...updates,
-      updatedAt: Date.now(),
-    };
+    await Notebooks.updateNotebook(ctx, id, updates);
 
-    if (updates.title) {
-      updateData.title = updates.title.trim();
-    }
+    const updated = await Notebooks.getNotebook(ctx, id);
+    const sourceCount = await Notebooks.getDocumentCountByNotebook(ctx, id);
+    if (!updated) throw new Error("Notebook not found");
 
-    await ctx.db.patch(id, updateData);
-
-    // Get updated notebook with count
-    const documents = await ctx.db
-      .query("documents")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", id))
-      .collect();
-
-    return {
-      id,
-      title: updateData.title || existing.title,
-      date: new Date(updateData.updatedAt).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }),
-      sourceCount: documents.length,
-      coverColor: updateData.coverColor || existing.coverColor || "bg-yellow-500",
-      icon: updateData.icon || existing.icon || "Folder",
-      isFeatured: updateData.isFeatured ?? existing.isFeatured,
-      folderId: updateData.folderId ?? existing.folderId,
-      created_at: existing.createdAt,
-      updated_at: updateData.updatedAt,
-    };
+    return toNotebookDTO(updated, sourceCount);
   },
 });
 
@@ -206,14 +155,12 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    // Verify ownership
-    const existing = await ctx.db.get(args.id);
+    const existing = await Notebooks.getNotebook(ctx, args.id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    await ctx.db.delete(args.id);
-
+    await Notebooks.deleteNotebook(ctx, args.id);
     return { message: "Notebook deleted successfully" };
   },
 });
@@ -227,18 +174,9 @@ export const getReports = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    // Verify user owns the notebook
-    const notebook = await ctx.db.get(args.notebookId);
-    if (!notebook || notebook.userId !== userId) {
-      return [];
-    }
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
+    if (!notebook || notebook.userId !== userId) return [];
 
-    const reports = await ctx.db
-      .query("reports")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .order("desc")
-      .collect();
-
-    return reports;
+    return await Notebooks.getReportsByNotebook(ctx, args.notebookId);
   },
 });

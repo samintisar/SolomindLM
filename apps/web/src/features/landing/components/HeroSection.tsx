@@ -48,7 +48,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
   }, [displayText, isDeleting, currentPlaceholderIndex]);
 
   return (
-        <section className="relative flex flex-col items-center px-6 pt-56 pb-40 overflow-hidden">
+        <section className="relative flex flex-col items-center px-6 pt-40 pb-40 overflow-hidden">
       {/* Animated mesh gradient background */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
         <div
@@ -114,8 +114,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
             }`}
             style={isFocused ? { boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(255,255,255,0.5), 0 0 40px rgba(249,115,22,0.15), 0 0 80px rgba(251,191,36,0.1)' } : undefined}
           >
-            {/* Top: prompt row */}
-            <div className="flex items-center gap-4 px-5 py-4">
+            {/* Top: prompt row - single line on all viewports */}
+            <div className="flex flex-nowrap items-center gap-2 sm:gap-4 px-3 sm:px-5 py-6">
               {/* Search icon */}
               <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
                 isFocused 
@@ -128,14 +128,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
                 </svg>
               </div>
 
-              <div className="flex-1 min-w-0 text-left">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`text-base md:text-lg font-medium transition-colors duration-300 ${
+              <div className="flex-1 min-w-0 text-left overflow-hidden">
+                <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
+                  <span className={`text-base md:text-lg font-medium transition-colors duration-300 truncate ${
                     isFocused ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
                   }`}>
                     {displayText}
                   </span>
-                  <span className={`shrink-0 w-0.5 h-4 rounded-full transition-opacity duration-200 ${
+                  <span className={`flex-shrink-0 w-0.5 h-4 rounded-full transition-opacity duration-200 ${
                     isFocused || !displayText ? 'opacity-100' : 'opacity-0'
                   } bg-primary animate-cursor-blink`} aria-hidden />
                 </div>

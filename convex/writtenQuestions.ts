@@ -2,47 +2,28 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
+import * as WrittenQuestions from "./model/writtenQuestions";
 
-/**
- * List all written question sets for a notebook
- */
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    return await ctx.db
-      .query("writtenQuestions")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await WrittenQuestions.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
-/**
- * Get a specific written question set by ID
- */
 export const get = query({
   args: { id: v.id("writtenQuestions") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-
-    const writtenQuestion = await ctx.db.get(args.id);
-
-    if (!writtenQuestion || writtenQuestion.userId !== userId) {
-      return null;
-    }
-
+    const writtenQuestion = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
+    if (!writtenQuestion || writtenQuestion.userId !== userId) return null;
     return writtenQuestion;
   },
 });
 
-/**
- * Create a written question set (for contentGeneration.ts)
- */
 export const create = mutation({
   args: {
     notebookId: v.id("notebooks"),
@@ -52,28 +33,17 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const writtenQuestionId = await ctx.db.insert("writtenQuestions", {
+    if (!userId) throw new Error("Unauthenticated");
+    return await WrittenQuestions.createWrittenQuestionAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      questionsData: [],
       questionType: args.questionType,
-      metadata: args.metadata || {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      metadata: args.metadata,
     });
-
-    return await ctx.db.get("writtenQuestions", writtenQuestionId);
   },
 });
 
-/**
- * Internal: Create a written question set (for use by contentGeneration action only).
- * Uses internal so Convex code calls internal.* instead of api.* per best practices.
- */
 export const createInternal = internalMutation({
   args: {
     userId: v.id("users"),
@@ -83,52 +53,34 @@ export const createInternal = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const writtenQuestionId = await ctx.db.insert("writtenQuestions", {
+    return await WrittenQuestions.createWrittenQuestionAndFetch(ctx, {
       userId: args.userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      questionsData: [],
       questionType: args.questionType,
-      metadata: args.metadata || {},
-      createdAt: now,
-      updatedAt: now,
+      metadata: args.metadata,
     });
-    return await ctx.db.get("writtenQuestions", writtenQuestionId);
   },
 });
 
-/**
- * Generate written questions for a notebook
- */
 export const generateWrittenQuestions = mutation({
   args: {
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
-    questionType: v.string(), // 'short' | 'essay'
+    questionType: v.string(),
     title: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
     const { notebookId, documentIds, questionType, title } = args;
-
-    // Create written questions record
-    const writtenQuestionId = await ctx.db.insert("writtenQuestions", {
+    const writtenQuestionId = await WrittenQuestions.createWrittenQuestion(ctx, {
       userId,
       notebookId,
       title: title || `Written Questions (${questionType})`,
-      status: "generating",
-      questionsData: [],
       questionType,
-      metadata: {},
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "generating",
     });
-
-    // Schedule the generation job
     await ctx.scheduler.runAfter(0, internal.jobs.WrittenQuestionsGenerationJob.writtenQuestionsGeneration, {
       writtenQuestionId,
       userId,
@@ -139,14 +91,10 @@ export const generateWrittenQuestions = mutation({
       difficulty: "medium",
       focus: undefined,
     });
-
     return writtenQuestionId;
   },
 });
 
-/**
- * Update a written question set
- */
 export const update = mutation({
   args: {
     id: v.id("writtenQuestions"),
@@ -156,38 +104,20 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const { id, metadata, ...otherUpdates } = args;
-
-    // Verify ownership
-    const writtenQuestion = await ctx.db.get(id);
-    if (!writtenQuestion || writtenQuestion.userId !== userId) {
-      throw new Error("Written question set not found or access denied");
-    }
-
-    const updateData: any = {
-      ...otherUpdates,
-      updatedAt: Date.now(),
-    };
-
-    // Merge metadata instead of replacing
+    if (!userId) throw new Error("Unauthenticated");
+    const { id, ...rest } = args;
+    const metadata = rest.metadata;
+    const otherUpdates: Omit<typeof rest, "metadata"> = rest;
+    const existing = await WrittenQuestions.getWrittenQuestion(ctx, id);
+    if (!existing || existing.userId !== userId) throw new Error("Written question set not found or access denied");
+    await WrittenQuestions.updateWrittenQuestion(ctx, id, otherUpdates, !!metadata);
     if (metadata) {
-      updateData.metadata = {
-        ...(writtenQuestion.metadata || {}),
-        ...metadata,
-      };
+      await WrittenQuestions.patchWrittenQuestion(ctx, id, { metadata });
     }
-
-    await ctx.db.patch(id, updateData);
-
-    return await ctx.db.get(id);
+    return await WrittenQuestions.getWrittenQuestion(ctx, id);
   },
 });
 
-/**
- * Update a written question set (legacy)
- */
 export const updateWrittenQuestions = mutation({
   args: {
     writtenQuestionId: v.id("writtenQuestions"),
@@ -197,120 +127,51 @@ export const updateWrittenQuestions = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
     const { writtenQuestionId, questionsData, title } = args;
-
-    // Verify ownership
-    const writtenQuestion = await ctx.db.get(writtenQuestionId);
-    if (!writtenQuestion || writtenQuestion.userId !== userId) {
-      throw new Error("Written question set not found or access denied");
-    }
-
-    // Update
-    const updates: any = { updatedAt: Date.now() };
+    const writtenQuestion = await WrittenQuestions.getWrittenQuestion(ctx, writtenQuestionId);
+    if (!writtenQuestion || writtenQuestion.userId !== userId) throw new Error("Written question set not found or access denied");
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
     if (questionsData !== undefined) updates.questionsData = questionsData;
     if (title !== undefined) updates.title = title;
-
-    await ctx.db.patch(writtenQuestionId, updates);
-
+    await WrittenQuestions.updateWrittenQuestion(ctx, writtenQuestionId, updates);
     return writtenQuestionId;
   },
 });
 
-/**
- * Delete a written question set
- */
 export const remove = mutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-  },
+  args: { writtenQuestionId: v.id("writtenQuestions") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    // Verify ownership
-    const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
-    if (!writtenQuestion || writtenQuestion.userId !== userId) {
-      throw new Error("Written question set not found or access denied");
-    }
-
-    await ctx.db.delete(args.writtenQuestionId);
+    if (!userId) throw new Error("Unauthenticated");
+    const writtenQuestion = await WrittenQuestions.getWrittenQuestion(ctx, args.writtenQuestionId);
+    if (!writtenQuestion || writtenQuestion.userId !== userId) throw new Error("Written question set not found or access denied");
+    await WrittenQuestions.deleteWrittenQuestion(ctx, args.writtenQuestionId);
   },
 });
 
-/**
- * Delete a written question set (alias for remove)
- */
-export const deleteWrittenQuestions = mutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+export const deleteWrittenQuestions = remove;
 
-    // Verify ownership
-    const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
-    if (!writtenQuestion || writtenQuestion.userId !== userId) {
-      throw new Error("Written question set not found or access denied");
-    }
-
-    await ctx.db.delete(args.writtenQuestionId);
-  },
-});
-
-/**
- * Internal: Update written question set status
- */
 export const updateStatus = internalMutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-    status: v.string(),
-  },
+  args: { writtenQuestionId: v.id("writtenQuestions"), status: v.string() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.writtenQuestionId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await WrittenQuestions.updateWrittenQuestionStatus(ctx, args.writtenQuestionId, args.status);
   },
 });
 
-/**
- * Internal: Update written question set data
- */
 export const updateData = internalMutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-    questionsData: v.array(v.any()),
-  },
+  args: { writtenQuestionId: v.id("writtenQuestions"), questionsData: v.array(v.any()) },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.writtenQuestionId, {
-      questionsData: args.questionsData,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await WrittenQuestions.updateWrittenQuestionData(ctx, args.writtenQuestionId, args.questionsData);
   },
 });
 
-/**
- * Internal: Update written question set with partial updates
- */
 export const patch = internalMutation({
-  args: {
-    writtenQuestionId: v.id("writtenQuestions"),
-    patch: v.any(),
-  },
+  args: { writtenQuestionId: v.id("writtenQuestions"), patch: v.any() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.writtenQuestionId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await WrittenQuestions.patchWrittenQuestion(ctx, args.writtenQuestionId, args.patch);
   },
 });
 
-/**
- * Internal: Update a specific user's answer (merges with existing answers)
- */
 export const patchUserAnswer = internalMutation({
   args: {
     writtenQuestionId: v.id("writtenQuestions"),
@@ -318,24 +179,6 @@ export const patchUserAnswer = internalMutation({
     answerData: v.any(),
   },
   handler: async (ctx, args) => {
-    const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
-    if (!writtenQuestion) {
-      throw new Error("Written question set not found");
-    }
-
-    // Get existing user answers or initialize empty object
-    const existingUserAnswers = (writtenQuestion.metadata as any)?.userAnswers || {};
-
-    // Merge the new answer with existing ones
-    await ctx.db.patch(args.writtenQuestionId, {
-      metadata: {
-        ...writtenQuestion.metadata,
-        userAnswers: {
-          ...existingUserAnswers,
-          [args.questionId]: args.answerData,
-        },
-      },
-      updatedAt: Date.now(),
-    });
+    await WrittenQuestions.patchWrittenQuestionUserAnswer(ctx, args.writtenQuestionId, args.questionId, args.answerData);
   },
 });

@@ -2,47 +2,29 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
+import * as Notebooks from "./model/notebooks";
+import * as Spreadsheets from "./model/spreadsheets";
 
-/**
- * List all spreadsheets for a notebook
- */
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    return await ctx.db
-      .query("spreadsheets")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Spreadsheets.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
-/**
- * Get a specific spreadsheet by ID
- */
 export const get = query({
   args: { id: v.id("spreadsheets") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-
-    const spreadsheet = await ctx.db.get(args.id);
-
-    if (!spreadsheet || spreadsheet.userId !== userId) {
-      return null;
-    }
-
+    const spreadsheet = await Spreadsheets.getSpreadsheet(ctx, args.id);
+    if (!spreadsheet || spreadsheet.userId !== userId) return null;
     return spreadsheet;
   },
 });
 
-/**
- * Create a new spreadsheet
- */
 export const create = mutation({
   args: {
     notebookId: v.id("notebooks"),
@@ -52,30 +34,17 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-
-    const notebook = await ctx.db.get(args.notebookId);
-    if (!notebook || notebook.userId !== userId) {
-      throw new Error("Notebook not found");
-    }
-
-    const spreadsheetId = await ctx.db.insert("spreadsheets", {
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
+    if (!notebook || notebook.userId !== userId) throw new Error("Notebook not found");
+    return await Spreadsheets.createSpreadsheetAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      data: {},
       metadata: args.metadata,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
     });
-
-    return await ctx.db.get(spreadsheetId);
   },
 });
 
-/**
- * Update a spreadsheet
- */
 export const update = mutation({
   args: {
     id: v.id("spreadsheets"),
@@ -86,46 +55,26 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-
     const { id, ...updates } = args;
-
-    const existing = await ctx.db.get(id);
-    if (!existing || existing.userId !== userId) {
-      throw new Error("Spreadsheet not found");
-    }
-
-    await ctx.db.patch(id, {
-      ...updates,
-      updatedAt: Date.now(),
-    });
-
-    return await ctx.db.get(id);
+    const existing = await Spreadsheets.getSpreadsheet(ctx, id);
+    if (!existing || existing.userId !== userId) throw new Error("Spreadsheet not found");
+    await Spreadsheets.updateSpreadsheet(ctx, id, updates);
+    return await Spreadsheets.getSpreadsheet(ctx, id);
   },
 });
 
-/**
- * Delete a spreadsheet
- */
 export const remove = mutation({
   args: { id: v.id("spreadsheets") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
-
-    const spreadsheet = await ctx.db.get(args.id);
-    if (!spreadsheet || spreadsheet.userId !== userId) {
-      throw new Error("Spreadsheet not found");
-    }
-
-    await ctx.db.delete(args.id);
-
+    const spreadsheet = await Spreadsheets.getSpreadsheet(ctx, args.id);
+    if (!spreadsheet || spreadsheet.userId !== userId) throw new Error("Spreadsheet not found");
+    await Spreadsheets.deleteSpreadsheet(ctx, args.id);
     return { message: "Spreadsheet deleted successfully" };
   },
 });
 
-/**
- * Generate a spreadsheet for a notebook
- */
 export const generateSpreadsheet = mutation({
   args: {
     notebookId: v.id("notebooks"),
@@ -137,28 +86,21 @@ export const generateSpreadsheet = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
     const { notebookId, documentIds, title, spreadsheetType, customPrompt } = args;
     if (documentIds.length === 0) {
       throw new Error("Please select at least one source. Content generation uses only your selected sources.");
     }
-
-    // Create spreadsheet record
-    const spreadsheetId = await ctx.db.insert("spreadsheets", {
+    const spreadsheetId = await Spreadsheets.createSpreadsheet(ctx, {
       userId,
       notebookId,
       title: title || "Spreadsheet",
       data: {},
-      status: "generating",
       metadata: {
         spreadsheetType: spreadsheetType || 'custom',
         customPrompt: customPrompt || '',
       },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "generating",
     });
-
-    // Schedule the generation job
     await ctx.scheduler.runAfter(0, internal.jobs.SpreadsheetGenerationJob.spreadsheetGeneration, {
       spreadsheetId,
       userId,
@@ -167,14 +109,10 @@ export const generateSpreadsheet = mutation({
       spreadsheetType: spreadsheetType || 'custom',
       customPrompt: customPrompt || '',
     });
-
     return spreadsheetId;
   },
 });
 
-/**
- * Update a spreadsheet
- */
 export const updateSpreadsheet = mutation({
   args: {
     spreadsheetId: v.id("spreadsheets"),
@@ -184,99 +122,49 @@ export const updateSpreadsheet = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
     const { spreadsheetId, data, title } = args;
-
-    // Verify ownership
-    const spreadsheet = await ctx.db.get(spreadsheetId);
-    if (!spreadsheet || spreadsheet.userId !== userId) {
-      throw new Error("Spreadsheet not found or access denied");
-    }
-
-    // Update
-    const updates: any = { updatedAt: Date.now() };
+    const spreadsheet = await Spreadsheets.getSpreadsheet(ctx, spreadsheetId);
+    if (!spreadsheet || spreadsheet.userId !== userId) throw new Error("Spreadsheet not found or access denied");
+    const updates: Record<string, unknown> = { updatedAt: Date.now() };
     if (data !== undefined) updates.data = data;
     if (title !== undefined) updates.title = title;
-
-    await ctx.db.patch(spreadsheetId, updates);
-
+    await Spreadsheets.updateSpreadsheet(ctx, spreadsheetId, updates);
     return spreadsheetId;
   },
 });
 
-/**
- * Delete a spreadsheet
- */
 export const deleteSpreadsheet = mutation({
-  args: {
-    spreadsheetId: v.id("spreadsheets"),
-  },
+  args: { spreadsheetId: v.id("spreadsheets") },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-
-    // Verify ownership
-    const spreadsheet = await ctx.db.get(args.spreadsheetId);
-    if (!spreadsheet || spreadsheet.userId !== userId) {
-      throw new Error("Spreadsheet not found or access denied");
-    }
-
-    await ctx.db.delete(args.spreadsheetId);
+    const spreadsheet = await Spreadsheets.getSpreadsheet(ctx, args.spreadsheetId);
+    if (!spreadsheet || spreadsheet.userId !== userId) throw new Error("Spreadsheet not found or access denied");
+    await Spreadsheets.deleteSpreadsheet(ctx, args.spreadsheetId);
   },
 });
 
-/**
- * Internal: Update spreadsheet status
- */
 export const updateStatus = internalMutation({
-  args: {
-    spreadsheetId: v.id("spreadsheets"),
-    status: v.string(),
-  },
+  args: { spreadsheetId: v.id("spreadsheets"), status: v.string() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.spreadsheetId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await Spreadsheets.updateSpreadsheetStatus(ctx, args.spreadsheetId, args.status);
   },
 });
 
-/**
- * Internal: Update spreadsheet data
- */
 export const updateData = internalMutation({
-  args: {
-    spreadsheetId: v.id("spreadsheets"),
-    data: v.any(),
-  },
+  args: { spreadsheetId: v.id("spreadsheets"), data: v.any() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.spreadsheetId, {
-      data: args.data,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await Spreadsheets.updateSpreadsheetData(ctx, args.spreadsheetId, args.data);
   },
 });
 
-/**
- * Internal: Update spreadsheet with partial updates
- */
 export const patch = internalMutation({
-  args: {
-    spreadsheetId: v.id("spreadsheets"),
-    patch: v.any(),
-  },
+  args: { spreadsheetId: v.id("spreadsheets"), patch: v.any() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.spreadsheetId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await Spreadsheets.patchSpreadsheet(ctx, args.spreadsheetId, args.patch);
   },
 });
 
-/**
- * Internal: Create a spreadsheet (used by action for best practices)
- */
 export const createInternal = internalMutation({
   args: {
     userId: v.id("users"),
@@ -287,21 +175,15 @@ export const createInternal = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const spreadsheetId = await ctx.db.insert("spreadsheets", {
+    return await Spreadsheets.createSpreadsheetAndFetch(ctx, {
       userId: args.userId,
       notebookId: args.notebookId,
       title: args.title,
-      data: {},
-      status: "generating",
       metadata: {
         spreadsheetType: args.spreadsheetType,
         customPrompt: args.customPrompt,
         ...args.metadata,
       },
-      createdAt: now,
-      updatedAt: now,
     });
-    return await ctx.db.get("spreadsheets", spreadsheetId);
   },
 });

@@ -1,8 +1,8 @@
 "use node"
 import { Supadata, SupadataError } from '@supadata/js';
-import { env } from '../../../lib/helpers/env';
-import { validateUrl } from '../../../lib/utils/urlValidation.js';
-import { invokeWithRetry } from '../../../lib/services/agents/shared/retry.js';
+import { env } from '../helpers/env';
+import { validateUrl } from '../utils/urlValidation.js';
+import { invokeWithRetry } from '../agents/shared/retry.js';
 
 /**
  * SupadataLoaderService handles content extraction from:

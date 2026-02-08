@@ -2,10 +2,10 @@
 import { internalAction } from '../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../_generated/api';
-import { FlashcardGraph } from '../../lib/services/agents/FlashcardGraph';
+import { FlashcardGraph } from '../lib/agents/FlashcardGraph';
 import { createCachedAction } from '../lib/cachedAgent';
 import { CACHE_TTL } from '../lib/cache';
-import { env } from '../../lib/helpers/env';
+import { env } from '../lib/helpers/env';
 
 // ============================================================
 // 1. Extract core generation logic into cacheable action

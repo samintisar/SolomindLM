@@ -2,8 +2,8 @@
 import { internalAction } from '../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../_generated/api';
-import { SlideDeckGraph } from '../../lib/services/agents/SlideDeckGraph';
-import { env } from '../../lib/helpers/env';
+import { SlideDeckGraph } from '../lib/agents/SlideDeckGraph';
+import { env } from '../lib/helpers/env';
 
 /**
  * Slide deck generation job handler

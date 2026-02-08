@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "./auth";
+import * as Notebooks from "./model/notebooks";
+import * as Flashcards from "./model/flashcards";
 
 /**
  * List all flashcards for a notebook
@@ -11,12 +13,7 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query("flashcards")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Flashcards.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
@@ -29,7 +26,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const flashcard = await ctx.db.get(args.id);
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
 
     if (!flashcard || flashcard.userId !== userId) {
       return null;
@@ -54,25 +51,18 @@ export const create = mutation({
     if (!userId) throw new Error("Unauthenticated");
 
     // Verify user owns the notebook
-    const notebook = await ctx.db.get(args.notebookId);
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
     if (!notebook || notebook.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    const now = Date.now();
-
-    const flashcardId = await ctx.db.insert("flashcards", {
+    return await Flashcards.createFlashcardAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      cardsData: args.cardsData || [],
+      cardsData: args.cardsData,
       metadata: args.metadata,
-      createdAt: now,
-      updatedAt: now,
     });
-
-    return await ctx.db.get("flashcards", flashcardId);
   },
 });
 
@@ -89,18 +79,13 @@ export const createInternal = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const flashcardId = await ctx.db.insert("flashcards", {
+    return await Flashcards.createFlashcardAndFetch(ctx, {
       userId: args.userId,
       notebookId: args.notebookId,
       title: args.title,
-      status: "draft",
-      cardsData: args.cardsData || [],
+      cardsData: args.cardsData,
       metadata: args.metadata,
-      createdAt: now,
-      updatedAt: now,
     });
-    return await ctx.db.get("flashcards", flashcardId);
   },
 });
 
@@ -119,30 +104,24 @@ export const update = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const { id, metadata, ...otherUpdates } = args;
+    const { id, ...rest } = args;
+    const metadata = rest.metadata;
+    const otherUpdates: Omit<typeof rest, "metadata"> = rest;
 
     // Verify ownership
-    const existing = await ctx.db.get(id);
+    const existing = await Flashcards.getFlashcard(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Flashcard set not found");
     }
 
-    const updateData: any = {
-      ...otherUpdates,
-      updatedAt: Date.now(),
-    };
+    await Flashcards.updateFlashcard(ctx, id, otherUpdates, !!metadata);
 
-    // Merge metadata instead of replacing
+    // Merge metadata if provided
     if (metadata) {
-      updateData.metadata = {
-        ...(existing.metadata || {}),
-        ...metadata,
-      };
+      await Flashcards.patchFlashcard(ctx, id, { metadata });
     }
 
-    await ctx.db.patch(id, updateData);
-
-    return await ctx.db.get(id);
+    return await Flashcards.getFlashcard(ctx, id);
   },
 });
 
@@ -155,12 +134,12 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const flashcard = await ctx.db.get(args.id);
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
     if (!flashcard || flashcard.userId !== userId) {
       throw new Error("Flashcard set not found");
     }
 
-    await ctx.db.delete(args.id);
+    await Flashcards.deleteFlashcard(ctx, args.id);
 
     return { message: "Flashcard set deleted successfully" };
   },
@@ -175,10 +154,7 @@ export const updateStatus = internalMutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.flashcardId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await Flashcards.updateFlashcardStatus(ctx, args.flashcardId, args.status);
   },
 });
 
@@ -191,11 +167,7 @@ export const updateData = internalMutation({
     cardsData: v.array(v.any()),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.flashcardId, {
-      cardsData: args.cardsData,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await Flashcards.updateFlashcardData(ctx, args.flashcardId, args.cardsData);
   },
 });
 
@@ -208,9 +180,6 @@ export const patch = internalMutation({
     patch: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.flashcardId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await Flashcards.patchFlashcard(ctx, args.flashcardId, args.patch);
   },
 });

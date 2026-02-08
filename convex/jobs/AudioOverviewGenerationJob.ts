@@ -2,8 +2,8 @@
 import { internalAction } from '../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../_generated/api';
-import { AudioOverviewGraph } from '../../lib/services/agents/AudioOverviewGraph';
-import { env } from '../../lib/helpers/env';
+import { AudioOverviewGraph } from '../lib/agents/AudioOverviewGraph';
+import { env } from '../lib/helpers/env';
 
 /**
  * Audio overview generation job handler

@@ -1,6 +1,6 @@
 "use node";
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { countTokens } from '../../../lib/services/agents/shared/tokenizer.js';
+import { countTokens } from '../agents/shared/tokenizer.js';
 
 export class TextSplitterService {
   static async splitText(

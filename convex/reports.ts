@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { internal } from "./_generated/api";
 import { getAuthUserId } from "./auth";
+import * as Notebooks from "./model/notebooks";
+import * as Reports from "./model/reports";
 
 /**
  * List all reports for a notebook
@@ -12,12 +13,7 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query("reports")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Reports.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
@@ -30,7 +26,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const report = await ctx.db.get(args.id);
+    const report = await Reports.getReport(ctx, args.id);
 
     if (!report || report.userId !== userId) {
       return null;
@@ -49,12 +45,7 @@ export const getReports = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
-      .query("reports")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .order("desc")
-      .collect();
+    return await Reports.listByNotebook(ctx, args.notebookId, userId);
   },
 });
 
@@ -74,26 +65,19 @@ export const create = mutation({
     if (!userId) throw new Error("Unauthenticated");
 
     // Verify user owns the notebook
-    const notebook = await ctx.db.get(args.notebookId);
+    const notebook = await Notebooks.getNotebook(ctx, args.notebookId);
     if (!notebook || notebook.userId !== userId) {
       throw new Error("Notebook not found");
     }
 
-    const now = Date.now();
-
-    const reportId = await ctx.db.insert("reports", {
+    return await Reports.createReportAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
       reportType: args.reportType,
       content: args.content,
-      status: "draft",
       metadata: args.metadata,
-      createdAt: now,
-      updatedAt: now,
     });
-
-    return await ctx.db.get("reports", reportId);
   },
 });
 
@@ -111,19 +95,14 @@ export const createInternal = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const reportId = await ctx.db.insert("reports", {
+    return await Reports.createReportAndFetch(ctx, {
       userId: args.userId,
       notebookId: args.notebookId,
       title: args.title,
       reportType: args.reportType,
       content: args.content,
-      status: "draft",
       metadata: args.metadata,
-      createdAt: now,
-      updatedAt: now,
     });
-    return await ctx.db.get("reports", reportId);
   },
 });
 
@@ -146,19 +125,14 @@ export const update = mutation({
     const { id, ...updates } = args;
 
     // Verify ownership
-    const existing = await ctx.db.get(id);
+    const existing = await Reports.getReport(ctx, id);
     if (!existing || existing.userId !== userId) {
       throw new Error("Report not found");
     }
 
-    const updateData: any = {
-      ...updates,
-      updatedAt: Date.now(),
-    };
+    await Reports.updateReport(ctx, id, updates);
 
-    await ctx.db.patch(id, updateData);
-
-    return await ctx.db.get(id);
+    return await Reports.getReport(ctx, id);
   },
 });
 
@@ -171,12 +145,12 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const report = await ctx.db.get(args.id);
+    const report = await Reports.getReport(ctx, args.id);
     if (!report || report.userId !== userId) {
       throw new Error("Report not found");
     }
 
-    await ctx.db.delete(args.id);
+    await Reports.deleteReport(ctx, args.id);
 
     return { message: "Report deleted successfully" };
   },
@@ -191,10 +165,7 @@ export const updateStatus = internalMutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.reportId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
+    await Reports.updateReportStatus(ctx, args.reportId, args.status);
   },
 });
 
@@ -207,11 +178,7 @@ export const updateContent = internalMutation({
     content: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.reportId, {
-      content: args.content,
-      status: "completed",
-      updatedAt: Date.now(),
-    });
+    await Reports.updateReportContent(ctx, args.reportId, args.content);
   },
 });
 
@@ -224,9 +191,6 @@ export const patch = internalMutation({
     patch: v.any(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.reportId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
+    await Reports.patchReport(ctx, args.reportId, args.patch);
   },
 });
