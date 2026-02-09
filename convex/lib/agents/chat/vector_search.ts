@@ -8,7 +8,7 @@
  */
 
 import { env } from '../../helpers/env';
-import type { ReferenceChunk } from 'storage/ChatHistoryService.js';
+import type { ReferenceChunk } from '../../../storage/ChatHistoryService';
 import type { EmbeddingService } from '../../processing/EmbeddingServiceClient';
 
 // Re-export ReferenceChunk for other modules

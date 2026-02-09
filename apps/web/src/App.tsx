@@ -32,6 +32,7 @@ import { useUpdateAudioOverview, useDeleteAudioOverview } from './features/studi
 import { useRenameWrittenQuestions, useDeleteWrittenQuestions } from './features/studio/services/writtenQuestionsApi';
 import { useRenameSlideDeck, useDeleteSlideDeck } from './features/studio/services/slidesApi';
 import { useRenameSpreadsheet, useDeleteSpreadsheet } from './features/studio/services/spreadsheetsApi';
+import { useUpdateUserNote, useDeleteUserNote } from './features/chat/services/userNotesApi';
 import { useNotebooks, useCreateNotebook, useUpdateNotebook, useDeleteNotebook } from './features/notebooks/services/notebooksApi';
 import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder } from './features/notebooks/services/foldersApi';
 import { useGenerateUploadUrl, useCreateDocument, useUpdateDocument, useDeleteDocument } from './features/sources/services/documentsApi';
@@ -187,6 +188,8 @@ const AppContent: React.FC = () => {
   const deleteSlideDeck = useDeleteSlideDeck();
   const renameSpreadsheet = useRenameSpreadsheet();
   const deleteSpreadsheet = useDeleteSpreadsheet();
+  const updateUserNote = useUpdateUserNote();
+  const deleteUserNote = useDeleteUserNote();
 
   // Determine current view from URL
   const currentView = useMemo(() => {
@@ -233,6 +236,13 @@ const AppContent: React.FC = () => {
     title: string;
     transcript?: string;
   } | null>(null);
+
+  // Optimistic UI: saved-chat placeholder shown in notes list until save completes
+  const [optimisticSaveNote, setOptimisticSaveNote] = useState<{ notebookId: string; note: Note } | null>(null);
+  const displayNotes = useMemo(() => {
+    if (!optimisticSaveNote || optimisticSaveNote.notebookId !== activeNotebookId) return notes;
+    return [optimisticSaveNote.note, ...notes];
+  }, [notes, optimisticSaveNote, activeNotebookId]);
 
   // Subscription status
   const subscriptionStatus = useSubscriptionStatus();
@@ -440,6 +450,9 @@ const AppContent: React.FC = () => {
         case 'spreadsheet':
           await renameSpreadsheet(id, newTitle.trim());
           break;
+        case 'note':
+          await updateUserNote(id, { title: newTitle.trim() });
+          break;
         default:
           console.warn('Unknown note type for update:', (note as Note).type);
       }
@@ -451,6 +464,10 @@ const AppContent: React.FC = () => {
 
   const handleUpdateNoteFull = (id: string, note: Note) => {
     // Notes will be automatically updated via Convex query reactivity
+  };
+
+  const handleSaveReportContent = async (reportId: string, content: string) => {
+    await updateReport(reportId, { content });
   };
 
   const handleDeleteNote = async (id: string) => {
@@ -481,6 +498,9 @@ const AppContent: React.FC = () => {
           break;
         case 'spreadsheet':
           await deleteSpreadsheet(id);
+          break;
+        case 'note':
+          await deleteUserNote(id);
           break;
         default:
           console.warn('Unknown note type for delete:', (note as Note).type);
@@ -970,6 +990,8 @@ const AppContent: React.FC = () => {
                     onSendMessage={handleSendMessage}
                     isLoading={isChatStreaming}
                     notebookId={activeNotebookId}
+                    notebookTitle={notebookTitle}
+                    onSaveChatOptimistic={setOptimisticSaveNote}
                   />
 
                   {isStudioOpen && (
@@ -983,11 +1005,12 @@ const AppContent: React.FC = () => {
                     isOpen={isStudioOpen}
                     onClose={toggleStudio}
                     tools={STUDIO_TOOLS}
-                    notes={notes}
+                    notes={displayNotes}
                     onUpdateNote={handleUpdateNote}
                     onUpdateNoteFull={handleUpdateNoteFull}
                     onDeleteNote={handleDeleteNote}
                     onAddNote={handleAddNote}
+                    onSaveReportContent={handleSaveReportContent}
                     width={rightWidth}
                     isResizing={isResizingRight}
                     sources={sources}
@@ -1034,6 +1057,8 @@ const AppContent: React.FC = () => {
                         onSendMessage={handleSendMessage}
                         isLoading={isChatStreaming}
                         notebookId={activeNotebookId}
+                        notebookTitle={notebookTitle}
+                        onSaveChatOptimistic={setOptimisticSaveNote}
                       />
                     </div>
                   )}
@@ -1043,11 +1068,12 @@ const AppContent: React.FC = () => {
                         isOpen={true}
                         onClose={() => {}}
                         tools={STUDIO_TOOLS}
-                        notes={notes}
+                        notes={displayNotes}
                         onUpdateNote={handleUpdateNote}
                         onUpdateNoteFull={handleUpdateNoteFull}
                         onDeleteNote={handleDeleteNote}
                         onAddNote={handleAddNote}
+                        onSaveReportContent={handleSaveReportContent}
                         width={390}
                         isResizing={false}
                         sources={sources}

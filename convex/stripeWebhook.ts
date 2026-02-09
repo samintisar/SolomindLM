@@ -84,7 +84,8 @@ async function handleCheckoutCompleted(
   if (!userId && customerId) {
     try {
       const customer = await stripe.customers.retrieve(customerId);
-      if (!customer.deleted && customer.metadata?.convexUserId) {
+      // Check if customer is not deleted before accessing metadata
+      if ('deleted' in customer && !customer.deleted && 'metadata' in customer && customer.metadata?.convexUserId) {
         userId = customer.metadata.convexUserId;
         console.log("[Stripe webhook] Resolved userId from customer metadata:", userId);
       }

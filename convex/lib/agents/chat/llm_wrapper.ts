@@ -9,7 +9,7 @@
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
-import type { ReferenceChunk } from 'storage/ChatHistoryService.js';
+import type { ReferenceChunk } from '../../../storage/ChatHistoryService';
 import { createLangSmithRunConfig } from '../shared/index.js';
 
 // ============================================================

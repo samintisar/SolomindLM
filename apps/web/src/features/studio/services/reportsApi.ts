@@ -103,41 +103,37 @@ export function useCreateReport() {
 }
 
 /**
- * Update a report (e.g. title) with optimistic update
+ * Update a report (e.g. title or content) with optimistic update
  */
 export function useUpdateReport() {
   const update = useMutation(api.reports.update).withOptimisticUpdate((localStore, args) => {
-    const { id, title } = args;
+    const { id, title, content } = args;
 
     // Read the current report to get its notebookId
     const report = localStore.getQuery(api.reports.get, { id });
     if (report) {
-      // Update detail view
-      localStore.setQuery(
-        api.reports.get,
-        { id },
-        { ...report, ...(title !== undefined && { title }) }
-      );
+      const updates: Record<string, unknown> = {};
+      if (title !== undefined) updates.title = title;
+      if (content !== undefined) updates.content = content;
+      if (Object.keys(updates).length > 0) {
+        localStore.setQuery(api.reports.get, { id }, { ...report, ...updates });
+      }
 
-      // Update list view using the notebookId from the item (if title is being updated)
+      // Update list view when title changes
       if (title !== undefined) {
         const listResult = localStore.getQuery(api.reports.list, { notebookId: report.notebookId });
         if (listResult) {
           localStore.setQuery(
             api.reports.list,
             { notebookId: report.notebookId },
-            listResult.map(r =>
-              r._id === id
-                ? { ...r, title }
-                : r
-            )
+            listResult.map(r => (r._id === id ? { ...r, title } : r))
           );
         }
       }
     }
   });
 
-  return async (reportId: string, updates: { title?: string }) => {
+  return async (reportId: string, updates: { title?: string; content?: string }) => {
     await update({
       id: reportId as Id<'reports'>,
       ...updates,

@@ -109,6 +109,7 @@ import type * as model_flashcards from "../model/flashcards.js";
 import type * as model_folders from "../model/folders.js";
 import type * as model_mindmaps from "../model/mindmaps.js";
 import type * as model_notebooks from "../model/notebooks.js";
+import type * as model_notes from "../model/notes.js";
 import type * as model_quizzes from "../model/quizzes.js";
 import type * as model_reports from "../model/reports.js";
 import type * as model_slides from "../model/slides.js";
@@ -130,6 +131,7 @@ import type * as stripeWebhook from "../stripeWebhook.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as subscriptionsActions from "../subscriptionsActions.js";
 import type * as titleGenerator from "../titleGenerator.js";
+import type * as userNotes from "../userNotes.js";
 import type * as writtenQuestionActions from "../writtenQuestionActions.js";
 import type * as writtenQuestions from "../writtenQuestions.js";
 
@@ -241,6 +243,7 @@ declare const fullApi: ApiFromModules<{
   "model/folders": typeof model_folders;
   "model/mindmaps": typeof model_mindmaps;
   "model/notebooks": typeof model_notebooks;
+  "model/notes": typeof model_notes;
   "model/quizzes": typeof model_quizzes;
   "model/reports": typeof model_reports;
   "model/slides": typeof model_slides;
@@ -262,6 +265,7 @@ declare const fullApi: ApiFromModules<{
   subscriptions: typeof subscriptions;
   subscriptionsActions: typeof subscriptionsActions;
   titleGenerator: typeof titleGenerator;
+  userNotes: typeof userNotes;
   writtenQuestionActions: typeof writtenQuestionActions;
   writtenQuestions: typeof writtenQuestions;
 }>;

@@ -224,6 +224,25 @@ export default defineSchema({
   })
     .index("by_conversation", ["conversationId"]),
 
+  // Notes table - for saved chat conversations and manual user notes
+  notes: defineTable({
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
+    type: v.union(v.literal("chat"), v.literal("manual")), // 'chat' for saved conversations, 'manual' for user-created notes
+    title: v.string(),
+    status: v.string(), // 'completed' - for consistency with other note types
+    content: v.optional(v.string()), // For manual notes (markdown content)
+    messages: v.optional(v.array(v.any())), // For saved chats (conversation snapshot)
+    messageCount: v.optional(v.number()), // For saved chats
+    conversationId: v.optional(v.id("conversations")), // For saved chats - link to original conversation
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_user", ["userId"])
+    .index("by_type", ["type"]),
+
   // Stripe
   stripeSubscriptions: defineTable({
     userId: v.id("users"),

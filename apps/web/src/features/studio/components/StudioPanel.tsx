@@ -25,6 +25,7 @@ interface StudioPanelProps {
   onUpdateNoteFull?: (id: string, note: Note) => void;
   onDeleteNote: (id: string) => void;
   onAddNote: (note: Note) => void;
+  onSaveReportContent?: (reportId: string, content: string) => void | Promise<void>;
   width: number;
   isResizing: boolean;
   sources?: any[];
@@ -54,6 +55,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   onUpdateNoteFull,
   onDeleteNote,
   onAddNote,
+  onSaveReportContent,
   width,
   isResizing,
   sources = [],
@@ -69,6 +71,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isEditingReportContent, setIsEditingReportContent] = useState(false);
 
   // Derived state
   const activeNote = notes.find(n => n.id === activeNoteId) || null;
@@ -157,7 +160,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     }
     if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' ||
         note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions' ||
-        note.type === 'slides' || note.type === 'spreadsheet') {
+        note.type === 'slides' || note.type === 'spreadsheet' || note.type === 'note') {
       setActiveNoteId(note.id);
     }
   };
@@ -185,7 +188,17 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   // Handle back button
   const handleBack = () => {
     setActiveNoteId(null);
+    setIsEditingReportContent(false);
   };
+
+  const handleEditReport = () => setIsEditingReportContent(true);
+
+  const handleSaveReportContent = async (reportId: string, content: string) => {
+    await onSaveReportContent?.(reportId, content);
+    setIsEditingReportContent(false);
+  };
+
+  const handleCancelEditReport = () => setIsEditingReportContent(false);
 
   if (!isOpen) {
     return <>{miniPlayerVisible && miniPlayerData && (
@@ -227,11 +240,15 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           onRenameSubmit={handleRenameSubmit}
           onEditStart={handleEditStartFromHeader}
           onEditCancel={noteActions.handleEditCancel}
+          onEditReport={onSaveReportContent ? handleEditReport : undefined}
           onCopyReport={noteActions.handleCopyReport}
           onDownloadReport={noteActions.handleDownloadReport}
           onDownloadSpreadsheet={noteActions.handleDownloadSpreadsheet}
           onExportFlashcards={noteActions.handleExportFlashcards}
+          onCopyUserNote={noteActions.handleCopyUserNote}
+          onDownloadUserNote={noteActions.handleDownloadUserNote}
           canCopyOrDownload={noteActions.canCopyOrDownloadReport}
+          canCopyOrDownloadUserNote={noteActions.canCopyOrDownloadUserNote}
           canExportFlashcards={noteActions.canExportFlashcards}
           canDownloadSpreadsheet={noteActions.canDownloadSpreadsheet}
           isExporting={noteActions.isExporting}
@@ -248,6 +265,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               onUpdateNoteFull={onUpdateNoteFull}
               isMobile={isMobile}
               onBack={handleBack}
+              isEditingReportContent={isEditingReportContent}
+              onSaveReportContent={onSaveReportContent ? handleSaveReportContent : undefined}
+              onCancelEditReport={onSaveReportContent ? handleCancelEditReport : undefined}
             />
           ) : (
             <NoteListView

@@ -6,7 +6,7 @@
  * with appropriate citations.
  */
 
-import type { ReferenceChunk } from 'storage/ChatHistoryService.js';
+import type { ReferenceChunk } from '../../../storage/ChatHistoryService';
 import type { EmbeddingService } from '../../processing/EmbeddingServiceClient';
 
 // ============================================================

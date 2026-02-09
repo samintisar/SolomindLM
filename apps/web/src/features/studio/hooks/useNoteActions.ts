@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote } from '@/shared/types/index';
+import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote, isUserNote } from '@/shared/types/index';
 import { exportFlashcardsCSV } from '../services/flashcardsApi';
 
 interface ConfirmOptions {
@@ -25,6 +25,7 @@ interface UseNoteActionsResult {
   isExporting: boolean;
   // Capabilities
   canCopyOrDownloadReport: boolean;
+  canCopyOrDownloadUserNote: boolean;
   canExportFlashcards: boolean;
   canDownloadSpreadsheet: boolean;
   // Actions
@@ -34,6 +35,8 @@ interface UseNoteActionsResult {
   handleKeyDown: (e: React.KeyboardEvent) => void;
   handleCopyReport: () => Promise<void>;
   handleDownloadReport: () => void;
+  handleCopyUserNote: () => Promise<void>;
+  handleDownloadUserNote: () => void;
   handleDownloadSpreadsheet: () => void;
   handleDeleteNote: (note: Note) => Promise<void>;
   handleExportFlashcards: () => Promise<void>;
@@ -67,6 +70,14 @@ export const useNoteActions = ({
   // Check if current note can download as CSV (spreadsheet)
   const canDownloadSpreadsheet = useMemo(() => {
     return Boolean(activeNote && isSpreadsheetNote(activeNote) && activeNote.content);
+  }, [activeNote]);
+
+  // Check if current user note has copyable/downloadable content (content or messages)
+  const canCopyOrDownloadUserNote = useMemo(() => {
+    if (!activeNote || !isUserNote(activeNote)) return false;
+    if (activeNote.content && activeNote.content.trim()) return true;
+    if (activeNote.messages && activeNote.messages.length > 0) return true;
+    return false;
   }, [activeNote]);
 
   // Start inline editing
@@ -120,6 +131,46 @@ export const useNoteActions = ({
     URL.revokeObjectURL(url);
   }, [activeNote]);
 
+  // Get user note body as plain text (content or messages formatted)
+  const getUserNoteBody = useCallback((note: Note): string => {
+    if (!isUserNote(note)) return '';
+    if (note.content && note.content.trim()) return note.content;
+    if (note.messages && note.messages.length > 0) {
+      return note.messages
+        .map((m) => `${m.role === 'user' ? 'You' : 'Assistant'}: ${m.content}`)
+        .join('\n\n');
+    }
+    return '';
+  }, []);
+
+  // Copy user note to clipboard
+  const handleCopyUserNote = useCallback(async () => {
+    if (!activeNote || !isUserNote(activeNote)) return;
+    const body = getUserNoteBody(activeNote);
+    if (!body) return;
+    try {
+      await navigator.clipboard.writeText(body);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  }, [activeNote, getUserNoteBody]);
+
+  // Download user note as .md or .txt
+  const handleDownloadUserNote = useCallback(() => {
+    if (!activeNote || !isUserNote(activeNote)) return;
+    const body = getUserNoteBody(activeNote);
+    if (!body) return;
+    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, '_').trim() || 'note';
+    const filename = `${safeName}.md`;
+    const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeNote, getUserNoteBody]);
+
   // Download spreadsheet as CSV
   const handleDownloadSpreadsheet = useCallback(() => {
     if (!activeNote || !isSpreadsheetNote(activeNote) || !activeNote.content) return;
@@ -168,6 +219,7 @@ export const useNoteActions = ({
     setEditTitle,
     isExporting,
     canCopyOrDownloadReport,
+    canCopyOrDownloadUserNote,
     canExportFlashcards,
     canDownloadSpreadsheet,
     handleStartEdit,
@@ -176,6 +228,8 @@ export const useNoteActions = ({
     handleKeyDown,
     handleCopyReport,
     handleDownloadReport,
+    handleCopyUserNote,
+    handleDownloadUserNote,
     handleDownloadSpreadsheet,
     handleDeleteNote,
     handleExportFlashcards,

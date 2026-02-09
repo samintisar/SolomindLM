@@ -139,6 +139,24 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
+    case 'note':
+      return {
+        id: dbNote._id,
+        title: dbNote.title,
+        preview: getNotePreview(dbNote),
+        type: 'note',
+        noteType: dbNote.type || 'chat',
+        content: dbNote.content,
+        messages: dbNote.messages,
+        status: dbNote.status,
+        metadata: {
+          messageCount: dbNote.messageCount,
+          conversationId: dbNote.conversationId,
+          savedAt: new Date(dbNote.createdAt).toISOString(),
+          ...dbNote.metadata,
+        },
+      };
+
     default:
       throw new Error(`Unknown note type: ${_type}`);
   }
@@ -201,6 +219,13 @@ function getWrittenQuestionsPreview(dbNote: any): string {
   return `${count} Question${count !== 1 ? 's' : ''}`;
 }
 
+function getNotePreview(dbNote: any): string {
+  const isChat = dbNote.type === 'chat';
+  if (isChat) return 'Note · Saved Chat';
+  // Manual note
+  return dbNote.content?.substring(0, 100) || 'Empty note';
+}
+
 /**
  * Load all studio notes for a notebook using a SINGLE unified query.
  *
@@ -243,7 +268,7 @@ export function useNote(type: string, noteId: string | null) {
   const note = useQuery(
     api.notes.getById,
     noteId && type
-      ? { type, id: noteId as Id<'documents'> }
+      ? { type, id: noteId as any }
       : 'skip'
   );
   return note ? mapDatabaseNoteToNote(note) : null;

@@ -56,6 +56,7 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
     writtenQuestions: { icon: MessageSquareText, bgClass: 'bg-green-500/10', textClass: 'text-green-700' },
     slides: { icon: Presentation, bgClass: 'bg-violet-500/10', textClass: 'text-violet-600' },
     spreadsheet: { icon: Table2, bgClass: 'bg-cyan-500/10', textClass: 'text-cyan-600' },
+    note: { icon: FileText, bgClass: 'bg-indigo-500/10', textClass: 'text-indigo-600' },
   };
 
   const config = iconConfig[note.type];

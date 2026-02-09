@@ -56,7 +56,12 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, children, a
       {isOpen && (
         <div
           role="menu"
-          className={`absolute top-full mt-2 ${alignClass} z-[200] min-w-[200px] bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200`}
+          className={`absolute top-full mt-2 ${alignClass} z-200 min-w-[200px] bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200`}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('[role="menuitem"]')) {
+              setIsOpen(false);
+            }
+          }}
         >
           {children}
         </div>

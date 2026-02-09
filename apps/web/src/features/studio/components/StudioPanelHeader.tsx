@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { ChevronRight, PenTool, ArrowLeft, Copy, Download, Loader2 } from 'lucide-react';
-import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote } from '@/shared/types/index';
+import { ChevronRight, PenTool, ArrowLeft, Copy, Download, Loader2, Pencil } from 'lucide-react';
+import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote, isUserNote } from '@/shared/types/index';
 
 interface StudioPanelHeaderProps {
   activeNote: Note | null;
@@ -12,11 +12,15 @@ interface StudioPanelHeaderProps {
   onRenameSubmit: (id: string, newTitle: string) => void;
   onEditStart: () => void;
   onEditCancel: () => void;
+  onEditReport?: () => void;
   onCopyReport: () => void;
   onDownloadReport: () => void;
   onDownloadSpreadsheet: () => void;
   onExportFlashcards: () => void;
+  onCopyUserNote: () => void;
+  onDownloadUserNote: () => void;
   canCopyOrDownload: boolean;
+  canCopyOrDownloadUserNote: boolean;
   canExportFlashcards: boolean;
   canDownloadSpreadsheet: boolean;
   isExporting: boolean;
@@ -37,11 +41,15 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   onRenameSubmit,
   onEditStart,
   onEditCancel,
+  onEditReport,
   onCopyReport,
   onDownloadReport,
   onDownloadSpreadsheet,
   onExportFlashcards,
+  onCopyUserNote,
+  onDownloadUserNote,
   canCopyOrDownload,
+  canCopyOrDownloadUserNote,
   canExportFlashcards,
   canDownloadSpreadsheet,
   isExporting,
@@ -63,6 +71,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
           <>
             <div className="flex items-center gap-2 text-foreground overflow-hidden min-w-0 flex-1">
               <button
+                type="button"
                 onClick={onBack}
                 className="p-1.5 hover:bg-secondary rounded-md transition-colors text-foreground flex items-center justify-center shrink-0"
                 aria-label="Back to Studio"
@@ -105,6 +114,17 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
             </div>
             {isReportNote(activeNote) && (
               <div className="flex items-center gap-1 shrink-0">
+                {onEditReport && (
+                  <button
+                    type="button"
+                    onClick={onEditReport}
+                    className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground"
+                    title="Edit report"
+                    aria-label="Edit report"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onCopyReport}
@@ -115,13 +135,37 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 >
                   <Copy className="w-4 h-4" />
                 </button>
+              <button
+                type="button"
+                onClick={onDownloadReport}
+                disabled={!canCopyOrDownload}
+                className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Download report as Markdown file"
+                aria-label="Download report as Markdown file"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+              </div>
+            )}
+            {isUserNote(activeNote) && (
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
-                  onClick={onDownloadReport}
-                  disabled={!canCopyOrDownload}
+                  onClick={onCopyUserNote}
+                  disabled={!canCopyOrDownloadUserNote}
                   className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Download report as Markdown file"
-                  aria-label="Download report as Markdown file"
+                  title="Copy note"
+                  aria-label="Copy note"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onDownloadUserNote}
+                  disabled={!canCopyOrDownloadUserNote}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download as Markdown"
+                  aria-label="Download as Markdown"
                 >
                   <Download className="w-4 h-4" />
                 </button>
@@ -177,8 +221,10 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
         <>
           <div className="flex items-center gap-2 text-sidebar-foreground overflow-hidden min-w-0 flex-1">
             <button
+              type="button"
               onClick={onBack}
               className="p-1 -ml-1 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground flex items-center justify-center shrink-0"
+              aria-label="Back to Studio"
             >
               <ArrowLeft className="w-5 h-5 shrink-0" />
             </button>
@@ -214,7 +260,11 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
               <span
                 role="button"
                 tabIndex={0}
-                onClick={onEditStart}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEditStart();
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -230,6 +280,17 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
           </div>
           {isReportNote(activeNote) && (
             <div className="flex items-center gap-1 shrink-0">
+              {onEditReport && (
+                <button
+                  type="button"
+                  onClick={onEditReport}
+                  className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                  title="Edit report"
+                  aria-label="Edit report"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onCopyReport}
@@ -247,6 +308,30 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Download report as Markdown file"
                 aria-label="Download report as Markdown file"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {isUserNote(activeNote) && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={onCopyUserNote}
+                disabled={!canCopyOrDownloadUserNote}
+                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Copy note"
+                aria-label="Copy note"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onDownloadUserNote}
+                disabled={!canCopyOrDownloadUserNote}
+                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Download as Markdown"
+                aria-label="Download as Markdown"
               >
                 <Download className="w-4 h-4" />
               </button>

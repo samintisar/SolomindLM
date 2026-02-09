@@ -5,7 +5,7 @@
  * TYPE-SAFE: No "use node" directive - this is a library file.
  */
 
-import type { ReferenceChunk } from 'storage/ChatHistoryService.js';
+import type { ReferenceChunk } from '../../../storage/ChatHistoryService';
 import type { EmbeddingService } from '../../processing/EmbeddingServiceClient';
 import {
   VectorSearchHandler,

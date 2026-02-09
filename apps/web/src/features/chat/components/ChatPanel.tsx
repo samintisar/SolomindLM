@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, RefreshCw, Loader2, Search, FileText, Brain, Copy, Check } from 'lucide-react';
+import { ArrowUp, PanelLeftOpen, PanelRightOpen, MessageCircle, RefreshCw, Loader2, Search, FileText, Brain, Copy, Check, MoreVertical, Download } from 'lucide-react';
 import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
+import { DropdownMenu } from '@/shared/ui/DropdownMenu';
 import { Virtuoso } from 'react-virtuoso';
-import { Message } from '@/shared/types/index';
+import { Message, Note } from '@/shared/types/index';
 import { sanitizeMarkdown } from '@/shared/utils';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { exportAsMarkdown } from '../utils/exportChat';
+import { useSaveChat } from '../services/userNotesApi';
 
 const MarkdownRenderer = lazy(() =>
   import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
@@ -19,6 +23,9 @@ interface ChatPanelProps {
   onSendMessage?: (message: string) => void;
   isLoading?: boolean;
   notebookId?: string | null;
+  notebookTitle?: string;
+  /** Optimistic UI: set when save starts, clear when save ends (success or failure). No toasts. */
+  onSaveChatOptimistic?: (payload: { notebookId: string; note: Note } | null) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -31,6 +38,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onSendMessage,
   isLoading = false,
   notebookId,
+  notebookTitle = 'Chat',
+  onSaveChatOptimistic,
 }) => {
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
@@ -48,6 +57,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const virtuosoRef = useRef<any>(null);
 
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+  const { success, error: toastError } = useToast();
+  const saveChat = useSaveChat();
 
   const handleDeleteHistory = async () => {
     const confirmed = await confirm(
@@ -57,6 +68,59 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     );
     if (confirmed) {
       onClearHistory?.();
+    }
+  };
+
+  const handleExportChat = () => {
+    if (messages.length === 0) {
+      toastError('No messages to export');
+      return;
+    }
+    exportAsMarkdown(messages, notebookTitle);
+    success('Chat exported successfully');
+  };
+
+  const handleSaveToNote = async () => {
+    if (messages.length === 0) {
+      toastError('No messages to save');
+      return;
+    }
+    if (!notebookId) {
+      toastError('No notebook selected');
+      return;
+    }
+
+    const placeholderNote: Note = {
+      id: `pending-save-${Date.now()}`,
+      title: 'Saved chat',
+      preview: 'Note · Saved Chat',
+      type: 'note',
+      noteType: 'chat',
+      status: 'generating',
+      content: undefined,
+      messages: [],
+      metadata: {
+        messageCount: messages.length,
+        savedAt: new Date().toISOString(),
+      },
+    };
+    onSaveChatOptimistic?.({ notebookId, note: placeholderNote });
+
+    try {
+      const serializedMessages = messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp.getTime() : msg.timestamp,
+      }));
+
+      await saveChat({
+        notebookId,
+        messages: serializedMessages,
+        messageCount: messages.length,
+      });
+    } catch (error) {
+      console.error('Failed to save chat:', error);
+    } finally {
+      onSaveChatOptimistic?.(null);
     }
   };
 
@@ -459,14 +523,46 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </button>
           )}
 
-          {/* Refresh Button */}
-          <button
-            onClick={handleDeleteHistory}
-            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-            title="Refresh chat"
+          {/* Chat actions kebab menu */}
+          <DropdownMenu
+            align="right"
+            trigger={
+              <button
+                className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
+                title="Chat options"
+                type="button"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            }
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+            <div className="py-1">
+              <button
+                onClick={handleDeleteHistory}
+                className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+                role="menuitem"
+              >
+                <RefreshCw className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span>Refresh chat</span>
+              </button>
+              <button
+                onClick={handleExportChat}
+                className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+                role="menuitem"
+              >
+                <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span>Export chat</span>
+              </button>
+              <button
+                onClick={handleSaveToNote}
+                className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+                role="menuitem"
+              >
+                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span>Save to note</span>
+              </button>
+            </div>
+          </DropdownMenu>
         </div>
       </div>
 

@@ -16,10 +16,15 @@ bun x convex dev               # Run Convex dev backend (separate terminal)
 ```bash
 bun run build                  # Build all workspace packages
 bun run build:prod             # Build production web app
-bun run typecheck              # Type check both convex and web
 bun run typecheck:convex       # Type check convex only
 bun run typecheck:web          # Type check web only
 ```
+
+**Type Checking:**
+Type checks must be run individually for each workspace:
+- Run `bun run typecheck:convex` to check Convex backend types
+- Run `bun run typecheck:web` to check web frontend types
+- Type checks cannot be run simultaneously due to TypeScript compilation limitations
 
 **Convex Environment:**
 ```bash

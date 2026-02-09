@@ -227,8 +227,22 @@ export interface SpreadsheetNote extends BaseNote {
   };
 }
 
+// User note - saved chat conversations or manual notes
+export interface UserNote extends BaseNote {
+  type: 'note';
+  noteType: 'chat' | 'manual'; // Distinguish between saved chats and manual notes
+  content?: string; // For manual notes (markdown content)
+  messages?: Message[]; // For saved chats (conversation snapshot)
+  metadata: {
+    messageCount?: number; // For saved chats
+    conversationId?: string; // For saved chats - link to original conversation
+    savedAt: string;
+    [key: string]: any;
+  };
+}
+
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | AudioOverviewNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote | SpreadsheetNote;
+export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | AudioOverviewNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote | SpreadsheetNote | UserNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
@@ -269,6 +283,10 @@ export function isSlideDeckNote(note: Note): note is SlideDeckNote {
 
 export function isSpreadsheetNote(note: Note): note is SpreadsheetNote {
   return note.type === 'spreadsheet';
+}
+
+export function isUserNote(note: Note): note is UserNote {
+  return note.type === 'note';
 }
 
 export interface NotebookItem {

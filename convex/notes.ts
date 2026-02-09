@@ -35,6 +35,7 @@ export const listAllByNotebook = query({
       "slides",
       "spreadsheets",
       "writtenQuestions",
+      "notes",
     ];
 
     const queries: Promise<any[]>[] = [];
@@ -136,6 +137,18 @@ export const listAllByNotebook = query({
       );
     }
 
+    if (!args.types || args.types.includes("notes")) {
+      queries.push(
+        ctx.db
+          .query("notes")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+          .filter((q) => q.eq(q.field("userId"), userId))
+          .order("desc")
+          .collect()
+          .then((items) => items.map((item) => ({ ...item, _type: "note" as const })))
+      );
+    }
+
     // Execute all queries in parallel and merge results
     const results = await Promise.all(queries);
     const allNotes = results.flat();
@@ -153,7 +166,17 @@ export const listAllByNotebook = query({
 export const getById = query({
   args: {
     type: v.string(),
-    id: v.id("documents"), // Use documents as a generic ID type, validated at runtime
+    id: v.union(
+      v.id("reports"),
+      v.id("flashcards"),
+      v.id("quizzes"),
+      v.id("mindmaps"),
+      v.id("audioOverviews"),
+      v.id("slides"),
+      v.id("spreadsheets"),
+      v.id("writtenQuestions"),
+      v.id("notes")
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -169,6 +192,7 @@ export const getById = query({
       slides: "slides",
       spreadsheet: "spreadsheets",
       writtenQuestions: "writtenQuestions",
+      note: "notes",
     };
 
     const tableName = tableMap[args.type];
@@ -207,7 +231,7 @@ export const countByType = query({
     }
 
     // Count all types in parallel
-    const [reports, flashcards, quizzes, mindmaps, audioOverviews, slides, spreadsheets, writtenQuestions] =
+    const [reports, flashcards, quizzes, mindmaps, audioOverviews, slides, spreadsheets, writtenQuestions, notes] =
       await Promise.all([
         ctx.db
           .query("reports")
@@ -257,6 +281,12 @@ export const countByType = query({
           .filter((q) => q.eq(q.field("userId"), userId))
           .collect()
           .then((items) => items.length),
+        ctx.db
+          .query("notes")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+          .filter((q) => q.eq(q.field("userId"), userId))
+          .collect()
+          .then((items) => items.length),
       ]);
 
     return {
@@ -268,6 +298,7 @@ export const countByType = query({
       slides,
       spreadsheets,
       writtenQuestions,
+      notes,
       total:
         reports +
         flashcards +
@@ -276,7 +307,8 @@ export const countByType = query({
         audioOverviews +
         slides +
         spreadsheets +
-        writtenQuestions,
+        writtenQuestions +
+        notes,
     };
   },
 });
