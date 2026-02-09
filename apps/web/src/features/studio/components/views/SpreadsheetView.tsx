@@ -1,5 +1,5 @@
 import React from 'react';
-import { XCircle, ArrowLeft, Download } from 'lucide-react';
+import { XCircle, ArrowLeft } from 'lucide-react';
 import { SpreadsheetNote } from '@/shared/types/index';
 
 /**
@@ -75,37 +75,8 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ content, noteTitle 
   const dataRows = rows.slice(1);
   const columnCount = header.length;
 
-  // Download CSV function
-  const handleDownload = () => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${noteTitle.replace(/[^a-z0-9]/gi, '_')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar with download button */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/20">
-        <div className="text-sm text-muted-foreground">
-          {dataRows.length} {dataRows.length === 1 ? 'row' : 'rows'} · {columnCount} {columnCount === 1 ? 'column' : 'columns'}
-        </div>
-        <button
-          type="button"
-          onClick={handleDownload}
-          className="p-2 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground/70 hover:text-foreground touch-manipulation"
-          title="Download as CSV"
-          aria-label="Download as CSV"
-        >
-          <Download className="w-4 h-4" />
-        </button>
-      </div>
-
       {/* Scrollable table container */}
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-sm">

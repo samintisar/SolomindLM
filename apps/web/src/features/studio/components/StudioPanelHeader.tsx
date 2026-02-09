@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { ChevronRight, PenTool, ArrowLeft, Copy, Download, Loader2 } from 'lucide-react';
-import { Note, isReportNote, isFlashcardNote } from '@/shared/types/index';
+import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote } from '@/shared/types/index';
 
 interface StudioPanelHeaderProps {
   activeNote: Note | null;
@@ -14,9 +14,11 @@ interface StudioPanelHeaderProps {
   onEditCancel: () => void;
   onCopyReport: () => void;
   onDownloadReport: () => void;
+  onDownloadSpreadsheet: () => void;
   onExportFlashcards: () => void;
   canCopyOrDownload: boolean;
   canExportFlashcards: boolean;
+  canDownloadSpreadsheet: boolean;
   isExporting: boolean;
   isMobile: boolean;
 }
@@ -37,9 +39,11 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   onEditCancel,
   onCopyReport,
   onDownloadReport,
+  onDownloadSpreadsheet,
   onExportFlashcards,
   canCopyOrDownload,
   canExportFlashcards,
+  canDownloadSpreadsheet,
   isExporting,
   isMobile,
 }) => {
@@ -138,6 +142,20 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
+                </button>
+              </div>
+            )}
+            {isSpreadsheetNote(activeNote) && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={onDownloadSpreadsheet}
+                  disabled={!canDownloadSpreadsheet}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download as CSV"
+                  aria-label="Download as CSV"
+                >
+                  <Download className="w-4 h-4" />
                 </button>
               </div>
             )}
@@ -249,6 +267,20 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
+              </button>
+            </div>
+          )}
+          {isSpreadsheetNote(activeNote) && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={onDownloadSpreadsheet}
+                disabled={!canDownloadSpreadsheet}
+                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Download as CSV"
+                aria-label="Download as CSV"
+              >
+                <Download className="w-4 h-4" />
               </button>
             </div>
           )}

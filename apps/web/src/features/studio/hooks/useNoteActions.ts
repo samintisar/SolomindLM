@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Note, isReportNote, isFlashcardNote } from '@/shared/types/index';
+import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote } from '@/shared/types/index';
 import { exportFlashcardsCSV } from '../services/flashcardsApi';
 
 interface ConfirmOptions {
@@ -26,6 +26,7 @@ interface UseNoteActionsResult {
   // Capabilities
   canCopyOrDownloadReport: boolean;
   canExportFlashcards: boolean;
+  canDownloadSpreadsheet: boolean;
   // Actions
   handleStartEdit: (note: Note) => void;
   handleSaveEdit: () => void;
@@ -33,6 +34,7 @@ interface UseNoteActionsResult {
   handleKeyDown: (e: React.KeyboardEvent) => void;
   handleCopyReport: () => Promise<void>;
   handleDownloadReport: () => void;
+  handleDownloadSpreadsheet: () => void;
   handleDeleteNote: (note: Note) => Promise<void>;
   handleExportFlashcards: () => Promise<void>;
 }
@@ -60,6 +62,11 @@ export const useNoteActions = ({
   // Check if current note can export flashcards
   const canExportFlashcards = useMemo(() => {
     return Boolean(activeNote && isFlashcardNote(activeNote));
+  }, [activeNote]);
+
+  // Check if current note can download as CSV (spreadsheet)
+  const canDownloadSpreadsheet = useMemo(() => {
+    return Boolean(activeNote && isSpreadsheetNote(activeNote) && activeNote.content);
   }, [activeNote]);
 
   // Start inline editing
@@ -113,6 +120,21 @@ export const useNoteActions = ({
     URL.revokeObjectURL(url);
   }, [activeNote]);
 
+  // Download spreadsheet as CSV
+  const handleDownloadSpreadsheet = useCallback(() => {
+    if (!activeNote || !isSpreadsheetNote(activeNote) || !activeNote.content) return;
+
+    const safeName = activeNote.title.replace(/[^a-z0-9]/gi, '_').trim() || 'spreadsheet';
+    const filename = `${safeName}.csv`;
+    const blob = new Blob([activeNote.content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeNote]);
+
   // Delete note with confirmation
   const handleDeleteNote = useCallback(async (note: Note) => {
     const confirmed = await confirm(
@@ -147,12 +169,14 @@ export const useNoteActions = ({
     isExporting,
     canCopyOrDownloadReport,
     canExportFlashcards,
+    canDownloadSpreadsheet,
     handleStartEdit,
     handleSaveEdit,
     handleEditCancel,
     handleKeyDown,
     handleCopyReport,
     handleDownloadReport,
+    handleDownloadSpreadsheet,
     handleDeleteNote,
     handleExportFlashcards,
   };
