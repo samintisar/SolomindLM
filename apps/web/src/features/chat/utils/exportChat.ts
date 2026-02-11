@@ -10,25 +10,9 @@ function messagesToMarkdown(messages: Message[]): string {
 
   for (const message of messages) {
     if (message.role === 'user') {
-      markdown += `## You\n\n${message.content}\n\n`;
+      markdown += `## You\n\n${(message.content ?? '').trim()}\n\n`;
     } else if (message.role === 'assistant') {
-      markdown += `## Assistant\n\n${message.content}\n\n`;
-
-      // Add references if they exist
-      if (message.references && message.references.length > 0) {
-        markdown += `**Sources:**\n\n`;
-        for (const ref of message.references) {
-          const excerpt = ref.content?.length > 150
-            ? ref.content.substring(0, 150) + "..."
-            : ref.content || "";
-          markdown += `- [${ref.id}] *${ref.sourceTitle}*\n`;
-          if (excerpt) {
-            markdown += `  \n  ${excerpt}\n`;
-          }
-        }
-        markdown += `\n`;
-      }
-
+      markdown += `## Assistant\n\n${(message.content ?? '').trim()}\n\n`;
       markdown += `---\n\n`;
     }
   }
