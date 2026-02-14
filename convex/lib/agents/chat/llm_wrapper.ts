@@ -191,15 +191,20 @@ export class ChatLLMWrapper {
   async generateStructuredResponse(
     chunks: ReferenceChunk[],
     userMessage: string,
-    userQuestions: string[] = []
+    conversationHistory: Array<{ role: string; content: string }> = []
   ): Promise<ChatResponse> {
     console.log('[ChatLLMWrapper] Generating structured response with citations');
 
     // Conditional few-shot: only for first query or complex patterns
-    const needsExamples = userQuestions.length === 0 || this.isComplexQuery(userMessage);
+    const needsExamples = conversationHistory.length === 0 || this.isComplexQuery(userMessage);
+    
+    // Inject current date so the model knows "today" vs historical document dates
+    const today = new Date().toISOString().split('T')[0];
+    const dateContext = `\nCurrent Date: ${today}`;
+
     const systemPrompt = needsExamples
-      ? `${MINIMAL_FEW_SHOT}\n\n${CORE_SYSTEM_PROMPT}`
-      : CORE_SYSTEM_PROMPT;
+      ? `${MINIMAL_FEW_SHOT}\n\n${CORE_SYSTEM_PROMPT}${dateContext}`
+      : `${CORE_SYSTEM_PROMPT}${dateContext}`;
 
     // Create model with structured output
     // Use 'any' to avoid deep type instantiation issues
@@ -207,7 +212,7 @@ export class ChatLLMWrapper {
       name: 'chat_response',
     });
 
-    const groundedPrompt = this.buildGroundingPrompt(chunks, userMessage, userQuestions);
+    const groundedPrompt = this.buildGroundingPrompt(chunks, userMessage, conversationHistory);
 
     // Debug: Log the full prompt (truncated if too long)
     console.log('[ChatLLMWrapper] Full grounded prompt (first 2000 chars):', groundedPrompt.slice(0, 2000));
@@ -233,13 +238,12 @@ export class ChatLLMWrapper {
       tags: ['agent', 'chat'],
       metadata: {
         chunksCount: chunks.length,
-        userQuestionsCount: userQuestions.length,
+        conversationHistoryCount: conversationHistory.length,
       },
     });
 
     try {
       const response: any = await structuredLlm.invoke(messages, traceConfig);
-
       // Validate the response matches our schema
       const validated = ChatResponseSchema.safeParse(response);
 
@@ -294,7 +298,7 @@ export class ChatLLMWrapper {
   private buildGroundingPrompt(
     chunks: ReferenceChunk[],
     userMessage: string,
-    userQuestions: string[]
+    conversationHistory: Array<{ role: string; content: string }>
   ): string {
     // Simplified chunk formatting (removed excessive metadata)
     const formattedChunks = chunks
@@ -319,11 +323,21 @@ export class ChatLLMWrapper {
       })
       .join('\n\n---\n\n');
 
-    // Conversation context
+    // Conversation context - include both user questions AND assistant responses
+    // This allows the LLM to understand follow-up questions like "Can you simplify that?"
     let contextSection = '';
-    if (userQuestions.length > 0) {
-      const recentQuestions = userQuestions.slice(-3).map((q, i) => `${i + 1}. ${q}`).join('\n');
-      contextSection = `# PREVIOUS QUESTIONS\n${recentQuestions}\n\n`;
+    if (conversationHistory.length > 0) {
+      const formattedHistory = conversationHistory
+        .map((msg) => {
+          const role = msg.role === 'user' ? 'USER' : 'ASSISTANT';
+          // Truncate long responses to avoid context bloat
+          const truncatedContent = msg.content.length > 500 
+            ? msg.content.slice(0, 500) + '...' 
+            : msg.content;
+          return `${role}: ${truncatedContent}`;
+        })
+        .join('\n');
+      contextSection = `# CONVERSATION HISTORY\n${formattedHistory}\n\n`;
     }
 
     // Ultra-concise query type hint
@@ -354,21 +368,22 @@ ${structureHint}`;
 
   /**
    * Provides ultra-concise structure hint based on query type.
+   * Includes negative constraints for better adherence.
    */
   private getStructureHint(query: string): string {
     const lower = query.toLowerCase();
 
     if (lower.match(/compare|contrast|difference|vs|versus/)) {
-      return 'Hint: Use table or structured comparison with citations';
+      return 'Hint: Use table or structured comparison with citations. Do not write block paragraphs for comparisons.';
     }
     if (lower.match(/equation|formula|formulas|recursive|stochastic|math|latex|notation|subscript|superscript/)) {
-      return 'Hint: Wrap every math expression in $...$ (inline) or $$...$$ (display) — e.g. $L_t$, $\\\\eta$, $B_{t-1}$. Never write L_t or neta without $ delimiters.';
+      return 'Hint: Wrap every math expression in $...$ (inline) or $$...$$ (display). Do not use plain text for variables (e.g., write $x$, not x).';
     }
     if (lower.match(/^(how|why|explain)/)) {
-      return 'Hint: Definition → mechanism → examples (if available)';
+      return 'Hint: Definition → mechanism → examples (if available). Do not provide generic examples not in sources.';
     }
     if (lower.match(/summarize|overview|main points|key takeaways/)) {
-      return 'Hint: Main themes → agreements/disagreements → gaps';
+      return 'Hint: Main themes → agreements/disagreements → gaps.';
     }
 
     return '';

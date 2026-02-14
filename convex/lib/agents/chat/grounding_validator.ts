@@ -30,6 +30,17 @@ export interface GroundingValidationResult {
 // ============================================================
 
 /**
+ * Semantic similarity threshold for grounding validation.
+ * Configurable via environment variable to support different embedding models.
+ * - OpenAI text-embedding-3: 0.35-0.40 is typically a good range
+ * - Older models (Ada-002): 0.60-0.70 may be needed
+ */
+const DEFAULT_GROUNDING_THRESHOLD = 0.38;
+const GROUNDING_THRESHOLD = parseFloat(
+  process.env.GROUNDING_SIMILARITY_THRESHOLD ?? String(DEFAULT_GROUNDING_THRESHOLD)
+);
+
+/**
  * text-embedding-3-small has max 8192 tokens (~4 chars/token).
  * Truncate to stay under limit and avoid BadRequestError.
  */
@@ -38,6 +49,29 @@ const MAX_EMBED_CHARS = 24_000; // ~6000 tokens
 function truncateForEmbedding(text: string): string {
   if (text.length <= MAX_EMBED_CHARS) return text;
   return text.slice(0, MAX_EMBED_CHARS);
+}
+
+/**
+ * Splits text into sentences using Intl.Segmenter for proper boundary detection.
+ * Handles edge cases like "e.g.", "Fig. 1", "Mr. Smith", "approx. 3.5", etc.
+ *
+ * @param text - The text to split into sentences
+ * @param minLength - Minimum sentence length to include (default: 20)
+ * @returns Array of sentence strings
+ */
+function splitIntoSentences(text: string, minLength: number = 20): string[] {
+  // Use Intl.Segmenter for proper sentence boundary detection
+  const segmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
+  const segments = segmenter.segment(text);
+
+  const sentences: string[] = [];
+  for (const segment of segments) {
+    if (segment.segment.trim().length >= minLength) {
+      sentences.push(segment.segment.trim());
+    }
+  }
+
+  return sentences;
 }
 
 /**
@@ -239,11 +273,9 @@ export async function validateSemanticGrounding(
   const issues: string[] = [];
   const citationPattern = /\[(\d+)\]/g;
 
-  // Split response into sentences
-  const sentences = response
-    .split(/[.!?]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 20); // Skip very short fragments
+  // Split response into sentences using Intl.Segmenter for proper boundary detection
+  // This handles edge cases like "e.g.", "Fig. 1", "Mr. Smith", "approx. 3.5", etc.
+  const sentences = splitIntoSentences(response, 20);
 
   console.log(`[SemanticGrounding] Validating ${sentences.length} sentences against ${sources.length} sources`);
 
@@ -260,8 +292,11 @@ export async function validateSemanticGrounding(
       continue;
     }
 
-    // Get the cited source content
-    const citedContent = citedIds.map((id) => sources[id - 1]?.content).filter(Boolean).join(' ');
+    // Get the cited source content (truncate to first 1000 chars per chunk for efficiency)
+    const citedContent = citedIds
+      .map((id) => sources[id - 1]?.content?.slice(0, 1000))
+      .filter(Boolean)
+      .join(' ');
 
     if (!citedContent) {
       issues.push(`Sentence cites sources with no content: "${sentence.slice(0, 50)}..."`);
@@ -277,9 +312,8 @@ export async function validateSemanticGrounding(
       const sourceEmbed = await embeddingService.embedText(citedTrunc);
 
       const similarity = cosineSimilarity(sentenceEmbed, sourceEmbed);
-      const threshold = 0.38; // Semantic similarity threshold (relaxed from 0.45 to reduce false positives)
 
-      if (similarity < threshold) {
+      if (similarity < GROUNDING_THRESHOLD) {
         issues.push(
           `Sentence "${sentence.slice(0, 60)}..." cites sources [${citedIds.join(', ')}] but claim may not be grounded (similarity: ${similarity.toFixed(2)})`
         );

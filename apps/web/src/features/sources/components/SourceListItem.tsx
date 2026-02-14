@@ -45,9 +45,9 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   };
 
   const getIcon = () => {
-    if (source.type === 'WEB') return <Globe className="w-5 h-5" />;
-    if (source.type === 'IMG') return <File className="w-5 h-5" />;
-    return <FileText className="w-5 h-5" />;
+    if (source.type === 'WEB') return <Globe className="w-4 h-4" />;
+    if (source.type === 'IMG') return <File className="w-4 h-4" />;
+    return <FileText className="w-4 h-4" />;
   };
 
   return (
@@ -55,12 +55,12 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
       className={`group flex flex-col bg-card border border-border rounded-lg hover:shadow-md transition-all cursor-pointer overflow-visible relative ${isMenuOpen ? 'z-[200]' : ''}`}
       onClick={() => canClick && onView(source.id)}
     >
-      <div className="flex items-center gap-3 p-3">
+      <div className="flex items-center gap-2 p-2">
         <div className="text-muted-foreground shrink-0 flex items-center justify-center">
           {getIcon()}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-0.5">
             {isRenaming ? (
               <input
                 type="text"
@@ -97,16 +97,16 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
         {!isRenaming && (
           <div className="flex items-center gap-2 shrink-0">
             <div
-              className="text-primary p-1.5 hover:bg-secondary rounded-full transition-colors flex items-center justify-center"
+              className="text-primary p-1 hover:bg-secondary rounded-full transition-colors flex items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggle(source.id);
               }}
             >
               {source.selected ? (
-                <CheckSquare className="w-5 h-5" />
+                <CheckSquare className="w-4 h-4" />
               ) : (
-                <Square className="w-5 h-5 opacity-50 group-hover:opacity-100" />
+                <Square className="w-4 h-4 opacity-50 group-hover:opacity-100" />
               )}
             </div>
             <div className="relative z-50">
@@ -115,12 +115,12 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                   e.stopPropagation();
                   onMenuOpen(source.id);
                 }}
-                className={`p-1.5 hover:bg-secondary rounded-full transition-colors flex items-center justify-center ${
+                className={`p-1 hover:bg-secondary rounded-full transition-colors flex items-center justify-center ${
                   isMenuOpen ? 'text-foreground bg-secondary' : 'text-muted-foreground'
                 }`}
                 title="More options"
               >
-                <MoreVertical className="w-5 h-5" />
+                <MoreVertical className="w-4 h-4" />
               </button>
               {isMenuOpen && (
                 <>

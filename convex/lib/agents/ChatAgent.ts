@@ -138,19 +138,17 @@ export class ChatAgent {
       console.log('[ChatAgent] Phase 2: Generating grounded response (structured output)');
       yield { type: 'status', status: 'thinking', message: 'Analyzing sources and formulating response...' };
 
-      // Extract recent user questions for conversation context (last 3)
-      const recentUserQuestions = context.conversationHistory
-        .filter((msg) => msg.role === 'user')
-        .slice(-3)
-        .map((msg) => msg.content);
+      // Extract recent conversation turns (user + assistant pairs) for context
+      // Include last 3 pairs (6 messages) to help the LLM understand follow-up questions
+      const recentTurns = context.conversationHistory.slice(-6);
 
-      console.log(`[ChatAgent] Including ${recentUserQuestions.length} previous questions for context`);
+      console.log(`[ChatAgent] Including ${recentTurns.length} previous messages for context`);
 
       // Generate structured response with citations and conversation context
       const structuredResponse = await this.llmWrapper.generateStructuredResponse(
         chunks,
         userMessage,
-        recentUserQuestions
+        recentTurns
       );
 
       // Yield the answer as tokens for compatibility with existing streaming interface

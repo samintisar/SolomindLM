@@ -57,7 +57,7 @@ export const SourceList: React.FC<SourceListProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-5">
+    <div className="p-3 space-y-4">
       {/* Action Bar */}
       <div className="flex gap-2 p-1.5 bg-background/50 border border-border rounded-lg shadow-inner">
         <button
@@ -79,7 +79,7 @@ export const SourceList: React.FC<SourceListProps> = ({
       </div>
 
       {/* Search & List */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="relative flex items-center">
           <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none shrink-0" />
           <input
@@ -91,7 +91,7 @@ export const SourceList: React.FC<SourceListProps> = ({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-1 font-sans">
             <span>
               {filteredSources.length} {searchQuery.trim() ? `of ${sources.length}` : ''} items
