@@ -201,7 +201,7 @@ export function useDeleteWrittenQuestions() {
  * Submit an answer for grading
  */
 export function useSubmitWrittenAnswer() {
-  const submitAndGrade = useAction(api.writtenQuestionActions.submitAndGrade);
+  const submitAndGrade = useAction(api.studio.writtenQuestions.grading.submitAndGrade);
 
   return async (params: SubmitAnswerParams) => {
     return await submitAndGrade({
