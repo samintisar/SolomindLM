@@ -35,6 +35,7 @@ interface ChatPanelProps {
   /** Optimistic UI: set when save starts, clear when save ends (success or failure). No toasts. */
   onSaveChatOptimistic?: (payload: { notebookId: string; note: Note } | null) => void;
   onSetFeedback?: (messageId: string, feedback: 'up' | 'down' | null) => void;
+  onRetry?: (messageId: string) => void;
   sourceCount?: number;
   sourceSummary?: string | null;
   suggestions?: string[] | null;
@@ -56,6 +57,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   notebookTitle = 'Chat',
   onSaveChatOptimistic,
   onSetFeedback,
+  onRetry,
   sourceCount = 0,
   sourceSummary,
   suggestions,
@@ -368,6 +370,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     copiedMessageId={copiedMessageId}
                     onSetFeedback={onSetFeedback}
                     onSendFollowUp={handleSendChip}
+                    onRetry={onRetry}
                   />
                 </div>
               )}

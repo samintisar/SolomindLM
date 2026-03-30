@@ -199,6 +199,51 @@ export const setMessageFeedback = mutation({
 });
 
 /**
+ * Delete an assistant message and any messages after it.
+ * Used for retry — removes the failed assistant response (and trailing messages)
+ * so a fresh response can be generated.
+ */
+export const deleteMessagesFrom = mutation({
+  args: {
+    messageId: v.id("messages"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const target = await ctx.db.get(args.messageId);
+    if (!target) throw new Error("Message not found");
+
+    // Verify ownership via conversation
+    const conversation = await ctx.db.get(target.conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get all messages in the conversation ordered by creation time
+    const allMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", target.conversationId)
+      )
+      .order("asc")
+      .collect();
+
+    // Delete the target message and everything after it
+    const targetIdx = allMessages.findIndex((m) => m._id === target._id);
+    if (targetIdx < 0) return { deleted: 0 };
+
+    let deleted = 0;
+    for (let i = targetIdx; i < allMessages.length; i++) {
+      await ctx.db.delete(allMessages[i]._id);
+      deleted++;
+    }
+
+    return { deleted };
+  },
+});
+
+/**
  * Clear all messages for a notebook
  */
 export const clearHistory = mutation({

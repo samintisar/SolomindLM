@@ -157,6 +157,7 @@ const AppContent: React.FC = () => {
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();
   const clearChatHistoryMutation = useMutation(api.chat.messages.clearHistory);
+  const deleteMessagesFromMutation = useMutation(api.chat.messages.deleteMessagesFrom);
 
   // Studio note update/delete (reports, flashcards, quizzes, etc.)
   const updateReport = useUpdateReport();
@@ -508,6 +509,30 @@ const AppContent: React.FC = () => {
     }
     return list;
   }, [messages, streamingContent, streamingReferences, streamingToolCalls, lastAssistantFollowUps, isChatStreaming]);
+
+  const handleRetryMessage = useCallback(async (assistantMessageId: string) => {
+    if (isChatStreaming) return;
+    const idx = chatDisplayMessages.findIndex((m) => m.id === assistantMessageId);
+    if (idx < 0) return;
+
+    // Find the user message that preceded this assistant message
+    let userContent = '';
+    let userMessageId: string | null = null;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (chatDisplayMessages[i].role === 'user') {
+        userContent = chatDisplayMessages[i].content;
+        userMessageId = chatDisplayMessages[i].id;
+        break;
+      }
+    }
+    if (!userContent || !userMessageId) return;
+
+    // Delete from the user message onward (user msg + assistant msg + anything after)
+    await deleteMessagesFromMutation({ messageId: userMessageId as Id<'messages'> });
+
+    // Re-send to generate a fresh response
+    handleSendMessage(userContent);
+  }, [chatDisplayMessages, isChatStreaming, handleSendMessage, deleteMessagesFromMutation]);
 
   const handleToggleSource = (id: string) => {
     setSources(prev => prev.map(source =>
@@ -1096,6 +1121,7 @@ const AppContent: React.FC = () => {
                     notebookTitle={notebookTitle}
                     onSaveChatOptimistic={setOptimisticSaveNote}
                     onSetFeedback={setMessageFeedback}
+                    onRetry={handleRetryMessage}
                     sourceCount={sourceCount}
                     sourceSummary={sourceSuggestions.summary}
                     suggestions={sourceSuggestions.suggestions}
@@ -1170,6 +1196,7 @@ const AppContent: React.FC = () => {
                         notebookTitle={notebookTitle}
                         onSaveChatOptimistic={setOptimisticSaveNote}
                         onSetFeedback={setMessageFeedback}
+                        onRetry={handleRetryMessage}
                         sourceCount={sourceCount}
                         sourceSummary={sourceSuggestions.summary}
                         suggestions={sourceSuggestions.suggestions}

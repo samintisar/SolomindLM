@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Copy, ThumbsUp, ThumbsDown, Search } from 'lucide-react';
+import { Check, Copy, ThumbsUp, ThumbsDown, Search, RotateCcw } from 'lucide-react';
 import { Message } from '@/shared/types/index';
 import { renderMessageWithReferences, RefHandlers } from '../utils/messageRendering';
 import { getStatusIcon, getStatusMessage } from '../utils/messageStatus';
@@ -11,12 +11,13 @@ interface MessageBubbleProps {
   copiedMessageId: string | null;
   onSetFeedback?: (messageId: string, feedback: 'up' | 'down' | null) => void;
   onSendFollowUp?: (text: string) => void;
+  onRetry?: (messageId: string) => void;
 }
 
 const ACTION_FLASH_MS = 220;
 
 export const MessageBubble = React.memo<MessageBubbleProps>(
-  ({ message, refHandlers, onCopyMessage, copiedMessageId, onSetFeedback, onSendFollowUp }) => {
+  ({ message, refHandlers, onCopyMessage, copiedMessageId, onSetFeedback, onSendFollowUp, onRetry }) => {
     const isUser = message.role === 'user';
     const isCopied = copiedMessageId === message.id;
     const [flashedActionId, setFlashedActionId] = React.useState<string | null>(null);
@@ -52,6 +53,15 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
         className: isCopied ? 'text-primary' : '',
       },
     ];
+
+    if (!isUser && onRetry) {
+      messageActions.splice(1, 0, {
+        id: 'retry',
+        label: 'Retry',
+        icon: RotateCcw,
+        onClick: () => onRetry(message.id),
+      });
+    }
 
     if (!isUser && onSetFeedback) {
       messageActions.push(
