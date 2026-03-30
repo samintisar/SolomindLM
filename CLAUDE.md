@@ -157,3 +157,11 @@ bun run convex:env:push:dry    # Dry run for env push
 - **Convex URLs:** Dev and prod use different deployment URLs - ensure `.env.local` uses dev URLs locally, while production hosting (Vercel) uses prod URLs
 - **TypeScript strict mode disabled** - `strict: false` in web tsconfig; rely on typecheck rather than strict null checks
 - **Agent caching** - Agent results are cached; increment version in `cacheVersions` table when prompts change to invalidate cache
+
+<!-- convex-ai-start -->
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
+<!-- convex-ai-end -->
