@@ -26,7 +26,7 @@
     "@types/dompurify": "^3.2.0",
     "@types/node": "^25.0.10",
     "@typescript/native-preview": "^7.0.0-dev.20260130.1",
-    "convex": "^1.31.7",
+    "convex": "^1.34.1",
     "typescript": "^5.9.3"
   },
   "dependencies": {

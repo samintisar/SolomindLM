@@ -74,7 +74,7 @@ export class ChatAgent {
     // Initialize LLM wrapper
     this.llmWrapper = new ChatLLMWrapper({
       apiKey: env.TOGETHER_AI_API_KEY,
-      model: env.SMART_LLM || 'Qwen/Qwen3-Next-80B-A3B-Instruct',
+      model: env.SMART_LLM || 'openai/gpt-oss-120b',
       temperature: parseFloat(env.CHAT_LLM_TEMPERATURE ?? '0.1'),
     });
 

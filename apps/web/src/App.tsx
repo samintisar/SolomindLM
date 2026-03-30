@@ -381,17 +381,18 @@ const AppContent: React.FC = () => {
       timestamp: new Date(msg.createdAt as number),
       references: msg.references,
     }));
-    if (streamingContent) {
+    if (isChatStreaming || streamingContent) {
       list.push({
         id: '__streaming__',
         role: 'assistant',
         content: streamingContent,
         timestamp: new Date(),
         references: (streamingReferences as Message['references']) ?? undefined,
+        status: streamingContent ? undefined : 'thinking',
       });
     }
     return list;
-  }, [messages, streamingContent, streamingReferences]);
+  }, [messages, streamingContent, streamingReferences, isChatStreaming]);
 
   const handleToggleSource = (id: string) => {
     setSources(prev => prev.map(source =>

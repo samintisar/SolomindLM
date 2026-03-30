@@ -170,7 +170,7 @@ export function createLLMsFromEnv(
 
   return createLLMs({
     apiKey,
-    mapModel: options.mapModel || env.FAST_LLM || 'meta-llama/Llama-3-70b-chat-hf',
+    mapModel: options.mapModel || env.FAST_LLM || 'Qwen/Qwen3.5-9B',
     reduceModel: options.reduceModel || env.SMART_LLM,
     temperatures: {
       map: options.mapTemperature,

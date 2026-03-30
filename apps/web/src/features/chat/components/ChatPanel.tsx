@@ -468,7 +468,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               </div>
             )}
             <div className="w-full max-w-4xl font-serif text-lg leading-relaxed text-foreground">
-              {renderMessageWithReferences(message.id, message.content, message.references)}
+              {message.content ? (
+                renderMessageWithReferences(message.id, message.content, message.references)
+              ) : (
+                <div className="flex items-center gap-1.5 py-3">
+                  <span className="w-2 h-2 rounded-full bg-foreground/30 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '1.2s' }} />
+                  <span className="w-2 h-2 rounded-full bg-foreground/30 animate-bounce" style={{ animationDelay: '200ms', animationDuration: '1.2s' }} />
+                  <span className="w-2 h-2 rounded-full bg-foreground/30 animate-bounce" style={{ animationDelay: '400ms', animationDuration: '1.2s' }} />
+                </div>
+              )}
               <div className="flex justify-start mt-3">
                 <ActionBar />
               </div>

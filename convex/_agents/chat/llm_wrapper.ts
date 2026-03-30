@@ -132,7 +132,12 @@ When paraphrasing, stay VERY close to original wording:
 - BAD: "The model is optimized to reproduce mappings [1]" (if source says "learns from labeled examples")
 - GOOD: "The model learns from labeled examples [1]"
 
-Your job is to REFLECT what the documents say, not enhance them with your training data.`;
+Your job is to REFLECT what the documents say, not enhance them with your training data.
+
+# PROHIBITED CLOSINGS
+- Do NOT end responses with meta-commentary like "Note: The above points are drawn directly from..."
+- Do NOT add any closing disclaimers about what sources do or don't contain
+- If sources are missing information, say so inline where relevant, then stop`;
 
 /**
  * Minimal few-shot examples (only used for first query or complex patterns).
