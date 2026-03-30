@@ -34,7 +34,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Typecheck Convex
-        run: bunx tsc --noEmit -p convex/tsconfig.json
+        run: bun run typecheck:convex
 
       - name: Build Web
         env:
