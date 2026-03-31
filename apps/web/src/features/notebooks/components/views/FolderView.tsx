@@ -3,6 +3,7 @@ import { ArrowLeft, LayoutGrid, List, ChevronDown, Calendar, ArrowUpAZ, CheckCir
 import { NotebookItem, FolderItem } from '@/shared/types/index';
 import { NotebookCard } from '../cards/NotebookCard';
 import { useNotebookHandlers, useNotebookSorting } from '../../hooks';
+import { useNotebookContext } from '../../NotebookContext';
 import { useFolderNotebooks } from '../../services/foldersApi';
 import { useCreateNotebook, useUpdateNotebook } from '../../services/notebooksApi';
 import { CustomizeNotebookModal, MoveToFolderModal } from '../modals';
@@ -11,11 +12,11 @@ import { PageSkeleton } from '@/shared/components/PageSkeleton';
 interface FolderViewProps {
   folderId: string;
   viewMode: 'grid' | 'list';
-  onBack: () => void;
-  onSelectNotebook: (notebook: NotebookItem) => void;
-  onCreateNotebook: () => void;
-  onUpdateNotebook: (id: string, updates: Partial<NotebookItem>) => void;
-  onDeleteNotebook: (id: string) => void;
+  onBack?: () => void;
+  onSelectNotebook?: (notebook: NotebookItem) => void;
+  onCreateNotebook?: () => void;
+  onUpdateNotebook?: (id: string, updates: Partial<NotebookItem>) => void;
+  onDeleteNotebook?: (id: string) => void;
   onMoveNotebookToFolder?: (notebookId: string, folderId: string | null) => void;
   folders?: FolderItem[];
   loadFolders?: () => void;
@@ -25,16 +26,16 @@ interface FolderViewProps {
 export const FolderView: React.FC<FolderViewProps> = ({
   folderId,
   viewMode: initialViewMode,
-  onBack,
-  onSelectNotebook,
-  onCreateNotebook: _onCreateNotebook,
-  onUpdateNotebook,
-  onDeleteNotebook,
-  onMoveNotebookToFolder,
-  folders = [],
-  loadFolders: _loadFolders,
-  onRequireAuth,
 }) => {
+  const ctx = useNotebookContext();
+  const onBack = ctx.folderBack;
+  const onSelectNotebook = ctx.selectNotebook;
+  const onUpdateNotebook = ctx.updateNotebook;
+  const onDeleteNotebook = ctx.deleteNotebook;
+  const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
+  const folders = ctx.folders;
+  const onRequireAuth = ctx.onRequireAuth;
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
 
   // Use Convex hooks - undefined means loading, empty array means no results

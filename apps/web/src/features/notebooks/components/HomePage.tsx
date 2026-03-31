@@ -4,6 +4,7 @@ import { NotebookItem, FolderItem } from '@/shared/types/index';
 import { FeaturedSection, RecentSection } from './views';
 import { CustomizeNotebookModal, MoveToFolderModal, CustomizeFolderModal } from './modals';
 import { useNotebookHandlers, useFolderHandlers, useNotebookSorting } from '../hooks';
+import { useNotebookContext } from '../NotebookContext';
 import { useCreateNotebook, useUpdateNotebook } from '../services/notebooksApi';
 import { useCreateFolder, useUpdateFolder } from '../services/foldersApi';
 import { useLimitErrorToast } from '@/shared/hooks/useLimitErrorToast';
@@ -21,12 +22,12 @@ interface FolderCreateData {
 }
 
 interface HomePageProps {
-  featuredNotebooks: NotebookItem[];
-  recentNotebooks: NotebookItem[];
-  onSelectNotebook: (notebook: NotebookItem) => void;
-  onSelectFolder: (folderId: string) => void;
-  onCreateNotebook: () => void;
-  onUpdateNotebook: (id: string, updates: Partial<NotebookItem>) => void;
+  featuredNotebooks?: NotebookItem[];
+  recentNotebooks?: NotebookItem[];
+  onSelectNotebook?: (notebook: NotebookItem) => void;
+  onSelectFolder?: (folderId: string) => void;
+  onCreateNotebook?: () => void;
+  onUpdateNotebook?: (id: string, updates: Partial<NotebookItem>) => void;
   onDeleteNotebook?: (id: string) => void;
   folders?: FolderItem[];
   onCreateFolder?: () => void;
@@ -37,20 +38,21 @@ interface HomePageProps {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({
-  featuredNotebooks,
-  recentNotebooks,
-  onSelectNotebook,
-  onSelectFolder,
-  onCreateNotebook: _onCreateNotebook,
-  onUpdateNotebook,
-  onDeleteNotebook,
-  folders = [],
-  onCreateFolder: _onCreateFolder,
-  onUpdateFolder,
-  onDeleteFolder,
-  onMoveNotebookToFolder,
-  onRequireAuth,
+  // Props kept for backward compatibility during migration; context is preferred
 }) => {
+  const ctx = useNotebookContext();
+  const featuredNotebooks = ctx.featuredNotebooks;
+  const recentNotebooks = ctx.recentNotebooks;
+  const onSelectNotebook = ctx.selectNotebook;
+  const onSelectFolder = ctx.selectFolder;
+  const onUpdateNotebook = ctx.updateNotebook;
+  const onDeleteNotebook = ctx.deleteNotebook;
+  const folders = ctx.folders;
+  const onUpdateFolder = ctx.updateFolder;
+  const onDeleteFolder = ctx.deleteFolder;
+  const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
+  const onRequireAuth = ctx.onRequireAuth;
+
   const [activeTab, setActiveTab] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 

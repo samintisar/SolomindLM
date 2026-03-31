@@ -11,6 +11,7 @@ import { ChatPanel } from './features/chat/components/ChatPanel';
 import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
 import { FolderView } from './features/notebooks/components/views/FolderView';
+import { NotebookProvider } from './features/notebooks/NotebookContext';
 import { BillingPage } from './features/billing/components/BillingPage';
 import { LandingPage } from './features/landing/LandingPage';
 import { useAuth, AuthProvider } from './features/auth/AuthContext';
@@ -23,6 +24,7 @@ import { PrivacyPolicy } from './features/legal/components/PrivacyPolicy';
 import { TermsOfService } from './features/legal/components/TermsOfService';
 import { STUDIO_TOOLS } from './shared/constants';
 import { Source, Note, NotebookItem, Message, FolderItem } from '@/shared/types/index';
+import { documentToSource } from './shared/utils/documentToSource';
 import { useNotes } from './features/studio/services/notesApi';
 import { useUpdateReport, useDeleteReport } from './features/studio/services/reportsApi';
 import { useRenameFlashcards, useDeleteFlashcards } from './features/studio/services/flashcardsApi';
@@ -43,80 +45,6 @@ import 'mind-elixir/style.css';
 
 const MIN_PANEL_WIDTH = 220;
 const getMaxPanelWidth = () => Math.min(window.innerWidth * 0.7, 1400);
-
-// Transform Convex Document type to Source UI type
-function documentToSource(doc: any): Source {
-  // Extract file extension and determine type
-  let type: Source['type'] = 'PDF';
-
-  if (doc.fileType === 'youtube') {
-    type = 'WEB';
-  } else if (doc.fileType === 'url') {
-    type = 'WEB';
-  } else if (doc.fileType === 'text') {
-    type = 'TXT';
-  } else if (doc.fileType === 'file') {
-    // Extract extension from fileName
-    const ext = doc.fileName.split('.').pop()?.toLowerCase() || '';
-
-    // Map extensions to types
-    switch (ext) {
-      case 'pdf': type = 'PDF'; break;
-      case 'docx': type = 'DOCX'; break;
-      case 'doc': type = 'DOC'; break;
-      case 'pptx': type = 'PPTX'; break;
-      case 'ppt': type = 'PPT'; break;
-      case 'xlsx': type = 'XLSX'; break;
-      case 'xls': type = 'XLS'; break;
-      case 'txt': type = 'TXT'; break;
-      case 'md':
-      case 'markdown': type = 'MD'; break;
-      case 'json': type = 'JSON'; break;
-      case 'csv': type = 'CSV'; break;
-      case 'png':
-      case 'jpg':
-      case 'jpeg':
-      case 'gif':
-      case 'webp':
-      case 'bmp':
-      case 'svg':
-      case 'avif': type = 'IMG'; break;
-      default: {
-        // No extension or unknown — use contentType so PDFs etc. are labeled correctly
-        const ct = (doc.contentType || '').toLowerCase();
-        if (ct.includes('pdf')) type = 'PDF';
-        else if (ct.includes('wordprocessingml') || ct.includes('msword')) type = ext === 'doc' ? 'DOC' : 'DOCX';
-        else if (ct.includes('presentationml') || ct.includes('ms-powerpoint')) type = ext === 'ppt' ? 'PPT' : 'PPTX';
-        else if (ct.includes('spreadsheetml') || ct.includes('ms-excel')) type = ext === 'xls' ? 'XLS' : 'XLSX';
-        else if (ct.includes('text/plain') || ct.includes('text/markdown')) type = 'TXT';
-        else if (ct.includes('image/')) type = 'IMG';
-        else type = 'DOC'; // unknown
-      }
-    }
-  }
-
-  // Display title: strip extension for files so list shows "Report" not "Report.pdf"
-  const displayTitle =
-    doc.fileType === 'file' && doc.fileName && doc.fileName.includes('.')
-      ? doc.fileName.replace(/\.[^/.]+$/, '')
-      : doc.fileName;
-
-  const url =
-    doc.fileType === 'url' || doc.fileType === 'youtube'
-      ? (doc.fileUrl as string | undefined)
-      : undefined;
-
-  return {
-    id: doc._id,
-    title: displayTitle,
-    type,
-    date: new Date(doc.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    selected: true,
-    content: '',
-    status: doc.status,
-    url,
-  };
-}
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -948,6 +876,46 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // NotebookContext value (pass-through — AppContent owns the state)
+  const notebookContextValue = useMemo(() => ({
+    notebookList,
+    featuredNotebooks,
+    recentNotebooks,
+    activeNotebook,
+    urlNotebookId,
+    urlFolderId,
+    currentView,
+    folders,
+    selectNotebook: handleSelectNotebook,
+    createNotebook: handleCreateNotebook,
+    updateNotebook: handleUpdateNotebook,
+    deleteNotebook: handleDeleteNotebook,
+    selectFolder: handleSelectFolder,
+    folderBack: handleFolderBack,
+    createFolder: handleCreateFolder,
+    updateFolder: handleUpdateFolder,
+    deleteFolder: handleDeleteFolder,
+    moveNotebookToFolder: handleMoveNotebookToFolder,
+    logoClick: handleLogoClick,
+    getStarted: handleGetStarted,
+    billingClick: handleBillingClick,
+    billingBack: handleBillingBack,
+    notebookTitle,
+    setNotebookTitle,
+    subscriptionStatus,
+    onRequireAuth: (errorMessage: string) => {
+      setAuthError(errorMessage);
+      setShowLoginModal(true);
+    },
+  }), [
+    notebookList, featuredNotebooks, recentNotebooks, activeNotebook,
+    urlNotebookId, urlFolderId, currentView, folders,
+    handleSelectNotebook, handleCreateNotebook, handleUpdateNotebook, handleDeleteNotebook,
+    handleSelectFolder, handleFolderBack, handleCreateFolder, handleUpdateFolder, handleDeleteFolder,
+    handleMoveNotebookToFolder, handleLogoClick, handleGetStarted, handleBillingClick, handleBillingBack,
+    notebookTitle, subscriptionStatus,
+  ]);
+
   return (
     <>
       {showLoginModal && !isAuthenticated && (
@@ -977,6 +945,7 @@ const AppContent: React.FC = () => {
         />
       )}
 
+      <NotebookProvider value={notebookContextValue}>
       <Routes>
         <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -984,26 +953,7 @@ const AppContent: React.FC = () => {
 
         <Route
           path="/home"
-          element={
-            <HomePage
-              featuredNotebooks={featuredNotebooks}
-              recentNotebooks={recentNotebooks}
-              onSelectNotebook={handleSelectNotebook}
-              onSelectFolder={handleSelectFolder}
-              onCreateNotebook={handleCreateNotebook}
-              onUpdateNotebook={handleUpdateNotebook}
-              onDeleteNotebook={handleDeleteNotebook}
-              folders={folders}
-              onCreateFolder={handleCreateFolder}
-              onUpdateFolder={handleUpdateFolder}
-              onDeleteFolder={handleDeleteFolder}
-              onMoveNotebookToFolder={handleMoveNotebookToFolder}
-              onRequireAuth={(errorMessage) => {
-                setAuthError(errorMessage);
-                setShowLoginModal(true);
-              }}
-            />
-          }
+          element={<HomePage />}
         />
 
         <Route
@@ -1014,17 +964,6 @@ const AppContent: React.FC = () => {
                 <FolderView
                   folderId={urlFolderId || ''}
                   viewMode="grid"
-                  onBack={handleFolderBack}
-                  onSelectNotebook={handleSelectNotebook}
-                  onCreateNotebook={handleCreateNotebook}
-                  onUpdateNotebook={handleUpdateNotebook}
-                  onDeleteNotebook={handleDeleteNotebook}
-                  onMoveNotebookToFolder={handleMoveNotebookToFolder}
-                  folders={folders}
-                  onRequireAuth={(errorMessage) => {
-                    setAuthError(errorMessage);
-                    setShowLoginModal(true);
-                  }}
                 />
               </main>
             </ProtectedRoute>
@@ -1237,6 +1176,7 @@ const AppContent: React.FC = () => {
           }
         />
       </Routes>
+      </NotebookProvider>
     </div>
     </>
   );
