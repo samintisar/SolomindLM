@@ -12,6 +12,9 @@ import { StudioPanel } from './features/studio/components/StudioPanel';
 import { HomePage } from './features/notebooks/components/HomePage';
 import { FolderView } from './features/notebooks/components/views/FolderView';
 import { NotebookProvider } from './features/notebooks/NotebookContext';
+import { ChatStreamingProvider } from './features/chat/ChatStreamingContext';
+import { SourcesProvider } from './features/sources/SourcesContext';
+import { StudioProvider } from './features/studio/StudioContext';
 import { BillingPage } from './features/billing/components/BillingPage';
 import { LandingPage } from './features/landing/LandingPage';
 import { useAuth, AuthProvider } from './features/auth/AuthContext';
@@ -108,6 +111,9 @@ const AppContent: React.FC = () => {
   const deleteUserNote = useDeleteUserNote();
 
   // Determine current view from URL
+  const isPublicPage = location.pathname === '/' || location.pathname === '/privacy' || location.pathname === '/terms';
+  const isHomePage = location.pathname === '/home' || location.pathname === '/billing' || location.pathname.startsWith('/folder/');
+
   const currentView = useMemo(() => {
     if (location.pathname === '/') return 'landing';
     if (location.pathname === '/home') return 'home';
@@ -248,25 +254,26 @@ const AppContent: React.FC = () => {
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
 
+  /** Reset all streaming state to idle. */
+  const resetStreamingState = () => {
+    setIsChatStreaming(false);
+    setStreamingContent('');
+    setStreamingReferences(null);
+    setStreamingJustFinished(false);
+    setStreamingToolCalls([]);
+    streamStartedAtRef.current = null;
+  };
+
   const handleClearChatHistory = async () => {
     if (!activeNotebookId || activeNotebookId === 'new') return;
     try {
       await clearChatHistoryMutation({
         notebookId: activeNotebookId as Id<'notebooks'>,
       });
-      setIsChatStreaming(false);
-      setStreamingContent('');
-      setStreamingReferences(null);
-      setStreamingJustFinished(false);
-      streamStartedAtRef.current = null;
-      // Convex reactivity will update `messages` automatically
+      resetStreamingState();
     } catch (error) {
       console.error('Failed to clear chat history', error);
-      setIsChatStreaming(false);
-      setStreamingContent('');
-      setStreamingReferences(null);
-      setStreamingJustFinished(false);
-      streamStartedAtRef.current = null;
+      resetStreamingState();
     }
   };
 
@@ -284,15 +291,6 @@ const AppContent: React.FC = () => {
 
     setStreamingToolCalls([]);
     setLastAssistantFollowUps(null);
-
-    const clearStreaming = () => {
-      setIsChatStreaming(false);
-      setStreamingContent('');
-      setStreamingReferences(null);
-      setStreamingJustFinished(false);
-      setStreamingToolCalls([]);
-      streamStartedAtRef.current = null;
-    };
 
     const onStreamComplete = () => {
       setIsChatStreaming(false);
@@ -323,12 +321,12 @@ const AppContent: React.FC = () => {
           }),
           onFollowUps: (qs) => setLastAssistantFollowUps(qs),
           onComplete: onStreamComplete,
-          onError: clearStreaming,
+          onError: resetStreamingState,
         },
         selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined
       );
     } catch {
-      clearStreaming();
+      resetStreamingState();
     }
   };
 
@@ -379,12 +377,7 @@ const AppContent: React.FC = () => {
     const SKEW_MS = 120_000;
     if (typeof assistant.createdAt !== 'number' || assistant.createdAt < t0 - SKEW_MS) return;
 
-    setIsChatStreaming(false);
-    setStreamingToolCalls([]);
-    setStreamingContent('');
-    setStreamingReferences(null);
-    setStreamingJustFinished(false);
-    streamStartedAtRef.current = null;
+    resetStreamingState();
   }, [isChatStreaming, streamingContent, messages]);
 
   // Chat list: DB messages + in-flight streaming assistant message so tokens appear as they arrive
@@ -916,6 +909,41 @@ const AppContent: React.FC = () => {
     notebookTitle, subscriptionStatus,
   ]);
 
+  const chatStreamingContextValue = useMemo(() => ({
+    messages: chatDisplayMessages,
+    isChatStreaming,
+    onSendMessage: handleSendMessage,
+    onClearHistory: handleClearChatHistory,
+    onSetFeedback: setMessageFeedback,
+    onRetry: handleRetryMessage,
+    onSaveChatOptimistic: setOptimisticSaveNote,
+    sourceCount,
+    sourceSummary: sourceSuggestions.summary,
+    suggestions: sourceSuggestions.suggestions,
+    isLoadingSuggestions: sourceSuggestions.isLoading,
+  }), [
+    chatDisplayMessages, isChatStreaming, handleSendMessage, handleClearChatHistory,
+    setMessageFeedback, handleRetryMessage, sourceCount, sourceSuggestions,
+  ]);
+
+  const sourcesContextValue = useMemo(() => ({
+    sources,
+    onToggleSource: handleToggleSource,
+    onToggleAll: handleToggleAll,
+    onAddSource: handleAddSource,
+    onDeleteSource: handleDeleteSource,
+    onRenameSource: handleRenameSource,
+  }), [sources, handleToggleSource, handleToggleAll, handleAddSource, handleDeleteSource, handleRenameSource]);
+
+  const studioContextValue = useMemo(() => ({
+    notes: displayNotes,
+    onUpdateNote: handleUpdateNote,
+    onUpdateNoteFull: handleUpdateNoteFull,
+    onDeleteNote: handleDeleteNote,
+    onAddNote: handleAddNote,
+    onSaveReportContent: handleSaveReportContent,
+  }), [displayNotes, handleUpdateNote, handleUpdateNoteFull, handleDeleteNote, handleAddNote, handleSaveReportContent]);
+
   return (
     <>
       {showLoginModal && !isAuthenticated && (
@@ -928,8 +956,8 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      <div className={`w-full bg-background text-foreground font-serif ${location.pathname === '/' || location.pathname === '/privacy' || location.pathname === '/terms' ? '' : 'flex flex-col h-screen overflow-hidden'}`}>
-      {location.pathname !== '/' && location.pathname !== '/privacy' && location.pathname !== '/terms' && (
+      <div className={`w-full bg-background text-foreground font-serif ${isPublicPage ? '' : 'flex flex-col h-screen overflow-hidden'}`}>
+      {!isPublicPage && (
         <Header
           title={notebookTitle}
           onRename={(newTitle: string) => {
@@ -938,7 +966,7 @@ const AppContent: React.FC = () => {
               handleUpdateNotebook(activeNotebookId, { title: newTitle });
             }
           }}
-          isHome={location.pathname === '/home' || location.pathname === '/billing' || location.pathname.startsWith('/folder/')}
+          isHome={isHomePage}
           onLogoClick={handleLogoClick}
           onBillingClick={handleBillingClick}
           hasSubscription={subscriptionStatus.hasSubscription}
@@ -985,6 +1013,9 @@ const AppContent: React.FC = () => {
           path="/notebook/:id"
           element={
             <ProtectedRoute requireNotebookAccess={true}>
+              <ChatStreamingProvider value={chatStreamingContextValue}>
+              <SourcesProvider value={sourcesContextValue}>
+              <StudioProvider value={studioContextValue}>
               <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
                 {/* Mobile Navigation Bar */}
                 <div className="md:hidden flex items-center justify-around border-b border-border bg-background sticky top-0 z-60 h-12">
@@ -1027,12 +1058,6 @@ const AppContent: React.FC = () => {
                   <SourcesPanel
                     isOpen={isSourcesOpen}
                     onClose={toggleSources}
-                    sources={sources}
-                    onToggleSource={handleToggleSource}
-                    onToggleAll={handleToggleAll}
-                    onAddSource={handleAddSource}
-                    onDeleteSource={handleDeleteSource}
-                    onRenameSource={handleRenameSource}
                     width={leftWidth}
                     isResizing={isResizingLeft}
                     userId={user?.id}
@@ -1048,23 +1073,12 @@ const AppContent: React.FC = () => {
                   )}
 
                   <ChatPanel
-                    messages={chatDisplayMessages}
                     isLeftOpen={isSourcesOpen}
                     isRightOpen={isStudioOpen}
                     toggleLeft={toggleSources}
                     toggleRight={toggleStudio}
-                    onClearHistory={handleClearChatHistory}
-                    onSendMessage={handleSendMessage}
-                    isLoading={isChatStreaming}
                     notebookId={activeNotebookId}
                     notebookTitle={notebookTitle}
-                    onSaveChatOptimistic={setOptimisticSaveNote}
-                    onSetFeedback={setMessageFeedback}
-                    onRetry={handleRetryMessage}
-                    sourceCount={sourceCount}
-                    sourceSummary={sourceSuggestions.summary}
-                    suggestions={sourceSuggestions.suggestions}
-                    isLoadingSuggestions={sourceSuggestions.isLoading}
                     notebookIcon={activeNotebook?.icon}
                     notebookCoverColor={activeNotebook?.coverColor}
                   />
@@ -1080,12 +1094,6 @@ const AppContent: React.FC = () => {
                     isOpen={isStudioOpen}
                     onClose={toggleStudio}
                     tools={STUDIO_TOOLS}
-                    notes={displayNotes}
-                    onUpdateNote={handleUpdateNote}
-                    onUpdateNoteFull={handleUpdateNoteFull}
-                    onDeleteNote={handleDeleteNote}
-                    onAddNote={handleAddNote}
-                    onSaveReportContent={handleSaveReportContent}
                     width={rightWidth}
                     isResizing={isResizingRight}
                     sources={sources}
@@ -1106,12 +1114,6 @@ const AppContent: React.FC = () => {
                       <SourcesPanel
                         isOpen={true}
                         onClose={() => {}}
-                        sources={sources}
-                        onToggleSource={handleToggleSource}
-                        onToggleAll={handleToggleAll}
-                        onAddSource={handleAddSource}
-                        onDeleteSource={handleDeleteSource}
-                        onRenameSource={handleRenameSource}
                         width={390}
                         isResizing={false}
                         userId={user?.id}
@@ -1123,23 +1125,12 @@ const AppContent: React.FC = () => {
                   {mobileActiveTab === 'chat' && (
                     <div className="flex-1 w-full overflow-hidden">
                       <ChatPanel
-                        messages={chatDisplayMessages}
                         isLeftOpen={false}
                         isRightOpen={false}
                         toggleLeft={() => {}}
                         toggleRight={() => {}}
-                        onClearHistory={handleClearChatHistory}
-                        onSendMessage={handleSendMessage}
-                        isLoading={isChatStreaming}
                         notebookId={activeNotebookId}
                         notebookTitle={notebookTitle}
-                        onSaveChatOptimistic={setOptimisticSaveNote}
-                        onSetFeedback={setMessageFeedback}
-                        onRetry={handleRetryMessage}
-                        sourceCount={sourceCount}
-                        sourceSummary={sourceSuggestions.summary}
-                        suggestions={sourceSuggestions.suggestions}
-                        isLoadingSuggestions={sourceSuggestions.isLoading}
                         notebookIcon={activeNotebook?.icon}
                         notebookCoverColor={activeNotebook?.coverColor}
                       />
@@ -1151,12 +1142,6 @@ const AppContent: React.FC = () => {
                         isOpen={true}
                         onClose={() => {}}
                         tools={STUDIO_TOOLS}
-                        notes={displayNotes}
-                        onUpdateNote={handleUpdateNote}
-                        onUpdateNoteFull={handleUpdateNoteFull}
-                        onDeleteNote={handleDeleteNote}
-                        onAddNote={handleAddNote}
-                        onSaveReportContent={handleSaveReportContent}
                         width={390}
                         isResizing={false}
                         sources={sources}
@@ -1172,6 +1157,9 @@ const AppContent: React.FC = () => {
                   )}
                 </div>
               </main>
+              </StudioProvider>
+              </SourcesProvider>
+              </ChatStreamingProvider>
             </ProtectedRoute>
           }
         />

@@ -13,6 +13,7 @@ import { DropdownMenu } from '@/shared/ui/DropdownMenu';
 import { Virtuoso } from 'react-virtuoso';
 import { Message, Note } from '@/shared/types/index';
 import { useToast } from '@/shared/contexts/ToastContext';
+import { useChatStreamingContext } from '../ChatStreamingContext';
 import { exportAsMarkdown } from '../utils/exportChat';
 import { useSaveChat } from '../services/userNotesApi';
 import { RefHandlers } from '../utils/messageRendering';
@@ -22,49 +23,39 @@ import { ChatEmptyState } from './ChatEmptyState';
 import { ChatInput } from './ChatInput';
 
 interface ChatPanelProps {
-  messages: Message[];
   isLeftOpen: boolean;
   isRightOpen: boolean;
   toggleLeft: () => void;
   toggleRight: () => void;
-  onClearHistory?: () => void;
-  onSendMessage?: (message: string) => void;
-  isLoading?: boolean;
   notebookId?: string | null;
   notebookTitle?: string;
-  /** Optimistic UI: set when save starts, clear when save ends (success or failure). No toasts. */
-  onSaveChatOptimistic?: (payload: { notebookId: string; note: Note } | null) => void;
-  onSetFeedback?: (messageId: string, feedback: 'up' | 'down' | null) => void;
-  onRetry?: (messageId: string) => void;
-  sourceCount?: number;
-  sourceSummary?: string | null;
-  suggestions?: string[] | null;
-  isLoadingSuggestions?: boolean;
   notebookIcon?: string | null;
   notebookCoverColor?: string | null;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
-  messages,
   isLeftOpen,
   isRightOpen,
   toggleLeft,
   toggleRight,
-  onClearHistory,
-  onSendMessage,
-  isLoading = false,
   notebookId,
   notebookTitle = 'Chat',
-  onSaveChatOptimistic,
-  onSetFeedback,
-  onRetry,
-  sourceCount = 0,
-  sourceSummary,
-  suggestions,
-  isLoadingSuggestions,
   notebookIcon,
   notebookCoverColor,
 }) => {
+  const {
+    messages,
+    isChatStreaming: isLoading,
+    onSendMessage,
+    onClearHistory,
+    onSetFeedback,
+    onRetry,
+    onSaveChatOptimistic,
+    sourceCount,
+    sourceSummary,
+    suggestions,
+    isLoadingSuggestions,
+  } = useChatStreamingContext();
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('top');

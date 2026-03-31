@@ -13,6 +13,7 @@ import { StudioPanelHeader } from './StudioPanelHeader';
 import { NoteListView } from './NoteListView';
 import { ActiveNoteView } from './ActiveNoteView';
 import { MiniAudioPlayer } from '@/features/audio/components/MiniAudioPlayer';
+import { useStudioContext } from '../StudioContext';
 import { useStudioHandlers } from '../hooks/useStudioHandlers';
 import { useNoteActions } from '../hooks/useNoteActions';
 
@@ -20,12 +21,6 @@ interface StudioPanelProps {
   isOpen: boolean;
   onClose: () => void;
   tools: StudioTool[];
-  notes: Note[];
-  onUpdateNote: (id: string, newTitle: string) => void;
-  onUpdateNoteFull?: (id: string, note: Note) => void;
-  onDeleteNote: (id: string) => void;
-  onAddNote: (note: Note) => void;
-  onSaveReportContent?: (reportId: string, content: string) => void | Promise<void>;
   width: number;
   isResizing: boolean;
   sources?: any[];
@@ -50,12 +45,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   isOpen,
   onClose,
   tools,
-  notes,
-  onUpdateNote,
-  onUpdateNoteFull,
-  onDeleteNote,
-  onAddNote,
-  onSaveReportContent,
   width,
   isResizing: _isResizing,
   sources = [],
@@ -67,6 +56,14 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   onCloseMiniPlayer,
   onExpandAudioPlayer,
 }) => {
+  const {
+    notes,
+    onUpdateNote,
+    onUpdateNoteFull,
+    onDeleteNote,
+    onAddNote,
+    onSaveReportContent,
+  } = useStudioContext();
   // State
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
@@ -240,7 +237,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           onRenameSubmit={handleRenameSubmit}
           onEditStart={handleEditStartFromHeader}
           onEditCancel={noteActions.handleEditCancel}
-          onEditReport={onSaveReportContent ? handleEditReport : undefined}
+          onEditReport={handleEditReport}
           onCopyReport={noteActions.handleCopyReport}
           onDownloadReport={noteActions.handleDownloadReport}
           onDownloadSpreadsheet={noteActions.handleDownloadSpreadsheet}
@@ -266,8 +263,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               isMobile={isMobile}
               onBack={handleBack}
               isEditingReportContent={isEditingReportContent}
-              onSaveReportContent={onSaveReportContent ? handleSaveReportContent : undefined}
-              onCancelEditReport={onSaveReportContent ? handleCancelEditReport : undefined}
+              onSaveReportContent={handleSaveReportContent}
+              onCancelEditReport={handleCancelEditReport}
             />
           ) : (
             <NoteListView

@@ -46,18 +46,8 @@ export interface ApiMessage {
 }
 
 // ============================================================
-// Types
+// API Response Types
 // ============================================================
-
-// API response format (with created_at as string)
-export interface ApiMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  created_at: string;
-  references?: ReferenceChunk[];
-  metadata?: Record<string, any>;
-}
 
 export interface ChatHistoryResponse {
   conversationId: string;

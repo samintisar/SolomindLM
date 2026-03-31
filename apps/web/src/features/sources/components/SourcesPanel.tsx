@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Source } from '@/shared/types/index';
+import { useSourcesContext } from '../SourcesContext';
 import { DiscoverSourcesModal } from './DiscoverSourcesModal';
 import { AddSourceModal } from './AddSourceModal';
 import { UrlInputModal } from './UrlInputModal';
@@ -17,12 +17,6 @@ import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 interface SourcesPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  sources: Source[];
-  onToggleSource: (id: string) => void;
-  onToggleAll: () => void;
-  onAddSource: (source: Source) => void;
-  onDeleteSource: (id: string) => void;
-  onRenameSource: (id: string, newTitle: string) => void;
   width: number;
   isResizing: boolean;
   userId?: string | null;
@@ -33,17 +27,19 @@ interface SourcesPanelProps {
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   isOpen,
   onClose,
-  sources,
-  onToggleSource,
-  onToggleAll,
-  onAddSource,
-  onDeleteSource,
-  onRenameSource,
   width,
   userId,
   noteId,
   onDocumentUploaded,
 }) => {
+  const {
+    sources,
+    onToggleSource,
+    onToggleAll,
+    onAddSource,
+    onDeleteSource,
+    onRenameSource,
+  } = useSourcesContext();
   // View state
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
