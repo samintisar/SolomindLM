@@ -3,6 +3,7 @@ import { internalAction } from '../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../_generated/api';
 import { MistralOCRService } from '../_services/extraction/MistralOCRService';
+import { AudioTranscriptionService } from '../_services/extraction/AudioTranscriptionService';
 import { SupadataLoaderService } from '../_services/extraction/SupadataLoaderService';
 import {
   extractDocumentMetadata,
@@ -26,12 +27,25 @@ const OCR_FILE_EXTENSIONS = [
   '.docx',
 ];
 
+const AUDIO_FILE_EXTENSIONS = [
+  '.wav',
+  '.mp3',
+  '.m4a',
+  '.webm',
+  '.flac',
+];
+
 /**
  * Check if a file requires OCR processing based on its extension
  */
 function needsOCR(fileName: string): boolean {
   const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
   return OCR_FILE_EXTENSIONS.includes(ext);
+}
+
+function needsAudioTranscription(fileName: string): boolean {
+  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+  return AUDIO_FILE_EXTENSIONS.includes(ext);
 }
 
 
@@ -114,8 +128,29 @@ export const docEmbedding = internalAction({
           throw new Error('File storage ID or URL not found for document: ' + documentId);
         }
 
-        // Check if file needs OCR or can be read directly as text
-        if (needsOCR(docDetails.fileName)) {
+        // Check if file is audio and needs transcription
+        if (needsAudioTranscription(docDetails.fileName)) {
+          logger.info('Processing audio file with transcription', {
+            fileName: docDetails.fileName,
+          });
+
+          // Get file URL from Convex storage
+          let fileUrl = docDetails.fileUrl;
+          if (!fileUrl && docDetails.storageId) {
+            fileUrl = await ctx.storage.getUrl(docDetails.storageId) ?? undefined;
+          }
+
+          if (!fileUrl) {
+            throw new Error('Could not get file URL for audio document: ' + documentId);
+          }
+
+          const audioTranscription = new AudioTranscriptionService(process.env.TOGETHER_AI_API_KEY || '');
+          extractedText = await audioTranscription.transcribe(fileUrl);
+          logger.phaseComplete('extraction', {
+            contentLength: extractedText.length,
+            method: 'audio_transcription',
+          });
+        } else if (needsOCR(docDetails.fileName)) {
           logger.info('Processing file with OCR', {
             fileName: docDetails.fileName,
           });

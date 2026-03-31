@@ -3,7 +3,7 @@ import { useUploadDocument, useCreateDocument } from '../services/documentsApi';
 import { useUserLimits } from '@/features/billing/services/subscriptionApi';
 import { useLimitErrorToast } from '@/shared/hooks/useLimitErrorToast';
 
-const ACCEPTED_FILE_TYPES = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.json', '.csv', '.png', '.jpg', '.jpeg', '.avif'];
+const ACCEPTED_FILE_TYPES = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.json', '.csv', '.png', '.jpg', '.jpeg', '.avif', '.wav', '.mp3', '.m4a', '.webm', '.flac'];
 
 interface UseSourceUploadProps {
   sourcesCount: number;

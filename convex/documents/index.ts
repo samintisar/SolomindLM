@@ -207,6 +207,7 @@ export const getSignedUrl = mutation({
 const FILE_EXTENSIONS = new Set([
   'pdf', 'docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'txt', 'md', 'markdown',
   'json', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif',
+  'wav', 'mp3', 'm4a', 'webm', 'flac',
 ]);
 
 /**

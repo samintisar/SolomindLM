@@ -111,7 +111,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               ref={fileInputRef}
               className="hidden"
               onChange={onFileSelect}
-              accept=".pdf,.docx,.pptx,.txt,.md,.json,.csv,.png,.jpg,.jpeg,.avif"
+              accept=".pdf,.docx,.pptx,.txt,.md,.json,.csv,.png,.jpg,.jpeg,.avif,.wav,.mp3,.m4a,.webm,.flac"
               multiple
             />
           )}
@@ -139,7 +139,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               <p className="text-sm text-muted-foreground">Drag & drop or <span className="text-primary underline decoration-dotted font-medium">choose file</span> to upload</p>
             </div>
             <p className="text-[10px] text-muted-foreground/60 text-center max-w-xl mt-4 font-mono">
-              Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF
+              Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF, WAV, MP3, M4A, WebM, FLAC
             </p>
           </div>
 

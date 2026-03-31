@@ -90,6 +90,7 @@ import type * as _services_cache_cache from "../_services/cache/cache.js";
 import type * as _services_cache_cacheCrypto from "../_services/cache/cacheCrypto.js";
 import type * as _services_cache_cacheMetrics from "../_services/cache/cacheMetrics.js";
 import type * as _services_cache_cachedAgent from "../_services/cache/cachedAgent.js";
+import type * as _services_extraction_AudioTranscriptionService from "../_services/extraction/AudioTranscriptionService.js";
 import type * as _services_extraction_MistralOCRService from "../_services/extraction/MistralOCRService.js";
 import type * as _services_extraction_SupadataLoaderService from "../_services/extraction/SupadataLoaderService.js";
 import type * as _services_extractors from "../_services/extractors.js";
@@ -229,6 +230,7 @@ declare const fullApi: ApiFromModules<{
   "_services/cache/cacheCrypto": typeof _services_cache_cacheCrypto;
   "_services/cache/cacheMetrics": typeof _services_cache_cacheMetrics;
   "_services/cache/cachedAgent": typeof _services_cache_cachedAgent;
+  "_services/extraction/AudioTranscriptionService": typeof _services_extraction_AudioTranscriptionService;
   "_services/extraction/MistralOCRService": typeof _services_extraction_MistralOCRService;
   "_services/extraction/SupadataLoaderService": typeof _services_extraction_SupadataLoaderService;
   "_services/extractors": typeof _services_extractors;
