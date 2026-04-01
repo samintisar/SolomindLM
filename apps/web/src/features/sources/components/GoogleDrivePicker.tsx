@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+const GOOGLE_BROWSER_API_KEY = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY as string | undefined;
 const GOOGLE_APP_ID = import.meta.env.VITE_GOOGLE_APP_ID as string | undefined;
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 const GOOGLE_API_KEY_PATTERN = /^AIza[0-9A-Za-z_-]+$/;
@@ -9,10 +9,10 @@ const GOOGLE_CLIENT_ID_SUFFIX = '.apps.googleusercontent.com';
 const GOOGLE_APP_ID_PATTERN = /^\d+$/;
 
 function hasValidGooglePickerConfig() {
-  if (!GOOGLE_API_KEY || !GOOGLE_API_KEY_PATTERN.test(GOOGLE_API_KEY)) {
+  if (!GOOGLE_BROWSER_API_KEY || !GOOGLE_API_KEY_PATTERN.test(GOOGLE_BROWSER_API_KEY)) {
     console.error(
-      'Google Drive picker misconfigured: expected VITE_GOOGLE_API_KEY to be a browser API key that starts with "AIza".',
-      { apiKeyPresent: Boolean(GOOGLE_API_KEY) },
+      'Google Drive picker misconfigured: expected VITE_GOOGLE_BROWSER_API_KEY to be a browser API key starting with "AIza". Configure API restrictions and HTTP referrer restrictions in Google Cloud Console.',
+      { apiKeyPresent: Boolean(GOOGLE_BROWSER_API_KEY) },
     );
     return false;
   }
@@ -77,7 +77,7 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
         const picker = new google.picker.PickerBuilder()
           .enableFeature(google.picker.Feature.NAV_HIDDEN)
           .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-          .setDeveloperKey(GOOGLE_API_KEY!)
+          .setDeveloperKey(GOOGLE_BROWSER_API_KEY!)
           .setAppId(GOOGLE_APP_ID!)
           .setOAuthToken(accessToken)
           .addView(view)
