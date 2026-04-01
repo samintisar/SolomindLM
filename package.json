@@ -47,7 +47,7 @@
     "convex-helpers": "^0.1.111",
     "dompurify": "^3.3.1",
     "langsmith": "^0.4.10",
-    "openai": "^4.62.1",
+    "openai": "^6.33.0",
     "p-limit": "^7.2.0",
     "stripe": "^20.0.0",
     "zeroentropy": "^0.1.0-alpha.7",
