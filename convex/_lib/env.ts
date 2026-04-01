@@ -40,6 +40,8 @@ export const env = {
   AUDIO_REDUCE_CHUNK_TOKENS: process.env.AUDIO_REDUCE_CHUNK_TOKENS || '40000',
   AUDIO_MAP_TIMEOUT_MS: process.env.AUDIO_MAP_TIMEOUT_MS || '300000',
   AUDIO_REDUCE_TIMEOUT_MS: process.env.AUDIO_REDUCE_TIMEOUT_MS || '300000',
+  /** Max completion tokens for script-writing (reduce); too low yields finish_reason=length and empty content */
+  AUDIO_REDUCE_MAX_OUTPUT_TOKENS: process.env.AUDIO_REDUCE_MAX_OUTPUT_TOKENS || '16384',
   AUDIO_TTS_TIMEOUT_MS: process.env.AUDIO_TTS_TIMEOUT_MS || '300000',
   AUDIO_VOICE_HOST_A: process.env.AUDIO_VOICE_HOST_A || 'shimmer',
   AUDIO_VOICE_HOST_B: process.env.AUDIO_VOICE_HOST_B || 'echo',

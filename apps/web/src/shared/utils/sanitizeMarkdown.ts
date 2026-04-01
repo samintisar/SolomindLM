@@ -1,5 +1,7 @@
 import DOMPurify from 'dompurify';
 
+import { normalizeMathMarkdown } from '@convex/_shared/mathMarkdown';
+
 /**
  * Strips ANSI escape codes from text (e.g., [1m, [0m, [31m).
  * These can leak into LLM output and cause KaTeX parse errors.
@@ -39,11 +41,12 @@ export function restoreAngleBracketsInMath(content: string): string {
 export function sanitizeMarkdown(content: string): string {
   // First strip ANSI codes that can cause KaTeX parse errors
   const withoutAnsi = stripAnsiCodes(content);
+  const normalizedMath = normalizeMathMarkdown(withoutAnsi);
 
   // DOMPurify sanitizes HTML, but we're using it on markdown source text
   // This strips any HTML tags that might be embedded in the markdown
   // ReactMarkdown will then parse the clean markdown and render it
-  const sanitized = DOMPurify.sanitize(withoutAnsi, {
+  const sanitized = DOMPurify.sanitize(normalizedMath, {
     // Allow only safe text content - no HTML tags in markdown source
     ALLOWED_TAGS: [], // Empty array means no HTML tags allowed in markdown source
     ALLOWED_ATTR: [],

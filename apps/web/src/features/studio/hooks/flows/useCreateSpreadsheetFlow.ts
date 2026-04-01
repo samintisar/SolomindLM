@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
 import type { Note, SpreadsheetNote } from '@/shared/types/index';
-import { useCreateSpreadsheet, pollSpreadsheetStatus, getSpreadsheetTypeLabel } from '../../services/spreadsheetsApi';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { useCreateSpreadsheet, getSpreadsheetTypeLabel } from '../../services/spreadsheetsApi';
 import type { SpreadsheetConfig } from '../../components/CustomizeSpreadsheetsModal';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
   const createSpreadsheet = useCreateSpreadsheet();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
 
   return useCallback(
     async (config: SpreadsheetConfig) => {
@@ -17,7 +21,7 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -58,39 +62,15 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        pollSpreadsheetStatus(
-          () => ctx.notes.find((n) => n.id === spreadsheetId) as SpreadsheetNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(spreadsheetId, updatedNote);
-          },
-          180,
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(spreadsheetId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Spreadsheet generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === spreadsheetId) || newNote;
-              if (failedNote.type === 'spreadsheet') {
-                ctx.onUpdateNoteFull(spreadsheetId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: `Spreadsheet • ${typeLabel} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate spreadsheet' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create spreadsheet:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create spreadsheet');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start the spreadsheet. Please try again.",
+          devLabel: 'Failed to create spreadsheet',
+        });
       }
     },
-    [ctx]
+    [ctx, createSpreadsheet, catchGenerationError, showErrorToast]
   );
 }

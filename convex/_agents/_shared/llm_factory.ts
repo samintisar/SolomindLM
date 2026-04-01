@@ -101,6 +101,7 @@ export function createLLMs(config: LLMConfig): LLMInstances {
         model: config.reduceModel,
         temperature: config.temperatures?.reduce ?? 0.6,
         maxTokens: config.maxTokens?.reduce,
+        modelKwargs: { chat_template_kwargs: { thinking: false } },
       })
     : fastLlm;
 

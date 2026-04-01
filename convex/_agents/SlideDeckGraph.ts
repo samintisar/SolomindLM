@@ -4,18 +4,11 @@
  *
  * Orchestrates AI-generated presentation slide deck creation.
  *
- * This implementation uses composition patterns with dedicated modules:
- * - prompts.ts: All prompt templates, types, and constants
- * - state.ts: State definitions using the Annotation API
- * - nodes.ts: Node functions and the main class
- *
- * Main export: SlideDeckGraph class
+ * This implementation uses composition patterns with dedicated modules under `slides/`.
  */
 
-// Re-export the main class from nodes module
-export { SlideDeckGraph, packChunks, validateChunks } from './slides/nodes.js';
+export { SlideDeckGraph, packChunks, validateChunks } from './slides/SlideDeckGraph.js';
 
-// Re-export types for backward compatibility
 export type {
   OverallStateType,
   ChunkProcessState,
@@ -27,5 +20,4 @@ export type {
   SlideResponse,
 } from './slides/prompts.js';
 
-// Re-export constants for backward compatibility
 export { GRAPH_CONFIG, SLIDE_COUNT_MAP } from './slides/prompts.js';

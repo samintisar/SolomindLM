@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
 import type { Note, WrittenQuestionsNote } from '@/shared/types/index';
-import { useCreateWrittenQuestions, pollWrittenQuestionsStatus } from '../../services/writtenQuestionsApi';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { useCreateWrittenQuestions } from '../../services/writtenQuestionsApi';
 import type { WrittenQuestionsConfig } from '../../components/CustomizeWrittenQuestionsModal';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
   const createWrittenQuestions = useCreateWrittenQuestions();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
   const countMap = { fewer: 5, standard: 10, more: 15 };
 
   return useCallback(
@@ -18,7 +22,7 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -70,39 +74,15 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        pollWrittenQuestionsStatus(
-          () => ctx.notes.find((n) => n.id === writtenQuestionsId) as WrittenQuestionsNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(writtenQuestionsId, updatedNote);
-          },
-          180,
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(writtenQuestionsId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Written questions generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === writtenQuestionsId) || newNote;
-              if (failedNote.type === 'writtenQuestions') {
-                ctx.onUpdateNoteFull(writtenQuestionsId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: `${questionCount} Questions • ${config.questionType} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate written questions' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create written questions:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create written questions');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start written questions. Please try again.",
+          devLabel: 'Failed to create written questions',
+        });
       }
     },
-    [ctx]
+    [ctx, createWrittenQuestions, catchGenerationError, showErrorToast]
   );
 }

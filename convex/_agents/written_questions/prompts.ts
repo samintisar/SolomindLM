@@ -7,7 +7,6 @@
  */
 
 import { z } from 'zod';
-import { env } from '../../_lib/env';
 
 // ============================================================
 // SCHEMAS
@@ -58,27 +57,7 @@ export const PROBLEMATIC_PHRASES = [
   'this figure',
 ] as const;
 
-// ============================================================
-// CONFIGURATION
-// ============================================================
-
-const WRITTEN_QUESTIONS_CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.WRITTEN_QUESTIONS_MAP_CHUNK_TOKENS || '20000', 10),
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_CHUNK_TOKENS || '40000', 10),
-  MIN_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MIN_QUESTIONS_PER_CHUNK || '2', 10),
-  MAX_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MAX_QUESTIONS_PER_CHUNK || '30', 10),
-  MIN_CHUNKS: parseInt(env.WRITTEN_QUESTIONS_MIN_CHUNKS || '2', 10),
-  MAP_TIMEOUT_MS: parseInt(env.WRITTEN_QUESTIONS_MAP_TIMEOUT_MS || '180000', 10),
-  REDUCE_TIMEOUT_MS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_TIMEOUT_MS || '240000', 10),
-  REDUCE_MAX_TOKENS: parseInt(env.WRITTEN_QUESTIONS_REDUCE_MAX_TOKENS || '32000', 10),
-  MAX_COLLAPSE_DEPTH: parseInt(env.WRITTEN_QUESTIONS_MAX_COLLAPSE_DEPTH || '3', 10),
-  DYNAMIC_BUFFER_MULTIPLIER: parseFloat(env.WRITTEN_QUESTIONS_DYNAMIC_BUFFER_MULTIPLIER || '1.5'),
-  CHUNK_COVERAGE_THRESHOLD: parseFloat(env.WRITTEN_QUESTIONS_CHUNK_COVERAGE_THRESHOLD || '0.7'),
-} as const;
-
-export const GRAPH_CONFIG = {
-  ...WRITTEN_QUESTIONS_CONFIG,
-} as const;
+export { GRAPH_CONFIG } from './config.js';
 
 // ============================================================
 // SYSTEM PROMPTS

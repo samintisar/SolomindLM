@@ -7,13 +7,12 @@
  * This refactored version uses composition patterns with dedicated modules:
  * - prompts.ts: All prompt templates
  * - state.ts: State definitions using factory composable
- * - nodes.ts: Node functions and graph building
+ * - audio_overview/*.ts: Node phases, config, and AudioOverviewGraph orchestration
  *
  * Main export: AudioOverviewGraph class
  */
 
-// Re-export the main class from nodes module
-export { AudioOverviewGraph } from './audio_overview/nodes.js';
+export { AudioOverviewGraph } from './audio_overview/AudioOverviewGraph.js';
 
 // Re-export types for backward compatibility
 export type {

@@ -201,36 +201,6 @@ export function useUpdateFlashcardProgress(flashcardId: string | null, currentIn
 }
 
 /**
- * Poll flashcard status until completion.
- * Pass initialNote from the create response so the first poll succeeds before
- * Convex query reactivity has added the new flashcard set to the notes list.
- */
-export async function pollFlashcardStatus(
-  getFlashcard: () => FlashcardNote | null | undefined,
-  onUpdate?: (note: FlashcardNote) => void,
-  maxAttempts = 180, // 6 minutes @ 2s intervals
-  interval = 2000,
-  initialNote?: FlashcardNote
-): Promise<FlashcardNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getFlashcard() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Flashcard set not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Flashcard generation timed out');
-}
-
-/**
  * Export a flashcard set as CSV
  * This is handled client-side now since we have the flashcard data
  */

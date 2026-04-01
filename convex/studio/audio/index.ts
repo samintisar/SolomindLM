@@ -131,6 +131,9 @@ export const generateAudioOverview = mutation({
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
     title: v.optional(v.string()),
+    audioType: v.optional(v.string()),
+    length: v.optional(v.string()),
+    focus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -139,7 +142,7 @@ export const generateAudioOverview = mutation({
     // Check daily audio limit
     await checkDailyLimit(ctx, userId, "audio");
 
-    const { notebookId, documentIds, title } = args;
+    const { notebookId, documentIds, title, audioType, length, focus } = args;
     if (documentIds.length === 0) {
       throw new Error("Please select at least one source. Content generation uses only your selected sources.");
     }
@@ -149,7 +152,11 @@ export const generateAudioOverview = mutation({
       userId,
       notebookId,
       title: title || "Audio Overview",
-      metadata: {},
+      metadata: {
+        audioType: audioType || "deep_dive",
+        length: length || "default",
+        focus: focus?.trim() || undefined,
+      },
       status: "generating",
     });
 

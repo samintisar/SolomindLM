@@ -10,7 +10,7 @@ import {
   Presentation,
   Table2,
 } from 'lucide-react';
-import { Note, isAudioNote } from '@/shared/types/index';
+import { Note, isAudioNote, isAudioOverviewNote } from '@/shared/types/index';
 
 interface NoteIconProps {
   note: Note;
@@ -31,15 +31,22 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
     );
   }
 
-  // Audio note with play button
-  if (note.type === 'audio' && isAudioNote(note) && note.status === 'completed' && note.metadata.audioUrl) {
+  // Audio overview (studio) — same shape as legacy audio note but top-level audioUrl
+  const audioOverviewHref =
+    isAudioOverviewNote(note) && note.status === 'completed' ? note.audioUrl?.trim() : '';
+  const audioNoteHref =
+    note.type === 'audio' && isAudioNote(note) && note.status === 'completed'
+      ? note.metadata.audioUrl?.trim()
+      : '';
+
+  if (audioOverviewHref || audioNoteHref) {
     return (
       <button
         onClick={(e) => {
           e.stopPropagation();
           onPlayAudio?.(note);
         }}
-        className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-all group/play"
+        className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center opacity-70 group-hover:opacity-100 hover:!opacity-100 hover:bg-primary hover:text-primary-foreground transition-all"
         aria-label="Play audio"
       >
         <Play className="w-3.5 h-3.5 fill-current ml-0.5 shrink-0" />

@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
-import type { Note, ReportNote } from '@/shared/types/index';
+import type { Note } from '@/shared/types/index';
+import { useToast } from '@/shared/contexts/ToastContext';
 import { getReportSubtitle } from '@/shared/types/reportTypes';
-import { useCreateReport, pollReportStatus } from '../../services/reportsApi';
+import { useCreateReport } from '../../services/reportsApi';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateReportFlow(ctx: CreateFlowContext) {
   const createReport = useCreateReport();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
 
   return useCallback(
     async (formatId: string, customPrompt?: string) => {
@@ -17,7 +21,7 @@ export function useCreateReportFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -46,7 +50,7 @@ export function useCreateReportFlow(ctx: CreateFlowContext) {
       ctx.onAddNote(newNote);
 
       try {
-        const { reportId, note } = await createReport({
+        const { note } = await createReport({
           notebookId: ctx.noteId,
           documentIds: selectedDocumentIds,
           reportType: formatId,
@@ -56,40 +60,15 @@ export function useCreateReportFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, note);
         }
-
-        pollReportStatus(
-          () => ctx.notes.find((n) => n.id === reportId) as ReportNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(reportId, updatedNote);
-          },
-          180,
-          2000,
-          note
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(reportId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Report generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === reportId) || newNote;
-              if (failedNote.type === 'report') {
-                const reportType = failedNote.metadata.reportType || formatId;
-                ctx.onUpdateNoteFull(reportId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: `${getReportSubtitle(reportType)} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate report' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create report:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create report');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start the report. Please try again.",
+          devLabel: 'Failed to create report',
+        });
       }
     },
-    [ctx]
+    [ctx, createReport, catchGenerationError, showErrorToast]
   );
 }

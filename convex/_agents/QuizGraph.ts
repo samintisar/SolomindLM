@@ -2,18 +2,11 @@
 /**
  * QuizGraph
  *
- * Orchestrates quiz question generation using extracted modules.
- *
- * This refactored version uses composition patterns with dedicated modules:
- * - prompts.ts: All prompt templates, types, and constants
- * - state.ts: State definitions using the Annotation API
- * - nodes.ts: Node functions and the main class
- *
- * Main export: QuizGraph class
+ * Orchestrates quiz question generation using extracted modules under `quiz/`.
  */
 
-// Re-export the main class from nodes module
-export { QuizGraph, packChunks, validateChunks } from './quiz/nodes.js';
+export { QuizGraph } from './quiz/QuizGraph.js';
+export { packChunks, validateChunks } from './quiz/chunkHelpers.js';
 
 // Re-export types for backward compatibility
 export type {

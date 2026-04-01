@@ -33,6 +33,11 @@ import {
   type WrittenQuestionsResponse,
 } from '../../_agents/written_questions/prompts';
 import {
+  applySelectedQuestionIds,
+  dedupeQuestions,
+  getSelectionIdsPrompt,
+} from '../../_agents/written_questions/postprocess';
+import {
   invokeWithTimeout,
   invokeWithRetry,
   sanitizeUserInput,
@@ -53,6 +58,23 @@ function createQuestionsLLM(llm: ChatTogetherAI): WrittenQuestionsOutputInvoker 
   // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(WrittenQuestionsArraySchema, {
     name: 'written_questions',
+  });
+}
+
+const WrittenQuestionIdSelectionSchema = z.object({
+  selectedIds: z.array(z.string()),
+});
+
+type WrittenQuestionIdSelectionResponse = z.infer<typeof WrittenQuestionIdSelectionSchema>;
+
+interface WrittenQuestionSelectionInvoker {
+  invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<WrittenQuestionIdSelectionResponse>;
+}
+
+function createQuestionSelectionLLM(llm: ChatTogetherAI): WrittenQuestionSelectionInvoker {
+  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
+  return llm.withStructuredOutput(WrittenQuestionIdSelectionSchema, {
+    name: 'written_question_id_selection',
   });
 }
 
@@ -528,60 +550,42 @@ export const finalizeWrittenQuestionsPhase = internalAction({
         },
       });
 
+      const dedupedQuestions = dedupeQuestions(allQuestions);
+      console.log(`[WrittenQuestionsJob] ${allQuestions.length} questions collapsed to ${dedupedQuestions.length} after heuristic dedupe`);
+
       let finalQuestions: WrittenQuestion[];
 
-      // If we have more questions than needed, select the best ones
-      if (allQuestions.length > questionCount) {
-        console.log(`[WrittenQuestionsJob] Selecting ${questionCount} best questions from ${allQuestions.length} candidates`);
+      if (dedupedQuestions.length > questionCount) {
+        console.log(`[WrittenQuestionsJob] Selecting ${questionCount} best questions from ${dedupedQuestions.length} deduped candidates`);
 
-        // Use SMART_LLM for selection
         const reduceLLM = createReduceLLM();
-
-        // Build selection prompt
-        const questionsList = allQuestions.map((q, i) =>
-          `[${i + 1}] ${q.questionType.toUpperCase()}: ${q.question}`
-        ).join('\n');
-
-        const selectionPrompt = `You are an expert educator selecting the best written questions for an assessment.
-
-**Configuration:**
-- Target question count: ${questionCount}
-- Question type: ${questionType.toUpperCase()}
-- Difficulty: ${difficulty}
-${focus ? `- Focus: ${focus}` : ''}
-
-**Candidate Questions:**
-${questionsList}
-
-**Selection Criteria:**
-1. Diversity: Cover different topics/concepts from the source material
-2. Quality: Clear, self-contained questions without ambiguous phrasing
-3. Balance: Mix of difficulty within the "${difficulty}" level
-4. Relevance: Questions that test important concepts, not trivial details
-
-**Output:**
-Return the selected questions preserving all their original properties (id, question, questionType, rubric, modelAnswer).
-Select exactly ${questionCount} questions.`;
-
-        // For selection, we'll use structured output with the same schema
-        const structuredSelectLLM = reduceLLM.withStructuredOutput(WrittenQuestionsArraySchema, {
-          name: 'written_questions_selection',
+        const structuredSelectLLM = createQuestionSelectionLLM(reduceLLM);
+        const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
+        const selectionPrompt = getSelectionIdsPrompt({
+          questions: dedupedQuestions,
+          targetCount: questionCount,
+          difficulty,
+          questionType,
+          focus: sanitizedFocus,
         });
+
+        console.log(`[WrittenQuestionsJob] Selection prompt: ${selectionPrompt.length} chars`);
 
         const startTime = Date.now();
         const selectionResponse = await invokeWithRetry(
           () => invokeWithTimeout(
-            () => (structuredSelectLLM as any).invoke([
+            () => structuredSelectLLM.invoke([
               new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
               new HumanMessage(selectionPrompt),
             ], createLangSmithRunConfig({
               runName: 'WrittenQuestionsJob.Select',
               tags: ['agent', 'written_questions', 'select'],
               metadata: {
-                inputQuestions: allQuestions.length,
+                inputQuestions: dedupedQuestions.length,
                 targetCount: questionCount,
                 difficulty,
                 questionType,
+                focus: sanitizedFocus || 'none',
               },
             })),
             CONFIG.REDUCE_TIMEOUT_MS,
@@ -594,14 +598,20 @@ Select exactly ${questionCount} questions.`;
           'WrittenQuestionsSelect'
         );
 
-        const selected = (selectionResponse as WrittenQuestionsResponse).questions;
-        finalQuestions = selected;
+        finalQuestions = applySelectedQuestionIds(
+          dedupedQuestions,
+          selectionResponse.selectedIds,
+          questionCount,
+        );
+
+        if (finalQuestions.length === 0) {
+          throw new Error('LLM returned zero valid selected question IDs');
+        }
 
         console.log(`[WrittenQuestionsJob] Selection completed in ${Date.now() - startTime}ms, selected ${finalQuestions.length} questions`);
       } else {
-        // Use all questions if we have fewer than requested
-        finalQuestions = allQuestions;
-        console.log(`[WrittenQuestionsJob] Using all ${finalQuestions.length} questions (within limit)`);
+        finalQuestions = dedupedQuestions;
+        console.log(`[WrittenQuestionsJob] Using all ${finalQuestions.length} deduped questions (within limit)`);
       }
 
       // Update status for finalizing

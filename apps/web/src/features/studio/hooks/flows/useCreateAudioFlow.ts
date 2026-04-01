@@ -1,12 +1,15 @@
 import { useCallback } from 'react';
 import type { Note, AudioOverviewNote } from '@/shared/types/index';
+import { useToast } from '@/shared/contexts/ToastContext';
 import { useCreateAudioOverview } from '../../services/audioApi';
-import { pollAudioOverviewStatus } from '../../services/audioApi';
 import type { AudioConfig } from '../../components/CustomizeAudioModal';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateAudioFlow(ctx: CreateFlowContext) {
   const createAudioOverview = useCreateAudioOverview();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
 
   return useCallback(
     async (config: AudioConfig) => {
@@ -18,7 +21,7 @@ export function useCreateAudioFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -46,6 +49,9 @@ export function useCreateAudioFlow(ctx: CreateFlowContext) {
           notebookId: ctx.noteId,
           documentIds: selectedDocumentIds,
           title: `Audio Overview • ${formatTitle}`,
+          audioType: config.formatId,
+          length: config.length,
+          focus: config.focus,
         });
 
         const initialNote: AudioOverviewNote = {
@@ -57,41 +63,15 @@ export function useCreateAudioFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        // Poll for completion using Convex-based audio overviews query
-        pollAudioOverviewStatus(
-          () => ctx.notes.find((n) => n.id === audioOverviewId) as AudioOverviewNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(audioOverviewId, updatedNote);
-          },
-          300,
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(audioOverviewId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Audio overview generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === audioOverviewId) || newNote;
-              if (failedNote.type === 'audioOverview') {
-                ctx.onUpdateNoteFull(audioOverviewId, {
-                  ...failedNote,
-                  id: audioOverviewId,
-                  status: 'failed',
-                  preview: `Audio Overview • ${formatTitle} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate audio overview' },
-                } as AudioOverviewNote);
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create audio overview:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create audio overview');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start the audio overview. Please try again.",
+          devLabel: 'Failed to create audio overview',
+        });
       }
     },
-    [ctx, createAudioOverview]
+    [ctx, createAudioOverview, catchGenerationError, showErrorToast]
   );
 }

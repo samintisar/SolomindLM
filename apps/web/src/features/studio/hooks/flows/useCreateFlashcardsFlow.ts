@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
 import type { Note, FlashcardNote } from '@/shared/types/index';
-import { useCreateFlashcards, pollFlashcardStatus } from '../../services/flashcardsApi';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { useCreateFlashcards } from '../../services/flashcardsApi';
 import type { FlashcardConfig } from '../../components/CustomizeFlashcardsModal';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
   const createFlashcards = useCreateFlashcards();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
   const countMap = { fewer: 20, standard: 35, more: 55 };
 
   return useCallback(
@@ -18,7 +22,7 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -59,39 +63,15 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        pollFlashcardStatus(
-          () => ctx.notes.find((n) => n.id === flashcardId) as FlashcardNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(flashcardId, updatedNote);
-          },
-          180,
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(flashcardId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Flashcard generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === flashcardId) || newNote;
-              if (failedNote.type === 'flashcard') {
-                ctx.onUpdateNoteFull(flashcardId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: `${cardCount} Cards • ${config.difficulty} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate flashcards' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create flashcards:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create flashcards');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start flashcards. Please try again.",
+          devLabel: 'Failed to create flashcards',
+        });
       }
     },
-    [ctx]
+    [ctx, createFlashcards, catchGenerationError, showErrorToast]
   );
 }

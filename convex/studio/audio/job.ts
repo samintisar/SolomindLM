@@ -57,8 +57,9 @@ const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_MAP_CHUNK_TOKENS || '3750', 10),
   REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_REDUCE_CHUNK_TOKENS || '10000', 10),
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk
-  REDUCE_TIMEOUT_MS: 180000, // 180 seconds for script writing
-  TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS || '120000', 10),
+  REDUCE_TIMEOUT_MS: parseInt(env.AUDIO_REDUCE_TIMEOUT_MS || '300000', 10),
+  REDUCE_MAX_OUTPUT_TOKENS: parseInt(env.AUDIO_REDUCE_MAX_OUTPUT_TOKENS || '16384', 10),
+  TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS || '300000', 10),
 } as const;
 
 /** Voice configuration (OpenAI TTS-1) */
@@ -66,6 +67,7 @@ const VOICES = {
   host_a: env.AUDIO_VOICE_HOST_A,
   host_b: env.AUDIO_VOICE_HOST_B,
 } as const;
+
 
 // ============================================================
 // HELPER: Create LLMs
@@ -86,7 +88,9 @@ function createReduceLLM(): ChatTogetherAI {
     apiKey: env.TOGETHER_AI_API_KEY,
     model: env.SMART_LLM,
     temperature: 0.6,
+    maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
+    modelKwargs: { chat_template_kwargs: { thinking: false } },
   });
 }
 
@@ -302,10 +306,14 @@ export const processAudioMapChunk = internalAction({
 
       // Process with LLM - extract dialogue beats
       const llm = createMapLLM();
-
-      // Default to deep_dive audio type
-      const audioType: AudioType = 'deep_dive';
-      const prompt = getMapPrompt(audioType, chunk);
+      const metadata = (audioOverview.metadata ?? {}) as {
+        audioType?: AudioType;
+        focus?: string;
+      };
+      const audioType: AudioType = metadata.audioType || 'deep_dive';
+      const sanitizedFocus = metadata.focus ? sanitizeUserInput(metadata.focus) : undefined;
+      console.log(`[AudioJob] ${chunkId} Map config: type=${audioType}, focus=${sanitizedFocus || 'none'}`);
+      const prompt = getMapPrompt(audioType, chunk, sanitizedFocus);
 
       console.log(`[AudioJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
@@ -537,14 +545,22 @@ export const finalizeAudioOverviewPhase = internalAction({
       });
 
       // Write dialogue script
+      const storedMetadata = (audioOverview.metadata ?? {}) as {
+        audioType?: AudioType;
+        length?: AudioLength;
+        focus?: string;
+      };
+      const audioType: AudioType = storedMetadata.audioType || 'deep_dive';
+      const length: AudioLength = storedMetadata.length || 'default';
+      const sanitizedFocus = storedMetadata.focus ? sanitizeUserInput(storedMetadata.focus) : undefined;
       const llm = createReduceLLM();
-      const audioType: AudioType = 'deep_dive';
-      const length: AudioLength = 'default';
       const targetLines = TARGET_LINE_COUNTS[length];
 
       let fullDialogueScript: DialogueLine[] = [];
       const numChunks = Math.ceil(targetLines / DIALOGUE_CHUNK_SIZE);
       const coveredExamples = new Set<string>();
+
+      console.log(`[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, focus=${sanitizedFocus || 'general overview'}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`);
 
       for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
         const linesThisChunk = Math.min(DIALOGUE_CHUNK_SIZE, targetLines - (chunkIdx * DIALOGUE_CHUNK_SIZE));
@@ -562,12 +578,12 @@ export const finalizeAudioOverviewPhase = internalAction({
           content: combined + previousDialogue,
           audioType,
           length,
-          focus: 'general overview',
+          focus: sanitizedFocus || 'general overview',
           targetLines: linesThisChunk,
           coveredTopicsPrompt,
         });
 
-        console.log(`[AudioJob] Writing script chunk ${chunkIdx + 1}/${numChunks}`);
+        console.log(`[AudioJob] Writing script chunk ${chunkIdx + 1}/${numChunks} (promptChars=${chunkPrompt.length}, promptTokens=${countTokens(chunkPrompt)}, lines=${linesThisChunk}, previousDialogueChars=${previousDialogue.length}, coveredExamples=${coveredExamples.size})`);
 
         const response = await invokeWithRetry(
           () => invokeWithTimeout(
@@ -580,6 +596,9 @@ export const finalizeAudioOverviewPhase = internalAction({
               metadata: {
                 chunkIndex: chunkIdx + 1,
                 totalChunks: numChunks,
+                audioType,
+                length,
+                focus: sanitizedFocus || 'general overview',
               },
             })),
             CONFIG.REDUCE_TIMEOUT_MS,
@@ -589,23 +608,42 @@ export const finalizeAudioOverviewPhase = internalAction({
           'AudioReduce'
         );
 
-        const responseText = String((response as any).content);
+        const responseAny = response as any;
+        const responseContent = responseAny?.content;
+        const responseText = typeof responseContent === 'string'
+          ? responseContent
+          : Array.isArray(responseContent)
+            ? responseContent.map((part: any) => {
+              if (typeof part === 'string') return part;
+              if (part && typeof part === 'object' && typeof part.text === 'string') return part.text;
+              return '';
+            }).join('')
+            : String(responseContent ?? '');
+        const finishReason = responseAny?.response_metadata?.finish_reason ?? responseAny?.response_metadata?.finishReason ?? null;
         const jsonStart = responseText.indexOf('[');
         const jsonEnd = responseText.lastIndexOf(']');
+
+        console.log(`[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}, finishReason=${finishReason ?? 'unknown'}`);
 
         if (jsonStart !== -1 && jsonEnd !== -1) {
           try {
             const chunkDialogue = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1)) as DialogueLine[];
             if (Array.isArray(chunkDialogue) && chunkDialogue.length > 0) {
               fullDialogueScript = fullDialogueScript.concat(chunkDialogue);
+            } else {
+              console.log(`[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} parsed empty or invalid array`);
             }
-          } catch (e) {
-            console.log(`[AudioJob] Failed to parse chunk ${chunkIdx + 1}`);
+          } catch (error) {
+            console.log(`[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} parse failed: ${error instanceof Error ? error.message : String(error)}`);
+            console.log(`[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} response preview: ${responseText.slice(0, 500)}`);
           }
+        } else {
+          console.log(`[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} missing JSON array; response preview: ${responseText.slice(0, 500)}`);
         }
       }
 
       if (fullDialogueScript.length === 0) {
+        console.log('[AudioJob] Dialogue generation returned no parsable JSON, using fallback script');
         fullDialogueScript = [
           { speaker: 'host_a', text: "I've analyzed the content you provided." },
           { speaker: 'host_b', text: 'What did you find most interesting?' },

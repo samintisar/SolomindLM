@@ -7,6 +7,9 @@ export interface CreateAudioOverviewParams {
   notebookId: string;
   documentIds: string[];
   title?: string;
+  audioType?: string;
+  length?: string;
+  focus?: string;
 }
 
 export interface CreateAudioOverviewResponse {
@@ -81,6 +84,9 @@ export function useCreateAudioOverview() {
       notebookId: params.notebookId as Id<'notebooks'>,
       documentIds: params.documentIds as Id<'documents'>[],
       title: params.title,
+      audioType: params.audioType,
+      length: params.length,
+      focus: params.focus,
     });
 
     return {
@@ -114,35 +120,4 @@ export function useDeleteAudioOverview() {
   return async (audioOverviewId: string) => {
     await remove({ id: audioOverviewId as Id<'audioOverviews'> });
   };
-}
-
-/**
- * Poll audio overview status until completion.
- * Note: Audio generation may take longer than other types.
- * Pass initialNote from the create response so the first poll succeeds before
- * Convex query reactivity has added the new item to the notes list.
- */
-export async function pollAudioOverviewStatus(
-  getAudioOverview: () => AudioOverviewNote | null | undefined,
-  onUpdate?: (note: AudioOverviewNote) => void,
-  maxAttempts = 300, // 10 minutes @ 2s intervals (audio generation takes time)
-  interval = 2000,
-  initialNote?: AudioOverviewNote
-): Promise<AudioOverviewNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getAudioOverview() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Audio overview not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Audio overview generation timed out');
 }

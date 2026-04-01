@@ -82,26 +82,28 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                     {/* Front */}
                     <div className="absolute inset-0 backface-hidden bg-card rounded-xl flex flex-col items-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
                          <span className="text-xs uppercase tracking-widest text-muted-foreground shrink-0">Front</span>
-                         <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center justify-center text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground prose prose-stone dark:prose-invert max-w-none py-1">
-                             <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
-                                 <MarkdownRenderer
-                                     components={{
-                                         img: () => null,
-                                         a: ({ children }) => <span className="text-foreground">{children}</span>,
-                                         video: () => null,
-                                         audio: () => null,
-                                         iframe: () => null,
-                                         table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
-                                         thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                                         tbody: ({ children }) => <tbody>{children}</tbody>,
-                                         tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                                         th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
-                                         td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
-                                     }}
-                                 >
-                                     {sanitizeMarkdown(currentCard.front)}
-                                 </MarkdownRenderer>
-                             </Suspense>
+                         <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground [scrollbar-gutter:stable]">
+                             <div className="min-h-full w-full flex flex-col items-center justify-center py-2 sm:py-3 prose prose-stone dark:prose-invert max-w-none text-center">
+                                 <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
+                                     <MarkdownRenderer
+                                         components={{
+                                             img: () => null,
+                                             a: ({ children }) => <span className="text-foreground">{children}</span>,
+                                             video: () => null,
+                                             audio: () => null,
+                                             iframe: () => null,
+                                             table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                             thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                             tbody: ({ children }) => <tbody>{children}</tbody>,
+                                             tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                             th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                             td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+                                         }}
+                                     >
+                                         {sanitizeMarkdown(currentCard.front)}
+                                     </MarkdownRenderer>
+                                 </Suspense>
+                             </div>
                          </div>
                          <div className="text-xs text-muted-foreground/50 flex items-center gap-2 shrink-0 mt-1">
                              <RotateCw className="w-3 h-3" /> Click to flip
@@ -111,26 +113,28 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                     {/* Back */}
                     <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary rounded-xl flex flex-col items-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
                          <span className="text-xs uppercase tracking-widest text-secondary-foreground/60 shrink-0">Back</span>
-                         <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center justify-center text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground prose prose-stone dark:prose-invert max-w-none py-1">
-                             <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
-                                 <MarkdownRenderer
-                                     components={{
-                                         img: () => null,
-                                         a: ({ children }) => <span className="text-foreground">{children}</span>,
-                                         video: () => null,
-                                         audio: () => null,
-                                         iframe: () => null,
-                                         table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
-                                         thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                                         tbody: ({ children }) => <tbody>{children}</tbody>,
-                                         tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                                         th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
-                                         td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
-                                     }}
-                                 >
-                                     {sanitizeMarkdown(currentCard.back)}
-                                 </MarkdownRenderer>
-                             </Suspense>
+                         <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground [scrollbar-gutter:stable]">
+                             <div className="min-h-full w-full flex flex-col items-center justify-center py-2 sm:py-3 prose prose-stone dark:prose-invert max-w-none text-center">
+                                 <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
+                                     <MarkdownRenderer
+                                         components={{
+                                             img: () => null,
+                                             a: ({ children }) => <span className="text-foreground">{children}</span>,
+                                             video: () => null,
+                                             audio: () => null,
+                                             iframe: () => null,
+                                             table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
+                                             thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                                             tbody: ({ children }) => <tbody>{children}</tbody>,
+                                             tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                                             th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
+                                             td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
+                                         }}
+                                     >
+                                         {sanitizeMarkdown(currentCard.back)}
+                                     </MarkdownRenderer>
+                                 </Suspense>
+                             </div>
                          </div>
                     </div>
 

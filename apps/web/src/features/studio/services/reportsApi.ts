@@ -168,34 +168,3 @@ export function useDeleteReport() {
     await remove({ id: reportId as Id<'reports'> });
   };
 }
-
-/**
- * Poll report status until completion
- * Note: With Convex, you can also use useQuery with real-time updates
- * This polling function is kept for compatibility
- * @param initialNote - Optional note to use when getReport() hasn't returned yet (e.g. before Convex reactivity updates)
- */
-export async function pollReportStatus(
-  getReport: () => ReportNote | null | undefined,
-  onUpdate?: (note: ReportNote) => void,
-  maxAttempts = 180, // 6 minutes @ 2s intervals
-  interval = 2000,
-  initialNote?: ReportNote
-): Promise<ReportNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getReport() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Report not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Report generation timed out');
-}

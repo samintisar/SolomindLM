@@ -83,10 +83,12 @@ export function useLimitErrorToast() {
       // Build full message
       const fullMessage = upgradeText ? `${message} ${upgradeText}` : message;
 
-      // Show toast with upgrade button
+      const effectiveShowUpgrade = showUpgradeButton && !parsedError.isPro;
+
+      // Show toast with upgrade button (free tier only)
       showError(fullMessage, {
         duration: 8000,
-        action: showUpgradeButton
+        action: effectiveShowUpgrade
           ? {
               label: 'Upgrade to Pro',
               onClick: onUpgrade || defaultOnUpgrade,

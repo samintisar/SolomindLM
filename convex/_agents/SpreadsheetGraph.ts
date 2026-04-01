@@ -2,7 +2,7 @@
 /**
  * SpreadsheetGraph
  *
- * Orchestrates spreadsheet generation using extracted modules.
+ * Orchestrates spreadsheet generation; implementation lives under `spreadsheet/`.
  *
  * This mirrors the ReportGraph architecture but generates structured tables/spreadsheets
  * instead of narrative reports. Uses the dedicated spreadsheets table instead of the
@@ -11,8 +11,8 @@
  * Main export: SpreadsheetGraph class
  */
 
-// Re-export the main class from nodes module
-export { SpreadsheetGraph, packChunks, validateChunks } from './spreadsheet/nodes.js';
+export { SpreadsheetGraph } from './spreadsheet/SpreadsheetGraph.js';
+export { packChunks, validateChunks } from './spreadsheet/chunkHelpers.js';
 
 // Re-export types for backward compatibility
 export type {

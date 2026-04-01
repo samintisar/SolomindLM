@@ -1,0 +1,295 @@
+"use node"
+
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+
+import {
+  invokeWithTimeout,
+  invokeWithRetry,
+  logInfo,
+  logWarn,
+  logError,
+  logPhaseStart,
+  logPhaseComplete,
+  sanitizeUserInput,
+  createLangSmithRunConfig,
+} from '../_shared/index.js';
+import type { OverallStateType, DialogueLine } from './state.js';
+import {
+  type AudioType,
+  type AudioLength,
+  getReducePrompt,
+  buildCoveredTopicsPrompt,
+  TARGET_LINE_COUNTS,
+  DIALOGUE_CHUNK_SIZE,
+  ESTIMATED_WORDS_PER_LINE,
+  REDUCE_SYSTEM_PROMPT,
+  EXAMPLE_EXTRACTION_SYSTEM_PROMPT,
+} from './prompts.js';
+import { GRAPH_CONFIG } from './config.js';
+
+/**
+ * Generate dialogue script from collapsed outputs (reduce phase).
+ */
+export async function writeScript(
+  state: OverallStateType,
+  smartLlm: any
+): Promise<Partial<OverallStateType>> {
+  const { collapsedOutputs, audioType, length, focus } = state;
+  const startTime = Date.now();
+
+  logPhaseStart({
+    agent: 'AudioOverviewGraph',
+    phase: 'write_script',
+    audioType,
+    length,
+    collapsedOutputsCount: collapsedOutputs.length,
+    focus: focus || 'none',
+  });
+
+  // Sanitize user input (focus)
+  const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
+
+  const combined = collapsedOutputs.join('\n\n---\n\n');
+  const targetLines = TARGET_LINE_COUNTS[length as AudioLength] || TARGET_LINE_COUNTS.default;
+
+  // Calculate number of chunks needed
+  const numChunks = Math.ceil(targetLines / DIALOGUE_CHUNK_SIZE);
+
+  logInfo({
+    agent: 'AudioOverviewGraph',
+    phase: 'write_script',
+    promptLength: combined.length,
+    targetLines,
+    numChunks,
+  }, `Generating dialogue script (~${targetLines} lines in ${numChunks} chunks)`);
+
+  let fullDialogueScript: DialogueLine[] = [];
+
+  // Track only examples to prevent repetition
+  const coveredExamples = new Set<string>();
+
+  try {
+    // Generate dialogue in chunks to avoid token limits
+    for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+      const linesThisChunk = Math.min(DIALOGUE_CHUNK_SIZE, targetLines - (chunkIndex * DIALOGUE_CHUNK_SIZE));
+      const estimatedWordsThisChunk = linesThisChunk * ESTIMATED_WORDS_PER_LINE;
+
+      // Build covered examples prompt for anti-repetition
+      let coveredTopicsPrompt = '';
+      if (chunkIndex > 0 && coveredExamples.size > 0) {
+        coveredTopicsPrompt = buildCoveredTopicsPrompt(Array.from(coveredExamples));
+      }
+
+      // Build context from previous chunks for continuity
+      const previousDialogue = chunkIndex > 0
+        ? `\n\nRECENT DIALOGUE (for continuity only - continue naturally from here):\n${fullDialogueScript.slice(-4).map(l => `${l.speaker}: ${l.text}`).join('\n')}\n`
+        : '';
+
+      const chunkPrompt = getReducePrompt({
+        content: combined + previousDialogue,
+        audioType: audioType as AudioType,
+        length: length as AudioLength,
+        focus: sanitizedFocus || 'general overview',
+        targetLines: linesThisChunk,
+        coveredTopicsPrompt,
+      });
+
+      logInfo({
+        agent: 'AudioOverviewGraph',
+        phase: 'write_script_chunk',
+        chunkIndex: chunkIndex + 1,
+        totalChunks: numChunks,
+        targetLines: linesThisChunk,
+      }, `Generating chunk ${chunkIndex + 1}/${numChunks}`);
+
+      // Timeout + Retry wrapper for resilient LLM calls
+      const response = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => smartLlm.invoke([
+            new SystemMessage(REDUCE_SYSTEM_PROMPT),
+            new HumanMessage(chunkPrompt),
+          ], createLangSmithRunConfig({
+            runName: 'AudioOverviewGraph.WriteScript',
+            tags: ['agent', 'audio-overview', 'reduce'],
+            metadata: {
+              chunkIndex: chunkIndex + 1,
+              totalChunks: numChunks,
+              audioType,
+              length,
+              focus: sanitizedFocus || 'general overview',
+            },
+          })),
+          GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+          'AudioReduce'
+        ),
+        {
+          maxAttempts: 3,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'AudioOverviewGraph',
+              phase: 'write_script_chunk',
+              chunkIndex: chunkIndex + 1,
+              attempt,
+              error: error.message,
+            }, `Retry attempt ${attempt}/3`);
+          }
+        },
+        'AudioReduce'
+      );
+
+      const responseText = String((response as { content: { toString: () => string } }).content);
+
+      logInfo({
+        agent: 'AudioOverviewGraph',
+        phase: 'write_script_chunk',
+        chunkIndex: chunkIndex + 1,
+        responseLength: responseText.length,
+      }, `Received response (${responseText.length} chars)`);
+
+      // Robust JSON extraction
+      const jsonStart = responseText.indexOf('[');
+      const jsonEnd = responseText.lastIndexOf(']');
+
+      if (jsonStart === -1 || jsonEnd === -1) {
+        logWarn({
+          agent: 'AudioOverviewGraph',
+          phase: 'write_script_chunk',
+          chunkIndex: chunkIndex + 1,
+          responsePreview: responseText.slice(0, 500),
+        }, 'No JSON array found in response');
+        continue;
+      }
+
+      const jsonStr = responseText.substring(jsonStart, jsonEnd + 1);
+
+      try {
+        const chunkDialogue = JSON.parse(jsonStr) as DialogueLine[];
+
+        // Validate structure
+        if (!Array.isArray(chunkDialogue) || chunkDialogue.length === 0 ||
+            !chunkDialogue.every(line => 'speaker' in line && 'text' in line)) {
+          throw new Error('Invalid dialogue script structure');
+        }
+
+        logInfo({
+          agent: 'AudioOverviewGraph',
+          phase: 'write_script_chunk',
+          chunkIndex: chunkIndex + 1,
+          linesGenerated: chunkDialogue.length,
+        }, `Successfully parsed ${chunkDialogue.length} lines`);
+
+        fullDialogueScript = fullDialogueScript.concat(chunkDialogue);
+
+        // Extract examples from this chunk using LLM
+        try {
+          const extractionPrompt = `Analyze this dialogue excerpt and extract ONLY concrete examples, analogies, or real-world applications mentioned.
+
+Return a JSON array:
+["example 1", "example 2", "example 3"]
+
+Rules:
+- Only extract UNIQUE examples/analogies (not common phrases like "the idea")
+- Maximum 5 examples
+- Examples are things like: "GPS navigation", "8-puzzle", "robot vacuum", "protein folding"
+- Ignore general concepts and filler words
+
+DIALOGUE:
+${chunkDialogue.map(d => `${d.speaker}: ${d.text}`).join('\n')}`;
+
+          const extractionResponse = await smartLlm.invoke([
+            new SystemMessage(EXAMPLE_EXTRACTION_SYSTEM_PROMPT),
+            new HumanMessage(extractionPrompt),
+          ], createLangSmithRunConfig({
+            runName: 'AudioOverviewGraph.ExampleExtraction',
+            tags: ['agent', 'audio-overview', 'analysis'],
+            metadata: {
+              chunkIndex: chunkIndex + 1,
+              linesGenerated: chunkDialogue.length,
+            },
+          }));
+
+          const extractionText = extractionResponse.content.toString();
+          const exJsonStart = extractionText.indexOf('[');
+          const exJsonEnd = extractionText.lastIndexOf(']');
+
+          if (exJsonStart !== -1 && exJsonEnd !== -1) {
+            const extracted = JSON.parse(extractionText.substring(exJsonStart, exJsonEnd + 1));
+            (extracted || []).forEach((e: string) => coveredExamples.add(e.trim()));
+          }
+        } catch (extractionError) {
+          // Silently fail - example extraction is optional
+        }
+
+      } catch (parseError) {
+        logWarn({
+          agent: 'AudioOverviewGraph',
+          phase: 'write_script_chunk',
+          chunkIndex: chunkIndex + 1,
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+          jsonPreview: jsonStr.slice(0, 500),
+        }, 'JSON parsing failed for chunk');
+      }
+    }
+
+    // If we got some dialogue but not enough, log a warning
+    if (fullDialogueScript.length > 0 && fullDialogueScript.length < targetLines * 0.5) {
+      logWarn({
+        agent: 'AudioOverviewGraph',
+        phase: 'write_script',
+        targetLines,
+        actualLines: fullDialogueScript.length,
+      }, `Generated fewer lines than target (${fullDialogueScript.length}/${targetLines})`);
+    }
+
+    // If extraction completely failed, generate fallback
+    if (fullDialogueScript.length === 0) {
+      logWarn({
+        agent: 'AudioOverviewGraph',
+        phase: 'write_script',
+      }, 'All chunks failed, using fallback script');
+      fullDialogueScript = [
+        { speaker: 'host_a', text: "I've analyzed the content you provided." },
+        { speaker: 'host_b', text: 'What did you find most interesting?' },
+        { speaker: 'host_a', text: 'There were several key points worth discussing.' },
+      ];
+    }
+
+    const elapsed = Date.now() - startTime;
+
+    logPhaseComplete({
+      agent: 'AudioOverviewGraph',
+      phase: 'write_script',
+      dialogueLines: fullDialogueScript.length,
+      processingTimeMs: elapsed,
+    });
+  } catch (error) {
+    logError({
+      agent: 'AudioOverviewGraph',
+      phase: 'write_script',
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+      } : String(error),
+    }, 'Error writing dialogue script');
+
+    fullDialogueScript = [
+      { speaker: 'host_a', text: 'I apologize, but I had trouble processing this content.' },
+      { speaker: 'host_b', text: 'That sounds frustrating. What went wrong?' },
+      { speaker: 'host_a', text: 'The system encountered an error. Please try again with different content.' },
+    ];
+  }
+
+  return {
+    ...state,
+    dialogueScript: fullDialogueScript,
+    status: 'synthesizing',
+    progress: {
+      phase: 'write_script',
+      percentage: 60,
+      message: `Generated ${fullDialogueScript.length} dialogue lines`,
+      dialogueLines: fullDialogueScript.length,
+    },
+  };
+}

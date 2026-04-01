@@ -283,36 +283,6 @@ export function useUpdateWrittenQuestionsProgress(writtenQuestionsId: string | n
 }
 
 /**
- * Poll written questions status until completion.
- * Pass initialNote from the create response so the first poll succeeds before
- * Convex query reactivity has added the new item to the notes list.
- */
-export async function pollWrittenQuestionsStatus(
-  getWQ: () => WrittenQuestionsNote | null | undefined,
-  onUpdate?: (note: WrittenQuestionsNote) => void,
-  maxAttempts = 180, // 6 minutes @ 2s intervals
-  interval = 2000,
-  initialNote?: WrittenQuestionsNote
-): Promise<WrittenQuestionsNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getWQ() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Written questions not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Written questions generation timed out');
-}
-
-/**
  * Poll for graded result
  */
 export async function pollGradedResult(

@@ -259,33 +259,3 @@ export function useUpdateQuizProgress(quizId: string | null, currentIndex: numbe
     };
   }, [quizId, currentIndex, update]);
 }
-
-/**
- * Poll quiz status until completion.
- * Pass initialNote from the create response so the first poll succeeds before
- * Convex query reactivity has added the new quiz to the notes list.
- */
-export async function pollQuizStatus(
-  getQuiz: () => QuizNote | null | undefined,
-  onUpdate?: (note: QuizNote) => void,
-  maxAttempts = 180, // 6 minutes @ 2s intervals
-  interval = 2000,
-  initialNote?: QuizNote
-): Promise<QuizNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getQuiz() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Quiz not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Quiz generation timed out');
-}

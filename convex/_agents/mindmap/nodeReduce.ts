@@ -1,0 +1,170 @@
+"use node"
+
+import type { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
+import { HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
+
+import {
+  invokeWithTimeout,
+  validateWithPreset,
+  logBanner,
+  logError,
+  logInfo,
+  logPhaseStart,
+  logWarn,
+  createLangSmithRunConfig,
+} from '../_shared/index.js';
+
+import { GRAPH_CONFIG } from './config.js';
+import { createSmartFallback } from './fallbacks.js';
+import { parseMarkdownToTree } from './parsing.js';
+import { REDUCE_PROMPT, REDUCE_SYSTEM_PROMPT } from './prompts.js';
+import type { OverallStateType } from './state.js';
+
+export async function reduceNode(
+  state: OverallStateType,
+  smartLlm: ChatTogetherAI
+): Promise<Partial<OverallStateType>> {
+  const extractions = state.extractedConcepts || [];
+
+  logPhaseStart({
+    agent: 'MindMapGraph',
+    phase: 'reduce',
+    extractionsCount: extractions.length,
+  });
+
+  if (extractions.length === 0) {
+    logError({
+      agent: 'MindMapGraph',
+      phase: 'reduce',
+    }, 'No extractions to build from!');
+    return {
+      finalOutput: { nodeData: { topic: 'Error: No Content', children: null } },
+      status: 'failed',
+      progress: {
+        phase: 'reduce',
+        percentage: 100,
+        message: 'Failed: No content extracted',
+      },
+    };
+  }
+
+  const inputData = extractions.map(e =>
+    `THEME: ${e.main_theme}\nSUMMARY: ${e.summary}\nCONCEPTS: ${e.key_concepts.join(', ')}`
+  ).join('\n\n---\n\n');
+
+  const safeInput = inputData.slice(0, 150000);
+
+  logInfo({
+    agent: 'MindMapGraph',
+    phase: 'reduce',
+    inputSize: inputData.length,
+    truncatedSize: safeInput.length,
+    model: (smartLlm as any).model,
+  }, `Reducing ${extractions.length} extractions into map (${safeInput.length} chars)`);
+
+  try {
+    const start = Date.now();
+    const response = await invokeWithTimeout(
+      () => (smartLlm as any).invoke([
+        new SystemMessage(REDUCE_SYSTEM_PROMPT),
+        new HumanMessage(REDUCE_PROMPT.replace('{extractions}', safeInput)),
+      ], createLangSmithRunConfig({
+        runName: 'MindMapGraph.Reduce',
+        tags: ['agent', 'mindmap', 'reduce'],
+        metadata: {
+          extractionCount: extractions.length,
+          inputSize: safeInput.length,
+        },
+      })),
+      GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+      'MindMapReduce'
+    );
+
+    const markdown = ((response as BaseMessage).content[0] as { text?: string })?.text || String((response as BaseMessage).content);
+
+    const validation = validateWithPreset(markdown, 'mindmap');
+    if (!validation.isValid) {
+      logWarn({
+        agent: 'MindMapGraph',
+        phase: 'reduce',
+        validation: {
+          isValid: validation.isValid,
+          warnings: validation.warnings,
+          score: validation.score,
+        },
+      }, `Mind map validation issues: ${validation.warnings.join(', ')}`);
+    }
+
+    const parsedTree = parseMarkdownToTree(markdown);
+    const elapsed = Date.now() - start;
+
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'reduce',
+      markdownLength: markdown.length,
+      processingTimeMs: elapsed,
+      rootTopic: parsedTree.topic,
+      branchCount: parsedTree.children?.length ?? 0,
+    }, `Final map generated in ${elapsed}ms`);
+
+    if (parsedTree.children) {
+      const branchTopics = parsedTree.children.map(c => c.topic).join(', ');
+      logInfo({
+        agent: 'MindMapGraph',
+        phase: 'reduce',
+        branchTopics,
+      }, `Branch topics: ${branchTopics}`);
+    }
+
+    logBanner(
+      {
+        agent: 'MindMapGraph',
+        phase: 'generation_complete',
+        rootTopic: parsedTree.topic,
+        branchCount: parsedTree.children?.length ?? 0,
+        processingTimeMs: elapsed,
+      },
+      'MIND MAP GENERATION COMPLETE'
+    );
+
+    return {
+      finalOutput: { nodeData: parsedTree },
+      status: 'completed',
+      progress: {
+        phase: 'reduce',
+        percentage: 100,
+        message: `Completed: Mind map "${parsedTree.topic}" with ${parsedTree.children?.length ?? 0} branches`,
+        conceptsExtracted: extractions.length,
+      },
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+
+    logError({
+      agent: 'MindMapGraph',
+      phase: 'reduce',
+      error: e instanceof Error ? {
+        name: e.name,
+        message: e.message,
+        stack: e.stack?.split('\n').slice(0, 3).join('\n'),
+      } : String(e),
+    }, `Reduce Error: ${msg}. Using smart fallback...`);
+
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'reduce_fallback',
+    }, 'Using smart fallback');
+
+    const fallback = createSmartFallback(extractions);
+    return {
+      finalOutput: fallback,
+      status: 'completed',
+      progress: {
+        phase: 'reduce',
+        percentage: 100,
+        message: `Completed: Mind map "${fallback.nodeData.topic}" (fallback mode)`,
+        conceptsExtracted: extractions.length,
+      },
+    };
+  }
+}

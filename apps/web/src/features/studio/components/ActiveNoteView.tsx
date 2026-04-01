@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
-import { Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isWrittenQuestionsNote, isSlideDeckNote, isSpreadsheetNote, isUserNote } from '@/shared/types/index';
+import { X, Save, Loader2 } from 'lucide-react';
+import { Note, isReportNote, isFlashcardNote, isQuizNote, isMindMapNote, isAudioNote, isAudioOverviewNote, isWrittenQuestionsNote, isSlideDeckNote, isSpreadsheetNote, isUserNote } from '@/shared/types/index';
 import { ReportView } from './views/ReportView';
 import { FlashcardView } from './views/FlashcardView';
 import { QuizView } from './views/QuizView';
@@ -164,6 +164,71 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         </div>
       );
     }
+  }
+
+  // Studio audio overview (Convex audioOverviews — top-level audioUrl / transcript)
+  if (isAudioOverviewNote(activeNote)) {
+    const url = activeNote.audioUrl?.trim() ?? '';
+    if (activeNote.status === 'completed') {
+      if (!url) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-4">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <X className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Audio unavailable</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                This overview finished without an audio file. Try generating it again.
+              </p>
+            </div>
+          </div>
+        );
+      }
+      return (
+        <AudioPlayer
+          audioUrl={url}
+          transcript={activeNote.transcript}
+          title={activeNote.title}
+          onBack={isMobile ? onBack : undefined}
+        />
+      );
+    }
+    if (activeNote.status === 'failed') {
+      const metaErr = activeNote.metadata?.error;
+      const message =
+        typeof metaErr === 'object' && metaErr !== null && 'message' in metaErr
+          ? String((metaErr as { message?: unknown }).message ?? '')
+          : typeof metaErr === 'string'
+            ? metaErr
+            : '';
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+            <X className="w-6 h-6 text-destructive" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-destructive">Generation Failed</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {message || 'An error occurred while generating the audio overview'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-4">
+        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Generating audio overview</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            This can take a few minutes. You can keep this notebook open; the player will appear when it is ready.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // Written questions view (no onBack on mobile - StudioPanelHeader provides single header)

@@ -16,6 +16,19 @@ import { internalAction } from '../../_generated/server';
 import { v } from 'convex/values';
 import { internal } from '../../_generated/api';
 import { packChunks, validateChunks } from '../../_agents/FlashcardGraph';
+import {
+  recursiveCollapse,
+  refineFlashcardSelection,
+} from '../../_agents/flashcard/collapseReduceLlm';
+import { FLASHCARD_CONFIG } from '../../_agents/flashcard/config';
+import {
+  groupFlashcardsByTopic,
+  heuristicDedupeFlashcards,
+  validateSelfContained,
+} from '../../_agents/flashcard/flashcardHeuristics';
+import { formatFlashcardsAsText } from '../../_agents/flashcard/formatFlashcards';
+import { createStructuredLLM } from '../../_agents/flashcard/structuredLlm';
+import { cleanBackText, cleanFrontText } from '../../_agents/flashcard/textCleanup';
 import { env } from '../../_lib/env';
 import {
   createJobLogger,
@@ -23,33 +36,18 @@ import {
 } from '../../_agents/_shared/logging';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { z } from 'zod';
 import {
   MAP_SYSTEM_PROMPT,
-  REDUCE_SYSTEM_PROMPT,
   getMapPrompt,
-  getReducePrompt,
 } from '../../_agents/flashcard/prompts';
 import { FlashcardArraySchema, type Flashcard, type FlashcardResponse } from '../../_agents/flashcard/prompts';
 import {
+  countTokens,
   invokeWithTimeout,
   invokeWithRetry,
   sanitizeUserInput,
   createLangSmithRunConfig,
 } from '../../_agents/_shared/index';
-
-// Interface for the structured LLM to avoid deep type instantiation
-interface FlashcardOutputInvoker {
-  invoke(messages: Array<SystemMessage | HumanMessage>): Promise<FlashcardResponse>;
-}
-
-// Helper function to create a structured LLM without triggering deep type instantiation
-function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): FlashcardOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
-  return llm.withStructuredOutput(schema, {
-    name: 'flashcard_array',
-  });
-}
 
 // ============================================================
 // CONFIGURATION
@@ -58,8 +56,8 @@ function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): Flashca
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: parseInt(env.FLASHCARD_MAP_CHUNK_TOKENS || '7500', 10),
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 90000, // 90 seconds for reduce
-  REDUCE_MAX_TOKENS: parseInt(env.FLASHCARD_REDUCE_MAX_TOKENS || '32000', 10),
+  REDUCE_TIMEOUT_MS: FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
+  REDUCE_MAX_TOKENS: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
   MIN_CARDS_PER_CHUNK: 2,
   BUFFER_MULTIPLIER: 1.5,
   MAX_CARDS_PER_CHUNK: 30,
@@ -86,35 +84,8 @@ function createReduceLLM(): ChatTogetherAI {
     temperature: 0.3,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
     maxTokens: CONFIG.REDUCE_MAX_TOKENS,
+    modelKwargs: { chat_template_kwargs: { thinking: false } },
   });
-}
-
-// ============================================================
-// TEXT CLEANING UTILITIES
-// ============================================================
-
-function cleanFrontText(front: string): string {
-  let cleaned = front.trim();
-  cleaned = cleaned.replace(/\\"/g, '"');
-  cleaned = cleaned.replace(/\s*[*_~]{1,2}\s*$/, '');
-  cleaned = cleaned.replace(/\s*\d+\.\s*$/, '');
-  cleaned = cleaned.trim();
-  cleaned = cleaned.replace(/\*\*\s*\*/g, '**');
-  cleaned = cleaned.replace(/\*\s*\*/g, '**');
-  cleaned = cleaned.replace(/^[\s\-•*]\*/, '');
-  return cleaned.trim();
-}
-
-function cleanBackText(back: string): string {
-  let cleaned = back.trim();
-  cleaned = cleaned.replace(/\\"/g, '"');
-  cleaned = cleaned.replace(/\s*\d+\.\s*$/, '');
-  cleaned = cleaned.replace(/\s*[*_~]{1,2}\s*$/, '');
-  cleaned = cleaned.replace(/"\./g, '".');
-  cleaned = cleaned.replace(/\.\./g, '.');
-  cleaned = cleaned.replace(/[,;:\s]+$/, '');
-  cleaned = cleaned.replace(/\s{2,}/g, ' ');
-  return cleaned.trim();
 }
 
 // ============================================================
@@ -510,6 +481,7 @@ export const finalizeFlashcardPhase = internalAction({
       const mapResults = flashcard.metadata?.mapResults as Record<string, string> || {};
 
       // Separate successful and failed results
+      const mapFlashcardGroups: Flashcard[][] = [];
       const allFlashcards: Flashcard[] = [];
       const failedCount = { count: 0 };
 
@@ -519,6 +491,7 @@ export const finalizeFlashcardPhase = internalAction({
           if (parsed._error) {
             failedCount.count++;
           } else if (parsed.flashcards && Array.isArray(parsed.flashcards)) {
+            mapFlashcardGroups.push(parsed.flashcards);
             allFlashcards.push(...parsed.flashcards);
           }
         } catch {
@@ -543,62 +516,64 @@ export const finalizeFlashcardPhase = internalAction({
         },
       });
 
-      // Reduce phase with LLM - select and refine flashcards
-      const llm = createReduceLLM();
-      const structuredLLM = createStructuredLLM(llm, FlashcardArraySchema);
-
-      // Format flashcards for reduce prompt
-      const flashcardsText = allFlashcards
-        .map((card, index) => `${index + 1}. Q: ${card.front}\n   A: ${card.back}`)
-        .join('\n\n');
-
+      // Collapse and reduce with the shared flashcard pipeline helpers
       const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
-      const prompt = getReducePrompt({
-        content: flashcardsText,
-        cardCount,
-        difficulty,
-        topic: sanitizedTopic,
-      });
-
-      console.log(`[FlashcardJob] Reduce prompt: ${prompt.length} chars`);
+      const llm = createReduceLLM();
+      const collapseReduceDeps = {
+        smartLlm: llm,
+        estimateTokens: countTokens,
+      };
 
       const startTime = Date.now();
-      const response = await invokeWithRetry(
-        () => invokeWithTimeout(
-          () => (structuredLLM as any).invoke([
-            new SystemMessage(REDUCE_SYSTEM_PROMPT),
-            new HumanMessage(prompt),
-          ], createLangSmithRunConfig({
-            runName: 'FlashcardJob.Reduce',
-            tags: ['agent', 'flashcard', 'reduce'],
-            metadata: {
-              cardCount,
-              difficulty,
-              topic: topic || 'none',
-              inputCards: allFlashcards.length,
-            },
-          })),
-          CONFIG.REDUCE_TIMEOUT_MS,
-          'FlashcardReduce'
-        ),
-        {
-          maxAttempts: 2,
-          baseDelayMs: 1000,
-        },
-        'FlashcardReduce'
+      const collapsedOutputs = await recursiveCollapse(
+        mapFlashcardGroups,
+        collapseReduceDeps,
+        sanitizedTopic
       );
 
-      const elapsed = Date.now() - startTime;
-      let finalFlashcards = (response as FlashcardResponse).flashcards;
+      const collapsedFlashcards = collapsedOutputs.flat().filter(
+        (card) => card.front && card.back && validateSelfContained(card)
+      );
 
-      console.log(`[FlashcardJob] Reduce completed in ${elapsed}ms, output: ${finalFlashcards.length} cards`);
-
-      // Ensure we don't exceed target count
-      if (finalFlashcards.length > cardCount) {
-        finalFlashcards = finalFlashcards.slice(0, cardCount);
+      if (collapsedFlashcards.length === 0) {
+        throw new Error('No valid flashcards remained after collapse');
       }
 
+      const { dedupedFlashcards, duplicatesRemoved } =
+        heuristicDedupeFlashcards(collapsedFlashcards);
+      const nearTargetUpperBound = Math.max(cardCount + 2, Math.ceil(cardCount * 1.2));
+      const shouldSkipSmartSelection =
+        dedupedFlashcards.length <= nearTargetUpperBound &&
+        (dedupedFlashcards.length <= cardCount || duplicatesRemoved <= 1);
+
+      let finalFlashcards: Flashcard[];
+      if (shouldSkipSmartSelection) {
+        finalFlashcards = dedupedFlashcards.slice(0, cardCount);
+        console.log(
+          `[FlashcardJob] Skipping smart reduce: ${dedupedFlashcards.length} deduped cards already near target ${cardCount}`
+        );
+      } else {
+        finalFlashcards = await refineFlashcardSelection(
+          dedupedFlashcards,
+          cardCount,
+          difficulty,
+          collapseReduceDeps,
+          sanitizedTopic
+        );
+      }
+
+      const elapsed = Date.now() - startTime;
+      const topicDistribution = groupFlashcardsByTopic(finalFlashcards);
+
+      console.log(
+        `[FlashcardJob] Reduce completed in ${elapsed}ms, output: ${finalFlashcards.length} cards`
+      );
+      console.log(
+        `[FlashcardJob] Reduce distribution: ${JSON.stringify(topicDistribution)}`
+      );
+
       // Generate title
+      const flashcardsText = formatFlashcardsAsText(finalFlashcards);
       let title = 'Flashcards';
       try {
         title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {

@@ -7,13 +7,12 @@
  * This refactored version uses composition patterns with dedicated modules:
  * - prompts.ts: All prompt templates, types, and constants
  * - state.ts: State definitions using the Annotation API
- * - nodes.ts: Node functions and the main class
+ * - WrittenQuestionsGraph.ts: Graph orchestration; node modules for each phase
  *
  * Main export: WrittenQuestionsGraph class
  */
 
-// Re-export the main class from nodes module
-export { WrittenQuestionsGraph, packChunks, validateChunks } from './written_questions/nodes.js';
+export { WrittenQuestionsGraph, packChunks, validateChunks } from './written_questions/WrittenQuestionsGraph.js';
 
 // Re-export types for backward compatibility
 export type {

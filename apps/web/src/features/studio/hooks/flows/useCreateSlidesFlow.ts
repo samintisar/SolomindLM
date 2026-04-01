@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
 import type { Note, SlideDeckNote } from '@/shared/types/index';
-import { useCreateSlideDeck, pollSlideDeckStatus } from '../../services/slidesApi';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { useCreateSlideDeck } from '../../services/slidesApi';
 import type { SlideDeckConfig } from '../../components/CustomizeSlidesModal';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateSlidesFlow(ctx: CreateFlowContext) {
   const createSlideDeck = useCreateSlideDeck();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
 
   return useCallback(
     async (config: SlideDeckConfig) => {
@@ -17,7 +21,7 @@ export function useCreateSlidesFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -61,39 +65,15 @@ export function useCreateSlidesFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        pollSlideDeckStatus(
-          () => ctx.notes.find((n) => n.id === slideDeckId) as SlideDeckNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(slideDeckId, updatedNote);
-          },
-          300, // 10 minutes @ 2s intervals (image generation takes time)
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(slideDeckId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Slide deck generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === slideDeckId) || newNote;
-              if (failedNote.type === 'slides') {
-                ctx.onUpdateNoteFull(slideDeckId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: `${typeLabel} • ${lengthLabel} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate slide deck' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create slide deck:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create slide deck');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start the slide deck. Please try again.",
+          devLabel: 'Failed to create slide deck',
+        });
       }
     },
-    [ctx]
+    [ctx, createSlideDeck, catchGenerationError, showErrorToast]
   );
 }

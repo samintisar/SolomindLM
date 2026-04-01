@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StudioTool, Note } from '@/shared/types/index';
+import { StudioTool, Note, isAudioOverviewNote } from '@/shared/types/index';
 import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { CreateReportModal } from './CreateReportModal';
 import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
@@ -151,7 +151,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       return;
     }
     if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' ||
-        note.type === 'mindmap' || note.type === 'audio' || note.type === 'writtenQuestions' ||
+        note.type === 'mindmap' || note.type === 'audio' || note.type === 'audioOverview' ||
+        note.type === 'writtenQuestions' ||
         note.type === 'slides' || note.type === 'spreadsheet' || note.type === 'note') {
       setActiveNoteId(note.id);
     }
@@ -161,6 +162,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   const handlePlayAudioFromNote = (note: Note) => {
     if (note.type === 'audio' && note.metadata.audioUrl) {
       onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
+    } else if (isAudioOverviewNote(note) && note.audioUrl) {
+      onPlayAudio?.(note.audioUrl, note.title, note.transcript, note.id);
     }
   };
 

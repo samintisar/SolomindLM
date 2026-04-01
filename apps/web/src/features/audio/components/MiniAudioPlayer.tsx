@@ -35,10 +35,9 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     };
 
     const handleLoadedMetadata = () => {
-      // Set default playback to 0.9x but display as 1x to users
-      audio.playbackRate = 0.9;
-      // Multiply by 1.11 to reflect listening time at 0.9x playback speed
-      setDuration(audio.duration * 1.11);
+      audio.playbackRate = 1;
+      audio.defaultPlaybackRate = 1;
+      setDuration(audio.duration);
       // Auto-play when the player is visible and metadata is loaded
       if (isVisible) {
         audio.play().catch(err => console.error('Autoplay failed:', err));
@@ -82,9 +81,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (audioRef.current && duration) {
       const displayedTime = (parseFloat(e.target.value) / 100) * duration;
-      // Convert displayed time back to actual audio time (accounting for 0.9x playback)
-      const actualTime = displayedTime / 1.11;
-      audioRef.current.currentTime = actualTime;
+      audioRef.current.currentTime = displayedTime;
       setProgress(parseFloat(e.target.value));
     }
   };

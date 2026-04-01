@@ -3,7 +3,50 @@
  * Parses both new structured errors and legacy string-based errors.
  */
 
+import { ConvexError } from 'convex/values';
 import type { DailyFeature } from '@/shared/types/index';
+
+/** Pro-tier daily caps (must match convex/_lib/rateLimits.ts getProLimit). */
+const PRO_DAILY_CAP: Record<DailyFeature, number> = {
+  chat: 500,
+  flashcard: 100,
+  quiz: 100,
+  report: 100,
+  audio: 5,
+  writtenQuestion: 100,
+  spreadsheet: 100,
+  slide: 10,
+};
+
+function inferIsProFromDailyCap(feature: DailyFeature | undefined, limit: number): boolean {
+  if (!feature) return false;
+  return PRO_DAILY_CAP[feature] === limit;
+}
+
+function parseLimitFromConvexErrorData(error: unknown): ParsedLimitError | null {
+  if (!(error instanceof ConvexError)) return null;
+  const d = error.data;
+  if (!d || typeof d !== 'object') return null;
+  const o = d as Record<string, unknown>;
+  const limitType = o.limitType;
+  if (
+    typeof o.code !== 'string' ||
+    typeof o.limit !== 'number' ||
+    typeof o.current !== 'number' ||
+    (limitType !== 'notebook' && limitType !== 'source' && limitType !== 'daily')
+  ) {
+    return null;
+  }
+  return {
+    isLimitError: true,
+    code: o.code,
+    limit: o.limit,
+    current: o.current,
+    limitType,
+    feature: o.feature as DailyFeature | undefined,
+    isPro: Boolean(o.isPro),
+  };
+}
 
 /**
  * Parsed limit error data
@@ -51,6 +94,9 @@ export function isLimitError(error: unknown): error is ParsedLimitError {
 export function parseLimitError(error: unknown): ParsedLimitError | null {
   if (!error) return null;
 
+  const fromConvexData = parseLimitFromConvexErrorData(error);
+  if (fromConvexData) return fromConvexData;
+
   // Handle Error objects
   if (error instanceof Error) {
     // Try to parse the error message for legacy errors
@@ -62,20 +108,46 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
     // Check if error has structured data attached
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
-      return err.data;
+      const raw = err.data as Record<string, unknown>;
+      return {
+        isLimitError: true,
+        code: String(raw.code),
+        limit: Number(raw.limit),
+        current: Number(raw.current),
+        limitType: raw.limitType as ParsedLimitError['limitType'],
+        feature: raw.feature as DailyFeature | undefined,
+        isPro: Boolean(raw.isPro),
+      };
     }
   }
 
   // Check if it's already a structured error
   if (isLimitError(error)) {
-    return error as ParsedLimitError;
+    return {
+      isLimitError: true,
+      code: error.code,
+      limit: error.limit,
+      current: error.current,
+      limitType: error.limitType,
+      feature: error.feature,
+      isPro: error.isPro,
+    };
   }
 
   // Handle plain objects with error data
   if (typeof error === 'object' && error !== null) {
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
-      return err.data;
+      const raw = err.data as Record<string, unknown>;
+      return {
+        isLimitError: true,
+        code: String(raw.code),
+        limit: Number(raw.limit),
+        current: Number(raw.current),
+        limitType: raw.limitType as ParsedLimitError['limitType'],
+        feature: raw.feature as DailyFeature | undefined,
+        isPro: Boolean(raw.isPro),
+      };
     }
   }
 
@@ -173,7 +245,7 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
         current,
         limitType: 'daily',
         feature,
-        isPro: limit > 50, // Rough check
+        isPro: inferIsProFromDailyCap(feature, limit),
       };
     }
   }
@@ -220,6 +292,9 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
   const { limitType, feature, isPro } = parsedError;
 
   if (isPro) {
+    if (limitType === 'daily') {
+      return 'This limit refreshes on a rolling day—try again later, or contact support if you need a higher cap.';
+    }
     return 'Contact support to increase your limits.';
   }
 

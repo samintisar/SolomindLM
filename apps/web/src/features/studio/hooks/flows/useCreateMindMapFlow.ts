@@ -1,10 +1,14 @@
 import { useCallback } from 'react';
 import type { Note, MindMapNote } from '@/shared/types/index';
-import { useCreateMindMap, pollMindMapStatus } from '../../services/mindMapApi';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { useCreateMindMap } from '../../services/mindMapApi';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateMindMapFlow(ctx: CreateFlowContext) {
   const createMindMap = useCreateMindMap();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
 
   return useCallback(
     async () => {
@@ -16,7 +20,7 @@ export function useCreateMindMapFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -55,39 +59,15 @@ export function useCreateMindMapFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        pollMindMapStatus(
-          () => ctx.notes.find((n) => n.id === mindMapId) as MindMapNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(mindMapId, updatedNote);
-          },
-          180,
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(mindMapId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Mind map generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === mindMapId) || newNote;
-              if (failedNote.type === 'mindmap') {
-                ctx.onUpdateNoteFull(mindMapId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: 'Mind Map • Failed',
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate mind map' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create mind map:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create mind map');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start the mind map. Please try again.",
+          devLabel: 'Failed to create mind map',
+        });
       }
     },
-    [ctx]
+    [ctx, createMindMap, catchGenerationError, showErrorToast]
   );
 }

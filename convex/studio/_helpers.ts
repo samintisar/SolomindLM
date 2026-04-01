@@ -7,6 +7,7 @@
 import { internalMutation } from '../_generated/server';
 import { v } from 'convex/values';
 import { type JobErrorType } from '../_agents/_shared/logging';
+import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from '../_shared/mathMarkdown';
 
 // ============================================================
 // SHARED ERROR UTILITIES
@@ -160,14 +161,16 @@ export const saveFlashcardResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const normalizedFlashcards = normalizeMathMarkdownDeep(args.flashcards);
+
     await ctx.db.patch(args.flashcardId, {
-      cardsData: args.flashcards,
+      cardsData: normalizedFlashcards,
       status: 'completed',
       updatedAt: Date.now(),
       title: args.metadata?.title ?? 'Flashcards',
       metadata: {
         ...args.metadata,
-        cardCount: args.flashcards.length,
+        cardCount: normalizedFlashcards.length,
         completedAt: Date.now(),
       },
     });
@@ -307,14 +310,16 @@ export const saveQuizResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const normalizedQuestions = normalizeMathMarkdownDeep(args.questions);
+
     await ctx.db.patch(args.quizId, {
-      questionsData: args.questions,
+      questionsData: normalizedQuestions,
       status: 'completed',
       updatedAt: Date.now(),
       title: args.metadata?.title ?? 'Quiz',
       metadata: {
         ...args.metadata,
-        questionCount: args.questions.length,
+        questionCount: normalizedQuestions.length,
         completedAt: Date.now(),
       },
     });
@@ -480,14 +485,16 @@ export const saveWrittenQuestionsResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const normalizedQuestions = normalizeMathMarkdownDeep(args.questions);
+
     await ctx.db.patch(args.writtenQuestionId, {
-      questionsData: args.questions,
+      questionsData: normalizedQuestions,
       status: 'completed',
       updatedAt: Date.now(),
       title: args.metadata?.title ?? 'Written Questions',
       metadata: {
         ...args.metadata,
-        questionCount: args.questions.length,
+        questionCount: normalizedQuestions.length,
         completedAt: Date.now(),
       },
     });
@@ -632,8 +639,12 @@ export const saveReportResults = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
+    const normalizedContent = typeof args.content === 'string'
+      ? normalizeMathMarkdown(args.content)
+      : normalizeMathMarkdownDeep(args.content);
+
     await ctx.db.patch(args.reportId, {
-      content: args.content,
+      content: normalizedContent,
       status: 'completed',
       updatedAt: Date.now(),
       title: args.metadata?.title ?? 'Report',
@@ -1271,8 +1282,10 @@ export const saveAudioOverviewResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const normalizedTranscript = normalizeMathMarkdown(args.transcript);
+
     await ctx.db.patch(args.audioOverviewId, {
-      transcript: args.transcript,
+      transcript: normalizedTranscript,
       audioUrl: args.audioUrl,
       status: 'completed',
       updatedAt: Date.now(),

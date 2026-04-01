@@ -205,34 +205,3 @@ export function useDeleteSlideDeck() {
     await remove({ id: slideDeckId as Id<'slides'> });
   };
 }
-
-/**
- * Poll slide deck status until completion.
- * Uses higher maxAttempts for image generation (up to 10 minutes).
- * Pass initialNote from the create response so the first poll succeeds before
- * Convex query reactivity has added the new item to the notes list.
- */
-export async function pollSlideDeckStatus(
-  getSlideDeck: () => SlideDeckNote | null | undefined,
-  onUpdate?: (note: SlideDeckNote) => void,
-  maxAttempts = 300, // 10 minutes @ 2s intervals (image generation takes time)
-  interval = 2000,
-  initialNote?: SlideDeckNote
-): Promise<SlideDeckNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getSlideDeck() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Slide deck not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Slide deck generation timed out');
-}

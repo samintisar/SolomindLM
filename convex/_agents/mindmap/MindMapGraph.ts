@@ -1,0 +1,154 @@
+"use node"
+/**
+ * MindMapGraph — orchestration and public API for mind map generation.
+ */
+
+import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
+import { END, START, StateGraph, type Send } from '@langchain/langgraph';
+
+import { logError, logInfo } from '../_shared/index.js';
+
+import { validateChunks } from './chunkHelpers.js';
+import { createMapTasks } from './routing.js';
+import { mapProcess, type MindMapMapProcessDeps } from './nodeMap.js';
+import { reduceNode } from './nodeReduce.js';
+import { createSmartFallback as buildSmartFallbackTree } from './fallbacks.js';
+import { parseMarkdownToTree as markdownToMindMapTree } from './parsing.js';
+import { extractConcepts as runConceptExtraction } from './structuredLlm.js';
+import {
+  OverallState,
+  type ChunkStateType,
+  type ConceptExtraction,
+  type FinalMindMap,
+  type MindMapNode,
+  type OverallStateType,
+} from './state.js';
+import { NODES } from './prompts.js';
+
+export { packChunks, validateChunks } from './chunkHelpers.js';
+
+/**
+ * MindMapGraph class that orchestrates mind map generation.
+ * This is the main class that users interact with.
+ */
+export class MindMapGraph {
+  private fastLlm: ChatTogetherAI;
+  private smartLlm: ChatTogetherAI;
+  private failureCount = 0;
+  private readonly MAX_TOTAL_FAILURES = 5;
+
+  constructor(apiKey: string, mapModel: string, reduceModel: string) {
+    this.fastLlm = new ChatTogetherAI({
+      apiKey,
+      model: mapModel,
+      temperature: 0.1,
+      maxTokens: 8000,
+      modelKwargs: { chat_template_kwargs: { thinking: false } },
+    });
+
+    this.smartLlm = new ChatTogetherAI({
+      apiKey,
+      model: reduceModel,
+      temperature: 0.3,
+      maxTokens: 16000,
+    });
+  }
+
+  /**
+   * Typed wrapper for concept extraction
+   */
+  private async extractConcepts(content: string): Promise<ConceptExtraction> {
+    return runConceptExtraction(this.fastLlm, content);
+  }
+
+  async mapProcess(state: ChunkStateType): Promise<Partial<OverallStateType> | Send> {
+    const deps: MindMapMapProcessDeps = {
+      extractConcepts: (c) => runConceptExtraction(this.fastLlm, c),
+      onMapSuccess: () => {
+        this.failureCount = 0;
+      },
+      onPermanentChunkFailure: () => {
+        this.failureCount++;
+        return this.failureCount;
+      },
+      maxTotalFailures: this.MAX_TOTAL_FAILURES,
+    };
+    return mapProcess(state, deps);
+  }
+
+  async reduceNode(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    return reduceNode(state, this.smartLlm);
+  }
+
+  parseMarkdownToTree(markdown: string): MindMapNode {
+    return markdownToMindMapTree(markdown);
+  }
+
+  createSmartFallback(extractions: ConceptExtraction[]): FinalMindMap {
+    return buildSmartFallbackTree(extractions);
+  }
+
+  /**
+   * Public API method with input validation.
+   */
+  async generate(chunks: string[]): Promise<FinalMindMap> {
+    if (!chunks || chunks.length === 0) {
+      throw new Error('No chunks provided for mind map generation');
+    }
+
+    const validated = validateChunks(chunks);
+    if (validated.length === 0) {
+      throw new Error('All chunks failed validation (empty or too small)');
+    }
+
+    logInfo({
+      agent: 'MindMapGraph',
+      phase: 'initialize',
+      inputChunks: chunks.length,
+      validChunks: validated.length,
+    }, `Starting mind map generation with ${validated.length} valid chunks`);
+
+    this.failureCount = 0;
+
+    const graph = this.buildGraph();
+
+    try {
+      const result = await graph.invoke({
+        allChunks: chunks,
+        status: 'generating',
+      });
+
+      if (!result.finalOutput) {
+        throw new Error('Graph execution completed but no output generated');
+      }
+
+      return result.finalOutput;
+    } catch (error) {
+      logError({
+        agent: 'MindMapGraph',
+        phase: 'generate',
+        error: error instanceof Error ? error.message : String(error),
+      }, `Mind map generation failed: ${error}`);
+
+      throw error;
+    }
+  }
+
+  /**
+   * Build Graph - using correct LangGraph map-reduce pattern.
+   */
+  buildGraph() {
+    const builder = new StateGraph(OverallState);
+
+    builder.addNode(NODES.MAP_PROCESS, (s: ChunkStateType) => this.mapProcess(s));
+    builder.addNode(NODES.REDUCE_NODE, (s: OverallStateType) => this.reduceNode(s));
+
+    builder.addConditionalEdges(START, createMapTasks);
+
+    builder.addEdge(NODES.MAP_PROCESS as any, NODES.REDUCE_NODE as any);
+    builder.addEdge(NODES.REDUCE_NODE as any, END);
+
+    return builder.compile();
+  }
+}
+

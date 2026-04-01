@@ -181,33 +181,3 @@ export function useDeleteMindMap() {
     await remove({ id: mindMapId as Id<'mindmaps'> });
   };
 }
-
-/**
- * Poll mind map status until completion.
- * Pass initialNote from the create response so the first poll succeeds before
- * Convex query reactivity has added the new item to the notes list.
- */
-export async function pollMindMapStatus(
-  getMindMap: () => MindMapNote | null | undefined,
-  onUpdate?: (note: MindMapNote) => void,
-  maxAttempts = 180, // 6 minutes @ 2s intervals
-  interval = 2000,
-  initialNote?: MindMapNote
-): Promise<MindMapNote> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const note = getMindMap() ?? initialNote;
-
-    if (!note) {
-      throw new Error('Mind map not found');
-    }
-
-    if (note.status === 'completed' || note.status === 'failed') {
-      return note;
-    }
-
-    onUpdate?.(note);
-    await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-
-  throw new Error('Mind map generation timed out');
-}

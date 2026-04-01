@@ -1,11 +1,15 @@
 import { useCallback } from 'react';
 import type { Note, QuizNote } from '@/shared/types/index';
-import { useCreateQuiz, pollQuizStatus } from '../../services/quizzesApi';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { useCreateQuiz } from '../../services/quizzesApi';
 import type { QuizConfig } from '../../components/CustomizeQuizModal';
+import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
 import type { CreateFlowContext } from './types';
 
 export function useCreateQuizFlow(ctx: CreateFlowContext) {
   const createQuiz = useCreateQuiz();
+  const catchGenerationError = useStudioGenerationCatch();
+  const { error: showErrorToast } = useToast();
   const countMap = { fewer: 10, standard: 20, more: 30 };
 
   return useCallback(
@@ -18,7 +22,7 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        alert('Authentication error. Please log in again.');
+        showErrorToast('Please sign in again to continue.');
         return;
       }
 
@@ -59,39 +63,15 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
         if (ctx.onUpdateNoteFull) {
           ctx.onUpdateNoteFull(placeholderId, initialNote);
         }
-
-        pollQuizStatus(
-          () => ctx.notes.find((n) => n.id === quizId) as QuizNote | undefined,
-          (updatedNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(quizId, updatedNote);
-          },
-          180,
-          2000,
-          initialNote
-        )
-          .then((finalNote) => {
-            if (ctx.onUpdateNoteFull) ctx.onUpdateNoteFull(quizId, finalNote);
-          })
-          .catch((error) => {
-            console.error('Quiz generation failed:', error);
-            if (ctx.onUpdateNoteFull) {
-              const failedNote = ctx.notes.find((n) => n.id === quizId) || newNote;
-              if (failedNote.type === 'quiz') {
-                ctx.onUpdateNoteFull(quizId, {
-                  ...failedNote,
-                  status: 'failed',
-                  preview: `${questionCount} Questions • ${config.difficulty} • Failed`,
-                  metadata: { ...failedNote.metadata, error: error instanceof Error ? error.message : 'Failed to generate quiz' },
-                });
-              }
-            }
-          });
       } catch (error) {
-        console.error('Failed to create quiz:', error);
-        alert(error instanceof Error ? error.message : 'Failed to create quiz');
-        ctx.onDeleteNote(placeholderId);
+        await catchGenerationError(error, {
+          placeholderId,
+          onDeleteNote: ctx.onDeleteNote,
+          toastMessage: "Couldn't start the quiz. Please try again.",
+          devLabel: 'Failed to create quiz',
+        });
       }
     },
-    [ctx]
+    [ctx, createQuiz, catchGenerationError, showErrorToast]
   );
 }
