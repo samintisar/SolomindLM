@@ -8,7 +8,8 @@ declare namespace google {
       }
 
       interface TokenResponse {
-        access_token: string;
+        access_token?: string;
+        error?: string;
       }
 
       function initTokenClient(config: {
@@ -22,4 +23,7 @@ declare namespace google {
 
 declare const gapi: {
   load(api: string, callback: () => void): void;
+  client: {
+    load(url: string): Promise<void>;
+  };
 };

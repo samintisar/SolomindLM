@@ -2,9 +2,11 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+const GOOGLE_APP_ID = import.meta.env.VITE_GOOGLE_APP_ID as string | undefined;
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 const GOOGLE_API_KEY_PATTERN = /^AIza[0-9A-Za-z_-]+$/;
 const GOOGLE_CLIENT_ID_SUFFIX = '.apps.googleusercontent.com';
+const GOOGLE_APP_ID_PATTERN = /^\d+$/;
 
 function hasValidGooglePickerConfig() {
   if (!GOOGLE_API_KEY || !GOOGLE_API_KEY_PATTERN.test(GOOGLE_API_KEY)) {
@@ -19,6 +21,14 @@ function hasValidGooglePickerConfig() {
     console.error(
       'Google Drive picker misconfigured: expected VITE_GOOGLE_CLIENT_ID to be a Google OAuth web client ID.',
       { clientIdPresent: Boolean(GOOGLE_CLIENT_ID) },
+    );
+    return false;
+  }
+
+  if (!GOOGLE_APP_ID || !GOOGLE_APP_ID_PATTERN.test(GOOGLE_APP_ID)) {
+    console.error(
+      'Google Drive picker misconfigured: expected VITE_GOOGLE_APP_ID to be your Google Cloud project number used by PickerBuilder.setAppId().',
+      { appIdPresent: Boolean(GOOGLE_APP_ID) },
     );
     return false;
   }
@@ -46,8 +56,8 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
     const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null);
     const accessTokenRef = useRef<string | null>(null);
     const scriptsLoadedRef = useRef(false);
-    const pickerLoadedRef = useRef(false);
-    const gisLoadedRef = useRef(false);
+    const pickerInitedRef = useRef(false);
+    const gisInitedRef = useRef(false);
     const pendingOpenRef = useRef(false);
 
     const openPicker = useCallback(
@@ -60,29 +70,39 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
           return;
         }
 
-        if (!accessToken.startsWith('ya29.')) {
-          console.warn('Google Drive picker received an unexpected access token format.');
-        }
-
         const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
           .setIncludeFolders(false)
           .setSelectFolderEnabled(false);
 
         const picker = new google.picker.PickerBuilder()
-          .setOAuthToken(accessToken)
-          .setDeveloperKey(GOOGLE_API_KEY!)
-          .addView(view)
+          .enableFeature(google.picker.Feature.NAV_HIDDEN)
           .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+          .setDeveloperKey(GOOGLE_API_KEY!)
+          .setAppId(GOOGLE_APP_ID!)
+          .setOAuthToken(accessToken)
+          .addView(view)
           .setCallback((data: google.picker.ResponseObject) => {
-            if (data.action === google.picker.Action.PICKED && data.docs) {
-              const files: PickedFile[] = data.docs
-                .filter((doc) => doc.name && doc.mimeType)
+            const action = data.action ?? data[google.picker.Response.ACTION];
+            const docs = data.docs ?? data[google.picker.Response.DOCUMENTS];
+
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H1',location:'GoogleDrivePicker.tsx:callback',message:'Picker callback payload received',data:{action,docsCount:Array.isArray(docs)?docs.length:-1},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+
+            if (action === google.picker.Action.PICKED && Array.isArray(docs)) {
+              const files: PickedFile[] = docs
+                .filter((doc) => doc.id && doc.name && doc.mimeType)
                 .map((doc) => ({
-                  id: doc.id,
+                  id: doc.id!,
                   name: doc.name!,
                   mimeType: doc.mimeType!,
                   sizeBytes: doc.sizeBytes,
                 }));
+
+              // #region agent log
+              fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H2',location:'GoogleDrivePicker.tsx:callback',message:'Mapped picker docs to files',data:{filesCount:files.length,hasAccessToken:Boolean(accessToken)},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
+
               if (files.length > 0) {
                 onFilesSelected(files, accessToken);
               }
@@ -95,19 +115,20 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
       [onFilesSelected],
     );
 
-    const flushPendingOpen = useCallback(() => {
+    const requestAccessToken = useCallback(() => {
+      if (!tokenClientRef.current) return;
+      tokenClientRef.current.requestAccessToken({
+        prompt: accessTokenRef.current ? '' : 'consent',
+      });
+    }, []);
+
+    const maybeOpenPicker = useCallback(() => {
       if (!pendingOpenRef.current) return;
-      if (!pickerLoadedRef.current || !gisLoadedRef.current || !tokenClientRef.current) return;
+      if (!pickerInitedRef.current || !gisInitedRef.current || !tokenClientRef.current) return;
 
       pendingOpenRef.current = false;
-
-      if (accessTokenRef.current) {
-        openPicker(accessTokenRef.current);
-        return;
-      }
-
-      tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
-    }, [openPicker]);
+      requestAccessToken();
+    }, [requestAccessToken]);
 
     useImperativeHandle(
       ref,
@@ -116,14 +137,14 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
           if (!hasValidGooglePickerConfig()) return;
 
           pendingOpenRef.current = true;
-          flushPendingOpen();
+          maybeOpenPicker();
 
-          if (!pickerLoadedRef.current || !gisLoadedRef.current || !tokenClientRef.current) {
+          if (!pickerInitedRef.current || !gisInitedRef.current || !tokenClientRef.current) {
             console.warn('Google Drive picker is still loading and will open automatically when ready.');
           }
         },
       }),
-      [flushPendingOpen],
+      [maybeOpenPicker],
     );
 
     useEffect(() => {
@@ -154,8 +175,8 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
           },
         });
 
-        gisLoadedRef.current = true;
-        flushPendingOpen();
+        gisInitedRef.current = true;
+        maybeOpenPicker();
       };
       document.body.appendChild(gisScript);
 
@@ -168,15 +189,16 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
           return;
         }
 
-        gapi.load('picker', () => {
-          pickerLoadedRef.current = true;
-          flushPendingOpen();
+        gapi.load('client:picker', async () => {
+          await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+          pickerInitedRef.current = true;
+          maybeOpenPicker();
         });
       };
       document.body.appendChild(gapiScript);
 
       scriptsLoadedRef.current = true;
-    }, [flushPendingOpen, openPicker]);
+    }, [maybeOpenPicker, openPicker]);
 
     return null;
   },

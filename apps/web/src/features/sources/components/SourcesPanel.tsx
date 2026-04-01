@@ -61,10 +61,23 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const handleGoogleDriveFiles = useCallback(
     async (files: PickedFile[], accessToken: string) => {
-      if (!userId || !noteId) return;
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H3',location:'SourcesPanel.tsx:handleGoogleDriveFiles',message:'Google Drive files handler entered',data:{filesCount:files.length,hasUserId:Boolean(userId),hasNoteId:Boolean(noteId),accessTokenLength:accessToken.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+
+      if (!noteId) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H5',location:'SourcesPanel.tsx:handleGoogleDriveFiles',message:'Upload aborted due to missing noteId',data:{hasUserId:Boolean(userId),hasNoteId:Boolean(noteId)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        return;
+      }
 
       for (const file of files) {
         try {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H3',location:'SourcesPanel.tsx:handleGoogleDriveFiles',message:'Starting ingestFromDrive action',data:{fileName:file.name,mimeType:file.mimeType,fileIdLength:file.id.length},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
           const result = await ingestFromDrive({
             notebookId: noteId,
             fileId: file.id,
@@ -72,8 +85,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             mimeType: file.mimeType,
             accessToken,
           });
+
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H4',location:'SourcesPanel.tsx:handleGoogleDriveFiles',message:'Ingest action succeeded',data:{fileName:file.name,documentId:result.documentId,status:result.status},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
           onDocumentUploaded?.(result.documentId);
         } catch (err) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-debug',hypothesisId:'H3',location:'SourcesPanel.tsx:handleGoogleDriveFiles',message:'Ingest action failed',data:{fileName:file.name,error:err instanceof Error ? err.message : String(err)},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
           console.error('Google Drive upload failed:', err);
           alert(
             err instanceof Error

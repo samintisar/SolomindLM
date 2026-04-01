@@ -4,8 +4,8 @@ import { api } from './_generated/api';
 
 const EXPORT_MIME_MAP: Record<string, { mimeType: string; extension: string }> = {
   'application/vnd.google-apps.document': {
-    mimeType: 'text/plain',
-    extension: '.txt',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    extension: '.docx',
   },
   'application/vnd.google-apps.spreadsheet': {
     mimeType: 'text/csv',
@@ -74,6 +74,10 @@ export const ingestFromGoogleDrive = action({
       fileName: finalFileName,
       contentType: finalContentType,
     };
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/c40b03dc-b194-43e0-8425-638bcd5bfca0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9b18a'},body:JSON.stringify({sessionId:'f9b18a',runId:'gd-upload-postfix',hypothesisId:'H6',location:'convex/googleDrive.ts:handler',message:'Prepared Google Drive upload args',data:{sourceMimeType:mimeType,finalFileName,finalContentType,isExportedType:Boolean(exportConfig)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const result = await ctx.runMutation(api.documents.index.upload, uploadArgs) as {
       documentId: string;

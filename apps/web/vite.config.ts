@@ -51,6 +51,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      // Google Identity Services popup flow can break without this opener policy.
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+      },
       // SAME-DOMAIN PROXY for local development
       // Proxies /api/* to Convex so cookies work just like in production
       proxy: convexSiteUrl ? {
