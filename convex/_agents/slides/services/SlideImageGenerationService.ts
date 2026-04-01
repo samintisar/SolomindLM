@@ -19,7 +19,7 @@ import type { Slide } from '../prompts.js';
 export class SlideImageGenerationService {
   private client: OpenAI;
   private uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>;
-  private maxRetries = 1; // Only 1 retry - ZhipuAI rate limits are very strict, retrying immediately doesn't help
+  private maxRetries = 2; // More retries for rate limit handling // Only 1 retry - ZhipuAI rate limits are very strict, retrying immediately doesn't help
 
   constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>) {
     if (!apiKey || apiKey.trim().length === 0) {
@@ -40,111 +40,144 @@ export class SlideImageGenerationService {
    * Returns the image as a Buffer.
    */
   async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer> {
-    const startTime = Date.now();
+  const startTime = Date.now();
 
-    logInfo(
-      {
-        agent: 'SlideDeckGraph',
-        phase: 'image_generation',
-        slideNumber,
-        promptLength: prompt.length,
-      } as any,
-      `Generating slide ${slideNumber} with ZhipuAI glm-image...`
-    );
+  logInfo(
+    {
+      agent: 'SlideDeckGraph',
+      phase: 'image_generation',
+      slideNumber,
+      promptLength: prompt.length,
+    } as any,
+    `Generating slide ${slideNumber} with OpenAI gpt-image-1.5...`
+  );
 
-    let lastError: Error | null = null;
+  let lastError: Error | null = null;
 
-    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-      try {
-        const response = await invokeWithTimeout(
-          async () => {
-            try {
-              return await this.client.createImages({
-                model: 'glm-image',
-                prompt: prompt,
-                size: '1728x960', // Standard slide aspect ratio (16:9)
-                n: 1,
-              });
-            } catch (apiError: any) {
-              const errorMessage =
-                apiError?.message ||
-                apiError?.error?.message ||
-                apiError?.response?.data?.error?.message ||
-                String(apiError);
-              throw new Error(`ZhipuAI API error: ${errorMessage}`);
+  for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+    try {
+      const response = await invokeWithTimeout(
+        async () => {
+          try {
+            return await this.client.images.generate({
+              model: 'gpt-image-1.5',
+              prompt: prompt,
+              size: '1536x1024',
+              quality: 'medium',
+              n: 1,
+            });
+          } catch (apiError: any) {
+            // Handle OpenAI-specific error structure
+            const errorMessage =
+              apiError?.message ||
+              apiError?.error?.message ||
+              apiError?.response?.data?.error?.message ||
+              String(apiError);
+
+            // Check for specific error codes
+            const statusCode = apiError?.status || apiError?.response?.status;
+
+            if (statusCode === 401) {
+              throw new Error(`OpenAI authentication failed: ${errorMessage}`);
+            } else if (statusCode === 400) {
+              throw new Error(`OpenAI invalid request: ${errorMessage}`);
+            } else if (statusCode === 429) {
+              // Rate limit error - preserve for retry logic
+              throw apiError;
+            } else {
+              throw new Error(`OpenAI API error: ${errorMessage}`);
             }
-          },
-          GRAPH_CONFIG.IMAGE_TIMEOUT_MS,
-          'ZhipuAIImageGen'
-        );
+          }
+        },
+        GRAPH_CONFIG.IMAGE_TIMEOUT_MS,
+        'OpenAIImageGen'
+      );
 
-        let imageUrl: string | undefined;
-        const firstItem = response.data?.[0];
+      // OpenAI returns { data: [{ url: string }] }
+      const imageUrl = response.data[0]?.url;
 
-        if (typeof firstItem === 'string') {
-          imageUrl = firstItem;
-        } else if (typeof firstItem === 'object' && firstItem !== null && 'url' in firstItem) {
-          imageUrl = (firstItem as { url: string }).url;
-        } else if (typeof firstItem === 'object' && firstItem !== null && 'b64_json' in firstItem) {
-          throw new Error('ZhipuAI returned base64 image instead of URL - not yet supported');
-        }
+      if (!imageUrl || typeof imageUrl !== 'string') {
+        throw new Error('Unexpected response format from OpenAI SDK: no image URL returned');
+      }
 
-        if (!imageUrl || typeof imageUrl !== 'string') {
-          throw new Error('Unexpected response format from ZhipuAI SDK: no image URL returned');
-        }
+      const imageResponse = await fetch(imageUrl);
 
-        const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
+      }
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      const imageData = Buffer.from(arrayBuffer);
 
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
-        }
-        const arrayBuffer = await imageResponse.arrayBuffer();
-        const imageData = Buffer.from(arrayBuffer);
+      const elapsed = Date.now() - startTime;
+      logInfo(
+        {
+          agent: 'SlideDeckGraph',
+          phase: 'image_generation',
+          slideNumber,
+          attempt,
+          imageSize: imageData.length,
+          processingTimeMs: elapsed,
+        } as any,
+        `Slide ${slideNumber} generated successfully (${(imageData.length / 1024).toFixed(2)} KB)`
+      );
 
-        const elapsed = Date.now() - startTime;
-        logInfo(
-          {
-            agent: 'SlideDeckGraph',
-            phase: 'image_generation',
-            slideNumber,
-            attempt,
-            imageSize: imageData.length,
-            processingTimeMs: elapsed,
-          } as any,
-          `Slide ${slideNumber} generated successfully (${(imageData.length / 1024).toFixed(2)} KB)`
-        );
+      return imageData;
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
 
-        return imageData;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
+      // Check for rate limit error (429)
+      const isRateLimit = error?.status === 429 || error?.code === 'rate_limit_exceeded';
 
-        let errorDetails: any;
-        if (error instanceof Error) {
-          errorDetails = {
-            message: error.message,
-            name: error.name,
-            stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-          };
-        } else if (typeof error === 'object' && error !== null) {
-          errorDetails = JSON.parse(JSON.stringify(error));
+      let errorDetails: any;
+      if (error instanceof Error) {
+        errorDetails = {
+          message: error.message,
+          name: error.name,
+          isRateLimit,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        };
+      } else if (typeof error === 'object' && error !== null) {
+        errorDetails = {
+          ...JSON.parse(JSON.stringify(error)),
+          isRateLimit,
+        };
+      } else {
+        errorDetails = { error: String(error), isRateLimit };
+      }
+
+      logWarn(
+        {
+          agent: 'SlideDeckGraph',
+          phase: 'image_generation',
+          slideNumber,
+          attempt,
+          error: errorDetails,
+        } as any,
+        `Attempt ${attempt}/${this.maxRetries} failed for slide ${slideNumber}: ${lastError.message}${isRateLimit ? ' (rate limit)' : ''}`
+      );
+
+      // Fail fast on auth or invalid request errors
+      if (error?.status === 401 || error?.status === 400) {
+        break;
+      }
+
+      if (attempt < this.maxRetries) {
+        // Use exponential backoff for rate limits, shorter for server errors
+        const baseDelay = isRateLimit ? 2000 : 1000;
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 16000);
+
+        if (isRateLimit) {
+          logInfo(
+            {
+              agent: 'SlideDeckGraph',
+              phase: 'image_generation',
+              slideNumber,
+              attempt,
+              delayMs: delay,
+            } as any,
+            `Rate limit hit. Waiting ${delay}ms before retry ${attempt + 1}/${this.maxRetries}...`
+          );
         } else {
-          errorDetails = { error: String(error) };
-        }
-
-        logWarn(
-          {
-            agent: 'SlideDeckGraph',
-            phase: 'image_generation',
-            slideNumber,
-            attempt,
-            error: errorDetails,
-          } as any,
-          `Attempt ${attempt}/${this.maxRetries} failed for slide ${slideNumber}: ${lastError.message}`
-        );
-
-        if (attempt < this.maxRetries) {
-          const baseDelay = 2000;
-          const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 15000);
           logInfo(
             {
               agent: 'SlideDeckGraph',
@@ -155,23 +188,25 @@ export class SlideImageGenerationService {
             } as any,
             `Waiting ${delay}ms before retry ${attempt + 1}/${this.maxRetries}...`
           );
-          await new Promise((resolve) => setTimeout(resolve, delay));
         }
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-
-    logError(
-      {
-        agent: 'SlideDeckGraph',
-        phase: 'image_generation',
-        slideNumber,
-        error: lastError?.message,
-      } as any,
-      `Failed to generate slide ${slideNumber} after ${this.maxRetries} attempts`
-    );
-
-    throw lastError || new Error('Failed to generate slide image');
   }
+
+  logError(
+    {
+      agent: 'SlideDeckGraph',
+      phase: 'image_generation',
+      slideNumber,
+      error: lastError?.message,
+    } as any,
+    `Failed to generate slide ${slideNumber} after ${this.maxRetries} attempts`
+  );
+
+  throw lastError || new Error('Failed to generate slide image');
+}
 
   /**
    * Upload an image buffer to storage.
