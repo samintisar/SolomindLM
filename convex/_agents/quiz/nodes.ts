@@ -642,7 +642,6 @@ export class QuizGraph {
 
   // Node: Reduce phase
   private async reduce(state: OverallStateType): Promise<Partial<OverallStateType> | Send> {
-    // Call status update callback
     await this.callStatusUpdate(state, 'reducing');
 
     logPhaseStart({
@@ -684,107 +683,34 @@ export class QuizGraph {
       };
     }
 
-    logInfo({
-      agent: 'QuizGraph',
-      phase: 'reduce_after_flatten',
-      initialQuestionCount: totalCandidatesBefore,
-    }, `Flattened ${totalCandidatesBefore} candidates - running LLM refinement...`);
-
-    // ALWAYS run LLM refinement for quality control (deduplication, merging, semantic diversity)
-    // This ensures consistent behavior regardless of question count
+    const dedupedCandidates = this.heuristicDedupe(allCandidates);
+    const duplicatesRemoved = totalCandidatesBefore - dedupedCandidates.length;
+    const nearTargetUpperBound = Math.max(state.questionCount + 2, Math.ceil(state.questionCount * 1.2));
+    const shouldSkipSmartSelection =
+      dedupedCandidates.length <= nearTargetUpperBound &&
+      (dedupedCandidates.length <= state.questionCount || duplicatesRemoved <= 1);
     const retryCount = state.reduceRetryCount ?? 0;
 
     logInfo({
       agent: 'QuizGraph',
-      phase: 'reduce_llm_selection',
-      totalQuestionsBefore: totalCandidatesBefore,
-      targetQuestionCount: state.questionCount,
-      retryAttempt: retryCount + 1,
-      reason: 'Running LLM refinement for deduplication, quality selection, and topic diversity',
-    }, `Using smart LLM for intelligent candidate selection from ${totalCandidatesBefore} candidates [Attempt ${retryCount + 1}/2]...`);
+      phase: 'reduce_after_flatten',
+      initialQuestionCount: totalCandidatesBefore,
+      dedupedQuestionCount: dedupedCandidates.length,
+      duplicatesRemoved,
+      nearTargetUpperBound,
+    }, `Flattened ${totalCandidatesBefore} candidates, deduped to ${dedupedCandidates.length}`);
 
-    const similarQuestions = this.detectSimilarQuestions(allCandidates);
-
-    if (similarQuestions.length > 0) {
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'reduce_similarity_detection',
-        duplicateGroups: similarQuestions.length,
-        duplicates: similarQuestions.slice(0, 5).map(d => ({
-          type: d.similarity,
-          reason: d.reason,
-          questions: d.questions.map(q => q.question.substring(0, 80)),
-        })),
-      }, `Detected ${similarQuestions.length} potential duplicate groups - LLM will handle merging`);
-    }
-
-    try {
-      const structuredLlm = this.smartLlm.withStructuredOutput<QuizCandidateResponse>(
-        QuizCandidateArraySchema,
-        { name: 'quiz_candidate_selection' }
-      );
-
-      const selectionPrompt = getCandidateSelectionPrompt({
-        candidates: allCandidates,
-        targetCount: state.questionCount,
-        difficulty: state.difficulty,
-        focus: state.focus,
-      });
-
-      const response: QuizCandidateResponse = await invokeWithRetry(
-        () => invokeWithTimeout(
-          () => (structuredLlm as any).invoke([
-            new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
-            new HumanMessage(selectionPrompt),
-          ], createLangSmithRunConfig({
-            runName: 'QuizGraph.ReduceSelect',
-            tags: ['agent', 'quiz', 'reduce'],
-            metadata: {
-              targetQuestionCount: state.questionCount,
-              difficulty: state.difficulty,
-              focus: state.focus || 'none',
-              candidatesCount: allCandidates.length,
-            },
-          })),
-          GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-          'QuizReduce'
-        ),
-        {
-          maxAttempts: 2,
-          baseDelayMs: 1000,
-          onRetry: (attempt, error) => {
-            logWarn({
-              agent: 'QuizGraph',
-              phase: 'reduce_llm_retry',
-              attempt,
-              error: error.message,
-            }, `LLM reduce retry attempt ${attempt}/2`);
-          }
-        },
-        'QuizReduce'
-      );
-
-      logInfo({
-        agent: 'QuizGraph',
-        phase: 'reduce_llm_success',
-        selectedCount: response.questions.length,
-        originalCount: totalCandidatesBefore,
-      }, `LLM refinement complete: ${totalCandidatesBefore} → ${response.questions.length} candidates`);
-
-      if (response.questions.length === 0) {
-        throw new Error('LLM returned zero candidates');
-      }
-
+    const expandCandidates = async (candidates: QuizCandidate[], phase: string): Promise<QuizQuestion[]> => {
       const expandConcurrency = GRAPH_CONFIG.EXPAND_CONCURRENCY;
       logInfo({
         agent: 'QuizGraph',
-        phase: 'expand_questions',
-        selectedCount: response.questions.length,
+        phase,
+        selectedCount: candidates.length,
         concurrency: expandConcurrency,
-      }, `Generating distractors for ${response.questions.length} questions (concurrency: ${expandConcurrency})...`);
+      }, `Generating distractors for ${candidates.length} questions (concurrency: ${expandConcurrency})...`);
 
       const expandedResults = await allWithConcurrency(
-        response.questions.map((candidate, index) => {
+        candidates.map((candidate, index) => {
           return async () => {
             try {
               return await this.expandQuestion(candidate);
@@ -812,6 +738,117 @@ export class QuizGraph {
         }, `${failedCount} candidate expansions failed`);
       }
 
+      return expandedQuestions;
+    };
+
+    if (shouldSkipSmartSelection) {
+      const directCandidates = dedupedCandidates.slice(0, state.questionCount);
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_skip_llm',
+        originalCount: totalCandidatesBefore,
+        dedupedCount: dedupedCandidates.length,
+        targetQuestionCount: state.questionCount,
+        duplicatesRemoved,
+        nearTargetUpperBound,
+      }, `Skipping smart reduce: ${dedupedCandidates.length} deduped candidates already near target ${state.questionCount}`);
+
+      const expandedQuestions = await expandCandidates(directCandidates, 'expand_questions_skip_llm');
+      if (expandedQuestions.length === 0) {
+        return {
+          ...state,
+          finalOutput: [],
+          status: 'failed',
+        };
+      }
+
+      return this.finalizeQuestions(expandedQuestions, state);
+    }
+
+    logInfo({
+      agent: 'QuizGraph',
+      phase: 'reduce_llm_selection',
+      totalQuestionsBefore: totalCandidatesBefore,
+      dedupedQuestionCount: dedupedCandidates.length,
+      targetQuestionCount: state.questionCount,
+      retryAttempt: retryCount + 1,
+      reason: 'Using smart LLM after heuristic dedupe still left an oversized or noisy pool',
+    }, `Using smart LLM for intelligent candidate selection from ${dedupedCandidates.length} candidates [Attempt ${retryCount + 1}/2]...`);
+
+    const similarQuestions = this.detectSimilarQuestions(dedupedCandidates);
+
+    if (similarQuestions.length > 0) {
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_similarity_detection',
+        duplicateGroups: similarQuestions.length,
+        duplicates: similarQuestions.slice(0, 5).map(d => ({
+          type: d.similarity,
+          reason: d.reason,
+          questions: d.questions.map(q => q.question.substring(0, 80)),
+        })),
+      }, `Detected ${similarQuestions.length} potential duplicate groups - LLM will handle merging`);
+    }
+
+    try {
+      const structuredLlm = this.smartLlm.withStructuredOutput<QuizCandidateResponse>(
+        QuizCandidateArraySchema,
+        { name: 'quiz_candidate_selection' }
+      );
+
+      const selectionPrompt = getCandidateSelectionPrompt({
+        candidates: dedupedCandidates,
+        targetCount: state.questionCount,
+        difficulty: state.difficulty,
+        focus: state.focus,
+      });
+
+      const response: QuizCandidateResponse = await invokeWithRetry(
+        () => invokeWithTimeout(
+          () => (structuredLlm as any).invoke([
+            new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
+            new HumanMessage(selectionPrompt),
+          ], createLangSmithRunConfig({
+            runName: 'QuizGraph.ReduceSelect',
+            tags: ['agent', 'quiz', 'reduce'],
+            metadata: {
+              targetQuestionCount: state.questionCount,
+              difficulty: state.difficulty,
+              focus: state.focus || 'none',
+              candidatesCount: dedupedCandidates.length,
+            },
+          })),
+          GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
+          'QuizReduce'
+        ),
+        {
+          maxAttempts: 2,
+          baseDelayMs: 1000,
+          onRetry: (attempt, error) => {
+            logWarn({
+              agent: 'QuizGraph',
+              phase: 'reduce_llm_retry',
+              attempt,
+              error: error.message,
+            }, `LLM reduce retry attempt ${attempt}/2`);
+          }
+        },
+        'QuizReduce'
+      );
+
+      logInfo({
+        agent: 'QuizGraph',
+        phase: 'reduce_llm_success',
+        selectedCount: response.questions.length,
+        originalCount: totalCandidatesBefore,
+        dedupedCount: dedupedCandidates.length,
+      }, `LLM refinement complete: ${totalCandidatesBefore} → ${dedupedCandidates.length} → ${response.questions.length} candidates`);
+
+      if (response.questions.length === 0) {
+        throw new Error('LLM returned zero candidates');
+      }
+
+      const expandedQuestions = await expandCandidates(response.questions, 'expand_questions');
       if (expandedQuestions.length === 0) {
         throw new Error('Expansion returned zero questions');
       }
@@ -825,9 +862,9 @@ export class QuizGraph {
           name: error.name,
           message: error.message,
         } : String(error),
-      }, `LLM reduce failed, falling back to simple slice`);
+      }, 'LLM reduce failed, falling back to heuristic slice');
 
-      const fallback = allCandidates.slice(0, state.questionCount);
+      const fallback = dedupedCandidates.slice(0, state.questionCount);
 
       if (fallback.length === 0 && retryCount < 1) {
         return new Send('reduce', {
@@ -836,27 +873,7 @@ export class QuizGraph {
         } as any);
       }
 
-      const expandConcurrency = GRAPH_CONFIG.EXPAND_CONCURRENCY;
-      const expandedFallbackResults = await allWithConcurrency(
-        fallback.map((candidate, index) => {
-          return async () => {
-            try {
-              return await this.expandQuestion(candidate);
-            } catch (error) {
-              logWarn({
-                agent: 'QuizGraph',
-                phase: 'expand_question_failed',
-                index,
-                error: error instanceof Error ? error.message : String(error),
-              }, 'Failed to expand candidate');
-              return null;
-            }
-          };
-        }),
-        expandConcurrency
-      );
-
-      const expandedFallback = expandedFallbackResults.filter((q): q is QuizQuestion => q !== null);
+      const expandedFallback = await expandCandidates(fallback, 'expand_questions_fallback');
 
       if (expandedFallback.length === 0) {
         return {

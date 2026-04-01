@@ -1160,14 +1160,87 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     return duplicates;
   }
 
+  private heuristicDedupeFlashcards(flashcards: Flashcard[]): {
+    dedupedFlashcards: Flashcard[];
+    duplicatesRemoved: number;
+  } {
+    const normalizeText = (text: string): string => {
+      return text
+        .toLowerCase()
+        .replace(/\\"/g, '"')
+        .replace(/\s+/g, ' ')
+        .replace(/[^\w\s]/g, '')
+        .trim();
+    };
+
+    const dedupedByExactKey = new Map<string, Flashcard>();
+    const exactKeyByFront = new Map<string, string>();
+    let duplicatesRemoved = 0;
+
+    for (const flashcard of flashcards) {
+      const normalizedFlashcard: Flashcard = {
+        ...flashcard,
+        front: cleanFrontText(flashcard.front),
+        back: cleanBackText(flashcard.back),
+      };
+
+      const frontKey = normalizeText(normalizedFlashcard.front);
+      const backKey = normalizeText(normalizedFlashcard.back);
+      const exactKey = `${frontKey}::${backKey}`;
+
+      if (!frontKey || !backKey) {
+        continue;
+      }
+
+      if (dedupedByExactKey.has(exactKey)) {
+        duplicatesRemoved += 1;
+        continue;
+      }
+
+      const existingExactKeyForFront = exactKeyByFront.get(frontKey);
+      if (existingExactKeyForFront) {
+        const existingFlashcard = dedupedByExactKey.get(existingExactKeyForFront);
+        if (existingFlashcard) {
+          const existingScore = existingFlashcard.front.length + existingFlashcard.back.length;
+          const candidateScore = normalizedFlashcard.front.length + normalizedFlashcard.back.length;
+
+          if (candidateScore > existingScore) {
+            dedupedByExactKey.delete(existingExactKeyForFront);
+            dedupedByExactKey.set(exactKey, normalizedFlashcard);
+            exactKeyByFront.set(frontKey, exactKey);
+          }
+        }
+
+        duplicatesRemoved += 1;
+        continue;
+      }
+
+      dedupedByExactKey.set(exactKey, normalizedFlashcard);
+      exactKeyByFront.set(frontKey, exactKey);
+    }
+
+    const dedupedFlashcards = [...dedupedByExactKey.values()];
+
+    logInfo({
+      agent: 'FlashcardGraph',
+      phase: 'heuristic_dedupe',
+      inputCount: flashcards.length,
+      outputCount: dedupedFlashcards.length,
+      duplicatesRemoved,
+    }, `Heuristic dedupe: ${flashcards.length} → ${dedupedFlashcards.length} flashcards (removed ${duplicatesRemoved})`);
+
+    return {
+      dedupedFlashcards,
+      duplicatesRemoved,
+    };
+  }
+
   /**
    * Node: Reduce phase
    */
   async reduce(state: OverallStateType): Promise<Partial<OverallStateType>> {
-    // Call status update callback
     await callStatusUpdate(state, 'reducing');
 
-    // Structured logging start
     logPhaseStart({
       agent: 'FlashcardGraph',
       phase: 'reduce',
@@ -1177,11 +1250,10 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       topic: state.topic || 'none',
     });
 
-    // Log each collapsed output for analysis
     state.collapsedOutputs.forEach((flashcards, idx) => {
       const cardCount = flashcards.length;
-      const preview = flashcards.length > 0 
-        ? `${flashcards[0].front.substring(0, 50)}...` 
+      const preview = flashcards.length > 0
+        ? `${flashcards[0].front.substring(0, 50)}...`
         : 'empty';
 
       logInfo({
@@ -1194,19 +1266,14 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       });
     });
 
-    // Step 1: Flatten collapsed outputs into a single array
     const parsedFlashcards = this.flattenCollapsedOutputs(state.collapsedOutputs);
 
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce_after_flatten',
       initialCardCount: parsedFlashcards.length,
-    }, `Flattened ${parsedFlashcards.length} flashcards - running LLM refinement...`);
+    }, `Flattened ${parsedFlashcards.length} flashcards`);
 
-    // Step 2: ALWAYS run LLM refinement for quality control
-    let finalFlashcards: Flashcard[];
-
-    // If still no flashcards, this is a critical failure
     if (parsedFlashcards.length === 0) {
       const totalInputs = state.collapsedOutputs.reduce((sum, flashcards) => {
         return sum + flashcards.length;
@@ -1226,22 +1293,42 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       };
     }
 
-    // Step 3: Apply LLM refinement (handles deduplication, merging, semantic diversity)
-    finalFlashcards = await this.refineFlashcardSelection(
-      parsedFlashcards,
-      state.cardCount,
-      state.difficulty,
-      state.topic
-    );
+    const { dedupedFlashcards, duplicatesRemoved } = this.heuristicDedupeFlashcards(parsedFlashcards);
+    const nearTargetUpperBound = Math.max(state.cardCount + 2, Math.ceil(state.cardCount * 1.2));
+    const shouldSkipSmartSelection =
+      dedupedFlashcards.length <= nearTargetUpperBound &&
+      (dedupedFlashcards.length <= state.cardCount || duplicatesRemoved <= 1);
 
-    logInfo({
-      agent: 'FlashcardGraph',
-      phase: 'reduce_after_refinement',
-      refinedCount: finalFlashcards.length,
-      originalCount: parsedFlashcards.length,
-    }, `LLM refinement complete: ${parsedFlashcards.length} → ${finalFlashcards.length} cards`);
+    let finalFlashcards: Flashcard[];
 
-    // Log topic distribution AFTER refinement
+    if (shouldSkipSmartSelection) {
+      finalFlashcards = dedupedFlashcards.slice(0, state.cardCount);
+      logInfo({
+        agent: 'FlashcardGraph',
+        phase: 'reduce_skip_llm',
+        originalCount: parsedFlashcards.length,
+        dedupedCount: dedupedFlashcards.length,
+        targetCardCount: state.cardCount,
+        duplicatesRemoved,
+        nearTargetUpperBound,
+      }, `Skipping smart reduce: ${dedupedFlashcards.length} deduped cards already near target ${state.cardCount}`);
+    } else {
+      finalFlashcards = await this.refineFlashcardSelection(
+        dedupedFlashcards,
+        state.cardCount,
+        state.difficulty,
+        state.topic
+      );
+
+      logInfo({
+        agent: 'FlashcardGraph',
+        phase: 'reduce_after_refinement',
+        refinedCount: finalFlashcards.length,
+        originalCount: parsedFlashcards.length,
+        dedupedCount: dedupedFlashcards.length,
+      }, `Smart refinement complete: ${parsedFlashcards.length} → ${dedupedFlashcards.length} → ${finalFlashcards.length} cards`);
+    }
+
     const topicDistribution = this.groupFlashcardsByTopic(finalFlashcards);
     logInfo({
       agent: 'FlashcardGraph',
@@ -1249,7 +1336,6 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       topicDistribution,
     }, `Final topic distribution across ${finalFlashcards.length} cards`);
 
-    // Log all generated flashcards for analysis
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce_flashcards_detail',
@@ -1261,7 +1347,6 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       })),
     });
 
-    // Validate flashcard quality
     const validation = validateFlashcards(JSON.stringify(finalFlashcards), state.cardCount);
     logInfo({
       agent: 'FlashcardGraph',
@@ -1280,17 +1365,15 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       targetCardCount: state.cardCount,
     }, `Generated ${finalFlashcards.length} flashcards (target: ${state.cardCount})`);
 
-    // Log if count doesn't match target (LLM should handle exact count in reduce phase)
     if (finalFlashcards.length !== state.cardCount) {
       logWarn({
         agent: 'FlashcardGraph',
         phase: 'reduce_count_mismatch',
         generatedCount: finalFlashcards.length,
         targetCount: state.cardCount,
-      }, `LLM returned ${finalFlashcards.length} cards, target was ${state.cardCount}. Accepting LLM result.`);
+      }, `Returned ${finalFlashcards.length} cards, target was ${state.cardCount}. Accepting final result.`);
     }
 
-    // Log final cards
     logInfo({
       agent: 'FlashcardGraph',
       phase: 'reduce_final',
@@ -1313,9 +1396,8 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       'GENERATION COMPLETE'
     );
 
-    // Calculate memory to be freed (estimate based on flashcard count)
     const totalCards = state.collapsedOutputs.reduce((sum, group) => sum + group.length, 0);
-    const estimatedSize = totalCards * 200; // Rough estimate: ~200 bytes per flashcard
+    const estimatedSize = totalCards * 200;
     const chunksSize = (state.chunks || []).reduce((sum, s) => sum + s.length * 2, 0);
     console.log(`[FlashcardGraph] Reduce: freeing ~${((estimatedSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`);
 
@@ -1323,7 +1405,6 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       ...state,
       finalOutput: finalFlashcards,
       status: 'completed',
-      // Clear collapsedOutputs and chunks to free memory - no longer needed after reduce
       ...clearStateKeys<OverallStateType>(['collapsedOutputs', 'chunks']),
       progress: {
         phase: 'reduce',
