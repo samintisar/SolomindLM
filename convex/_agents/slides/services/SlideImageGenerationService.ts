@@ -19,7 +19,7 @@ import type { Slide } from '../prompts.js';
 export class SlideImageGenerationService {
   private client: OpenAI;
   private uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>;
-  private maxRetries = 2; // More retries for rate limit handling // Only 1 retry - ZhipuAI rate limits are very strict, retrying immediately doesn't help
+  private maxRetries = 2; // More retries for rate limit handling // More retries for rate limit handling // Only 1 retry - ZhipuAI rate limits are very strict, retrying immediately doesn't help
 
   constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>) {
     if (!apiKey || apiKey.trim().length === 0) {
