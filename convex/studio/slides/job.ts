@@ -98,7 +98,7 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
   REFINE_TIMEOUT_MS: 90000, // 90 seconds per slide refinement
-  IMAGE_TIMEOUT_MS: parseInt(env.SLIDES_IMAGE_TIMEOUT_MS || '120000', 10), // 2 minutes per image
+  IMAGE_TIMEOUT_MS: parseInt(env.SLIDES_IMAGE_TIMEOUT_MS || '180000', 10), // 3 minutes per image (gpt-image-1.5 can be slow)
   MIN_SLIDES_PER_CHUNK: parseInt(env.SLIDES_MIN_SLIDES_PER_CHUNK || '1', 10),
   MAX_SLIDES_PER_CHUNK: parseInt(env.SLIDES_MAX_SLIDES_PER_CHUNK || '6', 10),
   BUFFER_MULTIPLIER: 1.3,
@@ -146,24 +146,25 @@ function createRefineLLM(): ChatTogetherAI {
 // ============================================================
 
 /**
- * Generate a slide image using ZhipuAI glm-image model.
+ * Generate a slide image using OpenAI gpt-image-1.5 model.
  */
 async function generateSlideImage(
-  client: ZhipuAI,
+  client: OpenAI,
   prompt: string,
   slideNumber: number
 ): Promise<Buffer> {
   const startTime = Date.now();
 
-  console.log(`[SlideDeckJob] Generating slide ${slideNumber} with ZhipuAI glm-image...`);
+  console.log(`[SlideDeckJob] Generating slide ${slideNumber} with OpenAI gpt-image-1.5...`);
 
   const response = await invokeWithTimeout(
     async () => {
       try {
-        return await client.createImages({
-          model: 'glm-image',
+        return await client.images.generate({
+          model: 'gpt-image-1.5',
           prompt: prompt,
-          size: '1728x960', // Standard slide aspect ratio (16:9)
+          size: '1536x1024',
+          quality: 'medium',
           n: 1,
         });
       } catch (apiError: any) {
@@ -171,37 +172,49 @@ async function generateSlideImage(
           apiError?.error?.message ||
           apiError?.response?.data?.error?.message ||
           String(apiError);
-        throw new Error(`ZhipuAI API error: ${errorMessage}`);
+        throw new Error(`OpenAI API error: ${errorMessage}`);
       }
     },
     CONFIG.IMAGE_TIMEOUT_MS,
-    'ZhipuAIImageGen'
+    'OpenAIImageGen'
   );
 
-  // Extract image URL from SDK response
-  let imageUrl: string | undefined;
+  // Extract image data from SDK response (gpt-image-1.5 returns base64)
   const firstItem = response.data?.[0];
+  let imageData: Buffer;
 
-  if (typeof firstItem === 'string') {
-    imageUrl = firstItem;
+  if (typeof firstItem === 'object' && firstItem !== null && 'b64_json' in firstItem) {
+    // Handle base64 response (gpt-image-1.5 default)
+    const base64Data = (firstItem as { b64_json: string }).b64_json;
+    if (typeof base64Data === 'string') {
+      imageData = Buffer.from(base64Data, 'base64');
+    } else {
+      throw new Error('Unexpected response format from OpenAI SDK: invalid b64_json');
+    }
   } else if (typeof firstItem === 'object' && firstItem !== null && 'url' in firstItem) {
-    imageUrl = (firstItem as { url: string }).url;
-  } else if (typeof firstItem === 'object' && firstItem !== null && 'b64_json' in firstItem) {
-    throw new Error('ZhipuAI returned base64 image instead of URL - not yet supported');
+    // Handle URL response (fallback for other models)
+    const imageUrl = (firstItem as { url: string }).url;
+    if (typeof imageUrl === 'string') {
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
+      }
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      imageData = Buffer.from(arrayBuffer);
+    } else {
+      throw new Error('Unexpected response format from OpenAI SDK: invalid url');
+    }
+  } else if (typeof firstItem === 'string') {
+    // Handle string URL response (legacy format)
+    const imageResponse = await fetch(firstItem);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image from URL: ${firstItem}`);
+    }
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    imageData = Buffer.from(arrayBuffer);
+  } else {
+    throw new Error('Unexpected response format from OpenAI SDK: no url or b64_json returned');
   }
-
-  if (!imageUrl || typeof imageUrl !== 'string') {
-    throw new Error('Unexpected response format from ZhipuAI SDK: no image URL returned');
-  }
-
-  // Fetch the image from the URL
-  const imageResponse = await fetch(imageUrl);
-  if (!imageResponse.ok) {
-    throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
-  }
-
-  const arrayBuffer = await imageResponse.arrayBuffer();
-  const imageData = Buffer.from(arrayBuffer);
 
   const elapsed = Date.now() - startTime;
   console.log(`[SlideDeckJob] Slide ${slideNumber} generated in ${elapsed}ms (${(imageData.length / 1024).toFixed(2)} KB)`);

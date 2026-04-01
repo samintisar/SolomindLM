@@ -1,13 +1,13 @@
 "use node"
 /**
  * Prompt templates and schemas for SlideDeckGraph.
- * 
+ *
  * OPTIMIZED FOR SOLOMINDLM (Vintage Academia Theme)
- * 
- * This system leverages ZhipuAI's glm-image model's excellent text rendering
+ *
+ * This system leverages OpenAI's gpt-image-1.5 model's excellent text rendering
  * capabilities to generate complete, professional presentation slides with
  * all text (titles, bullet points, labels) baked directly into the images.
- * 
+ *
  * Handles:
  * - Slide concept generation with professional narrative flow (map phase)
  * - Intelligent slide selection for coherent storytelling (selection phase)
@@ -27,7 +27,7 @@ import { env } from '../../_lib/env';
 export const SlideSchema = z.object({
   slideNumber: z.number().int().min(1).describe('The slide number in the deck (1-indexed)'),
   title: z.string().describe('The title of the slide'),
-  prompt: z.string().describe('Comprehensive prompt for glm-image model that includes: (1) EXACT text to render (title, bullet points, labels), (2) typography specifications (fonts, sizes, weights), (3) layout composition (text placement, visual elements, spacing), (4) visual style (Vintage Academia theme, colors, graphics), (5) quality requirements. The prompt must be detailed enough for glm-image to generate a complete, professional presentation slide with all text baked in.'),
+  prompt: z.string().describe('Comprehensive prompt for gpt-image-1.5 model that includes: (1) EXACT text to render in quotation marks (title, bullet points, labels), (2) typography specifications (fonts, sizes, weights, crisp/sharp keywords), (3) layout composition (text placement, visual elements, spacing), (4) visual style (Vintage Academia theme, colors, graphics), (5) quality requirements. The prompt must be detailed enough for gpt-image-1.5 to generate a complete, professional presentation slide with all text baked in.'),
   imageUrl: z.string().nullable().optional().describe('URL to the generated slide image (filled in after image generation)'),
   talkingPoints: z.array(z.string()).describe('Array of talking points for the presenter (3-5 bullet points) - these are also rendered as bullet points in the slide image for detailed_deck type'),
   sourceReferences: z.array(z.string()).nullable().optional().describe('References to source material for attribution'),
@@ -104,7 +104,7 @@ const SLIDES_CONFIG = {
   MAX_TOKENS: safeParseInt(env.SLIDES_MAX_TOKENS, 8000),
   MAP_TIMEOUT_MS: safeParseInt(env.SLIDES_MAP_TIMEOUT_MS, 180000),
   REDUCE_TIMEOUT_MS: safeParseInt(env.SLIDES_REDUCE_TIMEOUT_MS, 240000),
-  IMAGE_TIMEOUT_MS: safeParseInt(env.SLIDES_IMAGE_TIMEOUT_MS, 120000), // 2 minutes per image (glm-image can take 70-90s)
+  IMAGE_TIMEOUT_MS: safeParseInt(env.SLIDES_IMAGE_TIMEOUT_MS, 180000), // 3 minutes per image (gpt-image-1.5 can be slow)
   MAX_COLLAPSE_DEPTH: 5,
 } as const;
 
@@ -137,7 +137,7 @@ const THEME_SOLOMIND = {
 export const MAP_CONCEPTS_SYSTEM_PROMPT = 'You are an expert instructional designer and presentation architect. You create professional slide deck concepts that follow Mayer\'s Principles of Multimedia Learning, with clear narrative flow, specific content, and strong visual storytelling potential. Every slide you design has a clear purpose in the overall narrative arc.';
 
 /** System prompt for reduce phase slide refinement with image generation prompts */
-export const REFINE_SLIDES_SYSTEM_PROMPT = 'You are a professional presentation designer specializing in Vintage Academia aesthetic. You create complete, professional presentation slides where ALL text (titles, bullet points, labels) is rendered directly in the image by the glm-image model. You craft detailed prompts that specify exact text content, typography, layout, and visual elements to produce publication-ready slides.';
+export const REFINE_SLIDES_SYSTEM_PROMPT = 'You are a professional presentation designer specializing in Vintage Academia aesthetic. You create complete, professional presentation slides where ALL text (titles, bullet points, labels) is rendered directly in the image by OpenAI\'s gpt-image-1.5 model. You craft detailed prompts that specify exact text content in quotation marks, crisp typography with sharp/legible keywords, precise layout, and visual elements to produce publication-ready slides with excellent text rendering.';
 
 /** System prompt for title generation */
 export const TITLE_GENERATION_SYSTEM_PROMPT = 'You are an expert at creating compelling, descriptive titles for presentations.';
@@ -219,24 +219,26 @@ export const getRefineSlidePrompt = (candidate: SlideCandidate, slideNumber: num
   const layoutGuidance = slideType === 'detailed_deck'
     ? `LAYOUT STRUCTURE FOR DETAILED DECK:
     - Professional presentation slide with clear hierarchy
-    - Title at the top in large, bold serif font
-    - 3-5 bullet points in clean, readable sans-serif font
+    - Title at the top in large, bold serif font (crisp, sharp text)
+    - 3-5 bullet points in clean, readable sans-serif font (legible, high contrast)
     - Visual element (diagram, illustration, or icon) integrated with the text
     - Balanced composition with proper whitespace
-    - Text should be large enough to read clearly (minimum 24pt for body, 48pt for title)`
+    - Text should be large enough to read clearly (minimum 24pt for body, 48pt for title)
+    - Use quotation marks around all text to render`
     : `LAYOUT STRUCTURE FOR PRESENTER SLIDES:
     - Minimalist presentation slide with strong visual impact
-    - Large, bold title that dominates the top or center
-    - 1-2 key phrases or statistics (if any)
+    - Large, bold title that dominates the top or center (crisp, sharp typography)
+    - 1-2 key phrases or statistics (if any) with clear, readable text
     - Dominant visual element that conveys the concept
     - Minimal text, maximum visual storytelling
-    - Title should be very large (60-80pt)`;
+    - Title should be very large (60-80pt)
+    - Use quotation marks around all text to render`;
 
   // Format talking points as bullet text for the image
   const bulletPoints = candidate.talkingPoints.slice(0, slideType === 'detailed_deck' ? 5 : 2);
   const bulletText = bulletPoints.map((point, idx) => `${idx + 1}. ${point}`).join('\n');
 
-  return `You are creating a prompt for ZhipuAI's glm-image model, which EXCELS at rendering text within images.
+  return `You are creating a prompt for OpenAI's gpt-image-1.5 model, which EXCELS at rendering crisp, sharp text within images.
 ${customPrompt ? `**Custom Focus:** Ensure the slide content reflects this focus area: ${customPrompt}` : ''}
 
 **PROJECT THEME:**
@@ -280,10 +282,12 @@ Your prompt must include:
    - Vintage academia meets modern design
    - Warm, inviting color temperature
    - Professional presentation aesthetic
-   - All text must be perfectly legible and spelled correctly
+   - All text must be perfectly legible, crisp, sharp, and spelled correctly
+   - Use clear, readable typography with high contrast
+   - Bold fonts for emphasis where appropriate
 
-**CRITICAL INSTRUCTION FOR glm-image:**
-The glm-image model is excellent at text rendering. Your prompt should explicitly specify the exact text to be rendered, the font styles, sizes, and positions. The model will generate a complete slide with all text baked into the image professionally.
+**CRITICAL INSTRUCTION FOR gpt-image-1.5:**
+The gpt-image-1.5 model excels at crisp, sharp text rendering. Your prompt should explicitly specify the exact text to be rendered in quotation marks, the font styles (serif/sans-serif), sizes in points, colors, and precise positions. Use typography keywords like "crisp", "sharp", "legible", "clear", "bold", "readable" to reinforce text quality. The model will generate a complete slide with all text baked into the image professionally.
 
 **REFERENCE EXAMPLES:**
 See the EXAMPLE_IMAGE_PROMPTS in this file for detailed examples of well-formed prompts.
@@ -407,7 +411,7 @@ Return the final curated list of slides with your reasoning for the narrative ar
 // ============================================================
 
 /**
- * Example of a well-formed image generation prompt for glm-image.
+ * Example of a well-formed image generation prompt for gpt-image-1.5.
  * These examples demonstrate the level of detail and specificity required.
  */
 export const EXAMPLE_IMAGE_PROMPTS = {

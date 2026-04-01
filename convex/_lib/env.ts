@@ -29,9 +29,6 @@ export const env = {
   LANGCHAIN_PROJECT: process.env.LANGCHAIN_PROJECT || '',
   LANGCHAIN_TRACING_V2: process.env.LANGCHAIN_TRACING_V2 || 'false',
 
-  // Zhipu AI
-  ZHIPU_API_KEY: process.env.ZHIPU_API_KEY || '',
-
   // Supadata
   SUPADATA_API_KEY: process.env.SUPADATA_API_KEY || '',
 

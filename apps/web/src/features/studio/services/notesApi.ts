@@ -109,7 +109,7 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         title: dbNote.title,
         preview: getSlidesPreview(dbNote),
         type: 'slides',
-        slides: dbNote.data?.slides || [],
+        slides: Array.isArray(dbNote.data) ? dbNote.data : (dbNote.data?.slides || []),
         status: dbNote.status,
         metadata: {
           slideType: dbNote.metadata?.slideType || 'detailed_deck',
