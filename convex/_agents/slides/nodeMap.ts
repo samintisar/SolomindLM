@@ -69,6 +69,7 @@ export async function mapProcess(
 
   let output: string;
   let slidesGenerated = 0;
+  let extractedTheme: string | undefined = undefined;
 
   try {
     const response: SlideCandidateResponse = await invokeWithRetry(
@@ -112,6 +113,22 @@ export async function mapProcess(
 
     slidesGenerated = response.slides.length;
     output = JSON.stringify(response.slides);
+
+    // Extract theme specification from first slide concept (if present)
+    if (chunkIndex === 0 && response.slides.length > 0) {
+      const firstSlide = response.slides[0] as any;
+      if (firstSlide.themeSpecification) {
+        extractedTheme = firstSlide.themeSpecification;
+        logInfo(
+          {
+            agent: 'SlideDeckGraph',
+            phase: 'map_process',
+            themeExtracted: true,
+          },
+          `Extracted AI-selected theme: ${extractedTheme?.substring(0, 100)}...`
+        );
+      }
+    }
   } catch (error) {
     const errorContext = {
       agent: 'SlideDeckGraph',
@@ -148,6 +165,7 @@ export async function mapProcess(
 
   return {
     mapOutputs: [output],
+    ...(extractedTheme && { themeSpecification: extractedTheme }),
     progress: {
       phase: 'map_process',
       percentage: Math.min(10 + ((chunkIndex ?? 0) * 30), 60),

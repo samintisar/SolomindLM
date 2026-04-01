@@ -42,7 +42,8 @@ export const SlideCandidateSchema = z.object({
   content: z.string().describe('The main content/topic of the slide'),
   talkingPoints: z.array(z.string()).describe('Key talking points (3-5 bullet points)'),
   sourceSnippet: z.string().describe('Relevant text from source for grounding and reference'),
-});
+  themeSpecification: z.string().optional().describe('AI-selected theme specification (only in first slide concept)'),
+});;
 
 /**
  * Array schema for map phase output.
@@ -134,10 +135,20 @@ const THEME_SOLOMIND = {
 // ============================================================
 
 /** System prompt for map phase slide concept generation */
-export const MAP_CONCEPTS_SYSTEM_PROMPT = 'You are an expert instructional designer and presentation architect. You create professional slide deck concepts that follow Mayer\'s Principles of Multimedia Learning, with clear narrative flow, specific content, and strong visual storytelling potential. Every slide you design has a clear purpose in the overall narrative arc.';
+export const MAP_CONCEPTS_SYSTEM_PROMPT = `You are an expert instructional designer and presentation architect. You create professional slide deck concepts that follow Mayer's Principles of Multimedia Learning, with clear narrative flow, specific content, and strong visual storytelling potential. Every slide you design has a clear purpose in the overall narrative arc.
+
+CRITICAL: You must also analyze the content and determine the most appropriate visual theme for the presentation. The theme should:
+- Enhance and support the content's message and tone
+- Be appropriate for the subject matter (academic, business, creative, technical, etc.)
+- Appeal to the target audience
+- Be consistent throughout the entire slide deck
+
+Your first output must include a theme selection with detailed visual specifications.`;;
 
 /** System prompt for reduce phase slide refinement with image generation prompts */
-export const REFINE_SLIDES_SYSTEM_PROMPT = 'You are a professional presentation designer specializing in Vintage Academia aesthetic. You create complete, professional presentation slides where ALL text (titles, bullet points, labels) is rendered directly in the image by OpenAI\'s gpt-image-1.5 model. You craft detailed prompts that specify exact text content in quotation marks, crisp typography with sharp/legible keywords, precise layout, and visual elements to produce publication-ready slides with excellent text rendering.';
+export const REFINE_SLIDES_SYSTEM_PROMPT = `You are a master presentation designer who creates complete, professional slides where ALL text (titles, bullet points, labels) is rendered directly in the image by OpenAI's gpt-image-1.5 model. You craft detailed prompts that specify exact text content in quotation marks, crisp typography with sharp/legible keywords, precise layout, and visual elements to produce publication-ready slides with excellent text rendering.
+
+You excel at adapting visual styles to match content - from vintage academia to modern minimalist, corporate professional to creative bold, technical diagrams to artistic illustrations. You always select and apply the most appropriate theme for the subject matter and audience, maintaining perfect consistency across all slides.`;;
 
 /** System prompt for title generation */
 export const TITLE_GENERATION_SYSTEM_PROMPT = 'You are an expert at creating compelling, descriptive titles for presentations.';
@@ -174,6 +185,27 @@ export const getCandidateMapPrompt = (params: {
 **Slide Strategy:** ${slideTypeDescription}
 **Deck Scope:** ${deckLengthDescription}
 ${customPrompt ? `**Custom Focus:** ${customPrompt}` : ''}
+
+**CRITICAL - THEME SELECTION:**
+Before creating slide concepts, you MUST analyze the content and select the most appropriate visual theme for this presentation. Consider:
+- Subject matter (academic, business, creative, technical, medical, etc.)
+- Target audience (students, professionals, general public, executives)
+- Tone (formal, casual, inspirational, educational, persuasive)
+- Content type (data-heavy, conceptual, instructional, narrative)
+
+Provide a brief theme specification (2-3 sentences) describing:
+1. Theme name and aesthetic direction
+2. Color palette and typography approach
+3. Visual style (illustrations, photos, diagrams, abstract)
+4. Why this theme fits the content
+
+Example themes to consider (but create your own as appropriate):
+- "Modern Tech" - Clean whites, blues, sans-serif fonts, data visualizations
+- "Vintage Academia" - Warm parchment, serif fonts, hand-drawn illustrations
+- "Corporate Professional" - Navy/grayscale, clean layouts, business graphics
+- "Creative Bold" - Vibrant colors, dynamic layouts, artistic elements
+- "Scientific Research" - Cool blues, technical diagrams, precision typography
+- "Elegant Minimalist" - Subtle colors, generous whitespace, refined typography
 
 TASK: Extract approximately ${slidesPerChunk} slide concepts that will form a cohesive, professional presentation.
 
@@ -214,13 +246,13 @@ ${chunk}`;
 // REFINE PROMPT (IMAGE GENERATION)
 // ============================================================
 
-export const getRefineSlidePrompt = (candidate: SlideCandidate, slideNumber: number, slideType: 'detailed_deck' | 'presenter_slides', customPrompt?: string): string => {
+export const getRefineSlidePrompt = (candidate: SlideCandidate, slideNumber: number, slideType: 'detailed_deck' | 'presenter_slides', themeInstructions?: string, customPrompt?: string): string => {
   
   const layoutGuidance = slideType === 'detailed_deck'
     ? `LAYOUT STRUCTURE FOR DETAILED DECK:
     - Professional presentation slide with clear hierarchy
-    - Title at the top in large, bold serif font (crisp, sharp text)
-    - 3-5 bullet points in clean, readable sans-serif font (legible, high contrast)
+    - Title at the top in large, bold font appropriate to the theme (crisp, sharp text)
+    - 3-5 bullet points in clean, readable font (legible, high contrast)
     - Visual element (diagram, illustration, or icon) integrated with the text
     - Balanced composition with proper whitespace
     - Text should be large enough to read clearly (minimum 24pt for body, 48pt for title)
@@ -241,8 +273,8 @@ export const getRefineSlidePrompt = (candidate: SlideCandidate, slideNumber: num
   return `You are creating a prompt for OpenAI's gpt-image-1.5 model, which EXCELS at rendering crisp, sharp text within images.
 ${customPrompt ? `**Custom Focus:** Ensure the slide content reflects this focus area: ${customPrompt}` : ''}
 
-**PROJECT THEME:**
-${THEME_SOLOMIND.visual_instructions}
+**THEME INSTRUCTIONS:**
+${themeInstructions || 'Apply a professional, modern aesthetic appropriate for the content. Use clean typography, balanced layouts, and a cohesive color palette that enhances the message.'}
 
 **SLIDE CONTEXT:**
 Slide Number: ${slideNumber}
@@ -266,10 +298,10 @@ Your prompt must include:
        : ''}
 
 2. **VISUAL DESIGN:**
-   - Background: Vintage academia aesthetic (textured parchment, warm beige tones, subtle paper texture)
-   - Visual element: ${candidate.content} (represented as hand-drawn illustration, diagram, or artistic graphic in ink wash style)
-   - Color palette: Coffee browns (#4B3621), cream (#F5F5DC), forest green accents
-   - Typography: Serif for title (elegant, classical), sans-serif for body (clean, modern)
+   - Background: As specified in theme instructions
+   - Visual element: ${candidate.content} (represented as illustration, diagram, or graphic appropriate to the theme)
+   - Color palette: As specified in theme instructions
+   - Typography: Fonts appropriate to the theme (clear, readable, with crisp text rendering)
 
 3. **LAYOUT COMPOSITION:**
    - Professional presentation format (16:9 aspect ratio, 1728x960px)
@@ -279,9 +311,7 @@ Your prompt must include:
 
 4. **STYLE REQUIREMENTS:**
    - High definition, 8k quality
-   - Vintage academia meets modern design
-   - Warm, inviting color temperature
-   - Professional presentation aesthetic
+   - Professional presentation aesthetic aligned with theme
    - All text must be perfectly legible, crisp, sharp, and spelled correctly
    - Use clear, readable typography with high contrast
    - Bold fonts for emphasis where appropriate
@@ -289,24 +319,13 @@ Your prompt must include:
 **CRITICAL INSTRUCTION FOR gpt-image-1.5:**
 The gpt-image-1.5 model excels at crisp, sharp text rendering. Your prompt should explicitly specify the exact text to be rendered in quotation marks, the font styles (serif/sans-serif), sizes in points, colors, and precise positions. Use typography keywords like "crisp", "sharp", "legible", "clear", "bold", "readable" to reinforce text quality. The model will generate a complete slide with all text baked into the image professionally.
 
-**REFERENCE EXAMPLES:**
-See the EXAMPLE_IMAGE_PROMPTS in this file for detailed examples of well-formed prompts.
-Your prompt should follow a similar structure with these sections:
-- TITLE: Exact text with font specs (size, style, color)
-- BULLET POINTS (for detailed_deck): Numbered list with exact text and font specs
-- KEY PHRASE (for presenter_slides): Short impactful text with font specs
-- VISUAL ELEMENT: Detailed description of illustration/diagram
-- BACKGROUND: Vintage academia theme specifications
-- LAYOUT: Precise positioning and composition percentages
-- STYLE: Quality and aesthetic keywords
-
 **KEY ELEMENTS YOUR PROMPT MUST INCLUDE:**
 ✓ Exact text to render (title + bullet points) with quotation marks
 ✓ Font specifications (serif/sans-serif, sizes in pt)
-✓ Color codes for text and background
+✓ Color codes for text and background (appropriate to theme)
 ✓ Precise layout percentages or positioning
 ✓ Visual element description (what to illustrate and how)
-✓ Style keywords (vintage, professional, 8k, etc.)
+✓ Style keywords (professional, 8k, etc.)
 ✓ Aspect ratio confirmation (16:9, 1728x960px)
 
 Output the complete slide object with the detailed image generation prompt.`;

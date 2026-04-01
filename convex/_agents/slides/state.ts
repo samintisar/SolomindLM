@@ -37,6 +37,10 @@ export const OverallState = Annotation.Root({
     reducer: (_x: string | undefined, y?: string | undefined) => y ?? _x,
     default: () => undefined,
   }),
+  themeSpecification: Annotation<string | undefined>({
+    reducer: (_x: string | undefined, y?: string | undefined) => y ?? _x,
+    default: () => undefined,
+  }),
   title: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
     default: () => 'Untitled Presentation',
@@ -71,7 +75,7 @@ export const OverallState = Annotation.Root({
     reducer: (_x, y?: any) => y ?? _x,
     default: () => undefined,
   }),
-});
+});;
 
 export type OverallStateType = typeof OverallState.State;
 

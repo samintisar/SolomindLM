@@ -59,7 +59,13 @@ async function refineSelectedSlides(
     selectedCandidates.slice(0, targetSlideCount).map((candidate, index) => {
       return async () => {
         try {
-          const refinePrompt = getRefineSlidePrompt(candidate, index + 1, state.slideType, state.customPrompt);
+          const refinePrompt = getRefineSlidePrompt(
+            candidate,
+            index + 1,
+            state.slideType,
+            state.themeSpecification,
+            state.customPrompt
+          );
 
           const refinedSlideRaw = await invokeWithRetry(
             () =>
