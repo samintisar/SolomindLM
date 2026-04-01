@@ -10,7 +10,7 @@
  * 1. slideDeckGeneration (entry) - Load docs, pack chunks, schedule map tasks
  * 2. processSlideDeckMapChunk - Extract slide concepts from one chunk (parallel)
  * 3. finalizeSlideDeckPhase - Select best slides, refine with image prompts,
- *    generate images via ZhipuAI, save output
+ *    generate images via OpenAI, save output
  */
 
 import { internalAction } from '../../_generated/server';
@@ -25,7 +25,7 @@ import {
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
-import { ZhipuAI } from 'zhipuai-sdk-nodejs-v4';
+import OpenAI from 'openai';
 import {
   getCandidateMapPrompt,
   getSlideSelectionPrompt,
@@ -884,8 +884,8 @@ export const finalizeSlideDeckPhase = internalAction({
         },
       });
 
-      // Stage 4: Generate images via ZhipuAI (sequential with delay for rate limiting)
-      const zhipuClient = new ZhipuAI({ apiKey: env.ZHIPU_API_KEY });
+      // Stage 4: Generate images via OpenAI (sequential with delay for rate limiting)
+      const openaiClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
       const finalSlides: Slide[] = [];
 
       for (let i = 0; i < slidesWithPrompts.length; i++) {
@@ -899,7 +899,7 @@ export const finalizeSlideDeckPhase = internalAction({
 
         try {
           // Generate image
-          const imageBuffer = await generateSlideImage(zhipuClient, slide.prompt, slide.slideNumber);
+          const imageBuffer = await generateSlideImage(openaiClient, slide.prompt, slide.slideNumber);
 
           // Upload to storage
           const fileName = `slide-${slideDeckId}-${slide.slideNumber}.png`;
