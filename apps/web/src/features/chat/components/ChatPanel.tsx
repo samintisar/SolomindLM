@@ -334,7 +334,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         {/* Messages Area */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-hidden relative">
+        <div
+          ref={messagesContainerRef}
+          className={`flex-1 min-h-0 relative chat-panel-graph-grid ${
+            messages.length === 0 ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'
+          }`}
+        >
           {messages.length === 0 ? (
             <ChatEmptyState
               onSendMessage={handleSendChip}
