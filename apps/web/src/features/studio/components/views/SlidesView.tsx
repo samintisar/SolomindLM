@@ -137,9 +137,9 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             : 'max-w-5xl aspect-video rounded-lg'
         }`}>
           {/* Slide Image */}
-          {currentSlide?.slide_url && !imageError ? (
+          {(currentSlide?.slide_url || currentSlide?.imageUrl) && !imageError ? (
             <img
-              src={currentSlide.slide_url}
+              src={currentSlide.slide_url || currentSlide.imageUrl}
               alt={`Slide ${currentSlide.slide_number}: ${currentSlide.title}`}
               className="w-full h-full object-contain"
               onError={() => setImageError(true)}

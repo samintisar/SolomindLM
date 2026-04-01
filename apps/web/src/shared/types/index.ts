@@ -96,7 +96,8 @@ export interface MindMapNodeData {
 // Slide deck slide
 export interface Slide {
   slide_number: number;
-  slide_url: string;
+  slide_url?: string; // Legacy field name
+  imageUrl?: string; // New field name from gpt-image-1.5 generation
   title: string;
   talking_points: string[];
   prompt?: string;

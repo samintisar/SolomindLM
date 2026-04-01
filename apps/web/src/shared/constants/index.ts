@@ -82,7 +82,7 @@ export const STUDIO_TOOLS: StudioTool[] = [
   { id: 'reports', label: 'Reports', iconName: 'FileText', color: 'text-amber-600' },
   { id: 'flashcards', label: 'Flashcards', iconName: 'Layers', color: 'text-red-700' },
   { id: 'quiz', label: 'Quiz', iconName: 'HelpCircle', color: 'text-blue-700' },
-  // { id: 'slides', label: 'Slide Deck', iconName: 'Presentation', color: 'text-violet-600' }, // Coming soon - feature not fully tested yet
+  { id: 'slides', label: 'Slide Deck', iconName: 'Presentation', color: 'text-violet-600' },
   { id: 'writtenQuestions', label: 'Written Questions', iconName: 'MessageSquareText', color: 'text-green-700' },
   { id: 'spreadsheets', label: 'Spreadsheets', iconName: 'Table2', color: 'text-cyan-600' },
 ];

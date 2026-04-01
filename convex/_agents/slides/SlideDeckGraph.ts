@@ -43,7 +43,7 @@ export class SlideDeckGraph {
     apiKey: string,
     fastModel: string,
     smartModel: string,
-    zhipuAiApiKey: string,
+    openaiApiKey: string,
     uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>
   ) {
     this.fastLlm = new ChatTogetherAI({
@@ -69,7 +69,7 @@ export class SlideDeckGraph {
 
     this.slideStructured = createStructuredLLM<Slide>(this.smartLlm, SlideSchema, 'slide');
 
-    this.imageService = new SlideImageGenerationService(zhipuAiApiKey, uploadStorage);
+    this.imageService = new SlideImageGenerationService(openaiApiKey, uploadStorage);
   }
 
   private estimateTokens(text: string): number {

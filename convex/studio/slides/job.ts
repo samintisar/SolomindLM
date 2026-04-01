@@ -98,7 +98,7 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
   REFINE_TIMEOUT_MS: 90000, // 90 seconds per slide refinement
-  IMAGE_TIMEOUT_MS: parseInt(env.SLIDES_IMAGE_TIMEOUT_MS || '120000', 10), // 2 minutes per image
+  IMAGE_TIMEOUT_MS: parseInt(env.SLIDES_IMAGE_TIMEOUT_MS || '180000', 10), // 3 minutes per image (gpt-image-1.5 can be slow)
   MIN_SLIDES_PER_CHUNK: parseInt(env.SLIDES_MIN_SLIDES_PER_CHUNK || '1', 10),
   MAX_SLIDES_PER_CHUNK: parseInt(env.SLIDES_MAX_SLIDES_PER_CHUNK || '6', 10),
   BUFFER_MULTIPLIER: 1.3,
@@ -146,7 +146,7 @@ function createRefineLLM(): ChatTogetherAI {
 // ============================================================
 
 /**
- * Generate a slide image using OpenAI gpt-image-1.5.
+ * Generate a slide image using OpenAI gpt-image-1.5 model.
  */
 async function generateSlideImage(
   client: OpenAI,
@@ -157,99 +157,69 @@ async function generateSlideImage(
 
   console.log(`[SlideDeckJob] Generating slide ${slideNumber} with OpenAI gpt-image-1.5...`);
 
-  const maxRetries = 2;
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await invokeWithTimeout(
-        async () => {
-          try {
-            return await client.images.generate({
-              model: 'gpt-image-1.5',
-              prompt: prompt,
-              size: '1536x1024',
-              quality: 'medium',
-              n: 1,
-            });
-          } catch (apiError: any) {
-            // Handle OpenAI-specific error structure
-            const errorMessage =
-              apiError?.message ||
-              apiError?.error?.message ||
-              apiError?.response?.data?.error?.message ||
-              String(apiError);
-
-            // Check for specific error codes
-            const statusCode = apiError?.status || apiError?.response?.status;
-
-            if (statusCode === 401) {
-              throw new Error(`OpenAI authentication failed: ${errorMessage}`);
-            } else if (statusCode === 400) {
-              throw new Error(`OpenAI invalid request: ${errorMessage}`);
-            } else if (statusCode === 429) {
-              // Rate limit error - preserve for retry logic
-              throw apiError;
-            } else {
-              throw new Error(`OpenAI API error: ${errorMessage}`);
-            }
-          }
-        },
-        CONFIG.IMAGE_TIMEOUT_MS,
-        'OpenAIImageGen'
-      );
-
-      // OpenAI returns { data: [{ url: string }] }
-      const imageUrl = response.data?.[0]?.url;
-
-      if (!imageUrl || typeof imageUrl !== 'string') {
-        throw new Error('Unexpected response format from OpenAI SDK: no image URL returned');
+  const response = await invokeWithTimeout(
+    async () => {
+      try {
+        return await client.images.generate({
+          model: 'gpt-image-1.5',
+          prompt: prompt,
+          size: '1536x1024',
+          quality: 'medium',
+          n: 1,
+        });
+      } catch (apiError: any) {
+        const errorMessage = apiError?.message ||
+          apiError?.error?.message ||
+          apiError?.response?.data?.error?.message ||
+          String(apiError);
+        throw new Error(`OpenAI API error: ${errorMessage}`);
       }
+    },
+    CONFIG.IMAGE_TIMEOUT_MS,
+    'OpenAIImageGen'
+  );
 
-      // Fetch the image from the URL
+  // Extract image data from SDK response (gpt-image-1.5 returns base64)
+  const firstItem = response.data?.[0];
+  let imageData: Buffer;
+
+  if (typeof firstItem === 'object' && firstItem !== null && 'b64_json' in firstItem) {
+    // Handle base64 response (gpt-image-1.5 default)
+    const base64Data = (firstItem as { b64_json: string }).b64_json;
+    if (typeof base64Data === 'string') {
+      imageData = Buffer.from(base64Data, 'base64');
+    } else {
+      throw new Error('Unexpected response format from OpenAI SDK: invalid b64_json');
+    }
+  } else if (typeof firstItem === 'object' && firstItem !== null && 'url' in firstItem) {
+    // Handle URL response (fallback for other models)
+    const imageUrl = (firstItem as { url: string }).url;
+    if (typeof imageUrl === 'string') {
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
         throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
       }
-
       const arrayBuffer = await imageResponse.arrayBuffer();
-      const imageData = Buffer.from(arrayBuffer);
-
-      const elapsed = Date.now() - startTime;
-      console.log(`[SlideDeckJob] Slide ${slideNumber} generated in ${elapsed}ms (${(imageData.length / 1024).toFixed(2)} KB)`);
-
-      return imageData;
-    } catch (error: any) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      // Check for rate limit error (429)
-      const isRateLimit = error?.status === 429 || error?.code === 'rate_limit_exceeded';
-
-      console.log(`[SlideDeckJob] Attempt ${attempt}/${maxRetries} failed for slide ${slideNumber}: ${lastError.message}${isRateLimit ? ' (rate limit)' : ''}`);
-
-      // Fail fast on auth or invalid request errors
-      if (error?.status === 401 || error?.status === 400) {
-        break;
-      }
-
-      if (attempt < maxRetries) {
-        // Use exponential backoff for rate limits, shorter for server errors
-        const baseDelay = isRateLimit ? 2000 : 1000;
-        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 16000);
-
-        if (isRateLimit) {
-          console.log(`[SlideDeckJob] Rate limit hit. Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}...`);
-        } else {
-          console.log(`[SlideDeckJob] Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}...`);
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+      imageData = Buffer.from(arrayBuffer);
+    } else {
+      throw new Error('Unexpected response format from OpenAI SDK: invalid url');
     }
+  } else if (typeof firstItem === 'string') {
+    // Handle string URL response (legacy format)
+    const imageResponse = await fetch(firstItem);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image from URL: ${firstItem}`);
+    }
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    imageData = Buffer.from(arrayBuffer);
+  } else {
+    throw new Error('Unexpected response format from OpenAI SDK: no url or b64_json returned');
   }
 
-  console.error(`[SlideDeckJob] Failed to generate slide ${slideNumber} after ${maxRetries} attempts`);
-  throw lastError || new Error('Failed to generate slide image');
+  const elapsed = Date.now() - startTime;
+  console.log(`[SlideDeckJob] Slide ${slideNumber} generated in ${elapsed}ms (${(imageData.length / 1024).toFixed(2)} KB)`);
+
+  return imageData;
 }
 
 // ============================================================
@@ -928,7 +898,7 @@ export const finalizeSlideDeckPhase = internalAction({
       });
 
       // Stage 4: Generate images via OpenAI (sequential with delay for rate limiting)
-      const openaiImageClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+      const openaiClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
       const finalSlides: Slide[] = [];
 
       for (let i = 0; i < slidesWithPrompts.length; i++) {
@@ -942,7 +912,7 @@ export const finalizeSlideDeckPhase = internalAction({
 
         try {
           // Generate image
-          const imageBuffer = await generateSlideImage(openaiImageClient, slide.prompt, slide.slideNumber);
+          const imageBuffer = await generateSlideImage(openaiClient, slide.prompt, slide.slideNumber);
 
           // Upload to storage
           const fileName = `slide-${slideDeckId}-${slide.slideNumber}.png`;
