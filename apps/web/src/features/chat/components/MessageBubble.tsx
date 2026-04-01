@@ -220,7 +220,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
             <div className="shrink-0 pt-4">
               <ActionBar />
             </div>
-            <div className="p-4 rounded-xl font-serif text-lg leading-relaxed bg-primary/10 text-foreground shadow-sm">
+            <div className="p-4 rounded-xl font-serif text-lg leading-relaxed text-foreground shadow-sm bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))]">
               {renderMessageWithReferences(message.id, message.content, message.references, refHandlers)}
             </div>
           </div>

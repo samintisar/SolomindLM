@@ -10,7 +10,7 @@
  * 1. slideDeckGeneration (entry) - Load docs, pack chunks, schedule map tasks
  * 2. processSlideDeckMapChunk - Extract slide concepts from one chunk (parallel)
  * 3. finalizeSlideDeckPhase - Select best slides, refine with image prompts,
- *    generate images via ZhipuAI, save output
+ *    generate images via OpenAI, save output
  */
 
 import { internalAction } from '../../_generated/server';
@@ -25,7 +25,7 @@ import {
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
-import { ZhipuAI } from 'zhipuai-sdk-nodejs-v4';
+import OpenAI from 'openai';
 import {
   getCandidateMapPrompt,
   getSlideSelectionPrompt,
@@ -146,67 +146,110 @@ function createRefineLLM(): ChatTogetherAI {
 // ============================================================
 
 /**
- * Generate a slide image using ZhipuAI glm-image model.
+ * Generate a slide image using OpenAI gpt-image-1.5.
  */
 async function generateSlideImage(
-  client: ZhipuAI,
+  client: OpenAI,
   prompt: string,
   slideNumber: number
 ): Promise<Buffer> {
   const startTime = Date.now();
 
-  console.log(`[SlideDeckJob] Generating slide ${slideNumber} with ZhipuAI glm-image...`);
+  console.log(`[SlideDeckJob] Generating slide ${slideNumber} with OpenAI gpt-image-1.5...`);
 
-  const response = await invokeWithTimeout(
-    async () => {
-      try {
-        return await client.createImages({
-          model: 'glm-image',
-          prompt: prompt,
-          size: '1728x960', // Standard slide aspect ratio (16:9)
-          n: 1,
-        });
-      } catch (apiError: any) {
-        const errorMessage = apiError?.message ||
-          apiError?.error?.message ||
-          apiError?.response?.data?.error?.message ||
-          String(apiError);
-        throw new Error(`ZhipuAI API error: ${errorMessage}`);
+  const maxRetries = 2;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await invokeWithTimeout(
+        async () => {
+          try {
+            return await client.images.generate({
+              model: 'gpt-image-1.5',
+              prompt: prompt,
+              size: '1536x1024',
+              quality: 'medium',
+              n: 1,
+            });
+          } catch (apiError: any) {
+            // Handle OpenAI-specific error structure
+            const errorMessage =
+              apiError?.message ||
+              apiError?.error?.message ||
+              apiError?.response?.data?.error?.message ||
+              String(apiError);
+
+            // Check for specific error codes
+            const statusCode = apiError?.status || apiError?.response?.status;
+
+            if (statusCode === 401) {
+              throw new Error(`OpenAI authentication failed: ${errorMessage}`);
+            } else if (statusCode === 400) {
+              throw new Error(`OpenAI invalid request: ${errorMessage}`);
+            } else if (statusCode === 429) {
+              // Rate limit error - preserve for retry logic
+              throw apiError;
+            } else {
+              throw new Error(`OpenAI API error: ${errorMessage}`);
+            }
+          }
+        },
+        CONFIG.IMAGE_TIMEOUT_MS,
+        'OpenAIImageGen'
+      );
+
+      // OpenAI returns { data: [{ url: string }] }
+      const imageUrl = response.data?.[0]?.url;
+
+      if (!imageUrl || typeof imageUrl !== 'string') {
+        throw new Error('Unexpected response format from OpenAI SDK: no image URL returned');
       }
-    },
-    CONFIG.IMAGE_TIMEOUT_MS,
-    'ZhipuAIImageGen'
-  );
 
-  // Extract image URL from SDK response
-  let imageUrl: string | undefined;
-  const firstItem = response.data?.[0];
+      // Fetch the image from the URL
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
+      }
 
-  if (typeof firstItem === 'string') {
-    imageUrl = firstItem;
-  } else if (typeof firstItem === 'object' && firstItem !== null && 'url' in firstItem) {
-    imageUrl = (firstItem as { url: string }).url;
-  } else if (typeof firstItem === 'object' && firstItem !== null && 'b64_json' in firstItem) {
-    throw new Error('ZhipuAI returned base64 image instead of URL - not yet supported');
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      const imageData = Buffer.from(arrayBuffer);
+
+      const elapsed = Date.now() - startTime;
+      console.log(`[SlideDeckJob] Slide ${slideNumber} generated in ${elapsed}ms (${(imageData.length / 1024).toFixed(2)} KB)`);
+
+      return imageData;
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Check for rate limit error (429)
+      const isRateLimit = error?.status === 429 || error?.code === 'rate_limit_exceeded';
+
+      console.log(`[SlideDeckJob] Attempt ${attempt}/${maxRetries} failed for slide ${slideNumber}: ${lastError.message}${isRateLimit ? ' (rate limit)' : ''}`);
+
+      // Fail fast on auth or invalid request errors
+      if (error?.status === 401 || error?.status === 400) {
+        break;
+      }
+
+      if (attempt < maxRetries) {
+        // Use exponential backoff for rate limits, shorter for server errors
+        const baseDelay = isRateLimit ? 2000 : 1000;
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 16000);
+
+        if (isRateLimit) {
+          console.log(`[SlideDeckJob] Rate limit hit. Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}...`);
+        } else {
+          console.log(`[SlideDeckJob] Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}...`);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
 
-  if (!imageUrl || typeof imageUrl !== 'string') {
-    throw new Error('Unexpected response format from ZhipuAI SDK: no image URL returned');
-  }
-
-  // Fetch the image from the URL
-  const imageResponse = await fetch(imageUrl);
-  if (!imageResponse.ok) {
-    throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
-  }
-
-  const arrayBuffer = await imageResponse.arrayBuffer();
-  const imageData = Buffer.from(arrayBuffer);
-
-  const elapsed = Date.now() - startTime;
-  console.log(`[SlideDeckJob] Slide ${slideNumber} generated in ${elapsed}ms (${(imageData.length / 1024).toFixed(2)} KB)`);
-
-  return imageData;
+  console.error(`[SlideDeckJob] Failed to generate slide ${slideNumber} after ${maxRetries} attempts`);
+  throw lastError || new Error('Failed to generate slide image');
 }
 
 // ============================================================
@@ -884,8 +927,8 @@ export const finalizeSlideDeckPhase = internalAction({
         },
       });
 
-      // Stage 4: Generate images via ZhipuAI (sequential with delay for rate limiting)
-      const zhipuClient = new ZhipuAI({ apiKey: env.ZHIPU_API_KEY });
+      // Stage 4: Generate images via OpenAI (sequential with delay for rate limiting)
+      const openaiImageClient = new OpenAI({ apiKey: env.OPENAI_API_KEY });
       const finalSlides: Slide[] = [];
 
       for (let i = 0; i < slidesWithPrompts.length; i++) {
@@ -899,7 +942,7 @@ export const finalizeSlideDeckPhase = internalAction({
 
         try {
           // Generate image
-          const imageBuffer = await generateSlideImage(zhipuClient, slide.prompt, slide.slideNumber);
+          const imageBuffer = await generateSlideImage(openaiImageClient, slide.prompt, slide.slideNumber);
 
           // Upload to storage
           const fileName = `slide-${slideDeckId}-${slide.slideNumber}.png`;
