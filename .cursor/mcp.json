@@ -1,0 +1,15 @@
+{
+    "mcpServers": {
+      "convex": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "convex@latest",
+          "mcp",
+          "start",
+          "--project-dir",
+          "C:/Users/samin/Documents/GitHub/SolomindLM"
+        ]
+      }
+    }
+  }
