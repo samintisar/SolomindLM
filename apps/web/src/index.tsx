@@ -10,6 +10,8 @@ if (!convexUrl) throw new Error('VITE_CONVEX_URL is required');
 
 const convex = new ConvexReactClient(convexUrl);
 
+// React 19 entry point with Convex auth - plugins removed, testing hooks
+
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error("Could not find root element");
 

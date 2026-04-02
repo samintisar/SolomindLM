@@ -1,6 +1,7 @@
-# CI for Convex + web app. For production deploy, add CONVEX_DEPLOY_KEY secret
-# and use: npx convex deploy --cmd "bun run --filter @solomindlm/web build"
-# See https://docs.convex.dev/testing/ci and https://docs.convex.dev/cli/deploy-key-types
+# PR: typecheck + Vite build (placeholder Convex URL).
+# main: same checks, then Convex deploy + web build — matches Vercel Production.
+# Add repo secret CONVEX_DEPLOY_KEY (same as Vercel). See:
+# https://docs.convex.dev/testing/ci and https://docs.convex.dev/cli/deploy-key-types
 
 name: CI
 
@@ -18,8 +19,8 @@ env:
   NODE_OPTIONS: "--max-old-space-size=4096"
 
 jobs:
-  build-web:
-    name: Build (Web)
+  typecheck-convex:
+    name: Typecheck (Convex)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,7 +37,51 @@ jobs:
       - name: Typecheck Convex
         run: bun run typecheck:convex
 
+  build-web:
+    name: Build (Web, PR parity)
+    needs: typecheck-convex
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.2"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
       - name: Build Web
         env:
           VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud"
         run: bun run --filter @solomindlm/web build
+
+  convex-prod-parity:
+    name: Convex deploy + web (main / Vercel prod parity)
+    needs: typecheck-convex
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.2"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Convex deploy and web build
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          if [ -z "${CONVEX_DEPLOY_KEY}" ]; then
+            echo "::error::Add the Convex deploy key as repository secret CONVEX_DEPLOY_KEY (same value as on Vercel) so main matches production."
+            exit 1
+          fi
+          bun x convex deploy --cmd "bun run build:prod" --cmd-url-env-var-name VITE_CONVEX_URL

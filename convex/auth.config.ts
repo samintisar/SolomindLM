@@ -1,3 +1,4 @@
+// Convex authentication configuration - plugins removed, testing hooks
 export default {
   providers: [
     {

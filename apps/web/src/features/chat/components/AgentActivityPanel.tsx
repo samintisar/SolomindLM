@@ -30,6 +30,34 @@ function toolLabel(tool: string): string {
   return tool.replace(/_/g, ' ');
 }
 
+/**
+ * Tool-call cards were rendered after all phase rows, so "Search documents" appeared after
+ * generating/complete even though the agent finishes retrieval before "Reading passages".
+ * Split phases so tool summaries sit after HyDE/embed/rank and before reading/formulation.
+ */
+function splitPhasesForSearchToolDetails(
+  phases: Array<{ status: string; message: string }>,
+  hasToolCalls: boolean
+): { pipeline: typeof phases; postSearch: typeof phases } {
+  const readingIdx = phases.findIndex((p) => p.status === 'reading');
+  if (readingIdx >= 0) {
+    return {
+      pipeline: phases.slice(0, readingIdx),
+      postSearch: phases.slice(readingIdx),
+    };
+  }
+  if (hasToolCalls) {
+    const lastRankingIdx = phases.findLastIndex((p) => p.status === 'ranking');
+    if (lastRankingIdx >= 0) {
+      return {
+        pipeline: phases.slice(0, lastRankingIdx + 1),
+        postSearch: phases.slice(lastRankingIdx + 1),
+      };
+    }
+  }
+  return { pipeline: phases, postSearch: [] };
+}
+
 export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
   ({
     isStreaming,
@@ -101,6 +129,17 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
     const phaseIcon = getStatusIcon((activityPhase ?? historicalPhase ?? undefined) as string | undefined);
 
+    /** Header already shows final completion; keep timeline focused on work steps */
+    const timelinePhases = useMemo(
+      () => activityPhases.filter((p) => p.status !== 'completed'),
+      [activityPhases]
+    );
+    const { pipeline, postSearch } = useMemo(
+      () => splitPhasesForSearchToolDetails(timelinePhases, toolCalls.length > 0),
+      [timelinePhases, toolCalls.length]
+    );
+    const totalTimelinePhaseRows = pipeline.length + postSearch.length;
+
     const hasActivity =
       isStreaming ||
       activityPhases.length > 0 ||
@@ -147,17 +186,17 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
             aria-labelledby={`${panelId}-trigger`}
             className="border-t border-border/50 px-3 pb-3 pt-1 font-sans text-xs text-foreground/80"
           >
-            {activityPhases.length > 0 && (
+            {(totalTimelinePhaseRows > 0 || toolCalls.length > 0) && (
               <div className="mt-2">
-                <ol className="space-y-1.5">
-                  {activityPhases.map((step, si) => {
+                <ol className="m-0 list-none space-y-1.5 p-0">
+                  {pipeline.map((step, si) => {
                     const line =
                       step.message?.trim() ||
                       getStatusMessage(step.status) ||
                       step.status.replace(/_/g, ' ');
                     const stepIsFinishedInTimeline =
                       !isStreaming ||
-                      si < activityPhases.length - 1 ||
+                      si < totalTimelinePhaseRows - 1 ||
                       step.status === 'completed';
                     const iconStatus =
                       step.status === 'generating' && stepIsFinishedInTimeline
@@ -165,7 +204,79 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                         : step.status;
                     return (
                       <li
-                        key={`${step.status}-${si}-${step.message?.slice(0, 24) ?? ''}`}
+                        key={`p-${step.status}-${si}-${step.message?.slice(0, 24) ?? ''}`}
+                        className="flex gap-2 rounded-md border border-border/35 bg-background/40 px-2 py-1.5 dark:bg-background/25"
+                      >
+                        <span
+                          className="mt-0.5 shrink-0 text-muted-foreground"
+                          aria-hidden
+                        >
+                          {getStatusIcon(iconStatus)}
+                        </span>
+                        <span className="min-w-0 leading-snug text-foreground/88">{line}</span>
+                      </li>
+                    );
+                  })}
+                  {toolCalls.map((tc, i) => {
+                    const long = tc.query.length > QUERY_PREVIEW_CHARS;
+                    const open = expandedQueries[i] ?? false;
+                    const display =
+                      !long || open ? tc.query : `${tc.query.slice(0, QUERY_PREVIEW_CHARS)}…`;
+                    return (
+                      <li
+                        key={`t-${tc.tool}-${tc.query}-${i}`}
+                        className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2 dark:bg-background/30"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden>
+                            {tc.status === 'searching' ? (
+                              <Search className="h-3.5 w-3.5 animate-pulse" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5 text-vintage-green-600 dark:text-vintage-green-500" />
+                            )}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-foreground/90">{toolLabel(tc.tool)}</div>
+                            <div className="mt-0.5 wrap-break-word text-muted-foreground leading-relaxed">
+                              {display}
+                            </div>
+                            {long && (
+                              <button
+                                type="button"
+                                onClick={() => toggleQuery(i)}
+                                className="mt-1 text-[11px] font-medium text-primary hover:underline"
+                              >
+                                {open ? 'Show less' : 'Show full query'}
+                              </button>
+                            )}
+                            {tc.status === 'done' && (
+                              <div className="mt-1 text-[11px] text-muted-foreground/90">
+                                {tc.resultCount ?? 0} passage{(tc.resultCount ?? 0) === 1 ? '' : 's'}{' '}
+                                retrieved
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                  {postSearch.map((step, si) => {
+                    const globalSi = pipeline.length + si;
+                    const line =
+                      step.message?.trim() ||
+                      getStatusMessage(step.status) ||
+                      step.status.replace(/_/g, ' ');
+                    const stepIsFinishedInTimeline =
+                      !isStreaming ||
+                      globalSi < totalTimelinePhaseRows - 1 ||
+                      step.status === 'completed';
+                    const iconStatus =
+                      step.status === 'generating' && stepIsFinishedInTimeline
+                        ? 'completed'
+                        : step.status;
+                    return (
+                      <li
+                        key={`s-${step.status}-${si}-${step.message?.slice(0, 24) ?? ''}`}
                         className="flex gap-2 rounded-md border border-border/35 bg-background/40 px-2 py-1.5 dark:bg-background/25"
                       >
                         <span
@@ -179,56 +290,6 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                     );
                   })}
                 </ol>
-              </div>
-            )}
-
-            {toolCalls.length > 0 && (
-              <div className={activityPhases.length > 0 ? 'mt-3' : 'mt-2'}>
-                <ul className="space-y-2">
-                {toolCalls.map((tc, i) => {
-                  const long = tc.query.length > QUERY_PREVIEW_CHARS;
-                  const open = expandedQueries[i] ?? false;
-                  const display =
-                    !long || open ? tc.query : `${tc.query.slice(0, QUERY_PREVIEW_CHARS)}…`;
-                  return (
-                    <li
-                      key={`${tc.tool}-${tc.query}-${i}`}
-                      className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2 dark:bg-background/30"
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden>
-                          {tc.status === 'searching' ? (
-                            <Search className="h-3.5 w-3.5 animate-pulse" />
-                          ) : (
-                            <Check className="h-3.5 w-3.5 text-vintage-green-600 dark:text-vintage-green-500" />
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-foreground/90">{toolLabel(tc.tool)}</div>
-                          <div className="mt-0.5 wrap-break-word text-muted-foreground leading-relaxed">
-                            {display}
-                          </div>
-                          {long && (
-                            <button
-                              type="button"
-                              onClick={() => toggleQuery(i)}
-                              className="mt-1 text-[11px] font-medium text-primary hover:underline"
-                            >
-                              {open ? 'Show less' : 'Show full query'}
-                            </button>
-                          )}
-                          {tc.status === 'done' && (
-                            <div className="mt-1 text-[11px] text-muted-foreground/90">
-                              {tc.resultCount ?? 0} passage{(tc.resultCount ?? 0) === 1 ? '' : 's'}{' '}
-                              retrieved
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-                </ul>
               </div>
             )}
 

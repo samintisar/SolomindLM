@@ -143,6 +143,20 @@ bun run convex:env:push:dry    # Dry run for env push
 
 **CI:** Runs on push to `main` and PRs - Build (Web), Type Check
 
+## Claude Code Hooks
+
+**Automatic typechecking is enabled:**
+- **Web files**: Typecheck runs automatically after editing any file in `apps/web/`
+- **Convex files**: Typecheck runs automatically after editing any file in `convex/`
+
+**Hook configuration:** `.claude/settings.json`
+
+**If hooks fail to run:**
+1. Check that `Bash(bun run typecheck:*)` is in permissions.allow
+2. Ensure hooks are in `settings.json` (not `settings.local.json`)
+3. Remove `shell: "powershell"` parameter (use default shell)
+4. Restart Claude Code to reload configuration
+
 ## Gotchas
 
 - **Convex directory structure** - Directories with `_` prefix are excluded from API generation. Functions in `convex/domain/index.ts` become `api.domain.index.*`
@@ -166,6 +180,29 @@ bun run convex:env:push:dry    # Dry run for env push
 | `langgraph-langchain` | Modifying agents in `convex/_agents/` |
 | `coding-standards` | Writing or reviewing TypeScript/React code |
 | `add-studio-feature` | Adding or extending Studio generation tools |
+
+## MCP Servers
+
+### context7 - Documentation Lookup
+
+This project uses the **context7 MCP server** for live documentation lookup of libraries and frameworks.
+
+**When to use context7:**
+- Looking up API documentation for any library (React, LangChain, Convex, Stripe, etc.)
+- Finding code examples for specific library features
+- Checking current best practices and patterns
+- Understanding library-specific APIs that may have changed
+
+**How to use:**
+```
+"Show me React 19.2 documentation for useTransition"
+"What's the current LangChain API for creating agents?"
+"How do I use Convex's v.scalar() for schema definitions?"
+```
+
+**Available via:** `mcp__plugin_context7_context7__query-docs` tool
+
+**Install:** Already configured in `.mcp.json`
 
 ## Code Navigation & Editing (Serena MCP)
 

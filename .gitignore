@@ -155,3 +155,4 @@ convex-exports/*.zip
 # Serena
 .serena/
 .vercel
+.env*.local

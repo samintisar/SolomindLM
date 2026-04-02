@@ -629,7 +629,12 @@ export declare const components: {
       handleSubscriptionDeleted: FunctionReference<
         "mutation",
         "internal",
-        { stripeSubscriptionId: string },
+        {
+          cancelAt?: number;
+          cancelAtPeriodEnd?: boolean;
+          currentPeriodEnd?: number;
+          stripeSubscriptionId: string;
+        },
         null
       >;
       handleSubscriptionUpdated: FunctionReference<
@@ -646,6 +651,17 @@ export declare const components: {
           stripeSubscriptionId: string;
         },
         null
+      >;
+      listSubscriptionsWithCreationTime: FunctionReference<
+        "query",
+        "internal",
+        { stripeCustomerId: string },
+        Array<{
+          _creationTime: number;
+          status: string;
+          stripeCustomerId: string;
+          stripeSubscriptionId: string;
+        }>
       >;
       updatePaymentCustomer: FunctionReference<
         "mutation",
@@ -672,6 +688,18 @@ export declare const components: {
         },
         string
       >;
+      getCheckoutSession: FunctionReference<
+        "query",
+        "internal",
+        { stripeCheckoutSessionId: string },
+        {
+          metadata?: any;
+          mode: string;
+          status: string;
+          stripeCheckoutSessionId: string;
+          stripeCustomerId?: string;
+        } | null
+      >;
       getCustomer: FunctionReference<
         "query",
         "internal",
@@ -681,6 +709,31 @@ export declare const components: {
           metadata?: any;
           name?: string;
           stripeCustomerId: string;
+          userId?: string;
+        } | null
+      >;
+      getCustomerByEmail: FunctionReference<
+        "query",
+        "internal",
+        { email: string },
+        {
+          email?: string;
+          metadata?: any;
+          name?: string;
+          stripeCustomerId: string;
+          userId?: string;
+        } | null
+      >;
+      getCustomerByUserId: FunctionReference<
+        "query",
+        "internal",
+        { userId: string },
+        {
+          email?: string;
+          metadata?: any;
+          name?: string;
+          stripeCustomerId: string;
+          userId?: string;
         } | null
       >;
       getPayment: FunctionReference<
@@ -734,6 +787,18 @@ export declare const components: {
           stripeSubscriptionId: string;
           userId?: string;
         } | null
+      >;
+      listCheckoutSessions: FunctionReference<
+        "query",
+        "internal",
+        { stripeCustomerId: string },
+        Array<{
+          metadata?: any;
+          mode: string;
+          status: string;
+          stripeCheckoutSessionId: string;
+          stripeCustomerId?: string;
+        }>
       >;
       listInvoices: FunctionReference<
         "query",
@@ -849,6 +914,24 @@ export declare const components: {
           userId?: string;
         }>
       >;
+      listSubscriptionsByOrgId: FunctionReference<
+        "query",
+        "internal",
+        { orgId: string },
+        Array<{
+          cancelAt?: number;
+          cancelAtPeriodEnd: boolean;
+          currentPeriodEnd: number;
+          metadata?: any;
+          orgId?: string;
+          priceId: string;
+          quantity?: number;
+          status: string;
+          stripeCustomerId: string;
+          stripeSubscriptionId: string;
+          userId?: string;
+        }>
+      >;
       listSubscriptionsByUserId: FunctionReference<
         "query",
         "internal",
@@ -881,7 +964,7 @@ export declare const components: {
       updateSubscriptionQuantity: FunctionReference<
         "action",
         "internal",
-        { apiKey: string; quantity: number; stripeSubscriptionId: string },
+        { quantity: number; stripeSubscriptionId: string },
         null
       >;
     };

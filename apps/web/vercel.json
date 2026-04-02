@@ -1,12 +1,17 @@
 {
-  "buildCommand": "cd ../.. && bun x convex deploy --typecheck disable --cmd \"bun run build:prod\" --cmd-url-env-var-name VITE_CONVEX_URL",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../.. && if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun run build:prod; else bun x convex deploy --cmd \"bun run build:prod\" --cmd-url-env-var-name VITE_CONVEX_URL; fi",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "cd ../.. && bun install && cd apps/web && bun install",
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://tame-gecko-736.convex.site/api/:path*" },
-    { "source": "/assets/:path*", "destination": "/assets/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "installCommand": "cd ../.. && bun install --frozen-lockfile",
+  "routes": [
+    { "handle": "filesystem" },
+    {
+      "src": "/api/(.*)",
+      "dest": "${VITE_CONVEX_SITE_URL}/api/$1",
+      "env": ["VITE_CONVEX_SITE_URL"]
+    },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "headers": [
     {
