@@ -1,5 +1,13 @@
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Id, Doc } from "../_generated/dataModel";
+import {
+  calculateNextReview,
+  initializeProficiency,
+  type CardProficiency,
+} from "../_lib/srsScheduling";
+
+export type { CardProficiency, SM2State } from "../_lib/srsScheduling";
+export { calculateNextReview, initializeProficiency };
 
 /**
  * Database operations for flashcards.
@@ -72,6 +80,78 @@ export type FlashcardUpdate = {
   cardsData?: unknown[];
   metadata?: unknown;
 };
+
+/**
+ * Update card proficiency after a review
+ * @param proficiency - Current proficiency data
+ * @param rating - User rating
+ * @returns Updated proficiency data
+ */
+export function updateProficiencyAfterReview(
+  proficiency: CardProficiency | undefined,
+  rating: 'again' | 'hard' | 'good' | 'easy'
+): CardProficiency {
+  const current = proficiency || initializeProficiency();
+  
+  // Update statistics
+  const updated: CardProficiency = {
+    ...current,
+    totalReviews: current.totalReviews + 1,
+    lastReviewedAt: Date.now(),
+  };
+
+  if (rating === 'again') {
+    updated.incorrectCount = current.incorrectCount + 1;
+    updated.streak = 0;
+  } else {
+    updated.correctCount = current.correctCount + 1;
+    updated.streak = current.streak + 1;
+  }
+
+  // Calculate next review
+  const sm2State = calculateNextReview(
+    { interval: current.interval, easeFactor: current.easeFactor },
+    rating
+  );
+
+  updated.interval = sm2State.interval;
+  updated.easeFactor = sm2State.easeFactor;
+  updated.nextReviewDate = sm2State.nextReviewDate;
+
+  return updated;
+}
+
+/**
+ * Check if a card is due for review
+ * @param proficiency - Card proficiency data
+ * @returns true if card is due (nextReviewDate <= now or not yet reviewed)
+ */
+export function isCardDue(proficiency: CardProficiency | undefined): boolean {
+  if (!proficiency || !proficiency.nextReviewDate) {
+    // New card (never reviewed) - always due
+    return true;
+  }
+  return proficiency.nextReviewDate <= Date.now();
+}
+
+/**
+ * Get cards that are due for review from a flashcard set
+ * @param cardsData - Array of cards with proficiency data
+ * @returns Array of indices for due cards
+ */
+export function getDueCardIndices(cardsData: any[]): number[] {
+  const now = Date.now();
+  return cardsData
+    .map((card, index) => ({ card, index }))
+    .filter(({ card }) => {
+      const proficiency = card.proficiency;
+      if (!proficiency || !proficiency.nextReviewDate) {
+        return true; // New card
+      }
+      return proficiency.nextReviewDate <= now;
+    })
+    .map(({ index }) => index);
+}
 
 export async function updateFlashcard(
   ctx: MutationCtx,

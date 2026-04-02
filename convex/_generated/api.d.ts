@@ -154,6 +154,7 @@ import type * as _lib_limits from "../_lib/limits.js";
 import type * as _lib_notebookAccess from "../_lib/notebookAccess.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
 import type * as _lib_shareToken from "../_lib/shareToken.js";
+import type * as _lib_srsScheduling from "../_lib/srsScheduling.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
 import type * as _model_audioOverviews from "../_model/audioOverviews.js";
 import type * as _model_conversations from "../_model/conversations.js";
@@ -404,6 +405,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/notebookAccess": typeof _lib_notebookAccess;
   "_lib/rateLimits": typeof _lib_rateLimits;
   "_lib/shareToken": typeof _lib_shareToken;
+  "_lib/srsScheduling": typeof _lib_srsScheduling;
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;
   "_model/audioOverviews": typeof _model_audioOverviews;
   "_model/conversations": typeof _model_conversations;

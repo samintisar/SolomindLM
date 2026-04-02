@@ -15,17 +15,21 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js
 
 export const FlashcardArraySchema = z.object({
   flashcards: z.array(z.object({
+    type: z.enum(['wh-question', 'fill-blank', 'true-false', 'multiple-choice', 'definition', 'scenario']),
     front: z.string(),
     back: z.string(),
     // FIX: TogetherAI/OpenAI strict output requires .nullable() before .optional()
     topic: z.string().nullable().optional().describe("Topic category or null if not applicable"),
+    options: z.array(z.string()).optional().describe("Answer choices for multiple-choice questions"),
   })),
 });
 
 export interface Flashcard {
+  type: 'wh-question' | 'fill-blank' | 'true-false' | 'multiple-choice' | 'definition' | 'scenario';
   front: string;
   back: string;
   topic?: string | null; // Optional topic field (nullable for TogetherAI/OpenAI strict output)
+  options?: string[]; // For multiple-choice questions
 }
 
 export interface FlashcardResponse {
@@ -94,11 +98,32 @@ This is part of a larger set targeting ${cardCount} total cards across all chunk
 **Difficulty Level: ${difficulty.toUpperCase()}** (${difficultyGuidance[difficulty] || difficulty})
 ${topic ? `**Topic Focus:** ${topic}` : ''}
 
+**CARD VARIETY REQUIREMENT:**
+You MUST generate a DIVERSE mix of flashcard types. Distribute evenly across these 6 types:
+1. **WH-Question** (what, where, when, why, how) - Test factual recall
+   Example: "What is the primary function of mitochondria?"
+2. **Fill-in-the-Blank** - Test precise knowledge recall
+   Example: "The _____ is the control center of the cell and contains DNA."
+3. **True/False** - Test understanding of misconceptions
+   Example: "True or False: Mitochondria are found only in animal cells. (False - also in plants)"
+4. **Multiple Choice** - Test discrimination between similar concepts
+   Example: "Which organelle is responsible for photosynthesis?
+   A) Nucleus B) Chloroplast C) Ribosome D) Lysosome"
+5. **Definition** - Test concept understanding
+   Example: "Define: Mitochondria (The powerhouse of the cell that generates ATP)"
+6. **Scenario/Application** - Test knowledge transfer
+   Example: "If a cell lacks mitochondria, what cellular process would be most impaired? (ATP production/energy metabolism)"
+
+**Card Type Distribution:** Aim for ~15-20% of each type. Mix them evenly!
+
 **Guidelines:**
 - Questions should be clear, specific, and test understanding
 - Answers should be concise but complete
 - Focus on key concepts, definitions, and important relationships
 - Avoid overly trivial or obvious questions
+- For multiple-choice: provide 3-4 plausible distractors (one clearly correct)
+- For true/false: include explanation in answer to clarify why it's true or false
+- For fill-in-the-blank: ensure the blank is the key concept being tested
 
 **SELF-CONTAINED FLASHCARDS REQUIREMENT:**
 CRITICAL: Each flashcard question MUST BE COMPLETELY SELF-CONTAINED. The user will ONLY see the question and answer.
@@ -127,9 +152,11 @@ BALANCE: Questions should be complete but concise. Include only what's necessary
 
 **OUTPUT FORMAT:**
 Return a JSON object with a "flashcards" array containing objects with:
-- "front": The question
-- "back": The answer
+- "type": One of: "wh-question", "fill-blank", "true-false", "multiple-choice", "definition", "scenario"
+- "front": The question/prompt
+- "back": The answer/explanation
 - "topic": A short 1-3 word category for this specific card (e.g., "History", "Definition", "Formula")
+- "options": (ONLY for multiple-choice) Array of 3-4 answer choices
 
 Content:
 ${chunk}

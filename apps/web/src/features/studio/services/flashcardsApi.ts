@@ -302,3 +302,157 @@ export async function getFlashcards(notebookId: string): Promise<FlashcardNote[]
   });
   return dbFlashcards?.map(mapFlashcardToNote) ?? [];
 }
+
+
+// ============================================================================
+// NEW HOOKS FOR FLASHCARD FEATURES
+// ============================================================================
+
+/**
+ * Submit card review for spaced repetition
+ */
+export function useCardReview() {
+  const submitReview = useMutation(api.studio.flashcards.index.submitCardReview);
+
+  return async (flashcardId: string, cardIndex: number, rating: 'again' | 'hard' | 'good' | 'easy') => {
+    return await submitReview({
+      id: flashcardId as Id<'flashcards'>,
+      cardIndex,
+      rating,
+    });
+  };
+}
+
+/**
+ * Get cards that are due for review
+ */
+export function useDueCards(flashcardId: string | null) {
+  return useQuery(
+    api.studio.flashcards.index.getDueCards,
+    flashcardId ? { id: flashcardId as Id<'flashcards'> } : 'skip'
+  );
+}
+
+/**
+ * Update individual card
+ */
+export function useUpdateCard() {
+  const update = useMutation(api.studio.flashcards.index.updateCard);
+
+  return async (flashcardId: string, cardIndex: number, updates: { front?: string; back?: string }) => {
+    return await update({
+      id: flashcardId as Id<'flashcards'>,
+      cardIndex,
+      ...updates,
+    });
+  };
+}
+
+/**
+ * Add new card
+ */
+export function useAddCard() {
+  const add = useMutation(api.studio.flashcards.index.addCard);
+
+  return async (flashcardId: string, card: { front: string; back: string; topic?: string; type?: Flashcard['type'] }) => {
+    return await add({
+      id: flashcardId as Id<'flashcards'>,
+      ...card,
+    });
+  };
+}
+
+/**
+ * Delete card
+ */
+export function useDeleteCard() {
+  const deleteCardMutation = useMutation(api.studio.flashcards.index.deleteCard);
+
+  return async (flashcardId: string, cardIndex: number) => {
+    return await deleteCardMutation({
+      id: flashcardId as Id<'flashcards'>,
+      cardIndex,
+    });
+  };
+}
+
+/**
+ * Update flashcard preferences
+ */
+export function useUpdateFlashcardPreferences() {
+  const update = useMutation(api.studio.flashcards.index.updatePreferences);
+
+  return async (flashcardId: string, preferences: { showMastered?: boolean }) => {
+    return await update({
+      id: flashcardId as Id<'flashcards'>,
+      ...preferences,
+    });
+  };
+}
+
+/**
+ * Submit card review (imperative version)
+ */
+export async function submitCardReview(flashcardId: string, cardIndex: number, rating: 'again' | 'hard' | 'good' | 'easy'): Promise<void> {
+  const client = getConvexClient();
+  await client.mutation(api.studio.flashcards.index.submitCardReview, {
+    id: flashcardId as Id<'flashcards'>,
+    cardIndex,
+    rating,
+  });
+}
+
+/**
+ * Get due cards (imperative version)
+ */
+export async function getDueCards(flashcardId: string): Promise<Array<{ index: number; card: Flashcard }>> {
+  const client = getConvexClient();
+  return await client.query(api.studio.flashcards.index.getDueCards, {
+    id: flashcardId as Id<'flashcards'>
+  });
+}
+
+/**
+ * Update card (imperative version)
+ */
+export async function updateCard(flashcardId: string, cardIndex: number, updates: { front?: string; back?: string }): Promise<void> {
+  const client = getConvexClient();
+  await client.mutation(api.studio.flashcards.index.updateCard, {
+    id: flashcardId as Id<'flashcards'>,
+    cardIndex,
+    ...updates,
+  });
+}
+
+/**
+ * Add card (imperative version)
+ */
+export async function addCard(flashcardId: string, card: { front: string; back: string; topic?: string; type?: Flashcard['type'] }): Promise<void> {
+  const client = getConvexClient();
+  await client.mutation(api.studio.flashcards.index.addCard, {
+    id: flashcardId as Id<'flashcards'>,
+    ...card,
+  });
+}
+
+/**
+ * Delete card (imperative version)
+ */
+export async function deleteCard(flashcardId: string, cardIndex: number): Promise<void> {
+  const client = getConvexClient();
+  await client.mutation(api.studio.flashcards.index.deleteCard, {
+    id: flashcardId as Id<'flashcards'>,
+    cardIndex,
+  });
+}
+
+/**
+ * Update flashcard preferences (imperative version)
+ */
+export async function updateFlashcardPreferences(flashcardId: string, preferences: { showMastered?: boolean }): Promise<void> {
+  const client = getConvexClient();
+  await client.mutation(api.studio.flashcards.index.updatePreferences, {
+    id: flashcardId as Id<'flashcards'>,
+    ...preferences,
+  });
+}

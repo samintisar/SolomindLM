@@ -203,3 +203,254 @@ export const patch = internalMutation({
     await Flashcards.patchFlashcard(ctx, args.flashcardId, args.patch);
   },
 });
+
+/**
+ * Submit a card review for spaced repetition
+ * Updates card proficiency based on user rating
+ */
+export const submitCardReview = mutation({
+  args: {
+    id: v.id("flashcards"),
+    cardIndex: v.number(),
+    rating: v.union(v.literal("again"), v.literal("hard"), v.literal("good"), v.literal("easy")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
+    if (!flashcard) {
+      throw new Error("Flashcard set not found");
+    }
+
+    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+
+    const cardsData = flashcard.cardsData as any[];
+    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
+      throw new Error("Invalid card index");
+    }
+
+    const card = cardsData[args.cardIndex];
+    const currentProficiency = card.proficiency;
+
+    // Update proficiency
+    const updatedProficiency = Flashcards.updateProficiencyAfterReview(
+      currentProficiency,
+      args.rating
+    );
+
+    // Update card with new proficiency
+    cardsData[args.cardIndex] = {
+      ...card,
+      proficiency: updatedProficiency,
+    };
+
+    // Save to database
+    await ctx.db.patch(args.id, {
+      cardsData,
+      updatedAt: Date.now(),
+    });
+
+    // Return updated flashcard
+    return await Flashcards.getFlashcard(ctx, args.id);
+  },
+});
+
+/**
+ * Update an individual card (edit front/back)
+ */
+export const updateCard = mutation({
+  args: {
+    id: v.id("flashcards"),
+    cardIndex: v.number(),
+    front: v.optional(v.string()),
+    back: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
+    if (!flashcard) {
+      throw new Error("Flashcard set not found");
+    }
+
+    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+
+    const cardsData = flashcard.cardsData as any[];
+    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
+      throw new Error("Invalid card index");
+    }
+
+    const card = cardsData[args.cardIndex];
+
+    // Preserve proficiency data when editing content
+    cardsData[args.cardIndex] = {
+      ...card,
+      front: args.front ?? card.front,
+      back: args.back ?? card.back,
+    };
+
+    await ctx.db.patch(args.id, {
+      cardsData,
+      updatedAt: Date.now(),
+    });
+
+    return await Flashcards.getFlashcard(ctx, args.id);
+  },
+});
+
+/**
+ * Add a new card to the flashcard set
+ */
+export const addCard = mutation({
+  args: {
+    id: v.id("flashcards"),
+    front: v.string(),
+    back: v.string(),
+    topic: v.optional(v.string()),
+    type: v.optional(v.union(
+      v.literal("wh-question"),
+      v.literal("fill-blank"),
+      v.literal("true-false"),
+      v.literal("multiple-choice"),
+      v.literal("definition"),
+      v.literal("scenario")
+    )),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
+    if (!flashcard) {
+      throw new Error("Flashcard set not found");
+    }
+
+    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+
+    const cardsData = flashcard.cardsData as any[];
+    const newCard = {
+      type: args.type || "wh-question",
+      front: args.front,
+      back: args.back,
+      topic: args.topic || null,
+      proficiency: Flashcards.initializeProficiency(),
+    };
+
+    cardsData.push(newCard);
+
+    // Update cardCount in metadata
+    const metadata = {
+      ...(flashcard.metadata as Record<string, unknown>),
+      cardCount: cardsData.length,
+    };
+
+    await ctx.db.patch(args.id, {
+      cardsData,
+      metadata,
+      updatedAt: Date.now(),
+    });
+
+    return await Flashcards.getFlashcard(ctx, args.id);
+  },
+});
+
+/**
+ * Delete a card from the flashcard set
+ */
+export const deleteCard = mutation({
+  args: {
+    id: v.id("flashcards"),
+    cardIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
+    if (!flashcard) {
+      throw new Error("Flashcard set not found");
+    }
+
+    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+
+    const cardsData = flashcard.cardsData as any[];
+    if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
+      throw new Error("Invalid card index");
+    }
+
+    cardsData.splice(args.cardIndex, 1);
+
+    // Update cardCount in metadata
+    const metadata = {
+      ...(flashcard.metadata as Record<string, unknown>),
+      cardCount: cardsData.length,
+    };
+
+    await ctx.db.patch(args.id, {
+      cardsData,
+      metadata,
+      updatedAt: Date.now(),
+    });
+
+    return { message: "Card deleted successfully" };
+  },
+});
+
+/**
+ * Get cards that are due for review
+ */
+export const getDueCards = query({
+  args: {
+    id: v.id("flashcards"),
+  },
+  handler: async (ctx, args) => {
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
+    if (!flashcard) {
+      throw new Error("Flashcard set not found");
+    }
+
+    const cardsData = flashcard.cardsData as any[];
+    const dueIndices = Flashcards.getDueCardIndices(cardsData);
+
+    // Return due cards with their indices
+    return dueIndices.map(index => ({
+      index,
+      card: cardsData[index],
+    }));
+  },
+});
+
+/**
+ * Update flashcard preferences (showMastered, etc.)
+ */
+export const updatePreferences = mutation({
+  args: {
+    id: v.id("flashcards"),
+    showMastered: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const flashcard = await Flashcards.getFlashcard(ctx, args.id);
+    if (!flashcard) {
+      throw new Error("Flashcard set not found");
+    }
+
+    await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
+
+    const metadata = {
+      ...(flashcard.metadata as Record<string, unknown>),
+      ...(args.showMastered !== undefined && { showMastered: args.showMastered }),
+    };
+
+    await ctx.db.patch(args.id, {
+      metadata,
+      updatedAt: Date.now(),
+    });
+
+    return await Flashcards.getFlashcard(ctx, args.id);
+  },
+});

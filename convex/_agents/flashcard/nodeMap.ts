@@ -88,9 +88,11 @@ export async function mapProcess(
 
     const flashcards = (response as FlashcardResponse).flashcards;
     const cleanedFlashcards = flashcards.map((card: Flashcard) => ({
+      type: card.type,
       front: cleanFrontText(card.front),
       back: cleanBackText(card.back),
       topic: card.topic,
+      options: card.options,
     }));
 
     const flashcardCount = cleanedFlashcards.length;

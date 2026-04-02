@@ -111,8 +111,21 @@ export interface WrittenQuestionAnswer {
 }
 
 export interface Flashcard {
+  type: 'wh-question' | 'fill-blank' | 'true-false' | 'multiple-choice' | 'definition' | 'scenario';
   front: string;
   back: string;
+  topic?: string;
+  options?: string[]; // For multiple-choice questions
+  proficiency?: {
+    nextReviewDate?: number;
+    interval: number;
+    easeFactor: number;
+    streak: number;
+    totalReviews: number;
+    correctCount: number;
+    incorrectCount: number;
+    lastReviewedAt?: number;
+  };
 }
 
 export interface MindMapNode {
@@ -181,6 +194,9 @@ export interface FlashcardNote extends BaseNote {
     topic?: string;
     error?: string;
     lastViewedIndex?: number;
+    studyMode?: 'browse' | 'study';
+    showMastered?: boolean;
+    masteredThreshold?: number;
   } & StudioGenerationMetadata;
 }
 

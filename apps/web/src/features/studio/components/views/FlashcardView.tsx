@@ -1,8 +1,28 @@
 import React, { useState, lazy, Suspense, useMemo, useRef, useEffect } from 'react';
-import { RotateCw, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
-import { FlashcardNote } from '@/shared/types/index';
-import { useUpdateFlashcardProgress, useFlashcard } from '@/features/studio/services/flashcardsApi';
+import {
+  RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  ArrowLeft,
+  BookOpen,
+  Brain,
+  Edit3,
+  Plus,
+} from 'lucide-react';
+import { FlashcardNote, Flashcard } from '@/shared/types/index';
+import {
+  useUpdateFlashcardProgress,
+  useFlashcard,
+  useUpdateCard,
+  useAddCard,
+  useDeleteCard,
+  useUpdateFlashcardPreferences,
+  useDueCards,
+} from '@/features/studio/services/flashcardsApi';
 import { sanitizeMarkdown } from '@/shared/utils';
+import { ProficiencyBadge } from './ProficiencyBadge';
+import { StudyMode } from './StudyMode';
+import { EditCardModal } from './EditCardModal';
 
 const MarkdownRenderer = lazy(() =>
   import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
@@ -13,152 +33,565 @@ export interface FlashcardViewProps {
   onBack?: () => void;
 }
 
+type ViewMode = 'browse' | 'study' | 'edit';
+
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
-    // Initialize currentIndex from note.metadata.lastViewedIndex if available
-    const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
-    const [currentIndex, setCurrentIndex] = useState(Math.min(initialIndex, Math.max(0, note.flashcards.length - 1)));
-    const [isFlipped, setIsFlipped] = useState(false);
-    const cards = note.flashcards;
+  // State
+  const [mode, setMode] = useState<ViewMode>('browse');
+  const [showMastered, setShowMastered] = useState(
+    (note.metadata as any)?.showMastered ?? false
+  );
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<Flashcard | undefined>(undefined);
+  const [editingCardIndex, setEditingCardIndex] = useState<number | undefined>(undefined);
 
-    // Get latest flashcard data from server (for restoring saved progress)
-    const latestNote = useFlashcard(note.id);
+  // Hooks
+  const latestNote = useFlashcard(note.id);
+  const updateCard = useUpdateCard();
+  const addCard = useAddCard();
+  const deleteCard = useDeleteCard();
+  const updatePreferences = useUpdateFlashcardPreferences();
 
-    // Track if we've initialized the index from saved progress
-    const hasInitializedIndex = useRef(false);
+  // Due cards for study mode
+  const dueCardsData = useDueCards(note.id);
+  const dueCards = useMemo(() => {
+    if (!dueCardsData) return [];
+    return dueCardsData.map((d: { index: number; card: Flashcard }) => d.card);
+  }, [dueCardsData]);
 
-    // Restore saved index on mount (from latestNote which has the latest data from server)
-    useEffect(() => {
-        if (!hasInitializedIndex.current && latestNote) {
-            const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
-            const boundedIndex = Math.min(savedIndex, Math.max(0, cards.length - 1));
-            if (savedIndex > 0) {
-                setCurrentIndex(boundedIndex);
-            }
-            hasInitializedIndex.current = true;
-        }
-    }, [latestNote, cards.length]);
+  // Filter cards based on showMastered preference
+  const filteredCards = useMemo(() => {
+    if (!showMastered) {
+      return note.flashcards.filter(card => {
+        const interval = card.proficiency?.interval || 0;
+        return interval < 21;
+      });
+    }
+    return note.flashcards;
+  }, [note.flashcards, showMastered]);
 
-    // Persist progress - track last viewed index
-    // Use useMemo to prevent re-initializing when other state changes
-    const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
-    useUpdateFlashcardProgress(note.id, stableCurrentIndex);
+  // Initialize currentIndex from note.metadata.lastViewedIndex
+  const hasInitializedIndex = useRef(false);
 
-    const handleNext = () => {
-        setIsFlipped(false);
-        setTimeout(() => setCurrentIndex((prev) => (prev + 1) % cards.length), 200);
-    };
+  useEffect(() => {
+    if (!hasInitializedIndex.current && latestNote) {
+      const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
+      const boundedIndex = Math.min(savedIndex, Math.max(0, filteredCards.length - 1));
+      if (savedIndex > 0) {
+        setCurrentIndex(boundedIndex);
+      }
+      hasInitializedIndex.current = true;
+    }
+  }, [latestNote, filteredCards.length]);
 
-    const handlePrev = () => {
-        setIsFlipped(false);
-        setTimeout(() => setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length), 200);
-    };
+  // Persist progress
+  const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
+  useUpdateFlashcardProgress(note.id, stableCurrentIndex);
 
-    if (cards.length === 0) return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <p className="text-muted-foreground font-serif italic">No flashcards available</p>
-      </div>
-    );
+  // Sync showMastered with server
+  useEffect(() => {
+    const serverShowMastered = (latestNote?.metadata as any)?.showMastered;
+    if (serverShowMastered !== undefined && serverShowMastered !== showMastered) {
+      setShowMastered(serverShowMastered);
+    }
+  }, [latestNote, showMastered]);
 
-    const currentCard = cards[currentIndex];
+  // Handlers
+  const handleNext = () => {
+    setIsFlipped(false);
+    setTimeout(() => setCurrentIndex((prev) => (prev + 1) % filteredCards.length), 200);
+  };
 
-    return (
-        <div className={`flex flex-col h-full items-center justify-center p-4 sm:p-6 bg-secondary/10 animate-in fade-in slide-in-from-right-4 duration-300 gap-4 sm:gap-6 relative ${onBack ? 'md:pt-0 pt-16' : ''}`}>
-            {/* Mobile Back Button */}
-            {onBack && (
-                <div className="md:hidden absolute top-0 left-0 right-0 flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm z-20">
-                    <button
-                        onClick={onBack}
-                        className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
-                        aria-label="Back to Studio"
-                    >
-                        <ArrowLeft className="w-5 h-5 shrink-0" />
-                    </button>
-                    <span className="text-sm font-semibold text-foreground truncate">{note.title}</span>
-                </div>
+  const handlePrev = () => {
+    setIsFlipped(false);
+    setTimeout(() => setCurrentIndex((prev) => (prev - 1 + filteredCards.length) % filteredCards.length), 200);
+  };
+
+  const handleModeChange = (newMode: ViewMode) => {
+    setMode(newMode);
+    setIsFlipped(false);
+  };
+
+  const setShowMasteredPreference = async (value: boolean) => {
+    if (value === showMastered) return;
+    setShowMastered(value);
+    await updatePreferences(note.id, { showMastered: value });
+  };
+
+  const handleEditCard = (index: number) => {
+    const cardIndex = note.flashcards.findIndex(card => card === filteredCards[index]);
+    setEditingCard(note.flashcards[cardIndex]);
+    setEditingCardIndex(cardIndex);
+    setEditModalOpen(true);
+  };
+
+  const handleAddCard = () => {
+    setEditingCard(undefined);
+    setEditingCardIndex(undefined);
+    setEditModalOpen(true);
+  };
+
+  const handleSaveCard = async (data: { front: string; back: string }) => {
+    if (editingCardIndex !== undefined) {
+      await updateCard(note.id, editingCardIndex, {
+        front: data.front,
+        back: data.back,
+      });
+    } else {
+      await addCard(note.id, data);
+    }
+    setEditModalOpen(false);
+    setEditingCard(undefined);
+    setEditingCardIndex(undefined);
+  };
+
+  const handleDeleteCard = async () => {
+    if (editingCardIndex !== undefined) {
+      await deleteCard(note.id, editingCardIndex);
+      setEditModalOpen(false);
+      setEditingCard(undefined);
+      setEditingCardIndex(undefined);
+      if (currentIndex >= filteredCards.length - 1) {
+        setCurrentIndex(Math.max(0, filteredCards.length - 2));
+      }
+    }
+  };
+
+  const handleStudyComplete = (stats: {
+    reviewed: number;
+    correct: number;
+    incorrect: number;
+    longestStreak: number;
+  }) => {
+    console.log('Study complete:', stats);
+  };
+
+  // Render different card types
+  const renderCardFront = (card: Flashcard) => {
+    const content = sanitizeMarkdown(card.front);
+
+    switch (card.type) {
+      case 'multiple-choice':
+        return (
+          <div className="space-y-6 w-full">
+            <div className="prose prose-base sm:prose-lg max-w-none text-center">
+              <Suspense fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}>
+                <MarkdownRenderer>{content}</MarkdownRenderer>
+              </Suspense>
+            </div>
+            {card.options && (
+              <ul className="mt-6 space-y-3 max-w-md mx-auto">
+                {card.options.map((opt, i) => (
+                  <li
+                    key={i}
+                    className="px-4 py-3 border border-border rounded-lg bg-muted/30 text-base font-medium"
+                  >
+                    <span className="inline-block w-6 text-muted-foreground">{String.fromCharCode(65 + i)})</span> {opt}
+                  </li>
+                ))}
+              </ul>
             )}
-            <div className="w-full max-w-lg min-h-[52vh] sm:min-h-0 shrink-0 perspective-1000 group cursor-pointer aspect-3/2" onClick={() => setIsFlipped(!isFlipped)}>
-                <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d shadow-xl rounded-xl border border-border ${isFlipped ? 'rotate-y-180' : ''}`}>
+          </div>
+        );
 
-                    {/* Front */}
-                    <div className="absolute inset-0 backface-hidden bg-card rounded-xl flex flex-col items-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
-                         <span className="text-xs uppercase tracking-widest text-muted-foreground shrink-0">Front</span>
-                         <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg lg:text-2xl font-bold font-serif text-foreground [scrollbar-gutter:stable]">
-                             <div className="min-h-full w-full flex flex-col items-center justify-center py-2 sm:py-3 prose prose-stone dark:prose-invert max-w-none text-center">
-                                 <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
-                                     <MarkdownRenderer
-                                         components={{
-                                             img: () => null,
-                                             a: ({ children }) => <span className="text-foreground">{children}</span>,
-                                             video: () => null,
-                                             audio: () => null,
-                                             iframe: () => null,
-                                             table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
-                                             thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                                             tbody: ({ children }) => <tbody>{children}</tbody>,
-                                             tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                                             th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
-                                             td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
-                                         }}
-                                     >
-                                         {sanitizeMarkdown(currentCard.front)}
-                                     </MarkdownRenderer>
-                                 </Suspense>
-                             </div>
-                         </div>
-                         <div className="text-xs text-muted-foreground/50 flex items-center gap-2 shrink-0 mt-1">
-                             <RotateCw className="w-3 h-3" /> Click to flip
-                         </div>
-                    </div>
-
-                    {/* Back */}
-                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary rounded-xl flex flex-col items-center p-4 sm:p-6 lg:p-8 text-center overflow-hidden">
-                         <span className="text-xs uppercase tracking-widest text-secondary-foreground/60 shrink-0">Back</span>
-                         <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg lg:text-2xl font-medium font-serif text-foreground [scrollbar-gutter:stable]">
-                             <div className="min-h-full w-full flex flex-col items-center justify-center py-2 sm:py-3 prose prose-stone dark:prose-invert max-w-none text-center">
-                                 <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
-                                     <MarkdownRenderer
-                                         components={{
-                                             img: () => null,
-                                             a: ({ children }) => <span className="text-foreground">{children}</span>,
-                                             video: () => null,
-                                             audio: () => null,
-                                             iframe: () => null,
-                                             table: ({ children }) => <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>,
-                                             thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                                             tbody: ({ children }) => <tbody>{children}</tbody>,
-                                             tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                                             th: ({ children }) => <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">{children}</th>,
-                                             td: ({ children }) => <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>,
-                                         }}
-                                     >
-                                         {sanitizeMarkdown(currentCard.back)}
-                                     </MarkdownRenderer>
-                                 </Suspense>
-                             </div>
-                         </div>
-                    </div>
-
-                </div>
+      case 'true-false':
+        return (
+          <div className="space-y-8 w-full">
+            <div className="prose prose-base sm:prose-lg max-w-none text-center">
+              <Suspense fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}>
+                <MarkdownRenderer>{content}</MarkdownRenderer>
+              </Suspense>
             </div>
-
-            <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-                <button onClick={handlePrev} className="p-2 sm:p-3 rounded-full hover:bg-card active:bg-card/80 active:scale-[0.97] border border-transparent hover:border-border transition-all shrink-0 touch-manipulation">
-                    <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
-                <span className="font-mono text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {currentIndex + 1} / {cards.length}
-                </span>
-                <button onClick={handleNext} className="p-2 sm:p-3 rounded-full hover:bg-card active:bg-card/80 active:scale-[0.97] border border-transparent hover:border-border transition-all shrink-0 touch-manipulation">
-                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
+            <div className="flex justify-center gap-16">
+              <span className="text-xl font-semibold text-emerald-700 dark:text-emerald-400">
+                ✓ True
+              </span>
+              <span className="text-xl font-semibold text-rose-700 dark:text-rose-400">
+                ✗ False
+              </span>
             </div>
+          </div>
+        );
 
-             <style>{`
-                .perspective-1000 { perspective: 1000px; }
-                .transform-style-3d { transform-style: preserve-3d; }
-                .backface-hidden { backface-visibility: hidden; }
-                .rotate-y-180 { transform: rotateY(180deg); }
-            `}</style>
+      case 'fill-blank':
+        return (
+          <div className="prose prose-base sm:prose-lg max-w-none text-center w-full">
+            <Suspense fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}>
+              <MarkdownRenderer>
+                {content.replace(/_+/g, '______')}
+              </MarkdownRenderer>
+            </Suspense>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="prose prose-base sm:prose-lg max-w-none text-center w-full">
+            <Suspense fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}>
+              <MarkdownRenderer>{content}</MarkdownRenderer>
+            </Suspense>
+          </div>
+        );
+    }
+  };
+
+  const boundedBrowseIndex =
+    filteredCards.length === 0
+      ? 0
+      : Math.min(Math.max(0, currentIndex), filteredCards.length - 1);
+  const currentCard =
+    filteredCards.length > 0 ? filteredCards[boundedBrowseIndex] : undefined;
+
+  return (
+    <div
+      className={`flex flex-col h-full min-h-0 p-4 sm:p-6 lg:p-8 bg-background animate-in fade-in duration-300 gap-4 sm:gap-6 relative ${
+        onBack ? 'md:pt-0 pt-16' : ''
+      }`}
+    >
+      {/* Mobile Back Button */}
+      {onBack && (mode === 'browse' || mode === 'study') && (
+        <div className="md:hidden absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-background z-20">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-muted active:bg-muted/70 rounded-lg transition-colors"
+            aria-label="Back to Studio"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <span className="text-sm font-medium truncate">
+            {note.title}
+          </span>
         </div>
-    );
+      )}
+
+      {/* Header Controls */}
+      <div className="shrink-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-xl">
+            <button
+              type="button"
+              onClick={() => handleModeChange('browse')}
+              className={`p-2.5 rounded-lg transition-all ${
+                mode === 'browse'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Browse Mode"
+            >
+              <BookOpen className="w-4.5 h-4.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange('study')}
+              className={`p-2.5 rounded-lg transition-all ${
+                (mode as string) === 'study'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              disabled={dueCards.length === 0}
+              title="Study Mode"
+            >
+              <Brain className="w-4.5 h-4.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange('edit')}
+              className={`p-2.5 rounded-lg transition-all ${
+                mode === 'edit'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Edit Mode"
+            >
+              <Edit3 className="w-4.5 h-4.5" />
+            </button>
+          </div>
+
+          {mode === 'browse' && currentCard && (
+            <ProficiencyBadge card={currentCard} />
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {mode === 'browse' && (
+            <div
+              className="flex items-center gap-0.5 p-1 bg-muted/50 rounded-xl"
+              role="group"
+              aria-label="Which cards to show"
+            >
+              <button
+                type="button"
+                onClick={() => void setShowMasteredPreference(false)}
+                className={`rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm ${
+                  !showMastered
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                Due
+              </button>
+              <button
+                type="button"
+                onClick={() => void setShowMasteredPreference(true)}
+                className={`rounded-lg px-3 py-2 text-xs font-medium transition-all sm:text-sm ${
+                  showMastered
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                All
+              </button>
+            </div>
+          )}
+
+          {mode === 'study' && dueCards.length > 0 && (
+            <span className="tabular-nums text-sm font-medium leading-none text-foreground/90">
+              {dueCards.length}
+              <span className="ml-1 font-normal text-muted-foreground">due</span>
+            </span>
+          )}
+
+          {mode === 'edit' && (
+            <button
+              type="button"
+              onClick={handleAddCard}
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-sm font-medium transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Add Card
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {mode === 'study' && dueCards.length > 0 && (
+          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center pb-1">
+            <StudyMode
+              cards={dueCards}
+              onComplete={handleStudyComplete}
+              onExit={() => handleModeChange('browse')}
+            />
+          </div>
+        )}
+
+        {mode === 'study' && dueCards.length === 0 && (
+          <div className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/20">
+              <Brain className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="mb-2 text-2xl font-semibold">All caught up</h3>
+              <p className="text-muted-foreground">
+                No cards are due for review right now. Check back later.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleModeChange('browse')}
+              className="rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition-all hover:bg-primary/90"
+            >
+              Back to browse
+            </button>
+          </div>
+        )}
+
+        {(mode === 'browse' || mode === 'edit') && filteredCards.length === 0 && (
+          <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
+              <BookOpen className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-lg text-muted-foreground">
+              {showMastered
+                ? 'No flashcards available. Try showing all cards.'
+                : 'No flashcards available. All cards are mastered!'}
+            </p>
+          </div>
+        )}
+
+        {(mode === 'browse' || mode === 'edit') && filteredCards.length > 0 && currentCard && (
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6">
+      {/* Card Display */}
+      <div
+        role={mode === 'browse' ? 'button' : undefined}
+        tabIndex={mode === 'browse' ? 0 : undefined}
+        aria-label={
+          mode === 'browse'
+            ? isFlipped
+              ? 'Flashcard answer. Press Enter or Space to show question.'
+              : 'Flashcard question. Press Enter or Space to reveal answer.'
+            : undefined
+        }
+        onKeyDown={(e) => {
+          if (mode !== 'browse') return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsFlipped((f) => !f);
+          }
+        }}
+        className={`w-full max-w-xl mx-auto h-[min(40vh,22rem)] min-h-56 max-h-96 shrink-0 perspective-1000 group cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+          mode === 'edit' ? 'cursor-pointer' : ''
+        }`}
+        onClick={() => {
+          if (mode === 'browse') {
+            setIsFlipped(!isFlipped);
+          } else if (mode === 'edit') {
+            handleEditCard(boundedBrowseIndex);
+          }
+        }}
+      >
+        <div
+          className={`relative w-full h-full transition-transform duration-700 transform-style-3d shadow-lg rounded-2xl ${
+            isFlipped ? 'rotate-y-180' : ''
+          } ${mode === 'edit' ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+        >
+          {/* Front */}
+          <div className="absolute inset-0 backface-hidden bg-card rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
+              Question
+            </span>
+            <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg font-medium text-foreground [scrollbar-gutter:stable]">
+              <div className="min-h-full w-full flex flex-col items-center justify-center py-1">
+                {renderCardFront(currentCard)}
+              </div>
+            </div>
+            <p
+              className={`mt-2 flex items-center justify-center gap-1.5 text-[11px] shrink-0 ${
+                mode === 'browse' ? 'text-muted-foreground' : 'text-primary'
+              }`}
+            >
+              <RotateCw className="h-3 w-3 opacity-70" aria-hidden />
+              <span>{mode === 'browse' ? 'Tap or Space to flip' : 'Tap to edit'}</span>
+            </p>
+          </div>
+
+          {/* Back */}
+          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-muted/30 rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
+              Answer
+            </span>
+            <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg font-medium text-foreground [scrollbar-gutter:stable]">
+              <div className="min-h-full w-full flex flex-col items-center justify-center py-1 prose prose-base sm:prose-lg max-w-none text-center">
+                <Suspense fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}>
+                  <MarkdownRenderer
+                    components={{
+                      img: () => null,
+                      a: ({ children }) => <span className="text-foreground">{children}</span>,
+                      video: () => null,
+                      audio: () => null,
+                      iframe: () => null,
+                      table: ({ children }) => (
+                        <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
+                          {children}
+                        </table>
+                      ),
+                      thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                      th: ({ children }) => (
+                        <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
+                          {children}
+                        </td>
+                      ),
+                    }}
+                  >
+                    {sanitizeMarkdown(currentCard.back)}
+                  </MarkdownRenderer>
+                </Suspense>
+              </div>
+            </div>
+            {mode === 'browse' && (
+              <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
+                <RotateCw className="h-3 w-3 opacity-70" aria-hidden />
+                <span>Tap or Space to flip back</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation: progress + circular arrows (distinct from header segments) */}
+      <div className="flex w-full max-w-xl mx-auto shrink-0 flex-col items-stretch gap-2.5">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={handlePrev}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
+            aria-label="Previous card"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div
+            className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={filteredCards.length}
+            aria-valuenow={boundedBrowseIndex + 1}
+            aria-label={`Card ${boundedBrowseIndex + 1} of ${filteredCards.length}`}
+          >
+            <div
+              className="h-full rounded-full bg-foreground/25 transition-[width] duration-300 ease-out dark:bg-foreground/35"
+              style={{
+                width: `${((boundedBrowseIndex + 1) / filteredCards.length) * 100}%`,
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
+            aria-label="Next card"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="text-center text-sm tabular-nums leading-snug text-muted-foreground">
+          <span className="font-semibold text-foreground">{boundedBrowseIndex + 1}</span>
+          <span className="mx-2 text-base font-light text-foreground/35" aria-hidden>
+            ·
+          </span>
+          <span className="font-medium text-foreground/85">{filteredCards.length}</span>
+        </p>
+      </div>
+      </div>
+        )}
+      </div>
+
+      {/* Edit Card Modal */}
+      <EditCardModal
+        isOpen={editModalOpen}
+        card={editingCard}
+        cardIndex={editingCardIndex}
+        onSave={handleSaveCard}
+        onCancel={() => {
+          setEditModalOpen(false);
+          setEditingCard(undefined);
+          setEditingCardIndex(undefined);
+        }}
+        onDelete={editingCardIndex !== undefined ? handleDeleteCard : undefined}
+      />
+
+      <style>{`
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+        .transform-style-3d {
+          transform-style: preserve-3d;
+        }
+        .backface-hidden {
+          backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+          transform: rotateY(180deg);
+        }
+      `}</style>
+    </div>
+  );
 };
