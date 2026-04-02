@@ -7,6 +7,8 @@ import { AgentActivityPanel } from './AgentActivityPanel';
 
 interface MessageBubbleProps {
   message: Message;
+  /** True only while the HTTP stream is still delivering tokens (not after __DONE). */
+  isAssistantStreamActive?: boolean;
   refHandlers: RefHandlers;
   onCopyMessage: (message: Message) => void;
   copiedMessageId: string | null;
@@ -18,7 +20,16 @@ interface MessageBubbleProps {
 const ACTION_FLASH_MS = 220;
 
 export const MessageBubble = React.memo<MessageBubbleProps>(
-  ({ message, refHandlers, onCopyMessage, copiedMessageId, onSetFeedback, onSendFollowUp, onRetry }) => {
+  ({
+    message,
+    isAssistantStreamActive = false,
+    refHandlers,
+    onCopyMessage,
+    copiedMessageId,
+    onSetFeedback,
+    onSendFollowUp,
+    onRetry,
+  }) => {
     const isUser = message.role === 'user';
     const isCopied = copiedMessageId === message.id;
     const [flashedActionId, setFlashedActionId] = React.useState<string | null>(null);
@@ -239,7 +250,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
           <>
             {showAgentPanel && (
               <AgentActivityPanel
-                isStreaming={isStreamingRow}
+                isStreaming={isStreamingRow && isAssistantStreamActive}
                 activityPhase={message.status}
                 activityDetail={message.statusDetail}
                 historicalPhase={historicalPhase}
@@ -278,7 +289,8 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     prev.message.groundingChecks === next.message.groundingChecks &&
     prev.message.clarificationQuestion === next.message.clarificationQuestion &&
     JSON.stringify(prev.message.agentTrace) === JSON.stringify(next.message.agentTrace) &&
-    prev.copiedMessageId === next.copiedMessageId
+    prev.copiedMessageId === next.copiedMessageId &&
+    prev.isAssistantStreamActive === next.isAssistantStreamActive
 );
 
 MessageBubble.displayName = 'MessageBubble';

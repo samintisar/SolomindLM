@@ -101,12 +101,10 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     const onStreamComplete = () => {
       setIsChatStreaming(false);
       setStreamingJustFinished(true);
-      setStreamingToolCalls([]);
-      setStreamingTracePhases([]);
-      setStreamingPhase(null);
-      setStreamingPhaseDetail(null);
-      setStreamingGrounding([]);
-      setStreamingClarification(null);
+      // Keep trace, tool calls, phase, and grounding until the synthetic __streaming__ row
+      // is removed (streamingContent cleared after the persisted assistant message arrives).
+      // Clearing them here left a gap where the panel still showed with empty toolCalls, so
+      // AgentActivityPanel fell back to "phases only, tools at end" and looked broken.
       const len = messagesRef.current.length;
       messagesLengthWhenStreamCompleteRef.current = len > 0 ? len : -1;
       streamStartedAtRef.current = null;
@@ -181,6 +179,12 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
       setStreamingContent('');
       setStreamingReferences(null);
       setStreamingJustFinished(false);
+      setStreamingToolCalls([]);
+      setStreamingTracePhases([]);
+      setStreamingPhase(null);
+      setStreamingPhaseDetail(null);
+      setStreamingGrounding([]);
+      setStreamingClarification(null);
     }
   }, [streamingJustFinished, messages]);
 

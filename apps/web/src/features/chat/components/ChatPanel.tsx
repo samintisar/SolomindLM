@@ -364,6 +364,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="px-3 py-3 sm:px-4 md:px-6">
                   <MessageBubble
                     message={message}
+                    isAssistantStreamActive={message.id === '__streaming__' ? isLoading : false}
                     refHandlers={refHandlers}
                     onCopyMessage={copyMessageAsMarkdown}
                     copiedMessageId={copiedMessageId}

@@ -58,6 +58,47 @@ function splitPhasesForSearchToolDetails(
   return { pipeline: phases, postSearch: [] };
 }
 
+/** Canonical RAG step order so a briefly out-of-order trace (e.g. status/detail vs phases) cannot show "Formulating" before HyDE/search prep. */
+const RAG_DISPLAY_ORDER: Record<string, number> = {
+  retrieving: 10,
+  embedding: 20,
+  ranking: 30,
+  reading: 40,
+  thinking: 50,
+  generating: 60,
+  writing: 70,
+};
+
+function sortTimelinePhasesForRagDisplay(
+  phases: Array<{ status: string; message: string }>
+): Array<{ status: string; message: string }> {
+  if (phases.length <= 1) return phases;
+  const rank = (s: string) => RAG_DISPLAY_ORDER[s] ?? 1000;
+  return [...phases]
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => rank(a.p.status) - rank(b.p.status) || a.i - b.i)
+    .map(({ p }) => p);
+}
+
+function phaseRowLine(step: { status: string; message: string }): string {
+  return (
+    step.message?.trim() ||
+    getStatusMessage(step.status) ||
+    step.status.replace(/_/g, ' ')
+  );
+}
+
+/** Avoid repeating the same line as the collapsible header inside the list. */
+function dropFirstPhaseIfMatchesHeader(
+  phases: Array<{ status: string; message: string }>,
+  headerLabel: string
+): Array<{ status: string; message: string }> {
+  const h = headerLabel.trim();
+  if (!h || phases.length === 0) return phases;
+  if (phaseRowLine(phases[0]) === h) return phases.slice(1);
+  return phases;
+}
+
 export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
   ({
     isStreaming,
@@ -134,9 +175,21 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       () => activityPhases.filter((p) => p.status !== 'completed'),
       [activityPhases]
     );
+    const sortedTimelinePhases = useMemo(
+      () => sortTimelinePhasesForRagDisplay(timelinePhases),
+      [timelinePhases]
+    );
+    const displayPhasesForSplit = useMemo(
+      () => dropFirstPhaseIfMatchesHeader(sortedTimelinePhases, phaseLabel),
+      [sortedTimelinePhases, phaseLabel]
+    );
     const { pipeline, postSearch } = useMemo(
-      () => splitPhasesForSearchToolDetails(timelinePhases, toolCalls.length > 0),
-      [timelinePhases, toolCalls.length]
+      () =>
+        splitPhasesForSearchToolDetails(
+          displayPhasesForSplit,
+          toolCalls.length > 0
+        ),
+      [displayPhasesForSplit, toolCalls.length]
     );
     const totalTimelinePhaseRows = pipeline.length + postSearch.length;
 
