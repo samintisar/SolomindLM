@@ -2,11 +2,7 @@
 
 import { Send } from '@langchain/langgraph';
 
-import {
-  logError,
-  logInfo,
-  logWarn,
-} from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { NODES } from './prompts.js';
 import type { ChunkStateType, ConceptExtraction, OverallStateType } from './state.js';
@@ -22,15 +18,16 @@ export async function mapProcess(
   state: ChunkStateType,
   deps: MindMapMapProcessDeps
 ): Promise<Partial<OverallStateType> | Send> {
+  const logger = createAgentGraphLogger('MindMapGraph', 'mindmap');
   const chunkLength = state.content?.length || 0;
   const retryCount = state.retryCount ?? 0;
 
-  logInfo({
+  logger.info(`Processing chunk (${chunkLength} chars) [Attempt ${retryCount + 1}/3]`, {
     agent: 'MindMapGraph',
     phase: 'map_process',
     chunkLength,
     attempt: retryCount + 1,
-  }, `Processing chunk (${chunkLength} chars) [Attempt ${retryCount + 1}/3]`);
+  });
 
   const startTime = Date.now();
 
@@ -40,11 +37,11 @@ export async function mapProcess(
       const jitter = Math.random() * backoff * 0.1;
       await new Promise(r => setTimeout(r, backoff + jitter));
 
-      logInfo({
+      logger.info(`Retry backoff: ${Math.round(backoff + jitter)}ms`, {
         agent: 'MindMapGraph',
         phase: 'map_process',
         backoff: Math.round(backoff + jitter),
-      }, `Retry backoff: ${Math.round(backoff + jitter)}ms`);
+      });
     } else {
       await new Promise(r => setTimeout(r, Math.random() * 500));
     }
@@ -52,13 +49,13 @@ export async function mapProcess(
     const extraction = await deps.extractConcepts(state.content || '');
     const elapsed = Date.now() - startTime;
 
-    logInfo({
+    logger.info(`Extracted ${extraction.key_concepts.length} concepts in ${elapsed}ms`, {
       agent: 'MindMapGraph',
       phase: 'map_process',
       conceptsExtracted: extraction.key_concepts.length,
       processingTimeMs: elapsed,
       mainTheme: extraction.main_theme,
-    }, `Extracted ${extraction.key_concepts.length} concepts in ${elapsed}ms`);
+    });
 
     deps.onMapSuccess();
 
@@ -76,28 +73,31 @@ export async function mapProcess(
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e);
 
-    logError({
-      agent: 'MindMapGraph',
-      phase: 'map_process',
-      error: e instanceof Error ? {
-        name: e.name,
-        message: e.message,
-        stack: e.stack?.split('\n').slice(0, 3).join('\n'),
-      } : String(e),
-      attempts: retryCount + 1,
-    }, `Chunk failed: ${msg}`);
+    logger.phaseError(
+      'map_process',
+      e instanceof Error ? e : new Error(String(e)),
+      {
+        agent: 'MindMapGraph',
+        error: e instanceof Error ? {
+          name: e.name,
+          message: e.message,
+          stack: e.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(e),
+        attempts: retryCount + 1,
+      }
+    );
 
     const isTimeout = msg.toLowerCase().includes('timeout');
     const isServerErr = msg.includes('500') || msg.includes('503') || msg.includes('internal server error');
 
     const MAX_ATTEMPTS = 3;
     if ((isTimeout || isServerErr) && retryCount < MAX_ATTEMPTS - 1) {
-      logWarn({
+      logger.warn(`Retrying chunk (${retryCount + 1}/${MAX_ATTEMPTS})...`, {
         agent: 'MindMapGraph',
         phase: 'map_process',
         retryAttempt: retryCount + 1,
         maxAttempts: MAX_ATTEMPTS,
-      }, `Retrying chunk (${retryCount + 1}/${MAX_ATTEMPTS})...`);
+      });
       return new Send(NODES.MAP_PROCESS, {
         content: state.content,
         retryCount: retryCount + 1,
@@ -106,21 +106,23 @@ export async function mapProcess(
 
     const totalFailures = deps.onPermanentChunkFailure();
     if (totalFailures >= deps.maxTotalFailures) {
-      logError({
+      logger.phaseError('map_process', new Error(`CIRCUIT BREAKER: ${totalFailures} failures - stopping generation`), {
         agent: 'MindMapGraph',
-        phase: 'map_process',
         totalFailures,
-      }, `CIRCUIT BREAKER: ${totalFailures} failures - stopping generation`);
+      });
 
       throw new Error(`Circuit breaker tripped: ${totalFailures} chunks failed permanently`);
     }
 
-    logError({
-      agent: 'MindMapGraph',
-      phase: 'map_process',
-      attempts: retryCount + 1,
-      totalFailures,
-    }, `Chunk failed permanently (${totalFailures} total failures)`);
+    logger.phaseError(
+      'map_process',
+      new Error(`Chunk failed permanently (${totalFailures} total failures)`),
+      {
+        agent: 'MindMapGraph',
+        attempts: retryCount + 1,
+        totalFailures,
+      }
+    );
     return { extractedConcepts: [] };
   }
 }

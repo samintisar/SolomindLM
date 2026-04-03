@@ -4,6 +4,7 @@ import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { END, START, StateGraph } from '@langchain/langgraph';
 
 import { countTokens } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import {
   type CollapseReduceDeps,
@@ -54,6 +55,7 @@ export class FlashcardGraph {
     const collapseReduceDeps: CollapseReduceDeps = {
       smartLlm: this.smartLlm,
       estimateTokens: this.estimateTokens.bind(this),
+      logger: createAgentGraphLogger('FlashcardGraph', 'flashcard'),
     };
 
     builder.addNode('split_chunks', (s: OverallStateType) => splitChunks(s));

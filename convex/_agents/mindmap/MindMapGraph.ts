@@ -6,7 +6,7 @@
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { END, START, StateGraph, type Send } from '@langchain/langgraph';
 
-import { logError, logInfo } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { validateChunks } from './chunkHelpers.js';
 import { createMapTasks } from './routing.js';
@@ -101,12 +101,13 @@ export class MindMapGraph {
       throw new Error('All chunks failed validation (empty or too small)');
     }
 
-    logInfo({
+    const logger = createAgentGraphLogger('MindMapGraph', 'mindmap');
+    logger.info(`Starting mind map generation with ${validated.length} valid chunks`, {
       agent: 'MindMapGraph',
       phase: 'initialize',
       inputChunks: chunks.length,
       validChunks: validated.length,
-    }, `Starting mind map generation with ${validated.length} valid chunks`);
+    });
 
     this.failureCount = 0;
 
@@ -124,11 +125,13 @@ export class MindMapGraph {
 
       return result.finalOutput;
     } catch (error) {
-      logError({
-        agent: 'MindMapGraph',
-        phase: 'generate',
-        error: error instanceof Error ? error.message : String(error),
-      }, `Mind map generation failed: ${error}`);
+      logger.phaseError(
+        'generate',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          agent: 'MindMapGraph',
+        }
+      );
 
       throw error;
     }

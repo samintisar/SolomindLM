@@ -8,11 +8,8 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
-  logPhaseStart,
-  logWarn,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import {
@@ -30,11 +27,11 @@ export async function reduce(
   state: OverallStateType,
   smartLlm: ChatTogetherAI
 ): Promise<Partial<OverallStateType> | Send> {
+  const logger = createAgentGraphLogger('WrittenQuestionsGraph', 'written_questions');
   await callStatusUpdate(state, 'reducing');
 
-  logPhaseStart({
+  logger.phaseStart('reduce', {
     agent: 'WrittenQuestionsGraph',
-    phase: 'reduce',
     collapsedOutputsCount: state.collapsedOutputs.length,
     targetQuestionCount: state.questionCount,
     difficulty: state.difficulty,
@@ -48,22 +45,20 @@ export async function reduce(
       const parsed = JSON.parse(output) as WrittenQuestion[];
       allQuestions.push(...parsed);
     } catch (e) {
-      logWarn({
+      logger.warn('Failed to parse question array in reduce', {
         agent: 'WrittenQuestionsGraph',
         phase: 'reduce_parse_error',
         error: e instanceof Error ? e.message : String(e),
-      }, 'Failed to parse question array in reduce');
+      });
     }
   }
 
   const totalQuestionsBefore = allQuestions.length;
 
   if (totalQuestionsBefore === 0) {
-    logError({
+    logger.phaseError('reduce', new Error('No questions generated'), {
       agent: 'WrittenQuestionsGraph',
-      phase: 'reduce',
-      error: 'No questions generated',
-    }, 'CRITICAL: No questions in collapsed outputs!');
+    });
     await callStatusUpdate(state, 'failed');
     return {
       ...state,
@@ -93,24 +88,24 @@ export async function reduce(
 
   const smartReduceThreshold = state.questionCount + Math.max(2, Math.ceil(state.questionCount * 0.25));
 
-  logInfo({
+  logger.info(`Flattened ${totalQuestionsBefore} questions, ${dedupedQuestions.length} remain after heuristic dedupe`, {
     agent: 'WrittenQuestionsGraph',
     phase: 'reduce_after_dedupe',
     totalQuestionsBefore,
     dedupedQuestionCount: dedupedQuestions.length,
     smartReduceThreshold,
-  }, `Flattened ${totalQuestionsBefore} questions, ${dedupedQuestions.length} remain after heuristic dedupe`);
+  });
 
   if (dedupedQuestions.length <= state.questionCount) {
-    logInfo({
+    logger.info(`Skipping LLM reduce, using ${dedupedQuestions.length} questions directly`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce_skip',
       totalQuestionsExtracted: dedupedQuestions.length,
       targetQuestionCount: state.questionCount,
       reason: 'Question pool is already at or below target after heuristic dedupe',
-    }, `Skipping LLM reduce, using ${dedupedQuestions.length} questions directly`);
+    });
 
-    const result = finalizeQuestions(dedupedQuestions, state);
+    const result = finalizeQuestions(dedupedQuestions, state, logger);
     return {
       ...result,
       progress: {
@@ -127,15 +122,15 @@ export async function reduce(
 
     if (similarQuestions.length === 0) {
       const skippedSelection = dedupedQuestions.slice(0, state.questionCount);
-      logInfo({
+      logger.info(`Skipping smart reduce: ${dedupedQuestions.length} heuristically clean questions are already near target`, {
         agent: 'WrittenQuestionsGraph',
         phase: 'reduce_skip_llm',
         candidateCount: dedupedQuestions.length,
         targetQuestionCount: state.questionCount,
         smartReduceThreshold,
-      }, `Skipping smart reduce: ${dedupedQuestions.length} heuristically clean questions are already near target`);
+      });
 
-      const result = finalizeQuestions(skippedSelection, state);
+      const result = finalizeQuestions(skippedSelection, state, logger);
       return {
         ...result,
         progress: {
@@ -147,13 +142,13 @@ export async function reduce(
       };
     }
 
-    logInfo({
+    logger.info(`Keeping smart reduce for ${dedupedQuestions.length} near-target questions because ${similarQuestions.length} duplicate groups remain`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce_keep_llm',
       candidateCount: dedupedQuestions.length,
       duplicateGroups: similarQuestions.length,
       reason: 'Near target but heuristic verifier still found overlaps',
-    }, `Keeping smart reduce for ${dedupedQuestions.length} near-target questions because ${similarQuestions.length} duplicate groups remain`);
+    });
   }
 
   const retryCount = state.reduceRetryCount ?? 0;
@@ -165,17 +160,17 @@ export async function reduce(
     const shuffled = [...questionsForLLM].sort(() => Math.random() - 0.5);
     questionsForLLM = shuffled.slice(0, MAX_QUESTIONS_FOR_LLM);
 
-    logInfo({
+    logger.info(`Randomly sampled ${dedupedQuestions.length} questions down to ${MAX_QUESTIONS_FOR_LLM} before LLM selection`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce_safety_cap',
       totalQuestionsBefore: dedupedQuestions.length,
       sampledDownTo: MAX_QUESTIONS_FOR_LLM,
       targetQuestionCount: state.questionCount,
       reason: 'Context window safety cap after heuristic dedupe',
-    }, `Randomly sampled ${dedupedQuestions.length} questions down to ${MAX_QUESTIONS_FOR_LLM} before LLM selection`);
+    });
   }
 
-  logInfo({
+  logger.info(`Using smart LLM for intelligent question selection from ${questionsForLLM.length} questions [Attempt ${retryCount + 1}/2]...`, {
     agent: 'WrittenQuestionsGraph',
     phase: 'reduce_llm_selection',
     totalQuestionsBefore,
@@ -184,12 +179,12 @@ export async function reduce(
     targetQuestionCount: state.questionCount,
     retryAttempt: retryCount + 1,
     reason: 'Using smart reduce after heuristic dedupe because the pool is still large or messy',
-  }, `Using smart LLM for intelligent question selection from ${questionsForLLM.length} questions [Attempt ${retryCount + 1}/2]...`);
+  });
 
   const similarQuestions = detectSimilarQuestions(questionsForLLM);
 
   if (similarQuestions.length > 0) {
-    logInfo({
+    logger.info(`Detected ${similarQuestions.length} potential duplicate groups - LLM will handle merging`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce_similarity_detection',
       duplicateGroups: similarQuestions.length,
@@ -198,7 +193,7 @@ export async function reduce(
         reason: d.reason,
         questions: d.questions.map(q => q.question.substring(0, 80)),
       })),
-    }, `Detected ${similarQuestions.length} potential duplicate groups - LLM will handle merging`);
+    });
   }
 
   try {
@@ -238,28 +233,28 @@ export async function reduce(
         maxAttempts: 2,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
-          logWarn({
+          logger.warn(`LLM reduce retry attempt ${attempt}/2`, {
             agent: 'WrittenQuestionsGraph',
             phase: 'reduce_llm_retry',
             attempt,
             error: error.message,
-          }, `LLM reduce retry attempt ${attempt}/2`);
+          });
         },
       },
       'WrittenQuestionsReduce'
     );
 
-    logInfo({
+    logger.info(`LLM selection completed, selected ${response.questions.length} questions`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'reduce_llm_success',
       selectedCount: response.questions.length,
-    }, `LLM selection completed, selected ${response.questions.length} questions`);
+    });
 
     if (response.questions.length === 0) {
       throw new Error('LLM returned zero questions');
     }
 
-    const result = finalizeQuestions(response.questions, state);
+    const result = finalizeQuestions(response.questions, state, logger);
     return {
       ...result,
       progress: {
@@ -279,7 +274,11 @@ export async function reduce(
       } : String(error),
     };
 
-    logError(errorContext, 'LLM reduce failed, retrying...');
+    logger.phaseError(
+      'reduce_llm_failed',
+      error instanceof Error ? error : new Error(String(error)),
+      errorContext
+    );
 
     if (retryCount < 1) {
       return new Send('reduce', {
@@ -288,13 +287,12 @@ export async function reduce(
       } as any);
     }
 
-    logError({
+    logger.phaseError('reduce_final_fallback', new Error('LLM reduce failed after retries, using simple slice fallback'), {
       agent: 'WrittenQuestionsGraph',
-      phase: 'reduce_final_fallback',
-    }, 'LLM reduce failed after retries, using simple slice fallback');
+    });
 
     const fallback = dedupedQuestions.slice(0, state.questionCount);
-    const result = finalizeQuestions(fallback, state);
+    const result = finalizeQuestions(fallback, state, logger);
     return {
       ...result,
       progress: {

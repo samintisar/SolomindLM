@@ -1,6 +1,6 @@
 "use node"
 
-import { logInfo } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import type { SlideCandidate } from './prompts.js';
 
@@ -28,6 +28,7 @@ export function calculateSlideSimilarity(s1: SlideCandidate, s2: SlideCandidate)
 }
 
 export function heuristicDedupeSlides(slides: SlideCandidate[]): SlideCandidate[] {
+  const logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
   const SIMILARITY_THRESHOLD = 0.75;
   const toRemove = new Set<number>();
 
@@ -41,16 +42,13 @@ export function heuristicDedupeSlides(slides: SlideCandidate[]): SlideCandidate[
   }
 
   const dedupedCount = slides.length - toRemove.size;
-  logInfo(
-    {
-      agent: 'SlideDeckGraph',
-      phase: 'heuristic_dedupe',
-      inputCount: slides.length,
-      outputCount: dedupedCount,
-      duplicatesRemoved: toRemove.size,
-    },
-    `Deduplication: ${slides.length} → ${dedupedCount} slides (${toRemove.size} duplicates removed)`
-  );
+  logger.info(`Deduplication: ${slides.length} → ${dedupedCount} slides (${toRemove.size} duplicates removed)`, {
+    agent: 'SlideDeckGraph',
+    phase: 'heuristic_dedupe',
+    inputCount: slides.length,
+    outputCount: dedupedCount,
+    duplicatesRemoved: toRemove.size,
+  });
 
   return slides.filter((_, idx) => !toRemove.has(idx));
 }
@@ -85,17 +83,15 @@ export function groupSlidesByTopicForSelection(slides: SlideCandidate[]): Record
 }
 
 export function preSelectSlides(slides: SlideCandidate[], maxSlides: number): SlideCandidate[] {
+  const logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
   if (slides.length <= maxSlides) {
-    logInfo(
-      {
-        agent: 'SlideDeckGraph',
-        phase: 'pre_select',
-        inputCount: slides.length,
-        outputCount: slides.length,
-        maxSlides,
-      },
-      `Pre-select: ${slides.length} slides (within limit)`
-    );
+    logger.info(`Pre-select: ${slides.length} slides (within limit)`, {
+      agent: 'SlideDeckGraph',
+      phase: 'pre_select',
+      inputCount: slides.length,
+      outputCount: slides.length,
+      maxSlides,
+    });
     return slides;
   }
 
@@ -110,17 +106,14 @@ export function preSelectSlides(slides: SlideCandidate[], maxSlides: number): Sl
 
   const result = selected.slice(0, maxSlides);
 
-  logInfo(
-    {
-      agent: 'SlideDeckGraph',
-      phase: 'pre_select',
-      inputCount: slides.length,
-      outputCount: result.length,
-      maxSlides,
-      topicsFound: Object.keys(grouped).length,
-    },
-    `Pre-select: ${slides.length} → ${result.length} slides (topic-based selection)`
-  );
+  logger.info(`Pre-select: ${slides.length} → ${result.length} slides (topic-based selection)`, {
+    agent: 'SlideDeckGraph',
+    phase: 'pre_select',
+    inputCount: slides.length,
+    outputCount: result.length,
+    maxSlides,
+    topicsFound: Object.keys(grouped).length,
+  });
 
   return result;
 }
@@ -131,6 +124,7 @@ export function selectSlidesHeuristic(
   minSlides: number,
   maxSlides: number
 ): SlideCandidate[] {
+  const logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
   const grouped = groupSlidesByTopicForSelection(candidates);
   const topicOrder = [
     'Introduction/Foundation',
@@ -164,18 +158,15 @@ export function selectSlidesHeuristic(
 
   const result = selected.slice(0, maxSlides);
 
-  logInfo(
-    {
-      agent: 'SlideDeckGraph',
-      phase: 'heuristic_selection_fallback',
-      inputCount: candidates.length,
-      outputCount: result.length,
-      targetCount,
-      minSlides,
-      maxSlides,
-    },
-    `Heuristic fallback: ${candidates.length} → ${result.length} slides`
-  );
+  logger.info(`Heuristic fallback: ${candidates.length} → ${result.length} slides`, {
+    agent: 'SlideDeckGraph',
+    phase: 'heuristic_selection_fallback',
+    inputCount: candidates.length,
+    outputCount: result.length,
+    targetCount,
+    minSlides,
+    maxSlides,
+  });
 
   return result;
 }

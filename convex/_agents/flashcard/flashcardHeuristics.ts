@@ -1,6 +1,6 @@
 "use node"
 
-import { logInfo, logWarn } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { PROBLEMATIC_PHRASES } from './prompts.js';
 import type { Flashcard } from './state.js';
@@ -47,27 +47,28 @@ export function groupFlashcardsByTopic(flashcards: Flashcard[]): Record<string, 
 }
 
 export function validateSelfContained(card: Flashcard): boolean {
+  const logger = createAgentGraphLogger('FlashcardGraph', 'flashcard');
   const text = card.front.toLowerCase();
   const hasProblematicPhrase = PROBLEMATIC_PHRASES.some(phrase => text.includes(phrase));
   const isShort = text.length < 150;
   const shouldReject = hasProblematicPhrase && isShort;
 
   if (shouldReject) {
-    logWarn({
+    logger.warn('Flashcard rejected: short with potential external references', {
       agent: 'FlashcardGraph',
       phase: 'validate_self_contained',
       questionPreview: card.front.substring(0, 100),
       questionLength: text.length,
       foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
-    }, 'Flashcard rejected: short with potential external references');
+    });
   } else if (hasProblematicPhrase && !isShort) {
-    logInfo({
+    logger.info('Flashcard accepted: has phrases but is long enough to include context', {
       agent: 'FlashcardGraph',
       phase: 'validate_self_contained_accept',
       questionPreview: card.front.substring(0, 100),
       questionLength: text.length,
       foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
-    }, 'Flashcard accepted: has phrases but is long enough to include context');
+    });
   }
 
   return !shouldReject;
@@ -210,6 +211,7 @@ export function heuristicDedupeFlashcards(flashcards: Flashcard[]): {
   dedupedFlashcards: Flashcard[];
   duplicatesRemoved: number;
 } {
+  const logger = createAgentGraphLogger('FlashcardGraph', 'flashcard');
   const dedupedByExactKey = new Map<string, Flashcard>();
   const exactKeyByFront = new Map<string, string>();
   let duplicatesRemoved = 0;
@@ -258,13 +260,13 @@ export function heuristicDedupeFlashcards(flashcards: Flashcard[]): {
 
   const dedupedFlashcards = [...dedupedByExactKey.values()];
 
-  logInfo({
+  logger.info(`Heuristic dedupe: ${flashcards.length} → ${dedupedFlashcards.length} flashcards (removed ${duplicatesRemoved})`, {
     agent: 'FlashcardGraph',
     phase: 'heuristic_dedupe',
     inputCount: flashcards.length,
     outputCount: dedupedFlashcards.length,
     duplicatesRemoved,
-  }, `Heuristic dedupe: ${flashcards.length} → ${dedupedFlashcards.length} flashcards (removed ${duplicatesRemoved})`);
+  });
 
   return {
     dedupedFlashcards,

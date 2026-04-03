@@ -2,7 +2,8 @@
 
 import { randomUUID } from 'crypto';
 
-import { clearStateKeys, logBanner, logInfo } from '../_shared/index.js';
+import { clearStateKeys } from '../_shared/index.js';
+import type { JobLogger } from '../_shared/logging.js';
 
 import { extractTopic } from './questionHeuristics.js';
 import type { WrittenQuestion } from './prompts.js';
@@ -201,7 +202,8 @@ export function applySelectedQuestionIds(
 
 export function finalizeQuestions(
   questions: WrittenQuestion[],
-  state: OverallStateType
+  state: OverallStateType,
+  logger: JobLogger
 ): Partial<OverallStateType> {
   const questionsWithIds = questions.map(q => ({
     ...q,
@@ -209,7 +211,7 @@ export function finalizeQuestions(
     questionType: state.questionType as 'short' | 'essay',
   }));
 
-  logInfo({
+  logger.info('Written questions reduce final summary', {
     agent: 'WrittenQuestionsGraph',
     phase: 'reduce_final',
     finalQuestionCount: questionsWithIds.length,
@@ -222,23 +224,21 @@ export function finalizeQuestions(
     })),
   });
 
-  logBanner(
-    {
-      agent: 'WrittenQuestionsGraph',
-      phase: 'generation_complete',
-      finalQuestionCount: questionsWithIds.length,
-      targetQuestionCount: state.questionCount,
-    },
-    'GENERATION COMPLETE'
-  );
+  logger.info('GENERATION COMPLETE', {
+    agent: 'WrittenQuestionsGraph',
+    phase: 'generation_complete',
+    finalQuestionCount: questionsWithIds.length,
+    targetQuestionCount: state.questionCount,
+    milestone: true,
+  });
 
   const collapsedOutputsSize = state.collapsedOutputs?.reduce((sum, s) => sum + s.length * 2, 0) ?? 0;
   const chunksSize = (state.chunks || []).reduce((sum, s) => sum + s.length * 2, 0);
-  logInfo({
+  logger.info(`Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`, {
     agent: 'WrittenQuestionsGraph',
     phase: 'reduce_cleanup',
     memoryFreedKB: ((collapsedOutputsSize + chunksSize) / 1024).toFixed(2),
-  }, `Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`);
+  });
 
   return {
     ...state,

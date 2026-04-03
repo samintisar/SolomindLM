@@ -19,12 +19,8 @@ import { Send } from '@langchain/langgraph';
 import {
   invokeWithTimeout,
   invokeWithRetry,
-  logPhaseStart,
-  logPhaseComplete,
-  logError,
-  logInfo,
-  logWarn,
 } from './index.js';
+import { createAgentGraphLogger, type JobLogger } from './logging.js';
 import type { RetryConfig } from './retry.js';
 import type { ProgressInfo } from './state_factory.js';
 
@@ -82,6 +78,10 @@ export type ResultHandler<TInput, TOutput> = (
 // Factory Functions
 // ============================================================
 
+function loggerForNodeConfig(config: NodeConfig) {
+  return createAgentGraphLogger(config.agentName);
+}
+
 /**
  * Creates a standard LLM node function with timeout, retry, and logging.
  *
@@ -124,12 +124,9 @@ export function createLLMNode<TInput = unknown, TOutput = unknown>(
 ): (input: TInput) => Promise<Partial<TOutput>> {
   return async (input: TInput): Promise<Partial<TOutput>> => {
     const startTime = Date.now();
+    const logger = loggerForNodeConfig(config);
 
-    // Log phase start
-    logPhaseStart({
-      agent: config.agentName,
-      phase: config.phase,
-    });
+    logger.phaseStart(config.phase, { agent: config.agentName });
 
     try {
       // Prepare messages
@@ -164,10 +161,8 @@ export function createLLMNode<TInput = unknown, TOutput = unknown>(
 
       const elapsed = Date.now() - startTime;
 
-      // Log phase complete
-      logPhaseComplete({
+      logger.phaseComplete(config.phase, {
         agent: config.agentName,
-        phase: config.phase,
         outputLength: responseText.length,
         processingTimeMs: elapsed,
       });
@@ -176,17 +171,12 @@ export function createLLMNode<TInput = unknown, TOutput = unknown>(
     } catch (error) {
       const elapsed = Date.now() - startTime;
 
-      // Log error
-      logError({
+      const err =
+        error instanceof Error ? error : new Error(String(error));
+      logger.phaseError(config.phase, err, {
         agent: config.agentName,
-        phase: config.phase,
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-        } : String(error),
         processingTimeMs: elapsed,
-      }, `${config.phase} failed`);
+      });
 
       // Handle error with custom handler or rethrow
       if (options.onError) {
@@ -243,19 +233,23 @@ export function createCollapseNode<TState extends { mapOutputs: string[] }>(
   maxOutputsPerCollapse: number = 10
 ): (state: TState) => Promise<Partial<TState>> {
   return async (state: TState): Promise<Partial<TState>> => {
-    logPhaseStart({
+    const logger = loggerForNodeConfig(config);
+    logger.phaseStart(config.phase, {
       agent: config.agentName,
-      phase: config.phase,
       inputCount: state.mapOutputs.length,
     });
 
-    const collapsed = recursiveCollapse(state.mapOutputs, maxOutputsPerCollapse);
+    const collapsed = recursiveCollapse(
+      state.mapOutputs,
+      maxOutputsPerCollapse,
+      logger
+    );
 
-    logInfo({
+    logger.info(`Collapsed ${state.mapOutputs.length} outputs to ${collapsed.length}`, {
       agent: config.agentName,
       phase: config.phase,
       outputCount: collapsed.length,
-    }, `Collapsed ${state.mapOutputs.length} outputs to ${collapsed.length}`);
+    });
 
     return {
       collapsedOutputs: collapsed,
@@ -275,7 +269,11 @@ export function createCollapseNode<TState extends { mapOutputs: string[] }>(
  * @param maxOutputsPerCollapse - Maximum outputs to include in each collapsed chunk
  * @returns Collapsed array of strings
  */
-function recursiveCollapse(outputs: string[], maxOutputsPerCollapse: number): string[] {
+function recursiveCollapse(
+  outputs: string[],
+  maxOutputsPerCollapse: number,
+  logger: JobLogger
+): string[] {
   if (outputs.length <= maxOutputsPerCollapse) {
     return outputs;
   }
@@ -286,12 +284,12 @@ function recursiveCollapse(outputs: string[], maxOutputsPerCollapse: number): st
     collapsed.push(batch.join('\n\n---\n\n'));
   }
 
-  logInfo({
+  logger.info(`Recursive collapse: ${outputs.length} -> ${collapsed.length}`, {
     agent: 'NodeBuilder',
     phase: 'recursive_collapse',
     inputCount: outputs.length,
     outputCount: collapsed.length,
-  }, `Recursive collapse: ${outputs.length} -> ${collapsed.length}`);
+  });
 
   return collapsed;
 }
@@ -316,22 +314,24 @@ export function createMapRouteFunction<TState extends { chunks: string[] }>(
   config: NodeConfig
 ): (state: TState) => Send[] | 'collapse' {
   return (state: TState) => {
+    const logger = loggerForNodeConfig(config);
+
     if (state.chunks.length === 0) {
-      logWarn({
+      logger.warn('No chunks to process, routing to collapse', {
         agent: config.agentName,
         phase: config.phase,
-      }, 'No chunks to process, routing to collapse');
+      });
       return 'collapse';
     }
 
     const packedChunks = packChunksFn(state.chunks);
 
-    logInfo({
+    logger.info(`Creating ${packedChunks.length} parallel map tasks`, {
       agent: config.agentName,
       phase: config.phase,
       originalChunks: state.chunks.length,
       packedChunks: packedChunks.length,
-    }, `Creating ${packedChunks.length} parallel map tasks`);
+    });
 
     return packedChunks.map((chunk, idx) =>
       new Send('map', {

@@ -6,13 +6,9 @@ import { HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messag
 import {
   invokeWithTimeout,
   validateWithPreset,
-  logBanner,
-  logError,
-  logInfo,
-  logPhaseStart,
-  logWarn,
   createLangSmithRunConfig,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import { createSmartFallback } from './fallbacks.js';
@@ -24,19 +20,18 @@ export async function reduceNode(
   state: OverallStateType,
   smartLlm: ChatTogetherAI
 ): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('MindMapGraph', 'mindmap');
   const extractions = state.extractedConcepts || [];
 
-  logPhaseStart({
+  logger.phaseStart('reduce', {
     agent: 'MindMapGraph',
-    phase: 'reduce',
     extractionsCount: extractions.length,
   });
 
   if (extractions.length === 0) {
-    logError({
+    logger.phaseError('reduce', new Error('No extractions to build from!'), {
       agent: 'MindMapGraph',
-      phase: 'reduce',
-    }, 'No extractions to build from!');
+    });
     return {
       finalOutput: { nodeData: { topic: 'Error: No Content', children: null } },
       status: 'failed',
@@ -54,13 +49,13 @@ export async function reduceNode(
 
   const safeInput = inputData.slice(0, 150000);
 
-  logInfo({
+  logger.info(`Reducing ${extractions.length} extractions into map (${safeInput.length} chars)`, {
     agent: 'MindMapGraph',
     phase: 'reduce',
     inputSize: inputData.length,
     truncatedSize: safeInput.length,
     model: (smartLlm as any).model,
-  }, `Reducing ${extractions.length} extractions into map (${safeInput.length} chars)`);
+  });
 
   try {
     const start = Date.now();
@@ -84,7 +79,7 @@ export async function reduceNode(
 
     const validation = validateWithPreset(markdown, 'mindmap');
     if (!validation.isValid) {
-      logWarn({
+      logger.warn(`Mind map validation issues: ${validation.warnings.join(', ')}`, {
         agent: 'MindMapGraph',
         phase: 'reduce',
         validation: {
@@ -92,40 +87,38 @@ export async function reduceNode(
           warnings: validation.warnings,
           score: validation.score,
         },
-      }, `Mind map validation issues: ${validation.warnings.join(', ')}`);
+      });
     }
 
     const parsedTree = parseMarkdownToTree(markdown);
     const elapsed = Date.now() - start;
 
-    logInfo({
+    logger.info(`Final map generated in ${elapsed}ms`, {
       agent: 'MindMapGraph',
       phase: 'reduce',
       markdownLength: markdown.length,
       processingTimeMs: elapsed,
       rootTopic: parsedTree.topic,
       branchCount: parsedTree.children?.length ?? 0,
-    }, `Final map generated in ${elapsed}ms`);
+    });
 
     if (parsedTree.children) {
       const branchTopics = parsedTree.children.map(c => c.topic).join(', ');
-      logInfo({
+      logger.info(`Branch topics: ${branchTopics}`, {
         agent: 'MindMapGraph',
         phase: 'reduce',
         branchTopics,
-      }, `Branch topics: ${branchTopics}`);
+      });
     }
 
-    logBanner(
-      {
-        agent: 'MindMapGraph',
-        phase: 'generation_complete',
-        rootTopic: parsedTree.topic,
-        branchCount: parsedTree.children?.length ?? 0,
-        processingTimeMs: elapsed,
-      },
-      'MIND MAP GENERATION COMPLETE'
-    );
+    logger.info('MIND MAP GENERATION COMPLETE', {
+      agent: 'MindMapGraph',
+      phase: 'generation_complete',
+      rootTopic: parsedTree.topic,
+      branchCount: parsedTree.children?.length ?? 0,
+      processingTimeMs: elapsed,
+      milestone: true,
+    });
 
     return {
       finalOutput: { nodeData: parsedTree },
@@ -140,20 +133,23 @@ export async function reduceNode(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
 
-    logError({
-      agent: 'MindMapGraph',
-      phase: 'reduce',
-      error: e instanceof Error ? {
-        name: e.name,
-        message: e.message,
-        stack: e.stack?.split('\n').slice(0, 3).join('\n'),
-      } : String(e),
-    }, `Reduce Error: ${msg}. Using smart fallback...`);
+    logger.phaseError(
+      'reduce',
+      e instanceof Error ? e : new Error(String(e)),
+      {
+        agent: 'MindMapGraph',
+        error: e instanceof Error ? {
+          name: e.name,
+          message: e.message,
+          stack: e.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(e),
+      }
+    );
 
-    logInfo({
+    logger.info('Using smart fallback', {
       agent: 'MindMapGraph',
       phase: 'reduce_fallback',
-    }, 'Using smart fallback');
+    });
 
     const fallback = createSmartFallback(extractions);
     return {

@@ -5,14 +5,10 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import {
   invokeWithTimeout,
   invokeWithRetry,
-  logInfo,
-  logWarn,
-  logError,
-  logPhaseStart,
-  logPhaseComplete,
   sanitizeUserInput,
   createLangSmithRunConfig,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 import type { OverallStateType, ChunkProcessState } from './state.js';
 import { getMapPrompt, MAP_SYSTEM_PROMPT } from './prompts.js';
 import { GRAPH_CONFIG } from './config.js';
@@ -24,12 +20,12 @@ export async function extractBeats(
   state: ChunkProcessState,
   fastLlm: any
 ): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('AudioOverviewGraph', 'audio');
   const { chunk, audioType, length, focus, chunkIndex, totalChunks } = state;
   const startTime = Date.now();
 
-  logPhaseStart({
+  logger.phaseStart('extract_beats', {
     agent: 'AudioOverviewGraph',
-    phase: 'extract_beats',
     chunkIndex,
     chunkLength: chunk.length,
     audioType,
@@ -42,12 +38,12 @@ export async function extractBeats(
 
   const prompt = getMapPrompt(audioType, chunk, sanitizedFocus);
 
-  logInfo({
+  logger.info(`Sending prompt to LLM (${prompt.length} chars)...`, {
     agent: 'AudioOverviewGraph',
     phase: 'extract_beats',
     chunkIndex,
     promptLength: prompt.length,
-  }, `Sending prompt to LLM (${prompt.length} chars)...`);
+  });
 
   let output: string;
   try {
@@ -75,13 +71,13 @@ export async function extractBeats(
         maxAttempts: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
-          logWarn({
+          logger.warn(`Retry attempt ${attempt}/3`, {
             agent: 'AudioOverviewGraph',
             phase: 'extract_beats',
             chunkIndex,
             attempt,
             error: error.message,
-          }, `Retry attempt ${attempt}/3`);
+          });
         }
       },
       'AudioMap'
@@ -102,16 +98,19 @@ export async function extractBeats(
       } : String(error),
     };
 
-    logError(errorContext, 'Extract beats failed');
+    logger.phaseError(
+      'extract_beats',
+      error instanceof Error ? error : new Error(String(error)),
+      errorContext
+    );
 
     output = `• Error processing chunk ${chunkIndex}\n• Unable to extract dialogue beats\n\n[Fallback: Continue with other chunks]`;
   }
 
   const elapsed = Date.now() - startTime;
 
-  logPhaseComplete({
+  logger.phaseComplete('extract_beats', {
     agent: 'AudioOverviewGraph',
-    phase: 'extract_beats',
     chunkIndex,
     outputLength: output.length,
     processingTimeMs: elapsed,

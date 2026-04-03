@@ -7,9 +7,8 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
 } from '../_shared/index.js';
+import type { JobLogger } from '../_shared/logging.js';
 
 import { FLASHCARD_CONFIG } from './config.js';
 import { detectSimilarFlashcards, groupFlashcardsByTopic } from './flashcardHeuristics.js';
@@ -26,6 +25,7 @@ import { createStructuredLLM } from './structuredLlm.js';
 export interface CollapseReduceDeps {
   smartLlm: ChatTogetherAI;
   estimateTokens: (text: string) => number;
+  logger: JobLogger;
 }
 
 export async function recursiveCollapse(
@@ -76,12 +76,12 @@ export async function collapseGroup(
     allCards.push(...flashcards);
   }
 
-  logInfo({
+  deps.logger.info(`Collapsing ${group.length} outputs (${allCards.length} cards)`, {
     agent: 'FlashcardGraph',
     phase: 'collapse_group',
     inputCount: group.length,
     mergedCardCount: allCards.length,
-  }, `Collapsing ${group.length} outputs (${allCards.length} cards)`);
+  });
 
   if (allCards.length <= 30) {
     return allCards;
@@ -137,17 +137,17 @@ export async function refineFlashcardSelection(
   deps: CollapseReduceDeps,
   topic?: string
 ): Promise<Flashcard[]> {
-  logInfo({
+  deps.logger.info(`Selecting ${targetCount} best cards from ${flashcards.length}`, {
     agent: 'FlashcardGraph',
     phase: 'refine_selection',
     totalFlashcards: flashcards.length,
     targetCount,
-  }, `Selecting ${targetCount} best cards from ${flashcards.length}`);
+  });
 
   const similarFlashcards = await detectSimilarFlashcards(flashcards);
 
   if (similarFlashcards.length > 0) {
-    logInfo({
+    deps.logger.info(`Detected ${similarFlashcards.length} potential duplicate groups - LLM will handle merging`, {
       agent: 'FlashcardGraph',
       phase: 'refine_similarity_detection',
       duplicateGroups: similarFlashcards.length,
@@ -159,7 +159,7 @@ export async function refineFlashcardSelection(
           back: f.back.substring(0, 60),
         })),
       })),
-    }, `Detected ${similarFlashcards.length} potential duplicate groups - LLM will handle merging`);
+    });
   }
 
   const flashcardsText = formatFlashcardsAsText(flashcards);
@@ -225,37 +225,40 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
 
   const selected = (response as FlashcardResponse).flashcards;
 
-  logInfo({
+  deps.logger.info(`Refine selection complete: ${selected.length} cards`, {
     agent: 'FlashcardGraph',
     phase: 'refine_selection_complete',
     selectedCount: selected.length,
   });
 
   const topicGroups = groupFlashcardsByTopic(selected);
-  logInfo({
+  deps.logger.info('Topic distribution after refine', {
     agent: 'FlashcardGraph',
     phase: 'refine_topic_distribution',
     topicDistribution: topicGroups,
   });
 
   if (selected.length === 0) {
-    logError({
-      agent: 'FlashcardGraph',
-      phase: 'refine_selection',
-      issue: 'llm_returned_empty',
-      inputCount: flashcards.length,
-      targetCount,
-    }, 'LLM returned empty selection - this should not happen with structured output');
+    deps.logger.phaseError(
+      'refine_selection',
+      new Error('LLM returned empty selection - this should not happen with structured output'),
+      {
+        agent: 'FlashcardGraph',
+        issue: 'llm_returned_empty',
+        inputCount: flashcards.length,
+        targetCount,
+      }
+    );
     return [];
   }
 
   if (selected.length > targetCount) {
-    logInfo({
+    deps.logger.info(`Truncating to ${targetCount} (LLM returned more than requested)`, {
       agent: 'FlashcardGraph',
       phase: 'refine_selection_truncate',
       selectedCount: selected.length,
       targetCount,
-    }, `Truncating to ${targetCount} (LLM returned more than requested)`);
+    });
     return selected.slice(0, targetCount);
   }
 
@@ -266,12 +269,12 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     const needed = targetCount - selected.length;
 
     if (remaining.length > 0) {
-      logInfo({
+      deps.logger.info(`Filling ${needed} more from remaining ${remaining.length}`, {
         agent: 'FlashcardGraph',
         phase: 'refine_selection_fill',
         selectedCount: selected.length,
         targetCount,
-      }, `Filling ${needed} more from remaining ${remaining.length}`);
+      });
       return [...selected, ...remaining.slice(0, needed)];
     }
   }

@@ -127,30 +127,6 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
 
   const renderCardFront = (card: Flashcard) => {
     switch (card.type) {
-      case 'multiple-choice':
-        return (
-          <div className="w-full space-y-5 text-center">
-            <div className="prose prose-base sm:prose-lg max-w-none text-center">
-              <Suspense fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}>
-                <MarkdownRenderer>{sanitizeMarkdown(card.front)}</MarkdownRenderer>
-              </Suspense>
-            </div>
-            {card.options && (
-              <ul className="mx-auto mt-4 max-w-md space-y-2.5">
-                {card.options?.map((opt: string, i: number) => (
-                  <li
-                    key={i}
-                    className="rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-left text-base font-medium"
-                  >
-                    <span className="inline-block w-6 text-muted-foreground">{String.fromCharCode(65 + i)})</span>{' '}
-                    {opt}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        );
-
       case 'true-false':
         return (
           <div className="w-full space-y-6 text-center">

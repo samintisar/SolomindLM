@@ -1,6 +1,8 @@
 "use node"
 
-import { countTokens, logInfo, logPhaseStart } from '../_shared/index.js';
+import { countTokens } from '../_shared/index.js';
+import type { JobLogger } from '../_shared/logging.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import type { OverallStateType } from './state.js';
@@ -8,7 +10,11 @@ import type { OverallStateType } from './state.js';
 /**
  * Recursively collapses multiple outputs into fewer chunks using actual token counting.
  */
-export async function recursiveCollapse(outputs: string[], maxTokens: number): Promise<string[]> {
+export async function recursiveCollapse(
+  outputs: string[],
+  maxTokens: number,
+  logger: JobLogger
+): Promise<string[]> {
   if (outputs.length <= 3) {
     return outputs;
   }
@@ -42,13 +48,13 @@ export async function recursiveCollapse(outputs: string[], maxTokens: number): P
     collapsed.push(currentGroup.join('\n\n---\n\n'));
   }
 
-  logInfo({
+  logger.info(`Recursive collapse: ${outputs.length} -> ${collapsed.length} (${totalTokens} tokens)`, {
     agent: 'AudioOverviewGraph',
     phase: 'recursive_collapse',
     inputCount: outputs.length,
     outputCount: collapsed.length,
     totalTokens,
-  }, `Recursive collapse: ${outputs.length} -> ${collapsed.length} (${totalTokens} tokens)`);
+  });
 
   return collapsed;
 }
@@ -59,21 +65,21 @@ export async function recursiveCollapse(outputs: string[], maxTokens: number): P
 export async function collapse(
   state: OverallStateType
 ): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('AudioOverviewGraph', 'audio');
   const { mapOutputs } = state;
 
-  logPhaseStart({
+  logger.phaseStart('collapse', {
     agent: 'AudioOverviewGraph',
-    phase: 'collapse',
     inputCount: mapOutputs.length,
   });
 
-  const collapsed = await recursiveCollapse(mapOutputs, GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS / 2);
+  const collapsed = await recursiveCollapse(mapOutputs, GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS / 2, logger);
 
-  logInfo({
+  logger.info(`Collapsed ${mapOutputs.length} outputs to ${collapsed.length}`, {
     agent: 'AudioOverviewGraph',
     phase: 'collapse',
     outputCount: collapsed.length,
-  }, `Collapsed ${mapOutputs.length} outputs to ${collapsed.length}`);
+  });
 
   return {
     ...state,

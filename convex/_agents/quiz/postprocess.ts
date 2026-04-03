@@ -6,12 +6,11 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logBanner,
-  logInfo,
-  logWarn,
   validateQuiz,
   clearStateKeys,
 } from '../_shared/index.js';
+import type { JobLogger } from '../_shared/logging.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import {
@@ -31,6 +30,7 @@ export async function expandQuestion(
   candidate: QuizCandidate,
   deps: ExpandQuestionDeps
 ): Promise<QuizQuestion> {
+  const logger = createAgentGraphLogger('QuizGraph', 'quiz');
   const prompt = getExpandPrompt(candidate);
 
   return invokeWithRetry(
@@ -53,12 +53,12 @@ export async function expandQuestion(
       maxAttempts: 2,
       baseDelayMs: 1000,
       onRetry: (attempt, error) => {
-        logWarn({
+        logger.warn(`LLM expand retry attempt ${attempt}/2`, {
           agent: 'QuizGraph',
           phase: 'expand_question_retry',
           attempt,
           error: error.message,
-        }, `LLM expand retry attempt ${attempt}/2`);
+        });
       }
     },
     'QuizExpand'
@@ -67,10 +67,11 @@ export async function expandQuestion(
 
 export function finalizeQuestions(
   questions: QuizQuestion[],
-  state: OverallStateType
+  state: OverallStateType,
+  logger: JobLogger
 ): Partial<OverallStateType> {
   const validation = validateQuiz(JSON.stringify(questions), state.questionCount);
-  logInfo({
+  logger.info(`Finalizing ${questions.length} questions`, {
     agent: 'QuizGraph',
     phase: 'reduce_after_parsing',
     questionsParsed: questions.length,
@@ -79,47 +80,47 @@ export function finalizeQuestions(
       warnings: validation.warnings,
       score: validation.score,
     },
-  }, `Finalizing ${questions.length} questions`);
+  });
 
   for (const q of questions) {
     if (typeof q.answer !== 'number' || q.answer < 0 || q.answer > 3) {
-      logWarn({
+      logger.warn(`Invalid answer index: ${q.answer} (must be 0-3)`, {
         agent: 'QuizGraph',
         phase: 'finalize_questions',
         question: q.question.substring(0, 100),
         answer: q.answer,
-      }, `Invalid answer index: ${q.answer} (must be 0-3)`);
+      });
     }
   }
 
   for (const q of questions) {
     if (q.explanation.length < 20) {
-      logWarn({
+      logger.warn('Explanation too short (may indicate poor grounding)', {
         agent: 'QuizGraph',
         phase: 'finalize_questions',
         question: q.question.substring(0, 100),
         explanationLength: q.explanation.length,
-      }, `Explanation too short (may indicate poor grounding)`);
+      });
     }
   }
 
-  logInfo({
+  logger.info(`Generated ${questions.length} questions (target: ${state.questionCount})`, {
     agent: 'QuizGraph',
     phase: 'reduce',
     questionsGenerated: questions.length,
     targetQuestionCount: state.questionCount,
-  }, `Generated ${questions.length} questions (target: ${state.questionCount})`);
+  });
 
   if (questions.length !== state.questionCount) {
-    logWarn({
+    logger.warn(`LLM returned ${questions.length} questions, target was ${state.questionCount}. Accepting LLM result.`, {
       agent: 'QuizGraph',
       phase: 'reduce_count_mismatch',
       generatedCount: questions.length,
       targetCount: state.questionCount,
-    }, `LLM returned ${questions.length} questions, target was ${state.questionCount}. Accepting LLM result.`);
+    });
   }
 
-  logInfo({
+  logger.info('Reduce final question summary', {
     agent: 'QuizGraph',
     phase: 'reduce_final',
     finalQuestionCount: questions.length,
@@ -131,23 +132,21 @@ export function finalizeQuestions(
     })),
   });
 
-  logBanner(
-    {
-      agent: 'QuizGraph',
-      phase: 'generation_complete',
-      finalQuestionCount: questions.length,
-      targetQuestionCount: state.questionCount,
-    },
-    'GENERATION COMPLETE'
-  );
+  logger.info('GENERATION COMPLETE', {
+    agent: 'QuizGraph',
+    phase: 'generation_complete',
+    finalQuestionCount: questions.length,
+    targetQuestionCount: state.questionCount,
+    milestone: true,
+  });
 
   const collapsedOutputsSize = state.collapsedOutputs.reduce((sum, s) => sum + s.length * 2, 0);
   const chunksSize = (state.chunks || []).reduce((sum, s) => sum + s.length * 2, 0);
-  logInfo({
+  logger.info(`Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`, {
     agent: 'QuizGraph',
     phase: 'reduce_cleanup',
     memoryFreedKB: ((collapsedOutputsSize + chunksSize) / 1024).toFixed(2),
-  }, `Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`);
+  });
 
   return {
     ...state,

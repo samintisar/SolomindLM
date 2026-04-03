@@ -313,7 +313,6 @@ export const addCard = mutation({
       v.literal("wh-question"),
       v.literal("fill-blank"),
       v.literal("true-false"),
-      v.literal("multiple-choice"),
       v.literal("definition"),
       v.literal("scenario")
     )),

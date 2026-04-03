@@ -1,11 +1,12 @@
 "use node"
 
-import { logInfo, logWarn } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { PROBLEMATIC_PHRASES } from './prompts.js';
 import type { WrittenQuestion } from './prompts.js';
 
 export function validateSelfContained(question: WrittenQuestion): boolean {
+  const logger = createAgentGraphLogger('WrittenQuestionsGraph', 'written_questions');
   const text = question.question.toLowerCase();
 
   const foundPhrases = PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase));
@@ -26,21 +27,21 @@ export function validateSelfContained(question: WrittenQuestion): boolean {
   const shouldReject = foundPhrases.length > 0 && !hasEmbeddedContext;
 
   if (shouldReject) {
-    logWarn({
+    logger.warn('Question rejected: references external content without embedded context', {
       agent: 'WrittenQuestionsGraph',
       phase: 'validate_self_contained',
       questionPreview: question.question.substring(0, 100),
       questionLength: text.length,
       foundPhrases,
-    }, 'Question rejected: references external content without embedded context');
+    });
   } else if (foundPhrases.length > 0 && hasEmbeddedContext) {
-    logInfo({
+    logger.info('Question accepted: has problematic phrases but includes embedded context', {
       agent: 'WrittenQuestionsGraph',
       phase: 'validate_self_contained_accept',
       questionPreview: question.question.substring(0, 100),
       questionLength: text.length,
       foundPhrases,
-    }, 'Question accepted: has problematic phrases but includes embedded context');
+    });
   }
 
   return !shouldReject;

@@ -6,19 +6,14 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
-  logPhaseComplete,
-  logPhaseStart,
-  logWarn,
   sanitizeUserInput,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import {
   getCandidateMapPrompt,
   MAP_CANDIDATES_SYSTEM_PROMPT,
-  type QuizCandidate,
   type QuizCandidateResponse,
 } from './prompts.js';
 import type { ChunkProcessState, OverallStateType } from './state.js';
@@ -38,9 +33,10 @@ export async function mapProcess(
 
   const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
 
-  logPhaseStart({
+  const logger = createAgentGraphLogger('QuizGraph', 'quiz');
+
+  logger.phaseStart('map_process', {
     agent: 'QuizGraph',
-    phase: 'map_process',
     chunkIndex,
     chunkTokens: deps.estimateTokens(chunk),
     chunkPreview: chunk.substring(0, 150).replace(/\n/g, ' '),
@@ -53,12 +49,12 @@ export async function mapProcess(
   const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
   const prompt = getCandidateMapPrompt({ chunk, questionCount, questionsPerChunk, difficulty, focus: sanitizedFocus });
 
-  logInfo({
+  logger.info(`Sending prompt to LLM (~${deps.estimateTokens(prompt)} tokens)...`, {
     agent: 'QuizGraph',
     phase: 'map_process',
     chunkId,
     promptTokens: deps.estimateTokens(prompt),
-  }, `Sending prompt to LLM (~${deps.estimateTokens(prompt)} tokens)...`);
+  });
 
   let output: string;
   let candidatesGenerated = 0;
@@ -86,13 +82,13 @@ export async function mapProcess(
         maxAttempts: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
-          logWarn({
+          logger.warn(`Retry attempt ${attempt}/3`, {
             agent: 'QuizGraph',
             phase: 'map_process',
             chunkIndex,
             attempt,
             error: error.message,
-          }, `Retry attempt ${attempt}/3`);
+          });
         }
       },
       'QuizMap'
@@ -101,20 +97,16 @@ export async function mapProcess(
     candidatesGenerated = response.questions.length;
     output = JSON.stringify(response.questions);
   } catch (error) {
-    const errorContext = {
-      agent: 'QuizGraph',
-      phase: 'map_process',
-      chunkIndex,
-      chunkLength: chunk.length,
-      difficulty,
-      error: error instanceof Error ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-      } : String(error),
-    };
-
-    logError(errorContext, 'Map process failed');
+    logger.phaseError(
+      'map_process',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        agent: 'QuizGraph',
+        chunkIndex,
+        chunkLength: chunk.length,
+        difficulty,
+      }
+    );
 
     output = '[]';
     candidatesGenerated = 0;
@@ -122,9 +114,8 @@ export async function mapProcess(
 
   const elapsed = Date.now() - startTime;
 
-  logPhaseComplete({
+  logger.phaseComplete('map_process', {
     agent: 'QuizGraph',
-    phase: 'map_process',
     chunkIndex,
     outputTokens: deps.estimateTokens(output),
     questionsGenerated: candidatesGenerated,

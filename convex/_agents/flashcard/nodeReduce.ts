@@ -2,13 +2,9 @@
 
 import {
   clearStateKeys,
-  logBanner,
-  logError,
-  logInfo,
-  logPhaseStart,
-  logWarn,
   validateFlashcards,
 } from '../_shared/index.js';
+import { createAgentGraphLogger, type JobLogger } from '../_shared/logging.js';
 
 import {
   groupFlashcardsByTopic,
@@ -27,7 +23,7 @@ export interface ReduceNodeDeps {
   ) => Promise<Flashcard[]>;
 }
 
-function flattenCollapsedOutputs(outputs: Flashcard[][]): Flashcard[] {
+function flattenCollapsedOutputs(outputs: Flashcard[][], logger: JobLogger): Flashcard[] {
   const allCards: Flashcard[] = [];
   let failedValidationCount = 0;
 
@@ -41,12 +37,12 @@ function flattenCollapsedOutputs(outputs: Flashcard[][]): Flashcard[] {
     }
   }
 
-  logInfo({
+  logger.info(`Flattened ${allCards.length} flashcards (${failedValidationCount} failed validation)`, {
     agent: 'FlashcardGraph',
     phase: 'flatten_collapsed_outputs_complete',
     extractedCount: allCards.length,
     failedValidationCount,
-  }, `Flattened ${allCards.length} flashcards (${failedValidationCount} failed validation)`);
+  });
 
   return allCards;
 }
@@ -57,9 +53,10 @@ export async function reduceFlashcards(
 ): Promise<Partial<OverallStateType>> {
   await callStatusUpdate(state, 'reducing');
 
-  logPhaseStart({
+  const logger = createAgentGraphLogger('FlashcardGraph', 'flashcard');
+
+  logger.phaseStart('reduce', {
     agent: 'FlashcardGraph',
-    phase: 'reduce',
     collapsedOutputsCount: state.collapsedOutputs.length,
     targetCardCount: state.cardCount,
     difficulty: state.difficulty,
@@ -72,7 +69,7 @@ export async function reduceFlashcards(
       ? `${flashcards[0].front.substring(0, 50)}...`
       : 'empty';
 
-    logInfo({
+    logger.info(`Collapsed output ${idx + 1}/${state.collapsedOutputs.length}: ${cardCount} cards — ${preview}`, {
       agent: 'FlashcardGraph',
       phase: 'reduce_analyze_output',
       outputIndex: idx,
@@ -82,23 +79,22 @@ export async function reduceFlashcards(
     });
   });
 
-  const parsedFlashcards = flattenCollapsedOutputs(state.collapsedOutputs);
+  const parsedFlashcards = flattenCollapsedOutputs(state.collapsedOutputs, logger);
 
-  logInfo({
+  logger.info(`Flattened ${parsedFlashcards.length} flashcards`, {
     agent: 'FlashcardGraph',
     phase: 'reduce_after_flatten',
     initialCardCount: parsedFlashcards.length,
-  }, `Flattened ${parsedFlashcards.length} flashcards`);
+  });
 
   if (parsedFlashcards.length === 0) {
     const totalInputs = state.collapsedOutputs.reduce((sum, flashcards) => sum + flashcards.length, 0);
 
-    logError({
-      agent: 'FlashcardGraph',
-      phase: 'reduce',
-      error: 'No flashcards parsed',
-      totalInputs,
-    }, `CRITICAL: No flashcards parsed despite ${totalInputs} input cards!`);
+    logger.phaseError(
+      'reduce',
+      new Error(`CRITICAL: No flashcards parsed despite ${totalInputs} input cards`),
+      { agent: 'FlashcardGraph', totalInputs }
+    );
     await callStatusUpdate(state, 'failed');
     return {
       ...state,
@@ -117,7 +113,7 @@ export async function reduceFlashcards(
 
   if (shouldSkipSmartSelection) {
     finalFlashcards = dedupedFlashcards.slice(0, state.cardCount);
-    logInfo({
+    logger.info(`Skipping smart reduce: ${dedupedFlashcards.length} deduped cards already near target ${state.cardCount}`, {
       agent: 'FlashcardGraph',
       phase: 'reduce_skip_llm',
       originalCount: parsedFlashcards.length,
@@ -125,7 +121,7 @@ export async function reduceFlashcards(
       targetCardCount: state.cardCount,
       duplicatesRemoved,
       nearTargetUpperBound,
-    }, `Skipping smart reduce: ${dedupedFlashcards.length} deduped cards already near target ${state.cardCount}`);
+    });
   } else {
     finalFlashcards = await deps.refineFlashcardSelection(
       dedupedFlashcards,
@@ -134,23 +130,23 @@ export async function reduceFlashcards(
       state.topic
     );
 
-    logInfo({
+    logger.info(`Smart refinement complete: ${parsedFlashcards.length} → ${dedupedFlashcards.length} → ${finalFlashcards.length} cards`, {
       agent: 'FlashcardGraph',
       phase: 'reduce_after_refinement',
       refinedCount: finalFlashcards.length,
       originalCount: parsedFlashcards.length,
       dedupedCount: dedupedFlashcards.length,
-    }, `Smart refinement complete: ${parsedFlashcards.length} → ${dedupedFlashcards.length} → ${finalFlashcards.length} cards`);
+    });
   }
 
   const topicDistribution = groupFlashcardsByTopic(finalFlashcards);
-  logInfo({
+  logger.info(`Final topic distribution across ${finalFlashcards.length} cards`, {
     agent: 'FlashcardGraph',
     phase: 'reduce_topic_distribution',
     topicDistribution,
-  }, `Final topic distribution across ${finalFlashcards.length} cards`);
+  });
 
-  logInfo({
+  logger.info('Flashcard detail snapshot', {
     agent: 'FlashcardGraph',
     phase: 'reduce_flashcards_detail',
     flashcards: finalFlashcards.map((card, idx) => ({
@@ -162,7 +158,7 @@ export async function reduceFlashcards(
   });
 
   const validation = validateFlashcards(JSON.stringify(finalFlashcards), state.cardCount);
-  logInfo({
+  logger.info('Validation result', {
     agent: 'FlashcardGraph',
     phase: 'reduce_validation',
     validation: {
@@ -172,23 +168,26 @@ export async function reduceFlashcards(
     },
   });
 
-  logInfo({
+  logger.info(`Generated ${finalFlashcards.length} flashcards (target: ${state.cardCount})`, {
     agent: 'FlashcardGraph',
     phase: 'reduce',
     flashcardsGenerated: finalFlashcards.length,
     targetCardCount: state.cardCount,
-  }, `Generated ${finalFlashcards.length} flashcards (target: ${state.cardCount})`);
+  });
 
   if (finalFlashcards.length !== state.cardCount) {
-    logWarn({
-      agent: 'FlashcardGraph',
-      phase: 'reduce_count_mismatch',
-      generatedCount: finalFlashcards.length,
-      targetCount: state.cardCount,
-    }, `Returned ${finalFlashcards.length} cards, target was ${state.cardCount}. Accepting final result.`);
+    logger.warn(
+      `Returned ${finalFlashcards.length} cards, target was ${state.cardCount}. Accepting final result.`,
+      {
+        agent: 'FlashcardGraph',
+        phase: 'reduce_count_mismatch',
+        generatedCount: finalFlashcards.length,
+        targetCount: state.cardCount,
+      }
+    );
   }
 
-  logInfo({
+  logger.info('Reduce final snapshot', {
     agent: 'FlashcardGraph',
     phase: 'reduce_final',
     finalFlashcardCount: finalFlashcards.length,
@@ -200,15 +199,13 @@ export async function reduceFlashcards(
     })),
   });
 
-  logBanner(
-    {
-      agent: 'FlashcardGraph',
-      phase: 'generation_complete',
-      finalFlashcardCount: finalFlashcards.length,
-      targetCardCount: state.cardCount,
-    },
-    'GENERATION COMPLETE'
-  );
+  logger.info('GENERATION COMPLETE', {
+    agent: 'FlashcardGraph',
+    phase: 'generation_complete',
+    finalFlashcardCount: finalFlashcards.length,
+    targetCardCount: state.cardCount,
+    milestone: true,
+  });
 
   const totalCards = state.collapsedOutputs.reduce((sum, group) => sum + group.length, 0);
   const estimatedSize = totalCards * 200;

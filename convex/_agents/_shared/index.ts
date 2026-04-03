@@ -16,7 +16,7 @@
  * import {
  *   invokeWithTimeout,
  *   invokeWithRetry,
- *   logInfo,
+ *   createAgentGraphLogger,
  *   sanitizeUserInput,
  *   packChunks,
  *   validateOutput
@@ -65,18 +65,11 @@ export {
 
 // Logging utilities
 export {
-  logInfo,
-  logWarn,
-  logError,
-  logDebug,
-  logPhaseStart,
-  logPhaseComplete,
-  logPhaseTransition,
-  logBanner,
-  logBatch,
-  createTimer,
-  createChildLogger,
-  type LogContext,
+  createJobLogger,
+  createAgentGraphLogger,
+  type JobLogContext,
+  type JobLogger,
+  type JobType,
   LogLevel,
 } from './logging.js';
 

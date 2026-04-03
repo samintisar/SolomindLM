@@ -83,50 +83,47 @@ export const getCandidateMapPrompt = (params: {
 }): string => {
   const { chunk, questionsPerChunk, difficulty, focus } = params;
 
-  // Difficulty-specific guidance
-  const difficultyGuidance: Record<string, string> = {
-    easy: `**EASY MODE:**
-- Focus: Basic recall, definitions, and direct facts
-- Question style: Direct questions with clear, unambiguous answers
-- Distractor strategy: Use obviously incorrect options (opposites, unrelated concepts)
-- Example: "What is the primary function of X?" or "Which term means Y?"`,
-    medium: `**MEDIUM MODE:**
-- Focus: Concepts, relationships, and understanding
-- Question style: Understanding-based questions requiring some thought
-- Distractor strategy: Use plausible but incorrect options (common misconceptions)
-- Example: "How does X affect Y?" or "Which relationship best describes..."`,
-    hard: `**HARD MODE:**
-- Focus: Application, analysis, synthesis, and complex scenarios
-- Question style: Complex scenarios requiring multi-step reasoning
-- Distractor strategy: Use subtle, nuanced options that require careful analysis
-- Example: "In a scenario where X occurs, what is the most likely outcome when..."`,
+  // Difficulty-specific examples to guide LLM behavior
+  const examples: Record<string, string> = {
+    easy: `• "What is the primary function of X?" 
+• "Which term refers to Y?"`,
+    medium: `• "How does X affect Y?"
+• "When should you use approach A vs approach B?"`,
+    hard: `• "In a scenario where X occurs, what is the most likely outcome when Y?"
+• "Why does method A outperform method B in this context?"`,
   };
 
-  return `You are an expert analyst extracting "Testable Concepts" from a document.
+  return `Extract ${questionsPerChunk} testable concepts from this document (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ''}).
+
+**QUESTION TYPES (in priority order):**
+1. **Conceptual:** Why something works, principles, relationships
+2. **Comparative:** Compare methods/approaches (e.g., "A vs B?")
+3. **Process:** How something works, steps, cause-and-effect
+4. **Application:** Given a scenario, what works best?
+
+**GOOD EXAMPLES (${difficulty.toUpperCase()}):**
+${examples[difficulty] || examples.medium}
+
+**AVOID:**
+•❌ Specific fact lookup: "What was the RMSE in 2008?"
+•❌ Single data points without context
+•✅ INSTEAD ask about: patterns, trends, comparisons
+
+**TABLES:** Extract concepts, ignore specific rows. Example: "Why does Model A outperform Model B?" ✓
+
+**OUTPUT FORMAT (JSON array):**
+For each concept:
+{
+  "topic": "Short category",
+  "question": "Draft question (use hypothetical scenarios)",
+  "correctAnswer": "Verified answer",
+  "contextSnippet": "3-5 sentences explaining concept + related concepts (crucial for generating distractors later)",
+  "difficulty": "${difficulty}"
+}
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}
 
-TARGET: Identify approximately ${questionsPerChunk} key concepts.
-
-**Difficulty: ${difficulty.toUpperCase()}**
-
-${difficultyGuidance[difficulty] || difficultyGuidance.medium}
-
-${focus ? `**Focus:** ${focus}` : ''}
-
-CRITICAL RULES (DO NOT IGNORE):
-1. **NO DATA RETRIEVAL:** Do NOT create questions that ask for specific numbers, dates, or table values found in the text (e.g., "What was the RMSE in 2008?").
-2. **NO ASCII TABLES:** If the text contains data tables, ignore the specific rows. Instead, extract the *principle* the table illustrates (e.g., "Why does Model A outperform Model B?").
-3. **CONCEPTUAL FOCUS:** Extract the *logic*, *syntax*, or *relationship* behind the facts.
-
-OUTPUT FORMAT:
-For each concept, provide:
-- **Topic:** Short category name.
-- **Question:** A draft question testing the concept (hypothetical scenarios are best).
-- **Context Snippet:** Extract a RICH text segment (3-5 sentences) that explains the concept AND mentions related concepts (this is crucial for generating wrong answers later).
-- **Difficulty:** Must match target difficulty ("easy", "medium", or "hard").
-
-Content to analyze:
+**CONTENT:**
 ${chunk}`;
 };
 
@@ -211,31 +208,26 @@ export const getCandidateSelectionPrompt = (params: {
   const { candidates, targetCount, difficulty, focus } = params;
   const candidatesList = formatCandidatesAsText(candidates);
 
-  return `You are a strict Quiz Curator.
+  return `Select ${targetCount} high-quality candidates from ${candidates.length} options.
 
-TASK: Select exactly ${targetCount} unique, high-quality candidates from the list below.
+**QUALITY THRESHOLD:**
+•✅ Good: Conceptual questions, comparisons, process questions
+•❌ Bad: Fact lookup ("What value is in row 5?"), missing context references
+•❌ Duplicates: Keep strongest version of similar concepts
 
-FILTERS (DISCARD THESE IMMEDIATELY):
-- Questions that ask for specific data values (e.g., "What is the value of X in row 5?").
-- Questions that rely on "the table below" or "the following list" if that context is missing.
-- Duplicate concepts (keep only the strongest version).
+**DIFFICULTY BALANCE:**
+• Target: ${difficulty.toUpperCase()} (aim for 70%+)
+• Can use adjacent levels if needed (${difficulty} ↔ ${difficulty === 'easy' ? 'medium' : difficulty === 'hard' ? 'medium' : 'easy/hard'})
 
-DIFFICULTY FILTERING (CRITICAL):
-- Target Difficulty: ${difficulty.toUpperCase()}
-- PRIORITIZE candidates where difficulty matches "${difficulty}" - aim for at least 70% of your selections to match the target difficulty
-- If insufficient candidates match the target difficulty, you may select from adjacent difficulty levels (easy↔medium↔hard)
-- DO NOT select candidates whose difficulty is completely inappropriate (e.g., selecting "easy" candidates when "hard" is requested)
+**DIVERSITY:**
+• Spread across different topics
+• Max 3 questions per narrow concept
 
-DIVERSITY:
-- Select questions across different topics.
-- Do not pick more than 3 questions for the same narrow concept.
-
-${focus ? `Focus: ${focus}` : ''}
-
-CANDIDATES POOL:
+${focus ? `**FOCUS:** ${focus}\n` : ''}**CANDIDATES:**
 ${candidatesList}
 
-Return the selected candidates as a JSON array.`;
+**OUTPUT:** Return selected ${targetCount} candidates as JSON array.
+If fewer than ${targetCount} meet quality standards, return all good candidates (minimum 1).`;
 };
 
 // ============================================================

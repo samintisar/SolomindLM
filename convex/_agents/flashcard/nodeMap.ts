@@ -6,13 +6,9 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
-  logPhaseComplete,
-  logPhaseStart,
-  logWarn,
   sanitizeUserInput,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { FLASHCARD_CONFIG } from './config.js';
 import { MAP_SYSTEM_PROMPT, getMapPrompt, type FlashcardResponse } from './prompts.js';
@@ -29,9 +25,10 @@ export async function mapProcess(
 
   const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
 
-  logPhaseStart({
+  const logger = createAgentGraphLogger('FlashcardGraph', 'flashcard');
+
+  logger.phaseStart('map_process', {
     agent: 'FlashcardGraph',
-    phase: 'map_process',
     chunkIndex,
     chunkLength: chunk.length,
     chunkPreview: chunk.substring(0, 150).replace(/\n/g, ' '),
@@ -44,12 +41,12 @@ export async function mapProcess(
   const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
   const prompt = getMapPrompt({ chunk, cardCount, cardsPerChunk, difficulty, topic: sanitizedTopic });
 
-  logInfo({
+  logger.info(`Sending prompt to LLM (${prompt.length} chars)...`, {
     agent: 'FlashcardGraph',
     phase: 'map_process',
     chunkId,
     promptLength: prompt.length,
-  }, `Sending prompt to LLM (${prompt.length} chars)...`);
+  });
 
   try {
     const response = await invokeWithRetry(
@@ -74,13 +71,13 @@ export async function mapProcess(
         maxAttempts: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
-          logWarn({
+          logger.warn(`Retry attempt ${attempt}/3`, {
             agent: 'FlashcardGraph',
             phase: 'map_process',
             chunkIndex,
             attempt,
             error: error.message,
-          }, `Retry attempt ${attempt}/3`);
+          });
         },
       },
       'FlashcardMap'
@@ -92,15 +89,13 @@ export async function mapProcess(
       front: cleanFrontText(card.front),
       back: cleanBackText(card.back),
       topic: card.topic,
-      options: card.options,
     }));
 
     const flashcardCount = cleanedFlashcards.length;
     const elapsed = Date.now() - startTime;
 
-    logPhaseComplete({
+    logger.phaseComplete('map_process', {
       agent: 'FlashcardGraph',
-      phase: 'map_process',
       chunkIndex,
       questionsGenerated: flashcardCount,
       processingTimeMs: elapsed,
@@ -130,21 +125,17 @@ export async function mapProcess(
     }, null, 2));
     console.error('='.repeat(80) + '\n');
 
-    const errorContext = {
+    const errorToLog = error instanceof Error ? error : new Error(String(error));
+    logger.phaseError('map_process', errorToLog, {
       agent: 'FlashcardGraph',
-      phase: 'map_process',
       chunkIndex,
       chunkLength: chunk.length,
       difficulty,
-    };
-
-    const errorToLog = error instanceof Error ? error : new Error(String(error));
-    logError(errorContext, errorToLog);
+    });
 
     const elapsed = Date.now() - startTime;
-    logPhaseComplete({
+    logger.phaseComplete('map_process', {
       agent: 'FlashcardGraph',
-      phase: 'map_process',
       chunkIndex,
       questionsGenerated: 0,
       processingTimeMs: elapsed,

@@ -7,13 +7,9 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
-  logPhaseComplete,
-  logPhaseStart,
-  logWarn,
   sanitizeUserInput,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import {
@@ -29,6 +25,7 @@ export async function mapProcess(
   state: ChunkProcessState,
   fastLlmStructured: WrittenQuestionsOutputInvoker
 ): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('WrittenQuestionsGraph', 'written_questions');
   const { chunk, chunkIndex, questionCount, difficulty, questionType, focus, questionsPerChunk, retryCount = 0 } = state;
   const startTime = Date.now();
 
@@ -37,20 +34,19 @@ export async function mapProcess(
     const jitter = Math.random() * backoff * 0.1;
     await new Promise(r => setTimeout(r, backoff + jitter));
 
-    logInfo({
+    logger.info(`Retry attempt ${retryCount}/2`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'map_process_retry',
       chunkIndex,
       retryCount,
       backoffMs: backoff + jitter,
-    }, `Retry attempt ${retryCount}/2`);
+    });
   }
 
   const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
 
-  logPhaseStart({
+  logger.phaseStart('map_process', {
     agent: 'WrittenQuestionsGraph',
-    phase: 'map_process',
     chunkIndex,
     retryCount,
     chunkLength: chunk.length,
@@ -65,12 +61,12 @@ export async function mapProcess(
   const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
   const prompt = getMapPrompt({ chunk, questionCount, questionsPerChunk, difficulty, questionType, focus: sanitizedFocus });
 
-  logInfo({
+  logger.info(`Sending prompt to LLM (${prompt.length} chars)...`, {
     agent: 'WrittenQuestionsGraph',
     phase: 'map_process',
     chunkId,
     promptLength: prompt.length,
-  }, `Sending prompt to LLM (${prompt.length} chars)...`);
+  });
 
   let output: string;
   let questionsGenerated = 0;
@@ -99,13 +95,13 @@ export async function mapProcess(
         maxAttempts: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
-          logWarn({
+          logger.warn(`Inner retry attempt ${attempt}/3`, {
             agent: 'WrittenQuestionsGraph',
             phase: 'map_process',
             chunkIndex,
             attempt,
             error: error.message,
-          }, `Inner retry attempt ${attempt}/3`);
+          });
         },
       },
       'WrittenQuestionsMap'
@@ -124,14 +120,14 @@ export async function mapProcess(
       },
     }));
 
-    logInfo({
+    logger.info(`Validated ${validQuestions.length}/${response.questions.length} questions`, {
       agent: 'WrittenQuestionsGraph',
       phase: 'map_process_validation',
       chunkIndex,
       generatedCount: response.questions.length,
       validatedCount: validQuestions.length,
       rejectedCount: response.questions.length - validQuestions.length,
-    }, `Validated ${validQuestions.length}/${response.questions.length} questions`);
+    });
 
     questionsGenerated = validQuestions.length;
     output = JSON.stringify(validQuestions);
@@ -173,16 +169,19 @@ export async function mapProcess(
       } : String(error),
     };
 
-    logError(errorContext, 'Map process failed - job will retry at job level');
+    logger.phaseError(
+      'map_process',
+      error instanceof Error ? error : new Error(String(error)),
+      errorContext
+    );
     throw error;
   }
 
   const elapsed = Date.now() - startTime;
   const previewQuestions = questionsGenerated > 0 ? JSON.parse(output) as WrittenQuestion[] : [];
 
-  logPhaseComplete({
+  logger.phaseComplete('map_process', {
     agent: 'WrittenQuestionsGraph',
-    phase: 'map_process',
     chunkIndex,
     outputLength: output.length,
     questionsGenerated,

@@ -1,6 +1,6 @@
 "use node"
 
-import { logInfo } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import type { QuizCandidate } from './prompts.js';
 
@@ -52,6 +52,7 @@ export function calculateSimilarity(q1: QuizCandidate, q2: QuizCandidate): numbe
  * This is much faster than LLM-based deduplication and works well for quiz questions.
  */
 export function heuristicDedupe(questions: QuizCandidate[]): QuizCandidate[] {
+  const logger = createAgentGraphLogger('QuizGraph', 'quiz');
   if (questions.length <= 1) return questions;
 
   const SIMILARITY_THRESHOLD = 0.8; // 80% similarity considered duplicate
@@ -72,13 +73,13 @@ export function heuristicDedupe(questions: QuizCandidate[]): QuizCandidate[] {
   }
 
   const uniqueCount = questions.length - toRemove.size;
-  logInfo({
+  logger.info(`Heuristic dedupe: ${questions.length} → ${uniqueCount} questions (removed ${toRemove.size} duplicates)`, {
     agent: 'QuizGraph',
     phase: 'heuristic_dedupe',
     inputCount: questions.length,
     duplicatesFound: toRemove.size,
     outputCount: uniqueCount,
-  }, `Heuristic dedupe: ${questions.length} → ${uniqueCount} questions (removed ${toRemove.size} duplicates)`);
+  });
 
   return questions.filter((_, idx) => !toRemove.has(idx));
 }

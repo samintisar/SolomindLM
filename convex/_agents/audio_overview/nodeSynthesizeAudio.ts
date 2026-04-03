@@ -2,12 +2,7 @@
 
 import type OpenAI from 'openai';
 
-import {
-  logInfo,
-  logError,
-  logPhaseStart,
-  logBanner,
-} from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 import type { OverallStateType, DialogueLine } from './state.js';
 import { GRAPH_CONFIG } from './config.js';
 import { VOICES } from './voices.js';
@@ -23,6 +18,7 @@ export async function synthesizeAudio(
   state: OverallStateType,
   deps: SynthesizeAudioDeps
 ): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('AudioOverviewGraph', 'audio');
   const { dialogueScript } = state;
   const { openai } = deps;
 
@@ -30,9 +26,8 @@ export async function synthesizeAudio(
     throw new Error('No dialogue script to synthesize');
   }
 
-  logPhaseStart({
+  logger.phaseStart('synthesize_audio', {
     agent: 'AudioOverviewGraph',
-    phase: 'synthesize_audio',
     dialogueLines: dialogueScript.length,
   });
 
@@ -42,12 +37,12 @@ export async function synthesizeAudio(
   for (let i = 0; i < dialogueScript.length; i += BATCH_SIZE) {
     const batchLines = dialogueScript.slice(i, i + BATCH_SIZE);
 
-    logInfo({
+    logger.info(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}`, {
       agent: 'AudioOverviewGraph',
       phase: 'synthesize_batch',
       batch: Math.floor(i / BATCH_SIZE) + 1,
       batchLines: batchLines.length,
-    }, `Processing batch ${Math.floor(i / BATCH_SIZE) + 1}`);
+    });
 
     const batchPromises = batchLines.map(async (line: DialogueLine, batchIdx: number) => {
       const globalIndex = i + batchIdx;
@@ -68,7 +63,7 @@ export async function synthesizeAudio(
 
         const buffer = Buffer.from(await mp3.arrayBuffer());
 
-        logInfo({
+        logger.info(`Synthesized line ${globalIndex + 1}/${dialogueScript.length}`, {
           agent: 'AudioOverviewGraph',
           phase: 'synthesize_line',
           line: globalIndex + 1,
@@ -79,12 +74,14 @@ export async function synthesizeAudio(
 
         return { index: globalIndex, buffer };
       } catch (error) {
-        logError({
-          agent: 'AudioOverviewGraph',
-          phase: 'synthesize_line',
-          line: globalIndex + 1,
-          error: error instanceof Error ? error.message : String(error),
-        }, `Failed line ${globalIndex + 1}`);
+        logger.phaseError(
+          'synthesize_line',
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            agent: 'AudioOverviewGraph',
+            line: globalIndex + 1,
+          }
+        );
         return { index: globalIndex, buffer: null };
       }
     });
@@ -101,27 +98,28 @@ export async function synthesizeAudio(
   const successCount = sortedBuffers.length;
 
   if (successCount < dialogueScript.length * 0.5) {
-    logError({
-      agent: 'AudioOverviewGraph',
-      phase: 'synthesize_audio',
-      successCount,
-      totalLines: dialogueScript.length,
-    }, `Too many synthesis failures: ${successCount}/${dialogueScript.length} lines succeeded`);
+    logger.phaseError(
+      'synthesize_audio',
+      new Error(`Too many synthesis failures: ${successCount}/${dialogueScript.length} lines succeeded`),
+      {
+        agent: 'AudioOverviewGraph',
+        successCount,
+        totalLines: dialogueScript.length,
+      }
+    );
     throw new Error(`Too many synthesis failures: ${successCount}/${dialogueScript.length} lines succeeded`);
   }
 
   const audioBuffer = Buffer.concat(sortedBuffers);
 
-  logBanner(
-    {
-      agent: 'AudioOverviewGraph',
-      phase: 'generation_complete',
-      linesSucceeded: successCount,
-      totalLines: dialogueScript.length,
-      finalAudioSize: audioBuffer.length,
-    },
-    'AUDIO GENERATION COMPLETE'
-  );
+  logger.info('AUDIO GENERATION COMPLETE', {
+    agent: 'AudioOverviewGraph',
+    phase: 'generation_complete',
+    linesSucceeded: successCount,
+    totalLines: dialogueScript.length,
+    finalAudioSize: audioBuffer.length,
+    milestone: true,
+  });
 
   return {
     ...state,

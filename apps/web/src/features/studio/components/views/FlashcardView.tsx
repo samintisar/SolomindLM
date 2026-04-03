@@ -173,29 +173,6 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
     const content = sanitizeMarkdown(card.front);
 
     switch (card.type) {
-      case 'multiple-choice':
-        return (
-          <div className="space-y-6 w-full">
-            <div className="prose prose-base sm:prose-lg max-w-none text-center">
-              <Suspense fallback={<div className="animate-pulse h-6 bg-muted rounded w-3/4 mx-auto" />}>
-                <MarkdownRenderer>{content}</MarkdownRenderer>
-              </Suspense>
-            </div>
-            {card.options && (
-              <ul className="mt-6 space-y-3 max-w-md mx-auto">
-                {card.options.map((opt, i) => (
-                  <li
-                    key={i}
-                    className="px-4 py-3 border border-border rounded-lg bg-muted/30 text-base font-medium"
-                  >
-                    <span className="inline-block w-6 text-muted-foreground">{String.fromCharCode(65 + i)})</span> {opt}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        );
-
       case 'true-false':
         return (
           <div className="space-y-8 w-full">

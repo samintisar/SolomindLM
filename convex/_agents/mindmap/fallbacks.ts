@@ -1,6 +1,6 @@
 "use node"
 
-import { logInfo } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import type { ConceptExtraction, FinalMindMap, MindMapNode } from './state.js';
 
@@ -8,6 +8,7 @@ import type { ConceptExtraction, FinalMindMap, MindMapNode } from './state.js';
  * Creates a meaningful fallback tree
  */
 export function createSmartFallback(extractions: ConceptExtraction[]): FinalMindMap {
+  const logger = createAgentGraphLogger('MindMapGraph', 'mindmap');
   const themeCounts: Record<string, number> = {};
   extractions.forEach(e => {
     const t = e.main_theme || 'Unknown';
@@ -17,12 +18,12 @@ export function createSmartFallback(extractions: ConceptExtraction[]): FinalMind
   const rootTitle = Object.entries(themeCounts)
     .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Knowledge Map';
 
-  logInfo({
+  logger.info(`Fallback root: "${rootTitle}"`, {
     agent: 'MindMapGraph',
     phase: 'fallback',
     rootTitle,
     themeCounts,
-  }, `Fallback root: "${rootTitle}"`);
+  });
 
   const seenThemes = new Set<string>();
   const children: MindMapNode[] = [];
@@ -43,11 +44,11 @@ export function createSmartFallback(extractions: ConceptExtraction[]): FinalMind
     });
   }
 
-  logInfo({
+  logger.info(`Fallback: ${children.length} branches`, {
     agent: 'MindMapGraph',
     phase: 'fallback',
     branchCount: children.length,
-  }, `Fallback: ${children.length} branches`);
+  });
 
   return {
     nodeData: {

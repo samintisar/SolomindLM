@@ -8,7 +8,7 @@ import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { END, START, Send, StateGraph, type CompiledStateGraph } from '@langchain/langgraph';
 
 import { env } from '../../_lib/env';
-import { logInfo, logWarn } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 import { OverallState, type OverallStateType, type ChunkProcessState } from './state.js';
 import { packChunks, validateChunks } from './chunkHelpers.js';
 import { extractBeats } from './nodeExtractBeats.js';
@@ -44,18 +44,20 @@ export class AudioOverviewGraph {
    * Route to map phase - creates Send objects for parallel processing.
    */
   routeToMap(state: OverallStateType): Send[] | 'collapse' {
+    const logger = createAgentGraphLogger('AudioOverviewGraph', 'audio');
+
     if (state.chunks.length === 0) {
-      logWarn({
+      logger.warn('No chunks to process, routing to collapse', {
         agent: 'AudioOverviewGraph',
         phase: 'route_to_map',
-      }, 'No chunks to process, routing to collapse');
+      });
       return 'collapse';
     }
 
     const validatedChunks = validateChunks(state.chunks);
     const packedChunks = packChunks(validatedChunks);
 
-    logInfo({
+    logger.info(`Creating ${packedChunks.length} parallel map tasks`, {
       agent: 'AudioOverviewGraph',
       phase: 'route_to_map',
       originalChunks: state.chunks.length,
@@ -63,7 +65,7 @@ export class AudioOverviewGraph {
       packedChunks: packedChunks.length,
       audioType: state.audioType,
       length: state.length,
-    }, `Creating ${packedChunks.length} parallel map tasks`);
+    });
 
     return packedChunks.map((chunk, idx) =>
       new Send('extract_beats', {

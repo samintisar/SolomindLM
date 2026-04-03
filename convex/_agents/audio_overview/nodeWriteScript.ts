@@ -5,14 +5,10 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import {
   invokeWithTimeout,
   invokeWithRetry,
-  logInfo,
-  logWarn,
-  logError,
-  logPhaseStart,
-  logPhaseComplete,
   sanitizeUserInput,
   createLangSmithRunConfig,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 import type { OverallStateType, DialogueLine } from './state.js';
 import {
   type AudioType,
@@ -34,12 +30,12 @@ export async function writeScript(
   state: OverallStateType,
   smartLlm: any
 ): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('AudioOverviewGraph', 'audio');
   const { collapsedOutputs, audioType, length, focus } = state;
   const startTime = Date.now();
 
-  logPhaseStart({
+  logger.phaseStart('write_script', {
     agent: 'AudioOverviewGraph',
-    phase: 'write_script',
     audioType,
     length,
     collapsedOutputsCount: collapsedOutputs.length,
@@ -55,13 +51,13 @@ export async function writeScript(
   // Calculate number of chunks needed
   const numChunks = Math.ceil(targetLines / DIALOGUE_CHUNK_SIZE);
 
-  logInfo({
+  logger.info(`Generating dialogue script (~${targetLines} lines in ${numChunks} chunks)`, {
     agent: 'AudioOverviewGraph',
     phase: 'write_script',
     promptLength: combined.length,
     targetLines,
     numChunks,
-  }, `Generating dialogue script (~${targetLines} lines in ${numChunks} chunks)`);
+  });
 
   let fullDialogueScript: DialogueLine[] = [];
 
@@ -94,13 +90,13 @@ export async function writeScript(
         coveredTopicsPrompt,
       });
 
-      logInfo({
+      logger.info(`Generating chunk ${chunkIndex + 1}/${numChunks}`, {
         agent: 'AudioOverviewGraph',
         phase: 'write_script_chunk',
         chunkIndex: chunkIndex + 1,
         totalChunks: numChunks,
         targetLines: linesThisChunk,
-      }, `Generating chunk ${chunkIndex + 1}/${numChunks}`);
+      });
 
       // Timeout + Retry wrapper for resilient LLM calls
       const response = await invokeWithRetry(
@@ -126,13 +122,13 @@ export async function writeScript(
           maxAttempts: 3,
           baseDelayMs: 1000,
           onRetry: (attempt, error) => {
-            logWarn({
+            logger.warn(`Retry attempt ${attempt}/3`, {
               agent: 'AudioOverviewGraph',
               phase: 'write_script_chunk',
               chunkIndex: chunkIndex + 1,
               attempt,
               error: error.message,
-            }, `Retry attempt ${attempt}/3`);
+            });
           }
         },
         'AudioReduce'
@@ -140,24 +136,24 @@ export async function writeScript(
 
       const responseText = String((response as { content: { toString: () => string } }).content);
 
-      logInfo({
+      logger.info(`Received response (${responseText.length} chars)`, {
         agent: 'AudioOverviewGraph',
         phase: 'write_script_chunk',
         chunkIndex: chunkIndex + 1,
         responseLength: responseText.length,
-      }, `Received response (${responseText.length} chars)`);
+      });
 
       // Robust JSON extraction
       const jsonStart = responseText.indexOf('[');
       const jsonEnd = responseText.lastIndexOf(']');
 
       if (jsonStart === -1 || jsonEnd === -1) {
-        logWarn({
+        logger.warn('No JSON array found in response', {
           agent: 'AudioOverviewGraph',
           phase: 'write_script_chunk',
           chunkIndex: chunkIndex + 1,
           responsePreview: responseText.slice(0, 500),
-        }, 'No JSON array found in response');
+        });
         continue;
       }
 
@@ -172,12 +168,12 @@ export async function writeScript(
           throw new Error('Invalid dialogue script structure');
         }
 
-        logInfo({
+        logger.info(`Successfully parsed ${chunkDialogue.length} lines`, {
           agent: 'AudioOverviewGraph',
           phase: 'write_script_chunk',
           chunkIndex: chunkIndex + 1,
           linesGenerated: chunkDialogue.length,
-        }, `Successfully parsed ${chunkDialogue.length} lines`);
+        });
 
         fullDialogueScript = fullDialogueScript.concat(chunkDialogue);
 
@@ -222,32 +218,32 @@ ${chunkDialogue.map(d => `${d.speaker}: ${d.text}`).join('\n')}`;
         }
 
       } catch (parseError) {
-        logWarn({
+        logger.warn('JSON parsing failed for chunk', {
           agent: 'AudioOverviewGraph',
           phase: 'write_script_chunk',
           chunkIndex: chunkIndex + 1,
           error: parseError instanceof Error ? parseError.message : String(parseError),
           jsonPreview: jsonStr.slice(0, 500),
-        }, 'JSON parsing failed for chunk');
+        });
       }
     }
 
     // If we got some dialogue but not enough, log a warning
     if (fullDialogueScript.length > 0 && fullDialogueScript.length < targetLines * 0.5) {
-      logWarn({
+      logger.warn(`Generated fewer lines than target (${fullDialogueScript.length}/${targetLines})`, {
         agent: 'AudioOverviewGraph',
         phase: 'write_script',
         targetLines,
         actualLines: fullDialogueScript.length,
-      }, `Generated fewer lines than target (${fullDialogueScript.length}/${targetLines})`);
+      });
     }
 
     // If extraction completely failed, generate fallback
     if (fullDialogueScript.length === 0) {
-      logWarn({
+      logger.warn('All chunks failed, using fallback script', {
         agent: 'AudioOverviewGraph',
         phase: 'write_script',
-      }, 'All chunks failed, using fallback script');
+      });
       fullDialogueScript = [
         { speaker: 'host_a', text: "I've analyzed the content you provided." },
         { speaker: 'host_b', text: 'What did you find most interesting?' },
@@ -257,22 +253,24 @@ ${chunkDialogue.map(d => `${d.speaker}: ${d.text}`).join('\n')}`;
 
     const elapsed = Date.now() - startTime;
 
-    logPhaseComplete({
+    logger.phaseComplete('write_script', {
       agent: 'AudioOverviewGraph',
-      phase: 'write_script',
       dialogueLines: fullDialogueScript.length,
       processingTimeMs: elapsed,
     });
   } catch (error) {
-    logError({
-      agent: 'AudioOverviewGraph',
-      phase: 'write_script',
-      error: error instanceof Error ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-      } : String(error),
-    }, 'Error writing dialogue script');
+    logger.phaseError(
+      'write_script',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        agent: 'AudioOverviewGraph',
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+        } : String(error),
+      }
+    );
 
     fullDialogueScript = [
       { speaker: 'host_a', text: 'I apologize, but I had trouble processing this content.' },

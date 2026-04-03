@@ -113,11 +113,10 @@ export interface WrittenQuestionAnswer {
 }
 
 export interface Flashcard {
-  type: 'wh-question' | 'fill-blank' | 'true-false' | 'multiple-choice' | 'definition' | 'scenario';
+  type: 'wh-question' | 'fill-blank' | 'true-false' | 'definition' | 'scenario';
   front: string;
   back: string;
   topic?: string;
-  options?: string[]; // For multiple-choice questions
   proficiency?: {
     nextReviewDate?: number;
     interval: number;

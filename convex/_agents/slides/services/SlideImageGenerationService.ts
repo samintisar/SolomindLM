@@ -2,12 +2,8 @@
 
 import OpenAI from 'openai';
 
-import {
-  invokeWithTimeout,
-  logError,
-  logInfo,
-  logWarn,
-} from '../../_shared/index.js';
+import { invokeWithTimeout } from '../../_shared/index.js';
+import { createAgentGraphLogger } from '../../_shared/logging.js';
 
 import { GRAPH_CONFIG } from '../config.js';
 import type { Slide } from '../prompts.js';
@@ -28,16 +24,14 @@ export class SlideImageGenerationService {
   private client: OpenAI;
   private uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>;
   private maxRetries = 2; // More retries for rate limit handling
+  private readonly logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
 
   constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>) {
     if (!apiKey || apiKey.trim().length === 0) {
-      logWarn(
-        {
-          agent: 'SlideDeckGraph',
-          phase: 'image_service_init',
-        } as any,
-        'OpenAI API key not configured - image generation will be skipped'
-      );
+      this.logger.warn('OpenAI API key not configured - image generation will be skipped', {
+        agent: 'SlideDeckGraph',
+        phase: 'image_service_init',
+      });
     }
     this.client = new OpenAI({ apiKey });
     this.uploadStorage = uploadStorage;
@@ -50,15 +44,12 @@ export class SlideImageGenerationService {
   async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer> {
   const startTime = Date.now();
 
-  logInfo(
-    {
-      agent: 'SlideDeckGraph',
-      phase: 'image_generation',
-      slideNumber,
-      promptLength: prompt.length,
-    } as any,
-    `Generating slide ${slideNumber} with OpenAI gpt-image-1.5...`
-  );
+  this.logger.info(`Generating slide ${slideNumber} with OpenAI gpt-image-1.5...`, {
+    agent: 'SlideDeckGraph',
+    phase: 'image_generation',
+    slideNumber,
+    promptLength: prompt.length,
+  });
 
   let lastError: Error | null = null;
 
@@ -125,17 +116,14 @@ export class SlideImageGenerationService {
       }
 
       const elapsed = Date.now() - startTime;
-      logInfo(
-        {
-          agent: 'SlideDeckGraph',
-          phase: 'image_generation',
-          slideNumber,
-          attempt,
-          imageSize: imageData.length,
-          processingTimeMs: elapsed,
-        } as any,
-        `Slide ${slideNumber} generated successfully (${(imageData.length / 1024).toFixed(2)} KB)`
-      );
+      this.logger.info(`Slide ${slideNumber} generated successfully (${(imageData.length / 1024).toFixed(2)} KB)`, {
+        agent: 'SlideDeckGraph',
+        phase: 'image_generation',
+        slideNumber,
+        attempt,
+        imageSize: imageData.length,
+        processingTimeMs: elapsed,
+      });
 
       return imageData;
     } catch (error: any) {
@@ -161,15 +149,15 @@ export class SlideImageGenerationService {
         errorDetails = { error: String(error), isRateLimit };
       }
 
-      logWarn(
+      this.logger.warn(
+        `Attempt ${attempt}/${this.maxRetries} failed for slide ${slideNumber}: ${lastError.message}${isRateLimit ? ' (rate limit)' : ''}`,
         {
           agent: 'SlideDeckGraph',
           phase: 'image_generation',
           slideNumber,
           attempt,
           error: errorDetails,
-        } as any,
-        `Attempt ${attempt}/${this.maxRetries} failed for slide ${slideNumber}: ${lastError.message}${isRateLimit ? ' (rate limit)' : ''}`
+        }
       );
 
       // Fail fast on auth or invalid request errors
@@ -183,27 +171,21 @@ export class SlideImageGenerationService {
         const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 16000);
 
         if (isRateLimit) {
-          logInfo(
-            {
-              agent: 'SlideDeckGraph',
-              phase: 'image_generation',
-              slideNumber,
-              attempt,
-              delayMs: delay,
-            } as any,
-            `Rate limit hit. Waiting ${delay}ms before retry ${attempt + 1}/${this.maxRetries}...`
-          );
+          this.logger.info(`Rate limit hit. Waiting ${delay}ms before retry ${attempt + 1}/${this.maxRetries}...`, {
+            agent: 'SlideDeckGraph',
+            phase: 'image_generation',
+            slideNumber,
+            attempt,
+            delayMs: delay,
+          });
         } else {
-          logInfo(
-            {
-              agent: 'SlideDeckGraph',
-              phase: 'image_generation',
-              slideNumber,
-              attempt,
-              delayMs: delay,
-            } as any,
-            `Waiting ${delay}ms before retry ${attempt + 1}/${this.maxRetries}...`
-          );
+          this.logger.info(`Waiting ${delay}ms before retry ${attempt + 1}/${this.maxRetries}...`, {
+            agent: 'SlideDeckGraph',
+            phase: 'image_generation',
+            slideNumber,
+            attempt,
+            delayMs: delay,
+          });
         }
 
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -211,14 +193,13 @@ export class SlideImageGenerationService {
     }
   }
 
-  logError(
+  this.logger.phaseError(
+    'image_generation',
+    lastError || new Error('Unknown image generation failure'),
     {
       agent: 'SlideDeckGraph',
-      phase: 'image_generation',
       slideNumber,
-      error: lastError?.message,
-    } as any,
-    `Failed to generate slide ${slideNumber} after ${this.maxRetries} attempts`
+    }
   );
 
   throw lastError || new Error('Failed to generate slide image');
@@ -231,40 +212,30 @@ export class SlideImageGenerationService {
   async uploadImage(imageBuffer: Buffer, slideNumber: number, slideDeckId: string): Promise<string> {
     const fileName = `slide-decks/${slideDeckId}/slide-${slideNumber}-${Date.now()}.png`;
 
-    logInfo(
-      {
-        agent: 'SlideDeckGraph',
-        phase: 'upload_image',
-        slideNumber,
-        fileName,
-        fileSize: imageBuffer.length,
-      } as any,
-      `Uploading slide ${slideNumber} to storage...`
-    );
+    this.logger.info(`Uploading slide ${slideNumber} to storage...`, {
+      agent: 'SlideDeckGraph',
+      phase: 'upload_image',
+      slideNumber,
+      fileName,
+      fileSize: imageBuffer.length,
+    });
 
     try {
       const publicUrl = await this.uploadStorage(imageBuffer, fileName);
 
-      logInfo(
-        {
-          agent: 'SlideDeckGraph',
-          phase: 'upload_image',
-          slideNumber,
-          publicUrl,
-        } as any,
-        `Slide ${slideNumber} uploaded successfully`
-      );
+      this.logger.info(`Slide ${slideNumber} uploaded successfully`, {
+        agent: 'SlideDeckGraph',
+        phase: 'upload_image',
+        slideNumber,
+        publicUrl,
+      });
 
       return publicUrl;
     } catch (error) {
-      logError(
-        {
-          agent: 'SlideDeckGraph',
-          phase: 'upload_image',
-          slideNumber,
-          error: error instanceof Error ? error.message : String(error),
-        } as any,
-        `Failed to upload slide ${slideNumber}`
+      this.logger.phaseError(
+        'upload_image',
+        error instanceof Error ? error : new Error(String(error)),
+        { agent: 'SlideDeckGraph', slideNumber }
       );
 
       throw error;
@@ -289,15 +260,12 @@ export class SlideImageGenerationService {
     slideDeckId: string,
     concurrency: number = 2
   ): Promise<Slide[]> {
-    logInfo(
-      {
-        agent: 'SlideDeckGraph',
-        phase: 'generate_slide_images',
-        totalSlides: slides.length,
-        concurrency,
-      } as any,
-      `Starting image generation for ${slides.length} slides with concurrency ${concurrency}...`
-    );
+    this.logger.info(`Starting image generation for ${slides.length} slides with concurrency ${concurrency}...`, {
+      agent: 'SlideDeckGraph',
+      phase: 'generate_slide_images',
+      totalSlides: slides.length,
+      concurrency,
+    });
 
     const DELAY_BETWEEN_BATCHES_MS = 1000;
     const results: Slide[] = [];
@@ -309,29 +277,23 @@ export class SlideImageGenerationService {
       const batchNumber = Math.floor(batchStart / concurrency) + 1;
       const totalBatches = Math.ceil(slides.length / concurrency);
 
-      logInfo(
-        {
-          agent: 'SlideDeckGraph',
-          phase: 'generate_slide_images',
-          batchNumber,
-          totalBatches,
-          batchSize: batch.length,
-          slideRange: `${batchStart + 1}-${batchEnd}`,
-        } as any,
-        `Processing batch ${batchNumber}/${totalBatches} (slides ${batchStart + 1}-${batchEnd})...`
-      );
+      this.logger.info(`Processing batch ${batchNumber}/${totalBatches} (slides ${batchStart + 1}-${batchEnd})...`, {
+        agent: 'SlideDeckGraph',
+        phase: 'generate_slide_images',
+        batchNumber,
+        totalBatches,
+        batchSize: batch.length,
+        slideRange: `${batchStart + 1}-${batchEnd}`,
+      });
 
       // Add delay between batches (not before first batch)
       if (batchStart > 0) {
-        logInfo(
-          {
-            agent: 'SlideDeckGraph',
-            phase: 'generate_slide_images',
-            batchNumber,
-            delay: DELAY_BETWEEN_BATCHES_MS,
-          } as any,
-          `Waiting ${DELAY_BETWEEN_BATCHES_MS}ms before processing batch ${batchNumber}...`
-        );
+        this.logger.info(`Waiting ${DELAY_BETWEEN_BATCHES_MS}ms before processing batch ${batchNumber}...`, {
+          agent: 'SlideDeckGraph',
+          phase: 'generate_slide_images',
+          batchNumber,
+          delay: DELAY_BETWEEN_BATCHES_MS,
+        });
         await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS));
       }
 
@@ -340,42 +302,36 @@ export class SlideImageGenerationService {
         const batchResults = await Promise.all(
           batch.map(async (slide) => {
             try {
-              logInfo(
-                {
-                  agent: 'SlideDeckGraph',
-                  phase: 'generate_slide_images',
-                  slideNumber: slide.slideNumber,
-                } as any,
-                `Generating image for slide ${slide.slideNumber}...`
-              );
+              this.logger.info(`Generating image for slide ${slide.slideNumber}...`, {
+                agent: 'SlideDeckGraph',
+                phase: 'generate_slide_images',
+                slideNumber: slide.slideNumber,
+              });
 
               const imageBuffer = await this.generateSlideImage(slide.prompt, slide.slideNumber);
               const imageUrl = await this.uploadImage(imageBuffer, slide.slideNumber, slideDeckId);
 
-              logInfo(
-                {
-                  agent: 'SlideDeckGraph',
-                  phase: 'generate_slide_images',
-                  slideNumber: slide.slideNumber,
-                  imageUrl,
-                } as any,
-                `Successfully generated image for slide ${slide.slideNumber}`
-              );
+              this.logger.info(`Successfully generated image for slide ${slide.slideNumber}`, {
+                agent: 'SlideDeckGraph',
+                phase: 'generate_slide_images',
+                slideNumber: slide.slideNumber,
+                imageUrl,
+              });
 
               return {
                 ...slide,
                 imageUrl,
               } as Slide;
             } catch (error) {
-              logError(
+              this.logger.phaseError(
+                'generate_slide_images',
+                error instanceof Error ? error : new Error(String(error)),
                 {
                   agent: 'SlideDeckGraph',
-                  phase: 'generate_slide_images',
                   slideNumber: slide.slideNumber,
                   slideTitle: slide.title,
-                  error: error instanceof Error ? error.message : String(error),
-                } as any,
-                `CRITICAL: Failed to generate image for slide ${slide.slideNumber} in batch ${batchNumber}. Aborting entire batch.`
+                  batchNumber,
+                }
               );
 
               // Re-throw to fail the entire batch
@@ -389,28 +345,24 @@ export class SlideImageGenerationService {
         // Add batch results to total results
         results.push(...batchResults);
 
-        logInfo(
-          {
-            agent: 'SlideDeckGraph',
-            phase: 'generate_slide_images',
-            batchNumber,
-            completedSlides: batchEnd,
-            totalSlides: slides.length,
-          } as any,
-          `Completed batch ${batchNumber}/${totalBatches} (${results.length}/${slides.length} slides completed)`
-        );
+        this.logger.info(`Completed batch ${batchNumber}/${totalBatches} (${results.length}/${slides.length} slides completed)`, {
+          agent: 'SlideDeckGraph',
+          phase: 'generate_slide_images',
+          batchNumber,
+          completedSlides: batchEnd,
+          totalSlides: slides.length,
+        });
       } catch (error) {
         // If batch fails, fail entire generation
-        logError(
+        this.logger.phaseError(
+          'generate_slide_images',
+          error instanceof Error ? error : new Error(String(error)),
           {
             agent: 'SlideDeckGraph',
-            phase: 'generate_slide_images',
             batchNumber,
             completedSlides: results.length,
             totalSlides: slides.length,
-            error: error instanceof Error ? error.message : String(error),
-          } as any,
-          `Batch ${batchNumber} failed. Aborting slide deck generation.`
+          }
         );
 
         throw error;
@@ -418,16 +370,13 @@ export class SlideImageGenerationService {
     }
 
     const successCount = results.filter((s) => s.imageUrl && !s.imageUrl.includes('placeholder')).length;
-    logInfo(
-      {
-        agent: 'SlideDeckGraph',
-        phase: 'generate_slide_images',
-        totalSlides: slides.length,
-        successful: successCount,
-        failed: slides.length - successCount,
-      } as any,
-      `Image generation complete: ${successCount}/${slides.length} slides generated`
-    );
+    this.logger.info(`Image generation complete: ${successCount}/${slides.length} slides generated`, {
+      agent: 'SlideDeckGraph',
+      phase: 'generate_slide_images',
+      totalSlides: slides.length,
+      successful: successCount,
+      failed: slides.length - successCount,
+    });
 
     return results;
   }

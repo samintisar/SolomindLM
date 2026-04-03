@@ -514,6 +514,7 @@ export async function runFinalizeFlashcardPhase(
       const collapseReduceDeps = {
         smartLlm: llm,
         estimateTokens: countTokens,
+        logger,
       };
 
       const startTime = Date.now();

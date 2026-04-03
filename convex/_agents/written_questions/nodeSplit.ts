@@ -1,6 +1,6 @@
 "use node"
 
-import { logInfo } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import { packChunks, validateChunks } from './chunkHelpers.js';
@@ -20,6 +20,7 @@ export async function callStatusUpdate(
 }
 
 export async function splitChunks(state: OverallStateType): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger('WrittenQuestionsGraph', 'written_questions');
   console.log('\n' + '='.repeat(80));
   console.log('[WrittenQuestionsGraph] ===== SPLIT CHUNKS PHASE =====');
   console.log('='.repeat(80));
@@ -37,13 +38,13 @@ export async function splitChunks(state: OverallStateType): Promise<Partial<Over
   const validatedChunks = validateChunks(state.chunks);
   const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS);
 
-  logInfo({
+  logger.info(`Packed ${state.chunks.length} chunks into ${packedChunks.length} processed chunks`, {
     agent: 'WrittenQuestionsGraph',
     phase: 'split_chunks',
     originalChunks: state.chunks.length,
     validatedChunks: validatedChunks.length,
     packedChunks: packedChunks.length,
-  }, `Packed ${state.chunks.length} chunks into ${packedChunks.length} processed chunks`);
+  });
 
   await callStatusUpdate(state, 'split_chunks');
 

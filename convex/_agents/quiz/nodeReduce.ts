@@ -9,11 +9,8 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
-  logPhaseStart,
-  logWarn,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import { callStatusUpdate } from './nodeSplit.js';
@@ -39,11 +36,11 @@ export async function reduce(
   state: OverallStateType,
   deps: ReduceQuizDeps
 ): Promise<Partial<OverallStateType> | Send> {
+  const logger = createAgentGraphLogger('QuizGraph', 'quiz');
   await callStatusUpdate(state, 'reducing');
 
-  logPhaseStart({
+  logger.phaseStart('reduce', {
     agent: 'QuizGraph',
-    phase: 'reduce',
     collapsedOutputsCount: state.collapsedOutputs.length,
     targetQuestionCount: state.questionCount,
     difficulty: state.difficulty,
@@ -56,22 +53,20 @@ export async function reduce(
       const parsed = JSON.parse(output) as QuizCandidate[];
       allCandidates.push(...parsed);
     } catch (e) {
-      logWarn({
+      logger.warn('Failed to parse question array in reduce', {
         agent: 'QuizGraph',
         phase: 'reduce_parse_error',
         error: e instanceof Error ? e.message : String(e),
-      }, 'Failed to parse question array in reduce');
+      });
     }
   }
 
   const totalCandidatesBefore = allCandidates.length;
 
   if (totalCandidatesBefore === 0) {
-    logError({
+    logger.phaseError('reduce', new Error('No candidates generated'), {
       agent: 'QuizGraph',
-      phase: 'reduce',
-      error: 'No candidates generated',
-    }, 'CRITICAL: No candidates in collapsed outputs!');
+    });
     await callStatusUpdate(state, 'failed');
     return {
       ...state,
@@ -84,13 +79,13 @@ export async function reduce(
   const smartReduceThreshold = state.questionCount + Math.max(2, Math.ceil(state.questionCount * 0.25));
   const retryCount = state.reduceRetryCount ?? 0;
 
-  logInfo({
+  logger.info(`Flattened ${totalCandidatesBefore} candidates, ${dedupedCandidates.length} remain after heuristic dedupe`, {
     agent: 'QuizGraph',
     phase: 'reduce_after_flatten',
     initialQuestionCount: totalCandidatesBefore,
     dedupedQuestionCount: dedupedCandidates.length,
     smartReduceThreshold,
-  }, `Flattened ${totalCandidatesBefore} candidates, ${dedupedCandidates.length} remain after heuristic dedupe`);
+  });
 
   let selectedCandidates: QuizCandidate[] | null = null;
 
@@ -99,26 +94,26 @@ export async function reduce(
 
     if (similarQuestions.length === 0) {
       selectedCandidates = dedupedCandidates.slice(0, state.questionCount);
-      logInfo({
+      logger.info(`Skipping smart reduce: ${dedupedCandidates.length} heuristically clean candidates are already near target`, {
         agent: 'QuizGraph',
         phase: 'reduce_skip_llm',
         candidateCount: dedupedCandidates.length,
         targetQuestionCount: state.questionCount,
         smartReduceThreshold,
-      }, `Skipping smart reduce: ${dedupedCandidates.length} heuristically clean candidates are already near target`);
+      });
     } else {
-      logInfo({
+      logger.info(`Keeping smart reduce for ${dedupedCandidates.length} near-target candidates because ${similarQuestions.length} duplicate groups remain`, {
         agent: 'QuizGraph',
         phase: 'reduce_keep_llm',
         candidateCount: dedupedCandidates.length,
         duplicateGroups: similarQuestions.length,
         reason: 'Near target but heuristic verifier still found overlaps',
-      }, `Keeping smart reduce for ${dedupedCandidates.length} near-target candidates because ${similarQuestions.length} duplicate groups remain`);
+      });
     }
   }
 
   if (selectedCandidates === null) {
-    logInfo({
+    logger.info(`Using smart LLM for intelligent candidate selection from ${dedupedCandidates.length} candidates [Attempt ${retryCount + 1}/2]...`, {
       agent: 'QuizGraph',
       phase: 'reduce_llm_selection',
       totalQuestionsBefore: totalCandidatesBefore,
@@ -126,7 +121,7 @@ export async function reduce(
       targetQuestionCount: state.questionCount,
       retryAttempt: retryCount + 1,
       reason: 'Using smart reduce after heuristic dedupe because the pool is still large or messy',
-    }, `Using smart LLM for intelligent candidate selection from ${dedupedCandidates.length} candidates [Attempt ${retryCount + 1}/2]...`);
+    });
 
     try {
       const structuredLlm = deps.smartLlm.withStructuredOutput<QuizCandidateResponse>(
@@ -163,12 +158,12 @@ export async function reduce(
           maxAttempts: 2,
           baseDelayMs: 1000,
           onRetry: (attempt, error) => {
-            logWarn({
+            logger.warn(`LLM reduce retry attempt ${attempt}/2`, {
               agent: 'QuizGraph',
               phase: 'reduce_llm_retry',
               attempt,
               error: error.message,
-            }, `LLM reduce retry attempt ${attempt}/2`);
+            });
           }
         },
         'QuizReduce'
@@ -176,26 +171,25 @@ export async function reduce(
 
       selectedCandidates = response.questions;
 
-      logInfo({
+      logger.info(`LLM refinement complete: ${dedupedCandidates.length} → ${selectedCandidates.length} candidates`, {
         agent: 'QuizGraph',
         phase: 'reduce_llm_success',
         selectedCount: selectedCandidates.length,
         originalCount: totalCandidatesBefore,
         dedupedCount: dedupedCandidates.length,
-      }, `LLM refinement complete: ${dedupedCandidates.length} → ${selectedCandidates.length} candidates`);
+      });
 
       if (selectedCandidates.length === 0) {
         throw new Error('LLM returned zero candidates');
       }
     } catch (error) {
-      logError({
-        agent: 'QuizGraph',
-        phase: 'reduce_llm_failed',
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-        } : String(error),
-      }, 'LLM reduce failed, falling back to heuristic slice');
+      logger.phaseError(
+        'reduce_llm_failed',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          agent: 'QuizGraph',
+        }
+      );
 
       const fallback = dedupedCandidates.slice(0, state.questionCount);
 
@@ -219,12 +213,12 @@ export async function reduce(
   }
 
   const expandConcurrency = GRAPH_CONFIG.EXPAND_CONCURRENCY;
-  logInfo({
+  logger.info(`Generating distractors for ${selectedCandidates.length} questions (concurrency: ${expandConcurrency})...`, {
     agent: 'QuizGraph',
     phase: 'expand_questions',
     selectedCount: selectedCandidates.length,
     concurrency: expandConcurrency,
-  }, `Generating distractors for ${selectedCandidates.length} questions (concurrency: ${expandConcurrency})...`);
+  });
 
   const expandDeps = { expandLlmQuestionStructured: deps.expandLlmQuestionStructured };
   const expandedResults = await allWithConcurrency(
@@ -233,12 +227,12 @@ export async function reduce(
         try {
           return await expandQuestion(candidate, expandDeps);
         } catch (error) {
-          logWarn({
+          logger.warn('Failed to expand candidate', {
             agent: 'QuizGraph',
             phase: 'expand_question_failed',
             index,
             error: error instanceof Error ? error.message : String(error),
-          }, 'Failed to expand candidate');
+          });
           return null;
         }
       };
@@ -249,11 +243,11 @@ export async function reduce(
   const expandedQuestions = expandedResults.filter((q): q is QuizQuestion => q !== null);
   const failedCount = expandedResults.length - expandedQuestions.length;
   if (failedCount > 0) {
-    logWarn({
+    logger.warn(`${failedCount} candidate expansions failed`, {
       agent: 'QuizGraph',
       phase: 'expand_questions_failed',
       failedCount,
-    }, `${failedCount} candidate expansions failed`);
+    });
   }
 
   if (expandedQuestions.length === 0) {
@@ -264,5 +258,5 @@ export async function reduce(
     };
   }
 
-  return finalizeQuestions(expandedQuestions, state);
+  return finalizeQuestions(expandedQuestions, state, logger);
 }

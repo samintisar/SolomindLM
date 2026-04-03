@@ -19,7 +19,9 @@ export type JobType =
   | 'slides'
   | 'spreadsheet'
   | 'written_questions'
-  | 'document_embedding';
+  | 'document_embedding'
+  /** Shared graph / node-builder paths without a Convex job document */
+  | 'agent_graph';
 
 /**
  * Error types for classification.
@@ -108,23 +110,6 @@ export type LogEvent =
   | 'phase_transition'
   | 'info'
   | 'warn';
-
-/**
- * Legacy Log context interface (deprecated, use JobLogContext).
- * All logs include agent name, phase, and timestamp.
- * Additional context can be added via index signature.
- * @deprecated Use createJobLogger instead
- */
-export interface LogContext {
-  /** Agent name (e.g., 'ReportGraph', 'FlashcardGraph') */
-  agent: string;
-  /** Operation phase (e.g., 'map_process', 'reduce', 'collapse') */
-  phase: string;
-  /** ISO 8601 timestamp (auto-generated if not provided) */
-  timestamp?: string;
-  /** Additional context properties */
-  [key: string]: any;
-}
 
 /**
  * Generate a correlation ID for distributed tracing.
@@ -546,189 +531,13 @@ export function createJobLogger(context: JobLogContext): JobLogger {
   };
 }
 
-// ============================================================
-// Legacy functions (preserved for backward compatibility)
-// ============================================================
-
 /**
- * Creates a log entry with timestamp and consistent structure.
- * @deprecated Use createJobLogger instead
+ * Structured logger for LangGraph nodes when logs are not tied to a Convex job row.
+ * `jobId` is set to `agentName` for searchability; pass a concrete `jobType` when the graph matches a studio artifact.
  */
-function createLogEntry(
-  context: LogContext,
-  level: LogLevel,
-  message?: string
-): Record<string, any> {
-  return {
-    timestamp: context.timestamp || new Date().toISOString(),
-    level,
-    agent: context.agent,
-    phase: context.phase,
-    ...Object.fromEntries(
-      Object.entries(context).filter(([key]) => !['agent', 'phase', 'timestamp'].includes(key))
-    ),
-    ...(message && { message }),
-  };
-}
-
-/**
- * Logs an informational message.
- * @deprecated Use createJobLogger instead
- */
-export function logInfo(context: LogContext, message?: string): void {
-  const entry = createLogEntry(context, LogLevel.INFO, message);
-  console.log(JSON.stringify(entry));
-}
-
-/**
- * Logs a warning message.
- * @deprecated Use createJobLogger instead
- */
-export function logWarn(context: LogContext, message?: string): void {
-  const entry = createLogEntry(context, LogLevel.WARN, message);
-  console.warn(JSON.stringify(entry));
-}
-
-/**
- * Logs an error message with error details.
- * @deprecated Use createJobLogger instead
- */
-export function logError(context: LogContext, error: Error | string): void {
-  const errorDetails =
-    error instanceof Error
-      ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-        }
-      : { message: error };
-
-  const entry = createLogEntry(context, LogLevel.ERROR);
-  console.error(JSON.stringify({ ...entry, error: errorDetails }));
-}
-
-/**
- * Logs a debug message (only in development/debug mode).
- * @deprecated Use createJobLogger instead
- */
-export function logDebug(context: LogContext, message?: string): void {
-  const isDebug = process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true';
-  if (isDebug) {
-    const entry = createLogEntry(context, LogLevel.DEBUG, message);
-    console.debug(JSON.stringify(entry));
-  }
-}
-
-/**
- * Logs the start of a phase with visual separator.
- * @deprecated Use createJobLogger instead
- */
-export function logPhaseStart(context: LogContext): void {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`[${context.agent}] ===== ${context.phase.toUpperCase().replace(/_/g, ' ')} =====`);
-  console.log('='.repeat(80));
-
-  const entry = createLogEntry(context, LogLevel.INFO);
-  console.log(JSON.stringify(entry));
-}
-
-/**
- * Logs the completion of a phase with timing and results.
- * @deprecated Use createJobLogger instead
- */
-export function logPhaseComplete(context: LogContext, result?: any): void {
-  const entry = createLogEntry(
-    context,
-    LogLevel.INFO,
-    result ? `Completed in ${context.processingTimeMs}ms` : 'Completed'
-  );
-
-  if (result) {
-    console.log(JSON.stringify({ ...entry, result }));
-  } else {
-    console.log(JSON.stringify(entry));
-  }
-}
-
-/**
- * Logs a phase transition between operations.
- * @deprecated Use createJobLogger instead
- */
-export function logPhaseTransition(
-  fromPhase: string,
-  toPhase: string,
-  context: Omit<LogContext, 'phase'>
-): void {
-  logInfo({
-    agent: context.agent,
-    phase: 'transition',
-    fromPhase,
-    toPhase,
-    timestamp: context.timestamp,
-  });
-}
-
-/**
- * Creates a performance timer for measuring operation duration.
- * @deprecated Use logger.createTimer() from createJobLogger instead
- */
-export function createTimer(): {
-  end: () => number;
-} {
-  const startTime = Date.now();
-
-  return {
-    end: () => Date.now() - startTime,
-  };
-}
-
-/**
- * Logs with a visual separator banner for important events.
- * @deprecated Use createJobLogger instead
- */
-export function logBanner(context: LogContext, title: string, style: string = '='): void {
-  const bannerLine = style.repeat(80);
-  console.log(`\n${bannerLine}`);
-  console.log(`[${context.agent}] ===== ${title} =====`);
-  console.log(bannerLine);
-
-  const entry = createLogEntry(context, LogLevel.INFO);
-  console.log(JSON.stringify(entry));
-}
-
-/**
- * Creates a child logger with preset context.
- * @deprecated Use logger.child() from createJobLogger instead
- */
-export function createChildLogger(
-  parentContext: Omit<LogContext, 'timestamp'>
-): {
-  info: (additionalContext: Partial<LogContext>, message?: string) => void;
-  warn: (additionalContext: Partial<LogContext>, message?: string) => void;
-  error: (additionalContext: Partial<LogContext>, error: Error | string) => void;
-  debug: (additionalContext: Partial<LogContext>, message?: string) => void;
-} {
-  return {
-    info: (additionalContext: Partial<LogContext> = {}, message?: string) => {
-      logInfo({ ...parentContext, ...additionalContext } as LogContext, message);
-    },
-    warn: (additionalContext: Partial<LogContext> = {}, message?: string) => {
-      logWarn({ ...parentContext, ...additionalContext } as LogContext, message);
-    },
-    error: (additionalContext: Partial<LogContext> = {}, error: Error | string) => {
-      logError({ ...parentContext, ...additionalContext } as LogContext, error);
-    },
-    debug: (additionalContext: Partial<LogContext> = {}, message?: string) => {
-      logDebug({ ...parentContext, ...additionalContext } as LogContext, message);
-    },
-  };
-}
-
-/**
- * Batch logs multiple entries as a single JSON array.
- * @deprecated Use createJobLogger instead
- */
-export function logBatch(entries: LogContext[], level: LogLevel = LogLevel.INFO): void {
-  const batchEntries = entries.map(entry => createLogEntry(entry, level));
-  console.log(JSON.stringify(batchEntries));
+export function createAgentGraphLogger(
+  agentName: string,
+  jobType: JobType = 'agent_graph'
+): JobLogger {
+  return createJobLogger({ jobType, jobId: agentName });
 }

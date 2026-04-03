@@ -6,13 +6,9 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-  logError,
-  logInfo,
-  logPhaseComplete,
-  logPhaseStart,
-  logWarn,
   sanitizeUserInput,
 } from '../_shared/index.js';
+import { createAgentGraphLogger } from '../_shared/logging.js';
 
 import { GRAPH_CONFIG } from './config.js';
 import {
@@ -37,9 +33,10 @@ export async function mapProcess(
 
   const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
 
-  logPhaseStart({
+  const logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
+
+  logger.phaseStart('map_process', {
     agent: 'SlideDeckGraph',
-    phase: 'map_process',
     chunkIndex,
     chunkTokens: deps.estimateTokens(chunk),
     chunkPreview: chunk.substring(0, 150).replace(/\n/g, ' '),
@@ -57,15 +54,12 @@ export async function mapProcess(
     customPrompt: sanitizedCustomPrompt,
   });
 
-  logInfo(
-    {
-      agent: 'SlideDeckGraph',
-      phase: 'map_process',
-      chunkId,
-      promptTokens: deps.estimateTokens(prompt),
-    },
-    `Sending prompt to LLM (~${deps.estimateTokens(prompt)} tokens)...`
-  );
+  logger.info(`Sending prompt to LLM (~${deps.estimateTokens(prompt)} tokens)...`, {
+    agent: 'SlideDeckGraph',
+    phase: 'map_process',
+    chunkId,
+    promptTokens: deps.estimateTokens(prompt),
+  });
 
   let output: string;
   let slidesGenerated = 0;
@@ -96,16 +90,13 @@ export async function mapProcess(
         maxAttempts: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
-          logWarn(
-            {
-              agent: 'SlideDeckGraph',
-              phase: 'map_process',
-              chunkIndex,
-              attempt,
-              error: error.message,
-            },
-            `Retry attempt ${attempt}/3`
-          );
+          logger.warn(`Retry attempt ${attempt}/3`, {
+            agent: 'SlideDeckGraph',
+            phase: 'map_process',
+            chunkIndex,
+            attempt,
+            error: error.message,
+          });
         },
       },
       'SlideMap'
@@ -114,39 +105,28 @@ export async function mapProcess(
     slidesGenerated = response.slides.length;
     output = JSON.stringify(response.slides);
 
-    // Extract theme specification from first slide concept (if present)
     if (chunkIndex === 0 && response.slides.length > 0) {
       const firstSlide = response.slides[0] as any;
       if (firstSlide.themeSpecification) {
         extractedTheme = firstSlide.themeSpecification;
-        logInfo(
-          {
-            agent: 'SlideDeckGraph',
-            phase: 'map_process',
-            themeExtracted: true,
-          },
-          `Extracted AI-selected theme: ${extractedTheme?.substring(0, 100)}...`
-        );
+        logger.info(`Extracted AI-selected theme: ${extractedTheme?.substring(0, 100)}...`, {
+          agent: 'SlideDeckGraph',
+          phase: 'map_process',
+          themeExtracted: true,
+        });
       }
     }
   } catch (error) {
-    const errorContext = {
-      agent: 'SlideDeckGraph',
-      phase: 'map_process',
-      chunkIndex,
-      chunkLength: chunk.length,
-      slideType,
-      error:
-        error instanceof Error
-          ? {
-              name: error.name,
-              message: error.message,
-              stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-            }
-          : String(error),
-    };
-
-    logError(errorContext, 'Map process failed');
+    logger.phaseError(
+      'map_process',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        agent: 'SlideDeckGraph',
+        chunkIndex,
+        chunkLength: chunk.length,
+        slideType,
+      }
+    );
 
     output = '[]';
     slidesGenerated = 0;
@@ -154,9 +134,8 @@ export async function mapProcess(
 
   const elapsed = Date.now() - startTime;
 
-  logPhaseComplete({
+  logger.phaseComplete('map_process', {
     agent: 'SlideDeckGraph',
-    phase: 'map_process',
     chunkIndex,
     outputTokens: deps.estimateTokens(output),
     slidesGenerated,
