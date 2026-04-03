@@ -55,7 +55,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   return (
     <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
       <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50">
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm">
           {source.type} • {source.date}
         </span>
 

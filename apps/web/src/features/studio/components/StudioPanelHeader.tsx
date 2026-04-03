@@ -102,12 +102,12 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                     onEditCancel();
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 font-sans font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                  className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
                   aria-label="Rename"
                   autoFocus
                 />
               ) : (
-                <span className="font-sans font-bold text-sm tracking-wide truncate text-foreground">
+                <span className="font-display font-bold text-sm tracking-wide truncate text-foreground">
                   {activeNote.title}
                 </span>
               )}
@@ -207,7 +207,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
         ) : (
           <div className="flex items-center gap-2 text-foreground">
             <PenTool className="w-4 h-4 shrink-0" />
-            <span className="font-sans font-bold text-sm tracking-wide uppercase">Studio</span>
+            <span className="font-display font-bold text-sm tracking-wide uppercase">Studio</span>
           </div>
         )}
       </div>
@@ -252,7 +252,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                   onEditCancel();
                 }}
                 onClick={(e) => e.stopPropagation()}
-                className="flex-1 min-w-0 font-sans font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
                 aria-label="Rename"
                 autoFocus
               />
@@ -271,7 +271,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                     onEditStart();
                   }
                 }}
-                className="font-sans font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
+                className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
                 title="Click to rename"
               >
                 {activeNote.title}
@@ -381,7 +381,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
           </button>
           <div className="flex items-center gap-2 text-sidebar-foreground">
             <PenTool className="w-4 h-4 shrink-0" />
-            <span className="font-sans font-bold text-sm tracking-wide uppercase">Studio</span>
+            <span className="font-display font-bold text-sm tracking-wide uppercase">Studio</span>
           </div>
         </>
       )}

@@ -11,9 +11,9 @@ export function ProgressBar({ value, className = '', showLabel = false }: Progre
   const clampedValue = Math.min(100, Math.max(0, value));
 
   return (
-    <div className={`relative w-full h-2 bg-muted rounded-full overflow-hidden ${className}`}>
+    <div className={`relative w-full h-2 bg-muted rounded-xl overflow-hidden ${className}`}>
       <div
-        className="absolute top-0 left-0 h-full bg-primary transition-all duration-500 ease-out rounded-full"
+        className="absolute top-0 left-0 h-full bg-primary transition-all duration-500 ease-out rounded-xl"
         style={{ width: `${clampedValue}%` }}
         role="progressbar"
         aria-valuenow={clampedValue}

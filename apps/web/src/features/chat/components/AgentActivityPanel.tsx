@@ -297,13 +297,13 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                               <button
                                 type="button"
                                 onClick={() => toggleQuery(i)}
-                                className="mt-1 text-[11px] font-medium text-primary hover:underline"
+                                className="mt-1 text-sm font-medium text-primary hover:underline"
                               >
                                 {open ? 'Show less' : 'Show full query'}
                               </button>
                             )}
                             {tc.status === 'done' && (
-                              <div className="mt-1 text-[11px] text-muted-foreground/90">
+                              <div className="mt-1 text-sm text-muted-foreground/90">
                                 {tc.resultCount ?? 0} passage{(tc.resultCount ?? 0) === 1 ? '' : 's'}{' '}
                                 retrieved
                               </div>
@@ -360,7 +360,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                           {g.message}
                         </p>
                         {g.issues.length > 0 && (
-                          <ul className="mt-1 list-disc pl-4 text-[11px] leading-snug text-amber-900 dark:text-amber-100/95">
+                          <ul className="mt-1 list-disc pl-4 text-sm leading-snug text-amber-900 dark:text-amber-100/95">
                             {g.issues.map((issue, ii) => (
                               <li key={ii}>{issue}</li>
                             ))}

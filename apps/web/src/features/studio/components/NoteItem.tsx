@@ -90,9 +90,9 @@ export const NoteItem: React.FC<NoteItemProps> = ({
           ? `${note.title}, ${generatingLines.primary}`
           : undefined
       }
-      className={`relative rounded-r-sm border-y border-r border-border border-l-4 border-l-primary p-3 pl-4 transition-[box-shadow,transform] duration-300 ${
+      className={`relative rounded-sm border border-border p-3 transition-[box-shadow,transform] duration-300 ${
         isGenerating
-          ? 'cursor-not-allowed overflow-hidden bg-card/95 shadow-sm border-l-primary/90'
+          ? 'cursor-not-allowed overflow-hidden bg-card/95 shadow-sm'
           : 'bg-card shadow-sm hover:shadow-md cursor-pointer group'
       }`}
     >
@@ -123,7 +123,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
             {isGenerating && generatingLines ? (
               <div className="relative z-1 mt-2 min-w-0 space-y-2">
                 {note.preview ? (
-                  <p className="text-[11px] leading-snug text-muted-foreground font-mono tracking-tight truncate">
+                  <p className="text-sm leading-snug text-muted-foreground font-mono tracking-tight truncate">
                     {note.preview}
                   </p>
                 ) : null}

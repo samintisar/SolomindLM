@@ -150,7 +150,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     if (activeNote.status === 'failed') {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
             <X className="w-6 h-6 text-destructive" />
           </div>
           <div>
@@ -173,7 +173,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
       if (!url) {
         return (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-4">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
               <X className="w-6 h-6 text-muted-foreground" />
             </div>
             <div>
@@ -204,7 +204,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
             : '';
       return (
         <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
             <X className="w-6 h-6 text-destructive" />
           </div>
           <div>
@@ -218,7 +218,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     }
     return (
       <div className="flex flex-col items-center justify-center h-full text-center space-y-4 px-4">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
         <div>
@@ -268,7 +268,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
   // Fallback for unknown note types
   return (
     <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+      <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
         <X className="w-6 h-6 text-muted-foreground" />
       </div>
       <div>

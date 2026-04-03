@@ -200,7 +200,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-300">
         <div className="text-center space-y-6 max-w-md w-full bg-card p-10 rounded-2xl border border-border shadow-lg">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+          <div className="w-20 h-20 bg-primary/10 rounded-xl flex items-center justify-center mx-auto text-primary">
             <Award className="w-10 h-10" />
           </div>
           <div>
@@ -209,7 +209,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
               You scored {score} out of {maxScore} points
             </p>
           </div>
-          <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-secondary rounded-xl h-3 overflow-hidden">
             <div
               className="bg-primary h-full transition-all duration-1000 ease-out"
               style={{ width: `${percentage}%` }}
@@ -278,13 +278,13 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
 
           {/* Progress Header */}
           <div className="mb-8">
-            <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
+            <div className="flex justify-between text-xs md:text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
               <span>Question {currentIndex + 1}</span>
               <span>
                 {answeredCount} of {totalCount} Answered
               </span>
             </div>
-            <div className="w-full bg-secondary/50 rounded-full h-1.5 overflow-hidden">
+            <div className="w-full bg-secondary/50 rounded-xl h-1.5 overflow-hidden">
               <div
                 className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
@@ -295,12 +295,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
           {/* Question Type Badge */}
           <div className="mb-4">
             {currentQuestion.questionType === 'short' ? (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-foreground border border-border">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary text-foreground border border-border">
                 <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold uppercase tracking-wide">SHORT ANSWER</span>
               </div>
             ) : (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-foreground border border-border">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary text-foreground border border-border">
                 <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold uppercase tracking-wide">ESSAY</span>
                 <span className="text-xs font-semibold text-muted-foreground ml-1">
@@ -455,7 +455,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
             </button>
             <button
               onClick={handleNext}
-              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-full hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
+              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
             >
               {currentIndex === questions.length - 1 ? 'Finish' : 'Next'}
             </button>
@@ -465,7 +465,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
             <button
               onClick={handleSubmitAnswer}
               disabled={!isAnswered || isSubmitting}
-              className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-full transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
+              className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>

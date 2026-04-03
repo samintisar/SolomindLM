@@ -13,22 +13,22 @@ function stripAnsiCodes(text: string): string {
 }
 
 /**
- * Restores angle brackets inside LaTeX math blocks after DOMPurify sanitization.
- * DOMPurify escapes < and > to &lt; and &gt;, which breaks LaTeX like 0 < \theta < 1.
- * This only unescapes inside $...$ and $$...$$ so that KaTeX receives valid input.
+ * Restores angle brackets after DOMPurify sanitization of markdown *source*.
+ *
+ * With ALLOWED_TAGS: [], DOMPurify still encodes `<` / `>` as `&lt;` / `&gt;` in the
+ * returned text. We previously unescaped only inside `$...$` / `$$...$$`, but that
+ * left literal `&lt;` everywhere else — including undelimited LaTeX fragments and
+ * plain inequalities — so KaTeX saw invalid input and users saw entity text.
+ *
+ * The output is still tag-free; react-markdown is used without rehype-raw, so these
+ * characters stay as markdown/text rather than becoming HTML elements.
  */
-export function restoreAngleBracketsInMath(content: string): string {
-  let out = content;
-  // Display math: $$...$$
-  out = out.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) =>
-    '$$' + math.replace(/&lt;/g, '<').replace(/&gt;/g, '>') + '$$'
-  );
-  // Inline math: $...$ (single $ not part of $$)
-  out = out.replace(/(?<!\$)\$(?!\$)([^$]*?)\$(?<!\$)(?!\$)/g, (_, math) =>
-    '$' + math.replace(/&lt;/g, '<').replace(/&gt;/g, '>') + '$'
-  );
-  return out;
+export function restoreAngleBracketsAfterDomPurify(content: string): string {
+  return content.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 }
+
+/** @deprecated Use restoreAngleBracketsAfterDomPurify; kept for any external imports. */
+export const restoreAngleBracketsInMath = restoreAngleBracketsAfterDomPurify;
 
 /**
  * Sanitizes markdown content using DOMPurify before rendering with ReactMarkdown.
@@ -36,7 +36,8 @@ export function restoreAngleBracketsInMath(content: string): string {
  *
  * Note: This sanitizes the markdown SOURCE text, not the rendered HTML.
  * ReactMarkdown will parse the sanitized markdown and render it safely.
- * Angle brackets inside math blocks are restored so LaTeX (e.g. 0 < \theta < 1) renders correctly.
+ * Angle brackets in the sanitized markdown source are restored so `<` / `>` work in
+ * math (e.g. $0 < \\theta < 1$) and in ordinary text.
  */
 export function sanitizeMarkdown(content: string): string {
   // First strip ANSI codes that can cause KaTeX parse errors
@@ -53,7 +54,7 @@ export function sanitizeMarkdown(content: string): string {
     KEEP_CONTENT: true, // Keep the text content
   });
 
-  return restoreAngleBracketsInMath(sanitized);
+  return restoreAngleBracketsAfterDomPurify(sanitized);
 }
 
 /**

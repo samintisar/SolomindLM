@@ -80,26 +80,26 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
             )}
             {/* Status badge */}
             {status === 'processing' && (
-              <div className="flex items-center gap-1 text-[10px] font-medium text-warning font-sans shrink-0">
+              <div className="flex items-center gap-1 text-xs font-medium text-warning font-sans shrink-0">
                 <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                 <span>Processing</span>
               </div>
             )}
             {status === 'failed' && (
-              <div className="flex items-center gap-1 text-[10px] font-medium text-destructive font-sans shrink-0">
+              <div className="flex items-center gap-1 text-xs font-medium text-destructive font-sans shrink-0">
                 <XCircle className="w-3 h-3 shrink-0" />
                 <span>Failed</span>
               </div>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-sans">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide font-sans">
             {source.type} • {source.date}
           </p>
         </div>
         {!isRenaming && (
           <div className="flex items-center gap-2 shrink-0">
             <div
-              className="text-primary p-1 hover:bg-secondary rounded-full transition-colors flex items-center justify-center"
+              className="text-primary p-1 hover:bg-secondary rounded-xl transition-colors flex items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggle(source.id);
@@ -117,7 +117,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                   e.stopPropagation();
                   onMenuOpen(source.id);
                 }}
-                className={`p-1 hover:bg-secondary rounded-full transition-colors flex items-center justify-center ${
+                className={`p-1 hover:bg-secondary rounded-xl transition-colors flex items-center justify-center ${
                   isMenuOpen ? 'text-foreground bg-secondary' : 'text-muted-foreground'
                 }`}
                 title="More options"

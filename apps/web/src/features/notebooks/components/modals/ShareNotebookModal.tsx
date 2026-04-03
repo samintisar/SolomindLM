@@ -119,7 +119,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 hover:bg-secondary rounded-full transition-colors"
+            className="p-1 hover:bg-secondary rounded-xl transition-colors"
           >
             <X className="w-5 h-5 text-muted-foreground" />
           </button>

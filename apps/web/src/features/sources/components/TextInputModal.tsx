@@ -54,7 +54,7 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
             </div>
             <h2 className="text-xl font-bold font-sans">Paste Text</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

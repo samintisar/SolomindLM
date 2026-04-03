@@ -20,7 +20,7 @@ export const LANDING_FAQS: FAQItem[] = [
   },
   {
     question: "How is my data used and protected?",
-    answer: "Your privacy is our priority. Uploaded content is encrypted and used only to generate your study materials. We don't use your data to train our models without explicit permission. We're GDPR compliant and never sell your data to third parties."
+    answer: "Your content is used to run the product you see—search, chat, and generation—and is handled as described in our Privacy Policy. We use trusted infrastructure and AI providers as subprocessors; we don't sell your personal information. The policy also covers analytics and email-based sign-in."
   },
   {
     question: "Is there a limit on how much I can upload?",
@@ -80,6 +80,7 @@ function getFeatureDescription(id: string): string {
     reports: "Study guides and reports, on demand",
     flashcards: "Auto-generated cards from any content",
     quiz: "Test yourself with AI-built quizzes",
+    slides: "Presentation-ready decks from your sources",
     writtenQuestions: "Written Q&A with instant feedback",
     rag: "Answers grounded in your sources",
     spreadsheets: "Sources turned into tables and data"

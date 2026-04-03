@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -18,7 +18,7 @@ import { ShareNotebookModal } from './features/notebooks/components/modals/Share
 import { BillingPage } from './features/billing/components/BillingPage';
 import { LandingPage } from './features/landing/LandingPage';
 import { useAuth, AuthProvider } from './features/auth/AuthContext';
-import { LoginModal } from './features/auth/components/LoginModal';
+import { AuthPage } from './features/auth/AuthPage';
 import { ThemeProvider } from './shared/contexts/ThemeContext';
 import { ToastProvider } from './shared/contexts/ToastContext';
 import { ToastContainer } from './shared/components/ToastContainer';
@@ -49,7 +49,18 @@ const AppContent: React.FC = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useStripeRedirect({ isAuthenticated, user });
-  const { showLoginModal, setShowLoginModal, authError, setAuthError } = useAuthGuard({ isAuthenticated, isLoading });
+  useAuthGuard({ isAuthenticated, isLoading });
+
+  const onRequireAuth = useCallback(
+    (errorMessage: string) => {
+      const returnTo =
+        location.pathname === '/' ? '/home' : `${location.pathname}${location.search}`;
+      navigate('/sign-in', {
+        state: { from: returnTo, message: errorMessage },
+      } as never);
+    },
+    [navigate, location.pathname, location.search],
+  );
 
   const notebooks = useNotebooks();
   const folders = useFolders();
@@ -79,8 +90,9 @@ const AppContent: React.FC = () => {
     user,
     activeNotebookId,
     setNotebookTitle,
+    onRequireAuth,
   });
-  const folderCRUD = useFolderCRUD({ isAuthenticated, user });
+  const folderCRUD = useFolderCRUD({ isAuthenticated, user, onRequireAuth });
 
   const subscriptionStatus = useSubscriptionStatus();
 
@@ -107,7 +119,11 @@ const AppContent: React.FC = () => {
     return null;
   }, [location.pathname]);
 
-  const isPublicPage = location.pathname === '/' || location.pathname === '/privacy' || location.pathname === '/terms';
+  const isPublicPage =
+    location.pathname === '/' ||
+    location.pathname === '/privacy' ||
+    location.pathname === '/terms' ||
+    location.pathname === '/sign-in';
   const isHomePage = location.pathname === '/home' || location.pathname === '/billing' || location.pathname.startsWith('/folder/');
 
   const notebookList = notebooks ?? [];
@@ -183,16 +199,14 @@ const AppContent: React.FC = () => {
     notebookTitle,
     setNotebookTitle,
     subscriptionStatus,
-    onRequireAuth: (errorMessage: string) => {
-      setAuthError(errorMessage);
-      setShowLoginModal(true);
-    },
+    isAuthenticated,
+    onRequireAuth,
   }), [
     notebookList, featuredNotebooks, recentNotebooks, activeNotebook,
     urlNotebookId, urlFolderId, currentView, folderList,
     handleSelectNotebook, notebookCRUD, folderCRUD,
     handleLogoClick, notebookTitle, subscriptionStatus, navigate,
-    setAuthError, setShowLoginModal,
+    isAuthenticated, onRequireAuth,
   ]);
 
   const chatStreamingContextValue = useMemo(() => ({
@@ -231,16 +245,6 @@ const AppContent: React.FC = () => {
 
   return (
     <>
-      {showLoginModal && !isAuthenticated && (
-        <LoginModal
-          onClose={() => {
-            setShowLoginModal(false);
-            setAuthError(null);
-          }}
-          authError={authError || undefined}
-        />
-      )}
-
       {shareModalOpen && urlNotebookId && activeNotebook && !activeNotebook.isSharedNotebook && (
         <ShareNotebookModal
           notebookId={urlNotebookId}
@@ -281,6 +285,7 @@ const AppContent: React.FC = () => {
       <NotebookProvider value={notebookContextValue}>
       <Routes>
         <Route path="/" element={<LandingPage onGetStarted={() => navigate('/home')} />} />
+        <Route path="/sign-in" element={<AuthPage />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
 

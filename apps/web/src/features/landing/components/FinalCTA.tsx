@@ -18,7 +18,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onGetStarted }) => {
     <section className="py-20 px-6 bg-gradient-to-br from-primary/10 via-background to-accent/10">
       <div className="max-w-3xl mx-auto text-center space-y-8">
         {/* Headline */}
-        <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground">
+        <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
           Start Learning Smarter Today
         </h2>
 
@@ -41,7 +41,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onGetStarted }) => {
         <Button
           onClick={onGetStarted}
           size="lg"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-bold shadow-lg hover:shadow-xl px-12 py-6 text-lg transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold shadow-lg hover:shadow-xl px-12 py-6 text-lg transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
         >
           Create Your Free Account
           <ArrowRight className="w-5 h-5 ml-2" />

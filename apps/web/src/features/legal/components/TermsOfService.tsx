@@ -1,445 +1,163 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FileText, AlertCircle, Shield, CreditCard, Ban, Gavel } from 'lucide-react';
-import { SEOMeta } from '@/shared/seo/SEOMeta';
+import { Link } from 'react-router-dom';
+import { LegalPageShell } from './LegalPageShell';
 
 export const TermsOfService: React.FC = () => {
-  const navigate = useNavigate();
-
   return (
-    <>
-      <SEOMeta
-        title="Terms of Service - SolomindLM"
-        description="Read SolomindLM's Terms of Service to understand your rights and responsibilities when using our AI-powered study platform."
-        canonical="/terms"
-      />
-      <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-          >
-            <span>←</span> Back to Home
-          </button>
-          <h1 className="text-4xl font-serif font-bold text-foreground mb-2">
-            Terms of Service
-          </h1>
-          <p className="text-muted-foreground">
-            Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
-      </div>
+    <LegalPageShell
+      title="Terms of Service"
+      description="Terms that apply when you use SolomindLM’s AI research notebooks, sources, chat, and study tools."
+      canonical="/terms"
+    >
+      <section className="space-y-3">
+        <p className="text-muted-foreground">
+          By creating an account or using SolomindLM (&quot;the Service&quot;), you agree to these Terms and our{' '}
+          <Link to="/privacy" className="text-foreground underline underline-offset-2 hover:no-underline">
+            Privacy Policy
+          </Link>
+          . If you disagree, do not use the Service. We may update these Terms; continued use after changes means you accept
+          the updated Terms.
+        </p>
+      </section>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="prose prose-lg max-w-none">
-          {/* Introduction */}
-          <section className="mb-12">
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-6 mb-6">
-              <p className="text-sm text-primary font-medium">
-                Please read these Terms of Service carefully before using SolomindLM. By accessing or
-                using our platform, you agree to be bound by these terms. If you do not agree to these
-                terms, please do not use our service.
-              </p>
-            </div>
-          </section>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">The Service</h2>
+        <p className="text-muted-foreground">
+          SolomindLM helps you organize research in notebooks, add sources (files, links, and optional Google Drive imports
+          where enabled), chat with retrieval over your materials, and generate study-style outputs (for example reports,
+          flashcards, quizzes, mind maps, slides, spreadsheets, audio overviews, and similar tools). Features may change,
+          and we may suspend or discontinue parts of the Service.
+        </p>
+        <p className="text-muted-foreground">
+          Where we offer collaboration or sharing, you are responsible for only sharing content you are allowed to share
+          and for how recipients use shared access.
+        </p>
+      </section>
 
-          {/* 1. Acceptance of Terms */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                1. Acceptance of Terms
-              </h2>
-            </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Accounts</h2>
+        <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
+          <li>You must be at least 13 years old to use the Service.</li>
+          <li>
+            You may sign in with Google or with email and password. Email-based flows may use one-time codes or links sent
+            to your address.
+          </li>
+          <li>Keep your credentials secure and notify us if you suspect unauthorized access.</li>
+          <li>You are responsible for activity under your account.</li>
+        </ul>
+      </section>
 
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground mb-4">
-                By creating an account, accessing, or using SolomindLM ("the Service"), you agree to be
-                bound by these Terms of Service and all applicable laws and regulations. If you do not
-                agree with any of these terms, you are prohibited from using the Service.
-              </p>
-              <p className="text-muted-foreground">
-                These terms constitute a legally binding agreement between you and SolomindLM. We reserve
-                the right to modify these terms at any time, and your continued use of the Service after
-                such modifications constitutes your acceptance of the updated terms.
-              </p>
-            </div>
-          </section>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Subscriptions and billing</h2>
+        <p className="text-muted-foreground">
+          We may offer free and paid plans. Paid subscriptions are billed through Stripe on the terms shown at checkout.
+          Unless required by law, fees are generally non-refundable. You can cancel according to in-product controls;
+          cancellation typically takes effect at the end of the current billing period. We may change prices with reasonable
+          notice where required.
+        </p>
+      </section>
 
-          {/* 2. Description of Service */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                2. Description of Service
-              </h2>
-            </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Acceptable use</h2>
+        <p className="text-muted-foreground">You agree not to:</p>
+        <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
+          <li>Violate law or others&apos; rights, including intellectual property and privacy.</li>
+          <li>Upload malware, probe or break security, or bypass limits or access controls.</li>
+          <li>Use the Service to generate or facilitate illegal, abusive, or harmful content.</li>
+          <li>Scrape, overload, or automate the Service in a way that harms its operation or other users.</li>
+        </ul>
+        <p className="text-muted-foreground">We may suspend or terminate accounts that violate these rules.</p>
+      </section>
 
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground mb-4">
-                SolomindLM is an AI-powered research platform that provides:
-              </p>
-              <ul className="space-y-2 text-muted-foreground mb-4">
-                <li>• Content ingestion from documents, websites, and social media platforms</li>
-                <li>• AI-powered chat with citation support (RAG-based)</li>
-                <li>• Automated content generation (reports, flashcards, quizzes, mind maps, audio overviews)</li>
-                <li>• Notebook organization and management</li>
-                <li>• Research tools and educational features</li>
-              </ul>
-              <p className="text-muted-foreground">
-                We reserve the right to modify, suspend, or discontinue any aspect of the Service at any
-                time without prior notice.
-              </p>
-            </div>
-          </section>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Your content</h2>
+        <p className="text-muted-foreground">
+          You keep ownership of content you submit. You give us permission to host, process, and display it as needed to run
+          the Service (including sending portions to subprocessors described in our Privacy Policy). You represent you have
+          the rights to submit that content.
+        </p>
+      </section>
 
-          {/* 3. User Accounts */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                3. User Accounts & Responsibilities
-              </h2>
-            </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">AI-generated output</h2>
+        <p className="text-muted-foreground">
+          Outputs may be wrong, incomplete, or outdated. They are informational aids, not professional advice. You are
+          responsible for how you use them, including verifying important facts.
+        </p>
+      </section>
 
-            <div className="space-y-4">
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">Account Creation</h3>
-                <ul className="space-y-2 text-muted-foreground text-sm">
-                  <li>• You must be at least 13 years old to create an account</li>
-                  <li>• You must provide accurate and complete information</li>
-                  <li>• You are responsible for maintaining the security of your account credentials</li>
-                  <li>• You are responsible for all activities that occur under your account</li>
-                  <li>• You must notify us immediately of any unauthorized use of your account</li>
-                </ul>
-              </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Our rights</h2>
+        <p className="text-muted-foreground">
+          The Service, its software, and our branding are owned by us or our licensors. Do not copy or misuse them except as
+          allowed by these Terms or law.
+        </p>
+      </section>
 
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">User Responsibilities</h3>
-                <p className="text-muted-foreground mb-3">As a user of SolomindLM, you agree to:</p>
-                <ul className="space-y-2 text-muted-foreground text-sm">
-                  <li>• Use the Service only for lawful purposes</li>
-                  <li>• Not upload malicious or harmful content</li>
-                  <li>• Not attempt to gain unauthorized access to our systems</li>
-                  <li>• Not use automated tools to abuse the Service</li>
-                  <li>• Respect the intellectual property rights of others</li>
-                  <li>• Not impersonate any person or entity</li>
-                </ul>
-              </div>
-            </div>
-          </section>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Disclaimers</h2>
+        <p className="text-muted-foreground">
+          THE SERVICE IS PROVIDED &quot;AS IS&quot; WITHOUT WARRANTIES OF ANY KIND, TO THE MAXIMUM EXTENT PERMITTED BY LAW.
+          We do not guarantee uninterrupted or error-free operation. We do not endorse third-party sources you import.
+        </p>
+      </section>
 
-          {/* 4. Subscription & Payment */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                4. Subscription & Payment Terms
-              </h2>
-            </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Limitation of liability</h2>
+        <p className="text-muted-foreground">
+          To the maximum extent permitted by law, we are not liable for indirect, incidental, special, consequential, or
+          punitive damages, or for loss of data, profits, or goodwill. Our total liability for a claim is limited to the
+          greater of (a) amounts you paid for the Service in the twelve months before the claim or (b) one hundred Canadian
+          dollars (CAD $100), except where law does not allow this cap.
+        </p>
+      </section>
 
-            <div className="space-y-4">
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">Free Tier</h3>
-                <p className="text-muted-foreground mb-3">
-                  SolomindLM offers a free tier with limited features and usage limits. Free tier
-                  features are subject to change at any time.
-                </p>
-              </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Termination</h2>
+        <p className="text-muted-foreground">
+          You may stop using the Service at any time. We may suspend or terminate access for violations, risk, legal
+          requirements, or prolonged inactivity, with or without notice where allowed. When access ends, we may delete data
+          according to our Privacy Policy and retention practices.
+        </p>
+      </section>
 
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">Paid Subscriptions</h3>
-                <ul className="space-y-2 text-muted-foreground text-sm">
-                  <li>• Paid subscriptions are billed monthly or yearly as selected during checkout</li>
-                  <li>• Subscription fees are non-refundable except as required by law</li>
-                  <li>• You may cancel your subscription at any time through your account settings</li>
-                  <li>• Cancellation takes effect at the end of the current billing period</li>
-                  <li>• We reserve the right to change pricing with 30 days notice to existing subscribers</li>
-                </ul>
-              </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Governing law and disputes</h2>
+        <p className="text-muted-foreground">
+          SolomindLM is operated from Canada. These Terms are governed by the laws of Canada and the laws of the province or
+          territory in which we operate, without regard to conflict-of-law rules that would apply another jurisdiction&apos;s
+          laws. Disputes should first be addressed by contacting us. Where formal resolution is needed, you and we submit to
+          the non-exclusive jurisdiction of the courts of that province or territory, except that mandatory consumer
+          protection rules in your own province, territory, or country may still apply to you where the law requires.
+        </p>
+      </section>
 
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">Payment Processing</h3>
-                <p className="text-muted-foreground">
-                  Payments are processed through Stripe. By subscribing, you authorize us to charge your
-                  selected payment method for the subscription fee. You agree to provide accurate, current,
-                  and complete payment information.
-                </p>
-              </div>
-            </div>
-          </section>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Indemnity</h2>
+        <p className="text-muted-foreground">
+          You will defend and indemnify us and our affiliates, officers, and agents against third-party claims arising
+          from your use of the Service, your content, or your breach of these Terms, to the extent permitted by law.
+        </p>
+      </section>
 
-          {/* 5. Acceptable Use Policy */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Ban className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                5. Acceptable Use Policy
-              </h2>
-            </div>
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground">General</h2>
+        <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
+          <li>These Terms and the Privacy Policy are the entire agreement on this subject.</li>
+          <li>If a provision is unenforceable, the rest remains in effect.</li>
+          <li>We may assign the Service; you may not assign these Terms without our consent.</li>
+        </ul>
+      </section>
 
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-semibold text-foreground mb-3">
-                Prohibited Activities
-              </h3>
-              <p className="text-foreground mb-3">
-                You agree NOT to use the Service to:
-              </p>
-              <ul className="space-y-2 text-foreground text-sm">
-                <li>• Violate any applicable laws or regulations</li>
-                <li>• Infringe on intellectual property rights of others</li>
-                <li>• Upload viruses, malware, or malicious code</li>
-                <li>• Harass, abuse, or harm other users</li>
-                <li>• Generate harmful, illegal, or inappropriate content</li>
-                <li>• Reverse engineer or attempt to extract our AI models</li>
-                <li>• Use the Service to compete with SolomindLM</li>
-                <li>• Circumvent usage limits or access controls</li>
-                <li>• Spam or send unsolicited communications</li>
-                <li>• Exploit vulnerabilities in the Service</li>
-              </ul>
-            </div>
-
-            <p className="text-muted-foreground">
-              We reserve the right to suspend or terminate accounts that violate these terms without
-              prior notice.
-            </p>
-          </section>
-
-          {/* 6. Content & Intellectual Property */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                6. Content & Intellectual Property
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">Your Content</h3>
-                <p className="text-muted-foreground mb-3">
-                  You retain ownership of content you upload to SolomindLM. By uploading content, you grant
-                  us a license to process, store, and use it solely to provide the Service to you.
-                </p>
-                <p className="text-muted-foreground">
-                  You represent and warrant that you have the right to upload all content and that it does
-                  not infringe on the rights of any third party.
-                </p>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">AI-Generated Content</h3>
-                <p className="text-muted-foreground mb-3">
-                  AI-generated content (reports, flashcards, quizzes, summaries, chat responses, etc.) is
-                  provided for informational and educational purposes only.
-                </p>
-                <ul className="space-y-2 text-muted-foreground text-sm">
-                  <li>• AI-generated content may not be accurate, complete, or current</li>
-                  <li>• You are responsible for verifying any AI-generated information</li>
-                  <li>• We do not guarantee the suitability of AI content for any specific purpose</li>
-                  <li>• You should not rely solely on AI-generated content for important decisions</li>
-                </ul>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">Our Intellectual Property</h3>
-                <p className="text-muted-foreground">
-                  The Service, including all technology, software, designs, features, and content
-                  (excluding your content), is owned by SolomindLM and protected by intellectual property
-                  laws. You may not copy, modify, or distribute our proprietary materials without permission.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* 7. Disclaimers & Warranties */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                7. Disclaimers & Warranties
-              </h2>
-            </div>
-
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-3">
-                Important Disclaimers
-              </h3>
-              <ul className="space-y-2 text-foreground text-sm">
-                <li>• THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND</li>
-                <li>• We do not guarantee uninterrupted or error-free operation</li>
-                <li>• AI-generated content may be inaccurate, incomplete, or misleading</li>
-                <li>• We are not responsible for any decisions made based on Service content</li>
-                <li>• Educational content is not a substitute for professional advice</li>
-                <li>• We do not endorse or verify third-party content you import</li>
-                <li>• Features and functionality may change without notice</li>
-              </ul>
-            </div>
-          </section>
-
-          {/* 8. Limitation of Liability */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Gavel className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                8. Limitation of Liability
-              </h2>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground mb-4">
-                To the maximum extent permitted by law, SolomindLM shall not be liable for:
-              </p>
-              <ul className="space-y-2 text-muted-foreground mb-4">
-                <li>• Any indirect, incidental, special, or consequential damages</li>
-                <li>• Loss of data, profits, revenue, or business opportunities</li>
-                <li>• Damages from errors, omissions, or inaccuracies in AI-generated content</li>
-                <li>• Damages from service interruptions or unavailability</li>
-                <li>• Actions taken based on information provided through the Service</li>
-              </ul>
-              <p className="text-muted-foreground">
-                Our total liability shall not exceed the amount you paid for the Service in the twelve
-                (12) months preceding the claim, or $100, whichever is greater.
-              </p>
-            </div>
-          </section>
-
-          {/* 9. Termination */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Ban className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                9. Termination
-              </h2>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground mb-4">
-                We reserve the right to suspend or terminate your account at any time, with or without
-                cause, with or without notice.
-              </p>
-              <p className="text-muted-foreground mb-3">Grounds for termination include, but are not limited to:</p>
-              <ul className="space-y-2 text-muted-foreground text-sm mb-4">
-                <li>• Violation of these Terms of Service</li>
-                <li>• Abuse of the Service or other users</li>
-                <li>• Fraudulent or illegal activities</li>
-                <li>• Account inactivity for an extended period</li>
-              </ul>
-              <p className="text-muted-foreground">
-                Upon termination, your right to use the Service immediately ceases. We may delete your
-                account data and content in accordance with our retention policies.
-              </p>
-            </div>
-          </section>
-
-          {/* 10. Governing Law */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Gavel className="w-5 h-5 text-primary" />
-              </div>
-              <h2 className="text-2xl font-serif font-bold text-foreground">
-                10. Governing Law & Dispute Resolution
-              </h2>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground mb-4">
-                These terms shall be governed by and construed in accordance with applicable laws.
-                Any disputes arising under these terms shall be resolved through good faith negotiations.
-              </p>
-              <p className="text-muted-foreground">
-                If formal dispute resolution becomes necessary, you agree to submit to the jurisdiction of
-                the appropriate courts.
-              </p>
-            </div>
-          </section>
-
-          {/* 11. Indemnification */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">
-              11. Indemnification
-            </h2>
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground">
-                You agree to indemnify and hold harmless SolomindLM, its officers, directors, employees,
-                and agents from any claims, damages, losses, liabilities, and expenses arising from:
-                (a) your use of the Service; (b) your violation of these terms; (c) your violation of
-                any rights of another; or (d) content you upload or create using the Service.
-              </p>
-            </div>
-          </section>
-
-          {/* 12. General Provisions */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">
-              12. General Provisions
-            </h2>
-            <div className="bg-card border border-border rounded-lg p-6">
-              <ul className="space-y-3 text-muted-foreground">
-                <li>• <strong>Entire Agreement:</strong> These terms constitute the entire agreement between you and SolomindLM</li>
-                <li>• <strong>Severability:</strong> If any provision is found invalid, the remaining provisions remain in full force</li>
-                <li>• <strong>Waiver:</strong> Failure to enforce any provision does not constitute a waiver</li>
-                <li>• <strong>Assignment:</strong> You may not assign these terms without our consent</li>
-                <li>• <strong>Force Majeure:</strong> We are not liable for delays beyond our reasonable control</li>
-              </ul>
-            </div>
-          </section>
-
-          {/* Contact */}
-          <section className="mb-12">
-            <h2 className="text-2xl font-serif font-bold text-foreground mb-4">
-              Contact Us
-            </h2>
-            <div className="bg-card border border-border rounded-lg p-6">
-              <p className="text-muted-foreground mb-4">
-                If you have any questions about these Terms of Service, please contact us:
-              </p>
-              <div className="bg-muted/50 rounded-lg p-4">
-                <p className="text-foreground font-semibold mb-2">SolomindLM</p>
-                <p className="text-muted-foreground">
-                  Email: support@solomindlm.com
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  We will respond to your inquiry within 30 days.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Agreement Notice */}
-          <section>
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-6">
-              <p className="text-sm text-primary font-medium text-center">
-                By continuing to use SolomindLM, you acknowledge that you have read, understood,
-                and agree to be bound by these Terms of Service and our Privacy Policy.
-              </p>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-    </>
+      <section className="space-y-3 border-t border-border pt-10">
+        <h2 className="text-base font-semibold text-foreground">Contact</h2>
+        <p className="text-muted-foreground">
+          Questions about these Terms:{' '}
+          <a href="mailto:support@solomindlm.com" className="text-foreground underline underline-offset-2 hover:no-underline">
+            support@solomindlm.com
+          </a>
+        </p>
+      </section>
+    </LegalPageShell>
   );
 };

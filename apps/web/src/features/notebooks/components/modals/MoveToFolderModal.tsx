@@ -25,7 +25,7 @@ export const MoveToFolderModal: React.FC<MoveToFolderModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="text-lg font-bold font-sans">Move to folder</h3>
-          <button onClick={onClose} className="p-1 hover:bg-secondary rounded-full transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-secondary rounded-xl transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
@@ -69,7 +69,7 @@ export const MoveToFolderModal: React.FC<MoveToFolderModalProps> = ({
         <div className="p-4 border-t border-border bg-secondary/10 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-full text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="px-4 py-2 rounded-xl text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             Cancel
           </button>

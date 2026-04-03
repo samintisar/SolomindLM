@@ -50,10 +50,16 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     ));
   }, []);
 
-  const handleToggleAll = useCallback(() => {
+  const handleToggleAll = useCallback((visibleIds: string[]) => {
+    if (visibleIds.length === 0) return;
+    const idSet = new Set(visibleIds);
     setSources(prev => {
-      const allSelected = prev.every(s => s.selected);
-      return prev.map(source => ({ ...source, selected: !allSelected }));
+      const visibleInState = prev.filter(s => idSet.has(s.id));
+      if (visibleInState.length === 0) return prev;
+      const allVisibleSelected = visibleInState.every(s => s.selected);
+      return prev.map(source =>
+        idSet.has(source.id) ? { ...source, selected: !allVisibleSelected } : source
+      );
     });
   }, []);
 

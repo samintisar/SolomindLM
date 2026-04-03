@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LandingHeroMockup } from './LandingHeroMockup';
 
 interface HeroSectionProps {
   onGetStarted: () => void;
@@ -86,7 +87,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
       <div className="relative z-10 max-w-[1500px] w-full mx-auto text-center space-y-36 sm:space-y-40 px-4 sm:px-6">
         {/* Headline + tagline */}
         <div className="space-y-5 sm:space-y-6">
-          <h1 className="text-6xl md:text-8xl font-sans font-extrabold text-foreground tracking-tight" style={{ lineHeight: '1.1' }}>
+          <h1 className="text-6xl md:text-8xl font-display font-extrabold text-foreground tracking-tight" style={{ lineHeight: '1.1' }}>
             Learn{' '}
             <span style={{
               background: 'linear-gradient(135deg, #f97316 0%, #fbbf24 50%, #fb7185 100%)',
@@ -97,7 +98,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
               Anything
             </span>
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground font-sans font-light leading-relaxed max-w-2xl mx-auto animate-in fade-in duration-700 delay-200">
+          <p className="text-xl md:text-2xl text-muted-foreground font-display font-light leading-relaxed max-w-2xl mx-auto animate-in fade-in duration-700 delay-200">
             AI that enhances learning, not replaces thinking.
           </p>
         </div>
@@ -126,12 +127,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
             {/* Placeholder at top - fixed height row so bar size never changes */}
             <div className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 flex items-center gap-1.5 pt-5 sm:pt-6 px-4 sm:px-6 min-h-0 min-w-0">
-                <span className={`text-base sm:text-lg font-medium truncate text-left transition-colors duration-300 ${
+                <span className={`font-display text-base sm:text-lg font-medium truncate text-left transition-colors duration-300 ${
                   isFocused ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
                 }`}>
                   {displayText}
                 </span>
-                <span className={`flex-shrink-0 w-0.5 h-4 rounded-full transition-opacity duration-200 ${
+                <span className={`flex-shrink-0 w-0.5 h-4 rounded-xl transition-opacity duration-200 ${
                   isFocused || !displayText ? 'opacity-100' : 'opacity-0'
                 } bg-primary animate-cursor-blink`} aria-hidden />
               </div>
@@ -146,7 +147,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
                 </div>
                 <div className="flex-1 min-w-0" />
                 <div className="flex-shrink-0 flex items-center gap-2">
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ease-out ${
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ease-out ${
                     isFocused ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground'
                   }`} aria-hidden>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -176,17 +177,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
                 </div>
                 <div className="flex-1 mx-4">
                   <div className="bg-background rounded-md px-3 py-1 text-xs text-muted-foreground text-center">
-                    www.solomindlm.com/studio
+                    www.solomindlm.com
                   </div>
                 </div>
               </div>
 
-              {/* Preview Content - Product Screenshot */}
-              <img 
-                src="https://i.ibb.co/279jDP1N/Demo-Screenshot.png" 
-                alt="SolomindLM Product Preview" 
-                className="w-full h-auto"
-              />
+              {/* Interactive product preview (demo only — no backend) */}
+              <div className="relative h-[min(76vh,56rem)] w-full min-h-[28rem] sm:min-h-[34rem] md:min-h-[38rem] lg:min-h-[42rem]">
+                <LandingHeroMockup onGetStarted={onGetStarted} className="h-full" />
+              </div>
             </div>
           </div>
         </div>

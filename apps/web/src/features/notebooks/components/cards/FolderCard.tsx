@@ -62,7 +62,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({
             <div className="relative folder-kebab-menu z-20" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => isMenuOpen ? onCloseMenu() : onToggleMenu()}
-                className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-full text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
+                className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-xl text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -96,8 +96,8 @@ export const FolderCard: React.FC<FolderCardProps> = ({
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 font-sans">{folder.name}</h3>
               
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium uppercase tracking-wider shrink-0">
-                <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-0.5 rounded-full">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium uppercase tracking-wider shrink-0">
+                <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-0.5 rounded-xl">
                   <Folder className="w-3 h-3" />
                   <span>{folder.notebookCount}</span>
                 </div>

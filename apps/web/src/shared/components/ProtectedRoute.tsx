@@ -8,7 +8,6 @@ import {
   AuthLoading,
 } from 'convex/react';
 import { api } from '@convex/_generated/api';
-import { LoginModal } from '../../features/auth/components/LoginModal';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -117,7 +116,16 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
       </Authenticated>
 
       <Unauthenticated>
-        <LoginModal onClose={() => {}} authError="Please sign in to continue" />
+        <Navigate
+          to="/sign-in"
+          replace
+          {...({
+            state: {
+              from: `${location.pathname}${location.search}`,
+              message: 'Please sign in to continue',
+            },
+          } as Record<string, unknown>)}
+        />
       </Unauthenticated>
     </>
   );

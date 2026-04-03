@@ -159,11 +159,19 @@ export class HybridSearchHandler extends VectorSearchHandler {
     noteId: string,
     query: string,
     documentIds?: string[],
-    preComputedEmbedding?: number[]
+    preComputedEmbedding?: number[],
+    retrievalAugmentForRerank?: string
   ): Promise<HybridReferenceChunk[]> {
     if (!this.hybridConfig.enableHybrid || !this.keywordSearchRunner) {
       // Vector-only: cast to base type for compatibility
-      return (await super.search(userId, noteId, query, documentIds, preComputedEmbedding)) as HybridReferenceChunk[];
+      return (await super.search(
+        userId,
+        noteId,
+        query,
+        documentIds,
+        preComputedEmbedding,
+        retrievalAugmentForRerank
+      )) as HybridReferenceChunk[];
     }
 
     const startTime = Date.now();
@@ -206,7 +214,11 @@ export class HybridSearchHandler extends VectorSearchHandler {
         });
       }
 
-      const reranked = await this.rerankResults(query, filtered);
+      const augment = retrievalAugmentForRerank?.trim();
+      const rerankQuery = augment
+        ? `${query.trim()}\n\n${augment.length > 2000 ? augment.slice(0, 2000) : augment}`
+        : query;
+      const reranked = await this.rerankResults(rerankQuery, filtered);
       const limited = reranked.slice(0, this.hybridConfig.maxResults);
 
       const finalResults: HybridReferenceChunk[] = limited.map((r, index) => {

@@ -150,7 +150,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   }, []);
 
   // Computed values
-  const allSelected = sources.length > 0 && sources.every(s => s.selected);
+  const allSelected =
+    filteredSources.length > 0 && filteredSources.every((s) => s.selected);
   const selectedCount = sources.filter(s => s.selected).length;
 
   const markdownContent = viewingSourceId
@@ -413,7 +414,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               filteredSources={filteredSources}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              onToggleAll={onToggleAll}
+              onToggleAll={() => onToggleAll(filteredSources.map((s) => s.id))}
               onToggleSource={handleToggleSource}
               onViewSource={handleViewSource}
               onDeleteSource={handleDeleteSource}

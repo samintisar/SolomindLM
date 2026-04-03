@@ -56,7 +56,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
   return (
     <section className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 pb-20">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-sans font-bold text-foreground">My Notebooks</h2>
+        <h2 className="text-xl font-display font-bold text-foreground">My Notebooks</h2>
       </div>
 
       {viewMode === 'grid' ? (
@@ -68,7 +68,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
               onClick={onCreateFolder}
               className="group aspect-16/10 rounded-2xl border-2 border-dashed border-border hover:border-blue-500 hover:bg-blue-500/5 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300"
             >
-              <div className="w-14 h-14 rounded-full bg-secondary text-blue-500 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
+              <div className="w-14 h-14 rounded-xl bg-secondary text-blue-500 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
                 <FolderInput className="w-7 h-7" />
               </div>
               <span className="text-base font-bold text-muted-foreground group-hover:text-blue-500 transition-colors font-sans">Create new folder</span>
@@ -78,7 +78,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
             onClick={onCreateNotebook}
             className="group aspect-16/10 rounded-2xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300"
           >
-            <div className="w-14 h-14 rounded-full bg-secondary text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
+            <div className="w-14 h-14 rounded-xl bg-secondary text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
               <Plus className="w-7 h-7" />
             </div>
             <span className="text-base font-bold text-muted-foreground group-hover:text-primary transition-colors font-sans">Create new notebook</span>

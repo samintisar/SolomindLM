@@ -3,6 +3,7 @@ import { useQuery, useConvexAuth } from 'convex/react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@convex/_generated/api';
 import { useAuthActions } from '@convex-dev/auth/react';
+import { getConvexAuthUserMessage } from '@/features/auth/utils/authErrorMessage';
 
 export interface User {
   id: string;
@@ -38,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signIn("google", { redirectTo: "/home" });
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Google sign-in failed');
+      setAuthError(getConvexAuthUserMessage(error, 'Google sign-in failed'));
     }
   };
 

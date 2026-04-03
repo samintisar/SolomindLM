@@ -157,14 +157,14 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
         return (
             <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="text-center space-y-6 max-w-md w-full bg-card p-10 rounded-2xl border border-border shadow-lg">
-                    <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                    <div className="w-20 h-20 bg-primary/10 rounded-xl flex items-center justify-center mx-auto text-primary">
                         <Sparkles className="w-10 h-10" />
                     </div>
                     <div>
                         <h3 className="text-2xl font-bold font-serif mb-2">Quiz Complete!</h3>
                         <p className="text-muted-foreground">You scored {score} out of {questions.length}</p>
                     </div>
-                    <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+                    <div className="w-full bg-secondary rounded-xl h-3 overflow-hidden">
                         <div
                             className="bg-primary h-full transition-all duration-1000 ease-out"
                             style={{ width: `${((score / questions.length) * 100)}%` }}
@@ -231,11 +231,11 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                         )}
 
                     <div className="mb-8">
-                        <div className="flex justify-between text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
+                        <div className="flex justify-between text-xs md:text-sm font-bold uppercase tracking-widest text-muted-foreground mb-3 font-sans">
                             <span>Question {currentIndex + 1}</span>
                             <span>{questions.length} Total</span>
                         </div>
-                        <div className="w-full bg-secondary/50 rounded-full h-1.5 overflow-hidden">
+                        <div className="w-full bg-secondary/50 rounded-xl h-1.5 overflow-hidden">
                             <div
                                 className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
                                 style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
@@ -361,7 +361,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                     <div className="relative">
                         <button
                             onClick={() => setShowHint(!showHint)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 hover:bg-secondary text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
                         >
                            <Lightbulb className="w-4 h-4" />
                            <span>Hint</span>
@@ -385,7 +385,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                         </button>
                         <button
                             onClick={handleNext}
-                            className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-full hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
+                            className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
                         >
                              {currentIndex === questions.length - 1 ? "Finish" : "Next"}
                         </button>

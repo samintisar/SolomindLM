@@ -77,7 +77,7 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
       onMouseLeave={onMouseLeave}
     >
       <div className="bg-popover border border-border rounded-2xl shadow-xl p-5 w-96 h-80 text-sm animate-in fade-in zoom-in-95 duration-200 relative flex flex-col">
-        <p className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-3 font-bold shrink-0">
+        <p className="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-3 font-bold shrink-0">
           Reference {hoveredRefId} • {reference.sourceTitle}
         </p>
         <div className="prose font-serif text-sm leading-relaxed max-w-none text-popover-foreground wrap-break-word min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">

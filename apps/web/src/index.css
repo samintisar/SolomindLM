@@ -9,7 +9,7 @@
     --card-foreground: oklch(0.21 0.01 0);
     --popover: oklch(0.9914 0.0098 87.4695);
     --popover-foreground: oklch(0.21 0.01 0);
-    --primary: oklch(0.6180 0.05 65.5444);
+    --primary: oklch(0.38 0.05 65.5444);
     --primary-foreground: oklch(1.0000 0 0);
     --secondary: oklch(0.8846 0.02 85.5655);
     --secondary-foreground: oklch(0.4313 0.03 64.9288);
@@ -21,24 +21,24 @@
     --destructive-foreground: oklch(1.0000 0 0);
     --border: oklch(0.8606 0.0321 84.5881);
     --input: oklch(0.8606 0.0321 84.5881);
-    --ring: oklch(0.6180 0.05 65.5444);
+    --ring: oklch(0.38 0.05 65.5444);
     --success: oklch(0.5471 0.08 142.9149);
     --success-foreground: oklch(1.0000 0 0);
     --warning: oklch(0.75 0.08 85);
     --warning-foreground: oklch(0.21 0.01 0);
-    --chart-1: oklch(0.6180 0.05 65.5444);
+    --chart-1: oklch(0.38 0.05 65.5444);
     --chart-2: oklch(0.5604 0.05 68.5805);
     --chart-3: oklch(0.4851 0.045 72.6827);
     --chart-4: oklch(0.6777 0.05 64.7755);
     --chart-5: oklch(0.7264 0.048 66.6967);
     --sidebar: oklch(0.9239 0.0190 83.0636);
     --sidebar-foreground: oklch(0.21 0.01 0);
-    --sidebar-primary: oklch(0.6180 0.05 65.5444);
+    --sidebar-primary: oklch(0.38 0.05 65.5444);
     --sidebar-primary-foreground: oklch(1.0000 0 0);
     --sidebar-accent: oklch(0.8348 0.025 88.8064);
     --sidebar-accent-foreground: oklch(0.21 0.01 0);
     --sidebar-border: oklch(0.8606 0.0321 84.5881);
-    --sidebar-ring: oklch(0.6180 0.05 65.5444);
+    --sidebar-ring: oklch(0.38 0.05 65.5444);
     
     /* Vintage muted colors - LIGHT MODE */
     --vintage-green-50: hsl(142, 50%, 94%);     /* Visible light green background */
@@ -93,8 +93,9 @@
     --vintage-brown-400: hsl(28, 25%, 52%);
     --vintage-brown-600: hsl(28, 30%, 35%);
 
-    --font-sans: 'Libre Baskerville', serif;
-    --font-serif: 'Lora', serif;
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-serif: 'Lora', ui-serif, Georgia, serif;
+    --font-display: 'Libre Baskerville', ui-serif, Georgia, serif;
     --font-mono: 'IBM Plex Mono', monospace;
     --radius: 0.5rem;
     --shadow-x: 2px;
@@ -138,8 +139,8 @@
        Muted even further to 'Old Brass'. 
        It stands out by Lightness, not Saturation.
     */
-    --primary: oklch(0.60 0.06 70.00);
-    --primary-foreground: oklch(0.20 0.01 65.00);
+    --primary: oklch(0.36 0.06 70.00);
+    --primary-foreground: oklch(0.97 0.004 85.00);
 
     /* SECONDARY:
        Almost pure grey, just a hint of warmth.
@@ -164,12 +165,12 @@
     --border: oklch(0.26 0.008 65.00);
     --input: oklch(0.26 0.008 65.00);
     
-    --ring: oklch(0.50 0.05 70.00);
+    --ring: oklch(0.34 0.055 70.00);
 
     /* CHARTS: 
        Desaturated, matte colors.
     */
-    --chart-1: oklch(0.55 0.06 70.00); /* Matte Gold */
+    --chart-1: oklch(0.44 0.06 70.00); /* Matte Gold */
     --chart-2: oklch(0.50 0.05 45.00); /* Matte Sienna */
     --chart-3: oklch(0.50 0.04 140.00); /* Matte Sage */
     --chart-4: oklch(0.45 0.05 30.00); /* Matte Rose */
@@ -181,12 +182,12 @@
     */
     --sidebar: oklch(0.17 0.006 65.00);
     --sidebar-foreground: oklch(0.96 0.004 85.00);
-    --sidebar-primary: oklch(0.60 0.06 70.00);
-    --sidebar-primary-foreground: oklch(0.20 0.01 65.00);
+    --sidebar-primary: oklch(0.36 0.06 70.00);
+    --sidebar-primary-foreground: oklch(0.97 0.004 85.00);
     --sidebar-accent: oklch(0.24 0.008 65.00);
     --sidebar-accent-foreground: oklch(0.96 0.004 85.00);
     --sidebar-border: oklch(0.24 0.008 65.00);
-    --sidebar-ring: oklch(0.60 0.06 70.00);
+    --sidebar-ring: oklch(0.36 0.06 70.00);
     
     /* Vintage colors - DARK MODE (muted, not bright) */
     --vintage-green-50: hsl(142, 25%, 18%);     /* Dark muted green background */
@@ -241,8 +242,9 @@
     --vintage-brown-400: hsl(28, 22%, 55%);
     --vintage-brown-600: hsl(28, 25%, 58%);
 
-    --font-sans: 'Libre Baskerville', serif;
-    --font-serif: 'Lora', serif;
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-serif: 'Lora', ui-serif, Georgia, serif;
+    --font-display: 'Libre Baskerville', ui-serif, Georgia, serif;
     --font-mono: 'IBM Plex Mono', monospace;
     --radius: 0.5rem;
     --shadow-x: 2px;
@@ -262,7 +264,8 @@
   }
 
   html {
-    font-size: 14px;
+    /* Slightly above 14px so rem-based UI (text-sm, text-xs, spacing) is easier to read without bloating headings */
+    font-size: 15px;
   }
 
   body {
@@ -366,6 +369,13 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
+  --font-display: var(--font-display);
+
+  /* Slightly larger than default Tailwind scale (was 0.75rem / 0.875rem) for small UI copy */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.45;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

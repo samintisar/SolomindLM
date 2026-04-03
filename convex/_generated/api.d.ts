@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as ResendOTP from "../ResendOTP.js";
+import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
 import type * as _agents_AudioOverviewGraph from "../_agents/AudioOverviewGraph.js";
 import type * as _agents_ChatAgent from "../_agents/ChatAgent.js";
 import type * as _agents_FlashcardGraph from "../_agents/FlashcardGraph.js";
@@ -154,6 +156,7 @@ import type * as _lib_googleDriveDownload from "../_lib/googleDriveDownload.js";
 import type * as _lib_limits from "../_lib/limits.js";
 import type * as _lib_notebookAccess from "../_lib/notebookAccess.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
+import type * as _lib_resendSendError from "../_lib/resendSendError.js";
 import type * as _lib_shareToken from "../_lib/shareToken.js";
 import type * as _lib_srsScheduling from "../_lib/srsScheduling.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
@@ -261,6 +264,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  ResendOTP: typeof ResendOTP;
+  ResendOTPPasswordReset: typeof ResendOTPPasswordReset;
   "_agents/AudioOverviewGraph": typeof _agents_AudioOverviewGraph;
   "_agents/ChatAgent": typeof _agents_ChatAgent;
   "_agents/FlashcardGraph": typeof _agents_FlashcardGraph;
@@ -407,6 +412,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/limits": typeof _lib_limits;
   "_lib/notebookAccess": typeof _lib_notebookAccess;
   "_lib/rateLimits": typeof _lib_rateLimits;
+  "_lib/resendSendError": typeof _lib_resendSendError;
   "_lib/shareToken": typeof _lib_shareToken;
   "_lib/srsScheduling": typeof _lib_srsScheduling;
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;

@@ -171,7 +171,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
           {/* Skip Backward Button */}
           <button
             onClick={() => skip(-5)}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors shrink-0"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors shrink-0"
             aria-label="Backward 5 seconds"
             title="Backward 5s"
           >
@@ -181,7 +181,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
           {/* Play/Pause Button */}
           <button
             onClick={togglePlay}
-            className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors shrink-0"
+            className="p-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shrink-0"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
@@ -194,7 +194,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
           {/* Skip Forward Button */}
           <button
             onClick={() => skip(5)}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors shrink-0"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors shrink-0"
             aria-label="Forward 5 seconds"
             title="Forward 5s"
           >

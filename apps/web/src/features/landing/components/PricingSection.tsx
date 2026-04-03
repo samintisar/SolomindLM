@@ -92,7 +92,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
           <p className="text-sm font-medium text-primary uppercase tracking-widest mb-3">
             Pricing
           </p>
-          <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground tracking-tight mb-3">
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground tracking-tight mb-3">
             Start free. Upgrade when you need more.
           </h2>
         </div>
@@ -101,7 +101,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
         <div className="flex justify-center mb-10">
           <div
             role="tablist"
-            className="inline-flex p-1 rounded-full bg-muted/80 border border-border/80"
+            className="inline-flex p-1 rounded-xl bg-muted/80 border border-border/80"
             aria-label="Billing period"
           >
             <button
@@ -109,7 +109,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
               role="tab"
               aria-selected={billing === 'yearly'}
               onClick={() => setBilling('yearly')}
-              className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 billing === 'yearly'
                   ? 'bg-background text-foreground shadow-sm border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -122,7 +122,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
               role="tab"
               aria-selected={billing === 'monthly'}
               onClick={() => setBilling('monthly')}
-              className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                 billing === 'monthly'
                   ? 'bg-background text-foreground shadow-sm border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -152,7 +152,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
             >
               {plan.highlighted && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="inline-block px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
+                  <span className="inline-block px-3 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-semibold">
                     Best value
                   </span>
                 </div>

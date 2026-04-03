@@ -1,6 +1,6 @@
 import React from 'react';
 import Marquee from 'react-fast-marquee';
-import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText, Brain, Table2 } from 'lucide-react';
+import { AudioLines, GitFork, FileText, Layers, HelpCircle, MessageSquareText, Brain, Table2, Presentation } from 'lucide-react';
 import { LANDING_CONTENT } from '../constants';
 
 export const FeaturesGrid: React.FC = () => {
@@ -11,6 +11,7 @@ export const FeaturesGrid: React.FC = () => {
       case 'reports': return FileText;
       case 'flashcards': return Layers;
       case 'quiz': return HelpCircle;
+      case 'slides': return Presentation;
       case 'writtenQuestions': return MessageSquareText;
       case 'rag': return Brain;
       case 'spreadsheets': return Table2;
@@ -25,6 +26,7 @@ export const FeaturesGrid: React.FC = () => {
       case 'reports': return 'text-amber-600';
       case 'flashcards': return 'text-red-700';
       case 'quiz': return 'text-blue-700';
+      case 'slides': return 'text-violet-600';
       case 'writtenQuestions': return 'text-green-700';
       case 'rag': return 'text-violet-600';
       case 'spreadsheets': return 'text-cyan-600';
@@ -41,10 +43,10 @@ export const FeaturesGrid: React.FC = () => {
         className="group flex-shrink-0 w-[300px] min-h-[220px] rounded-2xl bg-card border border-border shadow-sm p-12 flex flex-col items-center justify-center text-center mx-4"
       >
         <Icon className={`w-10 h-10 flex-shrink-0 ${colorClass} mb-2 group-hover:scale-105 transition-transform duration-300`} />
-        <h3 className="text-lg font-sans font-bold text-foreground mb-1 line-clamp-1">
+        <h3 className="text-lg font-display font-bold text-foreground mb-1 line-clamp-1">
           {feature.title}
         </h3>
-        <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
+        <p className="text-muted-foreground text-base leading-relaxed line-clamp-2">
           {feature.description}
         </p>
       </div>
@@ -61,7 +63,7 @@ export const FeaturesGrid: React.FC = () => {
       <div className="max-w-[1500px] w-full mx-auto">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
             Powerful Learning Tools
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

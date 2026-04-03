@@ -65,7 +65,7 @@ export function renderMessageWithReferences(
                     onMouseLeave={handlers.onRefLeave}
                     onClick={(e) => handlers.onRefClick(refId, messageId, e)}
                     onTouchStart={(e) => handlers.onRefClick(refId, messageId, e)}
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold cursor-pointer hover:bg-primary/90 active:bg-primary/80 transition-colors mx-1 align-middle relative touch-manipulation"
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-xl bg-primary text-primary-foreground text-xs font-bold cursor-pointer hover:bg-primary/90 active:bg-primary/80 transition-colors mx-1 align-middle relative touch-manipulation"
                     title={`Reference ${refId}`}
                     style={{ verticalAlign: 'middle' }}
                   >

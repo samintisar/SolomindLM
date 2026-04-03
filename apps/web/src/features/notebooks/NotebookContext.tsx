@@ -45,6 +45,7 @@ export interface NotebookContextType {
   subscriptionStatus: ReturnType<typeof useSubscriptionStatus>;
 
   // Auth helpers for child components to trigger login modal
+  isAuthenticated: boolean;
   onRequireAuth: (errorMessage: string) => void;
 }
 

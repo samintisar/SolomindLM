@@ -16,7 +16,7 @@ export const FAQSection: React.FC = () => {
       <div className="max-w-3xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-20">
-          <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
             Frequently Asked Questions
           </h2>
           <p className="text-lg text-muted-foreground">
@@ -68,7 +68,7 @@ export const FAQSection: React.FC = () => {
           <Button
             variant="outline"
             size="lg"
-            className="rounded-full transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
+            className="rounded-xl transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
             onClick={() => {
               // Open contact form or email
               window.location.href = 'mailto:support@solomindlm.com';

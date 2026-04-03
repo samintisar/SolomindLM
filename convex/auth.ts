@@ -1,7 +1,10 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import Google from "@auth/core/providers/google";
+import { Password } from "@convex-dev/auth/providers/Password";
 import { query, type QueryCtx, type MutationCtx, type ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { ResendOTP } from "./ResendOTP";
+import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
@@ -9,6 +12,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
     }),
+    Password({ verify: ResendOTP, reset: ResendOTPPasswordReset }),
   ],
 });
 

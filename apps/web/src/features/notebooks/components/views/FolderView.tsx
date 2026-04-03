@@ -35,6 +35,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const folders = ctx.folders;
   const onRequireAuth = ctx.onRequireAuth;
+  const isAuthenticated = ctx.isAuthenticated;
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
 
@@ -117,7 +118,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
               <span>Back</span>
             </button>
             <div className="h-6 w-px bg-border" />
-            <h1 className="text-2xl font-bold text-foreground font-sans">{folder.name}</h1>
+            <h1 className="text-2xl font-bold text-foreground font-display">{folder.name}</h1>
           </div>
 
           {/* Right: View Toggles and Sort */}
@@ -144,7 +145,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-card hover:bg-secondary/50 transition-colors text-sm font-medium shadow-sm min-w-[140px] justify-between"
+                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-secondary/50 transition-colors text-sm font-medium shadow-sm min-w-[140px] justify-between"
               >
                 <span className="truncate">{sortOption === 'date' ? 'Most recent' : 'Title (A-Z)'}</span>
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -180,7 +181,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
               onClick={notebookHandlers.openCreateNotebook}
               className="group aspect-16/10 rounded-2xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300"
             >
-              <div className="w-14 h-14 rounded-full bg-secondary text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
+              <div className="w-14 h-14 rounded-xl bg-secondary text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
                 <Plus className="w-7 h-7" />
               </div>
               <span className="text-base font-bold text-muted-foreground group-hover:text-primary transition-colors font-sans">Create new notebook</span>
@@ -247,6 +248,11 @@ export const FolderView: React.FC<FolderViewProps> = ({
           onClose={notebookHandlers.closeCustomize}
           onSave={async (data) => {
             if (notebookHandlers.isCreatingNotebook) {
+              if (!isAuthenticated) {
+                onRequireAuth('Sign in to create a notebook.');
+                notebookHandlers.closeCustomize();
+                return;
+              }
               try {
                 // Create notebook using hook
                 await createNotebook({

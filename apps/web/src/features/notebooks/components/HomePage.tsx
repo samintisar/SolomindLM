@@ -52,6 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const onDeleteFolder = ctx.deleteFolder;
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const onRequireAuth = ctx.onRequireAuth;
+  const isAuthenticated = ctx.isAuthenticated;
 
   const [activeTab, setActiveTab] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -81,6 +82,11 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Handlers for creating notebooks and folders via modal
   const handleCreateNotebookFromModal = async (data: NotebookCreateData) => {
+    if (!isAuthenticated) {
+      onRequireAuth('Sign in to create a notebook.');
+      notebookHandlers.closeCustomize();
+      return;
+    }
     try {
       await createNotebookHook({
         title: data.title,
@@ -115,6 +121,11 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleCreateFolderFromModal = async (data: FolderCreateData) => {
+    if (!isAuthenticated) {
+      onRequireAuth('Sign in to create a folder.');
+      folderHandlers.closeFolderCustomize();
+      return;
+    }
     try {
       await createFolderHook({
         name: data.name,
@@ -187,7 +198,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`
-                  px-5 py-2 rounded-full text-sm font-sans font-bold transition-all
+                  px-5 py-2 rounded-xl text-sm font-sans font-bold transition-all
                   ${activeTab === tab
                     ? 'bg-foreground text-background shadow-md'
                     : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'}
@@ -224,7 +235,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-card hover:bg-secondary/50 transition-colors text-sm font-medium shadow-sm min-w-[140px] justify-between"
+                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-secondary/50 transition-colors text-sm font-medium shadow-sm min-w-[140px] justify-between"
               >
                 <span className="truncate">{sortOption === 'date' ? 'Most recent' : 'Title (A-Z)'}</span>
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />

@@ -449,7 +449,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
         >
           {/* Front */}
           <div className="absolute inset-0 backface-hidden bg-card rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
               Question
             </span>
             <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg font-medium text-foreground [scrollbar-gutter:stable]">
@@ -458,7 +458,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
               </div>
             </div>
             <p
-              className={`mt-2 flex items-center justify-center gap-1.5 text-[11px] shrink-0 ${
+              className={`mt-2 flex items-center justify-center gap-1.5 text-sm shrink-0 ${
                 mode === 'browse' ? 'text-muted-foreground' : 'text-primary'
               }`}
             >
@@ -469,7 +469,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
 
           {/* Back */}
           <div className="absolute inset-0 backface-hidden rotate-y-180 bg-muted/30 rounded-2xl flex flex-col items-center p-5 sm:p-6 text-center overflow-hidden border border-border">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2 shrink-0">
               Answer
             </span>
             <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden text-base sm:text-lg font-medium text-foreground [scrollbar-gutter:stable]">
@@ -508,7 +508,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
               </div>
             </div>
             {mode === 'browse' && (
-              <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
+              <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-muted-foreground shrink-0">
                 <RotateCw className="h-3 w-3 opacity-70" aria-hidden />
                 <span>Tap or Space to flip back</span>
               </p>
@@ -523,7 +523,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
           <button
             type="button"
             onClick={handlePrev}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
             aria-label="Previous card"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -546,7 +546,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
           <button
             type="button"
             onClick={handleNext}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] touch-manipulation"
             aria-label="Next card"
           >
             <ChevronRight className="h-5 w-5" />

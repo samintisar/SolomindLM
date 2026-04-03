@@ -194,7 +194,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
             <div className="relative">
               {/* Save Badge */}
               <div className="absolute left-1/2 -translate-x-1/2 -top-4 z-10">
-                <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold whitespace-nowrap">
+                <div className="bg-primary text-primary-foreground px-4 py-1 rounded-xl text-sm font-semibold whitespace-nowrap">
                   Save 50%
                 </div>
               </div>

@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
 import { X, Presentation, Check } from 'lucide-react';
+import { StudioModalDiscoverPromptsButton } from './StudioModalDiscoverPromptsButton';
 
 interface CustomizeSlidesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (config: SlideDeckConfig) => void;
+  embedded?: boolean;
 }
 
 export interface SlideDeckConfig {
@@ -14,18 +16,27 @@ export interface SlideDeckConfig {
   customPrompt: string;
 }
 
-export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({ isOpen, onClose, onGenerate }) => {
+export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
+  isOpen,
+  onClose,
+  onGenerate,
+  embedded = false,
+}) => {
   const [slideType, setSlideType] = useState<SlideDeckConfig['slideType']>('detailed_deck');
   const [deckLength, setDeckLength] = useState<SlideDeckConfig['deckLength']>('default');
   const [customPrompt, setCustomPrompt] = useState('');
 
   if (!isOpen) return null;
 
+  const overlayClass = embedded
+    ? "absolute inset-0 z-50 flex min-h-0 items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200"
+    : "fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200";
+
   return (
-    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className={overlayClass}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-4xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col overflow-hidden font-sans">
+      <div className="relative flex max-h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
@@ -34,9 +45,12 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({ isOp
             </div>
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Slide Deck</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <StudioModalDiscoverPromptsButton />
+            <button type="button" onClick={onClose} className="rounded-xl p-2 transition-colors hover:bg-secondary/50">
+              <X className="h-5 w-5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 md:p-10 space-y-10 bg-card/50">
@@ -61,7 +75,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({ isOp
                     <div className="flex justify-between items-start mb-3">
                       <span className={`font-bold text-sm ${slideType === opt.value ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
                       {slideType === opt.value && (
-                        <div className="p-1 rounded-full bg-primary text-primary-foreground">
+                        <div className="p-1 rounded-xl bg-primary text-primary-foreground">
                           <Check className="w-2.5 h-2.5" />
                         </div>
                       )}
@@ -76,7 +90,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({ isOp
 
             <div className="space-y-4">
               <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Length</label>
-              <div className="flex bg-background border border-border rounded-full p-1 w-fit">
+              <div className="flex bg-background border border-border rounded-xl p-1 w-fit">
                 {([
                   { value: 'short' as const, label: 'Short' },
                   { value: 'default' as const, label: 'Default' }
@@ -85,7 +99,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({ isOp
                     key={opt.value}
                     onClick={() => setDeckLength(opt.value)}
                     className={`
-                      flex items-center justify-center gap-2 px-6 py-2 rounded-full text-xs font-bold transition-all
+                      flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all
                       ${deckLength === opt.value 
                         ? 'bg-primary text-primary-foreground shadow-sm' 
                         : 'text-muted-foreground hover:text-foreground'}
@@ -112,7 +126,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({ isOp
           <div className="flex justify-end pt-2">
             <button
               onClick={() => onGenerate({ slideType, deckLength, customPrompt })}
-              className="px-10 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full transition-all shadow-md active:scale-95 text-sm"
+              className="px-10 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all shadow-md active:scale-95 text-sm"
             >
               Generate Slide Deck
             </button>

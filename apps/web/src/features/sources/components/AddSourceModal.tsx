@@ -83,7 +83,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
             </div>
             <h2 className="text-xl font-bold">SolomindLM</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -94,7 +94,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               <h3 className="text-2xl font-medium">Add sources</h3>
               <button
                 onClick={() => { onClose(); onDiscoverClick(); }}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full border border-border hover:bg-secondary/50 transition-colors text-sm font-medium"
+                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border hover:bg-secondary/50 transition-colors text-sm font-medium"
               >
                 <Globe className="w-4 h-4" />
                 Discover sources
@@ -133,14 +133,14 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                 : 'border-border bg-secondary/5 hover:bg-secondary/10 cursor-pointer'
             }`}
           >
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0">
               <Upload className="w-6 h-6 text-primary shrink-0" />
             </div>
             <div className="text-center space-y-2">
               <h3 className="text-lg font-bold text-primary">Upload sources</h3>
               <p className="text-sm text-muted-foreground">Drag & drop or <span className="text-primary underline decoration-dotted font-medium">choose file</span> to upload</p>
             </div>
-            <p className="text-[10px] text-muted-foreground/60 text-center max-w-xl mt-4 font-mono">
+            <p className="text-xs text-muted-foreground/60 text-center max-w-xl mt-4 font-mono">
               Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF, WAV, MP3, M4A, WebM, FLAC
             </p>
           </div>
@@ -183,7 +183,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                   disabled={!canUpload}
                   className="h-11 w-full flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-background flex items-center justify-center border border-border shadow-sm group-hover:scale-105 transition-transform shrink-0">
                     <FileText className="w-4 h-4 text-chart-4" />
                   </div>
                   <span className="text-sm font-medium">Copied text</span>
@@ -240,7 +240,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
             <File className="w-4 h-4 shrink-0" />
             <span>Source limit</span>
           </div>
-          <div className="flex-1 h-2 bg-secondary/50 rounded-full overflow-hidden">
+          <div className="flex-1 h-2 bg-secondary/50 rounded-xl overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
                 sourcesCount >= MAX_SOURCES ? 'bg-destructive' : 'bg-primary'

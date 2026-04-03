@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { User as UserIcon, Share2 } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { DropdownMenu } from './DropdownMenu';
 import { AvatarDropdown } from '../../features/auth/components/AvatarDropdown';
-import { LoginModal } from '../../features/auth/components/LoginModal';
 
 interface HeaderProps {
   title: string;
@@ -29,9 +29,10 @@ export const Header: React.FC<HeaderProps> = ({
   notebookRenamable = true,
   onShare,
 }) => {
+  const navigate = useNavigate();
+  const authLocation = useLocation();
   const { user, isAuthenticated, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(title);
@@ -87,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="h-14 flex items-center justify-between px-4 border-b-2 border-border bg-background relative z-[70] transition-all duration-300">
 
       {/* Hidden span for measuring text width */}
-      <span ref={spanRef} className="absolute opacity-0 pointer-events-none text-lg font-sans font-bold whitespace-pre">
+      <span ref={spanRef} className="absolute opacity-0 pointer-events-none text-lg font-display font-bold whitespace-pre">
         {inputValue || 'Enter title'}
       </span>
 
@@ -116,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </button>
         {isHome ? (
-          <span className="text-xl font-sans font-bold text-foreground tracking-tight">
+          <span className="text-xl font-display font-bold text-foreground tracking-tight">
             SolomindLM
           </span>
         ) : (
@@ -131,20 +132,20 @@ export const Header: React.FC<HeaderProps> = ({
                 onKeyDown={handleKeyDown}
                 onBlur={handleSave}
                 style={{ width: Math.max(100, inputWidth) }}
-                className="text-lg font-sans font-bold text-foreground bg-transparent border-b border-primary outline-none p-0 tracking-tight min-w-0"
+                className="text-lg font-display font-bold text-foreground bg-transparent border-b border-primary outline-none p-0 tracking-tight min-w-0"
                 aria-label="Notebook name"
               />
             ) : notebookRenamable ? (
               <h1
                 onClick={() => setIsEditing(true)}
-                className="text-lg font-sans font-bold text-foreground tracking-tight cursor-text hover:text-foreground/80 hover:decoration-dotted hover:underline underline-offset-4 transition-all truncate min-w-0"
+                className="text-lg font-display font-bold text-foreground tracking-tight cursor-text hover:text-foreground/80 hover:decoration-dotted hover:underline underline-offset-4 transition-all truncate min-w-0"
                 title="Click to rename notebook"
               >
                 {title}
               </h1>
             ) : (
               <h1
-                className="text-lg font-sans font-bold text-foreground tracking-tight truncate min-w-0"
+                className="text-lg font-display font-bold text-foreground tracking-tight truncate min-w-0"
                 title={title}
               >
                 {title}
@@ -185,7 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
         <DropdownMenu
           trigger={
-            <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center hover:ring-2 hover:ring-ring transition-all shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center hover:ring-2 hover:ring-ring transition-all shrink-0">
               <UserIcon className="w-4 h-4 text-secondary-foreground shrink-0" />
             </div>
           }
@@ -194,7 +195,16 @@ export const Header: React.FC<HeaderProps> = ({
           <AvatarDropdown
             user={user}
             isAuthenticated={isAuthenticated}
-            onLogin={() => setShowLoginModal(true)}
+            onLogin={() =>
+              navigate('/sign-in', {
+                state: {
+                  from:
+                    authLocation.pathname === '/'
+                      ? '/home'
+                      : `${authLocation.pathname}${authLocation.search}`,
+                },
+              } as never)
+            }
             onLogout={signOut}
             theme={theme}
             toggleTheme={toggleTheme}
@@ -202,10 +212,6 @@ export const Header: React.FC<HeaderProps> = ({
         </DropdownMenu>
       </div>
 
-      {/* Login Modal */}
-      {showLoginModal && (
-        <LoginModal onClose={() => setShowLoginModal(false)} />
-      )}
     </header>
   );
 };

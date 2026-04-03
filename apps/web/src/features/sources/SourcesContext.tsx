@@ -4,7 +4,7 @@ import { Source } from '@/shared/types/index';
 export interface SourcesContextType {
   sources: Source[];
   onToggleSource: (id: string) => void;
-  onToggleAll: () => void;
+  onToggleAll: (visibleIds: string[]) => void;
   onAddSource: (source: Source) => void;
   onDeleteSource: (id: string) => void;
   onDeleteSelectedSources: (ids: string[]) => Promise<void>;

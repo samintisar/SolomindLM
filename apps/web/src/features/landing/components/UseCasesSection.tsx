@@ -67,7 +67,7 @@ export const UseCasesSection: React.FC = () => {
       <div className="max-w-[1500px] w-full mx-auto">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
             Built for Every Learner
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -91,7 +91,7 @@ export const UseCasesSection: React.FC = () => {
                   />
                 </div>
 
-                <h3 className="text-lg font-sans font-bold text-foreground mb-2">
+                <h3 className="text-lg font-display font-bold text-foreground mb-2">
                   {useCase.title}
                 </h3>
 

@@ -9,6 +9,7 @@ interface UseNotebookCRUDProps {
   user: any;
   activeNotebookId: string | null;
   setNotebookTitle: (title: string) => void;
+  onRequireAuth?: (message: string) => void;
 }
 
 function alertError(error: unknown, fallback: string) {
@@ -21,6 +22,7 @@ export function useNotebookCRUD({
   user,
   activeNotebookId,
   setNotebookTitle,
+  onRequireAuth,
 }: UseNotebookCRUDProps) {
   const navigate = useNavigate();
   const createNotebook = useCreateNotebook();
@@ -30,7 +32,7 @@ export function useNotebookCRUD({
 
   const handleCreateNotebook = useCallback(async () => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot create notebook: not authenticated');
+      onRequireAuth?.('Sign in to create a notebook.');
       return;
     }
 
@@ -48,11 +50,11 @@ export function useNotebookCRUD({
         alertError(error, 'Failed to create notebook');
       }
     }
-  }, [isAuthenticated, user, createNotebook, navigate, handleLimitError]);
+  }, [isAuthenticated, user, createNotebook, navigate, handleLimitError, onRequireAuth]);
 
   const handleUpdateNotebook = useCallback(async (id: string, updates: Partial<NotebookItem>) => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot update notebook: not authenticated');
+      onRequireAuth?.('Sign in to update notebooks.');
       return;
     }
 
@@ -71,11 +73,11 @@ export function useNotebookCRUD({
     } catch (error) {
       alertError(error, 'Failed to update notebook');
     }
-  }, [isAuthenticated, user, updateNotebook, activeNotebookId, setNotebookTitle]);
+  }, [isAuthenticated, user, updateNotebook, activeNotebookId, setNotebookTitle, onRequireAuth]);
 
   const handleDeleteNotebook = useCallback(async (id: string) => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot delete notebook: not authenticated');
+      onRequireAuth?.('Sign in to delete notebooks.');
       return;
     }
 
@@ -87,7 +89,7 @@ export function useNotebookCRUD({
     } catch (error) {
       alertError(error, 'Failed to delete notebook');
     }
-  }, [isAuthenticated, user, deleteNotebook, activeNotebookId, navigate]);
+  }, [isAuthenticated, user, deleteNotebook, activeNotebookId, navigate, onRequireAuth]);
 
   return {
     handleCreateNotebook,

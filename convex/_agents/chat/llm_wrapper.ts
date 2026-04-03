@@ -195,10 +195,13 @@ export class ChatLLMWrapper {
   private tokenBudget: number = 7000; // Reserve tokens for generation
 
   constructor(config: LLMWrapperConfig) {
+  // Smart model: allow template "thinking" / reasoning where the provider supports it
+  // (e.g. hybrid Qwen, DeepSeek V3.1 on Together — see chat_template_kwargs in API).
   this.llm = new ChatTogetherAI({
     apiKey: config.apiKey,
     model: config.model,
     temperature: config.temperature ?? 0.1,
+    modelKwargs: { chat_template_kwargs: { thinking: true } },
   });
   this.fastLlm = config.fastModel
     ? new ChatTogetherAI({
@@ -209,11 +212,12 @@ export class ChatLLMWrapper {
       })
     : this.llm;
   this.fastLlmModelId = config.fastModel ?? config.model;
-  // Deterministic routing — must be temp=0, always smart model
+  // Deterministic routing — temp=0; disable thinking so tool JSON stays reliable
   this.decisionLlm = new ChatTogetherAI({
     apiKey: config.apiKey,
     model: config.model,
     temperature: 0,
+    modelKwargs: { chat_template_kwargs: { thinking: false } },
   });
 }
 
@@ -259,17 +263,25 @@ export class ChatLLMWrapper {
 
   /**
    * Generates a hypothetical document paragraph for HyDE retrieval.
-   * The resulting text is embedded instead of the raw query for better semantic search.
+   * The caller typically embeds this together with the declarative search query so
+   * explicit keywords stay represented while HyDE improves semantic density.
    */
   async generateHypotheticalDocument(query: string): Promise<string> {
     console.log('[ChatLLMWrapper] Generating hypothetical document for HyDE');
-    const prompt = `Write a short, factual paragraph (2-4 sentences) that would directly answer this question if it appeared in a textbook or study material. Write as a statement of facts, not as an answer to a question.\n\nQuestion: ${query}`;
+    const prompt = `Write a short, factual paragraph (2–5 sentences) that would directly address this information need if it appeared in a textbook or study note. Write as plain statements of fact, not as dialogue or Q&A.
+
+Coverage rules (for retrieval — follow even if you are unsure of fine details):
+- If the question compares or contrasts multiple methods, concepts, named entities, cases, or time periods, give EACH distinct subject at least one clear sentence. Do not let the first or most familiar subject consume the whole paragraph or leave other named subjects out.
+- If the question asks how A relates to B (difference, similarity, tradeoff), describe both A and B (or every side listed), not only one.
+- Include important proper nouns and technical terms from the question using normal spacing between words.
+
+Question: ${query}`;
     try {
       const response = await uncachedLlmCall({
         model: this.fastLlmModelId,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        maxTokens: 150,
+        maxTokens: 220,
         reasoningEnabled: false,
         toolChoice: 'none',
       });

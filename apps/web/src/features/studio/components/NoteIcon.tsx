@@ -25,7 +25,7 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
   // Generating state with spinner
   if (note.status === 'generating') {
     return (
-      <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+      <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
         <Loader2 className="w-4 h-4 text-primary animate-spin" />
       </div>
     );
@@ -46,7 +46,7 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
           e.stopPropagation();
           onPlayAudio?.(note);
         }}
-        className="shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center opacity-70 group-hover:opacity-100 hover:!opacity-100 hover:bg-primary hover:text-primary-foreground transition-all"
+        className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center opacity-70 group-hover:opacity-100 hover:!opacity-100 hover:bg-primary hover:text-primary-foreground transition-all"
         aria-label="Play audio"
       >
         <Play className="w-3.5 h-3.5 fill-current ml-0.5 shrink-0" />

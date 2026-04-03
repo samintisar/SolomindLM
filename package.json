@@ -42,6 +42,7 @@
     "@langchain/langgraph": "^1.2.6",
     "@langchain/openai": "^1.4.1",
     "@langchain/textsplitters": "^1.0.1",
+    "@oslojs/crypto": "^1",
     "@standard-schema/spec": "^1.1.0",
     "@supadata/js": "^1.4.0",
     "convex-helpers": "^0.1.114",
@@ -49,6 +50,7 @@
     "langsmith": "^0.4.12",
     "openai": "^6.33.0",
     "p-limit": "^7.3.0",
+    "resend": "^4",
     "stripe": "^20.4.1",
     "zeroentropy": "^0.1.0-alpha.10",
     "zod": "^3.25.76"

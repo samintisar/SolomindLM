@@ -154,7 +154,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             </div>
             <h2 className="text-xl font-bold">Discover Sources</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
@@ -209,12 +209,12 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                       <div key={idx} className="group relative bg-card border border-border p-5 rounded-xl shadow-sm hover:shadow-md hover:border-primary/30 transition-all flex flex-col justify-between h-full">
                          <div className="space-y-3">
                             <div className="flex items-start justify-between gap-4">
-                               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary/80 font-sans">
+                               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary/80 font-sans">
                                   <Globe className="w-3 h-3" />
                                   <span>Website</span>
                                </div>
                                <div className="flex items-center gap-2">
-                                  <span className={`text-[10px] font-bold uppercase ${getScoreColor(result.score)}`}>
+                                  <span className={`text-xs font-bold uppercase ${getScoreColor(result.score)}`}>
                                     {getScoreLabel(result.score)} relevance
                                   </span>
                                   <a href={result.url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-secondary rounded-md text-muted-foreground hover:text-primary transition-colors">
@@ -226,12 +226,12 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                             <p className="text-sm text-muted-foreground font-serif line-clamp-3 leading-relaxed">{result.snippet}</p>
                          </div>
                          <div className="mt-6 pt-4 border-t border-border/30 flex justify-between items-center">
-                            <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[150px]">{getHostname(result.url)}</span>
+                            <span className="text-xs font-mono text-muted-foreground truncate max-w-[150px]">{getHostname(result.url)}</span>
                             <button
                               onClick={() => handleAddResult(result)}
                               disabled={result.isAdded || result.isAdding || isAtLimit}
                               className={`
-                                px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5
+                                px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5
                                 ${result.isAdded || isAtLimit
                                   ? 'bg-secondary text-muted-foreground cursor-default'
                                   : result.isAdding
@@ -260,7 +260,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                 </div>
              ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-center p-12 opacity-40">
-                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4 shrink-0">
+                   <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center mb-4 shrink-0">
                       <Search className="w-8 h-8" />
                    </div>
                    <p className="font-serif italic text-lg">Enter a topic to discover related web sources</p>

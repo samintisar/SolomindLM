@@ -147,6 +147,7 @@ RULES:
 2. You may skip searching ONLY for: greetings, meta-questions about the app itself, or follow-ups already fully covered by a prior tool result in this conversation.
 3. If the question is too ambiguous to search effectively, call ask_clarification instead.
 4. When calling search_documents, rephrase the question as a declarative statement for better retrieval (e.g. "photosynthesis converts light into chemical energy" not "How does photosynthesis work?").
+4b. If the question names, compares, or contrasts multiple distinct topics (e.g. two algorithms, two theories, cause vs. effect, "X versus Y"), your search query MUST name every distinct topic with clear wording — not only the first or most salient one — so retrieval can surface material for each part.
 5. Prefer ONE strong search first. Call search_documents at most once per turn. Run a second search on a later turn only if the first results are clearly insufficient — do not batch multiple unrelated searches in a single turn. The system enforces a small search budget per question.`;
 
 /** OpenAI-style tool defs so LangChain/Together receive `type: "function"` (required by inference v2). */
@@ -160,7 +161,8 @@ const SEARCH_TOOL_DEF = {
       properties: {
         query: {
           type: 'string',
-          description: 'Search query — rephrase the user question as a declarative statement for better retrieval',
+          description:
+            'Declarative search string for retrieval. For comparisons or multi-topic questions, name every distinct subject (e.g. both methods in an X vs Y question), not just one.',
         },
       },
       required: ['query'],
@@ -319,8 +321,11 @@ export class ChatAgent {
               status: 'embedding',
               message: 'Embedding the query for semantic search…',
             };
+            // Keep the tool’s declarative query in the embedding input so explicit terms
+            // (e.g. every side of a comparison) are not lost if HyDE over-emphasizes one topic.
+            const textForVectorEmbedding = [query.trim(), hydeText.trim()].filter(Boolean).join('\n\n');
             const hydeEmbedding = await withTimeout(
-              this.embeddingService.embedText(hydeText),
+              this.embeddingService.embedText(textForVectorEmbedding),
               remainingMs(),
               'hyde_embedding'
             );
@@ -335,7 +340,8 @@ export class ChatAgent {
                 context.noteId,
                 query,
                 context.documentIds,
-                hydeEmbedding
+                hydeEmbedding,
+                hydeText
               ),
               remainingMs(),
               'vector_hybrid_search'

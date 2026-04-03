@@ -20,7 +20,7 @@ export const ContentShowcase: React.FC = () => {
       <div className="max-w-[1500px] w-full mx-auto">
         {/* Section Header */}
         <div className="text-center mb-20">
-          <h2 className="text-3xl md:text-4xl font-sans font-bold text-foreground mb-4">
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
             {LANDING_CONTENT.contentShowcase.title}
           </h2>
           <p className="text-lg text-muted-foreground">

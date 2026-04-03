@@ -55,7 +55,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
               alt="SolomindLM"
               className="w-8 h-8 shrink-0 object-contain"
             />
-            <span className="text-xl font-sans font-bold text-foreground tracking-tight">
+            <span className="text-xl font-display font-bold text-foreground tracking-tight">
               SolomindLM
             </span>
           </div>
@@ -66,7 +66,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
               <button
                 key={item.href}
                 onClick={() => scrollToSection(item.href)}
-                className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                className="font-sans text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
               >
                 {item.label}
               </button>
@@ -77,7 +77,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
           <div className="hidden md:block">
             <Button
               onClick={onGetStarted}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold px-6 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
+              className="font-sans bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-semibold px-6 py-2 transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
             >
               Get Started Free
             </Button>
@@ -101,7 +101,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
                 <button
                   key={item.href}
                   onClick={() => scrollToSection(item.href)}
-                  className="text-left text-foreground hover:text-primary transition-colors text-sm font-medium py-2.5 px-2 rounded-none"
+                  className="font-sans text-left text-foreground hover:text-primary transition-colors text-sm font-medium py-2.5 px-2 rounded-none"
                 >
                   {item.label}
                 </button>
@@ -111,7 +111,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
                   onGetStarted();
                   setIsMobileMenuOpen(false);
                 }}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold w-full mt-2 transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
+                className="font-sans bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-semibold w-full mt-2 transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]"
               >
                 Get Started Free
               </Button>

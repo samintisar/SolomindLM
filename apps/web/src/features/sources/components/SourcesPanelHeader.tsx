@@ -79,7 +79,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                     onExitRename();
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 font-sans font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                  className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
                   autoFocus
                   aria-label="Rename source"
                 />
@@ -98,7 +98,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                       onEnterRename();
                     }
                   }}
-                  className="font-sans font-bold text-sm tracking-wide truncate text-foreground cursor-text hover:opacity-80"
+                  className="font-display font-bold text-sm tracking-wide truncate text-foreground cursor-text hover:opacity-80"
                   title="Click to rename"
                 >
                   {viewingSource.title}
@@ -144,8 +144,8 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
         ) : (
           <div className="flex items-center gap-2 text-foreground">
             <FileStack className="w-4 h-4" />
-            <span className="font-sans font-bold text-sm tracking-wide uppercase">Sources</span>
-            <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-full font-mono">
+            <span className="font-display font-bold text-sm tracking-wide uppercase">Sources</span>
+            <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-xl font-mono">
               {selectedCount}
             </span>
           </div>
@@ -187,7 +187,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                     onExitRename();
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 font-sans font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                  className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
                   autoFocus
                   aria-label="Rename source"
                 />
@@ -206,7 +206,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                       onEnterRename();
                     }
                   }}
-                  className="font-sans font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
+                  className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
                   title="Click to rename"
                 >
                   {viewingSource.title}
@@ -253,8 +253,8 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
           <>
             <div className="flex items-center gap-2 text-sidebar-foreground">
               <FileStack className="w-4 h-4 shrink-0" />
-              <span className="font-sans font-bold text-sm tracking-wide uppercase">Sources</span>
-              <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-full font-mono">
+              <span className="font-display font-bold text-sm tracking-wide uppercase">Sources</span>
+              <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-xl font-mono">
                 {selectedCount}
               </span>
             </div>

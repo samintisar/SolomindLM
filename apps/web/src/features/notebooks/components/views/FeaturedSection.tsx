@@ -19,7 +19,7 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
   return (
     <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-sans font-bold text-foreground">Featured notebooks</h2>
+        <h2 className="text-xl font-display font-bold text-foreground">Featured notebooks</h2>
       </div>
 
       {viewMode === 'grid' ? (
@@ -41,13 +41,13 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
 
               <div className="absolute inset-0 p-6 flex flex-col justify-end text-white z-10">
                 <div className="flex items-center gap-2 mb-3 transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                  <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-[10px] font-bold uppercase ring-1 ring-white/30">
+                  <div className="w-6 h-6 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xs font-bold uppercase ring-1 ring-white/30">
                     {nb.author?.charAt(0)}
                   </div>
                   <span className="text-xs font-medium text-white/90 truncate drop-shadow-sm">{nb.author}</span>
                 </div>
                 <h3 className="text-lg font-bold leading-tight mb-3 drop-shadow-md line-clamp-2 font-sans tracking-tight">{nb.title}</h3>
-                <div className="flex items-center gap-3 text-[11px] font-medium text-white/80 uppercase tracking-wide">
+                <div className="flex items-center gap-3 text-sm font-medium text-white/80 uppercase tracking-wide">
                   <div className="flex items-center gap-1.5">
                     <Globe className="w-3 h-3 shrink-0" />
                     <span>{nb.sourceCount} sources</span>
@@ -83,7 +83,7 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
                 </div>
               </div>
               <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-2 hover:bg-secondary rounded-full text-muted-foreground hover:text-foreground transition-colors">
+                <button className="p-2 hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-colors">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="1" />
                     <circle cx="12" cy="5" r="1" />

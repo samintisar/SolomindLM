@@ -6,6 +6,7 @@ import { useUpdateNotebook } from '../services/notebooksApi';
 interface UseFolderCRUDProps {
   isAuthenticated: boolean;
   user: any;
+  onRequireAuth?: (message: string) => void;
 }
 
 function alertError(error: unknown, fallback: string) {
@@ -13,7 +14,7 @@ function alertError(error: unknown, fallback: string) {
   alert(error instanceof Error ? error.message : fallback);
 }
 
-export function useFolderCRUD({ isAuthenticated, user }: UseFolderCRUDProps) {
+export function useFolderCRUD({ isAuthenticated, user, onRequireAuth }: UseFolderCRUDProps) {
   const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
   const deleteFolder = useDeleteFolder();
@@ -21,7 +22,7 @@ export function useFolderCRUD({ isAuthenticated, user }: UseFolderCRUDProps) {
 
   const handleCreateFolder = useCallback(async () => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot create folder: not authenticated');
+      onRequireAuth?.('Sign in to create a folder.');
       return;
     }
 
@@ -34,11 +35,11 @@ export function useFolderCRUD({ isAuthenticated, user }: UseFolderCRUDProps) {
     } catch (error) {
       alertError(error, 'Failed to create folder');
     }
-  }, [isAuthenticated, user, createFolder]);
+  }, [isAuthenticated, user, createFolder, onRequireAuth]);
 
   const handleUpdateFolder = useCallback(async (id: string, updates: Partial<FolderItem>) => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot update folder: not authenticated');
+      onRequireAuth?.('Sign in to update folders.');
       return;
     }
 
@@ -52,11 +53,11 @@ export function useFolderCRUD({ isAuthenticated, user }: UseFolderCRUDProps) {
     } catch (error) {
       alertError(error, 'Failed to update folder');
     }
-  }, [isAuthenticated, user, updateFolder]);
+  }, [isAuthenticated, user, updateFolder, onRequireAuth]);
 
   const handleDeleteFolder = useCallback(async (id: string) => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot delete folder: not authenticated');
+      onRequireAuth?.('Sign in to delete folders.');
       return;
     }
 
@@ -65,11 +66,11 @@ export function useFolderCRUD({ isAuthenticated, user }: UseFolderCRUDProps) {
     } catch (error) {
       alertError(error, 'Failed to delete folder');
     }
-  }, [isAuthenticated, user, deleteFolder]);
+  }, [isAuthenticated, user, deleteFolder, onRequireAuth]);
 
   const handleMoveNotebookToFolder = useCallback(async (notebookId: string, folderId: string | null) => {
     if (!isAuthenticated || !user) {
-      console.error('Cannot move notebook: not authenticated');
+      onRequireAuth?.('Sign in to move notebooks.');
       return;
     }
 
@@ -78,7 +79,7 @@ export function useFolderCRUD({ isAuthenticated, user }: UseFolderCRUDProps) {
     } catch (error) {
       alertError(error, 'Failed to move notebook');
     }
-  }, [isAuthenticated, user, updateNotebook]);
+  }, [isAuthenticated, user, updateNotebook, onRequireAuth]);
 
   return {
     handleCreateFolder,

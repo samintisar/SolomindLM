@@ -65,7 +65,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
             <div className="relative kebab-menu z-20" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => (isMenuOpen ? onCloseMenu() : onToggleMenu())}
-                className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-full text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
+                className="p-1.5 -mr-1.5 -mt-1.5 hover:bg-black/10 rounded-xl text-muted-foreground/70 hover:text-foreground transition-colors opacity-100"
               >
                 <MoreVertical className="w-4 h-4" />
               </button>
@@ -98,7 +98,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
             </div>
           ) : (
             <div
-              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary"
+              className="inline-flex items-center gap-1 rounded-xl bg-primary/10 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-primary"
               title="Shared with you"
             >
               <Users className="w-3 h-3" />
@@ -118,7 +118,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
             <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 font-sans flex-1 min-w-0">
               {notebook.title}
             </h3>
-            <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-0.5 rounded-full text-[11px] text-muted-foreground font-medium uppercase tracking-wider shrink-0">
+            <div className="flex items-center gap-1.5 bg-secondary/50 px-2 py-0.5 rounded-xl text-sm text-muted-foreground font-medium uppercase tracking-wider shrink-0">
               <FileText className="w-3 h-3" />
               <span>{notebook.sourceCount}</span>
             </div>
@@ -151,7 +151,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
         {/* Right: Sources + Menu */}
         <div className="flex items-center gap-2 shrink-0 z-10">
           {/* Sources */}
-          <div className="inline-flex items-center gap-1 bg-secondary/40 px-1.5 py-0.5 rounded text-[10px] font-medium text-muted-foreground pointer-events-none">
+          <div className="inline-flex items-center gap-1 bg-secondary/40 px-1.5 py-0.5 rounded text-xs font-medium text-muted-foreground pointer-events-none">
             <FileText className="w-3 h-3 shrink-0" />
             <span>{notebook.sourceCount}</span>
           </div>
@@ -203,7 +203,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
             </div>
           ) : (
             <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary pointer-events-none"
+              className="inline-flex items-center gap-0.5 rounded-xl bg-primary/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary pointer-events-none"
               title="Shared with you"
             >
               <Users className="w-3 h-3 shrink-0" />
@@ -291,7 +291,7 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
           </>
         ) : (
           <span
-            className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary"
+            className="inline-flex items-center gap-1 rounded-xl bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary"
             title="Shared with you"
           >
             <Users className="w-3.5 h-3.5 shrink-0" />

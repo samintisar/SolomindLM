@@ -106,7 +106,9 @@ export class VectorSearchHandler {
     noteId: string,
     query: string,
     documentIds?: string[],
-    preComputedEmbedding?: number[]
+    preComputedEmbedding?: number[],
+    /** Extra text (e.g. HyDE paragraph) appended for reranking only — does not change the embedding. */
+    retrievalAugmentForRerank?: string
   ): Promise<ReferenceChunk[]> {
     if (!this.embeddingService || !this.vectorSearchRunner) {
       throw new Error(
@@ -160,7 +162,11 @@ export class VectorSearchHandler {
     const deduped = this.deduplicateResults(filtered);
     console.log(`[VectorSearch] After dedup: ${deduped.length}`);
 
-    const reranked = await this.rerankResults(query, deduped);
+    const augment = retrievalAugmentForRerank?.trim();
+    const rerankQuery = augment
+      ? `${query.trim()}\n\n${augment.length > 2000 ? augment.slice(0, 2000) : augment}`
+      : query;
+    const reranked = await this.rerankResults(rerankQuery, deduped);
     const limited = reranked.slice(0, this.config.maxResults);
 
     const finalResults: ReferenceChunk[] = limited.map((r, index) => ({

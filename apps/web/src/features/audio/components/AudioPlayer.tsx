@@ -145,7 +145,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
       <div className="flex items-center justify-center gap-3 shrink-0">
         <button
           onClick={() => skip(-5)}
-          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors"
+          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors"
           aria-label="Backward 5 seconds"
           title="Backward 5s"
         >
@@ -153,14 +153,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
         </button>
         <button
           onClick={togglePlay}
-          className="p-3 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+          className="p-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
         </button>
         <button
           onClick={() => skip(5)}
-          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors"
+          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors"
           aria-label="Forward 5 seconds"
           title="Forward 5s"
         >

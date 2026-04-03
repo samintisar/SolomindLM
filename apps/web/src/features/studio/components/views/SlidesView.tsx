@@ -250,7 +250,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                       <p className="text-white text-xs font-medium truncate">{slide.title}</p>
                     </div>
                     {idx === currentIndex && (
-                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                      <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-xl flex items-center justify-center">
                         <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                       </div>
                     )}
@@ -358,7 +358,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
           }`}>
             {/* Transition indicator */}
             {transition !== 'none' && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-full text-white text-xs font-medium z-10">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-xl text-white text-xs font-medium z-10">
                 {transition} transition
               </div>
             )}
@@ -392,13 +392,13 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
               )}
 
               {/* Slide Number Overlay */}
-              <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+              <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-xl text-white text-sm font-medium">
                 {currentIndex + 1} / {slides.length}
               </div>
 
               {/* Timer in fullscreen */}
               {isFullscreen && (
-                <div className="absolute top-4 right-4 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-full text-white text-sm font-mono">
+                <div className="absolute top-4 right-4 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-xl text-white text-sm font-mono">
                   {formatTime(elapsedTime)}
                 </div>
               )}
@@ -418,7 +418,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                   <button
                     key={idx}
                     onClick={() => jumpToSlide(idx)}
-                    className={`w-2 h-2 rounded-full transition-all ${
+                    className={`w-2 h-2 rounded-xl transition-all ${
                       idx === currentIndex
                         ? 'bg-primary w-6'
                         : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
@@ -438,7 +438,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             {!isFullscreen && (isPresenterSlides || currentSlide?.talking_points?.length > 0) && (
               <button
                 onClick={() => setShowTalkingPoints(!showTalkingPoints)}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-full text-sm font-medium transition-colors"
+                className="mt-4 flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-xl text-sm font-medium transition-colors"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>
@@ -478,7 +478,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              className={`rounded-full bg-secondary hover:bg-secondary/80 disabled:opacity-30 disabled:hover:bg-secondary transition-all ${
+              className={`rounded-xl bg-secondary hover:bg-secondary/80 disabled:opacity-30 disabled:hover:bg-secondary transition-all ${
                 isFullscreen ? 'p-2' : 'p-3'
               }`}
               aria-label="Previous slide"
@@ -488,7 +488,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             <button
               onClick={handleNext}
               disabled={currentIndex === slides.length - 1}
-              className={`rounded-full bg-secondary hover:bg-secondary/80 disabled:opacity-30 disabled:hover:bg-secondary transition-all ${
+              className={`rounded-xl bg-secondary hover:bg-secondary/80 disabled:opacity-30 disabled:hover:bg-secondary transition-all ${
                 isFullscreen ? 'p-2' : 'p-3'
               }`}
               aria-label="Next slide"
@@ -501,7 +501,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             {/* Thumbnail Grid Toggle */}
             <button
               onClick={() => setShowThumbnailGrid(!showThumbnailGrid)}
-              className={`rounded-full bg-secondary hover:bg-secondary/80 transition-all ${
+              className={`rounded-xl bg-secondary hover:bg-secondary/80 transition-all ${
                 isFullscreen ? 'p-2' : 'p-3'
               }`}
               aria-label="Toggle slide grid"
@@ -514,7 +514,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             {!isFullscreen && (
               <button
                 onClick={() => setShowSpeakerView(!showSpeakerView)}
-                className="rounded-full bg-secondary hover:bg-secondary/80 transition-all p-3"
+                className="rounded-xl bg-secondary hover:bg-secondary/80 transition-all p-3"
                 aria-label="Toggle speaker view"
                 title="Speaker view (S)"
               >
@@ -525,7 +525,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             {/* Fullscreen Toggle */}
             <button
               onClick={toggleFullscreen}
-              className={`rounded-full bg-secondary hover:bg-secondary/80 transition-all ${
+              className={`rounded-xl bg-secondary hover:bg-secondary/80 transition-all ${
                 isFullscreen ? 'p-2' : 'p-3'
               }`}
               aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
@@ -541,7 +541,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             {/* Download Button - Hide in fullscreen */}
             {!isFullscreen && (
               <button
-                className="p-3 rounded-full bg-secondary hover:bg-secondary/80 transition-all"
+                className="p-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-all"
                 aria-label="Download slides"
                 title="Download coming soon"
               >

@@ -199,25 +199,25 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
         <div className="mb-8 grid w-full max-w-xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums sm:text-3xl">{reviewedCards.length}</div>
-            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Reviewed</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Reviewed</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums text-emerald-600 sm:text-3xl dark:text-emerald-400">
               {correctCount}
             </div>
-            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Correct</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Correct</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums text-rose-600 sm:text-3xl dark:text-rose-400">
               {incorrectCount}
             </div>
-            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Again</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Again</div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums text-amber-600 sm:text-3xl dark:text-amber-400">
               {longestStreak}
             </div>
-            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Best streak</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Best streak</div>
           </div>
         </div>
 
@@ -287,7 +287,7 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
       <div className="flex h-[min(40vh,22rem)] min-h-56 max-h-96 w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
         {!showAnswer ? (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 text-center sm:p-6">
-            <span className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Question
             </span>
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
@@ -298,7 +298,7 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
           </div>
         ) : (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 text-center sm:p-6">
-            <span className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Answer
             </span>
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
@@ -325,7 +325,7 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
             type="button"
             onClick={handlePrevious}
             disabled={currentIndex === 0}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
             aria-label="Previous card"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -347,7 +347,7 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
             type="button"
             onClick={handleNext}
             disabled={currentIndex === cards.length - 1}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
             aria-label="Next card"
           >
             <ChevronRight className="h-5 w-5" />

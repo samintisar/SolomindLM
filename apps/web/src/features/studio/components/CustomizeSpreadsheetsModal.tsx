@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Pencil, Table2, ChevronLeft } from 'lucide-react';
+import { StudioModalDiscoverPromptsButton } from './StudioModalDiscoverPromptsButton';
 
 interface CustomizeSpreadsheetsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (config: SpreadsheetConfig) => void;
+  embedded?: boolean;
 }
 
 export interface SpreadsheetConfig {
@@ -113,6 +115,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
   isOpen,
   onClose,
   onGenerate,
+  embedded = false,
 }) => {
   const [configuringFormat, setConfiguringFormat] = useState<SpreadsheetFormat | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -147,25 +150,35 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
     }
   };
 
+  const overlayClass = embedded
+    ? "absolute inset-0 z-50 flex min-h-0 items-center justify-center p-2 sm:p-3 animate-in fade-in duration-200"
+    : "fixed inset-0 z-110 flex items-center justify-center p-4 animate-in fade-in duration-200";
+  const panelMaxClass = embedded ? "max-h-full min-h-0" : "max-h-[90vh]";
+
   return (
-    <div className="fixed inset-0 z-110 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className={overlayClass}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-5xl bg-card text-card-foreground rounded-xl shadow-2xl border border-border flex flex-col max-h-[90vh] overflow-hidden font-sans">
+      <div
+        className={`relative flex w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl ${panelMaxClass}`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
             {configuringFormat && (
-              <button onClick={() => setConfiguringFormat(null)} className="p-2 hover:bg-secondary/50 rounded-full transition-colors -ml-2">
+              <button onClick={() => setConfiguringFormat(null)} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors -ml-2">
                 <ChevronLeft className="w-5 h-5" />
               </button>
             )}
             <Table2 className="w-5 h-5 text-primary" />
             <h2 className="text-xl font-bold font-sans">Create spreadsheet</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-full transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <StudioModalDiscoverPromptsButton />
+            <button type="button" onClick={onClose} className="rounded-xl p-2 transition-colors hover:bg-secondary/50">
+              <X className="h-5 w-5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         {configuringFormat ? (
@@ -188,7 +201,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
             <div className="flex justify-end pt-4">
               <button
                 onClick={handleGenerate}
-                className="px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-full transition-all shadow-md active:scale-95 text-sm"
+                className="px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl transition-all shadow-md active:scale-95 text-sm"
               >
                 Generate Spreadsheet
               </button>
@@ -214,7 +227,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
 const FormatCard: React.FC<{ format: SpreadsheetFormat; onClick: () => void; onEditClick: (e: React.MouseEvent) => void; }> = ({ format, onClick, onEditClick }) => (
   <div onClick={onClick} className="group relative flex flex-col p-5 rounded-xl bg-card border border-border/50 hover:border-primary/40 hover:bg-secondary/30 transition-all cursor-pointer h-48 shadow-sm hover:shadow-md">
     {format.hasEdit && (
-      <button onClick={onEditClick} className="absolute top-3 right-3 p-1.5 rounded-full bg-background border border-border text-muted-foreground hover:text-primary transition-colors z-10">
+      <button onClick={onEditClick} className="absolute top-3 right-3 p-1.5 rounded-xl bg-background border border-border text-muted-foreground hover:text-primary transition-colors z-10">
         <Pencil className="w-3 h-3" />
       </button>
     )}

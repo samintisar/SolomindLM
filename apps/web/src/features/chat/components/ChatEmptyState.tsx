@@ -90,7 +90,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
               {[38, 52, 44, 48].map((w, i) => (
                 <div
                   key={i}
-                  className="h-10 animate-pulse rounded-full border border-border bg-muted/70"
+                  className="h-10 animate-pulse rounded-xl border border-border bg-muted/70"
                   style={{ width: `${w}%` }}
                 />
               ))}
@@ -102,7 +102,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
                 type="button"
                 disabled={disabled}
                 onClick={() => onSendMessage(prompt)}
-                className="inline-flex items-center rounded-full border border-border bg-card px-4 py-2 font-serif text-sm leading-relaxed text-foreground shadow-sm transition-colors hover:bg-accent hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50"
+                className="inline-flex items-center rounded-xl border border-border bg-card px-4 py-2 font-serif text-sm leading-relaxed text-foreground shadow-sm transition-colors hover:bg-accent hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50"
               >
                 {prompt}
               </button>
