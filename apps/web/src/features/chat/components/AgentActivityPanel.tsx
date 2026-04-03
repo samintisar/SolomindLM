@@ -162,6 +162,12 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
     const phaseLabel = useMemo(() => {
       const currentPhase = (activityPhase ?? historicalPhase ?? undefined) as string | undefined;
 
+      // For active streaming, prioritize current activity details over historical data
+      // This prevents showing stale "Searching X passages" from previous messages
+      if (isStreaming && activityDetail?.trim()) {
+        return activityDetail.trim();
+      }
+
       // Show passage count for completed searches (takes priority over generic detail text)
       if (currentPhase === 'completed' && toolCalls.length > 0) {
         const totalPassages = toolCalls.reduce(
@@ -178,7 +184,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
       const fallback = getStatusMessage(currentPhase);
       return fallback ?? 'Working…';
-    }, [activityPhase, activityDetail, historicalPhase, historicalDetail, toolCalls]);
+    }, [activityPhase, activityDetail, historicalPhase, historicalDetail, toolCalls, isStreaming]);
 
     const phaseIcon = getStatusIcon((activityPhase ?? historicalPhase ?? undefined) as string | undefined);
 
