@@ -162,21 +162,24 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
     const phaseLabel = useMemo(() => {
       const currentPhase = (activityPhase ?? historicalPhase ?? undefined) as string | undefined;
 
-      // For active streaming, prioritize current activity details over historical data
-      // This prevents showing stale "Searching X passages" from previous messages
-      if (isStreaming && activityDetail?.trim()) {
-        return activityDetail.trim();
+      // For completed searches with tool calls, always show passage count
+      // This takes priority over historicalDetail which might say "Reading X passages..."
+      if (toolCalls.length > 0) {
+        const allDone = toolCalls.every((tc) => tc.status === 'done');
+        if (allDone || currentPhase === 'completed') {
+          // Use the maximum resultCount (cumulative total from last search) instead of sum
+          const totalPassages = Math.max(
+            ...toolCalls.map((tc) => tc.resultCount ?? 0)
+          );
+          if (totalPassages > 0) {
+            return `Searched ${totalPassages} passage${totalPassages === 1 ? '' : 's'}`;
+          }
+        }
       }
 
-      // Show passage count for completed searches (takes priority over generic detail text)
-      if (currentPhase === 'completed' && toolCalls.length > 0) {
-        const totalPassages = toolCalls.reduce(
-          (sum, tc) => sum + (tc.resultCount ?? 0),
-          0
-        );
-        if (totalPassages > 0) {
-          return `Searched ${totalPassages} passage${totalPassages === 1 ? '' : 's'}`;
-        }
+      // Fall back to generic "Response complete" for completed without tool calls
+      if (currentPhase === 'completed') {
+        return 'Response complete';
       }
 
       if (activityDetail?.trim()) return activityDetail.trim();
@@ -184,7 +187,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
       const fallback = getStatusMessage(currentPhase);
       return fallback ?? 'Working…';
-    }, [activityPhase, activityDetail, historicalPhase, historicalDetail, toolCalls, isStreaming]);
+    }, [activityPhase, activityDetail, historicalPhase, historicalDetail, toolCalls]);
 
     const phaseIcon = getStatusIcon((activityPhase ?? historicalPhase ?? undefined) as string | undefined);
 
@@ -288,49 +291,90 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                       </li>
                     );
                   })}
-                  {toolCalls.map((tc, i) => {
-                    const long = tc.query.length > QUERY_PREVIEW_CHARS;
-                    const open = expandedQueries[i] ?? false;
-                    const display =
-                      !long || open ? tc.query : `${tc.query.slice(0, QUERY_PREVIEW_CHARS)}…`;
-                    return (
-                      <li
-                        key={`t-${tc.tool}-${tc.query}-${i}`}
-                        className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2 dark:bg-background/30"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden>
-                            {tc.status === 'searching' ? (
-                              <Search className="h-3.5 w-3.5 animate-pulse" />
-                            ) : (
-                              <Check className="h-3.5 w-3.5 text-vintage-green-600 dark:text-vintage-green-500" />
-                            )}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-foreground/90">{toolLabel(tc.tool)}</div>
-                            <div className="mt-0.5 wrap-break-word text-muted-foreground leading-relaxed">
-                              {display}
-                            </div>
-                            {long && (
-                              <button
-                                type="button"
-                                onClick={() => toggleQuery(i)}
-                                className="mt-1 text-sm font-medium text-primary hover:underline"
-                              >
-                                {open ? 'Show less' : 'Show full query'}
-                              </button>
-                            )}
-                            {tc.status === 'done' && (
-                              <div className="mt-1 text-sm text-muted-foreground/90">
-                                {tc.resultCount ?? 0} passage{(tc.resultCount ?? 0) === 1 ? '' : 's'}{' '}
-                                retrieved
+                  {(() => {
+                    // Group tool calls by query to combine duplicate searches
+                    const groupedToolCalls = toolCalls.reduce((acc, tc, originalIndex) => {
+                      const key = `${tc.tool}:${tc.query}`;
+                      if (!acc[key]) {
+                        acc[key] = {
+                          tool: tc.tool,
+                          query: tc.query,
+                          status: tc.status,
+                          resultCount: 0,
+                          originalIndices: [],
+                          totalCount: 0
+                        };
+                      }
+                      acc[key].resultCount = Math.max(acc[key].resultCount, tc.resultCount ?? 0);
+                      acc[key].originalIndices.push(originalIndex);
+                      acc[key].totalCount += 1;
+                      if (tc.status === 'searching') {
+                        acc[key].status = 'searching';
+                      }
+                      return acc;
+                    }, {} as Record<string, {
+                      tool: string;
+                      query: string;
+                      status: 'searching' | 'done';
+                      resultCount: number;
+                      originalIndices: number[];
+                      totalCount: number;
+                    }>);
+
+                    return Object.values(groupedToolCalls).map((group, groupIndex) => {
+                      const { tool, query, status, resultCount, totalCount } = group;
+                      const long = query.length > QUERY_PREVIEW_CHARS;
+                      const useIndex = group.originalIndices[0];
+                      const open = expandedQueries[useIndex] ?? false;
+                      const display =
+                        !long || open ? query : `${query.slice(0, QUERY_PREVIEW_CHARS)}…`;
+                      const isMultiple = totalCount > 1;
+
+                      return (
+                        <li
+                          key={`t-${tool}-${query}-${groupIndex}`}
+                          className="rounded-md border border-border/40 bg-background/50 px-2.5 py-2 dark:bg-background/30"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden>
+                              {status === 'searching' ? (
+                                <Search className="h-3.5 w-3.5 animate-pulse" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5 text-vintage-green-600 dark:text-vintage-green-500" />
+                              )}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-foreground/90">
+                                {toolLabel(tool)}
+                                {isMultiple && (
+                                  <span className="ml-1.5 text-xs text-muted-foreground/70 font-normal">
+                                    ({totalCount} searches)
+                                  </span>
+                                )}
                               </div>
-                            )}
+                              <div className="mt-0.5 wrap-break-word text-muted-foreground leading-relaxed">
+                                {display}
+                              </div>
+                              {long && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleQuery(useIndex)}
+                                  className="mt-1 text-sm font-medium text-primary hover:underline"
+                                >
+                                  {open ? 'Show less' : 'Show full query'}
+                                </button>
+                              )}
+                              {status === 'done' && (
+                                <div className="mt-1 text-sm text-muted-foreground/90">
+                                  {resultCount} passage{resultCount === 1 ? '' : 's'} retrieved
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    );
-                  })}
+                        </li>
+                      );
+                    });
+                  })()}
                   {postSearch.map((step, si) => {
                     const globalSi = pipeline.length + si;
                     const line =

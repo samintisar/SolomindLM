@@ -435,6 +435,11 @@ export async function streamChatResponse(
   };
 
   const recordPhase = (status: string, message: string) => {
+    // Deduplicate: don't record the exact same status+message twice in a row
+    const last = agentTrace.phases[agentTrace.phases.length - 1];
+    if (last && last.status === status && last.message === message) {
+      return; // Skip duplicate
+    }
     agentTrace.phases.push({ status, message });
   };
 

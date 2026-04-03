@@ -466,7 +466,7 @@ export class ChatAgent {
 
           yield {
             type: 'tool_call',
-            data: { tool: 'search_documents', query, status: 'done', resultCount: newChunks.length },
+            data: { tool: 'search_documents', query, status: 'done', resultCount: allChunks.length },
           };
 
           messages.push(
