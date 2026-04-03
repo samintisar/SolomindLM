@@ -270,43 +270,78 @@ export async function streamChatResponse(
       sourceTitle: (titleMap.get(r.documentId) ?? "Document") as string,
     }));
 
-    // Filter by threshold BEFORE applying documentIds filter
-    // This ensures we only use high-quality matches
-    console.log(`[vectorSearchRunner] Applying threshold filter: ${VECTOR_MATCH_THRESHOLD}`);
-    let thresholded = rows.filter((r) => r._score >= VECTOR_MATCH_THRESHOLD);
-    console.log(`[vectorSearchRunner] After threshold (${VECTOR_MATCH_THRESHOLD}): ${thresholded.length} results (from ${rows.length})`);
+    // REFACTORED: Apply documentIds filter FIRST, then threshold
+    // This ensures selected documents get a lower threshold (user explicitly chose them)
+    if (docIds && docIds.length > 0) {
+      // User selected specific sources - handle differently
+      const docIdSet = new Set(docIds);
 
-    // Log score distribution for debugging
-    if (rows.length > 0) {
-      const scores = rows.map(r => r._score);
-      console.log(`[vectorSearchRunner] Score distribution: min=${Math.min(...scores).toFixed(3)}, max=${Math.max(...scores).toFixed(3)}, avg=${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3)}`);
-    }
+      // Filter by selected documents FIRST, before applying threshold
+      const selectedDocResults = rows.filter((r) => docIdSet.has(r.documentId));
+      console.log(`[vectorSearchRunner] Selected docs: ${selectedDocResults.length} chunks from ${docIds.length} sources`);
 
-    // Fallback: If no results pass threshold, progressively lower it
-    if (thresholded.length === 0 && rows.length > 0) {
-      const FALLBACK_THRESHOLDS = [0.35, 0.3, 0.25, 0.2];
-      for (const fallbackThreshold of FALLBACK_THRESHOLDS) {
-        thresholded = rows.filter((r) => r._score >= fallbackThreshold);
-        if (thresholded.length > 0) {
-          console.warn(`[vectorSearchRunner] No results at threshold ${VECTOR_MATCH_THRESHOLD}. Using fallback threshold ${fallbackThreshold}: ${thresholded.length} results`);
-          break;
+      if (selectedDocResults.length === 0) {
+        console.warn('[vectorSearchRunner] No chunks found in selected documents at all');
+        return [];
+      }
+
+      // Apply a LOWER threshold for selected documents (user explicitly chose these)
+      const SELECTED_DOC_THRESHOLD = VECTOR_MATCH_THRESHOLD * 0.7; // 30% lower
+
+      let thresholded = selectedDocResults.filter((r) => r._score >= SELECTED_DOC_THRESHOLD);
+      console.log(`[vectorSearchRunner] Selected docs after threshold (${SELECTED_DOC_THRESHOLD}): ${thresholded.length} results`);
+
+      // If still no results at lower threshold, try even lower as last resort
+      if (thresholded.length === 0) {
+        const LAST_RESORT_THRESHOLD = VECTOR_MATCH_THRESHOLD * 0.5; // 50% lower
+        thresholded = selectedDocResults.filter((r) => r._score >= LAST_RESORT_THRESHOLD);
+        console.warn(`[vectorSearchRunner] No results at ${SELECTED_DOC_THRESHOLD}, trying ${LAST_RESORT_THRESHOLD}: ${thresholded.length} results`);
+      }
+
+      // Final fallback: return top results from selected docs regardless of score
+      if (thresholded.length === 0) {
+        console.warn(`[vectorSearchRunner] No results even at lowest threshold, returning top ${Math.min(limit, selectedDocResults.length)} from selected docs`);
+        thresholded = selectedDocResults.slice(0, Math.min(limit, selectedDocResults.length));
+      }
+
+      return thresholded.slice(0, limit);
+
+    } else if (docIds && docIds.length === 0) {
+      // User explicitly has no selected sources - return empty results
+      console.log('[vectorSearchRunner] No sources selected, returning empty results');
+      return [];
+
+    } else {
+      // docIds is undefined or not provided - apply normal threshold logic (should not happen after frontend fix)
+      console.log(`[vectorSearchRunner] Applying threshold filter: ${VECTOR_MATCH_THRESHOLD}`);
+      let thresholded = rows.filter((r) => r._score >= VECTOR_MATCH_THRESHOLD);
+      console.log(`[vectorSearchRunner] After threshold (${VECTOR_MATCH_THRESHOLD}): ${thresholded.length} results (from ${rows.length})`);
+
+      // Log score distribution for debugging
+      if (rows.length > 0) {
+        const scores = rows.map(r => r._score);
+        console.log(`[vectorSearchRunner] Score distribution: min=${Math.min(...scores).toFixed(3)}, max=${Math.max(...scores).toFixed(3)}, avg=${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3)}`);
+      }
+
+      // Fallback: If no results pass threshold, progressively lower it
+      if (thresholded.length === 0 && rows.length > 0) {
+        const FALLBACK_THRESHOLDS = [0.35, 0.3, 0.25, 0.2];
+        for (const fallbackThreshold of FALLBACK_THRESHOLDS) {
+          thresholded = rows.filter((r) => r._score >= fallbackThreshold);
+          if (thresholded.length > 0) {
+            console.warn(`[vectorSearchRunner] No results at threshold ${VECTOR_MATCH_THRESHOLD}. Using fallback threshold ${fallbackThreshold}: ${thresholded.length} results`);
+            break;
+          }
+        }
+        // Last resort: return top results regardless of score
+        if (thresholded.length === 0) {
+          console.warn(`[vectorSearchRunner] No results even at lowest threshold. Returning top ${Math.min(limit, rows.length)} results regardless of score.`);
+          thresholded = rows.slice(0, Math.min(limit, rows.length));
         }
       }
-      // Last resort: return top results regardless of score
-      if (thresholded.length === 0) {
-        console.warn(`[vectorSearchRunner] No results even at lowest threshold. Returning top ${Math.min(limit, rows.length)} results regardless of score.`);
-        thresholded = rows.slice(0, Math.min(limit, rows.length));
-      }
-    }
 
-    // Then apply documentIds filter if provided (strict - no fallback)
-    if (docIds?.length) {
-      const docIdSet = new Set(docIds);
-      const filteredByDoc = thresholded.filter((r) => docIdSet.has(r.documentId));
-      console.log(`[vectorSearchRunner] After documentIds filter: ${filteredByDoc.length} results`);
-      return filteredByDoc.slice(0, limit);
+      return thresholded.slice(0, limit);
     }
-    return thresholded.slice(0, limit);
   };
 
   // Keyword search runner: full-text index filters by chunk.userId; chunks use notebook owner's id for RAG.

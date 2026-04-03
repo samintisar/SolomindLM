@@ -221,7 +221,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
       const reranked = await this.rerankResults(rerankQuery, filtered);
       const limited = reranked.slice(0, this.hybridConfig.maxResults);
 
-      const finalResults: HybridReferenceChunk[] = limited.map((r, index) => {
+      let finalResults: HybridReferenceChunk[] = limited.map((r, index) => {
         const key = `${r._id}-${r.chunkIndex}`;
         const rrfMeta = rrfMetadataMap.get(key);
         return {
@@ -250,6 +250,37 @@ export class HybridSearchHandler extends VectorSearchHandler {
         final_count: finalResults.length,
         latency_ms: Date.now() - startTime,
       });
+
+      // KEYWORD FALLBACK: If no results from hybrid search in selected docs, try keyword-only search
+      if (finalResults.length === 0 && documentIds && documentIds.length > 0) {
+        console.log('[HybridSearch] No results from hybrid search in selected docs, trying keyword fallback');
+
+        // Use keyword search with the exact query terms
+        const keywordOnlyResults = await this.executeKeywordSearch(
+          query,
+          documentIds
+        );
+
+        if (keywordOnlyResults.length > 0) {
+          console.log(`[HybridSearch] Keyword fallback found ${keywordOnlyResults.length} results`);
+
+          // Convert to final format without reranking (already keyword-relevant)
+          const limited = keywordOnlyResults.slice(0, this.config.maxResults);
+
+          finalResults = limited.map((r, index) => ({
+            id: String(index + 1),
+            sourceId: String(r._id),
+            sourceTitle: r.sourceTitle ?? 'Document',
+            content: r.content,
+            chunkIndex: r.chunkIndex,
+            similarity: r._score ?? 0,
+            rrfScore: 1 / (60 + 1), // RRF score for keyword-only result
+            vectorRank: undefined,
+            keywordRank: 1,
+            metadata: r.metadata,
+          }));
+        }
+      }
 
       return finalResults;
     } catch (error: any) {

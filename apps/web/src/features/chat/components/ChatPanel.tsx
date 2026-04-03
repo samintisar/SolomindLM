@@ -21,6 +21,7 @@ import { MessageBubble } from './MessageBubble';
 import { ReferenceTooltip } from './ReferenceTooltip';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ChatInput } from './ChatInput';
+import { useSourcesContext } from '../../sources/SourcesContext';
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -57,6 +58,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     suggestions,
     isLoadingSuggestions,
   } = useChatStreamingContext();
+  const { sources } = useSourcesContext();
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('top');
@@ -218,18 +220,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleSendMessage = useCallback(async () => {
     const trimmed = inputMessage.trim();
     if (!trimmed || chatInputDisabled || !notebookId || !onSendMessage) return;
+
+    // Check if user has selected any sources
+    const selectedSources = sources?.filter((s) => s.selected) ?? [];
+    if (selectedSources.length === 0) {
+      toastError('Please select at least one source before asking a question');
+      return;
+    }
+
     setIsSending(true);
     setInputMessage('');
     onSendMessage(trimmed);
     setIsSending(false);
-  }, [inputMessage, chatInputDisabled, notebookId, onSendMessage]);
+  }, [inputMessage, chatInputDisabled, notebookId, onSendMessage, sources, toastError]);
 
   const handleSendChip = useCallback(
     (text: string) => {
       if (chatInputDisabled || !notebookId || !onSendMessage) return;
+
+      // Check if user has selected any sources
+      const selectedSources = sources?.filter((s) => s.selected) ?? [];
+      if (selectedSources.length === 0) {
+        toastError('Please select at least one source before asking a question');
+        return;
+      }
+
       onSendMessage(text);
     },
-    [chatInputDisabled, notebookId, onSendMessage]
+    [chatInputDisabled, notebookId, onSendMessage, sources, toastError]
   );
 
   // --- Scroll to bottom ---

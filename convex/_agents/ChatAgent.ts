@@ -138,9 +138,69 @@ async function* sliceParagraphForStream(para: string): AsyncGenerator<string> {
   }
 }
 
+/**
+ * Expand query with keyword-based variations (no LLM overhead, ~10ms latency)
+ * Helps find content when user's terminology doesn't match document terminology
+ */
+function expandQueryWithKeywords(query: string): string[] {
+  const variations = [query];
+  const lowerQuery = query.toLowerCase();
+
+  // Domain-independent term mappings
+  const termVariations: Record<string, string[]> = {
+    // Comparison/contrast terms
+    'difference': ['compare', 'contrast', 'vs', 'versus', 'comparison'],
+    'how does it work': ['mechanism', 'algorithm', 'process', 'methodology', 'approach'],
+    'advantages': ['benefits', 'pros', 'strengths'],
+    'disadvantages': ['drawbacks', 'cons', 'weaknesses', 'limitations'],
+    'example': ['instance', 'case', 'illustration'],
+
+    // Common academic/technical variations
+    'definition': ['define', 'meaning', 'what is', 'what are'],
+    'explain': ['describe', 'elaborate', 'clarify'],
+    'overview': ['summary', 'introduction', 'background'],
+    'purpose': ['goal', 'objective', 'aim', 'function'],
+    'result': ['outcome', 'output', 'consequence', 'effect'],
+  };
+
+  // Apply variations (limit to avoid too many search calls)
+  let variationCount = 0;
+  const maxVariations = 2;
+
+  for (const [term, synonyms] of Object.entries(termVariations)) {
+    if (lowerQuery.includes(term) && variationCount < maxVariations) {
+      for (const synonym of synonyms.slice(0, 2)) {
+        if (variationCount >= maxVariations) break;
+
+        // Create variation by replacing the term
+        const regex = new RegExp(term, 'gi');
+        const variation = query.replace(regex, synonym);
+        if (variation !== query) {
+          variations.push(variation);
+          variationCount++;
+        }
+      }
+    }
+  }
+
+  return variations.slice(0, 3); // Limit to 3 total variations (original + 2)
+}
+
 const TOOL_DECISION_SYSTEM_PROMPT = `You are a study assistant helping a student understand their uploaded documents.
 
 Your job is to decide what information to retrieve before answering.
+
+**CRITICAL DISTINCTION ABOUT INFORMATION AVAILABILITY**:
+- "The provided excerpts do not contain..." → Use this ONLY when the retrieved passages don't have the information
+- "The sources do not contain..." → NEVER use this. You haven't seen all sources, only retrieved excerpts.
+
+When retrieved excerpts don't contain the answer:
+1. State clearly: "Based on the retrieved passages, I cannot find information about..."
+2. Do NOT claim the sources don't contain it
+3. Suggest what you DO find in the excerpts that might be related
+4. If the user selected specific documents, acknowledge this and suggest they may need to rephrase or the information might be in other parts of those documents
+
+**User's Selected Sources**: When the user has selected specific documents, they expect you to search those thoroughly. If you don't find something, acknowledge the limitation without claiming it's not there.
 
 RULES:
 1. You MUST call search_documents before answering any content question about the study material.
@@ -334,18 +394,57 @@ export class ChatAgent {
               status: 'ranking',
               message: 'Running hybrid search and reranking passages…',
             };
-            newChunks = await withTimeout(
-              this.vectorSearch.search(
-                context.userId,
-                context.noteId,
-                query,
-                context.documentIds,
-                hydeEmbedding,
-                hydeText
-              ),
-              remainingMs(),
-              'vector_hybrid_search'
-            );
+
+            // Query expansion for selected sources: search with multiple query variations
+            if (context.documentIds?.length) {
+              // User selected specific documents - expand query to improve recall
+              const expandedQueries = expandQueryWithKeywords(query);
+              console.log(`[ChatAgent] Expanded queries (${expandedQueries.length} variations):`, expandedQueries.map(q => q.slice(0, 50)));
+
+              // Search with each variation, merging and deduplicating results
+              const allResults = [];
+              const seenChunkKeys = new Set<string>();
+
+              for (const queryVariation of expandedQueries) {
+                const variationResults = await withTimeout(
+                  this.vectorSearch.search(
+                    context.userId,
+                    context.noteId,
+                    queryVariation,
+                    context.documentIds,
+                    hydeEmbedding,
+                    hydeText
+                  ),
+                  remainingMs(),
+                  'vector_hybrid_search'
+                );
+
+                // Merge without duplicates
+                for (const chunk of variationResults) {
+                  const key = chunkDedupKey(chunk);
+                  if (!seenChunkKeys.has(key)) {
+                    allResults.push(chunk);
+                    seenChunkKeys.add(key);
+                  }
+                }
+              }
+
+              newChunks = allResults;
+            } else {
+              // No selected sources - normal single query search
+              newChunks = await withTimeout(
+                this.vectorSearch.search(
+                  context.userId,
+                  context.noteId,
+                  query,
+                  context.documentIds,
+                  hydeEmbedding,
+                  hydeText
+                ),
+                remainingMs(),
+                'vector_hybrid_search'
+              );
+            }
           } catch (e) {
             console.warn('[ChatAgent] Search pipeline failed or timed out:', e);
             newChunks = [];

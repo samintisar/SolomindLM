@@ -149,7 +149,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
           onComplete: onStreamComplete,
           onError: resetStreamingState,
         },
-        selectedDocumentIds.length > 0 ? selectedDocumentIds : undefined
+        selectedDocumentIds.length > 0 ? selectedDocumentIds : []
       );
     } catch {
       resetStreamingState();
