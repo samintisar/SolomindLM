@@ -141,7 +141,7 @@ bun run convex:env:push:dry    # Dry run for env push
 - Commit format: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
 - Use squash merge for clean history
 
-**CI:** Runs on push to `main` and PRs - Build (Web), Type Check
+**CI:** Runs on push to `main` and PRs — Convex typecheck; web build (main uses repo variable `VITE_CONVEX_URL`, not a second `convex deploy` — avoids racing Vercel).
 
 ## Claude Code Hooks
 

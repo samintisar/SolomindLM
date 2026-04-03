@@ -96,7 +96,11 @@ vercel deploy --prod
 
 **CI vs Vercel**
 
-On **`main`**, GitHub Actions runs the same command as Vercel Production: `convex deploy` with `--cmd "bun run build:prod"`. Add repository secret **`CONVEX_DEPLOY_KEY`** (same key as Vercel). Pull requests still run typecheck + a standalone Vite build with a placeholder Convex URL (no deploy).
+**Do not** run `convex deploy` from both GitHub Actions and Vercel on the same push: concurrent pushes to one deployment return **409 ExistingModuleHashConflict**.
+
+- **Vercel Production** is the only place that should run `convex deploy` (see `apps/web/vercel.json`).
+- On **`main`**, GitHub Actions runs typecheck plus `bun run build:prod` with repository variable **`VITE_CONVEX_URL`** set to your prod `https://….convex.cloud` URL (the same value `convex deploy --cmd` injects on Vercel). No `CONVEX_DEPLOY_KEY` is needed in GitHub for that job.
+- Pull requests still run typecheck + Vite build with a placeholder Convex URL (no deploy).
 
 ### Running Locally
 
