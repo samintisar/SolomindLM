@@ -18,5 +18,5 @@ export { ToastContainer } from './ToastContainer';
 // Re-export ProtectedRoute for convenience
 export { ProtectedRoute } from './ProtectedRoute';
 
-// Markdown (lazy-load in consumers to avoid circular chunk with react-vendor)
+// Markdown / Streamdown (lazy-load in consumers to avoid heavy vendor chunks)
 export { default as MarkdownRenderer } from './MarkdownRenderer';

@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Download, ChevronUp, X, RotateCcw, RotateCw } from 'lucide-react';
+import { useResolvedAudioPlaybackUrl } from '../hooks/useResolvedAudioPlaybackUrl';
 
 interface MiniAudioPlayerProps {
   audioUrl: string;
+  /** When set, `audioUrl` is resolved on the server via `storage.getUrl` (handles legacy `/audio/...`). */
+  audioOverviewId?: string;
   title?: string;
   transcript?: string;
   isVisible: boolean;
@@ -12,6 +15,7 @@ interface MiniAudioPlayerProps {
 
 export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
   audioUrl,
+  audioOverviewId,
   title = 'Audio Overview',
   transcript: _transcript,
   isVisible,
@@ -23,7 +27,76 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const resolvedPlayback = useResolvedAudioPlaybackUrl(audioUrl, audioOverviewId);
+
+  // Fetch audio as blob to enable seeking without server Range Request support
+  useEffect(() => {
+    if (!isVisible) return; // Only fetch when visible
+
+    if (resolvedPlayback === undefined) return;
+
+    if (resolvedPlayback === null) {
+      setBlobUrl(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    let localBlobUrl: string | null = null;
+
+    const fetchAudio = async () => {
+      try {
+        console.log('[MiniAudioPlayer] Fetching audio as blob for seeking support...');
+        setIsLoading(true);
+        setBlobUrl(null);
+
+        const response = await fetch(resolvedPlayback);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const blob = await response.blob();
+        console.log('[MiniAudioPlayer] Audio blob size:', blob.size, 'bytes');
+
+        localBlobUrl = URL.createObjectURL(blob);
+
+        if (mounted) {
+          setBlobUrl(localBlobUrl);
+          setIsLoading(false);
+          console.log('[MiniAudioPlayer] Blob URL created:', localBlobUrl);
+        }
+      } catch (error) {
+        console.error('[MiniAudioPlayer] Failed to fetch audio as blob:', error);
+        if (mounted) {
+          setIsLoading(false);
+          // Fall back to streaming from HTTPS URL if blob fetch fails
+          setBlobUrl(resolvedPlayback);
+        }
+      }
+    };
+
+    fetchAudio();
+
+    return () => {
+      mounted = false;
+      if (localBlobUrl) {
+        console.log('[MiniAudioPlayer] Revoking blob URL');
+        URL.revokeObjectURL(localBlobUrl);
+      }
+    };
+  }, [resolvedPlayback, isVisible]);
+
+  // Add error handling for audio loading
+  const handleAudioError = () => {
+    console.error('[MiniAudioPlayer] Audio failed to load:', {
+      src: audioRef.current?.src,
+      error: 'No supported sources',
+      audioUrl,
+      resolvedPlayback,
+    });
+  };
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -35,12 +108,27 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     };
 
     const handleLoadedMetadata = () => {
+      console.log('[MiniAudioPlayer loadedmetadata]', {
+        audioDuration: audio.duration,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+      });
       audio.playbackRate = 1;
       audio.defaultPlaybackRate = 1;
       setDuration(audio.duration);
       // Auto-play when the player is visible and metadata is loaded
       if (isVisible) {
         audio.play().catch(err => console.error('Autoplay failed:', err));
+      }
+    };
+
+    const handleDurationChange = () => {
+      console.log('[MiniAudioPlayer durationchange]', {
+        newDuration: audio.duration,
+        oldDurationState: duration,
+      });
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
       }
     };
 
@@ -55,33 +143,60 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
+    audio.addEventListener('error', handleAudioError);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('error', handleAudioError);
     };
   }, [isVisible]);
 
-  const togglePlay = () => {
-    if (audioRef.current) {
+  const togglePlay = async () => {
+    const el = audioRef.current;
+    if (!el || isLoading) return;
+    if (resolvedPlayback === undefined || resolvedPlayback === null) return;
+    try {
       if (isPlaying) {
-        audioRef.current.pause();
+        el.pause();
       } else {
-        audioRef.current.play();
+        await el.play();
       }
+    } catch (e) {
+      console.error('[MiniAudioPlayer] play() failed:', e);
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (audioRef.current && duration) {
-      const displayedTime = (parseFloat(e.target.value) / 100) * duration;
+    if (audioRef.current) {
+      const actualDuration = audioRef.current.duration;
+      if (!isFinite(actualDuration)) {
+        console.log('[MiniAudioPlayer handleSeek] blocked - invalid duration', {
+          actualDuration,
+          durationState: duration,
+        });
+        return;
+      }
+      const displayedTime = (parseFloat(e.target.value) / 100) * actualDuration;
+      console.log('[MiniAudioPlayer handleSeek]', {
+        sliderValue: e.target.value,
+        durationState: duration,
+        audioDuration: actualDuration,
+        currentTimeBefore: audioRef.current.currentTime,
+        calculatedTime: displayedTime,
+      });
       audioRef.current.currentTime = displayedTime;
+      console.log('[MiniAudioPlayer handleSeek] after set:', {
+        currentTimeAfter: audioRef.current.currentTime,
+      });
       setProgress(parseFloat(e.target.value));
     }
   };
@@ -99,7 +214,31 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
   const skip = (seconds: number) => {
     if (audioRef.current) {
-      audioRef.current.currentTime = Math.max(0, Math.min(audioRef.current.duration, audioRef.current.currentTime + seconds));
+      const actualDuration = audioRef.current.duration;
+
+      // Check if audio is ready
+      if (!isFinite(actualDuration) || actualDuration === 0) {
+        console.warn('[MiniAudioPlayer skip] Cannot skip - audio not ready:', {
+          audioDuration: actualDuration,
+          readyState: audioRef.current.readyState,
+          networkState: audioRef.current.networkState,
+          src: audioRef.current.src,
+        });
+        return;
+      }
+
+      const beforeTime = audioRef.current.currentTime;
+      const newTime = Math.max(0, Math.min(actualDuration, audioRef.current.currentTime + seconds));
+      console.log('[MiniAudioPlayer skip]', {
+        seconds,
+        audioDuration: actualDuration,
+        currentTimeBefore: beforeTime,
+        calculatedNewTime: newTime,
+      });
+      audioRef.current.currentTime = newTime;
+      console.log('[MiniAudioPlayer skip] after set:', {
+        currentTimeAfter: audioRef.current.currentTime,
+      });
     }
   };
 
@@ -107,8 +246,31 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
   return (
     <div className="w-full bg-card border-t border-border shadow-lg animate-in slide-in-from-bottom duration-300">
+      {/* Loading state */}
+      {(isLoading || resolvedPlayback === undefined) && (
+        <div className="flex items-center justify-center py-4">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary mb-1"></div>
+            <p className="text-xs text-muted-foreground">Loading audio...</p>
+          </div>
+        </div>
+      )}
+
+      {resolvedPlayback === null && !isLoading && (
+        <div className="px-4 py-2 text-center text-xs text-destructive">
+          Could not resolve audio URL. Try regenerating the audio overview or check your connection.
+        </div>
+      )}
+
       {/* Hidden audio element */}
-      <audio ref={audioRef} src={audioUrl} />
+      <audio
+        ref={audioRef}
+        src={
+          blobUrl ||
+          (typeof resolvedPlayback === 'string' ? resolvedPlayback : undefined) ||
+          undefined
+        }
+      />
 
       <div className="w-full px-4 py-3">
         {/* Top Section: Title and Controls */}
@@ -121,7 +283,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             {/* Download Button */}
             <a
-              href={audioUrl}
+              href={typeof resolvedPlayback === 'string' ? resolvedPlayback : '#'}
               download
               className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
               title="Download audio"

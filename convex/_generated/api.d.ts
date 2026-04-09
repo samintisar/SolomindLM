@@ -229,6 +229,8 @@ import type * as notebooks_index from "../notebooks/index.js";
 import type * as notebooks_sharing from "../notebooks/sharing.js";
 import type * as notes_index from "../notes/index.js";
 import type * as notes_userNotes from "../notes/userNotes.js";
+import type * as scripts_fixAudioUrls from "../scripts/fixAudioUrls.js";
+import type * as scripts_runFixAudioUrls from "../scripts/runFixAudioUrls.js";
 import type * as server from "../server.js";
 import type * as storage_ChatHistoryService from "../storage/ChatHistoryService.js";
 import type * as storage_ConvexStorageService from "../storage/ConvexStorageService.js";
@@ -236,6 +238,7 @@ import type * as storage_VectorStoreService from "../storage/VectorStoreService.
 import type * as studio__job_collapseStringOutputsByTokens from "../studio/_job/collapseStringOutputsByTokens.js";
 import type * as studio__job_invokeStudioLlm from "../studio/_job/invokeStudioLlm.js";
 import type * as studio_audio_audioJobPhases from "../studio/audio/audioJobPhases.js";
+import type * as studio_audio_fixAudioUrl from "../studio/audio/fixAudioUrl.js";
 import type * as studio_audio_index from "../studio/audio/index.js";
 import type * as studio_audio_job from "../studio/audio/job.js";
 import type * as studio_flashcards_flashcardJobPhases from "../studio/flashcards/flashcardJobPhases.js";
@@ -506,6 +509,8 @@ declare const fullApi: ApiFromModules<{
   "notebooks/sharing": typeof notebooks_sharing;
   "notes/index": typeof notes_index;
   "notes/userNotes": typeof notes_userNotes;
+  "scripts/fixAudioUrls": typeof scripts_fixAudioUrls;
+  "scripts/runFixAudioUrls": typeof scripts_runFixAudioUrls;
   server: typeof server;
   "storage/ChatHistoryService": typeof storage_ChatHistoryService;
   "storage/ConvexStorageService": typeof storage_ConvexStorageService;
@@ -513,6 +518,7 @@ declare const fullApi: ApiFromModules<{
   "studio/_job/collapseStringOutputsByTokens": typeof studio__job_collapseStringOutputsByTokens;
   "studio/_job/invokeStudioLlm": typeof studio__job_invokeStudioLlm;
   "studio/audio/audioJobPhases": typeof studio_audio_audioJobPhases;
+  "studio/audio/fixAudioUrl": typeof studio_audio_fixAudioUrl;
   "studio/audio/index": typeof studio_audio_index;
   "studio/audio/job": typeof studio_audio_job;
   "studio/flashcards/flashcardJobPhases": typeof studio_flashcards_flashcardJobPhases;

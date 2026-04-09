@@ -96,6 +96,54 @@ function normalizeTextSegment(value: string): string {
   return normalizeMathParentheticals(withCanonicalDelimiters);
 }
 
+type MathBoundarySegment =
+  | { kind: 'text'; s: string }
+  | { kind: 'math'; s: string };
+
+/**
+ * Splits prose into alternating plain-text and math spans ($...$ / $$...$$).
+ * Same delimiter rules as `replaceCitationMarkersOutsideMath` in the web app.
+ *
+ * We must not run `normalizeMathParentheticals` (or delimiter rewrites) **inside**
+ * math spans: patterns like `\bigl(Y_{t-i}-\mu\bigr)` live inside `$$...$$`, and the
+ * parenthetical regex would wrongly wrap `(Y_{t-i}-\mu\bigr)` as `($...$)`, producing
+ * `\bigl($Y_{t-i}-\mu\bigr$)` and breaking KaTeX/remark-math.
+ */
+function splitByMathDelimiters(value: string): MathBoundarySegment[] {
+  const out: MathBoundarySegment[] = [];
+  let remaining = value;
+
+  while (remaining.length > 0) {
+    const dollarAt = remaining.indexOf('$');
+    if (dollarAt === -1) {
+      out.push({ kind: 'text', s: remaining });
+      break;
+    }
+    if (dollarAt > 0) {
+      out.push({ kind: 'text', s: remaining.slice(0, dollarAt) });
+      remaining = remaining.slice(dollarAt);
+    }
+    const isDisplay = remaining.startsWith('$$');
+    const delim = isDisplay ? '$$' : '$';
+    const close = remaining.indexOf(delim, delim.length);
+    if (close === -1) {
+      out.push({ kind: 'text', s: remaining });
+      break;
+    }
+    const mathBlock = remaining.slice(0, close + delim.length);
+    out.push({ kind: 'math', s: mathBlock });
+    remaining = remaining.slice(close + delim.length);
+  }
+
+  return out;
+}
+
+function normalizeTextOutsideMathOnly(segment: string): string {
+  return splitByMathDelimiters(segment)
+    .map((part) => (part.kind === 'text' ? normalizeTextSegment(part.s) : part.s))
+    .join('');
+}
+
 export function normalizeMathMarkdown(content: string): string {
   if (!content) {
     return content;
@@ -108,7 +156,7 @@ export function normalizeMathMarkdown(content: string): string {
         return segment;
       }
 
-      return normalizeTextSegment(segment);
+      return normalizeTextOutsideMathOnly(segment);
     })
     .join('');
 }

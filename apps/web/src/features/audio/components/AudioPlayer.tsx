@@ -1,20 +1,84 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Download, RotateCcw, RotateCw, ArrowLeft } from 'lucide-react';
+import { useResolvedAudioPlaybackUrl } from '../hooks/useResolvedAudioPlaybackUrl';
 
 interface AudioPlayerProps {
   audioUrl: string;
+  audioOverviewId?: string;
   transcript?: string;
   title?: string;
   onBack?: () => void;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, title, onBack }) => {
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  audioUrl,
+  audioOverviewId,
+  transcript,
+  title,
+  onBack,
+}) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  const resolvedPlayback = useResolvedAudioPlaybackUrl(audioUrl, audioOverviewId);
+
+  // Fetch audio as blob to enable seeking without server Range Request support
+  useEffect(() => {
+    if (resolvedPlayback === undefined) return;
+
+    if (resolvedPlayback === null) {
+      setBlobUrl(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    let localBlobUrl: string | null = null;
+
+    const fetchAudio = async () => {
+      try {
+        console.log('[AudioPlayer] Fetching audio as blob for seeking support...');
+        setIsLoading(true);
+        setBlobUrl(null);
+
+        const response = await fetch(resolvedPlayback);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const blob = await response.blob();
+        console.log('[AudioPlayer] Audio blob size:', blob.size, 'bytes');
+
+        localBlobUrl = URL.createObjectURL(blob);
+
+        if (mounted) {
+          setBlobUrl(localBlobUrl);
+          setIsLoading(false);
+          console.log('[AudioPlayer] Blob URL created:', localBlobUrl);
+        }
+      } catch (error) {
+        console.error('[AudioPlayer] Failed to fetch audio as blob:', error);
+        if (mounted) {
+          setIsLoading(false);
+          setBlobUrl(resolvedPlayback);
+        }
+      }
+    };
+
+    fetchAudio();
+
+    return () => {
+      mounted = false;
+      if (localBlobUrl) {
+        console.log('[AudioPlayer] Revoking blob URL');
+        URL.revokeObjectURL(localBlobUrl);
+      }
+    };
+  }, [resolvedPlayback]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -26,9 +90,24 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
     };
 
     const handleLoadedMetadata = () => {
+      console.log('[AudioPlayer loadedmetadata]', {
+        audioDuration: audio.duration,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+      });
       audio.playbackRate = 1;
       audio.defaultPlaybackRate = 1;
       setDuration(audio.duration);
+    };
+
+    const handleDurationChange = () => {
+      console.log('[AudioPlayer durationchange]', {
+        newDuration: audio.duration,
+        oldDurationState: duration,
+      });
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
     };
 
     const handleEnded = () => {
@@ -42,6 +121,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
@@ -49,26 +129,50 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
     };
   }, []);
 
-  const togglePlay = () => {
-    if (audioRef.current) {
+  const togglePlay = async () => {
+    const el = audioRef.current;
+    if (!el || isLoading) return;
+    if (resolvedPlayback === undefined || resolvedPlayback === null) return;
+    try {
       if (isPlaying) {
-        audioRef.current.pause();
+        el.pause();
       } else {
-        audioRef.current.play();
+        await el.play();
       }
+    } catch (e) {
+      console.error('[AudioPlayer] play() failed:', e);
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (audioRef.current && duration) {
-      const displayedTime = (parseFloat(e.target.value) / 100) * duration;
+    if (audioRef.current) {
+      const actualDuration = audioRef.current.duration;
+      if (!isFinite(actualDuration)) {
+        console.log('[AudioPlayer handleSeek] blocked - invalid duration', {
+          actualDuration,
+          durationState: duration,
+        });
+        return;
+      }
+      const displayedTime = (parseFloat(e.target.value) / 100) * actualDuration;
+      console.log('[AudioPlayer handleSeek]', {
+        sliderValue: e.target.value,
+        durationState: duration,
+        audioDuration: actualDuration,
+        currentTimeBefore: audioRef.current.currentTime,
+        calculatedTime: displayedTime,
+      });
       audioRef.current.currentTime = displayedTime;
+      console.log('[AudioPlayer handleSeek] after set:', {
+        currentTimeAfter: audioRef.current.currentTime,
+      });
       setProgress(parseFloat(e.target.value));
     }
   };
@@ -86,7 +190,19 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
 
   const skip = (seconds: number) => {
     if (audioRef.current) {
-      audioRef.current.currentTime = Math.max(0, Math.min(audioRef.current.duration, audioRef.current.currentTime + seconds));
+      const actualDuration = audioRef.current.duration;
+      const beforeTime = audioRef.current.currentTime;
+      const newTime = Math.max(0, Math.min(actualDuration, audioRef.current.currentTime + seconds));
+      console.log('[AudioPlayer skip]', {
+        seconds,
+        audioDuration: actualDuration,
+        currentTimeBefore: beforeTime,
+        calculatedNewTime: newTime,
+      });
+      audioRef.current.currentTime = newTime;
+      console.log('[AudioPlayer skip] after set:', {
+        currentTimeAfter: audioRef.current.currentTime,
+      });
     }
   };
 
@@ -106,15 +222,38 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioUrl, transcript, 
         </div>
       )}
       <div className="flex-1 flex flex-col bg-card border border-border rounded-xl p-4 space-y-4">
+        {/* Loading state */}
+        {(isLoading || resolvedPlayback === undefined) && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+              <p className="text-sm text-muted-foreground">Loading audio...</p>
+            </div>
+          </div>
+        )}
+
+        {resolvedPlayback === null && !isLoading && (
+          <p className="text-sm text-destructive text-center py-4">
+            Could not resolve audio URL. Try regenerating the audio overview.
+          </p>
+        )}
+
         {/* Hidden audio element */}
-        <audio ref={audioRef} src={audioUrl} />
+        <audio
+          ref={audioRef}
+          src={
+            blobUrl ||
+            (typeof resolvedPlayback === 'string' ? resolvedPlayback : undefined) ||
+            undefined
+          }
+        />
 
         {/* Header */}
         <div className="flex items-center justify-between shrink-0">
           <h3 className="font-bold text-foreground">{title || 'Audio Overview'}</h3>
         <div className="flex gap-2">
           <a
-            href={audioUrl}
+            href={typeof resolvedPlayback === 'string' ? resolvedPlayback : '#'}
             download
             className="p-2 hover:bg-secondary rounded-lg transition-colors"
             title="Download audio"

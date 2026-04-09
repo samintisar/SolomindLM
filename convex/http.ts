@@ -125,6 +125,125 @@ http.route({
 });
 
 // ============================================================
+// Audio Streaming Endpoint with Range Request Support
+// ============================================================
+
+// Test endpoint to verify routing works
+http.route({
+  path: "/audio/test",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    console.log('[Audio HTTP] Test endpoint called');
+    return new Response(
+      JSON.stringify({ message: "Audio HTTP routing works!" }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }),
+});
+
+http.route({
+  path: "/audio/" + ":storageId",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const origin = request.headers.get("origin");
+    const corsHeaders = getCorsHeaders(origin);
+    const withCors = (extra: Record<string, string>) => ({ ...corsHeaders, ...extra });
+
+    // Extract storageId from URL path
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/');
+    const storageId = pathParts[pathParts.length - 1] as any;
+
+    console.log('[Audio HTTP] Request received:', {
+      pathname: url.pathname,
+      storageId,
+      searchParams: url.search,
+      headers: Object.fromEntries(request.headers.entries()),
+    });
+
+    try {
+      const blob = await ctx.storage.get(storageId);
+
+      if (blob === null) {
+        console.error('[Audio HTTP] Storage ID not found:', storageId);
+        return new Response("Audio file not found", {
+          status: 404,
+          headers: withCors({ "Content-Type": "text/plain" }),
+        });
+      }
+
+      console.log('[Audio HTTP] Blob found:', {
+        size: blob.size,
+        type: blob.type,
+      });
+
+      // Handle Range Requests for seeking
+      const rangeHeader = request.headers.get("range");
+      const fileSize = blob.size;
+
+      if (rangeHeader) {
+        // Parse Range header: "bytes=start-end"
+        const ranges = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+
+        if (ranges) {
+          const start = parseInt(ranges[1]);
+          const end = ranges[2] ? parseInt(ranges[2]) : fileSize - 1;
+
+          // Validate range
+          if (start >= 0 && start < fileSize && end >= start && end < fileSize) {
+            const chunkSize = end - start + 1;
+
+            // Slice the blob to get the requested range
+            const chunk = blob.slice(start, end + 1);
+
+            console.log(`[Audio streaming] Range request: ${start}-${end}/${fileSize} (${chunkSize} bytes)`);
+
+            return new Response(chunk, {
+              status: 206, // Partial Content
+              headers: withCors({
+                "Content-Type": blob.type || "audio/mpeg",
+                "Content-Length": chunkSize.toString(),
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+              }),
+            });
+          }
+        }
+      }
+
+      // No Range header or invalid range - return entire file
+      console.log(`[Audio streaming] Full file request: ${fileSize} bytes`);
+
+      return new Response(blob, {
+        status: 200,
+        headers: withCors({
+          "Content-Type": blob.type || "audio/mpeg",
+          "Content-Length": fileSize.toString(),
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+        }),
+      });
+
+    } catch (error) {
+      console.error("[Audio streaming] Error:", error);
+      return new Response(
+        JSON.stringify({ error: "Failed to serve audio file" }),
+        {
+          status: 500,
+          headers: withCors({ "Content-Type": "application/json" }),
+        }
+      );
+    }
+  }),
+});
+
+// ============================================================
 // Chat Streaming Endpoint
 // ============================================================
 

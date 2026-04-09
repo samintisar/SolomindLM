@@ -16,7 +16,7 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js
 export const MAP_SYSTEM_PROMPT = 'You are extracting engaging content for a podcast conversation. Extract key points that would make for interesting discussion.';
 
 /** System prompt for reduce phase script writing */
-export const REDUCE_SYSTEM_PROMPT = 'You are an expert podcast scriptwriter. Output ONLY valid JSON arrays of dialogue lines.';
+export const REDUCE_SYSTEM_PROMPT = 'You are an expert podcast scriptwriter. Write natural, varied two-host dialogue—avoid repetitive openers and stock hooks. Output ONLY valid JSON arrays of dialogue lines.';
 
 /** System prompt for example extraction for anti-repetition */
 export const EXAMPLE_EXTRACTION_SYSTEM_PROMPT = 'You are a text analyzer. Extract concrete examples as a JSON array only.';
@@ -160,8 +160,9 @@ Output ONLY a valid JSON array of dialogue lines with this exact format:
 ]
 
 CRITICAL LENGTH REQUIREMENTS:
-- Generate EXACTLY {targetLines} dialogue exchanges (speaker turns, not sentences)
-- Each speaker turn should be 2-4 sentences (15-40 words per turn)
+- Generate EXACTLY {targetLines} speaker turns (JSON objects with "speaker" and "text")
+- Each turn should usually be 2-5 sentences (roughly 25-55 words). Prefer fuller turns over choppy one-liners—listeners should hear real paragraphs, not ping-pong quips
+- Occasionally let one host speak twice in a row when they are explaining a concept, telling a mini-story, or answering a multi-part question (then the other host responds)
 - Total target: approximately {estimatedWords} words
 - DO NOT summarize - explore topics in depth with examples, elaboration, and follow-up questions
 - Include natural tangents and deeper dives into interesting points
@@ -179,8 +180,8 @@ ANTI-REPETITION RULES:
 {coveredTopicsPrompt}
 
 HOST PERSONALITIES:
-- host_a (Asteria - Expert): Knowledgeable, explains concepts clearly, provides specific details, cites evidence, sounds authoritative but accessible. Shows measured enthusiasm with "Right," "Exactly," "That's a great point," "Here's what's interesting..."
-- host_b (Orion - Interviewer): Genuinely curious and intellectually engaged. Asks thoughtful follow-up questions, makes connections, shows interest through phrases like "That's fascinating," "I hadn't considered that," "So what you're saying is," "That makes sense but..." Plays devil's advocate respectfully, adds natural fillers ("Hmm," "Interesting," "Right," "I see")
+- host_a (Asteria - Expert): Knowledgeable, explains concepts clearly, provides specific details, cites evidence, sounds authoritative but accessible. Vary acknowledgments—do not open most replies with "Right," or "Exactly," (use sparingly across the whole script). Mix in "So," "One thing that stands out," "The short version is," "What the data actually shows," and direct answers without a verbal tic
+- host_b (Orion - Interviewer): Genuinely curious and intellectually engaged. Asks thoughtful follow-up questions, makes connections, reacts with varied language—rotate "That's fascinating," "I hadn't considered that," "So what you're saying is," "Walk me through," "How does that square with..." Avoid repeating the same reaction phrase in consecutive turns
 
 NATURALNESS REQUIREMENTS FOR PODCAST DIALOGUE:
 - host_b should sound intellectually curious and engaged - excited about ideas, not just shocked
@@ -192,22 +193,27 @@ NATURALNESS REQUIREMENTS FOR PODCAST DIALOGUE:
 - Both hosts should show authentic intellectual engagement - excited about learning, not performing
 
 GUIDELINES FOR NATURAL CONVERSATION:
-1. Alternate speakers naturally (not rigid A-B-A-B pattern - sometimes one speaks twice for depth)
-2. Keep dialogue segments 2-4 sentences each (15-40 words)
+1. Alternate speakers in a human rhythm: default is back-and-forth, but break strict A-B-A-B when it helps—two turns from the same host in a row is fine for explanations, stories, or a quick follow-up
+2. Keep most turns substantive (2-5 sentences; avoid a script of single-sentence ping-pong)
 3. host_a provides explanations and depth, host_b reacts and asks follow-ups
-4. Start with a hook that grabs attention ("So, here's something wild...")
+4. OPENING: Start from the actual material—a striking number, a tension, a question, or a plain-spoken summary of why this matters. NEVER use a canned podcast opener; do not begin with "So, here's something wild" or any fixed stock phrase. The first line should sound specific to this topic
 5. End with a summary reflection or takeaway
 6. Make it sound like two real people talking, not reading a script
-7. When something is surprising or insightful, host_b responds thoughtfully: "That's really interesting," or "I hadn't thought of it that way"
-8. Use "..." for thoughtful pauses when processing complex ideas or making connections
-9. host_b should ask clarifying questions that help listeners understand - "So if I'm understanding correctly..." or "Can you give an example of that?"
+7. When something is surprising or insightful, host_b responds with varied wording—not the same praise every time
+8. Use "..." sparingly for thoughtful pauses when processing complex ideas
+9. host_b should ask clarifying questions that help listeners understand; vary how those questions start
 
-EXAMPLES OF ENGAGING DIALOGUE:
+ANTI-ROBOTIC RULES (critical):
+- Do not begin more than one host_a turn in the entire script with "Right," — same for "Exactly," as a sentence starter
+- Do not mirror the same sentence structure every turn (e.g. every line starting with the same filler)
+- Vary energy: some turns are short reactions, others are longer explanations—avoid uniform length every time
+
+EXAMPLES OF ENGAGING DIALOGUE (structure and rhythm—do not copy wording literally):
 host_b: "That's a really interesting point... so you're saying that [concept] works like [analogy]?"
-host_a: "Exactly. And what's particularly noteworthy is how [detail] connects to [broader principle]."
+host_a: "You've got it. What's particularly noteworthy is how [detail] connects to [broader principle]."
 host_b: "That helps me understand it better. But what about [edge case]?"
-host_a: "Great question. That's where [nuance] comes in..."
-host_b: "Right, I see. So it's not just [simple view], it's actually [more sophisticated view]."
+host_a: "Great question—that's where [nuance] comes in. [One or two more sentences unpacking it.]"
+host_b: "Okay, so it's not just [simple view], it's actually [more sophisticated view]."
 
 AUDIO TYPE: {audioType}
 TARGET LENGTH: {targetLines} dialogue turns (~{estimatedWords} words)

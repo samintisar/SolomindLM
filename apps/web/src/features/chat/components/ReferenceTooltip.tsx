@@ -47,6 +47,9 @@ const tooltipMarkdownComponents = {
   code: ({ children }: { children?: React.ReactNode }) => (
     <code className="bg-secondary/50 px-1 py-0.5 rounded text-[0.8em]">{children}</code>
   ),
+  inlineCode: ({ children }: { children?: React.ReactNode }) => (
+    <code className="bg-secondary/50 px-1 py-0.5 rounded text-[0.8em]">{children}</code>
+  ),
 };
 
 interface ReferenceTooltipProps {

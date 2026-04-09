@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useNotebookContext } from '@/features/notebooks/NotebookContext';
 import { useSourcesContext } from '@/features/sources/SourcesContext';
@@ -35,13 +35,20 @@ export function NotebookView() {
     audioUrl: string;
     title: string;
     transcript?: string;
+    audioOverviewId?: string;
   } | null>(null);
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
 
-  const handlePlayAudio = (audioUrl: string, title: string, transcript?: string, noteId?: string) => {
-    setMiniPlayerData({ audioUrl, title, transcript });
+  const handlePlayAudio = (
+    audioUrl: string,
+    title: string,
+    transcript?: string,
+    noteId?: string,
+    audioOverviewId?: string
+  ) => {
+    setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
     setMiniPlayerVisible(true);
     if (noteId) {
       (window as any).__currentPlayingAudioNoteId = noteId;

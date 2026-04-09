@@ -99,12 +99,13 @@ bun run convex:env:push:dry    # Dry run for env push
 ### AI Services Integration
 
 **LLMs:** openai/gpt-oss-120b (smart model), openai/gpt-oss-20b (fast model)
-**Embeddings:** LangChain integration
+**Embeddings:** LangChain integration (can use Together AI models)
 **Reranking:** ZeroEntropy
 **OCR:** Mistral for images
 **Web Search:** Tavily API
 **Content Extraction:** Supadata (YouTube, TikTok, Instagram, X, web scraping)
-**Audio overviews (TTS):** Together AI (Kokoro and related models; voices via `AUDIO_VOICE_HOST_*`)
+**Together AI:** Audio overviews (TTS), embeddings, chat completions, images, video, evaluations
+**Audio voices:** Configured via `AUDIO_VOICE_HOST_*` environment variables
 
 ### Processing Pipelines
 
@@ -183,14 +184,43 @@ bun run convex:env:push:dry    # Dry run for env push
 
 **Always invoke these skills at the specified triggers.**
 
+### Core Skills (Session Workflow)
+
 | Skill | When |
 |-------|------|
 | `serena-first` | Session start — before any code work |
-| `convex-dev` | Working on Convex backend code |
-| `convex-create-component` | Creating new Convex components |
-| `langgraph-langchain` | Modifying agents in `convex/_agents/` |
 | `coding-standards` | Writing or reviewing TypeScript/React code |
+
+### Convex Skills
+
+| Skill | When |
+|-------|------|
+| `ai-agent-design` | Designing or implementing LangGraph + Convex agents |
+| `convex-create-component` | Creating new Convex components with isolated tables |
+| `convex-migration-helper` | Planning or executing schema/data migrations |
+| `convex-performance-audit` | Auditing or optimizing Convex performance |
+| `convex-quickstart` | Initializing new Convex projects |
+| `convex-setup-auth` | Setting up authentication with @convex-dev/auth |
+| `langgraph-langchain` | Modifying agents in `convex/_agents/` or working with LangGraph |
+| `langsmith` | Setting up tracing/observability for agents |
+
+### Frontend & AI Generation Skills
+
+| Skill | When |
+|-------|------|
 | `add-studio-feature` | Adding or extending Studio generation tools |
+| `bun-runtime` | Working with Bun-specific features or debugging Bun issues |
+
+### Together AI Skills
+
+| Skill | When |
+|-------|------|
+| `together-audio` | Working with TTS/STT or audio overviews |
+| `together-chat-completions` | Using Together AI's chat/completions API |
+| `together-embeddings` | Working with embeddings or vector search |
+| `together-evaluations` | Using LLM-as-a-judge evaluation |
+| `together-images` | Text-to-image generation or editing |
+| `together-video` | Text-to-video or image-to-video generation |
 
 ## MCP Servers
 

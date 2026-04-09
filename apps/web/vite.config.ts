@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), katexFonts()],
     optimizeDeps: {
-      include: ['react-markdown', 'remark-gfm', 'remark-math', 'rehype-katex'],
+      include: ['streamdown', '@streamdown/code', '@streamdown/math'],
     },
     server: {
       port: 5173,
@@ -57,19 +57,27 @@ export default defineConfig(({ mode }) => {
       },
       // SAME-DOMAIN PROXY for local development
       // Proxies /api/* to Convex so cookies work just like in production
-      proxy: convexSiteUrl ? {
-        '/api': {
-          target: convexSiteUrl,
-          changeOrigin: true,
-          secure: true,
-          configure: (proxy, _options) => {
-            proxy.on('proxyReq', (proxyReq, _req, _res) => {
-              console.log('[Vite Proxy] Proxying:', proxyReq.path, '→', convexSiteUrl + proxyReq.path);
-            });
-            return proxy;
-          },
-        },
-      } : undefined,
+      proxy: convexSiteUrl
+        ? {
+            '/api': {
+              target: convexSiteUrl,
+              changeOrigin: true,
+              secure: true,
+              configure: (proxy, _options) => {
+                proxy.on('proxyReq', (proxyReq, _req, _res) => {
+                  console.log('[Vite Proxy] Proxying:', proxyReq.path, '→', convexSiteUrl + proxyReq.path);
+                });
+                return proxy;
+              },
+            },
+            // Convex http.ts serves /audio/:storageId on the .site deployment
+            '/audio': {
+              target: convexSiteUrl,
+              changeOrigin: true,
+              secure: true,
+            },
+          }
+        : undefined,
     },
     resolve: {
       alias: {
@@ -97,9 +105,9 @@ export default defineConfig(({ mode }) => {
               return 'supabase';
             }
 
-            // Do NOT put react-markdown/remark/rehype in a manual chunk - it causes
-            // "Cannot access 'X' before initialization" (circular dep in react-markdown
-            // ecosystem when split; see https://github.com/vitejs/vite/issues/3592)
+            // Do NOT put streamdown / markdown-related deps in a manual chunk without
+            // testing — similar circular-init issues have occurred with markdown stacks
+            // when split (see https://github.com/vitejs/vite/issues/3592)
 
             // Mind mapping
             if (id.includes('node_modules/mind-elixir')) {

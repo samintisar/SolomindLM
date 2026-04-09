@@ -675,13 +675,23 @@ export async function runFinalizeAudioOverviewPhase(
       // Upload to Convex storage
       const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
       const storageId = await ctx.storage.store(blob);
-      const audioUrl = await ctx.storage.getUrl(storageId);
 
-      if (!audioUrl) {
+      // Get the standard Convex storage URL first
+      const standardUrl = await ctx.storage.getUrl(storageId);
+
+      if (!standardUrl) {
         throw new Error('Failed to get Convex storage URL for audio');
       }
 
-      console.log(`[AudioJob] Audio uploaded: ${audioUrl}`);
+      // For now, use the standard URL while we debug the custom endpoint
+      // TODO: Switch to custom /audio/ endpoint once verified working
+      const audioUrl = standardUrl;
+
+      console.log(`[AudioJob] Audio uploaded:`, {
+        storageId,
+        standardUrl,
+        customUrl: `${process.env.CONVEX_DEPLOYMENT}/audio/${storageId}`,
+      });
 
       // Build transcript
       const transcript = fullDialogueScript.map(l => l.text).join('\n');

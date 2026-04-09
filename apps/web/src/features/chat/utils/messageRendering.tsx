@@ -25,11 +25,13 @@ export function renderMessageWithReferences(
   messageId: string,
   content: string,
   _references: any[] | undefined,
-  handlers: RefHandlers
+  handlers: RefHandlers,
+  options?: { isStreamingVisual?: boolean }
 ): React.ReactNode {
   const cleanContent = stripReferencesSection(content);
   const sanitizedContent = sanitizeMarkdown(cleanContent);
   const processedContent = replaceCitationMarkersOutsideMath(sanitizedContent);
+  const streaming = !!options?.isStreamingVisual;
 
   return (
     <Suspense
@@ -39,6 +41,10 @@ export function renderMessageWithReferences(
     >
       <div className="prose max-w-none space-y-2 font-serif text-base leading-relaxed">
         <MarkdownRenderer
+          mode={streaming ? 'streaming' : 'static'}
+          parseIncompleteMarkdown={streaming}
+          isAnimating={streaming}
+          animated={streaming}
           components={{
             img: () => null,
             a: ({ children }) => <span className="text-foreground">{children}</span>,
@@ -58,24 +64,26 @@ export function renderMessageWithReferences(
             td: ({ children }) =>
               React.createElement('td', { className: 'px-4 py-2 text-foreground border-r border-border last:border-r-0' }, children),
             p: ({ children }) => <p className="text-base leading-relaxed">{children}</p>,
-            code: ({ children, node }: any) => {
+            /** Citation pills: backend replaces [n] with `CITE:n` (inline code). Streamdown uses `inlineCode` for backticks. */
+            inlineCode: ({ children }: any) => {
               const text = String(children);
-              const isInline = !node?.position || (node as any).data?.meta === undefined;
-              if (isInline && text.startsWith('CITE:')) {
-                const refId = parseInt(text.slice(5));
-                return (
-                  <span
-                    onMouseEnter={(e) => handlers.onRefHover(refId, messageId, e)}
-                    onMouseLeave={handlers.onRefLeave}
-                    onClick={(e) => handlers.onRefClick(refId, messageId, e)}
-                    onTouchStart={(e) => handlers.onRefClick(refId, messageId, e)}
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-xl bg-primary text-primary-foreground text-xs font-bold cursor-pointer hover:bg-primary/90 active:bg-primary/80 transition-colors mx-1 align-middle relative touch-manipulation"
-                    title={`Reference ${refId}`}
-                    style={{ verticalAlign: 'middle' }}
-                  >
-                    {refId}
-                  </span>
-                );
+              if (text.startsWith('CITE:')) {
+                const refId = parseInt(text.slice(5), 10);
+                if (!Number.isNaN(refId)) {
+                  return (
+                    <span
+                      onMouseEnter={(e) => handlers.onRefHover(refId, messageId, e)}
+                      onMouseLeave={handlers.onRefLeave}
+                      onClick={(e) => handlers.onRefClick(refId, messageId, e)}
+                      onTouchStart={(e) => handlers.onRefClick(refId, messageId, e)}
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-xl bg-primary text-primary-foreground text-xs font-bold cursor-pointer hover:bg-primary/90 active:bg-primary/80 transition-colors mx-1 align-middle relative touch-manipulation"
+                      title={`Reference ${refId}`}
+                      style={{ verticalAlign: 'middle' }}
+                    >
+                      {refId}
+                    </span>
+                  );
+                }
               }
               return <code className="bg-secondary/50 px-1.5 py-0.5 rounded text-sm">{children}</code>;
             },

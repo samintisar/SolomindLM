@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
 import { checkDailyLimit } from "../../_lib/limits";
@@ -45,6 +46,39 @@ export const get = query({
     }
 
     return audioOverview;
+  },
+});
+
+/**
+ * HTTPS URL for playback (uses `storage.getUrl` for legacy `/audio/<storageId>` values).
+ */
+export const resolvePlaybackUrl = query({
+  args: { audioOverviewId: v.id("audioOverviews") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const overview = await AudioOverviews.getAudioOverview(ctx, args.audioOverviewId);
+    if (!overview?.audioUrl?.trim()) return null;
+
+    try {
+      await assertCanReadNotebook(ctx, overview.notebookId, userId);
+    } catch {
+      return null;
+    }
+
+    const raw = overview.audioUrl.trim();
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+      return { url: raw };
+    }
+
+    let storageId = raw;
+    if (storageId.startsWith("/audio/")) storageId = storageId.slice("/audio/".length);
+    else if (storageId.startsWith("audio/")) storageId = storageId.slice("audio/".length);
+    if (storageId.startsWith("/")) storageId = storageId.slice(1);
+
+    const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
+    return url ? { url } : null;
   },
 });
 

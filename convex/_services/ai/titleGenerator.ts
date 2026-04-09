@@ -31,18 +31,27 @@ ${truncatedContent}
 
 Title:`;
 
+    /** Strip quotes; first line only; cap at 10 words (prompt contract). */
+    function finalizeTitle(raw: string): string {
+      let t = raw.trim().replace(/^["']|["']$/g, "");
+      const line = t.split(/\n/)[0]?.trim() ?? "";
+      const words = line.split(/\s+/).filter(Boolean);
+      if (words.length > 10) return words.slice(0, 10).join(" ");
+      return line;
+    }
+
     async function titleFromModel(model: string): Promise<string> {
       const response = await uncachedLlmCall({
         model,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
-        maxTokens: 50,
+        // Reasoning models (e.g. GPT-OSS on Together) may consume part of the completion budget
+        // for traces; 50 was too small and could cut titles mid-phrase (e.g. after "100×").
+        maxTokens: 128,
         reasoningEnabled: false,
         toolChoice: "none",
       });
-      let title = response.content.trim();
-      title = title.replace(/^["']|["']$/g, "");
-      return title;
+      return finalizeTitle(response.content);
     }
 
     try {

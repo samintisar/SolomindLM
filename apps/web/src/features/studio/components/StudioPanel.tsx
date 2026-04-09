@@ -163,7 +163,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     if (note.type === 'audio' && note.metadata.audioUrl) {
       onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
     } else if (isAudioOverviewNote(note) && note.audioUrl) {
-      onPlayAudio?.(note.audioUrl, note.title, note.transcript, note.id);
+      onPlayAudio?.(note.audioUrl, note.title, note.transcript, note.id, note.id);
     }
   };
 
@@ -199,6 +199,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     return <>{miniPlayerVisible && miniPlayerData && (
       <MiniAudioPlayer
         audioUrl={miniPlayerData.audioUrl}
+        audioOverviewId={miniPlayerData.audioOverviewId}
         title={miniPlayerData.title}
         transcript={miniPlayerData.transcript}
         isVisible={miniPlayerVisible}
@@ -289,6 +290,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         {miniPlayerVisible && miniPlayerData && (
           <MiniAudioPlayer
             audioUrl={miniPlayerData.audioUrl}
+            audioOverviewId={miniPlayerData.audioOverviewId}
             title={miniPlayerData.title}
             transcript={miniPlayerData.transcript}
             isVisible={miniPlayerVisible}

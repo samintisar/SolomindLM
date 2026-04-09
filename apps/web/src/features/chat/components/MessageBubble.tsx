@@ -149,6 +149,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     );
 
     const isStreamingRow = message.id === '__streaming__';
+    const isStreamingVisual = !isUser && isStreamingRow && isAssistantStreamActive;
     const toolCalls = message.toolCalls ?? message.agentTrace?.toolCalls ?? [];
     const groundingChecks = message.groundingChecks ?? message.agentTrace?.grounding ?? [];
     const activityPhases = message.agentTrace?.phases ?? [];
@@ -243,7 +244,9 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
               <ActionBar />
             </div>
             <div className="p-4 rounded-xl font-serif text-lg leading-relaxed text-foreground shadow-sm bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))]">
-              {renderMessageWithReferences(message.id, message.content, message.references, refHandlers)}
+              {renderMessageWithReferences(message.id, message.content, message.references, refHandlers, {
+                isStreamingVisual,
+              })}
             </div>
           </div>
         ) : (
@@ -269,7 +272,9 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
             )}
             {message.content && (
               <div className="w-full min-w-0 max-w-4xl font-serif text-lg leading-relaxed text-foreground">
-                {renderMessageWithReferences(message.id, message.content, message.references, refHandlers)}
+                {renderMessageWithReferences(message.id, message.content, message.references, refHandlers, {
+                isStreamingVisual,
+              })}
                 <div className="mt-3 pt-3 border-t border-dashed border-border/40">
                   <ActionBar />
                 </div>

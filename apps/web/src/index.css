@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
+/* Streamdown (Tailwind v4): scan hoisted package classes — deps live under apps/web/node_modules */
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
+
 @layer base {
   :root {
     --background: oklch(0.9582 0.0152 90.2357);

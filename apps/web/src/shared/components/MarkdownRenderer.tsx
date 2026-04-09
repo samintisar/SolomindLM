@@ -1,34 +1,67 @@
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import type { Components } from 'react-markdown';
+import { Streamdown, type StreamdownProps } from 'streamdown';
+import { code } from '@streamdown/code';
+import { createMathPlugin } from '@streamdown/math';
 
-export interface MarkdownRendererProps {
-  children: string;
-  components?: Components;
-  className?: string;
-}
+/** Shared plugins for all app markdown (Shiki + KaTeX). Inline $...$ enabled to match previous app behavior. */
+const mathPlugin = createMathPlugin({
+  singleDollarTextMath: true,
+  errorColor: '#6b7280',
+});
 
-/** KaTeX options: use a muted color for parse errors instead of bright red. */
-const katexOptions = {
-  errorColor: '#6b7280', // gray-500, visible but not alarming
-  throwOnError: false, // Silently fall back to raw LaTeX on parse errors
+export const streamdownPlugins: NonNullable<StreamdownProps['plugins']> = {
+  code,
+  math: mathPlugin,
 };
 
+export interface MarkdownRendererProps
+  extends Pick<
+    StreamdownProps,
+    | 'className'
+    | 'components'
+    | 'controls'
+    | 'isAnimating'
+    | 'lineNumbers'
+    | 'mode'
+    | 'parseIncompleteMarkdown'
+    | 'shikiTheme'
+  > {
+  children: string;
+  /** Word/stream animation; prefer false for static Studio content. */
+  animated?: StreamdownProps['animated'];
+}
+
 /**
- * Shared markdown renderer (ReactMarkdown + GFM + math + KaTeX).
- * Lazy-load this component to avoid circular chunk dependency with react-vendor.
+ * Shared markdown renderer (Streamdown + code + math plugins).
+ * Lazy-load this component in feature modules to keep the markdown chunk isolated.
  */
-export default function MarkdownRenderer({ children, components, className }: MarkdownRendererProps) {
+export default function MarkdownRenderer({
+  children,
+  components,
+  className,
+  mode = 'static',
+  parseIncompleteMarkdown = mode === 'streaming',
+  isAnimating = false,
+  animated = mode === 'streaming' ? isAnimating : false,
+  controls = false,
+  lineNumbers = false,
+  shikiTheme = ['github-light', 'github-dark'],
+  ...rest
+}: MarkdownRendererProps) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[[rehypeKatex, katexOptions]]}
+    <Streamdown
+      mode={mode}
+      parseIncompleteMarkdown={parseIncompleteMarkdown}
+      isAnimating={isAnimating}
+      animated={animated}
+      plugins={streamdownPlugins}
       components={components}
       className={className}
+      controls={controls}
+      lineNumbers={lineNumbers}
+      shikiTheme={shikiTheme}
+      {...rest}
     >
       {children}
-    </ReactMarkdown>
+    </Streamdown>
   );
 }

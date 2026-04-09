@@ -6,8 +6,16 @@ export interface AudioPlayerContextType {
     audioUrl: string;
     title: string;
     transcript?: string;
+    /** When set (audio overview notes), URL is resolved server-side via `storage.getUrl`. */
+    audioOverviewId?: string;
   } | null;
-  onPlayAudio: (audioUrl: string, title: string, transcript?: string, noteId?: string) => void;
+  onPlayAudio: (
+    audioUrl: string,
+    title: string,
+    transcript?: string,
+    noteId?: string,
+    audioOverviewId?: string
+  ) => void;
   onCloseMiniPlayer: () => void;
   onExpandAudioPlayer: () => void;
 }

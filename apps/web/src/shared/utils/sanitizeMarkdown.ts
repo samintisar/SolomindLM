@@ -20,19 +20,19 @@ function stripAnsiCodes(text: string): string {
  * left literal `&lt;` everywhere else — including undelimited LaTeX fragments and
  * plain inequalities — so KaTeX saw invalid input and users saw entity text.
  *
- * The output is still tag-free; react-markdown is used without rehype-raw, so these
- * characters stay as markdown/text rather than becoming HTML elements.
+ * The output is still tag-free; the app renderer (Streamdown) does not treat these
+ * as raw HTML from markdown source, so they stay as text/math delimiters.
  */
 export function restoreAngleBracketsAfterDomPurify(content: string): string {
   return content.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 }
 
 /**
- * Sanitizes markdown content using DOMPurify before rendering with ReactMarkdown.
+ * Sanitizes markdown content using DOMPurify before rendering with Streamdown.
  * This prevents XSS attacks while allowing safe markdown elements.
  *
  * Note: This sanitizes the markdown SOURCE text, not the rendered HTML.
- * ReactMarkdown will parse the sanitized markdown and render it safely.
+ * Streamdown parses the sanitized markdown and applies its own hardened pipeline.
  * Angle brackets in the sanitized markdown source are restored so `<` / `>` work in
  * math (e.g. $0 < \\theta < 1$) and in ordinary text.
  */
@@ -43,7 +43,7 @@ export function sanitizeMarkdown(content: string): string {
 
   // DOMPurify sanitizes HTML, but we're using it on markdown source text
   // This strips any HTML tags that might be embedded in the markdown
-  // ReactMarkdown will then parse the clean markdown and render it
+  // Streamdown then parses the clean markdown for display
   const sanitized = DOMPurify.sanitize(normalizedMath, {
     // Allow only safe text content - no HTML tags in markdown source
     ALLOWED_TAGS: [], // Empty array means no HTML tags allowed in markdown source

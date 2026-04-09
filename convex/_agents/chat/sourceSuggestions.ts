@@ -4,7 +4,10 @@
  *
  * Generates a source summary + study prompts based on uploaded documents.
  * Tries env.FAST_LLM first, then env.SMART_LLM if the fast path fails (API or parse).
- * Hybrid Qwen / gpt-oss: reasoning + tool_calls disabled so content stays in `message.content`.
+ *
+ * Together GPT-OSS: reasoning is a separate `message.reasoning` field (not tags in `content`);
+ * `uncachedLlmCall` → `togetherChoiceAssistantText` prefers `content`, else `reasoning`.
+ * `reasoningEnabled: false` maps to low `reasoning_effort` via mergeModelKwargs; no tool_calls.
  */
 
 import { internalAction } from "../../_generated/server";
@@ -12,6 +15,13 @@ import { v } from "convex/values";
 import { api } from "../../_generated/api";
 import { uncachedLlmCall } from "../_shared/cachedLlm";
 import { env } from "../../_lib/env";
+
+/** Best-effort fixes before JSON.parse (models sometimes emit trailing commas). */
+function repairJsonObjectText(json: string): string {
+  return json
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]");
+}
 
 function parseSuggestionsPayload(raw: string): {
   summary: string;
@@ -21,9 +31,6 @@ function parseSuggestionsPayload(raw: string): {
   if (!text) {
     throw new Error("empty LLM content");
   }
-
-  // Qwen-style reasoning blocks before the answer (angle-bracket tags)
-  text = text.replace(/\x3Cthink\x3E[\s\S]*?\x3C\/think\x3E/gi, "").trim();
 
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fence) {
@@ -37,7 +44,15 @@ function parseSuggestionsPayload(raw: string): {
   }
   text = text.slice(start, end + 1);
 
-  const parsed = JSON.parse(text) as { summary?: unknown; suggestions?: unknown };
+  let parsed: { summary?: unknown; suggestions?: unknown };
+  try {
+    parsed = JSON.parse(text) as { summary?: unknown; suggestions?: unknown };
+  } catch {
+    parsed = JSON.parse(repairJsonObjectText(text)) as {
+      summary?: unknown;
+      suggestions?: unknown;
+    };
+  }
 
   if (!parsed.summary || !Array.isArray(parsed.suggestions)) {
     throw new Error("Invalid response structure");
@@ -59,12 +74,13 @@ async function generateSuggestionsWithModel(
       {
         role: "system",
         content:
-          "You output only a single JSON object. Keys: summary (string), suggestions (string array, length 3). No tools, no markdown, no explanation.",
+          "You output only a single JSON object. Keys: summary (string), suggestions (string array, length 3). Escape quotes inside strings with backslash. No tools, no markdown, no explanation.",
       },
       { role: "user", content: prompt },
     ],
     temperature: 0.5,
     maxTokens: 512,
+    responseFormat: { type: "json_object" },
     reasoningEnabled: false,
     toolChoice: "none",
   });
