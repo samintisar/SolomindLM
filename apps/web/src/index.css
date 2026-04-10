@@ -698,6 +698,16 @@
   max-width: none;
 }
 
+/*
+ * Streamdown + Shiki: fenced code is rendered as one <span> per logical line inside <pre><code>.
+ * Those spans are inline by default, so multiple lines collapse into one unreadable row unless we
+ * stack them (there are no newline text nodes between sibling spans).
+ */
+[data-streamdown='code-block-body'] pre code > span {
+  display: block;
+  width: 100%;
+}
+
 /* Dark mode prose adjustments */
 .dark .prose {
   color: var(--foreground);

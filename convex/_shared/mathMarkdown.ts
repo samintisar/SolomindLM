@@ -138,8 +138,29 @@ function splitByMathDelimiters(value: string): MathBoundarySegment[] {
   return out;
 }
 
-function normalizeTextOutsideMathOnly(segment: string): string {
+/**
+ * Models often wrap fragments in extra `$...$` inside an outer `$$...$$` block (invalid; breaks KaTeX).
+ * Strip those inner pairs inside display math only — leave `\\$` (escaped dollar) untouched.
+ */
+function stripInnerInlineDollarsInDisplayMath(segment: string): string {
   return splitByMathDelimiters(segment)
+    .map((part) => {
+      if (part.kind !== 'math' || !part.s.startsWith('$$') || part.s.length <= 4) {
+        return part.s;
+      }
+      if (!part.s.endsWith('$$')) {
+        return part.s;
+      }
+      const inner = part.s.slice(2, -2);
+      const fixed = inner.replace(/(?<![\\])\$([^$\n]+)\$/g, '$1');
+      return `$$${fixed}$$`;
+    })
+    .join('');
+}
+
+function normalizeTextOutsideMathOnly(segment: string): string {
+  const stripped = stripInnerInlineDollarsInDisplayMath(segment);
+  return splitByMathDelimiters(stripped)
     .map((part) => (part.kind === 'text' ? normalizeTextSegment(part.s) : part.s))
     .join('');
 }

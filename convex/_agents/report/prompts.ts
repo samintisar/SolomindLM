@@ -17,13 +17,29 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js
 /** System prompt for map phase content analysis and topic extraction */
 export const MAP_SYSTEM_PROMPT = `You are a professional content analyzer and writer. Always extract 3-5 key topics and provide comprehensive summaries.
 
+CRITICAL OUTPUT FORMAT: You MUST output your summaries in MARKDOWN text format, NOT JSON. Use markdown headers, bullet points, and standard formatting. Do NOT output JSON objects or arrays.
+
 ${MARKDOWN_MATH_NOTATION_FOR_APP}`;
 
 /** System prompt for collapse phase summary condensation */
-export const COLLAPSE_SYSTEM_PROMPT = 'You are a skilled summarizer. Always maintain structured format with topic headers like "Main Topics:"';
+export const COLLAPSE_SYSTEM_PROMPT = `You are a skilled summarizer. Always maintain structured format with topic headers like "Main Topics:". CRITICAL: You MUST output MARKDOWN text format, NOT JSON. Use markdown headers and bullet points, not JSON objects or arrays.
+
+${MARKDOWN_MATH_NOTATION_FOR_APP}`;
 
 /** System prompt for reduce phase final report generation */
-export const REDUCE_SYSTEM_PROMPT = 'You are a professional content writer and editor.';
+export const REDUCE_SYSTEM_PROMPT = `You are a professional content writer and editor. 
+
+CRITICAL OUTPUT FORMAT REQUIREMENTS:
+- You MUST output content in MARKDOWN format, NOT JSON
+- Use Markdown headers (##, ###) for sections
+- Use Markdown bullet points and lists
+- Use Markdown bold (**text**) for emphasis
+- Do NOT use JSON objects, arrays, or key-value pairs
+- Your output should be readable Markdown text that can be directly rendered
+
+The user wants a nicely formatted document they can read, not raw JSON data.
+
+${MARKDOWN_MATH_NOTATION_FOR_APP}`;
 
 // ============================================================
 // MAP PROMPTS
@@ -163,7 +179,9 @@ CONDENSED (maintain topic structure and "Main Topics:" format, prioritize custom
 // ============================================================
 
 export const REDUCE_PROMPTS: Record<string, string> = {
-  briefing: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  briefing: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -195,7 +213,9 @@ Based on the following source material:
 
 BRIEFING DOC:`,
 
-  study_guide: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  study_guide: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -227,7 +247,9 @@ Based on the following source material:
 
 STUDY GUIDE:`,
 
-  blog_post: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  blog_post: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -261,7 +283,9 @@ Based on the following source material:
 
 BLOG POST:`,
 
-  summary: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  summary: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -287,7 +311,9 @@ Based on the following source material:
 
 SUMMARY:`,
 
-  technical_report: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  technical_report: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -322,7 +348,9 @@ Based on the following source material:
 
 TECHNICAL REPORT:`,
 
-  concept_explainer: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  concept_explainer: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -353,7 +381,9 @@ Based on the following source material:
 
 CONCEPT EXPLAINER:`,
 
-  methodology_overview: `CRITICAL REQUIREMENT - READ CAREFULLY:
+  methodology_overview: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+CRITICAL REQUIREMENT - READ CAREFULLY:
 You MUST cover ALL major topics present in the source material.
 Do not focus primarily on one or two topics while neglecting others.
 Ensure each major theme receives balanced, thorough coverage.
@@ -385,7 +415,9 @@ Based on the following source material:
 
 METHODOLOGY OVERVIEW:`,
 
-  custom: `INSTRUCTIONS:
+  custom: `CRITICAL OUTPUT FORMAT: You MUST respond with MARKDOWN text, NOT JSON. Use ## headers, bullet points, and standard Markdown formatting. Do NOT output JSON objects or arrays.
+
+INSTRUCTIONS:
 The user has provided a custom prompt below.
 Unless the user explicitly asks to focus on a narrow specific detail, you MUST generally cover all major topics found in the source material.
 However, the user's custom instruction takes precedence if it conflicts with general coverage.
