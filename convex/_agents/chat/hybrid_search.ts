@@ -237,11 +237,20 @@ export class HybridSearchHandler extends VectorSearchHandler {
         })[];
       }
 
-      let finalResults: HybridReferenceChunk[] = rankedForMap.map((r, index) => {
+      // FIX: Preserve positions from the fused results before reranking to maintain citation consistency
+      // Create a map of positions from the fused array (before reranking)
+      const fusedPositionMap = new Map<string, number>();
+      filtered.forEach((r, idx) => {
+        const key = `${r._id}-${r.chunkIndex}`;
+        fusedPositionMap.set(key, idx + 1); // 1-based indexing
+      });
+
+      let finalResults: HybridReferenceChunk[] = rankedForMap.map((r) => {
         const key = `${r._id}-${r.chunkIndex}`;
         const rrfMeta = rrfMetadataMap.get(key);
+        const originalPosition = fusedPositionMap.get(key) ?? 0;
         return {
-          id: String(index + 1),
+          id: String(originalPosition),
           sourceId: String(r._id),
           documentId: r.documentId,
           sourceTitle: r.sourceTitle ?? 'Document',
@@ -285,8 +294,9 @@ export class HybridSearchHandler extends VectorSearchHandler {
           // Convert to final format without reranking (already keyword-relevant)
           const limited = keywordOnlyResults.slice(0, this.config.maxResults);
 
+          // FIX: Preserve positions from the original keyword results
           finalResults = limited.map((r, index) => ({
-            id: String(index + 1),
+            id: String(index + 1), // Keyword fallback uses simple sequential numbering
             sourceId: String(r._id),
             documentId: r.documentId,
             sourceTitle: r.sourceTitle ?? 'Document',

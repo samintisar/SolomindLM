@@ -188,18 +188,30 @@ export class VectorSearchHandler {
       : this.config.maxResults;
     const limited = ranked.slice(0, pool);
 
-    const finalResults: ReferenceChunk[] = limited.map((r, index) => ({
-      id: String(index + 1),
-      sourceId: String(r._id),
-      documentId: r.documentId,
-      sourceTitle: r.sourceTitle ?? 'Document',
-      sourceUrl: r.sourceUrl,
-      content: r.content,
-      chunkIndex: r.chunkIndex,
-      similarity: r.similarity,
-      // Include chunk metadata
-      metadata: r.metadata,
-    }));
+    // FIX: Preserve original positions from raw results to maintain citation consistency
+    // Create a map of original positions for all raw results
+    const originalPositionMap = new Map<string, number>();
+    raw.forEach((r, idx) => {
+      const key = `${r._id}-${r.chunkIndex}`;
+      originalPositionMap.set(key, idx + 1); // 1-based indexing
+    });
+
+    const finalResults: ReferenceChunk[] = limited.map((r) => {
+      const key = `${r._id}-${r.chunkIndex}`;
+      const originalPosition = originalPositionMap.get(key) ?? 0;
+      return {
+        id: String(originalPosition),
+        sourceId: String(r._id),
+        documentId: r.documentId,
+        sourceTitle: r.sourceTitle ?? 'Document',
+        sourceUrl: r.sourceUrl,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        similarity: r.similarity,
+        // Include chunk metadata
+        metadata: r.metadata,
+      };
+    });
 
     console.log(`[VectorSearch] final: ${finalResults.length} results`);
 

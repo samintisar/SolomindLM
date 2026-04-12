@@ -4,21 +4,32 @@ import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 
-export class MistralOCRService {
-  private apiKey: string;
-  private baseUrl = 'https://api.mistral.ai/v1';
-  private model = 'mistral-ocr-latest';
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+/**
+ * Stitch OCR pages into one markdown string with visible page labels (HTML comments are hidden when rendered).
+ */
+export function markdownFromMistralOcrResponse(data: {
+  pages?: Array<{ markdown?: string }>;
+  markdown?: string;
+  text?: string;
+}): string {
+  if (data?.pages && Array.isArray(data.pages) && data.pages.length > 0) {
+    return data.pages
+      .map((page, index) => {
+        const md = page.markdown || "";
+        const label = `**Page ${index + 1}**`;
+        return index === 0 ? `${label}\n\n${md}` : `---\n\n${label}\n\n${md}`;
+      })
+      .join("\n\n");
   }
+  return data.markdown || data.text || "";
+}
 
-  /**
-   * Strip all media references from text (images, videos, audio, etc.)
-   * This ensures only text content is returned
-   */
-  private stripMedia(text: string): string {
-    return text
+/**
+ * Strip all media references from text (images, videos, audio, etc.)
+ * This ensures only text content is returned
+ */
+export function stripMistralOcrMedia(text: string): string {
+  return text
       // Remove markdown images: ![alt](url) or ![alt][ref]
       .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
       .replace(/!\[([^\]]*)\]\[[^\]]+\]/g, '')
@@ -61,8 +72,17 @@ export class MistralOCRService {
       .replace(/[^\s]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, '')
       // Clean up extra whitespace and line breaks
       .replace(/\n\s*\n\s*\n+/g, '\n\n')
-      .replace(/^\s+|\s+$/g, '')
+      .replace(/^\s+|\s+$/g, "")
       .trim();
+}
+
+export class MistralOCRService {
+  private apiKey: string;
+  private baseUrl = 'https://api.mistral.ai/v1';
+  private model = 'mistral-ocr-latest';
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
   }
 
   private async callOcrEndpoint(documentUrl: string): Promise<string> {
@@ -87,6 +107,8 @@ export class MistralOCRService {
               type: "document_url",
               document_url: documentUrl,
             },
+            table_format: "markdown",
+            include_image_base64: false,
           }),
           signal: controller.signal,
         });
@@ -108,16 +130,8 @@ export class MistralOCRService {
 
         logger.apiSuccess("mistral", "/ocr", Date.now() - t0, {});
 
-        let content = "";
-        if (data?.pages && Array.isArray(data.pages)) {
-          content = data.pages
-            .map((page: { markdown?: string }) => page.markdown || "")
-            .join("\n\n");
-        } else {
-          content = data.markdown || data.text || "";
-        }
-
-        return this.stripMedia(content);
+        const content = markdownFromMistralOcrResponse(data);
+        return stripMistralOcrMedia(content);
       } catch (error) {
         clearTimeout(timeoutId);
         if (error instanceof Error) {

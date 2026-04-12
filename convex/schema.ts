@@ -90,6 +90,8 @@ export default defineSchema({
     language: v.optional(v.string()),
     documentStructure: v.optional(v.union(v.literal("flat"), v.literal("hierarchical"))),
     maxHeadingLevel: v.optional(v.number()),
+    /** Full extracted text for UI copy/view (not chunk-overlapped). RAG still uses documentChunks. */
+    extractedMarkdown: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

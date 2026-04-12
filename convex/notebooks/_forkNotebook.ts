@@ -69,6 +69,7 @@ export async function performNotebookFork(
       language: d.language,
       documentStructure: d.documentStructure,
       maxHeadingLevel: d.maxHeadingLevel,
+      extractedMarkdown: d.extractedMarkdown,
       createdAt: now,
       updatedAt: now,
     });

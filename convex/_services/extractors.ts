@@ -2,6 +2,10 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
+import {
+  markdownFromMistralOcrResponse,
+  stripMistralOcrMedia,
+} from "./extraction/MistralOCRService";
 
 // PDF/DOCX extraction is handled by Mistral OCR in DocEmbeddingJob (MistralOCRService).
 // No PDFCO_API_KEY or CLOUDCONVERT_API_KEY needed.
@@ -140,6 +144,8 @@ export const extractFromOCR = action({
           type: "document_url",
           document_url: args.fileUrl,
         },
+        table_format: "markdown",
+        include_image_base64: false,
       }),
     });
 
@@ -149,12 +155,6 @@ export const extractFromOCR = action({
     }
 
     const data = await response.json();
-
-    // Combine all pages/sections
-    if (data.pages && Array.isArray(data.pages)) {
-      return data.pages.map((page: any) => page.markdown || page.text).join("\n\n");
-    }
-
-    return data.markdown || data.text || "";
+    return stripMistralOcrMedia(markdownFromMistralOcrResponse(data));
   },
 });

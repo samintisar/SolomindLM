@@ -96,7 +96,7 @@ function normalizeTextSegment(value: string): string {
   return normalizeMathParentheticals(withCanonicalDelimiters);
 }
 
-type MathBoundarySegment =
+export type MathBoundarySegment =
   | { kind: 'text'; s: string }
   | { kind: 'math'; s: string };
 
@@ -109,7 +109,7 @@ type MathBoundarySegment =
  * parenthetical regex would wrongly wrap `(Y_{t-i}-\mu\bigr)` as `($...$)`, producing
  * `\bigl($Y_{t-i}-\mu\bigr$)` and breaking KaTeX/remark-math.
  */
-function splitByMathDelimiters(value: string): MathBoundarySegment[] {
+export function splitByMathDelimiters(value: string): MathBoundarySegment[] {
   const out: MathBoundarySegment[] = [];
   let remaining = value;
 
@@ -158,8 +158,119 @@ function stripInnerInlineDollarsInDisplayMath(segment: string): string {
     .join('');
 }
 
+/**
+ * OCR/LLM output often uses e.g. \\begin{array}{cccc} for a 5×n matrix (needs ccccc).
+ * KaTeX strict mode warns: "Too few columns specified in the {array} column argument."
+ */
+function countArrayColumnSpecLetters(spec: string): number {
+  const compact = spec.replace(/\s/g, '').replace(/\|/g, '');
+  let n = 0;
+  for (const ch of compact) {
+    if (ch === 'c' || ch === 'l' || ch === 'r') {
+      n++;
+    }
+  }
+  return n;
+}
+
+function inferMaxColumnsInArrayBody(body: string): number {
+  let max = 0;
+  const rows = body.split(/\\\\+/);
+  for (const row of rows) {
+    const t = row.trim();
+    if (!t) {
+      continue;
+    }
+    const cells = t.split('&').length;
+    max = Math.max(max, cells);
+  }
+  return max;
+}
+
+function findMatchingArrayEnd(tex: string, bodyStart: number): number {
+  let depth = 1;
+  let pos = bodyStart;
+  while (pos < tex.length) {
+    const nextBegin = tex.indexOf('\\begin{array}', pos);
+    const nextEnd = tex.indexOf('\\end{array}', pos);
+    if (nextEnd === -1) {
+      return -1;
+    }
+    if (nextBegin !== -1 && nextBegin < nextEnd) {
+      depth++;
+      pos = nextBegin + 1;
+    } else {
+      depth--;
+      if (depth === 0) {
+        return nextEnd;
+      }
+      pos = nextEnd + '\\end{array}'.length;
+    }
+  }
+  return -1;
+}
+
+function fixMismatchedArrayEnvironments(tex: string): string {
+  let out = '';
+  let i = 0;
+  while (i < tex.length) {
+    const j = tex.indexOf('\\begin{array}', i);
+    if (j === -1) {
+      out += tex.slice(i);
+      break;
+    }
+    out += tex.slice(i, j);
+    const m = tex.slice(j).match(/^\\begin\{array\}\{([^}]*)\}/);
+    if (!m) {
+      out += tex[j];
+      i = j + 1;
+      continue;
+    }
+    const spec = m[1];
+    const headerLen = m[0].length;
+    const bodyStart = j + headerLen;
+    const endIdx = findMatchingArrayEnd(tex, bodyStart);
+    if (endIdx === -1) {
+      out += tex.slice(j, bodyStart);
+      i = bodyStart;
+      continue;
+    }
+    const body = tex.slice(bodyStart, endIdx);
+    const declared = countArrayColumnSpecLetters(spec);
+    const needed = inferMaxColumnsInArrayBody(body);
+    if (needed > declared && declared >= 1 && needed <= 32) {
+      out += `\\begin{array}{${'c'.repeat(needed)}}${body}\\end{array}`;
+    } else {
+      out += tex.slice(j, endIdx + '\\end{array}'.length);
+    }
+    i = endIdx + '\\end{array}'.length;
+  }
+  return out;
+}
+
+function fixArraysInDelimitedMath(mathSpan: string): string {
+  if (!mathSpan.startsWith('$')) {
+    return mathSpan;
+  }
+  const isDisplay = mathSpan.startsWith('$$');
+  const delim = isDisplay ? '$$' : '$';
+  if (mathSpan.length < 2 * delim.length || !mathSpan.endsWith(delim)) {
+    return mathSpan;
+  }
+  const inner = mathSpan.slice(delim.length, -delim.length);
+  const decoded = decodeMathEntities(inner);
+  return `${delim}${fixMismatchedArrayEnvironments(decoded)}${delim}`;
+}
+
+function fixArraysInAllMathSpans(segment: string): string {
+  return splitByMathDelimiters(segment)
+    .map((part) => (part.kind === 'math' ? fixArraysInDelimitedMath(part.s) : part.s))
+    .join('');
+}
+
 function normalizeTextOutsideMathOnly(segment: string): string {
-  const stripped = stripInnerInlineDollarsInDisplayMath(segment);
+  const arrayFixed = fixArraysInAllMathSpans(segment);
+  const stripped = stripInnerInlineDollarsInDisplayMath(arrayFixed);
   return splitByMathDelimiters(stripped)
     .map((part) => (part.kind === 'text' ? normalizeTextSegment(part.s) : part.s))
     .join('');

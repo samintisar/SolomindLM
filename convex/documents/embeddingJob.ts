@@ -225,6 +225,20 @@ export const docEmbedding = internalAction({
 
       logger.info('Text extraction complete', { contentLength: extractedText.length });
 
+      // Full markdown for source viewer / copy (no overlapping chunk boundaries).
+      // Convex document field limit ~1MB UTF-8; cap stored copy for huge PDFs.
+      const MAX_STORED_MARKDOWN_CHARS = 800_000;
+      let extractedMarkdownForUi = extractedText;
+      if (extractedMarkdownForUi.length > MAX_STORED_MARKDOWN_CHARS) {
+        extractedMarkdownForUi =
+          extractedMarkdownForUi.slice(0, MAX_STORED_MARKDOWN_CHARS) +
+          "\n\n---\n\n**Note:** Display copy was truncated for a very large document. Use **Original PDF** to view the full file.";
+      }
+      await ctx.runMutation(internal.documents.index.setExtractedMarkdown, {
+        documentId,
+        extractedMarkdown: extractedMarkdownForUi,
+      });
+
       // Phase: Chunking
       logger.phaseStart('chunking');
       currentPhase = 'chunking';

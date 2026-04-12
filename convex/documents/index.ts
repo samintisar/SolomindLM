@@ -174,7 +174,7 @@ export const list = query({
 });
 
 /**
- * Get document content from chunks
+ * Get document content for the source viewer (prefers full `extractedMarkdown`, else stitched chunks).
  */
 export const getContent = query({
   args: { id: v.id("documents") },
@@ -198,20 +198,28 @@ export const getContent = query({
       .withIndex("by_document", (q) => q.eq("documentId", args.id))
       .collect();
 
-    if (chunks.length === 0) {
+    const sortedChunks = chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+    const stored = document.extractedMarkdown?.trim();
+    if (stored) {
+      return {
+        documentId: args.id,
+        content: stored,
+        chunkCount: sortedChunks.length,
+      };
+    }
+
+    if (sortedChunks.length === 0) {
       throw new Error("Document content not found");
     }
 
-    // Sort by chunk index and reconstruct. Use single newline so we don't insert
-    // blank lines inside markdown tables when chunk boundaries fall mid-table
-    // (GFM treats a blank line as ending the table, which breaks rendering).
-    const sortedChunks = chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+    // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view
     const fullContent = sortedChunks.map((chunk) => chunk.content).join("\n");
 
     return {
       documentId: args.id,
       content: fullContent,
-      chunkCount: chunks.length,
+      chunkCount: sortedChunks.length,
     };
   },
 });
@@ -481,6 +489,22 @@ export const updateTitle = internalMutation({
 /**
  * Internal: Update document-level metadata
  */
+/**
+ * Full extracted markdown for source viewer / copy (single string, no chunk overlap).
+ */
+export const setExtractedMarkdown = internalMutation({
+  args: {
+    documentId: v.id("documents"),
+    extractedMarkdown: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.documentId, {
+      extractedMarkdown: args.extractedMarkdown,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const updateMetadata = internalMutation({
   args: {
     documentId: v.id("documents"),

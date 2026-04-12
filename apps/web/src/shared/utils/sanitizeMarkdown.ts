@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 
-import { normalizeMathMarkdown } from '@convex/_shared/mathMarkdown';
+import { normalizeMathMarkdown, splitByMathDelimiters } from '@convex/_shared/mathMarkdown';
 
 /**
  * Strips ANSI escape codes from text (e.g., [1m, [0m, [31m).
@@ -37,21 +37,27 @@ export function restoreAngleBracketsAfterDomPurify(content: string): string {
  * math (e.g. $0 < \\theta < 1$) and in ordinary text.
  */
 export function sanitizeMarkdown(content: string): string {
-  // First strip ANSI codes that can cause KaTeX parse errors
   const withoutAnsi = stripAnsiCodes(content);
   const normalizedMath = normalizeMathMarkdown(withoutAnsi);
 
-  // DOMPurify sanitizes HTML, but we're using it on markdown source text
-  // This strips any HTML tags that might be embedded in the markdown
-  // Streamdown then parses the clean markdown for display
-  const sanitized = DOMPurify.sanitize(normalizedMath, {
-    // Allow only safe text content - no HTML tags in markdown source
-    ALLOWED_TAGS: [], // Empty array means no HTML tags allowed in markdown source
-    ALLOWED_ATTR: [],
-    KEEP_CONTENT: true, // Keep the text content
-  });
+  // Run DOMPurify only outside $...$ / $$...$$. Inside math, `<` is common (e.g. $0<\lambda<s\mu$);
+  // passing the whole string through DOMPurify can truncate or corrupt those spans before KaTeX runs.
+  const segments = splitByMathDelimiters(normalizedMath);
+  const sanitized = segments
+    .map((part) => {
+      if (part.kind === 'math') {
+        return part.s;
+      }
+      const raw = DOMPurify.sanitize(part.s, {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+        KEEP_CONTENT: true,
+      });
+      return restoreAngleBracketsAfterDomPurify(raw);
+    })
+    .join('');
 
-  return restoreAngleBracketsAfterDomPurify(sanitized);
+  return sanitized;
 }
 
 /**
