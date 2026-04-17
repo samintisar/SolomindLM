@@ -103,7 +103,7 @@ export async function collapse(
   console.log('='.repeat(80));
 
   const mapOutputsDetails = state.mapOutputs.map((output, idx) => {
-    let slides = 0;
+    let slides: number;
     try {
       const parsed = JSON.parse(output) as SlideCandidate[];
       slides = parsed.length;

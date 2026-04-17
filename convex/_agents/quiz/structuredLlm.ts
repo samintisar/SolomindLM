@@ -20,6 +20,5 @@ export function createStructuredLLM<T>(
   schema: z.ZodTypeAny,
   name: string
 ): StructuredOutputInvoker<T> {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(schema, { name }) as any;
 }

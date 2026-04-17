@@ -27,10 +27,9 @@ interface MapOutputInvoker {
 }
 
 function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(schema, {
     name: 'extract_topics_and_summary',
-  });
+  }) as unknown as MapOutputInvoker;
 }
 
 const CONFIG = {

@@ -39,7 +39,6 @@ interface ConceptExtractionInvoker {
 
 // Helper function to create a structured LLM without triggering deep type instantiation
 function createConceptExtractionLLM(llm: ChatTogetherAI): ConceptExtractionInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(ConceptExtractionSchema, {
     name: 'concept_extraction',
   });

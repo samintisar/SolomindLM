@@ -126,7 +126,8 @@ export const createCheckoutSession = action({
         } catch (retryErr: unknown) {
           const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
           throw new Error(
-            `Stripe customer not found and retry failed. ${retryMsg}`
+            `Stripe customer not found and retry failed. ${retryMsg}`,
+            { cause: retryErr }
           );
         }
       }
@@ -138,7 +139,8 @@ export const createCheckoutSession = action({
             ? "STRIPE_PRO_MONTHLY_PRICE_ID"
             : "STRIPE_PRO_YEARLY_PRICE_ID";
         throw new Error(
-          `Invalid Stripe price. Update ${varName} in Convex to a Price ID from the same Stripe account and mode (test vs live) as your STRIPE_SECRET_KEY. In Stripe Dashboard → Products, copy the correct price_xxx. Stripe: ${message}`
+          `Invalid Stripe price. Update ${varName} in Convex to a Price ID from the same Stripe account and mode (test vs live) as your STRIPE_SECRET_KEY. In Stripe Dashboard → Products, copy the correct price_xxx. Stripe: ${message}`,
+          { cause: err }
         );
       }
       throw err;

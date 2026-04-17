@@ -77,14 +77,14 @@ export class SlideImageGenerationService {
             const statusCode = apiError?.status || apiError?.response?.status;
 
             if (statusCode === 401) {
-              throw new Error(`OpenAI authentication failed: ${errorMessage}`);
+              throw new Error(`OpenAI authentication failed: ${errorMessage}`, { cause: apiError });
             } else if (statusCode === 400) {
-              throw new Error(`OpenAI invalid request: ${errorMessage}`);
+              throw new Error(`OpenAI invalid request: ${errorMessage}`, { cause: apiError });
             } else if (statusCode === 429) {
               // Rate limit error - preserve for retry logic
               throw apiError;
             } else {
-              throw new Error(`OpenAI API error: ${errorMessage}`);
+              throw new Error(`OpenAI API error: ${errorMessage}`, { cause: apiError });
             }
           }
         },
@@ -336,7 +336,8 @@ export class SlideImageGenerationService {
 
               // Re-throw to fail the entire batch
               throw new Error(
-                `Failed to generate image for slide ${slide.slideNumber} ("${slide.title}"): ${error instanceof Error ? error.message : String(error)}`
+                `Failed to generate image for slide ${slide.slideNumber} ("${slide.title}"): ${error instanceof Error ? error.message : String(error)}`,
+                { cause: error }
               );
             }
           })

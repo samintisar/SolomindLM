@@ -205,7 +205,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const copyMessageAsMarkdown = useCallback(async (message: Message) => {
     const stripRefs = (c: string) => {
-      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s\.,\-:\–\—]*$/i);
+      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s.,\-:–—]*$/i);
       return m ? c.substring(0, m.index).trim() : c;
     };
     try {

@@ -13,9 +13,8 @@ export interface FlashcardOutputInvoker {
   ): Promise<FlashcardResponse>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): FlashcardOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(schema, {
     name: 'flashcard_array',
   }) as any;

@@ -33,7 +33,7 @@ Title:`;
 
     /** Strip quotes; first line only; cap at 10 words (prompt contract). */
     function finalizeTitle(raw: string): string {
-      let t = raw.trim().replace(/^["']|["']$/g, "");
+      const t = raw.trim().replace(/^["']|["']$/g, "");
       const line = t.split(/\n/)[0]?.trim() ?? "";
       const words = line.split(/\s+/).filter(Boolean);
       if (words.length > 10) return words.slice(0, 10).join(" ");
@@ -73,7 +73,7 @@ Title:`;
       return title;
     } catch (error) {
       console.error("[TitleGenerator] Error:", error);
-      throw new Error("Failed to generate title");
+      throw new Error("Failed to generate title", { cause: error });
     }
   },
 });

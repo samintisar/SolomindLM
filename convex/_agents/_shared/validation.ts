@@ -292,7 +292,7 @@ export const ValidationPresets = {
     customRules: [
       (output: string) => {
         // Check for multiple choice format
-        const hasOptions = /^[a-d][\.)]\s*/im.test(output);
+        const hasOptions = /^[a-d][.)]\s*/im.test(output);
         const hasAnswer = /answer:\s*[a-d]/i.test(output);
         return {
           valid: hasOptions && hasAnswer,
@@ -339,7 +339,7 @@ export const ValidationPresets = {
     customRules: [
       (output: string) => {
         // Check for hierarchical structure (indentation)
-        const hasHierarchy = /^  /m.test(output);
+        const hasHierarchy = /^ {2}/m.test(output);
         // Check for root topic
         const hasRoot = /^#\s+.+/m.test(output);
         return {

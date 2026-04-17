@@ -32,7 +32,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
   // Fallback: if end is missing (e.g. old record), derive from period start + interval
   if (!periodEndDate || !Number.isFinite(periodEndDate.getTime())) {
     const periodStartMs = subscription.currentPeriodStart;
-    let startMs = typeof periodStartMs === 'number' && Number.isFinite(periodStartMs) && periodStartMs > 0
+    const startMs = typeof periodStartMs === 'number' && Number.isFinite(periodStartMs) && periodStartMs > 0
       ? periodStartMs
       : (subscription as { createdAt?: number }).createdAt;
     if (typeof startMs === 'number' && Number.isFinite(startMs) && startMs > 0) {

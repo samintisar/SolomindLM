@@ -37,9 +37,8 @@ interface HomePageProps {
   onRequireAuth?: (errorMessage: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({
-  // Props kept for backward compatibility during migration; context is preferred
-}) => {
+// Props kept for backward compatibility during migration; context is preferred.
+export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   const ctx = useNotebookContext();
   const featuredNotebooks = ctx.featuredNotebooks;
   const recentNotebooks = ctx.recentNotebooks;

@@ -216,7 +216,7 @@ export const docEmbedding = internalAction({
 
       // Sanitize extracted text
       const originalLength = extractedText.length;
-      extractedText = extractedText.replace(/\u0000/g, '');
+      extractedText = extractedText.split("\u0000").join("");
       if (originalLength !== extractedText.length) {
         logger.warn('Removed null bytes from text', {
           bytesRemoved: originalLength - extractedText.length,

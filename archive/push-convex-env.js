@@ -1,3 +1,4 @@
+/* eslint-env node */
 #!/usr/bin/env node
 /**
  * Push all variables from .env to Convex deployment.

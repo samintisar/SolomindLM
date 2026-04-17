@@ -248,7 +248,7 @@ export class SupadataLoaderService {
     } catch (e) {
       if (e instanceof SupadataError) {
         logger.error('Scrape failed', e, { code: e.error });
-        throw new Error(`Failed to scrape web page: ${e.message}`);
+        throw new Error(`Failed to scrape web page: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -277,7 +277,7 @@ export class SupadataLoaderService {
     } catch (e) {
       if (e instanceof SupadataError) {
         logger.error('Map failed', e, { code: e.error });
-        throw new Error(`Failed to map website: ${e.message}`);
+        throw new Error(`Failed to map website: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -323,7 +323,7 @@ export class SupadataLoaderService {
     } catch (e) {
       if (e instanceof SupadataError) {
         logger.error('Crawl failed', e, { code: e.error });
-        throw new Error(`Failed to crawl website: ${e.message}`);
+        throw new Error(`Failed to crawl website: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -335,7 +335,7 @@ export class SupadataLoaderService {
    */
   extractVideoId(url: string): string {
     const regex =
-      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+      /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
     const match = url.match(regex);
     if (!match?.[1]) throw new Error('Invalid YouTube URL');
     return match[1];

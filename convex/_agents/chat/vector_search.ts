@@ -127,7 +127,7 @@ export class VectorSearchHandler {
       console.log('[VectorSearch] Using pre-computed HyDE embedding');
     }
     const queryEmbedding = preComputedEmbedding ?? await this.embeddingService.embedText(query);
-    let raw = await this.vectorSearchRunner(
+    const raw = await this.vectorSearchRunner(
       queryEmbedding,
       this.config.vectorMatchCount,
       documentIds
@@ -154,7 +154,7 @@ export class VectorSearchHandler {
       });
     }
 
-    let filtered = withScore.filter(
+    const filtered = withScore.filter(
       (r) => (r.similarity ?? 0) >= this.config.vectorMatchThreshold
     );
     console.log(`[VectorSearch] After threshold: ${filtered.length} results`);

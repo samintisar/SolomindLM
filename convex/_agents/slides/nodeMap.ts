@@ -62,7 +62,7 @@ export async function mapProcess(
   });
 
   let output: string;
-  let slidesGenerated = 0;
+  let slidesGenerated: number;
   let extractedTheme: string | undefined = undefined;
 
   try {

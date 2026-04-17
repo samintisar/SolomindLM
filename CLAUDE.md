@@ -22,6 +22,14 @@ bun run typecheck:web          # Type check web only
 
 Type checks must be run individually per workspace (cannot run simultaneously).
 
+**Linting & Formatting:**
+```bash
+bun run lint                  # Run ESLint on entire codebase
+bun run lint:fix              # Auto-fix ESLint issues
+bun run format                # Format all files with Prettier
+bun run format:check          # Check formatting without writing
+```
+
 **Convex Environment:**
 ```bash
 bun run convex:env:push        # Push .env vars to convex dev
@@ -170,7 +178,7 @@ bun run convex:env:push:dry    # Dry run for env push
 - **Convex directory structure** - Directories with `_` prefix are excluded from API generation. Functions in `convex/domain/index.ts` become `api.domain.index.*`
 - **Auth file location** - `@convex-dev/auth` requires `convex/auth.ts` at root level, not in a subdirectory
 - **Vite cache** - After changing API paths, clear Vite cache: `rm -rf apps/web/node_modules/.vite` and hard refresh browser (Ctrl+Shift+R)
-- **No linting/tests configured** - Typecheck is the primary validation
+- **Linting/formatting:** ESLint (flat config) + Prettier. Run `bun run lint` before committing. Convex generated files (`convex/_generated/`) are excluded. `@typescript-eslint/no-explicit-any` is a warning (not error) to match `strict: false` in web tsconfig — tighten this as null safety improves. No tests configured yet — typecheck is the primary validation.
 - **Port management:** `bun run dev:web` automatically kills existing processes on port 5173 via kill-port script
 - **Convex URLs:** Dev and prod use different deployment URLs - ensure `.env.local` uses dev URLs locally, while production hosting (Vercel) uses prod URLs
 - **TypeScript strict mode disabled** - `strict: false` in web tsconfig; rely on typecheck rather than strict null checks
@@ -249,19 +257,43 @@ This project uses the **context7 MCP server** for live documentation lookup of l
 
 **ALWAYS invoke the `serena-first` skill at the start of every session before doing any code work.** This project uses the Serena MCP server for LSP-powered semantic code operations.
 
-**When to use Serena vs built-in tools:**
-- **Reading code:** Use `find_symbol` (with `include_body=true`) or `get_symbols_overview` instead of `Read` for `.ts`/`.tsx` files
-- **Searching:** Use `find_symbol` or `search_for_pattern` instead of `Grep` for code searches
-- **Editing:** Use `replace_symbol_body`, `replace_content` (regex mode), `insert_before_symbol`, `insert_after_symbol` instead of `Edit`
-- **Renaming:** Use `rename_symbol` for project-wide renames
-- **Finding usages:** Use `find_referencing_symbols` before changing any signature
-- **New files:** Use `create_text_file` instead of `Write`
+### Session Startup
+
+1. Call `initial_instructions` to load Serena's operational guidance for this project
+2. Check `list_memories` for any relevant project context from prior sessions
+3. Proceed with code work using Serena's tools as the primary method
+
+### General Rules
+
+- Prefer Serena's code-aware tools over naive file reads and regex/grep:
+  - Use `find_symbol` and `find_referencing_symbols` to locate definitions/usages instead of scanning whole files.
+  - Use `insert_before_symbol`, `insert_after_symbol`, and `replace_symbol_body` for edits instead of rewriting entire files.
+- For non-trivial refactors: ask Serena to find all references before changing any public API. Apply edits via Serena's editing tools so changes are localized and consistent.
+
+### When to Use Serena vs Built-in Tools
+
+**Use Serena for (`.ts`/`.tsx` files):**
+- **Reading code:** `find_symbol` (with `include_body=true`) or `get_symbols_overview` to understand structure, then `find_symbol` to read specific symbols — avoids loading entire files
+- **Searching:** `find_symbol` or `search_for_pattern` instead of `Grep` for code searches
+- **Editing:** `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol` instead of `Edit` — more token-efficient and localized
+- **Renaming:** `rename_symbol` for project-wide renames
+- **Finding usages:** `find_referencing_symbols` before changing any signature
+- **New code files:** `create_text_file` instead of `Write`
 
 **Built-in tools are fine for:** non-code files (`.md`, `.json`, `.yaml`, `.css`, `.html`), images, and binary files.
 
-**Workflow:** Start with `get_symbols_overview` to understand a file, then `find_symbol` to read specific symbols. Avoid reading entire files when possible.
+### Workflow
 
-**LSP staleness:** If Serena seems unaware of recent changes, call `restart_language_server` to resync. This can happen after using built-in tools for edits.
+1. Start with `get_symbols_overview` to understand a file's structure
+2. Use `find_symbol` to read only the symbols you need (`include_body=true`)
+3. Edit with `replace_symbol_body` or insert with `insert_before_symbol`/`insert_after_symbol`
+4. Verify references with `find_referencing_symbols` after changing public APIs
+
+### Operational Preferences
+
+- Assume Serena is already configured for this project; don't try to reconfigure the MCP server.
+- If Serena tools fail or are unavailable, fall back to Claude Code's built-in file operations, but prefer Serena when possible.
+- **LSP staleness:** If Serena seems unaware of recent changes, call `restart_language_server` to resync. This can happen after using built-in tools for edits.
 
 <!-- convex-ai-start -->
 This project uses [Convex](https://convex.dev) as its backend.

@@ -296,7 +296,7 @@ export function useSendMessage() {
     callbacks: SendMessageCallbacks,
     documentIds?: string[]
   ) => {
-    let tempMessageId: string | null = null;
+    let tempMessageId: string | null;
 
     // Check authentication and token availability
     if (!isAuthenticated || !authToken) {
@@ -328,7 +328,7 @@ export function useSendMessage() {
 
       // Step 2: Get auth token for cross-origin requests
       // HTTP actions require JWT token via Authorization header (cookies don't work cross-origin)
-      let headers: Record<string, string> = {
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`,
       };

@@ -112,7 +112,8 @@ async function refineSelectedSlides(
           );
 
           throw new Error(
-            `Failed to refine slide ${index + 1} ("${candidate.title}"): ${error instanceof Error ? error.message : String(error)}`
+            `Failed to refine slide ${index + 1} ("${candidate.title}"): ${error instanceof Error ? error.message : String(error)}`,
+            { cause: error }
           );
         }
       };

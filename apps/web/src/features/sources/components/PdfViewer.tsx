@@ -9,6 +9,7 @@ if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
 
+// Module-level constant computed once at load time.
 const BASE_PAGE_WIDTH = Math.min(420, typeof window !== 'undefined' ? window.innerWidth - 80 : 420);
 /** 100% = minimum (readable baseline); 200% = max for detail */
 const ZOOM_MIN = 1;

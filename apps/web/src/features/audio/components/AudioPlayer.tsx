@@ -134,6 +134,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const togglePlay = async () => {

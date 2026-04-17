@@ -246,7 +246,7 @@ export class StructuralChunker {
   }
 
   private detectMathNotation(content: string): boolean {
-    return /\$\$[\s\S]*?\$\$/.test(content) || /\$[^\$\n]+?\$/.test(content);
+    return /\$\$[\s\S]*?\$\$/.test(content) || /\$[^$\n]+?\$/.test(content);
   }
 
   private detectTable(content: string): boolean {

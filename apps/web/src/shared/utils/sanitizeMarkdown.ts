@@ -8,6 +8,7 @@ import { normalizeMathMarkdown, splitByMathDelimiters } from '@convex/_shared/ma
  */
 function stripAnsiCodes(text: string): string {
   // Matches ANSI escape sequences like \x1b[...m or \[...\d
+  // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b\[[0-9;]*m/g, '')
               .replace(/\[[0-9;]*[mK]/g, '');
 }

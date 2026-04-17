@@ -143,7 +143,11 @@ export const FolderCard: React.FC<FolderCardProps> = ({
         {/* Action Column */}
         <div className="flex justify-end z-20 pointer-events-auto folder-kebab-menu relative">
           <button
-            onClick={(e) => { e.stopPropagation(); isMenuOpen ? onCloseMenu() : onToggleMenu(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isMenuOpen) onCloseMenu();
+              else onToggleMenu();
+            }}
             className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? 'bg-secondary' : ''}`}
           >
             <MoreVertical className="w-4 h-4 shrink-0" />

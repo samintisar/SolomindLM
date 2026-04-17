@@ -51,14 +51,12 @@ interface QuizQuestionOutputInvoker {
 
 // Helper function to create a structured LLM without triggering deep type instantiation
 function createCandidateLLM(llm: ChatTogetherAI): QuizCandidateOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(QuizCandidateArraySchema, {
     name: 'quiz_candidates',
   });
 }
 
 function createQuestionLLM(llm: ChatTogetherAI): QuizQuestionOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(QuizQuestionSchema, {
     name: 'quiz_question',
   });

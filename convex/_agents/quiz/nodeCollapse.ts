@@ -97,7 +97,7 @@ export async function collapse(
   console.log('='.repeat(80));
 
   const mapOutputsDetails = state.mapOutputs.map((output, idx) => {
-    let candidates = 0;
+    let candidates: number;
     try {
       const parsed = JSON.parse(output) as QuizCandidate[];
       candidates = parsed.length;

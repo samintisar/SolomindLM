@@ -180,9 +180,8 @@ export class HybridSearchHandler extends VectorSearchHandler {
     const startTime = Date.now();
     console.log(`[HybridSearch] query="${query.slice(0, 80)}..."`);
 
-    try {
-      // Parallel retrieval
-      const [vectorResults, keywordResults] = await Promise.all([
+    // Parallel retrieval
+    const [vectorResults, keywordResults] = await Promise.all([
         this.executeVectorSearch(query, documentIds, preComputedEmbedding),
         this.executeKeywordSearch(query, documentIds),
       ]);
@@ -312,11 +311,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
         }
       }
 
-      return finalResults;
-    } catch (error: any) {
-      // Re-throw error instead of falling back
-      throw error;
-    }
+    return finalResults;
   }
 
   /**

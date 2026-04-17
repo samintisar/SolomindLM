@@ -18,8 +18,9 @@ export interface UseFolderHandlersReturn {
   setFolderActiveMenuId: (id: string | null) => void;
 }
 
-export function useFolderHandlers({
-}: UseFolderHandlersProps = {}): UseFolderHandlersReturn {
+export function useFolderHandlers(
+  _props: UseFolderHandlersProps = {}
+): UseFolderHandlersReturn {
   const [folderActiveMenuId, setFolderActiveMenuId] = useState<string | null>(null);
   const [folderCustomizingId, setFolderCustomizingId] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);

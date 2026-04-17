@@ -45,7 +45,6 @@ interface WrittenQuestionsOutputInvoker {
 
 // Helper function to create a structured LLM without triggering deep type instantiation
 function createQuestionsLLM(llm: ChatTogetherAI): WrittenQuestionsOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(WrittenQuestionsArraySchema, {
     name: 'written_questions',
   });
@@ -62,7 +61,6 @@ interface WrittenQuestionSelectionInvoker {
 }
 
 function createQuestionSelectionLLM(llm: ChatTogetherAI): WrittenQuestionSelectionInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(WrittenQuestionIdSelectionSchema, {
     name: 'written_question_id_selection',
   });

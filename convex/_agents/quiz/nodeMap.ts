@@ -57,7 +57,7 @@ export async function mapProcess(
   });
 
   let output: string;
-  let candidatesGenerated = 0;
+  let candidatesGenerated: number;
 
   try {
     const response: QuizCandidateResponse = await invokeWithRetry(

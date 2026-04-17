@@ -88,16 +88,6 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     };
   }, [resolvedPlayback, isVisible]);
 
-  // Add error handling for audio loading
-  const handleAudioError = () => {
-    console.error('[MiniAudioPlayer] Audio failed to load:', {
-      src: audioRef.current?.src,
-      error: 'No supported sources',
-      audioUrl,
-      resolvedPlayback,
-    });
-  };
-
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -125,7 +115,6 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     const handleDurationChange = () => {
       console.log('[MiniAudioPlayer durationchange]', {
         newDuration: audio.duration,
-        oldDurationState: duration,
       });
       if (isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
@@ -140,6 +129,15 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+
+    const handleAudioError = () => {
+      console.error('[MiniAudioPlayer] Audio failed to load:', {
+        src: audio.src,
+        error: 'No supported sources',
+        audioUrl,
+        resolvedPlayback,
+      });
+    };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -158,6 +156,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('error', handleAudioError);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
 
   const togglePlay = async () => {

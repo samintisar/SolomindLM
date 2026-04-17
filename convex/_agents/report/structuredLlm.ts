@@ -32,7 +32,6 @@ export interface MapOutputInvoker {
  * Helper function to create a structured LLM without triggering deep type instantiation.
  */
 export function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(schema, {
     name: 'extract_topics_and_summary',
   }) as any;

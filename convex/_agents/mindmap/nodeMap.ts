@@ -111,7 +111,7 @@ export async function mapProcess(
         totalFailures,
       });
 
-      throw new Error(`Circuit breaker tripped: ${totalFailures} chunks failed permanently`);
+      throw new Error(`Circuit breaker tripped: ${totalFailures} chunks failed permanently`, { cause: e });
     }
 
     logger.phaseError(

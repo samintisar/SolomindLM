@@ -59,21 +59,18 @@ interface SlideSelectionOutputInvoker {
 
 // Helper function to create a structured LLM without triggering deep type instantiation
 function createCandidateLLM(llm: ChatTogetherAI): SlideCandidateOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(SlideCandidateArraySchema, {
     name: 'slide_candidates',
   });
 }
 
 function createSlideLLM(llm: ChatTogetherAI): SlideOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(SlideSchema, {
     name: 'slide',
   });
 }
 
 function createSelectionLLM(llm: ChatTogetherAI): SlideSelectionOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(SlideSelectionSchema, {
     name: 'slide_selection',
   });
@@ -192,7 +189,7 @@ async function generateSlideImage(
           apiError?.error?.message ||
           apiError?.response?.data?.error?.message ||
           String(apiError);
-        throw new Error(`OpenAI API error: ${errorMessage}`);
+        throw new Error(`OpenAI API error: ${errorMessage}`, { cause: apiError });
       }
     },
     CONFIG.IMAGE_TIMEOUT_MS,
@@ -910,7 +907,9 @@ export async function runFinalizeSlideDeckPhase(
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
           console.error(`[SlideDeckJob] CRITICAL: Failed to generate image for slide ${slide.slideNumber}: ${errorMsg}`);
-          throw new Error(`Failed to generate image for slide ${slide.slideNumber} ("${slide.title}"): ${errorMsg}`);
+          throw new Error(`Failed to generate image for slide ${slide.slideNumber} ("${slide.title}"): ${errorMsg}`, {
+            cause: error,
+          });
         }
       }
 

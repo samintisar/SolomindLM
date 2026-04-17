@@ -36,7 +36,9 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
   const [showNewPassword, setShowNewPassword] = useState(false);
 
   useEffect(() => {
-    if (authError) setError(authError);
+    if (authError) {
+      setError(authError);
+    }
   }, [authError]);
 
   const handleGoogleSignIn = async () => {

@@ -10,9 +10,8 @@ export interface WrittenQuestionsOutputInvoker {
   invoke(messages: Array<SystemMessage | HumanMessage>): Promise<WrittenQuestionsResponse>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): WrittenQuestionsOutputInvoker {
-  // @ts-ignore - Type instantiation is excessively deep with LangChain's withStructuredOutput
   return llm.withStructuredOutput(schema, {
     name: 'written_questions',
   }) as any;

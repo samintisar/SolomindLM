@@ -161,4 +161,5 @@ export interface ChunkProcessStateBase {
  * }>;
  * ```
  */
-export type CreateChunkProcessState<T extends Record<string, any> = {}> = ChunkProcessStateBase & T;
+export type CreateChunkProcessState<T extends Record<string, any> = Record<string, never>> =
+  ChunkProcessStateBase & T;

@@ -78,7 +78,7 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case 'mindmap':
+    case 'mindmap': {
       const nodeData = normalizeMindMapNodeData(dbNote.data, dbNote.title);
       return {
         id: dbNote._id,
@@ -93,6 +93,7 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
+    }
 
     case 'audioOverview':
       return {

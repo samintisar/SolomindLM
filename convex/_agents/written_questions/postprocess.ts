@@ -152,7 +152,7 @@ ${focus ? `Focus Area: ${focus}\n` : ''}
 Candidate Questions:
 ${questionsText}
 
-Return a JSON object with a single property \"selectedIds\" containing exactly ${targetCount} chosen IDs.`;
+Return a JSON object with a single property "selectedIds" containing exactly ${targetCount} chosen IDs.`;
 }
 
 export function applySelectedQuestionIds(

@@ -161,7 +161,8 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  isMenuOpen ? onCloseMenu() : onToggleMenu();
+                  if (isMenuOpen) onCloseMenu();
+                  else onToggleMenu();
                 }}
                 className={`p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? 'bg-secondary' : ''}`}
               >
@@ -249,7 +250,8 @@ export const NotebookCard: React.FC<NotebookCardProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                isMenuOpen ? onCloseMenu() : onToggleMenu();
+                if (isMenuOpen) onCloseMenu();
+                else onToggleMenu();
               }}
               className={`p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex items-center justify-center shrink-0 opacity-100 ${isMenuOpen ? 'bg-secondary' : ''}`}
             >

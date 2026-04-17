@@ -136,11 +136,11 @@ export class MistralOCRService {
         clearTimeout(timeoutId);
         if (error instanceof Error) {
           if (error.name === "AbortError") {
-            throw new Error("Mistral OCR request timed out");
+            throw new Error("Mistral OCR request timed out", { cause: error });
           }
           throw error;
         }
-        throw new Error("Failed to process document with Mistral OCR");
+        throw new Error("Failed to process document with Mistral OCR", { cause: error });
       }
     }, "mistral_ocr");
   }

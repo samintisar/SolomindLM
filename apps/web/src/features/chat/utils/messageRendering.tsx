@@ -7,7 +7,7 @@ const MarkdownRenderer = lazy(() =>
 );
 
 export function stripReferencesSection(content: string): string {
-  const referencesPattern = /\n?(?:References|Reference):\s*\n?[\d\s\.,\-:\–\—]*$/i;
+  const referencesPattern = /\n?(?:References|Reference):\s*\n?[\d\s.,\-:–—]*$/i;
   const match = content.match(referencesPattern);
   if (match) {
     return content.substring(0, match.index).trim();

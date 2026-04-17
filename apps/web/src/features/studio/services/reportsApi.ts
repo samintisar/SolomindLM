@@ -22,7 +22,7 @@ export interface CreateReportResponse {
  */
 function mapDatabaseReportToNote(dbReport: any): ReportNote {
   const reportType = normalizeReportTypeId(dbReport.reportType || dbReport.metadata?.reportType || 'custom');
-  let preview = '';
+  let preview: string;
 
   // Determine preview based on status
   if (dbReport.status === 'generating' || dbReport.status === 'mapping' || dbReport.status === 'collapsing' || dbReport.status === 'reducing') {

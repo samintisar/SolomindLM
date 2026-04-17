@@ -387,7 +387,7 @@ http.route({
         }
       })();
 
-      let response = new Response(readable);
+      const response = new Response(readable);
 
       // Add CORS headers to the response
       Object.entries(corsHeaders).forEach(([key, value]) => {

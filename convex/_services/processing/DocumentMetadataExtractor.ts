@@ -91,7 +91,7 @@ function detectCodeBlocks(text: string): boolean {
 function detectMathNotation(text: string): boolean {
   // Display math: $$...$$
   // Inline math: $...$ (avoid matching currency like $5.00)
-  return /\$\$[\s\S]*?\$\$/.test(text) || /\$[^\$\n]+?\$/.test(text);
+  return /\$\$[\s\S]*?\$\$/.test(text) || /\$[^$\n]+?\$/.test(text);
 }
 
 /**

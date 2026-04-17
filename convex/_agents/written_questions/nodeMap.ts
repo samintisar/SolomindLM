@@ -69,7 +69,7 @@ export async function mapProcess(
   });
 
   let output: string;
-  let questionsGenerated = 0;
+  let questionsGenerated: number;
 
   try {
     const response: WrittenQuestionsResponse = await invokeWithRetry(

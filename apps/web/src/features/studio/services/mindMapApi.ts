@@ -33,7 +33,7 @@ function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
  * Map a database mindmap response to the frontend MindMapNote interface
  */
 function mapMindMapToNote(dbMindMap: any): MindMapNote {
-  let preview = '';
+  let preview: string;
 
   // Determine preview based on status
   if (dbMindMap.status === 'generating' || dbMindMap.status === 'mapping' || dbMindMap.status === 'collapsing' || dbMindMap.status === 'reducing') {

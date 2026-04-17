@@ -120,9 +120,10 @@ export function sanitizeFilename(filename: string): string {
   if (!filename) return '';
 
   return filename
-    .replace(/[\/\\]/g, '_')           // Replace path separators
+    .replace(/[/\\]/g, '_')           // Replace path separators
     .replace(/\.\./g, '')               // Remove parent directory references
     .replace(/[<>:"|?*]/g, '_')        // Remove invalid Windows characters
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1f\x80-\x9f]/g, '') // Remove control characters
     .replace(/^\.+/, '')                // Remove leading dots
     .substring(0, 255);                 // Limit length
@@ -193,7 +194,7 @@ export function detectThreats(input: string): string[] {
   }
 
   // Check for path traversal
-  if (/\.\.[\/\\]/.test(input)) {
+  if (/\.\.[/\\]/.test(input)) {
     threats.push('Path traversal pattern detected');
   }
 

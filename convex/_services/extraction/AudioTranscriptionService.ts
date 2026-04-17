@@ -71,7 +71,7 @@ export class AudioTranscriptionService {
         } catch (error) {
           clearTimeout(timeoutId);
           if (error instanceof Error && error.name === "AbortError") {
-            throw new Error("Audio transcription request timed out");
+            throw new Error("Audio transcription request timed out", { cause: error });
           }
           throw error;
         }
@@ -82,7 +82,7 @@ export class AudioTranscriptionService {
     } catch (error) {
       logger.operationError(error);
       if (error instanceof Error) throw error;
-      throw new Error("Failed to transcribe audio file");
+      throw new Error("Failed to transcribe audio file", { cause: error });
     }
   }
 }

@@ -523,11 +523,15 @@ export class ChatAgent {
       isGrounded: boolean;
       issues: string[];
       missingCitations: boolean;
-    } = { isGrounded: true, issues: [], missingCitations: false };
+    } = {
+      isGrounded: true,
+      issues: [],
+      missingCitations: false,
+    };
 
     if (mode === 'sync') {
       console.log('[ChatAgent] Phase 3: Validating grounding (sync)');
-      let syntacticValidation = validateGrounding(structuredResponse.answer_markdown, allChunks);
+      const syntacticValidation = validateGrounding(structuredResponse.answer_markdown, allChunks);
       semanticValidation = syntacticValidation.isGrounded
         ? await validateSemanticGrounding(
             structuredResponse.answer_markdown,
@@ -598,7 +602,6 @@ export class ChatAgent {
       const g = await groundingPromise;
       isGrounded = g.isGrounded;
       semanticOnlyFailure = g.semanticOnlyFailure;
-      semanticValidation = g.sem;
 
       if (!isGrounded) {
         const syntacticIssues = validateGrounding(structuredResponse.answer_markdown, allChunks).issues;
