@@ -1,14 +1,10 @@
-export type SubscriptionInterval = 'month' | 'year';
-export type SubscriptionStatus =
-  | 'active'
-  | 'past_due'
-  | 'canceled'
-  | 'unpaid';
+export type SubscriptionInterval = "month" | "year";
+export type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid";
 
 export interface SubscriptionStatusResponse {
   hasSubscription: boolean;
   status?: SubscriptionStatus;
-  plan?: 'free' | 'premium';
+  plan?: "free" | "premium";
   notebookLimit?: number;
   sourceLimit?: number;
   currentPeriodEnd?: string;

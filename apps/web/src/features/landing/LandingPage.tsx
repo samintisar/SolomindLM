@@ -1,20 +1,20 @@
-import React from 'react';
-import { NavigationHeader } from './components/NavigationHeader';
-import { HeroSection } from './components/HeroSection';
-import { FeaturesGrid } from './components/FeaturesGrid';
-import { UseCasesSection } from './components/UseCasesSection';
-import { ContentShowcase } from './components/ContentShowcase';
-import { PricingSection } from './components/PricingSection';
-import { FAQSection } from './components/FAQSection';
-import { Footer } from './components/Footer';
+import React from "react";
+import { NavigationHeader } from "./components/NavigationHeader";
+import { HeroSection } from "./components/HeroSection";
+import { FeaturesGrid } from "./components/FeaturesGrid";
+import { UseCasesSection } from "./components/UseCasesSection";
+import { ContentShowcase } from "./components/ContentShowcase";
+import { PricingSection } from "./components/PricingSection";
+import { FAQSection } from "./components/FAQSection";
+import { Footer } from "./components/Footer";
 import {
   SEOMeta,
   generateOrganizationStructuredData,
   generateWebSiteStructuredData,
   generateSoftwareApplicationStructuredData,
   generateFAQStructuredData,
-} from '@/shared/seo/SEOMeta';
-import { LANDING_FAQS } from './constants';
+} from "@/shared/seo/SEOMeta";
+import { LANDING_FAQS } from "./constants";
 
 interface LandingPageProps {
   onGetStarted: () => void;

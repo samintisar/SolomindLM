@@ -2,9 +2,9 @@ import type {
   SubscriptionStatusResponse,
   CheckoutSessionResponse,
   SubscriptionInterval,
-} from '../types';
-import { useQuery, useAction } from 'convex/react';
-import { api } from '@convex/_generated/api';
+} from "../types";
+import { useQuery, useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
 
 /**
  * Get subscription status for current user
@@ -15,7 +15,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
   if (!subscription) {
     return {
       hasSubscription: false,
-      plan: 'free',
+      plan: "free",
       notebookLimit: 5,
       sourceLimit: 20,
       currentPeriodEnd: undefined,
@@ -26,20 +26,21 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
   // Backend stores period start/end in milliseconds (Stripe seconds * 1000).
   const periodEndMs = subscription.currentPeriodEnd;
   let periodEndDate: Date | null =
-    typeof periodEndMs === 'number' && Number.isFinite(periodEndMs) && periodEndMs > 0
+    typeof periodEndMs === "number" && Number.isFinite(periodEndMs) && periodEndMs > 0
       ? new Date(periodEndMs)
       : null;
   // Fallback: if end is missing (e.g. old record), derive from period start + interval
   if (!periodEndDate || !Number.isFinite(periodEndDate.getTime())) {
     const periodStartMs = subscription.currentPeriodStart;
-    let startMs = typeof periodStartMs === 'number' && Number.isFinite(periodStartMs) && periodStartMs > 0
-      ? periodStartMs
-      : (subscription as { createdAt?: number }).createdAt;
-    if (typeof startMs === 'number' && Number.isFinite(startMs) && startMs > 0) {
+    const startMs =
+      typeof periodStartMs === "number" && Number.isFinite(periodStartMs) && periodStartMs > 0
+        ? periodStartMs
+        : (subscription as { createdAt?: number }).createdAt;
+    if (typeof startMs === "number" && Number.isFinite(startMs) && startMs > 0) {
       const start = new Date(startMs);
-      const interval = (subscription.interval as string) || 'month';
+      const interval = (subscription.interval as string) || "month";
       const end = new Date(start);
-      if (interval === 'year') {
+      if (interval === "year") {
         end.setFullYear(end.getFullYear() + 1);
       } else {
         end.setMonth(end.getMonth() + 1);
@@ -57,11 +58,11 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
   }
 
   return {
-    hasSubscription: subscription.status === 'active',
+    hasSubscription: subscription.status === "active",
     status: subscription.status as any,
-    plan: subscription.status === 'active' ? 'premium' : 'free',
-    notebookLimit: subscription.status === 'active' ? 100 : 5,
-    sourceLimit: subscription.status === 'active' ? 500 : 20,
+    plan: subscription.status === "active" ? "premium" : "free",
+    notebookLimit: subscription.status === "active" ? 100 : 5,
+    sourceLimit: subscription.status === "active" ? 500 : 20,
     currentPeriodEnd: currentPeriodEndIso ?? undefined,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     interval: subscription.interval as SubscriptionInterval,
@@ -76,7 +77,7 @@ export function useCreateCheckout() {
   const create = useAction(api.billing.index.createCheckoutSession);
 
   return async (
-    interval: 'month' | 'year',
+    interval: "month" | "year",
     successUrl: string,
     cancelUrl: string
   ): Promise<CheckoutSessionResponse> => {
@@ -132,7 +133,7 @@ export function useCreatePortalSession() {
  */
 export function useIsSubscribed(): boolean {
   const subscription = useQuery(api.billing.index.getCurrent);
-  return subscription?.status === 'active' || false;
+  return subscription?.status === "active" || false;
 }
 
 /**
@@ -141,7 +142,7 @@ export function useIsSubscribed(): boolean {
 export function useUserLimits() {
   const subscription = useQuery(api.billing.index.getCurrent);
 
-  if (subscription?.status === 'active') {
+  if (subscription?.status === "active") {
     return {
       notebookLimit: 100,
       sourceLimit: 500,

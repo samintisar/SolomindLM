@@ -29,10 +29,10 @@ import {
   invokeWithTimeout,
   createLangSmithRunConfig,
   type RetryConfig,
-} from '../../_agents/_shared/index';
+} from "../../_agents/_shared/index";
 
 /** Documented defaults for Studio LLM retries (exponential backoff inside invokeWithRetry). */
-export const STUDIO_LLM_DEFAULT_RETRY: Pick<RetryConfig, 'maxAttempts' | 'baseDelayMs'> = {
+export const STUDIO_LLM_DEFAULT_RETRY: Pick<RetryConfig, "maxAttempts" | "baseDelayMs"> = {
   maxAttempts: 3,
   baseDelayMs: 1000,
 };

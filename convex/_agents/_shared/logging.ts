@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Structured logging utility for LLM agent operations.
  *
@@ -6,37 +6,36 @@
  * correlation IDs, and context for production observability and debugging.
  */
 
-
 /**
  * Job types supported by the logging system.
  */
 export type JobType =
-  | 'report'
-  | 'flashcard'
-  | 'quiz'
-  | 'mindmap'
-  | 'audio'
-  | 'slides'
-  | 'spreadsheet'
-  | 'written_questions'
-  | 'wiki'
-  | 'document_embedding'
+  | "report"
+  | "flashcard"
+  | "quiz"
+  | "mindmap"
+  | "audio"
+  | "slides"
+  | "spreadsheet"
+  | "written_questions"
+  | "wiki"
+  | "document_embedding"
   /** Shared graph / node-builder paths without a Convex job document */
-  | 'agent_graph';
+  | "agent_graph";
 
 /**
  * Error types for classification.
  */
 export type JobErrorType =
-  | 'llm_timeout'
-  | 'llm_error'
-  | 'embedding_failure'
-  | 'parsing_error'
-  | 'rate_limit'
-  | 'extraction_failure'
-  | 'storage_error'
-  | 'validation_error'
-  | 'unknown';
+  | "llm_timeout"
+  | "llm_error"
+  | "embedding_failure"
+  | "parsing_error"
+  | "rate_limit"
+  | "extraction_failure"
+  | "storage_error"
+  | "validation_error"
+  | "unknown";
 
 /**
  * Structured error metadata for database storage.
@@ -92,25 +91,25 @@ interface LogEntry {
  * Log level for filtering and categorization.
  */
 export enum LogLevel {
-  INFO = 'INFO',
-  WARN = 'WARN',
-  ERROR = 'ERROR',
-  DEBUG = 'DEBUG',
+  INFO = "INFO",
+  WARN = "WARN",
+  ERROR = "ERROR",
+  DEBUG = "DEBUG",
 }
 
 /**
  * Log event types for categorization.
  */
 export type LogEvent =
-  | 'job_start'
-  | 'job_complete'
-  | 'job_error'
-  | 'phase_start'
-  | 'phase_complete'
-  | 'phase_error'
-  | 'phase_transition'
-  | 'info'
-  | 'warn';
+  | "job_start"
+  | "job_complete"
+  | "job_error"
+  | "phase_start"
+  | "phase_complete"
+  | "phase_error"
+  | "phase_transition"
+  | "info"
+  | "warn";
 
 /**
  * Generate a correlation ID for distributed tracing.
@@ -126,7 +125,7 @@ function generateCorrelationId(): string {
  */
 export function classifyError(error: Error | unknown): JobErrorType {
   if (!(error instanceof Error)) {
-    return 'unknown';
+    return "unknown";
   }
 
   const message = error.message.toLowerCase();
@@ -134,85 +133,77 @@ export function classifyError(error: Error | unknown): JobErrorType {
 
   // Timeout errors
   if (
-    message.includes('timeout') ||
-    message.includes('timed out') ||
-    message.includes('524') ||
-    message.includes('504')
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("524") ||
+    message.includes("504")
   ) {
-    return 'llm_timeout';
+    return "llm_timeout";
   }
 
   // Rate limiting
   if (
-    message.includes('rate limit') ||
-    message.includes('429') ||
-    message.includes('too many requests')
+    message.includes("rate limit") ||
+    message.includes("429") ||
+    message.includes("too many requests")
   ) {
-    return 'rate_limit';
+    return "rate_limit";
   }
 
   // LLM errors
   if (
-    name.includes('llm') ||
-    message.includes('llm') ||
-    message.includes('model') ||
-    message.includes('openai') ||
-    message.includes('together') ||
-    message.includes('api key')
+    name.includes("llm") ||
+    message.includes("llm") ||
+    message.includes("model") ||
+    message.includes("openai") ||
+    message.includes("together") ||
+    message.includes("api key")
   ) {
-    return 'llm_error';
+    return "llm_error";
   }
 
   // Embedding errors
   if (
-    message.includes('embedding') ||
-    message.includes('vector') ||
-    message.includes('dimension')
+    message.includes("embedding") ||
+    message.includes("vector") ||
+    message.includes("dimension")
   ) {
-    return 'embedding_failure';
+    return "embedding_failure";
   }
 
   // Parsing errors
   if (
-    name.includes('syntax') ||
-    name.includes('parse') ||
-    message.includes('json') ||
-    message.includes('parse') ||
-    message.includes('invalid') ||
-    message.includes('malformed')
+    name.includes("syntax") ||
+    name.includes("parse") ||
+    message.includes("json") ||
+    message.includes("parse") ||
+    message.includes("invalid") ||
+    message.includes("malformed")
   ) {
-    return 'parsing_error';
+    return "parsing_error";
   }
 
   // Extraction errors
-  if (
-    message.includes('ocr') ||
-    message.includes('extract') ||
-    message.includes('transcript')
-  ) {
-    return 'extraction_failure';
+  if (message.includes("ocr") || message.includes("extract") || message.includes("transcript")) {
+    return "extraction_failure";
   }
 
   // Storage errors
-  if (
-    message.includes('storage') ||
-    message.includes('upload') ||
-    message.includes('download')
-  ) {
-    return 'storage_error';
+  if (message.includes("storage") || message.includes("upload") || message.includes("download")) {
+    return "storage_error";
   }
 
   // Validation errors
   if (
-    name.includes('validation') ||
-    name.includes('type') ||
-    message.includes('invalid') ||
-    message.includes('required')
+    name.includes("validation") ||
+    name.includes("type") ||
+    message.includes("invalid") ||
+    message.includes("required")
   ) {
-    return 'validation_error';
+    return "validation_error";
   }
 
-  return 'unknown';
+  return "unknown";
 }
 
 /**
@@ -220,10 +211,10 @@ export function classifyError(error: Error | unknown): JobErrorType {
  */
 export function isRetryableError(errorType: JobErrorType): boolean {
   const retryableTypes: JobErrorType[] = [
-    'llm_timeout',
-    'rate_limit',
-    'storage_error',
-    'extraction_failure',
+    "llm_timeout",
+    "rate_limit",
+    "storage_error",
+    "extraction_failure",
   ];
   return retryableTypes.includes(errorType);
 }
@@ -231,22 +222,17 @@ export function isRetryableError(errorType: JobErrorType): boolean {
 /**
  * Create structured error metadata from an error.
  */
-export function createErrorMetadata(
-  error: Error | unknown,
-  phase: string
-): JobErrorMetadata {
+export function createErrorMetadata(error: Error | unknown, phase: string): JobErrorMetadata {
   const type = classifyError(error);
-  const message =
-    error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
 
   // Truncate message to 500 chars for storage
-  const truncatedMessage =
-    message.length > 500 ? message.substring(0, 500) + '...' : message;
+  const truncatedMessage = message.length > 500 ? message.substring(0, 500) + "..." : message;
 
   // Get stack trace (first 5 lines)
   let stackTrace: string | undefined;
   if (error instanceof Error && error.stack) {
-    stackTrace = error.stack.split('\n').slice(0, 5).join('\n');
+    stackTrace = error.stack.split("\n").slice(0, 5).join("\n");
   }
 
   return {
@@ -369,7 +355,7 @@ export function createJobLogger(context: JobLogContext): JobLogger {
     event: LogEvent,
     message?: string,
     meta?: Record<string, unknown>,
-    errorInfo?: LogEntry['error']
+    errorInfo?: LogEntry["error"]
   ): LogEntry => ({
     timestamp: new Date().toISOString(),
     level,
@@ -392,8 +378,8 @@ export function createJobLogger(context: JobLogContext): JobLogger {
     jobStart: (meta?: Record<string, unknown>) => {
       const entry = createEntry(
         LogLevel.INFO,
-        'init',
-        'job_start',
+        "init",
+        "job_start",
         `Starting ${context.jobType} job`,
         meta
       );
@@ -403,8 +389,8 @@ export function createJobLogger(context: JobLogContext): JobLogger {
     jobComplete: (meta?: Record<string, unknown>) => {
       const entry = createEntry(
         LogLevel.INFO,
-        'complete',
-        'job_complete',
+        "complete",
+        "job_complete",
         `${context.jobType} job completed successfully`,
         meta
       );
@@ -412,11 +398,11 @@ export function createJobLogger(context: JobLogContext): JobLogger {
     },
 
     jobError: (error: Error | unknown, meta?: Record<string, unknown>) => {
-      const errorMeta = createErrorMetadata(error, 'job');
+      const errorMeta = createErrorMetadata(error, "job");
       const entry = createEntry(
         LogLevel.ERROR,
-        'error',
-        'job_error',
+        "error",
+        "job_error",
         `${context.jobType} job failed: ${errorMeta.message}`,
         meta,
         {
@@ -433,7 +419,7 @@ export function createJobLogger(context: JobLogContext): JobLogger {
       const entry = createEntry(
         LogLevel.INFO,
         phase,
-        'phase_start',
+        "phase_start",
         `Starting phase: ${phase}`,
         meta
       );
@@ -444,7 +430,7 @@ export function createJobLogger(context: JobLogContext): JobLogger {
       const entry = createEntry(
         LogLevel.INFO,
         phase,
-        'phase_complete',
+        "phase_complete",
         `Completed phase: ${phase}`,
         meta
       );
@@ -456,7 +442,7 @@ export function createJobLogger(context: JobLogContext): JobLogger {
       const entry = createEntry(
         LogLevel.ERROR,
         phase,
-        'phase_error',
+        "phase_error",
         `Error in phase ${phase}: ${errorMeta.message}`,
         meta,
         {
@@ -473,7 +459,7 @@ export function createJobLogger(context: JobLogContext): JobLogger {
       const entry = createEntry(
         LogLevel.INFO,
         toPhase,
-        'phase_transition',
+        "phase_transition",
         `Transitioning from ${fromPhase} to ${toPhase}`,
         { fromPhase, toPhase, ...meta }
       );
@@ -481,38 +467,31 @@ export function createJobLogger(context: JobLogContext): JobLogger {
     },
 
     info: (message: string, meta?: Record<string, unknown>) => {
-      const entry = createEntry(LogLevel.INFO, 'general', 'info', message, meta);
+      const entry = createEntry(LogLevel.INFO, "general", "info", message, meta);
       outputLog(entry);
     },
 
     warn: (message: string, meta?: Record<string, unknown>) => {
-      const entry = createEntry(LogLevel.WARN, 'general', 'warn', message, meta);
+      const entry = createEntry(LogLevel.WARN, "general", "warn", message, meta);
       outputLog(entry);
     },
 
     error: (message: string, error: Error | unknown, meta?: Record<string, unknown>) => {
-      const errorMeta = createErrorMetadata(error, 'general');
-      const entry = createEntry(
-        LogLevel.ERROR,
-        'general',
-        'info',
-        message,
-        meta,
-        {
-          type: errorMeta.type,
-          message: errorMeta.message,
-          retryable: errorMeta.retryable,
-          stackTrace: errorMeta.stackTrace,
-        }
-      );
+      const errorMeta = createErrorMetadata(error, "general");
+      const entry = createEntry(LogLevel.ERROR, "general", "info", message, meta, {
+        type: errorMeta.type,
+        message: errorMeta.message,
+        retryable: errorMeta.retryable,
+        stackTrace: errorMeta.stackTrace,
+      });
       outputLog(entry);
     },
 
     debug: (message: string, meta?: Record<string, unknown>) => {
-      const isDebug = process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true';
+      const isDebug = process.env.NODE_ENV === "development" || process.env.DEBUG === "true";
       if (!isDebug) return;
 
-      const entry = createEntry(LogLevel.DEBUG, 'general', 'info', message, meta);
+      const entry = createEntry(LogLevel.DEBUG, "general", "info", message, meta);
       outputLog(entry);
     },
 
@@ -538,7 +517,7 @@ export function createJobLogger(context: JobLogContext): JobLogger {
  */
 export function createAgentGraphLogger(
   agentName: string,
-  jobType: JobType = 'agent_graph'
+  jobType: JobType = "agent_graph"
 ): JobLogger {
   return createJobLogger({ jobType, jobId: agentName });
 }

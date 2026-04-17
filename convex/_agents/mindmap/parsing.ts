@@ -1,12 +1,12 @@
-"use node"
+"use node";
 
-import type { MindMapNode } from './state.js';
+import type { MindMapNode } from "./state.js";
 
 function cleanLeafNodes(node: MindMapNode): void {
   if (node.children && node.children.length === 0) {
     node.children = null;
   } else if (node.children) {
-    node.children.forEach(c => cleanLeafNodes(c));
+    node.children.forEach((c) => cleanLeafNodes(c));
   }
 }
 
@@ -14,16 +14,16 @@ function cleanLeafNodes(node: MindMapNode): void {
  * Parses markdown indentation into a JSON tree
  */
 export function parseMarkdownToTree(markdown: string): MindMapNode {
-  const lines = markdown.split('\n').filter(l => l.trim().length > 0);
-  let root: MindMapNode = { topic: 'Knowledge Map', children: [] };
+  const lines = markdown.split("\n").filter((l) => l.trim().length > 0);
+  let root: MindMapNode = { topic: "Knowledge Map", children: [] };
 
   const stack: { node: MindMapNode; level: number }[] = [];
 
   for (const rawLine of lines) {
-    const line = rawLine.replace(/\t/g, '  ');
+    const line = rawLine.replace(/\t/g, "  ");
 
-    if (line.trim().startsWith('#')) {
-      const rootTopic = line.replace(/^#+\s*/, '').trim();
+    if (line.trim().startsWith("#")) {
+      const rootTopic = line.replace(/^#+\s*/, "").trim();
       root = { topic: rootTopic, children: [] };
       stack.length = 0;
       stack.push({ node: root, level: 0 });

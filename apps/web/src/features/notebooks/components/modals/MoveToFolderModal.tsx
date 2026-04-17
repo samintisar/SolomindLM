@@ -1,9 +1,31 @@
-import React from 'react';
-import { X, Folder, FolderOpen, Book, BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb } from 'lucide-react';
-import { FolderItem } from '@/shared/types/index';
+import React from "react";
+import {
+  X,
+  Folder,
+  FolderOpen,
+  Book,
+  BarChart3,
+  Monitor,
+  Search,
+  Brain,
+  Globe,
+  FileText,
+  GraduationCap,
+  Lightbulb,
+} from "lucide-react";
+import { FolderItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
-  Folder, Book, BarChart: BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb
+  Folder,
+  Book,
+  BarChart: BarChart3,
+  Monitor,
+  Search,
+  Brain,
+  Globe,
+  FileText,
+  GraduationCap,
+  Lightbulb,
 };
 
 interface MoveToFolderModalProps {
@@ -45,7 +67,7 @@ export const MoveToFolderModal: React.FC<MoveToFolderModalProps> = ({
             </div>
           </button>
 
-          {folders.map(folder => {
+          {folders.map((folder) => {
             const FolderIcon = folder.icon ? IconMap[folder.icon] : Folder;
             return (
               <button
@@ -53,12 +75,18 @@ export const MoveToFolderModal: React.FC<MoveToFolderModalProps> = ({
                 onClick={() => onMove(notebookId, folder.id)}
                 className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left"
               >
-                <div className={`w-10 h-10 rounded-lg ${folder.color || 'bg-blue-500'} bg-opacity-20 flex items-center justify-center`}>
-                  <FolderIcon className={`w-5 h-5 ${(folder.color || '').replace('bg-', 'text-')}`} />
+                <div
+                  className={`w-10 h-10 rounded-lg ${folder.color || "bg-blue-500"} bg-opacity-20 flex items-center justify-center`}
+                >
+                  <FolderIcon
+                    className={`w-5 h-5 ${(folder.color || "").replace("bg-", "text-")}`}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-foreground truncate">{folder.name}</div>
-                  <div className="text-xs text-muted-foreground">{folder.notebookCount} notebooks</div>
+                  <div className="text-xs text-muted-foreground">
+                    {folder.notebookCount} notebooks
+                  </div>
                 </div>
               </button>
             );

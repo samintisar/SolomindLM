@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * LLM factory for agent operations.
  *
@@ -9,8 +9,8 @@
  * logic and provides a single source of truth for LLM configuration.
  */
 
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import type { BaseLanguageModel } from '@langchain/core/language_models/base';
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 
 // ============================================================
 // Types
@@ -57,7 +57,7 @@ export interface LLMInstances {
 // ============================================================
 
 /** Map = fast extraction; smart = reduce / synthesis (medium reasoning on GPT-OSS). */
-export type TogetherModelPhase = 'fast' | 'smart';
+export type TogetherModelPhase = "fast" | "smart";
 
 /**
  * Kwargs for Together chat/completions: GPT-OSS uses `reasoning_effort`; hybrid
@@ -70,16 +70,16 @@ export type TogetherModelPhase = 'fast' | 'smart';
  */
 export function mergeModelKwargs(
   model: string,
-  phase: TogetherModelPhase,
+  phase: TogetherModelPhase
 ): Record<string, unknown> {
-  if (model.startsWith('openai/gpt-oss-')) {
-    return { reasoning_effort: phase === 'fast' ? 'low' : 'medium' };
+  if (model.startsWith("openai/gpt-oss-")) {
+    return { reasoning_effort: phase === "fast" ? "low" : "medium" };
   }
-  if (model.startsWith('openai/')) {
+  if (model.startsWith("openai/")) {
     return {};
   }
   return {
-    chat_template_kwargs: { thinking: phase === 'smart' },
+    chat_template_kwargs: { thinking: phase === "smart" },
   };
 }
 
@@ -116,10 +116,8 @@ export function mergeModelKwargs(
  * ```
  */
 export function createLLMs(config: LLMConfig): LLMInstances {
-  const fastModelKwargs = mergeModelKwargs(config.mapModel, 'fast');
-  const reduceModelKwargs = config.reduceModel
-    ? mergeModelKwargs(config.reduceModel, 'smart')
-    : {};
+  const fastModelKwargs = mergeModelKwargs(config.mapModel, "fast");
+  const reduceModelKwargs = config.reduceModel ? mergeModelKwargs(config.reduceModel, "smart") : {};
 
   // Fast model for map phase (parallel processing, lower temp for consistency)
   const fastLlm = new ChatTogetherAI({
@@ -161,13 +159,15 @@ export function createLLMs(config: LLMConfig): LLMInstances {
  * });
  * ```
  */
-export function createLLM(config: Omit<LLMConfig, 'reduceModel' | 'temperatures' | 'maxTokens'> & {
-  temperatures?: number;
-  maxTokens?: number;
-  /** Default `fast` when omitted. */
-  phase?: TogetherModelPhase;
-}): ChatTogetherAI {
-  const modelKwargs = mergeModelKwargs(config.mapModel, config.phase ?? 'fast');
+export function createLLM(
+  config: Omit<LLMConfig, "reduceModel" | "temperatures" | "maxTokens"> & {
+    temperatures?: number;
+    maxTokens?: number;
+    /** Default `fast` when omitted. */
+    phase?: TogetherModelPhase;
+  }
+): ChatTogetherAI {
+  const modelKwargs = mergeModelKwargs(config.mapModel, config.phase ?? "fast");
 
   return new ChatTogetherAI({
     apiKey: config.apiKey,
@@ -208,12 +208,12 @@ export function createLLMsFromEnv(
   const apiKey = options.mapModel && env.TOGETHER_AI_API_KEY;
 
   if (!apiKey) {
-    throw new Error('TOGETHER_AI_API_KEY is required');
+    throw new Error("TOGETHER_AI_API_KEY is required");
   }
 
   return createLLMs({
     apiKey,
-    mapModel: options.mapModel || env.FAST_LLM || 'gpt-oss-20b',
+    mapModel: options.mapModel || env.FAST_LLM || "gpt-oss-20b",
     reduceModel: options.reduceModel || env.SMART_LLM,
     temperatures: {
       map: options.mapTemperature,

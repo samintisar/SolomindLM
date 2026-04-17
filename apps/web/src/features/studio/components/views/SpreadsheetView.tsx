@@ -1,6 +1,6 @@
-import React from 'react';
-import { XCircle, ArrowLeft } from 'lucide-react';
-import { SpreadsheetNote } from '@/shared/types/index';
+import React from "react";
+import { XCircle, ArrowLeft } from "lucide-react";
+import { SpreadsheetNote } from "@/shared/types/index";
 
 /**
  * Parse CSV content into an array of rows.
@@ -9,12 +9,12 @@ import { SpreadsheetNote } from '@/shared/types/index';
 function parseCSV(content: string): string[][] {
   if (!content || !content.trim()) return [];
 
-  const lines = content.trim().split('\n');
+  const lines = content.trim().split("\n");
   const rows: string[][] = [];
 
   for (const line of lines) {
     const values: string[] = [];
-    let current = '';
+    let current = "";
     let inQuotes = false;
 
     for (let i = 0; i < line.length; i++) {
@@ -30,10 +30,10 @@ function parseCSV(content: string): string[][] {
           // Toggle quote mode
           inQuotes = !inQuotes;
         }
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === "," && !inQuotes) {
         // Comma separator outside quotes
         values.push(current.trim());
-        current = '';
+        current = "";
       } else {
         current += char;
       }
@@ -43,7 +43,7 @@ function parseCSV(content: string): string[][] {
     values.push(current.trim());
 
     // Only add non-empty rows
-    if (values.length > 0 && values.some(v => v.length > 0)) {
+    if (values.length > 0 && values.some((v) => v.length > 0)) {
       rows.push(values);
     }
   }
@@ -102,7 +102,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ content, noteTitle:
                   {rowIdx + 1}
                 </td>
                 {Array.from({ length: columnCount }).map((_, colIdx) => {
-                  const cellValue = row[colIdx] ?? '';
+                  const cellValue = row[colIdx] ?? "";
                   return (
                     <td
                       key={colIdx}
@@ -120,9 +120,7 @@ const SpreadsheetTable: React.FC<SpreadsheetTableProps> = ({ content, noteTitle:
 
       {/* Footer with row count info */}
       {dataRows.length === 0 && (
-        <div className="p-8 text-center text-muted-foreground">
-          No data rows found
-        </div>
+        <div className="p-8 text-center text-muted-foreground">No data rows found</div>
       )}
     </div>
   );
@@ -134,7 +132,7 @@ export interface SpreadsheetViewProps {
 }
 
 export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ note, onBack }) => {
-  const isFailed = note.status === 'failed';
+  const isFailed = note.status === "failed";
 
   return (
     <div className="flex flex-col h-full bg-background animate-in fade-in slide-in-from-right-4 duration-300">
@@ -160,9 +158,10 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({ note, onBack }
             <div className="flex-1">
               <p className="text-sm font-medium text-destructive">Spreadsheet generation failed</p>
               <p className="text-xs text-destructive/70 mt-1">
-                {typeof note.metadata?.error === 'object'
-                  ? (note.metadata.error as { message?: string }).message || 'An unknown error occurred'
-                  : note.metadata?.error || 'An unknown error occurred'}
+                {typeof note.metadata?.error === "object"
+                  ? (note.metadata.error as { message?: string }).message ||
+                    "An unknown error occurred"
+                  : note.metadata?.error || "An unknown error occurred"}
               </p>
             </div>
           </div>

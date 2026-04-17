@@ -10,15 +10,15 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-declare module '*.css' {
+declare module "*.css" {
   const content: string;
   export default content;
 }
 
-declare module '@vercel/analytics/react' {
+declare module "@vercel/analytics/react" {
   export const Analytics: React.ComponentType;
 }
 
-declare module '@vercel/speed-insights/react' {
+declare module "@vercel/speed-insights/react" {
   export const SpeedInsights: React.ComponentType;
 }

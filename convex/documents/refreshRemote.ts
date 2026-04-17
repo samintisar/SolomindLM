@@ -2,10 +2,7 @@ import { action, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
-import {
-  fetchGoogleDriveBlob,
-  resolveGoogleDriveDownload,
-} from "../_lib/googleDriveDownload";
+import { fetchGoogleDriveBlob, resolveGoogleDriveDownload } from "../_lib/googleDriveDownload";
 import type { Doc } from "../_generated/dataModel";
 
 const refreshSummaryValidator = v.object({
@@ -18,7 +15,7 @@ async function refreshDriveDocument(
   ctx: ActionCtx,
   doc: Doc<"documents">,
   accessToken: string,
-  delayMs: number,
+  delayMs: number
 ): Promise<void> {
   const fileId = doc.googleDriveFileId;
   const mimeType = doc.googleDriveMimeType;
@@ -26,11 +23,7 @@ async function refreshDriveDocument(
     throw new Error("Google Drive file metadata missing");
   }
 
-  const { downloadUrl } = resolveGoogleDriveDownload(
-    fileId,
-    doc.fileName,
-    mimeType,
-  );
+  const { downloadUrl } = resolveGoogleDriveDownload(fileId, doc.fileName, mimeType);
 
   const blob = await fetchGoogleDriveBlob(downloadUrl, accessToken);
   const newStorageId = await ctx.storage.store(blob);
@@ -113,15 +106,9 @@ export const refreshRemoteSource = action({
       return null;
     }
 
-    if (
-      doc.fileType === "file" &&
-      doc.googleDriveFileId &&
-      doc.googleDriveMimeType
-    ) {
+    if (doc.fileType === "file" && doc.googleDriveFileId && doc.googleDriveMimeType) {
       if (!args.accessToken) {
-        throw new Error(
-          "Google sign-in is required to refresh this Google Drive source.",
-        );
+        throw new Error("Google sign-in is required to refresh this Google Drive source.");
       }
       await refreshDriveDocument(ctx, doc, args.accessToken, 0);
       return null;

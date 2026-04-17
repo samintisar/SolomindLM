@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
+import React, { useState, useEffect } from "react";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
 
 interface NavigationHeaderProps {
   onGetStarted: () => void;
@@ -12,10 +12,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Features', href: '#features' },
-  { label: 'Use Cases', href: '#use-cases' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'FAQ', href: '#faq' }
+  { label: "Features", href: "#features" },
+  { label: "Use Cases", href: "#use-cases" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faq" },
 ];
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted }) => {
@@ -26,14 +26,14 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const scrollToSection = (href: string) => {
     const element = document.querySelector(href);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+      element.scrollIntoView({ behavior: "smooth" });
       setIsMobileMenuOpen(false);
     }
   };
@@ -41,9 +41,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onGetStarted
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? 'bg-background/60 backdrop-blur-xl'
-          : 'bg-transparent'
+        isScrolled ? "bg-background/60 backdrop-blur-xl" : "bg-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-8 md:px-12">

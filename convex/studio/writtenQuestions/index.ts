@@ -2,10 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 
 export const list = query({
@@ -104,16 +101,20 @@ export const generateWrittenQuestions = mutation({
       questionType,
       status: "generating",
     });
-    await ctx.scheduler.runAfter(0, internal.studio.writtenQuestions.job.writtenQuestionsGeneration, {
-      writtenQuestionId,
-      userId,
-      notebookId,
-      documentIds,
-      questionType,
-      questionCount: 10,
-      difficulty: "medium",
-      focus: undefined,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.studio.writtenQuestions.job.writtenQuestionsGeneration,
+      {
+        writtenQuestionId,
+        userId,
+        notebookId,
+        documentIds,
+        questionType,
+        questionCount: 10,
+        difficulty: "medium",
+        focus: undefined,
+      }
+    );
     return writtenQuestionId;
   },
 });
@@ -187,7 +188,11 @@ export const updateStatus = internalMutation({
 export const updateData = internalMutation({
   args: { writtenQuestionId: v.id("writtenQuestions"), questionsData: v.array(v.any()) },
   handler: async (ctx, args) => {
-    await WrittenQuestions.updateWrittenQuestionData(ctx, args.writtenQuestionId, args.questionsData);
+    await WrittenQuestions.updateWrittenQuestionData(
+      ctx,
+      args.writtenQuestionId,
+      args.questionsData
+    );
   },
 });
 
@@ -205,6 +210,11 @@ export const patchUserAnswer = internalMutation({
     answerData: v.any(),
   },
   handler: async (ctx, args) => {
-    await WrittenQuestions.patchWrittenQuestionUserAnswer(ctx, args.writtenQuestionId, args.questionId, args.answerData);
+    await WrittenQuestions.patchWrittenQuestionUserAnswer(
+      ctx,
+      args.writtenQuestionId,
+      args.questionId,
+      args.answerData
+    );
   },
 });

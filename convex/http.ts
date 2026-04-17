@@ -8,9 +8,7 @@ import { auth } from "./auth";
 const http = httpRouter();
 
 // Initialize Persistent Text Streaming
-const streaming = new PersistentTextStreaming(
-  components.persistentTextStreaming
-);
+const streaming = new PersistentTextStreaming(components.persistentTextStreaming);
 
 // Add Convex Auth HTTP routes
 auth.addHttpRoutes(http);
@@ -25,23 +23,24 @@ const DEV_ORIGINS = [
 
 const getAllowedOrigins = (): string[] => {
   const siteUrl = process.env.SITE_URL || "http://localhost:5173";
-  const fromEnv = siteUrl.split(",").map((url) => url.trim()).filter(Boolean);
+  const fromEnv = siteUrl
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
   return [...new Set([...DEV_ORIGINS, ...fromEnv])];
 };
 
 // CORS for non-auth routes (health, chat/stream)
 const getCorsHeaders = (origin?: string | null): Record<string, string> => {
   const allowedOrigins = getAllowedOrigins();
-  const allowOrigin = origin && allowedOrigins.includes(origin)
-    ? origin
-    : allowedOrigins[0];
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
-    "Vary": "origin",
+    Vary: "origin",
   };
 };
 
@@ -72,10 +71,10 @@ http.route({
     const payload = await request.text();
 
     if (!signature) {
-      return new Response(
-        JSON.stringify({ error: "Missing stripe-signature header" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Missing stripe-signature header" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     try {
@@ -111,16 +110,13 @@ http.route({
     const origin = request.headers.get("origin");
     const corsHeaders = getCorsHeaders(origin);
 
-    return new Response(
-      JSON.stringify({ status: "ok", timestamp: Date.now() }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      }
-    );
+    return new Response(JSON.stringify({ status: "ok", timestamp: Date.now() }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
+    });
   }),
 });
 
@@ -133,16 +129,13 @@ http.route({
   path: "/audio/test",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
-    console.log('[Audio HTTP] Test endpoint called');
-    return new Response(
-      JSON.stringify({ message: "Audio HTTP routing works!" }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    console.log("[Audio HTTP] Test endpoint called");
+    return new Response(JSON.stringify({ message: "Audio HTTP routing works!" }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   }),
 });
 
@@ -156,10 +149,10 @@ http.route({
 
     // Extract storageId from URL path
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const storageId = pathParts[pathParts.length - 1] as any;
 
-    console.log('[Audio HTTP] Request received:', {
+    console.log("[Audio HTTP] Request received:", {
       pathname: url.pathname,
       storageId,
       searchParams: url.search,
@@ -170,14 +163,14 @@ http.route({
       const blob = await ctx.storage.get(storageId);
 
       if (blob === null) {
-        console.error('[Audio HTTP] Storage ID not found:', storageId);
+        console.error("[Audio HTTP] Storage ID not found:", storageId);
         return new Response("Audio file not found", {
           status: 404,
           headers: withCors({ "Content-Type": "text/plain" }),
         });
       }
 
-      console.log('[Audio HTTP] Blob found:', {
+      console.log("[Audio HTTP] Blob found:", {
         size: blob.size,
         type: blob.type,
       });
@@ -201,7 +194,9 @@ http.route({
             // Slice the blob to get the requested range
             const chunk = blob.slice(start, end + 1);
 
-            console.log(`[Audio streaming] Range request: ${start}-${end}/${fileSize} (${chunkSize} bytes)`);
+            console.log(
+              `[Audio streaming] Range request: ${start}-${end}/${fileSize} (${chunkSize} bytes)`
+            );
 
             return new Response(chunk, {
               status: 206, // Partial Content
@@ -229,16 +224,12 @@ http.route({
           "Cache-Control": "public, max-age=31536000", // Cache for 1 year
         }),
       });
-
     } catch (error) {
       console.error("[Audio streaming] Error:", error);
-      return new Response(
-        JSON.stringify({ error: "Failed to serve audio file" }),
-        {
-          status: 500,
-          headers: withCors({ "Content-Type": "application/json" }),
-        }
-      );
+      return new Response(JSON.stringify({ error: "Failed to serve audio file" }), {
+        status: 500,
+        headers: withCors({ "Content-Type": "application/json" }),
+      });
     }
   }),
 });
@@ -257,7 +248,7 @@ http.route({
 
     return new Response(null, {
       status: 204,
-      headers: corsHeaders
+      headers: corsHeaders,
     });
   }),
 });
@@ -272,22 +263,19 @@ http.route({
 
     // Helper for error responses with CORS
     const errorResponse = (message: string, status: number) => {
-      return new Response(
-        JSON.stringify({ error: message }),
-        {
-          status,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      });
     };
 
     // Simplified auth check with Convex Auth
     const identity = await ctx.auth.getUserIdentity();
     // Subject is "userId|sessionId", extract just the userId
-    const userId = identity?.subject?.split('|')[0];
+    const userId = identity?.subject?.split("|")[0];
 
     if (!userId) {
       return errorResponse("Please log in to use chat", 401);
@@ -297,7 +285,7 @@ http.route({
       // Parse request body
       let body;
       try {
-        body = await request.json() as {
+        body = (await request.json()) as {
           notebookId: string;
           message: string;
           documentIds?: string[];
@@ -323,13 +311,10 @@ http.route({
 
       console.log("[Chat] Processing message for user:", userId);
 
-      const canReadNotebook = await ctx.runQuery(
-        internal.notebooks.index.canReadNotebookInternal,
-        {
-          notebookId: notebookId as any,
-          userId: userId as any,
-        }
-      );
+      const canReadNotebook = await ctx.runQuery(internal.notebooks.index.canReadNotebookInternal, {
+        notebookId: notebookId as any,
+        userId: userId as any,
+      });
       if (!canReadNotebook) {
         return errorResponse("Notebook not found", 404);
       }
@@ -387,7 +372,7 @@ http.route({
         }
       })();
 
-      let response = new Response(readable);
+      const response = new Response(readable);
 
       // Add CORS headers to the response
       Object.entries(corsHeaders).forEach(([key, value]) => {
@@ -395,7 +380,6 @@ http.route({
       });
 
       return response;
-
     } catch (error) {
       console.error("[Chat route] Unexpected error:", error);
       const errorMessage = error instanceof Error ? error.message : "Internal server error";

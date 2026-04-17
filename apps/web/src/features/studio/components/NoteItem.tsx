@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
-import { Note } from '@/shared/types/index';
-import { getStudioGeneratingListLines } from '../utils/studioGenerationLabels';
-import { NoteIcon } from './NoteIcon';
+import React, { useRef, useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Note } from "@/shared/types/index";
+import { getStudioGeneratingListLines } from "../utils/studioGenerationLabels";
+import { NoteIcon } from "./NoteIcon";
 
 interface NoteItemProps {
   note: Note;
@@ -68,15 +68,15 @@ export const NoteItem: React.FC<NoteItemProps> = ({
       }
     };
     updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
     return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
     };
   }, [isMenuOpen]);
 
-  const isGenerating = note.status === 'generating';
+  const isGenerating = note.status === "generating";
   const generatingLines = isGenerating ? getStudioGeneratingListLines(note) : null;
 
   return (
@@ -86,14 +86,12 @@ export const NoteItem: React.FC<NoteItemProps> = ({
       }}
       aria-busy={isGenerating ? true : undefined}
       aria-label={
-        isGenerating && generatingLines
-          ? `${note.title}, ${generatingLines.primary}`
-          : undefined
+        isGenerating && generatingLines ? `${note.title}, ${generatingLines.primary}` : undefined
       }
       className={`relative rounded-sm border border-border p-3 transition-[box-shadow,transform] duration-300 ${
         isGenerating
-          ? 'cursor-not-allowed overflow-hidden bg-card/95 shadow-sm'
-          : 'bg-card shadow-sm hover:shadow-md cursor-pointer group'
+          ? "cursor-not-allowed overflow-hidden bg-card/95 shadow-sm"
+          : "bg-card shadow-sm hover:shadow-md cursor-pointer group"
       }`}
     >
       <div className="flex justify-between items-start gap-3">
@@ -114,7 +112,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
             ) : (
               <h4
                 className={`text-sm font-bold text-foreground font-serif truncate leading-tight transition-colors ${
-                  isGenerating ? 'mb-0' : 'mb-1 group-hover:text-primary'
+                  isGenerating ? "mb-0" : "mb-1 group-hover:text-primary"
                 }`}
               >
                 {note.title}

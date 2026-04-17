@@ -23,7 +23,10 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query.filter((q) => q.eq(q.field("userId"), userId)).order("desc").collect();
+    return await query
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .collect();
   }
   return await query.order("desc").collect();
 }
@@ -135,7 +138,7 @@ export async function patchWrittenQuestion(
       patch = {
         ...patch,
         metadata: {
-          ...(existing.metadata as Record<string, unknown> ?? {}),
+          ...((existing.metadata as Record<string, unknown>) ?? {}),
           ...(patch.metadata as Record<string, unknown>),
         },
       };
@@ -157,7 +160,8 @@ export async function patchWrittenQuestionUserAnswer(
   const writtenQuestion = await getWrittenQuestion(ctx, writtenQuestionId);
   if (!writtenQuestion) throw new Error("Written question set not found");
 
-  const existingUserAnswers = (writtenQuestion.metadata as { userAnswers?: Record<string, unknown> })?.userAnswers || {};
+  const existingUserAnswers =
+    (writtenQuestion.metadata as { userAnswers?: Record<string, unknown> })?.userAnswers || {};
 
   await ctx.db.patch("writtenQuestions", writtenQuestionId, {
     metadata: {

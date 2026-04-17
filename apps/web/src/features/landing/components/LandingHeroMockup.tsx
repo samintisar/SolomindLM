@@ -38,7 +38,10 @@ export interface LandingHeroMockupProps {
   className?: string;
 }
 
-export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: LandingHeroMockupProps) {
+export function LandingHeroMockup({
+  onGetStarted: _onGetStarted,
+  className,
+}: LandingHeroMockupProps) {
   const [mode, setMode] = useState<HeroMode>("chat");
   const [sourceId, setSourceId] = useState<string>("s1");
   const [refKey, setRefKey] = useState<1 | 2 | null>(1);
@@ -52,7 +55,7 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
       { id: "s2", title: "Normal forms explained", kind: "YouTube" },
       { id: "s3", title: "ACM survey (2019)", kind: "Article" },
     ],
-    [],
+    []
   );
 
   const closeStudioModal = useCallback(() => setStudioModal(null), []);
@@ -87,7 +90,7 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
             "Third normal form relaxes BCNF slightly: transitive dependencies through prime attributes may remain. Teams often accept 3NF when BCNF decomposition would fragment the schema too much for query patterns.",
         },
       }) as const,
-    [],
+    []
   );
 
   const citeBtnBase =
@@ -160,7 +163,9 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
           <aside className="flex w-[min(38%,12rem)] shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-background/70 shadow-md backdrop-blur-sm sm:w-[min(38%,13.5rem)] sm:rounded-2xl">
             <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border bg-background/80 px-3 backdrop-blur-sm sm:h-14 sm:gap-2 sm:px-4">
               <FileStack className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-              <span className="font-display text-xs font-bold uppercase tracking-wide sm:text-sm">Sources</span>
+              <span className="font-display text-xs font-bold uppercase tracking-wide sm:text-sm">
+                Sources
+              </span>
             </div>
             <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-3 sm:gap-2 sm:p-4">
               {sources.map((s) => {
@@ -176,8 +181,12 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
                         : "border-border/80 bg-background/60 hover:border-border hover:bg-accent/40"
                     }`}
                   >
-                    <p className="truncate font-sans text-[11px] font-medium text-foreground sm:text-xs">{s.title}</p>
-                    <p className="mt-0.5 font-sans text-[10px] text-muted-foreground sm:text-[11px]">{s.kind}</p>
+                    <p className="truncate font-sans text-[11px] font-medium text-foreground sm:text-xs">
+                      {s.title}
+                    </p>
+                    <p className="mt-0.5 font-sans text-[10px] text-muted-foreground sm:text-[11px]">
+                      {s.kind}
+                    </p>
                   </button>
                 );
               })}
@@ -188,7 +197,9 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
             <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur-sm sm:h-14 sm:px-4">
               <div className="flex items-center gap-1.5 text-foreground sm:gap-2">
                 <MessageCircle className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
-                <span className="font-display text-xs font-bold uppercase tracking-wide sm:text-sm">Chat</span>
+                <span className="font-display text-xs font-bold uppercase tracking-wide sm:text-sm">
+                  Chat
+                </span>
               </div>
               <div className="flex items-center gap-1.5" aria-hidden>
                 <span className="rounded-md border border-border bg-card p-1.5 text-muted-foreground shadow-sm sm:rounded-lg sm:p-2">
@@ -217,7 +228,10 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
                     onClick={() => setActivityOpen((o) => !o)}
                     className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/90 px-2.5 py-2 text-left text-xs text-muted-foreground shadow-sm transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-3 sm:py-2.5 sm:text-sm"
                   >
-                    <Search className="h-3.5 w-3.5 shrink-0 text-primary/80 sm:h-4 sm:w-4" aria-hidden />
+                    <Search
+                      className="h-3.5 w-3.5 shrink-0 text-primary/80 sm:h-4 sm:w-4"
+                      aria-hidden
+                    />
                     <span className="font-sans">Searching your sources</span>
                     <ChevronDown
                       className={`ml-auto h-3.5 w-3.5 shrink-0 transition sm:h-4 sm:w-4 ${activityOpen ? "rotate-180" : ""}`}
@@ -227,15 +241,24 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
                   {activityOpen ? (
                     <ul className="space-y-1 border-l-2 border-primary/20 py-1 pl-2.5 font-sans text-[10px] text-muted-foreground sm:space-y-1.5 sm:pl-3 sm:text-xs">
                       <li className="flex items-center gap-1.5 sm:gap-2">
-                        <Check className="h-3 w-3 shrink-0 text-vintage-green-600 sm:h-3.5 sm:w-3.5" aria-hidden />
+                        <Check
+                          className="h-3 w-3 shrink-0 text-vintage-green-600 sm:h-3.5 sm:w-3.5"
+                          aria-hidden
+                        />
                         HyDE + embeddings
                       </li>
                       <li className="flex items-center gap-1.5 sm:gap-2">
-                        <Check className="h-3 w-3 shrink-0 text-vintage-green-600 sm:h-3.5 sm:w-3.5" aria-hidden />
+                        <Check
+                          className="h-3 w-3 shrink-0 text-vintage-green-600 sm:h-3.5 sm:w-3.5"
+                          aria-hidden
+                        />
                         Ranked relevant passages
                       </li>
                       <li className="flex items-start gap-1.5 pt-0.5 sm:gap-2">
-                        <Globe className="mt-0.5 h-3 w-3 shrink-0 opacity-70 sm:h-3.5 sm:w-3.5" aria-hidden />
+                        <Globe
+                          className="mt-0.5 h-3 w-3 shrink-0 opacity-70 sm:h-3.5 sm:w-3.5"
+                          aria-hidden
+                        />
                         <span>Reading: CPSC 304 — notes.pdf</span>
                       </li>
                     </ul>
@@ -258,7 +281,8 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
                         >
                           1
                         </button>
-                        . Third normal form still allows some dependencies when the right-hand side is a prime attribute
+                        . Third normal form still allows some dependencies when the right-hand side
+                        is a prime attribute
                         <button
                           type="button"
                           aria-pressed={refKey === 2}
@@ -269,8 +293,8 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
                         >
                           2
                         </button>
-                        . In practice, pushing all the way to BCNF can mean more joins, so teams weigh anomaly risk
-                        against query ergonomics.
+                        . In practice, pushing all the way to BCNF can mean more joins, so teams
+                        weigh anomaly risk against query ergonomics.
                       </p>
                     </div>
 
@@ -323,13 +347,20 @@ export function LandingHeroMockup({ onGetStarted: _onGetStarted, className }: La
       >
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur-sm sm:h-14 sm:gap-2 sm:px-5">
           <Layers className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" aria-hidden />
-          <span className="font-display text-xs font-bold uppercase tracking-wide text-foreground sm:text-sm">Studio</span>
+          <span className="font-display text-xs font-bold uppercase tracking-wide text-foreground sm:text-sm">
+            Studio
+          </span>
           <span className="hidden font-sans text-[10px] text-muted-foreground sm:ml-2 sm:inline sm:text-xs">
             Create study artifacts from your sources
           </span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5 sm:py-5 md:px-6">
-          <ToolGrid tools={STUDIO_TOOLS} onToolClick={handleStudioToolClick} width={480} activeToolId={studioModal} />
+          <ToolGrid
+            tools={STUDIO_TOOLS}
+            onToolClick={handleStudioToolClick}
+            width={480}
+            activeToolId={studioModal}
+          />
         </div>
       </div>
 

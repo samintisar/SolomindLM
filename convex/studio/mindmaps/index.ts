@@ -2,10 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Mindmaps from "../../_model/mindmaps";
 
 /**
@@ -148,7 +145,9 @@ export const generateMindMap = mutation({
 
     const { notebookId, documentIds, title } = args;
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
 
     await assertCanEditNotebook(ctx, notebookId, userId);

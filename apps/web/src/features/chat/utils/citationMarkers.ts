@@ -1,4 +1,4 @@
-import { replaceCitationMarkersWithPlaceholders } from '@convex/_agents/_shared/citationExtract';
+import { replaceCitationMarkersWithPlaceholders } from "@convex/_agents/_shared/citationExtract";
 
 /**
  * Replaces citation markers [1], [2], etc. (also \[1\] when models escape brackets) with `CITE:n`
@@ -10,14 +10,14 @@ export function replaceCitationMarkersOutsideMath(content: string): string {
 
   while (remaining.length > 0) {
     // Prefer $$ over $ so we don't split display math
-    const nextDollar = remaining.indexOf('$');
+    const nextDollar = remaining.indexOf("$");
     if (nextDollar === -1) {
       parts.push(replaceCitationMarkersWithPlaceholders(remaining));
       break;
     }
 
-    const isDisplayMath = remaining.slice(nextDollar, nextDollar + 2) === '$$';
-    const delim = isDisplayMath ? '$$' : '$';
+    const isDisplayMath = remaining.slice(nextDollar, nextDollar + 2) === "$$";
+    const delim = isDisplayMath ? "$$" : "$";
     const afterOpen = nextDollar + delim.length;
     const closeIndex = remaining.indexOf(delim, afterOpen);
 
@@ -35,5 +35,5 @@ export function replaceCitationMarkersOutsideMath(content: string): string {
     remaining = remaining.slice(closeIndex + delim.length);
   }
 
-  return parts.join('');
+  return parts.join("");
 }

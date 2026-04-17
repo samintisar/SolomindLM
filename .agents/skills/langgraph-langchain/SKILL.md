@@ -11,16 +11,16 @@ This project uses **LangGraph** (`@langchain/langgraph`) for all AI generation a
 
 ## Project Conventions
 
-| Convention | Rule |
-|---|---|
-| File header | Every agent file must start with `"use node"` directive |
-| Agent location | `convex/_agents/<feature>/` — one dir per agent type |
-| Shared utilities | Always prefer `_shared/` helpers over hand-rolling |
-| LLM creation | Use `createLLMs()` / `createLLMsFromEnv()` from `_shared/llm_factory.ts` |
-| Graph building | Use `buildMapReduceGraph()` / `buildLinearGraph()` from `_shared/graph_builder.ts` |
-| Structured output | Always use `.withStructuredOutput(ZodSchema)` — never parse raw LLM strings |
-| Parallel processing | Use LangGraph `Send` API + reducer on state fields |
-| Smart vs fast LLM | `env.SMART_LLM` for reduce/synthesis, `env.FAST_LLM` for map/extraction |
+| Convention          | Rule                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| File header         | Every agent file must start with `"use node"` directive                            |
+| Agent location      | `convex/_agents/<feature>/` — one dir per agent type                               |
+| Shared utilities    | Always prefer `_shared/` helpers over hand-rolling                                 |
+| LLM creation        | Use `createLLMs()` / `createLLMsFromEnv()` from `_shared/llm_factory.ts`           |
+| Graph building      | Use `buildMapReduceGraph()` / `buildLinearGraph()` from `_shared/graph_builder.ts` |
+| Structured output   | Always use `.withStructuredOutput(ZodSchema)` — never parse raw LLM strings        |
+| Parallel processing | Use LangGraph `Send` API + reducer on state fields                                 |
+| Smart vs fast LLM   | `env.SMART_LLM` for reduce/synthesis, `env.FAST_LLM` for map/extraction            |
 
 ---
 
@@ -43,8 +43,8 @@ convex/_agents/MyFeatureGraph.ts  — Re-export from nodes.ts
 Use `Annotation.Root` for state definition. Use reducers for fields that accumulate parallel results:
 
 ```typescript
-"use node"
-import { Annotation } from '@langchain/langgraph';
+"use node";
+import { Annotation } from "@langchain/langgraph";
 
 export const OverallState = Annotation.Root({
   // Input
@@ -67,7 +67,7 @@ export const OverallState = Annotation.Root({
     default: () => [],
   }),
   // Config params
-  topic: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => '' }),
+  topic: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "" }),
   count: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 10 }),
 });
 
@@ -75,11 +75,12 @@ export type OverallStateType = typeof OverallState.State;
 ```
 
 For **chunk-level parallel state** (used in Send fan-out):
+
 ```typescript
 export const ChunkProcessState = Annotation.Root({
-  chunk: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => '' }),
+  chunk: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "" }),
   chunkIndex: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
-  topic: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => '' }),
+  topic: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "" }),
 });
 export type ChunkProcessStateType = typeof ChunkProcessState.State;
 ```
@@ -89,14 +90,14 @@ export type ChunkProcessStateType = typeof ChunkProcessState.State;
 ## 2. Prompts & Schemas (`prompts.ts`)
 
 ```typescript
-"use node"
-import { z } from 'zod';
+"use node";
+import { z } from "zod";
 
 // Always define Zod schemas for structured output
 export const MyItemSchema = z.object({
-  front: z.string().describe('Question or term'),
-  back: z.string().describe('Answer or definition'),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
+  front: z.string().describe("Question or term"),
+  back: z.string().describe("Answer or definition"),
+  difficulty: z.enum(["easy", "medium", "hard"]),
 });
 
 export const MyItemArraySchema = z.object({
@@ -119,16 +120,17 @@ Select the best {count} items from the candidates.`;
 ## 3. Nodes & Class (`nodes.ts`)
 
 ### LLM Setup
+
 ```typescript
-"use node"
-import { createLLMs } from '../_shared/llm_factory.js';
-import { env } from '../../_lib/env.js';
+"use node";
+import { createLLMs } from "../_shared/llm_factory.js";
+import { env } from "../../_lib/env.js";
 
 // In constructor or runGraph()
 const { fastLlm, smartLlm } = createLLMs({
   apiKey: env.TOGETHER_AI_API_KEY,
-  mapModel: env.FAST_LLM,           // parallel extraction
-  reduceModel: env.SMART_LLM,       // synthesis
+  mapModel: env.FAST_LLM, // parallel extraction
+  reduceModel: env.SMART_LLM, // synthesis
   temperatures: { map: 0.3, reduce: 0.6 },
 });
 
@@ -139,59 +141,61 @@ const reduceLlm = smartLlm.withStructuredOutput(MyItemArraySchema);
 
 ### Node Functions
 
-**Map node** — receives the *sent state* (only the fields passed via `Send`), returns only the accumulator field on `OverallState`. The graph merges it via the reducer.
+**Map node** — receives the _sent state_ (only the fields passed via `Send`), returns only the accumulator field on `OverallState`. The graph merges it via the reducer.
 
 ```typescript
 // Input is ChunkProcessStateType (what was passed in Send), NOT OverallStateType
 // Return type is only the accumulator field — not the full OverallState
-async function mapProcessNode(state: typeof ChunkProcessState.State): Promise<{ mapOutputs: MyItem[][] }> {
+async function mapProcessNode(
+  state: typeof ChunkProcessState.State
+): Promise<{ mapOutputs: MyItem[][] }> {
   const result = await mapLlm.invoke([
-    { role: 'system', content: MAP_SYSTEM_PROMPT.replace('{count}', String(perChunkCount)) },
-    { role: 'user', content: state.chunk },
+    { role: "system", content: MAP_SYSTEM_PROMPT.replace("{count}", String(perChunkCount)) },
+    { role: "user", content: state.chunk },
   ]);
   return { mapOutputs: [result.items] }; // reducer on OverallState.mapOutputs concatenates this
 }
 ```
 
 **Reduce / linear node** — receives full `OverallState`, returns only changed fields:
+
 ```typescript
 async function reduceNode(state: typeof OverallState.State): Promise<{ finalOutput: MyItem[] }> {
   const candidates = state.mapOutputs.flat();
   const result = await reduceLlm.invoke([
-    { role: 'system', content: REDUCE_SYSTEM_PROMPT.replace('{count}', String(state.count)) },
-    { role: 'user', content: JSON.stringify(candidates) },
+    { role: "system", content: REDUCE_SYSTEM_PROMPT.replace("{count}", String(state.count)) },
+    { role: "user", content: JSON.stringify(candidates) },
   ]);
   return { finalOutput: result.items };
 }
 ```
 
 ### Route Function for Send Fan-out
+
 ```typescript
-import { Send } from '@langchain/langgraph';
+import { Send } from "@langchain/langgraph";
 
 function routeToMap(state: OverallStateType): Send[] {
-  return state.chunks.map((chunk, i) =>
-    new Send('map', {
-      chunk,
-      chunkIndex: i,
-      topic: state.topic,
-    })
+  return state.chunks.map(
+    (chunk, i) =>
+      new Send("map", {
+        chunk,
+        chunkIndex: i,
+        topic: state.topic,
+      })
   );
 }
 ```
 
 ### Main Class
+
 ```typescript
 export class MyFeatureGraph {
-  async runGraph(input: {
-    chunks: string[];
-    topic: string;
-    count: number;
-  }): Promise<MyItem[]> {
+  async runGraph(input: { chunks: string[]; topic: string; count: number }): Promise<MyItem[]> {
     const graph = buildMapReduceGraph({
       state: OverallState,
       mapNode: mapProcessNode,
-      collapseNode: collapseNode,   // optional: merge before reduce
+      collapseNode: collapseNode, // optional: merge before reduce
       reduceNode: reduceNode,
       routeToMap,
     });
@@ -214,44 +218,49 @@ export class MyFeatureGraph {
 > **These are project-internal wrappers**, not LangGraph builtins. They live in `convex/_agents/_shared/graph_builder.ts` and are thin factories built on top of `StateGraph`, `addNode`, `addEdge`, and `addConditionalEdges`. If you go looking for them in `@langchain/langgraph` docs you won't find them.
 
 ### MapReduce Graph (most common pattern)
+
 ```
 START → routeToMap → [map×N parallel] → collapse → reduce → END
 ```
+
 ```typescript
-import { buildMapReduceGraph } from '../_shared/graph_builder.js';
+import { buildMapReduceGraph } from "../_shared/graph_builder.js";
 
 const graph = buildMapReduceGraph({
   state: OverallState,
-  mapNode: mapProcessNode,        // runs once per Send
-  collapseNode: collapseNode,     // optional, merges before reduce
-  reduceNode: reduceNode,         // final synthesis
-  routeToMap,                     // returns Send[]
-  mapNodeName: 'processChunk',    // optional custom names
-  reduceNodeName: 'synthesize',
-  skipCollapse: false,            // set true to skip collapse phase
+  mapNode: mapProcessNode, // runs once per Send
+  collapseNode: collapseNode, // optional, merges before reduce
+  reduceNode: reduceNode, // final synthesis
+  routeToMap, // returns Send[]
+  mapNodeName: "processChunk", // optional custom names
+  reduceNodeName: "synthesize",
+  skipCollapse: false, // set true to skip collapse phase
 });
 ```
 
 ### Linear Graph (sequential pipeline)
+
 ```
 START → step1 → step2 → step3 → END
 ```
+
 ```typescript
-import { buildLinearGraph } from '../_shared/graph_builder.js';
+import { buildLinearGraph } from "../_shared/graph_builder.js";
 
 const graph = buildLinearGraph({
   state: OverallState,
   nodes: [
-    { name: 'extract', handler: extractNode },
-    { name: 'analyze', handler: analyzeNode },
-    { name: 'format',  handler: formatNode },
+    { name: "extract", handler: extractNode },
+    { name: "analyze", handler: analyzeNode },
+    { name: "format", handler: formatNode },
   ],
 });
 ```
 
 ### Custom Graph (complex routing)
+
 ```typescript
-import { buildCustomGraph } from '../_shared/graph_builder.js';
+import { buildCustomGraph } from "../_shared/graph_builder.js";
 
 const graph = buildCustomGraph(
   OverallState,
@@ -261,24 +270,25 @@ const graph = buildCustomGraph(
     fallback: fallbackNode,
   },
   [
-    [START, 'validate'],
-    ['validate', (state) => state.isValid ? 'process' : 'fallback'],
-    ['process', END],
-    ['fallback', END],
+    [START, "validate"],
+    ["validate", (state) => (state.isValid ? "process" : "fallback")],
+    ["process", END],
+    ["fallback", END],
   ]
 );
 ```
 
 ### Conditional Routes (project utility, not a LangGraph builtin)
+
 ```typescript
-import { createConditionalRoute } from '../_shared/graph_builder.js';
+import { createConditionalRoute } from "../_shared/graph_builder.js";
 
 const route = createConditionalRoute(
   {
     needsRetry: (state) => state.retryCount < 3 && state.hasError,
     hasError: (state) => state.hasError,
   },
-  'success'  // default
+  "success" // default
 );
 // Returns: 'needsRetry' | 'hasError' | 'success'
 ```
@@ -290,12 +300,12 @@ const route = createConditionalRoute(
 Always pass LangSmith config when invoking graphs/LLMs in production jobs:
 
 ```typescript
-import { createJobLangSmithConfig } from '../_shared/langsmith.js';
+import { createJobLangSmithConfig } from "../_shared/langsmith.js";
 
-const langSmithConfig = createJobLangSmithConfig('flashcard', flashcardId, {
+const langSmithConfig = createJobLangSmithConfig("flashcard", flashcardId, {
   notebookId,
   userId,
-  additionalTags: ['priority:high'],
+  additionalTags: ["priority:high"],
 });
 
 // Pass as second arg to graph.invoke()
@@ -310,30 +320,31 @@ const result = await llm.invoke(messages, langSmithConfig);
 ## 6. Graph Root Export (`MyFeatureGraph.ts`)
 
 The root file re-exports from the feature directory:
+
 ```typescript
-"use node"
+"use node";
 // Re-export main class
-export { MyFeatureGraph } from './myfeature/nodes.js';
+export { MyFeatureGraph } from "./myfeature/nodes.js";
 
 // Re-export types for consumers
-export type { OverallStateType, ChunkProcessStateType, MyItem } from './myfeature/state.js';
-export type { MyItemResponse } from './myfeature/prompts.js';
+export type { OverallStateType, ChunkProcessStateType, MyItem } from "./myfeature/state.js";
+export type { MyItemResponse } from "./myfeature/prompts.js";
 ```
 
 ---
 
 ## Key Patterns Quick Reference
 
-| Task | How |
-|---|---|
-| Parallel fan-out | `Send` API in route function + reducer on output field |
-| Structured LLM output | `llm.withStructuredOutput(ZodSchema)` |
-| LLM messages | Pass array: `[{role:'system',content:...},{role:'user',content:...}]` |
-| State update | Return `Partial<State>` — only changed fields |
-| Collapse before reduce | Use `collapseNode` in MapReduce config |
-| Type safety on graph | Cast with `as never` for node/edge names (project pattern) |
-| Skip collapse | `skipCollapse: true` in `buildMapReduceGraph` |
-| Check if enabled | `isLangSmithEnabled()` from `_shared/langsmith.ts` |
+| Task                   | How                                                                   |
+| ---------------------- | --------------------------------------------------------------------- |
+| Parallel fan-out       | `Send` API in route function + reducer on output field                |
+| Structured LLM output  | `llm.withStructuredOutput(ZodSchema)`                                 |
+| LLM messages           | Pass array: `[{role:'system',content:...},{role:'user',content:...}]` |
+| State update           | Return `Partial<State>` — only changed fields                         |
+| Collapse before reduce | Use `collapseNode` in MapReduce config                                |
+| Type safety on graph   | Cast with `as never` for node/edge names (project pattern)            |
+| Skip collapse          | `skipCollapse: true` in `buildMapReduceGraph`                         |
+| Check if enabled       | `isLangSmithEnabled()` from `_shared/langsmith.ts`                    |
 
 ---
 
@@ -344,10 +355,10 @@ This project uses LangGraph **v1.x**. Key change vs v0.x:
 ```typescript
 // createReactAgent was removed from @langchain/langgraph/prebuilt in v1
 // OLD (v0, will error in v1):
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
 
 // NEW (v1+):
-import { createAgent } from 'langchain';
+import { createAgent } from "langchain";
 ```
 
 This codebase does **not** use `createReactAgent` — it builds `StateGraph` directly, so this doesn't apply today. But don't reach for `createReactAgent` from LangGraph if you see it in external examples.
@@ -360,14 +371,14 @@ The project uses `ChatTogetherAI` from `@langchain/community`. The deep import p
 
 ```typescript
 // Deep import — matches project's current usage; check package.json if this breaks
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 
 // Root import — works on some versions of @langchain/community
 // import { ChatTogetherAI } from '@langchain/community';
 
 const llm = new ChatTogetherAI({
   apiKey: env.TOGETHER_AI_API_KEY,
-  model: env.FAST_LLM,      // e.g. 'Qwen/Qwen3-80B'
+  model: env.FAST_LLM, // e.g. 'Qwen/Qwen3-80B'
   temperature: 0.3,
   maxTokens: 2000,
 });

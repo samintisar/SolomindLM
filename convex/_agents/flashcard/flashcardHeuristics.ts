@@ -1,10 +1,10 @@
-"use node"
+"use node";
 
-import { createAgentGraphLogger } from '../_shared/logging.js';
+import { createAgentGraphLogger } from "../_shared/logging.js";
 
-import { PROBLEMATIC_PHRASES } from './prompts.js';
-import type { Flashcard } from './state.js';
-import { cleanBackText, cleanFrontText } from './textCleanup.js';
+import { PROBLEMATIC_PHRASES } from "./prompts.js";
+import type { Flashcard } from "./state.js";
+import { cleanBackText, cleanFrontText } from "./textCleanup.js";
 
 export interface SimilarFlashcardGroup {
   similarity: string;
@@ -16,8 +16,8 @@ function normalizeText(text: string): string {
   return text
     .toLowerCase()
     .replace(/\\"/g, '"')
-    .replace(/\s+/g, ' ')
-    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, " ")
+    .replace(/[^\w\s]/g, "")
     .trim();
 }
 
@@ -32,7 +32,7 @@ export function extractTopic(card: Flashcard): string {
     return card.topic.trim();
   }
 
-  return 'Uncategorized';
+  return "Uncategorized";
 }
 
 export function groupFlashcardsByTopic(flashcards: Flashcard[]): Record<string, number> {
@@ -47,27 +47,27 @@ export function groupFlashcardsByTopic(flashcards: Flashcard[]): Record<string, 
 }
 
 export function validateSelfContained(card: Flashcard): boolean {
-  const logger = createAgentGraphLogger('FlashcardGraph', 'flashcard');
+  const logger = createAgentGraphLogger("FlashcardGraph", "flashcard");
   const text = card.front.toLowerCase();
-  const hasProblematicPhrase = PROBLEMATIC_PHRASES.some(phrase => text.includes(phrase));
+  const hasProblematicPhrase = PROBLEMATIC_PHRASES.some((phrase) => text.includes(phrase));
   const isShort = text.length < 150;
   const shouldReject = hasProblematicPhrase && isShort;
 
   if (shouldReject) {
-    logger.warn('Flashcard rejected: short with potential external references', {
-      agent: 'FlashcardGraph',
-      phase: 'validate_self_contained',
+    logger.warn("Flashcard rejected: short with potential external references", {
+      agent: "FlashcardGraph",
+      phase: "validate_self_contained",
       questionPreview: card.front.substring(0, 100),
       questionLength: text.length,
-      foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
+      foundPhrases: PROBLEMATIC_PHRASES.filter((phrase) => text.includes(phrase)),
     });
   } else if (hasProblematicPhrase && !isShort) {
-    logger.info('Flashcard accepted: has phrases but is long enough to include context', {
-      agent: 'FlashcardGraph',
-      phase: 'validate_self_contained_accept',
+    logger.info("Flashcard accepted: has phrases but is long enough to include context", {
+      agent: "FlashcardGraph",
+      phase: "validate_self_contained_accept",
       questionPreview: card.front.substring(0, 100),
       questionLength: text.length,
-      foundPhrases: PROBLEMATIC_PHRASES.filter(phrase => text.includes(phrase)),
+      foundPhrases: PROBLEMATIC_PHRASES.filter((phrase) => text.includes(phrase)),
     });
   }
 
@@ -77,7 +77,9 @@ export function validateSelfContained(card: Flashcard): boolean {
 export function levenshteinDistance(str1: string, str2: string): number {
   const m = str1.length;
   const n = str2.length;
-  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+  const dp: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0));
 
   for (let i = 0; i <= m; i++) dp[i][0] = i;
   for (let j = 0; j <= n; j++) dp[0][j] = j;
@@ -95,7 +97,9 @@ export function levenshteinDistance(str1: string, str2: string): number {
   return dp[m][n];
 }
 
-export async function detectSimilarFlashcards(flashcards: Flashcard[]): Promise<SimilarFlashcardGroup[]> {
+export async function detectSimilarFlashcards(
+  flashcards: Flashcard[]
+): Promise<SimilarFlashcardGroup[]> {
   const duplicates: SimilarFlashcardGroup[] = [];
 
   const COMPARISON_WINDOW = 20;
@@ -114,7 +118,7 @@ export async function detectSimilarFlashcards(flashcards: Flashcard[]): Promise<
       comparisonCount++;
 
       if (flashcards.length > LARGE_SET_THRESHOLD && comparisonCount % YIELD_INTERVAL === 0) {
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
       }
 
       const f1 = flashcards[i];
@@ -122,13 +126,13 @@ export async function detectSimilarFlashcards(flashcards: Flashcard[]): Promise<
 
       const words1 = extractWords(f1.front);
       const words2 = extractWords(f2.front);
-      const intersection = [...words1].filter(w => words2.has(w));
+      const intersection = [...words1].filter((w) => words2.has(w));
       const union = new Set([...words1, ...words2]);
       const frontOverlap = intersection.length / union.size;
 
       if (frontOverlap > 0.7) {
         duplicates.push({
-          similarity: 'high_front_overlap',
+          similarity: "high_front_overlap",
           flashcards: [
             { index: i, front: f1.front, back: f1.back },
             { index: j, front: f2.front, back: f2.back },
@@ -140,13 +144,13 @@ export async function detectSimilarFlashcards(flashcards: Flashcard[]): Promise<
 
       const backWords1 = extractWords(f1.back);
       const backWords2 = extractWords(f2.back);
-      const backIntersection = [...backWords1].filter(w => backWords2.has(w));
+      const backIntersection = [...backWords1].filter((w) => backWords2.has(w));
       const backUnion = new Set([...backWords1, ...backWords2]);
       const backOverlap = backIntersection.length / backUnion.size;
 
       if (backOverlap > 0.75) {
         duplicates.push({
-          similarity: 'high_back_overlap',
+          similarity: "high_back_overlap",
           flashcards: [
             { index: i, front: f1.front, back: f1.back },
             { index: j, front: f2.front, back: f2.back },
@@ -165,12 +169,12 @@ export async function detectSimilarFlashcards(flashcards: Flashcard[]): Promise<
       if (isDefinition1 && isDefinition2) {
         const words1Arr = normalizedFront1.split(/\s+/);
         const words2Arr = normalizedFront2.split(/\s+/);
-        const term1 = words1Arr[words1Arr.length - 1] || '';
-        const term2 = words2Arr[words2Arr.length - 1] || '';
+        const term1 = words1Arr[words1Arr.length - 1] || "";
+        const term2 = words2Arr[words2Arr.length - 1] || "";
 
         if (term1 === term2 && term1.length > 2) {
           duplicates.push({
-            similarity: 'same_definition_pattern',
+            similarity: "same_definition_pattern",
             flashcards: [
               { index: i, front: f1.front, back: f1.back },
               { index: j, front: f2.front, back: f2.back },
@@ -192,7 +196,7 @@ export async function detectSimilarFlashcards(flashcards: Flashcard[]): Promise<
         const frontCharSim = charSimilarity(normalizedFront1, normalizedFront2);
         if (frontCharSim > 0.85) {
           duplicates.push({
-            similarity: 'high_character_similarity',
+            similarity: "high_character_similarity",
             flashcards: [
               { index: i, front: f1.front, back: f1.back },
               { index: j, front: f2.front, back: f2.back },
@@ -211,7 +215,7 @@ export function heuristicDedupeFlashcards(flashcards: Flashcard[]): {
   dedupedFlashcards: Flashcard[];
   duplicatesRemoved: number;
 } {
-  const logger = createAgentGraphLogger('FlashcardGraph', 'flashcard');
+  const logger = createAgentGraphLogger("FlashcardGraph", "flashcard");
   const dedupedByExactKey = new Map<string, Flashcard>();
   const exactKeyByFront = new Map<string, string>();
   let duplicatesRemoved = 0;
@@ -260,13 +264,16 @@ export function heuristicDedupeFlashcards(flashcards: Flashcard[]): {
 
   const dedupedFlashcards = [...dedupedByExactKey.values()];
 
-  logger.info(`Heuristic dedupe: ${flashcards.length} → ${dedupedFlashcards.length} flashcards (removed ${duplicatesRemoved})`, {
-    agent: 'FlashcardGraph',
-    phase: 'heuristic_dedupe',
-    inputCount: flashcards.length,
-    outputCount: dedupedFlashcards.length,
-    duplicatesRemoved,
-  });
+  logger.info(
+    `Heuristic dedupe: ${flashcards.length} → ${dedupedFlashcards.length} flashcards (removed ${duplicatesRemoved})`,
+    {
+      agent: "FlashcardGraph",
+      phase: "heuristic_dedupe",
+      inputCount: flashcards.length,
+      outputCount: dedupedFlashcards.length,
+      duplicatesRemoved,
+    }
+  );
 
   return {
     dedupedFlashcards,

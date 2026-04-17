@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,8 +9,8 @@ import {
   Download,
   Grid3x3,
   Timer,
-} from 'lucide-react';
-import { SlideDeckNote } from '@/shared/types/index';
+} from "lucide-react";
+import { SlideDeckNote } from "@/shared/types/index";
 
 export interface SlidesViewProps {
   note: SlideDeckNote;
@@ -18,15 +18,19 @@ export interface SlidesViewProps {
   onBack?: () => void;
 }
 
-type TransitionType = 'fade' | 'slide' | 'scale' | 'none';
+type TransitionType = "fade" | "slide" | "scale" | "none";
 
-export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onNoteUpdate, onBack }) => {
+export const SlidesView: React.FC<SlidesViewProps> = ({
+  note,
+  onNoteUpdate: _onNoteUpdate,
+  onBack,
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTalkingPoints, setShowTalkingPoints] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [showThumbnailGrid, setShowThumbnailGrid] = useState(false);
-  const [transition, setTransition] = useState<TransitionType>('fade');
+  const [transition, setTransition] = useState<TransitionType>("fade");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showSpeakerView, setShowSpeakerView] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -40,7 +44,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
   useEffect(() => {
     if (showSpeakerView || isFullscreen) {
       timerRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
+        setElapsedTime((prev) => prev + 1);
       }, 1000);
     } else {
       if (timerRef.current) {
@@ -59,33 +63,33 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   // Handle fullscreen
   const toggleFullscreen = useCallback(async () => {
-    console.log('Toggle fullscreen clicked', {
+    console.log("Toggle fullscreen clicked", {
       hasContainer: !!containerRef.current,
       isCurrentlyFullscreen: !!document.fullscreenElement,
     });
 
     if (!containerRef.current) {
-      console.error('Container ref not available');
+      console.error("Container ref not available");
       return;
     }
 
     try {
       if (!document.fullscreenElement) {
-        console.log('Entering fullscreen...');
+        console.log("Entering fullscreen...");
         await containerRef.current.requestFullscreen();
-        console.log('Fullscreen request successful');
+        console.log("Fullscreen request successful");
       } else {
-        console.log('Exiting fullscreen...');
+        console.log("Exiting fullscreen...");
         await document.exitFullscreen();
-        console.log('Exit fullscreen successful');
+        console.log("Exit fullscreen successful");
       }
     } catch (err) {
-      console.error('Fullscreen error:', err);
+      console.error("Fullscreen error:", err);
       alert(`Fullscreen error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, []);
@@ -96,9 +100,9 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
       setIsFullscreen(!!document.fullscreenElement);
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
 
@@ -106,7 +110,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
     if (currentIndex < slides.length - 1) {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentIndex(prev => prev + 1);
+        setCurrentIndex((prev) => prev + 1);
         setImageError(false);
         setTimeout(() => setIsTransitioning(false), 50);
       }, 150);
@@ -117,7 +121,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
     if (currentIndex > 0) {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentIndex(prev => prev - 1);
+        setCurrentIndex((prev) => prev - 1);
         setImageError(false);
         setTimeout(() => setIsTransitioning(false), 50);
       }, 150);
@@ -141,51 +145,53 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
         return;
       }
 
-      if (e.key === 'ArrowRight' || e.key === ' ') {
+      if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         handleNext();
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         handlePrev();
-      } else if (e.key === 'f' || e.key === 'F') {
+      } else if (e.key === "f" || e.key === "F") {
         e.preventDefault();
         toggleFullscreen();
-      } else if (e.key === 'g' || e.key === 'G') {
+      } else if (e.key === "g" || e.key === "G") {
         e.preventDefault();
-        setShowThumbnailGrid(prev => !prev);
-      } else if (e.key === 's' || e.key === 'S') {
+        setShowThumbnailGrid((prev) => !prev);
+      } else if (e.key === "s" || e.key === "S") {
         e.preventDefault();
-        setShowSpeakerView(prev => !prev);
-      } else if (e.key === 't' || e.key === 'T') {
+        setShowSpeakerView((prev) => !prev);
+      } else if (e.key === "t" || e.key === "T") {
         e.preventDefault();
-        setTransition(prev => {
-          const transitions: TransitionType[] = ['fade', 'slide', 'scale', 'none'];
+        setTransition((prev) => {
+          const transitions: TransitionType[] = ["fade", "slide", "scale", "none"];
           const currentIndex = transitions.indexOf(prev);
           return transitions[(currentIndex + 1) % transitions.length];
         });
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
+    window.addEventListener("keydown", handleKeyPress);
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener("keydown", handleKeyPress);
     };
   }, [handleNext, handlePrev, toggleFullscreen]);
 
   // Get transition classes
   const getTransitionClasses = () => {
-    if (!isTransitioning) return '';
+    if (!isTransitioning) return "";
     switch (transition) {
-      case 'fade':
-        return 'opacity-0';
-      case 'slide':
-        return currentIndex > slides.indexOf(currentSlide) ? '-translate-x-full' : 'translate-x-full';
-      case 'scale':
-        return 'scale-95 opacity-0';
-      case 'none':
-        return '';
+      case "fade":
+        return "opacity-0";
+      case "slide":
+        return currentIndex > slides.indexOf(currentSlide)
+          ? "-translate-x-full"
+          : "translate-x-full";
+      case "scale":
+        return "scale-95 opacity-0";
+      case "none":
+        return "";
       default:
-        return '';
+        return "";
     }
   };
 
@@ -198,12 +204,12 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
     );
   }
 
-  const isPresenterSlides = note.metadata?.slideType === 'presenter_slides';
+  const isPresenterSlides = note.metadata?.slideType === "presenter_slides";
 
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col h-full bg-background ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}
+      className={`flex flex-col h-full bg-background ${isFullscreen ? "fixed inset-0 z-50" : ""}`}
     >
       {/* Thumbnail Grid Overlay */}
       {showThumbnailGrid && (
@@ -231,11 +237,11 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                     onClick={() => jumpToSlide(idx)}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all hover:scale-105 bg-black ${
                       idx === currentIndex
-                        ? 'border-primary shadow-lg shadow-primary/50'
-                        : 'border-slate-700 hover:border-slate-600'
+                        ? "border-primary shadow-lg shadow-primary/50"
+                        : "border-slate-700 hover:border-slate-600"
                     }`}
                   >
-                    {(slide.slide_url || slide.imageUrl) ? (
+                    {slide.slide_url || slide.imageUrl ? (
                       <img
                         src={slide.slide_url || slide.imageUrl}
                         alt={slide.title}
@@ -280,8 +286,12 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                   <div className="text-center p-8">
                     {imageError ? (
                       <>
-                        <p className="text-lg font-semibold text-foreground mb-2">Slide Unavailable</p>
-                        <p className="text-sm text-muted-foreground">The image could not be loaded</p>
+                        <p className="text-lg font-semibold text-foreground mb-2">
+                          Slide Unavailable
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          The image could not be loaded
+                        </p>
                       </>
                     ) : (
                       <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -353,21 +363,23 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
           )}
 
           {/* Main Slide Display Area */}
-          <div className={`flex-1 flex flex-col items-center justify-center ${
-            isFullscreen ? 'p-2' : 'p-4 md:p-8 bg-card border-t border-border'
-          }`}>
+          <div
+            className={`flex-1 flex flex-col items-center justify-center ${
+              isFullscreen ? "p-2" : "p-4 md:p-8 bg-card border-t border-border"
+            }`}
+          >
             {/* Transition indicator */}
-            {transition !== 'none' && (
+            {transition !== "none" && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/50 backdrop-blur-sm rounded-xl text-white text-xs font-medium z-10">
                 {transition} transition
               </div>
             )}
 
-            <div className={`w-full relative bg-black overflow-hidden shadow-2xl transition-all duration-300 ${
-              isFullscreen
-                ? 'h-full max-h-full'
-                : 'max-w-5xl aspect-video rounded-lg'
-            }`}>
+            <div
+              className={`w-full relative bg-black overflow-hidden shadow-2xl transition-all duration-300 ${
+                isFullscreen ? "h-full max-h-full" : "max-w-5xl aspect-video rounded-lg"
+              }`}
+            >
               {/* Slide Image */}
               {(currentSlide?.slide_url || currentSlide?.imageUrl) && !imageError ? (
                 <img
@@ -381,8 +393,12 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                   <div className="text-center p-8">
                     {imageError ? (
                       <>
-                        <p className="text-lg font-semibold text-foreground mb-2">Slide Unavailable</p>
-                        <p className="text-sm text-muted-foreground">The image could not be loaded</p>
+                        <p className="text-lg font-semibold text-foreground mb-2">
+                          Slide Unavailable
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          The image could not be loaded
+                        </p>
                       </>
                     ) : (
                       <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -420,16 +436,14 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                     onClick={() => jumpToSlide(idx)}
                     className={`w-2 h-2 rounded-xl transition-all ${
                       idx === currentIndex
-                        ? 'bg-primary w-6'
-                        : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                        ? "bg-primary w-6"
+                        : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
                     }`}
                     aria-label={`Go to slide ${idx + 1}`}
                   />
                 ))}
                 {slides.length > 10 && (
-                  <span className="text-xs text-muted-foreground">
-                    +{slides.length - 10} more
-                  </span>
+                  <span className="text-xs text-muted-foreground">+{slides.length - 10} more</span>
                 )}
               </div>
             )}
@@ -441,9 +455,7 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
                 className="mt-4 flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-xl text-sm font-medium transition-colors"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>
-                  {showTalkingPoints ? 'Hide' : 'Show'} Talking Points
-                </span>
+                <span>{showTalkingPoints ? "Hide" : "Show"} Talking Points</span>
               </button>
             )}
 
@@ -468,32 +480,36 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
       )}
 
       {/* Navigation Controls */}
-      <div className={`shrink-0 border-t border-border bg-background/80 backdrop-blur-md z-10 ${
-        isFullscreen ? 'p-2' : 'p-4 md:px-8 md:py-6'
-      }`}>
-        <div className={`mx-auto w-full flex items-center justify-between ${
-          isFullscreen ? '' : 'max-w-5xl'
-        }`}>
+      <div
+        className={`shrink-0 border-t border-border bg-background/80 backdrop-blur-md z-10 ${
+          isFullscreen ? "p-2" : "p-4 md:px-8 md:py-6"
+        }`}
+      >
+        <div
+          className={`mx-auto w-full flex items-center justify-between ${
+            isFullscreen ? "" : "max-w-5xl"
+          }`}
+        >
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
               className={`rounded-xl bg-secondary hover:bg-secondary/80 disabled:opacity-30 disabled:hover:bg-secondary transition-all ${
-                isFullscreen ? 'p-2' : 'p-3'
+                isFullscreen ? "p-2" : "p-3"
               }`}
               aria-label="Previous slide"
             >
-              <ChevronLeft className={isFullscreen ? 'w-4 h-4' : 'w-5 h-5'} />
+              <ChevronLeft className={isFullscreen ? "w-4 h-4" : "w-5 h-5"} />
             </button>
             <button
               onClick={handleNext}
               disabled={currentIndex === slides.length - 1}
               className={`rounded-xl bg-secondary hover:bg-secondary/80 disabled:opacity-30 disabled:hover:bg-secondary transition-all ${
-                isFullscreen ? 'p-2' : 'p-3'
+                isFullscreen ? "p-2" : "p-3"
               }`}
               aria-label="Next slide"
             >
-              <ChevronRight className={isFullscreen ? 'w-4 h-4' : 'w-5 h-5'} />
+              <ChevronRight className={isFullscreen ? "w-4 h-4" : "w-5 h-5"} />
             </button>
           </div>
 
@@ -502,12 +518,12 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             <button
               onClick={() => setShowThumbnailGrid(!showThumbnailGrid)}
               className={`rounded-xl bg-secondary hover:bg-secondary/80 transition-all ${
-                isFullscreen ? 'p-2' : 'p-3'
+                isFullscreen ? "p-2" : "p-3"
               }`}
               aria-label="Toggle slide grid"
               title="Slide grid (G)"
             >
-              <Grid3x3 className={isFullscreen ? 'w-4 h-4' : 'w-5 h-5'} />
+              <Grid3x3 className={isFullscreen ? "w-4 h-4" : "w-5 h-5"} />
             </button>
 
             {/* Speaker View Toggle - Hide in fullscreen */}
@@ -526,15 +542,15 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
             <button
               onClick={toggleFullscreen}
               className={`rounded-xl bg-secondary hover:bg-secondary/80 transition-all ${
-                isFullscreen ? 'p-2' : 'p-3'
+                isFullscreen ? "p-2" : "p-3"
               }`}
-              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               title="Fullscreen (F)"
             >
               {isFullscreen ? (
-                <Minimize2 className={isFullscreen ? 'w-4 h-4' : 'w-5 h-5'} />
+                <Minimize2 className={isFullscreen ? "w-4 h-4" : "w-5 h-5"} />
               ) : (
-                <Maximize2 className={isFullscreen ? 'w-4 h-4' : 'w-5 h-5'} />
+                <Maximize2 className={isFullscreen ? "w-4 h-4" : "w-5 h-5"} />
               )}
             </button>
 
@@ -555,7 +571,8 @@ export const SlidesView: React.FC<SlidesViewProps> = ({ note, onNoteUpdate: _onN
         {!isFullscreen && (
           <div className="text-center mt-2">
             <p className="text-xs text-muted-foreground">
-              Use arrow keys to navigate • Space for next • F for fullscreen • G for grid • S for speaker view • T for transitions
+              Use arrow keys to navigate • Space for next • F for fullscreen • G for grid • S for
+              speaker view • T for transitions
             </p>
           </div>
         )}

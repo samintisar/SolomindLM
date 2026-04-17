@@ -1,5 +1,5 @@
-"use node"
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js';
+"use node";
+import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
 /**
  * Prompt templates for ReportGraph.

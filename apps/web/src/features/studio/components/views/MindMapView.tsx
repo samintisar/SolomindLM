@@ -1,13 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  XCircle,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Minimize2,
-  ArrowLeft,
-} from 'lucide-react';
-import { MindMapNote } from '@/shared/types/index';
+import React, { useState, useRef, useEffect } from "react";
+import { XCircle, ZoomIn, ZoomOut, Maximize2, Minimize2, ArrowLeft } from "lucide-react";
+import { MindMapNote } from "@/shared/types/index";
 
 export interface MindMapViewProps {
   note: MindMapNote;
@@ -17,19 +10,22 @@ export interface MindMapViewProps {
 }
 
 function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any {
-  if (!node || typeof node !== 'object') {
+  if (!node || typeof node !== "object") {
     return {
-      id: isRoot ? 'root' : `node-${Math.random().toString(36).slice(2, 9)}`,
-      topic: isRoot ? fallbackTopic : 'Untitled',
+      id: isRoot ? "root" : `node-${Math.random().toString(36).slice(2, 9)}`,
+      topic: isRoot ? fallbackTopic : "Untitled",
       children: [],
     };
   }
 
-  const rawTopic = typeof node.topic === 'string' ? node.topic : '';
-  const topic = rawTopic.trim().length > 0 ? rawTopic : (isRoot ? fallbackTopic : 'Untitled');
-  const id = typeof node.id === 'string' && node.id.trim().length > 0
-    ? node.id
-    : (isRoot ? 'root' : `node-${Math.random().toString(36).slice(2, 9)}`);
+  const rawTopic = typeof node.topic === "string" ? node.topic : "";
+  const topic = rawTopic.trim().length > 0 ? rawTopic : isRoot ? fallbackTopic : "Untitled";
+  const id =
+    typeof node.id === "string" && node.id.trim().length > 0
+      ? node.id
+      : isRoot
+        ? "root"
+        : `node-${Math.random().toString(36).slice(2, 9)}`;
 
   const children = Array.isArray(node.children)
     ? node.children.map((child: any) => sanitizeNodeTree(child, fallbackTopic, false))
@@ -43,7 +39,12 @@ function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any
   };
 }
 
-export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = false, onToggleExpanded, onBack }) => {
+export const MindMapView: React.FC<MindMapViewProps> = ({
+  note,
+  isExpanded = false,
+  onToggleExpanded,
+  onBack,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mindRef = useRef<any>(null);
   const [scale, setScale] = useState(1);
@@ -59,12 +60,12 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
     }
 
     // Dynamic import Mind Elixir
-    import('mind-elixir').then(({ default: MindElixir }) => {
+    import("mind-elixir").then(({ default: MindElixir }) => {
       const el = containerRef.current;
       if (!el) return;
       const sanitizedRoot = sanitizeNodeTree(
         mindMapData?.nodeData,
-        (note.title && note.title.trim()) || 'Mind Map',
+        (note.title && note.title.trim()) || "Mind Map",
         true
       );
 
@@ -76,7 +77,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
         toolBar: false, // Disable default toolbar to use custom controls
         nodeMenu: false, // Disable node menu on right-click
         keypress: true,
-        locale: 'en' as any,
+        locale: "en" as any,
         overflowHidden: false,
         mainLinkStyle: 2,
         // Keep drag-to-pan on left mouse; marquee selection only on right mouse.
@@ -91,21 +92,21 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
         },
         // SolomindLM theme: clean, card-based, minimalist
         theme: {
-          name: 'SolomindLM',
+          name: "SolomindLM",
           // Uniform blue/gray palette - monochrome with blue accents
-          palette: ['#1a73e8', '#5f6368', '#3c4043'],
+          palette: ["#1a73e8", "#5f6368", "#3c4043"],
           cssVar: {
-            '--main-color': '#1f1f1f',       // Dark grey text for root
-            '--main-bgcolor': '#ffffff',     // White background for root
-            '--color': '#3c4043',            // Dark grey text for nodes
-            '--bgcolor': '#ffffff',          // White background for nodes
-            '--panel-color': '#3c4043',      // Text color for panel
-            '--panel-bgcolor': '#f8f9fa',    // Light grey background for canvas
-            '--panel-border-color': '#dadce0', // Google-style soft border grey
+            "--main-color": "#1f1f1f", // Dark grey text for root
+            "--main-bgcolor": "#ffffff", // White background for root
+            "--color": "#3c4043", // Dark grey text for nodes
+            "--bgcolor": "#ffffff", // White background for nodes
+            "--panel-color": "#3c4043", // Text color for panel
+            "--panel-bgcolor": "#f8f9fa", // Light grey background for canvas
+            "--panel-border-color": "#dadce0", // Google-style soft border grey
             // Rounded corners for Material Design look
-            '--root-radius': '12px',
-            '--main-radius': '8px',
-            '--topic-radius': '8px',
+            "--root-radius": "12px",
+            "--main-radius": "8px",
+            "--topic-radius": "8px",
           },
         } as any,
       };
@@ -117,7 +118,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
       // Center map on first render so root is visible.
       requestAnimationFrame(() => {
         try {
-          if (typeof mind.toCenter === 'function') {
+          if (typeof mind.toCenter === "function") {
             mind.toCenter();
           }
         } catch {
@@ -178,7 +179,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
   };
 
   // Generating/loading state
-  const isFailed = note.status === 'failed';
+  const isFailed = note.status === "failed";
 
   if (isFailed) {
     return (
@@ -189,9 +190,10 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
             <div className="flex-1">
               <p className="text-sm font-medium text-destructive">Mind map generation failed</p>
               <p className="text-xs text-destructive/70 mt-1">
-                {typeof note.metadata?.error === 'object'
-                  ? (note.metadata.error as { message?: string }).message || 'An unknown error occurred'
-                  : note.metadata?.error || 'An unknown error occurred'}
+                {typeof note.metadata?.error === "object"
+                  ? (note.metadata.error as { message?: string }).message ||
+                    "An unknown error occurred"
+                  : note.metadata?.error || "An unknown error occurred"}
               </p>
             </div>
           </div>
@@ -232,11 +234,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
               <ArrowLeft className="w-5 h-5 shrink-0" />
             </button>
           )}
-          {isExpanded && (
-            <h2 className="text-sm font-bold text-foreground mr-4">
-              {note.title}
-            </h2>
-          )}
+          {isExpanded && <h2 className="text-sm font-bold text-foreground mr-4">{note.title}</h2>}
           <button
             onClick={handleZoomOut}
             className="p-2 rounded-md hover:bg-secondary transition-colors"
@@ -306,10 +304,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({ note, isExpanded = fal
             </button>
           </div>
         )}
-        <div
-          ref={containerRef}
-          className="mind-map-container w-full h-full"
-        />
+        <div ref={containerRef} className="mind-map-container w-full h-full" />
       </div>
 
       {/* Keyboard shortcuts hint */}

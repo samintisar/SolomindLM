@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import React from "react";
+import { AlertTriangle, X } from "lucide-react";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -7,7 +7,7 @@ interface ConfirmDialogProps {
   message: string | React.ReactNode;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning' | 'default';
+  variant?: "danger" | "warning" | "default";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -16,24 +16,24 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  variant = 'default',
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  variant = "default",
   onConfirm,
   onCancel,
 }) => {
   if (!isOpen) return null;
 
   const iconColors = {
-    danger: 'text-destructive bg-destructive/10',
-    warning: 'text-warning bg-warning/10',
-    default: 'text-primary bg-primary/10',
+    danger: "text-destructive bg-destructive/10",
+    warning: "text-warning bg-warning/10",
+    default: "text-primary bg-primary/10",
   };
 
   const confirmButtonStyles = {
-    danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-    warning: 'bg-warning text-warning-foreground hover:bg-warning/90',
-    default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+    warning: "bg-warning text-warning-foreground hover:bg-warning/90",
+    default: "bg-primary text-primary-foreground hover:bg-primary/90",
   };
 
   return (
@@ -59,7 +59,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         {/* Body */}
         <div className="p-6">
           <div className="text-sm text-foreground leading-relaxed">
-            {typeof message === 'string' ? <p>{message}</p> : message}
+            {typeof message === "string" ? <p>{message}</p> : message}
           </div>
         </div>
 
@@ -91,42 +91,45 @@ export const useConfirmDialog = () => {
     message: string | React.ReactNode;
     confirmText?: string;
     cancelText?: string;
-    variant?: 'danger' | 'warning' | 'default';
+    variant?: "danger" | "warning" | "default";
     onConfirm?: () => void;
   }>({
     isOpen: false,
-    title: '',
-    message: '',
+    title: "",
+    message: "",
   });
 
-  const confirm = React.useCallback((
-    title: string,
-    message: string | React.ReactNode,
-    options?: {
-      confirmText?: string;
-      cancelText?: string;
-      variant?: 'danger' | 'warning' | 'default';
-    }
-  ): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setState({
-        isOpen: true,
-        title,
-        message,
-        confirmText: options?.confirmText,
-        cancelText: options?.cancelText,
-        variant: options?.variant || 'default',
-        onConfirm: () => {
-          setState(prev => ({ ...prev, isOpen: false }));
-          resolve(true);
-        },
+  const confirm = React.useCallback(
+    (
+      title: string,
+      message: string | React.ReactNode,
+      options?: {
+        confirmText?: string;
+        cancelText?: string;
+        variant?: "danger" | "warning" | "default";
+      }
+    ): Promise<boolean> => {
+      return new Promise((resolve) => {
+        setState({
+          isOpen: true,
+          title,
+          message,
+          confirmText: options?.confirmText,
+          cancelText: options?.cancelText,
+          variant: options?.variant || "default",
+          onConfirm: () => {
+            setState((prev) => ({ ...prev, isOpen: false }));
+            resolve(true);
+          },
+        });
       });
-    });
-  }, []);
+    },
+    []
+  );
 
   const Dialog = React.useCallback(() => {
     const handleCancel = () => {
-      setState(prev => ({ ...prev, isOpen: false }));
+      setState((prev) => ({ ...prev, isOpen: false }));
     };
 
     return (

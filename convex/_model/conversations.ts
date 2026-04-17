@@ -20,9 +20,7 @@ export async function getConversationByUserAndNotebook(
 ): Promise<Doc<"conversations"> | null> {
   return await ctx.db
     .query("conversations")
-    .withIndex("by_user_notebook", (q) =>
-      q.eq("userId", userId).eq("notebookId", notebookId)
-    )
+    .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
     .first();
 }
 

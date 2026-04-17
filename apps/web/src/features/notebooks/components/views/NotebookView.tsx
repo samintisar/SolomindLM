@@ -1,14 +1,14 @@
-import { useState, useMemo } from 'react';
-import { useAuth } from '@/features/auth/AuthContext';
-import { useNotebookContext } from '@/features/notebooks/NotebookContext';
-import { useSourcesContext } from '@/features/sources/SourcesContext';
-import { useStudioContext } from '@/features/studio/StudioContext';
-import { AudioPlayerProvider } from '@/features/audio/AudioPlayerContext';
-import { usePanelResize } from '@/shared/hooks/usePanelResize';
-import { SourcesPanel } from '@/features/sources/components/SourcesPanel';
-import { ChatPanel } from '@/features/chat/components/ChatPanel';
-import { StudioPanel } from '@/features/studio/components/StudioPanel';
-import { STUDIO_TOOLS } from '@/shared/constants';
+import { useState, useMemo } from "react";
+import { useAuth } from "@/features/auth/AuthContext";
+import { useNotebookContext } from "@/features/notebooks/NotebookContext";
+import { useSourcesContext } from "@/features/sources/SourcesContext";
+import { useStudioContext } from "@/features/studio/StudioContext";
+import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
+import { usePanelResize } from "@/shared/hooks/usePanelResize";
+import { SourcesPanel } from "@/features/sources/components/SourcesPanel";
+import { ChatPanel } from "@/features/chat/components/ChatPanel";
+import { StudioPanel } from "@/features/studio/components/StudioPanel";
+import { STUDIO_TOOLS } from "@/shared/constants";
 
 export function NotebookView() {
   const { user } = useAuth();
@@ -25,7 +25,7 @@ export function NotebookView() {
     startResizingRight,
   } = usePanelResize();
 
-  const [mobileActiveTab, setMobileActiveTab] = useState<'sources' | 'chat' | 'studio'>('sources');
+  const [mobileActiveTab, setMobileActiveTab] = useState<"sources" | "chat" | "studio">("sources");
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
   const [isStudioOpen, setIsStudioOpen] = useState(true);
 
@@ -63,21 +63,24 @@ export function NotebookView() {
     setMiniPlayerVisible(false);
     const noteId = (window as any).__currentPlayingAudioNoteId;
     if (noteId) {
-      const note = notes.find(n => n.id === noteId);
+      const note = notes.find((n) => n.id === noteId);
       if (note) {
-        const event = new CustomEvent('setActiveNote', { detail: { noteId } });
+        const event = new CustomEvent("setActiveNote", { detail: { noteId } });
         window.dispatchEvent(event);
       }
     }
   };
 
-  const audioPlayerContextValue = useMemo(() => ({
-    miniPlayerVisible,
-    miniPlayerData,
-    onPlayAudio: handlePlayAudio,
-    onCloseMiniPlayer: handleCloseMiniPlayer,
-    onExpandAudioPlayer: handleExpandAudioPlayer,
-  }), [miniPlayerVisible, miniPlayerData]);
+  const audioPlayerContextValue = useMemo(
+    () => ({
+      miniPlayerVisible,
+      miniPlayerData,
+      onPlayAudio: handlePlayAudio,
+      onCloseMiniPlayer: handleCloseMiniPlayer,
+      onExpandAudioPlayer: handleExpandAudioPlayer,
+    }),
+    [miniPlayerVisible, miniPlayerData]
+  );
 
   return (
     <AudioPlayerProvider value={audioPlayerContextValue}>
@@ -85,33 +88,33 @@ export function NotebookView() {
         {/* Mobile Navigation Bar */}
         <div className="md:hidden flex items-center justify-around border-b border-border bg-background sticky top-0 z-60 h-12">
           <button
-            onClick={() => setMobileActiveTab('sources')}
+            onClick={() => setMobileActiveTab("sources")}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === 'sources'
-                ? 'text-primary border-b-2 border-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground'
+              mobileActiveTab === "sources"
+                ? "text-primary border-b-2 border-primary bg-primary/5"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Sources
           </button>
           <div className="w-px h-6 bg-border"></div>
           <button
-            onClick={() => setMobileActiveTab('chat')}
+            onClick={() => setMobileActiveTab("chat")}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === 'chat'
-                ? 'text-primary border-b-2 border-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground'
+              mobileActiveTab === "chat"
+                ? "text-primary border-b-2 border-primary bg-primary/5"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Chat
           </button>
           <div className="w-px h-6 bg-border"></div>
           <button
-            onClick={() => setMobileActiveTab('studio')}
+            onClick={() => setMobileActiveTab("studio")}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
-              mobileActiveTab === 'studio'
-                ? 'text-primary border-b-2 border-primary bg-primary/5'
-                : 'text-muted-foreground hover:text-foreground'
+              mobileActiveTab === "studio"
+                ? "text-primary border-b-2 border-primary bg-primary/5"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Studio
@@ -169,7 +172,7 @@ export function NotebookView() {
 
         {/* Mobile Layout */}
         <div className="md:hidden flex-1 overflow-hidden w-full flex flex-col">
-          {mobileActiveTab === 'sources' && (
+          {mobileActiveTab === "sources" && (
             <div className="flex-1 w-full overflow-hidden">
               <SourcesPanel
                 isOpen={true}
@@ -182,7 +185,7 @@ export function NotebookView() {
               />
             </div>
           )}
-          {mobileActiveTab === 'chat' && (
+          {mobileActiveTab === "chat" && (
             <div className="flex-1 w-full overflow-hidden">
               <ChatPanel
                 isLeftOpen={false}
@@ -196,7 +199,7 @@ export function NotebookView() {
               />
             </div>
           )}
-          {mobileActiveTab === 'studio' && (
+          {mobileActiveTab === "studio" && (
             <div className="flex-1 w-full overflow-hidden">
               <StudioPanel
                 isOpen={true}

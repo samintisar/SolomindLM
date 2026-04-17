@@ -11,18 +11,18 @@ AI-powered research platform for multi-source content ingestion, RAG-based chat,
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, Vite, TypeScript, TailwindCSS 4, Radix UI |
-| Backend | Convex 1.31+, TypeScript, LangChain |
-| Auth | @convex-dev/auth |
-| LLMs | openai/gpt-oss-120b, openai/gpt-oss-20b |
-| Embeddings | OpenAI (text-embedding-3-small) |
-| Reranking | ZeroEntropy (zerank-2) |
-| OCR | Mistral |
-| Web Search | Tavily |
-| Content Extraction | Supadata |
-| Audio (TTS) | Together AI |
+| Layer              | Technology                                          |
+| ------------------ | --------------------------------------------------- |
+| Frontend           | React 19, Vite, TypeScript, TailwindCSS 4, Radix UI |
+| Backend            | Convex 1.31+, TypeScript, LangChain                 |
+| Auth               | @convex-dev/auth                                    |
+| LLMs               | openai/gpt-oss-120b, openai/gpt-oss-20b             |
+| Embeddings         | OpenAI (text-embedding-3-small)                     |
+| Reranking          | ZeroEntropy (zerank-2)                              |
+| OCR                | Mistral                                             |
+| Web Search         | Tavily                                              |
+| Content Extraction | Supadata                                            |
+| Audio (TTS)        | Together AI                                         |
 
 ## Getting Started
 
@@ -72,11 +72,11 @@ Use **`VITE_CONVEX_SITE_URL`** as the single value for both the browser (Vite) a
 
 Set it to your Convex **HTTP** site base: `https://YOUR_DEPLOYMENT.convex.site` (no trailing slash).
 
-| Name | Production | Preview |
-|------|------------|---------|
-| `CONVEX_DEPLOY_KEY` | Required on Vercel ([deploy key](https://docs.convex.dev/cli/deploy-key-types)) | Omit |
-| `VITE_CONVEX_SITE_URL` | Required — same URL for chat/streaming **and** `/api/*` proxy | Required — dev `.convex.site` |
-| `VITE_CONVEX_URL` | Set automatically during Production build by `convex deploy --cmd` | Required — dev `https://….convex.cloud` |
+| Name                   | Production                                                                      | Preview                                 |
+| ---------------------- | ------------------------------------------------------------------------------- | --------------------------------------- |
+| `CONVEX_DEPLOY_KEY`    | Required on Vercel ([deploy key](https://docs.convex.dev/cli/deploy-key-types)) | Omit                                    |
+| `VITE_CONVEX_SITE_URL` | Required — same URL for chat/streaming **and** `/api/*` proxy                   | Required — dev `.convex.site`           |
+| `VITE_CONVEX_URL`      | Set automatically during Production build by `convex deploy --cmd`              | Required — dev `https://….convex.cloud` |
 
 If you previously used **`CONVEX_SITE_ORIGIN`**, delete it in Vercel and set **`VITE_CONVEX_SITE_URL`** to the same value (one variable instead of two).
 

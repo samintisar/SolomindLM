@@ -87,7 +87,7 @@ function togetherChoiceAssistantText(choice: any): string {
   const fromMessage = messageContentToString(msg);
   if (fromMessage.trim()) return fromMessage;
   if (typeof choice.text === "string" && choice.text.trim()) return choice.text;
-  
+
   // FIX: Return reasoning content even if it's plain text (not just JSON)
   // Hybrid models like openai/gpt-oss-* use reasoning field for all output
   const reasoning = (msg as { reasoning?: unknown }).reasoning;
@@ -97,16 +97,12 @@ function togetherChoiceAssistantText(choice: any): string {
   return "";
 }
 
-function logEmptyTogetherAssistant(
-  model: string,
-  choice: any,
-): void {
+function logEmptyTogetherAssistant(model: string, choice: any): void {
   const msg = choice?.message;
   console.warn("[Together LLM] empty assistant text", {
     model,
     finishReason: choice?.finish_reason,
-    messageKeys:
-      msg && typeof msg === "object" ? Object.keys(msg as object) : [],
+    messageKeys: msg && typeof msg === "object" ? Object.keys(msg as object) : [],
     refusal:
       msg && typeof (msg as { refusal?: unknown }).refusal === "string"
         ? (msg as { refusal: string }).refusal
@@ -115,9 +111,7 @@ function logEmptyTogetherAssistant(
 }
 
 /** HTTP statuses where a short backoff retry is appropriate (Together / OpenAI-style APIs). */
-const TRANSIENT_LLM_HTTP_STATUSES = new Set([
-  408, 429, 500, 502, 503, 504, 520, 522, 524, 529,
-]);
+const TRANSIENT_LLM_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504, 520, 522, 524, 529]);
 
 function isTransientLlmHttpStatus(status: number): boolean {
   return TRANSIENT_LLM_HTTP_STATUSES.has(status);
@@ -153,10 +147,7 @@ function togetherChatRequestBody(options: LLMOptions): Record<string, unknown> {
     Object.assign(body, mergeModelKwargs(options.model, "smart"));
   }
   // Together marks GPT-OSS as no tool calling; omit tool_choice so the payload matches plain invokes.
-  if (
-    options.toolChoice !== undefined &&
-    !options.model.includes("openai/gpt-oss")
-  ) {
+  if (options.toolChoice !== undefined && !options.model.includes("openai/gpt-oss")) {
     body.tool_choice = options.toolChoice;
   }
   return body;
@@ -167,7 +158,7 @@ function togetherChatRequestBody(options: LLMOptions): Record<string, unknown> {
  */
 async function executeTogetherLlmRequest(
   options: LLMOptions,
-  apiKey: string,
+  apiKey: string
 ): Promise<LLMResponse> {
   const url = "https://api.together.xyz/v1/chat/completions";
   const init: RequestInit = {
@@ -187,14 +178,9 @@ async function executeTogetherLlmRequest(
       const bodyText = await response.text();
 
       if (!response.ok) {
-        const err = new Error(
-          `LLM API error: ${response.status} - ${bodyText}`,
-        );
+        const err = new Error(`LLM API error: ${response.status} - ${bodyText}`);
         lastFailure = err;
-        if (
-          isTransientLlmHttpStatus(response.status) &&
-          attempt < TOGETHER_LLM_MAX_ATTEMPTS - 1
-        ) {
+        if (isTransientLlmHttpStatus(response.status) && attempt < TOGETHER_LLM_MAX_ATTEMPTS - 1) {
           await sleepMs(retryDelayMs(attempt, TOGETHER_LLM_RETRY_BASE_MS));
           continue;
         }
@@ -225,14 +211,10 @@ async function executeTogetherLlmRequest(
           : undefined,
       };
     } catch (e) {
-      if (
-        e instanceof Error &&
-        e.message === "LLM API returned non-JSON body"
-      ) {
+      if (e instanceof Error && e.message === "LLM API returned non-JSON body") {
         throw e;
       }
-      const isOurApiError =
-        e instanceof Error && e.message.startsWith("LLM API error:");
+      const isOurApiError = e instanceof Error && e.message.startsWith("LLM API error:");
       if (isOurApiError) {
         throw e;
       }
@@ -255,10 +237,12 @@ async function executeTogetherLlmRequest(
 export const llmInternal = internalAction({
   args: {
     model: v.string(),
-    messages: v.array(v.object({
-      role: v.string(),
-      content: v.string(),
-    })),
+    messages: v.array(
+      v.object({
+        role: v.string(),
+        content: v.string(),
+      })
+    ),
     temperature: v.number(),
     maxTokens: v.optional(v.number()),
     responseFormat: v.optional(v.object({ type: v.string() })),
@@ -281,7 +265,7 @@ export const llmInternal = internalAction({
         reasoningEnabled: args.reasoningEnabled,
         toolChoice: args.toolChoice as LLMOptions["toolChoice"],
       },
-      apiKey,
+      apiKey
     );
   },
 });
@@ -290,10 +274,10 @@ export const llmInternal = internalAction({
 // Cached Wrapper
 // ============================================================
 
-const llmCache = createCachedAction(
-  internal._agents._shared.cachedLlm.llmInternal,
-  { ttl: withJitter(CACHE_TTL.generatedContent, 0.1), name: "llm-deterministic" }
-);
+const llmCache = createCachedAction(internal._agents._shared.cachedLlm.llmInternal, {
+  ttl: withJitter(CACHE_TTL.generatedContent, 0.1),
+  name: "llm-deterministic",
+});
 
 // ============================================================
 // Public Functions
@@ -301,25 +285,22 @@ const llmCache = createCachedAction(
 
 /**
  * Cached LLM call - only caches when temperature=0 (deterministic)
- * 
+ *
  * @param ctx - Convex context
  * @param options - LLM options including model, messages, temperature
  * @returns LLM response with content and usage stats
  */
-export async function cachedLlmCall(
-  ctx: any,
-  options: LLMOptions
-): Promise<LLMResponse> {
+export async function cachedLlmCall(ctx: any, options: LLMOptions): Promise<LLMResponse> {
   // Skip caching for non-deterministic calls
   if (options.temperature > 0) {
-    console.log(`[CachedLLM] Skipping cache for non-deterministic call (temp=${options.temperature})`);
+    console.log(
+      `[CachedLLM] Skipping cache for non-deterministic call (temp=${options.temperature})`
+    );
     return uncachedLlmCall(options);
   }
 
   // Build cache key for logging
-  const messagesHash = hashInput(
-    options.messages.map((m) => `${m.role}:${m.content}`).join("|")
-  );
+  const messagesHash = hashInput(options.messages.map((m) => `${m.role}:${m.content}`).join("|"));
   console.log(`[CachedLLM] Cached call: model=${options.model}, messagesHash=${messagesHash}`);
 
   // Use cached action

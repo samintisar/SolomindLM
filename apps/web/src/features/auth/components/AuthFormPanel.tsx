@@ -25,7 +25,12 @@ interface AuthFormPanelProps {
   className?: string;
 }
 
-export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signIn", className }: AuthFormPanelProps) {
+export function AuthFormPanel({
+  authError,
+  onAuthenticated,
+  initialMode = "signIn",
+  className,
+}: AuthFormPanelProps) {
   const { signInWithGoogle } = useAuth();
   const { signIn } = useAuthActions();
   const [step, setStep] = useState<AuthStep>(initialMode);
@@ -36,7 +41,9 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
   const [showNewPassword, setShowNewPassword] = useState(false);
 
   useEffect(() => {
-    if (authError) setError(authError);
+    if (authError) {
+      setError(authError);
+    }
   }, [authError]);
 
   const handleGoogleSignIn = async () => {
@@ -139,7 +146,9 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
       className={`rounded-2xl border border-stone-200/90 bg-white/90 p-6 shadow-lg shadow-stone-200/40 backdrop-blur-sm sm:p-8${className ? ` ${className}` : ""}`}
     >
       <div className="mb-6 text-center">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">{modalTitle}</h2>
+        <h2 className="font-display text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+          {modalTitle}
+        </h2>
       </div>
 
       {error && (
@@ -151,7 +160,12 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
       <div className="space-y-5">
         {step === "signIn" || step === "signUp" ? (
           <>
-            <button type="button" onClick={handleGoogleSignIn} disabled={disableAll} className={btnOutline}>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={disableAll}
+              className={btnOutline}
+            >
               <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden>
                 <path
                   fill="#4285F4"
@@ -215,7 +229,11 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
                   onClick={() => setShowAuthPassword((v) => !v)}
                   aria-label={showAuthPassword ? "Hide password" : "Show password"}
                 >
-                  {showAuthPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+                  {showAuthPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden />
+                  )}
                 </button>
               </div>
               <input name="flow" type="hidden" value={step === "signUp" ? "signUp" : "signIn"} />
@@ -276,8 +294,9 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
         {typeof step === "object" && step.kind === "emailVerification" ? (
           <>
             <p className="text-sm leading-relaxed text-stone-600 font-sans">
-              We sent an 8-digit code to <span className="font-medium text-stone-900">{step.email}</span>. Enter it below
-              to continue.
+              We sent an 8-digit code to{" "}
+              <span className="font-medium text-stone-900">{step.email}</span>. Enter it below to
+              continue.
             </p>
             <form className="space-y-3" onSubmit={handleEmailVerificationSubmit}>
               <input name="email" type="hidden" value={step.email} />
@@ -321,7 +340,14 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
               Enter your email and we will send you a code to reset your password.
             </p>
             <form className="space-y-3" onSubmit={handleForgotSubmit}>
-              <input name="email" type="email" autoComplete="email" required placeholder="Email" className={inputClass} />
+              <input
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="Email"
+                className={inputClass}
+              />
               <input name="flow" type="hidden" value="reset" />
               <button type="submit" disabled={disableAll} className={btnPrimary}>
                 {passwordLoading ? (
@@ -350,7 +376,8 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
         {typeof step === "object" && step.kind === "resetVerification" ? (
           <>
             <p className="text-sm leading-relaxed text-stone-600 font-sans">
-              Enter the code we sent to <span className="font-medium text-stone-900">{step.email}</span> and choose a new
+              Enter the code we sent to{" "}
+              <span className="font-medium text-stone-900">{step.email}</span> and choose a new
               password.
             </p>
             <form className="space-y-3" onSubmit={handleResetVerificationSubmit}>
@@ -379,7 +406,11 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
                   onClick={() => setShowNewPassword((v) => !v)}
                   aria-label={showNewPassword ? "Hide new password" : "Show new password"}
                 >
-                  {showNewPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden />
+                  )}
                 </button>
               </div>
               <button type="submit" disabled={disableAll} className={btnPrimary}>
@@ -410,11 +441,17 @@ export function AuthFormPanel({ authError, onAuthenticated, initialMode = "signI
           <div className="border-t border-stone-200 pt-5 text-center">
             <p className="text-sm text-stone-500 font-sans">
               By signing in, you agree to our{" "}
-              <Link to="/terms" className="text-stone-700 underline-offset-2 hover:text-stone-900 hover:underline">
+              <Link
+                to="/terms"
+                className="text-stone-700 underline-offset-2 hover:text-stone-900 hover:underline"
+              >
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link to="/privacy" className="text-stone-700 underline-offset-2 hover:text-stone-900 hover:underline">
+              <Link
+                to="/privacy"
+                className="text-stone-700 underline-offset-2 hover:text-stone-900 hover:underline"
+              >
                 Privacy Policy
               </Link>
               .

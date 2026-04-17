@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from "react";
 import {
   BookOpen,
   ChevronRight,
@@ -8,8 +8,8 @@ import {
   FileText,
   Loader2,
   Square,
-} from 'lucide-react';
-import type { Wiki } from '../services/wikiApi';
+} from "lucide-react";
+import type { Wiki } from "../services/wikiApi";
 
 interface WikiCardProps {
   wiki: Wiki | null | undefined;
@@ -25,7 +25,7 @@ interface WikiPage {
   id: string;
   name: string;
   path: string;
-  type: 'file' | 'folder';
+  type: "file" | "folder";
   children?: WikiPage[];
 }
 
@@ -35,7 +35,7 @@ const WikiTreeItem: React.FC<{
   onOpenArticle?: (path: string) => void;
 }> = ({ page, level, onOpenArticle }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isFolder = page.type === 'folder';
+  const isFolder = page.type === "folder";
 
   return (
     <div>
@@ -50,7 +50,7 @@ const WikiTreeItem: React.FC<{
           }
         }}
         className={`w-full flex items-center gap-1.5 py-1 px-2 rounded hover:bg-secondary/50 transition-colors text-left ${
-          level > 0 ? 'ml-4' : ''
+          level > 0 ? "ml-4" : ""
         }`}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
       >
@@ -61,7 +61,9 @@ const WikiTreeItem: React.FC<{
             ) : (
               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             )}
-            <Folder className={`w-4 h-4 ${isExpanded ? 'text-primary' : 'text-muted-foreground'}`} />
+            <Folder
+              className={`w-4 h-4 ${isExpanded ? "text-primary" : "text-muted-foreground"}`}
+            />
           </>
         ) : (
           <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -71,7 +73,12 @@ const WikiTreeItem: React.FC<{
       {isFolder && isExpanded && page.children && (
         <div className="mt-0.5">
           {page.children.map((child) => (
-            <WikiTreeItem key={child.id} page={child} level={level + 1} onOpenArticle={onOpenArticle} />
+            <WikiTreeItem
+              key={child.id}
+              page={child}
+              level={level + 1}
+              onOpenArticle={onOpenArticle}
+            />
           ))}
         </div>
       )}
@@ -99,41 +106,41 @@ export const WikiCard: React.FC<WikiCardProps> = ({
     const grouped: Record<string, WikiPage[]> = {};
 
     wiki.articles.forEach((article) => {
-      if (article.type === 'index' || article.type === 'log') {
+      if (article.type === "index" || article.type === "log") {
         // Root level files
         if (!grouped.root) grouped.root = [];
         grouped.root.push({
           id: article.path,
           name: article.title,
           path: article.path,
-          type: 'file',
+          type: "file",
         });
-      } else if (article.type === 'concept') {
+      } else if (article.type === "concept") {
         // Concepts folder
         if (!grouped.concepts) grouped.concepts = [];
         grouped.concepts.push({
           id: article.path,
           name: article.title,
           path: article.path,
-          type: 'file',
+          type: "file",
         });
-      } else if (article.type === 'connection') {
+      } else if (article.type === "connection") {
         // Connections folder
         if (!grouped.connections) grouped.connections = [];
         grouped.connections.push({
           id: article.path,
           name: article.title,
           path: article.path,
-          type: 'file',
+          type: "file",
         });
-      } else if (article.type === 'qa') {
+      } else if (article.type === "qa") {
         // QA folder
         if (!grouped.qa) grouped.qa = [];
         grouped.qa.push({
           id: article.path,
           name: article.title,
           path: article.path,
-          type: 'file',
+          type: "file",
         });
       }
     });
@@ -144,10 +151,10 @@ export const WikiCard: React.FC<WikiCardProps> = ({
     // Add concepts folder
     if (grouped.concepts && grouped.concepts.length > 0) {
       tree.push({
-        id: 'concepts',
-        name: 'Concepts',
-        path: 'concepts',
-        type: 'folder',
+        id: "concepts",
+        name: "Concepts",
+        path: "concepts",
+        type: "folder",
         children: grouped.concepts,
       });
     }
@@ -155,10 +162,10 @@ export const WikiCard: React.FC<WikiCardProps> = ({
     // Add connections folder
     if (grouped.connections && grouped.connections.length > 0) {
       tree.push({
-        id: 'connections',
-        name: 'Connections',
-        path: 'connections',
-        type: 'folder',
+        id: "connections",
+        name: "Connections",
+        path: "connections",
+        type: "folder",
         children: grouped.connections,
       });
     }
@@ -166,10 +173,10 @@ export const WikiCard: React.FC<WikiCardProps> = ({
     // Add QA folder
     if (grouped.qa && grouped.qa.length > 0) {
       tree.push({
-        id: 'qa',
-        name: 'QA',
-        path: 'qa',
-        type: 'folder',
+        id: "qa",
+        name: "QA",
+        path: "qa",
+        type: "folder",
         children: grouped.qa,
       });
     }
@@ -206,18 +213,18 @@ export const WikiCard: React.FC<WikiCardProps> = ({
   }
 
   const wikiStatus = wiki.status;
-  const isDraft = wikiStatus === 'draft';
-  const isGenerating = wikiStatus === 'generating' || Boolean(isPending);
-  const isCompleted = wikiStatus === 'completed';
-  const isFailed = wikiStatus === 'failed';
+  const isDraft = wikiStatus === "draft";
+  const isGenerating = wikiStatus === "generating" || Boolean(isPending);
+  const isCompleted = wikiStatus === "completed";
+  const isFailed = wikiStatus === "failed";
 
   const showRefresh =
     Boolean(onRegenerateWiki) && !isGenerating && (isDraft || isCompleted || isFailed);
   const showStop = Boolean(onCancelGeneration) && isGenerating;
 
   const cardClass =
-    'bg-card border rounded-lg transition-colors' +
-    (isGenerating ? ' border-primary/50 bg-primary/[0.06] shadow-sm' : ' border-border');
+    "bg-card border rounded-lg transition-colors" +
+    (isGenerating ? " border-primary/50 bg-primary/[0.06] shadow-sm" : " border-border");
 
   return (
     <div className={cardClass} aria-busy={isGenerating}>
@@ -226,7 +233,7 @@ export const WikiCard: React.FC<WikiCardProps> = ({
         tabIndex={0}
         onClick={() => setIsExpanded(!isExpanded)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setIsExpanded(!isExpanded);
           }
@@ -242,7 +249,7 @@ export const WikiCard: React.FC<WikiCardProps> = ({
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="text-base font-medium text-foreground truncate leading-tight">
-            {wiki.title || 'Knowledge Wiki'}
+            {wiki.title || "Knowledge Wiki"}
           </h4>
           {isGenerating && (
             <p className="text-sm text-primary font-medium uppercase tracking-wide font-sans">
@@ -292,7 +299,7 @@ export const WikiCard: React.FC<WikiCardProps> = ({
                 onRegenerateWiki?.();
               }}
               className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-              title={isDraft ? 'Generate knowledge base' : 'Regenerate knowledge base'}
+              title={isDraft ? "Generate knowledge base" : "Regenerate knowledge base"}
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -310,7 +317,7 @@ export const WikiCard: React.FC<WikiCardProps> = ({
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className="h-full w-1/2 rounded-full bg-primary/80 animate-pulse motion-reduce:animate-none"
-              style={{ animationDuration: '1.2s' }}
+              style={{ animationDuration: "1.2s" }}
             />
           </div>
           <p className="text-xs text-center text-muted-foreground leading-snug">
@@ -335,7 +342,7 @@ export const WikiCard: React.FC<WikiCardProps> = ({
             </div>
           ) : (
             <div className="pt-4 pb-2 text-center text-sm text-muted-foreground">
-              {isGenerating ? 'Generating wiki articles…' : 'No articles generated yet'}
+              {isGenerating ? "Generating wiki articles…" : "No articles generated yet"}
             </div>
           )}
         </div>

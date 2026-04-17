@@ -4,20 +4,20 @@
  * @see ./spreadsheetJobPhases.ts for phase logic.
  */
 
-import { internalAction } from '../../_generated/server';
-import { v } from 'convex/values';
+import { internalAction } from "../../_generated/server";
+import { v } from "convex/values";
 import {
   runSpreadsheetGenerationPhase,
   runProcessSpreadsheetMapChunkPhase,
   runFinalizeSpreadsheetPhase,
-} from './spreadsheetJobPhases';
+} from "./spreadsheetJobPhases";
 
 export const spreadsheetGeneration = internalAction({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
-    documentIds: v.array(v.id('documents')),
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
     spreadsheetType: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
   },
@@ -29,9 +29,9 @@ export const spreadsheetGeneration = internalAction({
 
 export const processSpreadsheetMapChunk = internalAction({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
@@ -46,9 +46,9 @@ export const processSpreadsheetMapChunk = internalAction({
 
 export const finalizeSpreadsheetPhase = internalAction({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     spreadsheetType: v.string(),
     customPrompt: v.string(),
   },

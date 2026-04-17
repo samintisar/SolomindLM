@@ -1,11 +1,11 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { normalizeMathMarkdownDeep } from '../../_shared/mathMarkdown';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveQuizResults = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     questions: v.array(v.any()),
     metadata: v.any(),
   },
@@ -14,9 +14,9 @@ export const saveQuizResults = internalMutation({
 
     await ctx.db.patch(args.quizId, {
       questionsData: normalizedQuestions,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Quiz',
+      title: args.metadata?.title ?? "Quiz",
       metadata: {
         ...args.metadata,
         questionCount: normalizedQuestions.length,
@@ -28,7 +28,7 @@ export const saveQuizResults = internalMutation({
 
 export const updateQuizTitle = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -41,7 +41,7 @@ export const updateQuizTitle = internalMutation({
 
 export const updateQuizStatus = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -59,18 +59,18 @@ export const updateQuizStatus = internalMutation({
 
 export const markQuizFailed = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.quizId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -83,7 +83,7 @@ export const markQuizFailed = internalMutation({
 // Multi-phase quiz helpers
 export const initQuizMapPhase = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     totalMapTasks: v.number(),
     questionCount: v.number(),
     difficulty: v.string(),
@@ -94,13 +94,13 @@ export const initQuizMapPhase = internalMutation({
     if (!quiz) return null;
 
     await ctx.db.patch(args.quizId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...quiz.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
@@ -115,7 +115,7 @@ export const initQuizMapPhase = internalMutation({
 
 export const storeQuizMapResult = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -147,7 +147,7 @@ export const storeQuizMapResult = internalMutation({
 
 export const clearQuizMapData = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
   },
   handler: async (ctx, args) => {
     const quiz = await ctx.db.get(args.quizId);

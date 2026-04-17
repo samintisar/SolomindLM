@@ -131,9 +131,9 @@ export const listAllByNotebook = query({
 
     if (!args.types || args.types.includes("notes")) {
       queries.push(
-        NotesModel
-          .listByNotebookShared(ctx, args.notebookId, userId)
-          .then((items) => items.map((item) => ({ ...item, _type: "note" as const })))
+        NotesModel.listByNotebookShared(ctx, args.notebookId, userId).then((items) =>
+          items.map((item) => ({ ...item, _type: "note" as const }))
+        )
       );
     }
 
@@ -225,55 +225,59 @@ export const countByType = query({
       return null;
     }
 
-    const sharedNotes = await NotesModel.listByNotebookShared(
-      ctx,
-      args.notebookId,
-      userId
-    );
+    const sharedNotes = await NotesModel.listByNotebookShared(ctx, args.notebookId, userId);
 
-    const [reports, flashcards, quizzes, mindmaps, audioOverviews, slides, spreadsheets, writtenQuestions] =
-      await Promise.all([
-        ctx.db
-          .query("reports")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("flashcards")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("quizzes")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("mindmaps")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("audioOverviews")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("slides")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("spreadsheets")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-        ctx.db
-          .query("writtenQuestions")
-          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-          .collect()
-          .then((items) => items.length),
-      ]);
+    const [
+      reports,
+      flashcards,
+      quizzes,
+      mindmaps,
+      audioOverviews,
+      slides,
+      spreadsheets,
+      writtenQuestions,
+    ] = await Promise.all([
+      ctx.db
+        .query("reports")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("flashcards")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("quizzes")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("mindmaps")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("audioOverviews")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("slides")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("spreadsheets")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
+        .query("writtenQuestions")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+    ]);
 
     const notes = sharedNotes.length;
 

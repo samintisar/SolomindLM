@@ -4,20 +4,20 @@
  * @see ./slideDeckJobPhases.ts for phase logic.
  */
 
-import { internalAction } from '../../_generated/server';
-import { v } from 'convex/values';
+import { internalAction } from "../../_generated/server";
+import { v } from "convex/values";
 import {
   runSlideDeckGenerationPhase,
   runProcessSlideDeckMapChunkPhase,
   runFinalizeSlideDeckPhase,
-} from './slideDeckJobPhases';
+} from "./slideDeckJobPhases";
 
 export const slideDeckGeneration = internalAction({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
-    documentIds: v.array(v.id('documents')),
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
     slideCount: v.number(),
   },
   handler: async (ctx, args) => {
@@ -28,9 +28,9 @@ export const slideDeckGeneration = internalAction({
 
 export const processSlideDeckMapChunk = internalAction({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
@@ -46,9 +46,9 @@ export const processSlideDeckMapChunk = internalAction({
 
 export const finalizeSlideDeckPhase = internalAction({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     slideCount: v.number(),
     deckLength: v.string(),
   },

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const RetrievalSubqueriesSchema = z.object({
   subqueries: z.array(z.string()).min(1).max(4),
@@ -10,7 +10,7 @@ export const RetrievalSubqueriesSchema = z.object({
  * extra latency and flaky fast-model 503s when status pages still show "Up".
  */
 export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
-  if (trimmed.includes('\n')) return false;
+  if (trimmed.includes("\n")) return false;
   if (trimmed.length > 200) return false;
   if (
     /\b(compare|comparing|versus|vs\.?|differences?\s+between|similarit|contrasts?\b|respectively)\b/i.test(
@@ -36,7 +36,7 @@ export function parseRetrievalSubqueriesFromLlmContent(
   try {
     const text = rawContent
       .trim()
-      .replace(/<redacted_thinking>[\s\S]*?<\/think>/gi, '')
+      .replace(/<redacted_thinking>[\s\S]*?<\/think>/gi, "")
       .trim();
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;

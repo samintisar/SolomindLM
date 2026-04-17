@@ -1,11 +1,17 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote, isUserNote } from '@/shared/types/index';
-import { exportFlashcardsCSV } from '../services/flashcardsApi';
+import { useState, useCallback, useMemo } from "react";
+import {
+  Note,
+  isReportNote,
+  isFlashcardNote,
+  isSpreadsheetNote,
+  isUserNote,
+} from "@/shared/types/index";
+import { exportFlashcardsCSV } from "../services/flashcardsApi";
 
 interface ConfirmOptions {
   confirmText?: string;
   cancelText?: string;
-  variant?: 'default' | 'danger' | 'warning';
+  variant?: "default" | "danger" | "warning";
 }
 
 interface UseNoteActionsProps {
@@ -54,7 +60,7 @@ export const useNoteActions = ({
   confirm,
 }: UseNoteActionsProps): UseNoteActionsResult => {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
+  const [editTitle, setEditTitle] = useState("");
   const [isExporting, setIsExporting] = useState(false);
 
   // Check if current note can have report copied/downloaded
@@ -100,10 +106,13 @@ export const useNoteActions = ({
   }, []);
 
   // Handle keyboard during edit
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSaveEdit();
-    if (e.key === 'Escape') handleEditCancel();
-  }, [handleSaveEdit, handleEditCancel]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") handleSaveEdit();
+      if (e.key === "Escape") handleEditCancel();
+    },
+    [handleSaveEdit, handleEditCancel]
+  );
 
   // Copy report to clipboard
   const handleCopyReport = useCallback(async () => {
@@ -112,7 +121,7 @@ export const useNoteActions = ({
     try {
       await navigator.clipboard.writeText(activeNote.content);
     } catch (err) {
-      console.error('Copy failed:', err);
+      console.error("Copy failed:", err);
     }
   }, [activeNote]);
 
@@ -120,11 +129,11 @@ export const useNoteActions = ({
   const handleDownloadReport = useCallback(() => {
     if (!activeNote || !isReportNote(activeNote) || !activeNote.content) return;
 
-    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, '_').trim() || 'report';
+    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, "_").trim() || "report";
     const filename = `${safeName}.md`;
-    const blob = new Blob([activeNote.content], { type: 'text/markdown;charset=utf-8' });
+    const blob = new Blob([activeNote.content], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
@@ -133,14 +142,14 @@ export const useNoteActions = ({
 
   // Get user note body as plain text (content or messages formatted)
   const getUserNoteBody = useCallback((note: Note): string => {
-    if (!isUserNote(note)) return '';
+    if (!isUserNote(note)) return "";
     if (note.content && note.content.trim()) return note.content;
     if (note.messages && note.messages.length > 0) {
       return note.messages
-        .map((m) => `${m.role === 'user' ? 'You' : 'Assistant'}: ${m.content}`)
-        .join('\n\n');
+        .map((m) => `${m.role === "user" ? "You" : "Assistant"}: ${m.content}`)
+        .join("\n\n");
     }
-    return '';
+    return "";
   }, []);
 
   // Copy user note to clipboard
@@ -151,7 +160,7 @@ export const useNoteActions = ({
     try {
       await navigator.clipboard.writeText(body);
     } catch (err) {
-      console.error('Copy failed:', err);
+      console.error("Copy failed:", err);
     }
   }, [activeNote, getUserNoteBody]);
 
@@ -160,11 +169,11 @@ export const useNoteActions = ({
     if (!activeNote || !isUserNote(activeNote)) return;
     const body = getUserNoteBody(activeNote);
     if (!body) return;
-    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, '_').trim() || 'note';
+    const safeName = activeNote.title.replace(/[\\/:*?"<>|]/g, "_").trim() || "note";
     const filename = `${safeName}.md`;
-    const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
+    const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
@@ -175,11 +184,11 @@ export const useNoteActions = ({
   const handleDownloadSpreadsheet = useCallback(() => {
     if (!activeNote || !isSpreadsheetNote(activeNote) || !activeNote.content) return;
 
-    const safeName = activeNote.title.replace(/[^a-z0-9]/gi, '_').trim() || 'spreadsheet';
+    const safeName = activeNote.title.replace(/[^a-z0-9]/gi, "_").trim() || "spreadsheet";
     const filename = `${safeName}.csv`;
-    const blob = new Blob([activeNote.content], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([activeNote.content], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
@@ -187,16 +196,19 @@ export const useNoteActions = ({
   }, [activeNote]);
 
   // Delete note with confirmation
-  const handleDeleteNote = useCallback(async (note: Note) => {
-    const confirmed = await confirm(
-      'Delete Note',
-      `Are you sure you want to delete "${note.title}"? This action cannot be undone.`,
-      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
-    );
-    if (confirmed) {
-      onDeleteNote(note.id);
-    }
-  }, [confirm, onDeleteNote]);
+  const handleDeleteNote = useCallback(
+    async (note: Note) => {
+      const confirmed = await confirm(
+        "Delete Note",
+        `Are you sure you want to delete "${note.title}"? This action cannot be undone.`,
+        { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
+      );
+      if (confirmed) {
+        onDeleteNote(note.id);
+      }
+    },
+    [confirm, onDeleteNote]
+  );
 
   // Export flashcards as CSV
   const handleExportFlashcards = useCallback(async () => {
@@ -206,8 +218,8 @@ export const useNoteActions = ({
       setIsExporting(true);
       await exportFlashcardsCSV(activeNote.id, activeNote.title, activeNote.flashcards);
     } catch (error) {
-      console.error('Failed to export flashcards:', error);
-      alert('Failed to export flashcards. Please try again.');
+      console.error("Failed to export flashcards:", error);
+      alert("Failed to export flashcards. Please try again.");
     } finally {
       setIsExporting(false);
     }

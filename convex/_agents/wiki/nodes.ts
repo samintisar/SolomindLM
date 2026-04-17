@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Node functions for WikiGraph.
  *
@@ -6,9 +6,9 @@
  * Follows project's map-reduce pattern for parallel chunk processing.
  */
 
-import { END, Send } from '@langchain/langgraph';
-import type { OverallStateType, ChunkProcessStateType } from './state.js';
-import type { ConceptExtraction, WikiArticle } from './prompts.js';
+import { END, Send } from "@langchain/langgraph";
+import type { OverallStateType, ChunkProcessStateType } from "./state.js";
+import type { ConceptExtraction, WikiArticle } from "./prompts.js";
 import {
   ConceptExtractionSchema,
   WikiArticleGenerationSchema,
@@ -19,18 +19,18 @@ import {
   CONCEPT_EXTRACTION_SYSTEM_PROMPT,
   ARTICLE_GENERATION_SYSTEM_PROMPT,
   CONNECTION_DETECTION_SYSTEM_PROMPT,
-} from './prompts.js';
+} from "./prompts.js";
 import {
   createAgentGraphLogger,
   invokeWithRetry,
   invokeWithTimeout,
   packChunks,
   validateChunks,
-} from '../_shared/index.js';
-import { WIKI_CONFIG } from './config.js';
-import type { BaseLanguageModel } from '@langchain/core/language_models/base';
-import { SystemMessage, HumanMessage } from '@langchain/core/messages';
-import { createLangSmithRunConfig } from '../_shared/langsmith.js';
+} from "../_shared/index.js";
+import { WIKI_CONFIG } from "./config.js";
+import type { BaseLanguageModel } from "@langchain/core/language_models/base";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import { createLangSmithRunConfig } from "../_shared/langsmith.js";
 
 // #region agent log
 function agentDebugLogWiki(payload: Record<string, unknown>) {
@@ -51,26 +51,24 @@ function agentDebugLogWiki(payload: Record<string, unknown>) {
 /**
  * Split node: Prepare chunks for map phase.
  */
-export async function splitChunks(
-  state: OverallStateType
-): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+export async function splitChunks(state: OverallStateType): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
 
-  logger.info('Preparing chunks for concept extraction', {
-    agent: 'WikiGraph',
-    phase: 'split_chunks',
+  logger.info("Preparing chunks for concept extraction", {
+    agent: "WikiGraph",
+    phase: "split_chunks",
     chunkCount: state.chunks?.length || 0,
   });
 
   return {
-    status: 'mapping',
+    status: "mapping",
     mapOutputs: [],
     collapsedConcepts: [],
     finalOutput: [],
     conceptArticles: [],
     connectionArticles: [],
     progress: {
-      phase: 'split_chunks',
+      phase: "split_chunks",
       percentage: 5,
       message: `Preparing ${state.chunks?.length || 0} chunks for processing`,
       totalChunks: state.chunks?.length || 0,
@@ -93,14 +91,14 @@ export async function extractConceptsMap(
   const { chunk, chunkIndex, documentIds, totalChunks } = state;
   const startTime = Date.now();
 
-  const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : '[Chunk ?]';
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+  const chunkId = chunkIndex !== undefined ? `[Chunk ${chunkIndex + 1}]` : "[Chunk ?]";
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
 
-  logger.phaseStart('extract_concepts_map', {
-    agent: 'WikiGraph',
+  logger.phaseStart("extract_concepts_map", {
+    agent: "WikiGraph",
     chunkIndex,
     chunkLength: chunk.length,
-    chunkPreview: chunk.substring(0, 150).replace(/\n/g, ' '),
+    chunkPreview: chunk.substring(0, 150).replace(/\n/g, " "),
     documentCount: documentIds.length,
   });
 
@@ -124,50 +122,52 @@ export async function extractConceptsMap(
   });
 
   logger.info(`Sending concept extraction prompt to LLM (${prompt.length} chars)...`, {
-    agent: 'WikiGraph',
-    phase: 'extract_concepts_map',
+    agent: "WikiGraph",
+    phase: "extract_concepts_map",
     chunkId,
     promptLength: prompt.length,
   });
 
   try {
     const response = await invokeWithRetry(
-      () => invokeWithTimeout(
-        () => structuredLlm.invoke([
-          new SystemMessage(CONCEPT_EXTRACTION_SYSTEM_PROMPT),
-          new HumanMessage(prompt),
-        ], createLangSmithRunConfig({
-          runName: 'WikiGraph.ExtractConcepts',
-          tags: ['agent', 'wiki', 'map'],
-          metadata: {
-            chunkIndex,
-            documentCount: documentIds.length,
-          },
-        }) as unknown as Record<string, unknown>),
-        WIKI_CONFIG.MAP_TIMEOUT_MS,
-        'WikiConceptExtraction'
-      ),
+      () =>
+        invokeWithTimeout(
+          () =>
+            structuredLlm.invoke(
+              [new SystemMessage(CONCEPT_EXTRACTION_SYSTEM_PROMPT), new HumanMessage(prompt)],
+              createLangSmithRunConfig({
+                runName: "WikiGraph.ExtractConcepts",
+                tags: ["agent", "wiki", "map"],
+                metadata: {
+                  chunkIndex,
+                  documentCount: documentIds.length,
+                },
+              }) as unknown as Record<string, unknown>
+            ),
+          WIKI_CONFIG.MAP_TIMEOUT_MS,
+          "WikiConceptExtraction"
+        ),
       {
         maxAttempts: 3,
         baseDelayMs: 1000,
         onRetry: (attempt, error) => {
           logger.warn(`Concept extraction retry attempt ${attempt}/3`, {
-            agent: 'WikiGraph',
-            phase: 'extract_concepts_map',
+            agent: "WikiGraph",
+            phase: "extract_concepts_map",
             chunkIndex,
             attempt,
             error: error instanceof Error ? error.message : String(error),
           });
         },
       },
-      'WikiConceptExtraction'
+      "WikiConceptExtraction"
     );
 
     const concepts = (response as any).concepts || [];
     const elapsed = Date.now() - startTime;
 
-    logger.phaseComplete('extract_concepts_map', {
-      agent: 'WikiGraph',
+    logger.phaseComplete("extract_concepts_map", {
+      agent: "WikiGraph",
       chunkIndex,
       conceptsExtracted: concepts.length,
       processingTimeMs: elapsed,
@@ -178,15 +178,15 @@ export async function extractConceptsMap(
     };
   } catch (error) {
     const errorToLog = error instanceof Error ? error : new Error(String(error));
-    logger.phaseError('extract_concepts_map', errorToLog, {
-      agent: 'WikiGraph',
+    logger.phaseError("extract_concepts_map", errorToLog, {
+      agent: "WikiGraph",
       chunkIndex,
       chunkLength: chunk.length,
     });
 
     const elapsed = Date.now() - startTime;
-    logger.phaseComplete('extract_concepts_map', {
-      agent: 'WikiGraph',
+    logger.phaseComplete("extract_concepts_map", {
+      agent: "WikiGraph",
       chunkIndex,
       conceptsExtracted: 0,
       processingTimeMs: elapsed,
@@ -209,14 +209,14 @@ export async function extractConceptsMap(
 export async function collapseConcepts(
   state: OverallStateType
 ): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
-  logger.phaseStart('collapse_concepts');
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
+  logger.phaseStart("collapse_concepts");
 
   const allConcepts = state.mapOutputs.flat();
 
   // Simple deduplication by concept name
   const uniqueConcepts = Array.from(
-    new Map(allConcepts.map(c => [c.name.toLowerCase(), c])).values()
+    new Map(allConcepts.map((c) => [c.name.toLowerCase(), c])).values()
   );
 
   // Sort by importance
@@ -229,7 +229,7 @@ export async function collapseConcepts(
       ? uniqueConcepts.slice(0, maxConcepts)
       : uniqueConcepts;
 
-  logger.phaseComplete('collapse_concepts', {
+  logger.phaseComplete("collapse_concepts", {
     totalConcepts: allConcepts.length,
     uniqueConcepts: uniqueConcepts.length,
     cappedTo: cappedConcepts.length,
@@ -238,9 +238,9 @@ export async function collapseConcepts(
   return {
     collapsedConcepts: cappedConcepts,
     progress: {
-      phase: 'Concept collapse',
+      phase: "Concept collapse",
       percentage: 30,
-      message: `Merged ${allConcepts.length} concepts into ${cappedConcepts.length} unique concepts (cap ${maxConcepts || 'off'})`,
+      message: `Merged ${allConcepts.length} concepts into ${cappedConcepts.length} unique concepts (cap ${maxConcepts || "off"})`,
       conceptsExtracted: cappedConcepts.length,
     },
   };
@@ -251,7 +251,7 @@ export async function collapseConcepts(
 // ============================================================
 
 function slugifyConceptName(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, '-');
+  return name.toLowerCase().trim().replace(/\s+/g, "-");
 }
 
 function buildWikiArticleFromGeneration(
@@ -259,20 +259,20 @@ function buildWikiArticleFromGeneration(
   state: OverallStateType,
   gen: { summary: string; relatedConcepts: string[]; content: string }
 ): WikiArticle {
-  const slug = slugifyConceptName(concept.name) || 'concept';
+  const slug = slugifyConceptName(concept.name) || "concept";
   const docIds = (state.documentIds || []).map(String);
   const related = (gen.relatedConcepts || [])
     .map((r) => {
-      const t = r.trim().replace(/^\[\[|\]\]$/g, '');
-      if (!t) return '';
-      if (t.startsWith('concepts/')) return t;
+      const t = r.trim().replace(/^\[\[|\]\]$/g, "");
+      if (!t) return "";
+      if (t.startsWith("concepts/")) return t;
       return `concepts/${slugifyConceptName(t)}`;
     })
     .filter(Boolean);
-  const summary = (gen.summary || concept.summary || '').trim().slice(0, 200);
+  const summary = (gen.summary || concept.summary || "").trim().slice(0, 200);
   return {
     path: `concepts/${slug}`,
-    type: 'concept',
+    type: "concept",
     title: concept.name,
     content: gen.content.trim(),
     frontmatter: {
@@ -287,11 +287,7 @@ function buildWikiArticleFromGeneration(
 
 /** Markdown table cell: no pipes or newlines */
 function indexTableCell(text: string, maxLen: number): string {
-  return text
-    .replace(/\|/g, '/')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLen);
+  return text.replace(/\|/g, "/").replace(/\s+/g, " ").trim().slice(0, maxLen);
 }
 
 /**
@@ -299,27 +295,27 @@ function indexTableCell(text: string, maxLen: number): string {
  */
 export function buildDeterministicWikiIndex(allArticles: WikiArticle[]): string {
   const iso = new Date().toISOString();
-  const day = iso.split('T')[0];
+  const day = iso.split("T")[0];
   const rows = allArticles.map((article) => {
     const link = `[[${article.path}]]`;
     const summary = indexTableCell(article.frontmatter.summary || article.title, 120);
     const updated =
-      (article.frontmatter.lastUpdated && article.frontmatter.lastUpdated.split('T')[0]) || day;
+      (article.frontmatter.lastUpdated && article.frontmatter.lastUpdated.split("T")[0]) || day;
     return `| ${link} | ${summary} | ${article.type} | ${updated} |`;
   });
   return [
-    '# Knowledge Base Index',
-    '',
+    "# Knowledge Base Index",
+    "",
     `Last updated: ${iso}`,
-    '',
-    '## Articles',
-    '',
-    '| Article | Summary | Type | Updated |',
-    '|---------|---------|------|---------|',
+    "",
+    "## Articles",
+    "",
+    "| Article | Summary | Type | Updated |",
+    "|---------|---------|------|---------|",
     ...rows,
-    '',
-    '*Notebook wiki — automated compile.*',
-  ].join('\n');
+    "",
+    "*Notebook wiki — automated compile.*",
+  ].join("\n");
 }
 
 async function mapConceptIndicesWithConcurrency(
@@ -344,10 +340,16 @@ async function mapConceptIndicesWithConcurrency(
   return results.filter((a): a is WikiArticle => a !== undefined);
 }
 
-function buildRelevantContentForConcept(state: OverallStateType, concept: { name: string; summary: string; description: string }): string {
-  const joined = (state.chunks || []).join('\n\n---\n\n');
+function buildRelevantContentForConcept(
+  state: OverallStateType,
+  concept: { name: string; summary: string; description: string }
+): string {
+  const joined = (state.chunks || []).join("\n\n---\n\n");
   const maxChars = WIKI_CONFIG.MAX_RELEVANT_CONTENT_CHARS;
-  let excerpt = joined.length > maxChars ? `${joined.slice(0, maxChars)}\n\n[…sources truncated for generation…]` : joined;
+  let excerpt =
+    joined.length > maxChars
+      ? `${joined.slice(0, maxChars)}\n\n[…sources truncated for generation…]`
+      : joined;
   if (!excerpt.trim()) {
     excerpt = `${concept.summary}\n\n${concept.description}`;
   }
@@ -374,7 +376,7 @@ export async function synthesizeArticlesForIndices(
   startInclusive: number,
   endExclusive: number
 ): Promise<WikiArticle[]> {
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
   const concepts = state.collapsedConcepts || [];
   const end = Math.min(endExclusive, concepts.length);
   const start = Math.max(0, startInclusive);
@@ -391,8 +393,8 @@ export async function synthesizeArticlesForIndices(
     const startTime = Date.now();
 
     logger.info(`Generating article for concept: ${concept.name}`, {
-      agent: 'WikiGraph',
-      phase: 'synthesize_articles',
+      agent: "WikiGraph",
+      phase: "synthesize_articles",
       conceptIndex: i,
       totalConcepts: concepts.length,
     });
@@ -406,35 +408,37 @@ export async function synthesizeArticlesForIndices(
       });
 
       const result = await invokeWithRetry(
-        () => invokeWithTimeout(
-          () => structuredLlm.invoke([
-            new SystemMessage(ARTICLE_GENERATION_SYSTEM_PROMPT),
-            new HumanMessage(prompt),
-          ], createLangSmithRunConfig({
-            runName: 'WikiGraph.GenerateArticle',
-            tags: ['agent', 'wiki', 'reduce'],
-            metadata: {
-              conceptName: concept.name,
-              conceptIndex: i,
-            },
-          }) as unknown as Record<string, unknown>),
-          WIKI_CONFIG.REDUCE_TIMEOUT_MS,
-          'WikiArticleGeneration'
-        ),
+        () =>
+          invokeWithTimeout(
+            () =>
+              structuredLlm.invoke(
+                [new SystemMessage(ARTICLE_GENERATION_SYSTEM_PROMPT), new HumanMessage(prompt)],
+                createLangSmithRunConfig({
+                  runName: "WikiGraph.GenerateArticle",
+                  tags: ["agent", "wiki", "reduce"],
+                  metadata: {
+                    conceptName: concept.name,
+                    conceptIndex: i,
+                  },
+                }) as unknown as Record<string, unknown>
+              ),
+            WIKI_CONFIG.REDUCE_TIMEOUT_MS,
+            "WikiArticleGeneration"
+          ),
         {
           maxAttempts: 2,
           baseDelayMs: 1000,
           onRetry: (attempt, error) => {
             logger.warn(`Article generation retry attempt ${attempt}/2`, {
-              agent: 'WikiGraph',
-              phase: 'synthesize_articles',
+              agent: "WikiGraph",
+              phase: "synthesize_articles",
               conceptName: concept.name,
               attempt,
               error: error instanceof Error ? error.message : String(error),
             });
           },
         },
-        'WikiArticleGeneration'
+        "WikiArticleGeneration"
       );
 
       const article = buildWikiArticleFromGeneration(
@@ -444,8 +448,8 @@ export async function synthesizeArticlesForIndices(
       );
 
       logger.info(`Article generated for ${concept.name} in ${Date.now() - startTime}ms`, {
-        agent: 'WikiGraph',
-        phase: 'synthesize_articles',
+        agent: "WikiGraph",
+        phase: "synthesize_articles",
         conceptName: concept.name,
         elapsed: Date.now() - startTime,
       });
@@ -453,9 +457,9 @@ export async function synthesizeArticlesForIndices(
       return article;
     } catch (error) {
       const errorToLog = error instanceof Error ? error : new Error(String(error));
-      logger.phaseError('synthesize_articles', errorToLog, {
-        agent: 'WikiGraph',
-        phase: 'synthesize_articles',
+      logger.phaseError("synthesize_articles", errorToLog, {
+        agent: "WikiGraph",
+        phase: "synthesize_articles",
         conceptName: concept.name,
       });
       return undefined;
@@ -470,13 +474,13 @@ export async function synthesizeArticles(
   state: OverallStateType,
   llm: BaseLanguageModel
 ): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
-  logger.phaseStart('synthesize_articles');
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
+  logger.phaseStart("synthesize_articles");
 
   const concepts = state.collapsedConcepts || [];
   const articles = await synthesizeArticlesForIndices(state, llm, 0, concepts.length);
 
-  logger.phaseComplete('synthesize_articles', {
+  logger.phaseComplete("synthesize_articles", {
     conceptsProcessed: concepts.length,
     articlesGenerated: articles.length,
   });
@@ -484,7 +488,7 @@ export async function synthesizeArticles(
   return {
     conceptArticles: articles,
     progress: {
-      phase: 'Article synthesis',
+      phase: "Article synthesis",
       percentage: 60,
       message: `Generated ${articles.length} concept articles`,
       articlesGenerated: articles.length,
@@ -504,13 +508,13 @@ export async function detectConnections(
   llm: BaseLanguageModel,
   conceptArticles: WikiArticle[]
 ): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
-  logger.phaseStart('detect_connections');
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
+  logger.phaseStart("detect_connections");
 
   const concepts = state.collapsedConcepts || [];
 
   if (conceptArticles.length < 2) {
-    logger.phaseComplete('detect_connections', {
+    logger.phaseComplete("detect_connections", {
       connectionsDetected: 0,
       skipped: true,
     });
@@ -518,9 +522,9 @@ export async function detectConnections(
       connectionArticles: [],
       finalOutput: conceptArticles,
       progress: {
-        phase: 'Connection detection',
+        phase: "Connection detection",
         percentage: 80,
-        message: 'Skipped connection detection (<2 articles)',
+        message: "Skipped connection detection (<2 articles)",
         articlesGenerated: conceptArticles.length,
       },
     };
@@ -528,8 +532,8 @@ export async function detectConnections(
 
   // Build articles context for connection detection
   const articlesContext = conceptArticles
-    .map(article => `## ${article.title}\n\n${article.content}`)
-    .join('\n\n---\n\n');
+    .map((article) => `## ${article.title}\n\n${article.content}`)
+    .join("\n\n---\n\n");
 
   const prompt = getConnectionDetectionPrompt({
     concepts,
@@ -539,35 +543,37 @@ export async function detectConnections(
   try {
     const structuredLlm = llm.withStructuredOutput!(ConnectionDetectionSchema);
     const result = await invokeWithRetry(
-      () => invokeWithTimeout(
-        () => structuredLlm.invoke([
-          new SystemMessage(CONNECTION_DETECTION_SYSTEM_PROMPT),
-          new HumanMessage(prompt),
-        ], createLangSmithRunConfig({
-          runName: 'WikiGraph.DetectConnections',
-          tags: ['agent', 'wiki', 'connections'],
-          metadata: {
-            conceptCount: concepts.length,
-          },
-        }) as unknown as Record<string, unknown>),
-        WIKI_CONFIG.REDUCE_TIMEOUT_MS,
-        'WikiConnectionDetection'
-      ),
+      () =>
+        invokeWithTimeout(
+          () =>
+            structuredLlm.invoke(
+              [new SystemMessage(CONNECTION_DETECTION_SYSTEM_PROMPT), new HumanMessage(prompt)],
+              createLangSmithRunConfig({
+                runName: "WikiGraph.DetectConnections",
+                tags: ["agent", "wiki", "connections"],
+                metadata: {
+                  conceptCount: concepts.length,
+                },
+              }) as unknown as Record<string, unknown>
+            ),
+          WIKI_CONFIG.REDUCE_TIMEOUT_MS,
+          "WikiConnectionDetection"
+        ),
       {
         maxAttempts: 2,
         baseDelayMs: 1000,
       },
-      'WikiConnectionDetection'
+      "WikiConnectionDetection"
     );
 
     // Convert connections to articles
     const connectionArticles: WikiArticle[] = (result as any).connections.map((conn: any) => ({
       path: conn.path,
-      type: 'connection' as const,
+      type: "connection" as const,
       title: conn.title,
       content: `# ${conn.title}\n\n${conn.relationship}`,
       frontmatter: {
-        slug: conn.path.split('/').pop() || conn.path,
+        slug: conn.path.split("/").pop() || conn.path,
         summary: conn.relationship.substring(0, 200),
         sources: state.documentIds,
         relatedConcepts: conn.concepts,
@@ -575,7 +581,7 @@ export async function detectConnections(
       },
     }));
 
-    logger.phaseComplete('detect_connections', {
+    logger.phaseComplete("detect_connections", {
       connectionsDetected: connectionArticles.length,
     });
 
@@ -586,7 +592,7 @@ export async function detectConnections(
       connectionArticles,
       finalOutput: allArticles,
       progress: {
-        phase: 'Connection detection',
+        phase: "Connection detection",
         percentage: 80,
         message: `Detected ${connectionArticles.length} concept connections`,
         articlesGenerated: allArticles.length,
@@ -594,16 +600,16 @@ export async function detectConnections(
     };
   } catch (error) {
     const errorToLog = error instanceof Error ? error : new Error(String(error));
-    logger.phaseError('detect_connections', errorToLog);
+    logger.phaseError("detect_connections", errorToLog);
 
     // Don't fail entire wiki if connection detection fails
     return {
       connectionArticles: [],
       finalOutput: conceptArticles,
       progress: {
-        phase: 'Connection detection',
+        phase: "Connection detection",
         percentage: 80,
-        message: 'Connection detection completed with errors',
+        message: "Connection detection completed with errors",
         articlesGenerated: conceptArticles.length,
       },
     };
@@ -621,8 +627,8 @@ export async function compileFinal(
   state: OverallStateType,
   allArticles: WikiArticle[]
 ): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('WikiGraph', 'wiki');
-  logger.phaseStart('compile_final');
+  const logger = createAgentGraphLogger("WikiGraph", "wiki");
+  logger.phaseStart("compile_final");
 
   const indexContent = buildDeterministicWikiIndex(allArticles);
 
@@ -630,16 +636,16 @@ export async function compileFinal(
   const timestamp = new Date().toISOString();
   const logContent = `## [${timestamp}] Wiki Compilation\n\n- Sources: ${state.documentIds.length} documents\n- Concepts: ${state.collapsedConcepts?.length || 0}\n- Articles: ${allArticles.length}\n`;
 
-  logger.phaseComplete('compile_final', {
+  logger.phaseComplete("compile_final", {
     totalArticles: allArticles.length,
   });
 
   return {
     indexContent,
     logContent,
-    status: 'completed',
+    status: "completed",
     progress: {
-      phase: 'Complete',
+      phase: "Complete",
       percentage: 100,
       message: `Wiki compiled with ${allArticles.length} articles`,
       articlesGenerated: allArticles.length,
@@ -671,12 +677,12 @@ export function routeToMap(state: OverallStateType): any {
 
   const validated = validateChunks(state.chunks, {
     targetSize: WIKI_CONFIG.MAP_CHUNK_SIZE_TOKENS,
-    agentName: 'WikiGraph',
+    agentName: "WikiGraph",
   });
 
   const packedChunks = packChunks(validated, {
     targetSize: WIKI_CONFIG.MAP_CHUNK_SIZE_TOKENS,
-    agentName: 'WikiGraph',
+    agentName: "WikiGraph",
   });
 
   if (packedChunks.length === 0) {
@@ -704,15 +710,16 @@ export function routeToMap(state: OverallStateType): any {
   });
   // #endregion
 
-  return packedChunks.map((chunk, i) =>
-    new Send('extract_concepts_map', {
-      chunk,
-      chunkIndex: i,
-      totalChunks: packedChunks.length,
-      documentIds: state.documentIds,
-      wikiId: state.wikiId,
-      notebookId: state.notebookId,
-      userId: state.userId,
-    })
+  return packedChunks.map(
+    (chunk, i) =>
+      new Send("extract_concepts_map", {
+        chunk,
+        chunkIndex: i,
+        totalChunks: packedChunks.length,
+        documentIds: state.documentIds,
+        wikiId: state.wikiId,
+        notebookId: state.notebookId,
+        userId: state.userId,
+      })
   );
 }

@@ -1,16 +1,16 @@
-"use node"
+"use node";
 
 /**
  * Helper to extract message content safely
  */
 export function getMessageContent(response: unknown): string {
-  if (typeof response === 'object' && response !== null) {
+  if (typeof response === "object" && response !== null) {
     const msg = response as { content?: unknown };
-    if (typeof msg.content === 'string') {
+    if (typeof msg.content === "string") {
       return msg.content;
     }
-    if (typeof msg.content === 'object' && msg.content !== null) {
-      if (typeof (msg.content as { toString?: () => string }).toString === 'function') {
+    if (typeof msg.content === "object" && msg.content !== null) {
+      if (typeof (msg.content as { toString?: () => string }).toString === "function") {
         return (msg.content as { toString: () => string }).toString();
       }
     }
@@ -24,7 +24,7 @@ export function getMessageContent(response: unknown): string {
  */
 export function parseCsvLine(line: string): string[] {
   const fields: string[] = [];
-  let currentField = '';
+  let currentField = "";
   let insideQuotes = false;
   let i = 0;
 
@@ -44,9 +44,9 @@ export function parseCsvLine(line: string): string[] {
       continue;
     }
 
-    if (char === ',' && !insideQuotes) {
+    if (char === "," && !insideQuotes) {
       fields.push(currentField);
-      currentField = '';
+      currentField = "";
       i++;
       continue;
     }
@@ -70,14 +70,14 @@ export function cleanCsvOutput(output: string): string {
   let cleaned = output.trim();
 
   // Remove markdown code blocks if present
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:csv)?\n?/, '').replace(/\n?```$/, '');
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:csv)?\n?/, "").replace(/\n?```$/, "");
   }
 
   cleaned = cleaned.trim();
 
   // Check if CSV is already properly quoted (heuristic: first line should start with quote)
-  const lines = cleaned.split('\n');
+  const lines = cleaned.split("\n");
   if (lines.length > 0 && lines[0].trim().startsWith('"')) {
     // Likely already properly formatted
     return cleaned;
@@ -95,21 +95,21 @@ export function cleanCsvOutput(output: string): string {
       const fields = parseCsvLine(line);
 
       // Re-quote all fields properly
-      const quotedFields = fields.map(field => {
+      const quotedFields = fields.map((field) => {
         // Escape internal quotes by doubling them
         const escaped = field.replace(/"/g, '""');
         return `"${escaped}"`;
       });
 
-      fixedLines.push(quotedFields.join(','));
+      fixedLines.push(quotedFields.join(","));
     }
 
     if (fixedLines.length > 0) {
-      console.log('[SpreadsheetGraph] Applied RFC 4180 CSV formatting to output');
-      return fixedLines.join('\n');
+      console.log("[SpreadsheetGraph] Applied RFC 4180 CSV formatting to output");
+      return fixedLines.join("\n");
     }
   } catch (error) {
-    console.warn('[SpreadsheetGraph] Failed to auto-format CSV, returning as-is:', error);
+    console.warn("[SpreadsheetGraph] Failed to auto-format CSV, returning as-is:", error);
   }
 
   return cleaned;
@@ -119,30 +119,33 @@ export function cleanCsvOutput(output: string): string {
  * Validate CSV completeness.
  * Checks for header row and consistent column counts.
  */
-export function validateTableCompleteness(output: string, spreadsheetType: string): {
+export function validateTableCompleteness(
+  output: string,
+  spreadsheetType: string
+): {
   isComplete: boolean;
   missing: string[];
 } {
   const missing: string[] = [];
-  const lines = output.trim().split('\n');
+  const lines = output.trim().split("\n");
 
   if (lines.length < 2) {
-    missing.push('CSV has insufficient rows (need at least header + data)');
+    missing.push("CSV has insufficient rows (need at least header + data)");
     return { isComplete: false, missing };
   }
 
   // Check for CSV format (header should have commas)
-  if (!lines[0].includes(',')) {
-    missing.push('Header row does not contain commas (not valid CSV)');
+  if (!lines[0].includes(",")) {
+    missing.push("Header row does not contain commas (not valid CSV)");
   }
 
-  const headerCount = lines[0].split(',').length;
+  const headerCount = lines[0].split(",").length;
 
   // Check sample rows for consistency (allow small variance for quoted commas)
   const sampleIndices = [1, Math.floor(lines.length / 2), lines.length - 1];
   for (const idx of sampleIndices) {
     if (idx < lines.length && idx > 0) {
-      const rowCount = lines[idx].split(',').length;
+      const rowCount = lines[idx].split(",").length;
       // Allow small variance for quoted commas, but flag major discrepancies
       if (Math.abs(rowCount - headerCount) > 2) {
         missing.push(`Row ${idx + 1} has ${rowCount} columns but header has ${headerCount}`);
@@ -151,26 +154,30 @@ export function validateTableCompleteness(output: string, spreadsheetType: strin
   }
 
   // Check for abrupt ending (last line should be complete)
-  const lastLine = lines[lines.length - 1] || '';
-  if (lastLine.length > 0 && lastLine.split(',').length < headerCount - 2) {
-    missing.push('Last row appears incomplete (truncated output)');
+  const lastLine = lines[lines.length - 1] || "";
+  if (lastLine.length > 0 && lastLine.split(",").length < headerCount - 2) {
+    missing.push("Last row appears incomplete (truncated output)");
   }
 
   // Type-specific validation
-  if (spreadsheetType === 'financial_summary') {
+  if (spreadsheetType === "financial_summary") {
     // Check for currency symbols or numbers
-    const hasCurrency = /\$[\d,]+\.?\d*/.test(output) || /[\d,]+\.?\d*\s*(USD|EUR|GBP)/.test(output);
+    const hasCurrency =
+      /\$[\d,]+\.?\d*/.test(output) || /[\d,]+\.?\d*\s*(USD|EUR|GBP)/.test(output);
     if (!hasCurrency) {
-      missing.push('Financial CSV should contain currency values');
+      missing.push("Financial CSV should contain currency values");
     }
   }
 
-  if (spreadsheetType === 'timeline') {
+  if (spreadsheetType === "timeline") {
     // Check for dates
-    const hasDates = /\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(output) ||
-                     /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/i.test(output);
+    const hasDates =
+      /\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(output) ||
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/i.test(
+        output
+      );
     if (!hasDates) {
-      missing.push('Timeline CSV should contain dates');
+      missing.push("Timeline CSV should contain dates");
     }
   }
 

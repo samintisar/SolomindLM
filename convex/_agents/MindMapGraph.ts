@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * MindMapGraph
  *
@@ -12,7 +12,7 @@
  * Main export: MindMapGraph class
  */
 
-export { MindMapGraph, packChunks, validateChunks } from './mindmap/MindMapGraph.js';
+export { MindMapGraph, packChunks, validateChunks } from "./mindmap/MindMapGraph.js";
 
 // Re-export types for backward compatibility
 export type {
@@ -21,7 +21,7 @@ export type {
   ConceptExtraction,
   MindMapNode,
   FinalMindMap,
-} from './mindmap/state.js';
+} from "./mindmap/state.js";
 
 // Re-export constants for backward compatibility
-export { NODES, MAP_PROMPT, REDUCE_PROMPT } from './mindmap/prompts.js';
+export { NODES, MAP_PROMPT, REDUCE_PROMPT } from "./mindmap/prompts.js";

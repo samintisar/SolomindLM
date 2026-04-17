@@ -1,11 +1,11 @@
-"use node"
+"use node";
 /**
  * State definitions for ReportGraph.
  *
  * Contains state interfaces using the LangGraph Annotation API.
  */
 
-import { Annotation } from '@langchain/langgraph';
+import { Annotation } from "@langchain/langgraph";
 
 // ============================================================
 // STATE DEFINITIONS
@@ -26,14 +26,14 @@ export const OverallState = Annotation.Root({
   }),
   reportType: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   customPrompt: Annotation<string | undefined>({
     reducer: (_x: string | undefined, y?: string | undefined) => y ?? _x,
     default: () => undefined,
   }),
   mapOutputs: Annotation<string[]>({
-    reducer: (x: string[], y?: string[]) => y ? x.concat(y) : x,
+    reducer: (x: string[], y?: string[]) => (y ? x.concat(y) : x),
     default: () => [],
   }),
   collapsedOutputs: Annotation<string[]>({
@@ -42,11 +42,11 @@ export const OverallState = Annotation.Root({
   }),
   finalOutput: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   status: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => 'generating',
+    default: () => "generating",
   }),
   reduceRetryCount: Annotation<number>({
     reducer: (_x: number, y?: number) => y ?? _x,
@@ -61,7 +61,7 @@ export const OverallState = Annotation.Root({
     totalChunks?: number;
   }>({
     reducer: (_x, y?: any) => y ?? _x,
-    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+    default: () => ({ phase: "initializing", percentage: 0, message: "Initializing..." }),
   }),
 });
 

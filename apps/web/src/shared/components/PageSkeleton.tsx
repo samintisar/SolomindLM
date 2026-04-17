@@ -6,7 +6,7 @@ interface PageSkeletonProps {
  * Full page loading skeleton
  * Use this when loading entire pages or main content areas
  */
-export function PageSkeleton({ className = '' }: PageSkeletonProps) {
+export function PageSkeleton({ className = "" }: PageSkeletonProps) {
   return (
     <div className={`flex-1 overflow-y-auto bg-background p-6 md:p-12 font-serif ${className}`}>
       <div className="max-w-[1600px] mx-auto space-y-10">
@@ -27,7 +27,7 @@ export function PageSkeleton({ className = '' }: PageSkeletonProps) {
               className="aspect-16/10 rounded-2xl bg-muted/10 border border-border animate-pulse"
               style={{
                 animationDelay: `${i * 100}ms`,
-                animationDuration: '1.5s',
+                animationDuration: "1.5s",
               }}
             />
           ))}

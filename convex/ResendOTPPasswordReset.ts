@@ -24,8 +24,7 @@ export const ResendOTPPasswordReset = Resend({
   },
   async sendVerificationRequest({ identifier: email, provider, token }) {
     const resend = new ResendAPI(provider.apiKey as string);
-    const from =
-      process.env.AUTH_RESEND_FROM ?? "Solomind <onboarding@resend.dev>";
+    const from = process.env.AUTH_RESEND_FROM ?? "Solomind <onboarding@resend.dev>";
     const { error } = await resend.emails.send({
       from,
       to: [email],

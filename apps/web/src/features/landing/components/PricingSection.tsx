@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Check, BadgePercent } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
+import React, { useState } from "react";
+import { Check, BadgePercent } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
 
 interface PricingSectionProps {
   onGetStarted: () => void;
@@ -14,66 +14,66 @@ interface PricingPlan {
   features: string[];
   cta: string;
   highlighted: boolean;
-  billingKey: 'free' | 'yearly' | 'monthly';
+  billingKey: "free" | "yearly" | "monthly";
 }
 
 const pricingPlans: PricingPlan[] = [
   {
-    name: 'Free',
-    price: '$0',
-    description: 'Get started with core tools',
+    name: "Free",
+    price: "$0",
+    description: "Get started with core tools",
     features: [
-      '20 notebooks · 20 sources each',
-      '50 chat messages / day',
-      '5 flashcards, quizzes, reports / day',
-      '1 audio overview / day',
-      '5 written questions / day'
+      "20 notebooks · 20 sources each",
+      "50 chat messages / day",
+      "5 flashcards, quizzes, reports / day",
+      "1 audio overview / day",
+      "5 written questions / day",
     ],
-    cta: 'Start free',
+    cta: "Start free",
     highlighted: false,
-    billingKey: 'free'
+    billingKey: "free",
   },
   {
-    name: 'Pro',
-    price: '$7.50',
-    period: '/mo, billed yearly',
-    description: 'For serious learners',
+    name: "Pro",
+    price: "$7.50",
+    period: "/mo, billed yearly",
+    description: "For serious learners",
     features: [
-      '200 notebooks · 100 sources each',
-      '500 chat messages / day',
-      '100 flashcards, quizzes, reports / day',
-      '5 audio overviews / day',
-      '100 written questions / day'
+      "200 notebooks · 100 sources each",
+      "500 chat messages / day",
+      "100 flashcards, quizzes, reports / day",
+      "5 audio overviews / day",
+      "100 written questions / day",
     ],
-    cta: 'Get Pro',
+    cta: "Get Pro",
     highlighted: true,
-    billingKey: 'yearly'
+    billingKey: "yearly",
   },
   {
-    name: 'Pro',
-    price: '$15',
-    period: '/mo',
-    description: 'Same as yearly, billed monthly',
+    name: "Pro",
+    price: "$15",
+    period: "/mo",
+    description: "Same as yearly, billed monthly",
     features: [
-      '200 notebooks · 100 sources each',
-      '500 chat messages / day',
-      '100 flashcards, quizzes, reports / day',
-      '5 audio overviews / day',
-      '100 written questions / day'
+      "200 notebooks · 100 sources each",
+      "500 chat messages / day",
+      "100 flashcards, quizzes, reports / day",
+      "5 audio overviews / day",
+      "100 written questions / day",
     ],
-    cta: 'Get Pro',
+    cta: "Get Pro",
     highlighted: false,
-    billingKey: 'monthly'
-  }
+    billingKey: "monthly",
+  },
 ];
 
 export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) => {
-  const [billing, setBilling] = useState<'yearly' | 'monthly'>('yearly');
+  const [billing, setBilling] = useState<"yearly" | "monthly">("yearly");
 
   const plansToShow =
-    billing === 'yearly'
-      ? pricingPlans.filter((p) => p.billingKey === 'free' || p.billingKey === 'yearly')
-      : pricingPlans.filter((p) => p.billingKey === 'free' || p.billingKey === 'monthly');
+    billing === "yearly"
+      ? pricingPlans.filter((p) => p.billingKey === "free" || p.billingKey === "yearly")
+      : pricingPlans.filter((p) => p.billingKey === "free" || p.billingKey === "monthly");
 
   return (
     <section id="pricing" className="py-32 md:py-40 px-6 relative">
@@ -82,16 +82,14 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
         className="absolute inset-0 pointer-events-none max-w-4xl mx-auto top-1/2 -translate-y-1/2 h-[420px] opacity-[0.07]"
         style={{
           background:
-            'radial-gradient(ellipse 80% 100% at 50% 50%, var(--primary), transparent 70%)'
+            "radial-gradient(ellipse 80% 100% at 50% 50%, var(--primary), transparent 70%)",
         }}
       />
 
       <div className="max-w-[1500px] w-full mx-auto relative">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <p className="text-sm font-medium text-primary uppercase tracking-widest mb-3">
-            Pricing
-          </p>
+          <p className="text-sm font-medium text-primary uppercase tracking-widest mb-3">Pricing</p>
           <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground tracking-tight mb-3">
             Start free. Upgrade when you need more.
           </h2>
@@ -107,12 +105,12 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
             <button
               type="button"
               role="tab"
-              aria-selected={billing === 'yearly'}
-              onClick={() => setBilling('yearly')}
+              aria-selected={billing === "yearly"}
+              onClick={() => setBilling("yearly")}
               className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                billing === 'yearly'
-                  ? 'bg-background text-foreground shadow-sm border border-border'
-                  : 'text-muted-foreground hover:text-foreground'
+                billing === "yearly"
+                  ? "bg-background text-foreground shadow-sm border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Annual
@@ -120,18 +118,18 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
             <button
               type="button"
               role="tab"
-              aria-selected={billing === 'monthly'}
-              onClick={() => setBilling('monthly')}
+              aria-selected={billing === "monthly"}
+              onClick={() => setBilling("monthly")}
               className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                billing === 'monthly'
-                  ? 'bg-background text-foreground shadow-sm border border-border'
-                  : 'text-muted-foreground hover:text-foreground'
+                billing === "monthly"
+                  ? "bg-background text-foreground shadow-sm border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Monthly
             </button>
           </div>
-          {billing === 'yearly' && (
+          {billing === "yearly" && (
             <span className="ml-3 inline-flex items-center gap-1 text-sm text-primary font-medium">
               <BadgePercent className="w-4 h-4" aria-hidden />
               Save 50%
@@ -146,8 +144,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
               key={`${plan.billingKey}-${plan.name}`}
               className={`relative rounded-2xl transition-all duration-300 ${
                 plan.highlighted
-                  ? 'bg-card border-2 border-primary/30 shadow-lg shadow-primary/5 dark:shadow-primary/10'
-                  : 'bg-card/80 border border-border hover:border-border/90 backdrop-blur-sm'
+                  ? "bg-card border-2 border-primary/30 shadow-lg shadow-primary/5 dark:shadow-primary/10"
+                  : "bg-card/80 border border-border hover:border-border/90 backdrop-blur-sm"
               }`}
             >
               {plan.highlighted && (
@@ -179,10 +177,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
                 <ul className="space-y-2.5 mb-8">
                   {plan.features.map((feature, index) => (
                     <li key={index} className="flex items-start gap-3">
-                      <Check
-                        className="w-4 h-4 text-primary shrink-0 mt-0.5"
-                        aria-hidden
-                      />
+                      <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" aria-hidden />
                       <span className="text-sm text-foreground/90">{feature}</span>
                     </li>
                   ))}
@@ -191,11 +186,11 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ onGetStarted }) 
                 {/* CTA */}
                 <Button
                   onClick={onGetStarted}
-                  variant={plan.highlighted ? 'default' : 'outline'}
+                  variant={plan.highlighted ? "default" : "outline"}
                   className={`w-full rounded-xl font-semibold h-11 ${
                     plan.highlighted
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      : 'border-border hover:bg-muted/50'
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "border-border hover:bg-muted/50"
                   }`}
                   size="lg"
                 >

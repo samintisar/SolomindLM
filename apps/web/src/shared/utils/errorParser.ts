@@ -3,8 +3,8 @@
  * Parses both new structured errors and legacy string-based errors.
  */
 
-import { ConvexError } from 'convex/values';
-import type { DailyFeature } from '@/shared/types/index';
+import { ConvexError } from "convex/values";
+import type { DailyFeature } from "@/shared/types/index";
 
 /** Pro-tier daily caps (must match convex/_lib/rateLimits.ts getProLimit). */
 const PRO_DAILY_CAP: Record<DailyFeature, number> = {
@@ -26,14 +26,14 @@ function inferIsProFromDailyCap(feature: DailyFeature | undefined, limit: number
 function parseLimitFromConvexErrorData(error: unknown): ParsedLimitError | null {
   if (!(error instanceof ConvexError)) return null;
   const d = error.data;
-  if (!d || typeof d !== 'object') return null;
+  if (!d || typeof d !== "object") return null;
   const o = d as Record<string, unknown>;
   const limitType = o.limitType;
   if (
-    typeof o.code !== 'string' ||
-    typeof o.limit !== 'number' ||
-    typeof o.current !== 'number' ||
-    (limitType !== 'notebook' && limitType !== 'source' && limitType !== 'daily')
+    typeof o.code !== "string" ||
+    typeof o.limit !== "number" ||
+    typeof o.current !== "number" ||
+    (limitType !== "notebook" && limitType !== "source" && limitType !== "daily")
   ) {
     return null;
   }
@@ -56,7 +56,7 @@ export interface ParsedLimitError {
   code: string;
   limit: number;
   current: number;
-  limitType: 'notebook' | 'source' | 'daily';
+  limitType: "notebook" | "source" | "daily";
   feature?: DailyFeature;
   isPro: boolean;
 }
@@ -65,25 +65,25 @@ export interface ParsedLimitError {
  * Type guard to check if an error is a LimitError from backend
  */
 export function isLimitError(error: unknown): error is ParsedLimitError {
-  if (!error || typeof error !== 'object') return false;
+  if (!error || typeof error !== "object") return false;
 
   // Check for structured error with data property (from Convex serialization)
   const err = error as any;
-  if (err.data && typeof err.data === 'object') {
+  if (err.data && typeof err.data === "object") {
     return (
-      typeof err.data.code === 'string' &&
-      typeof err.data.limit === 'number' &&
-      typeof err.data.current === 'number' &&
-      typeof err.data.limitType === 'string'
+      typeof err.data.code === "string" &&
+      typeof err.data.limit === "number" &&
+      typeof err.data.current === "number" &&
+      typeof err.data.limitType === "string"
     );
   }
 
   // Check for direct LimitError properties
   return (
-    typeof err.code === 'string' &&
-    typeof err.limit === 'number' &&
-    typeof err.current === 'number' &&
-    typeof err.limitType === 'string'
+    typeof err.code === "string" &&
+    typeof err.limit === "number" &&
+    typeof err.current === "number" &&
+    typeof err.limitType === "string"
   );
 }
 
@@ -114,7 +114,7 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
         code: String(raw.code),
         limit: Number(raw.limit),
         current: Number(raw.current),
-        limitType: raw.limitType as ParsedLimitError['limitType'],
+        limitType: raw.limitType as ParsedLimitError["limitType"],
         feature: raw.feature as DailyFeature | undefined,
         isPro: Boolean(raw.isPro),
       };
@@ -135,7 +135,7 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
   }
 
   // Handle plain objects with error data
-  if (typeof error === 'object' && error !== null) {
+  if (typeof error === "object" && error !== null) {
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
       const raw = err.data as Record<string, unknown>;
@@ -144,7 +144,7 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
         code: String(raw.code),
         limit: Number(raw.limit),
         current: Number(raw.current),
-        limitType: raw.limitType as ParsedLimitError['limitType'],
+        limitType: raw.limitType as ParsedLimitError["limitType"],
         feature: raw.feature as DailyFeature | undefined,
         isPro: Boolean(raw.isPro),
       };
@@ -163,17 +163,17 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
   const lowerMessage = message.toLowerCase();
 
   // Notebook limit errors
-  if (lowerMessage.includes('notebook limit')) {
+  if (lowerMessage.includes("notebook limit")) {
     const match = message.match(/(\d+)\/(\d+)/);
     if (match) {
       const current = parseInt(match[1], 10);
       const limit = parseInt(match[2], 10);
       return {
         isLimitError: true,
-        code: 'NOTEBOOK_LIMIT_REACHED',
+        code: "NOTEBOOK_LIMIT_REACHED",
         limit,
         current,
-        limitType: 'notebook',
+        limitType: "notebook",
         isPro: limit > 5,
       };
     }
@@ -183,27 +183,27 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
       const limit = parseInt(limitMatch[1], 10);
       return {
         isLimitError: true,
-        code: 'NOTEBOOK_LIMIT_REACHED',
+        code: "NOTEBOOK_LIMIT_REACHED",
         limit,
         current: limit,
-        limitType: 'notebook',
+        limitType: "notebook",
         isPro: limit > 5,
       };
     }
   }
 
   // Source limit errors
-  if (lowerMessage.includes('source limit')) {
+  if (lowerMessage.includes("source limit")) {
     const match = message.match(/(\d+)\/(\d+)/);
     if (match) {
       const current = parseInt(match[1], 10);
       const limit = parseInt(match[2], 10);
       return {
         isLimitError: true,
-        code: 'SOURCE_LIMIT_REACHED',
+        code: "SOURCE_LIMIT_REACHED",
         limit,
         current,
-        limitType: 'source',
+        limitType: "source",
         isPro: limit > 20,
       };
     }
@@ -212,27 +212,27 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
       const limit = parseInt(limitMatch[1], 10);
       return {
         isLimitError: true,
-        code: 'SOURCE_LIMIT_REACHED',
+        code: "SOURCE_LIMIT_REACHED",
         limit,
         current: limit,
-        limitType: 'source',
+        limitType: "source",
         isPro: limit > 20,
       };
     }
   }
 
   // Daily limit errors
-  if (lowerMessage.includes('daily') && lowerMessage.includes('limit')) {
+  if (lowerMessage.includes("daily") && lowerMessage.includes("limit")) {
     // Try to detect feature type
     let feature: DailyFeature | undefined;
-    if (lowerMessage.includes('chat')) feature = 'chat';
-    else if (lowerMessage.includes('flashcard')) feature = 'flashcard';
-    else if (lowerMessage.includes('quiz')) feature = 'quiz';
-    else if (lowerMessage.includes('report')) feature = 'report';
-    else if (lowerMessage.includes('audio')) feature = 'audio';
-    else if (lowerMessage.includes('written question')) feature = 'writtenQuestion';
-    else if (lowerMessage.includes('spreadsheet')) feature = 'spreadsheet';
-    else if (lowerMessage.includes('slide')) feature = 'slide';
+    if (lowerMessage.includes("chat")) feature = "chat";
+    else if (lowerMessage.includes("flashcard")) feature = "flashcard";
+    else if (lowerMessage.includes("quiz")) feature = "quiz";
+    else if (lowerMessage.includes("report")) feature = "report";
+    else if (lowerMessage.includes("audio")) feature = "audio";
+    else if (lowerMessage.includes("written question")) feature = "writtenQuestion";
+    else if (lowerMessage.includes("spreadsheet")) feature = "spreadsheet";
+    else if (lowerMessage.includes("slide")) feature = "slide";
 
     const match = message.match(/(\d+)\/(\d+)/);
     if (match) {
@@ -240,10 +240,10 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
       const limit = parseInt(match[2], 10);
       return {
         isLimitError: true,
-        code: 'DAILY_LIMIT_REACHED',
+        code: "DAILY_LIMIT_REACHED",
         limit,
         current,
-        limitType: 'daily',
+        limitType: "daily",
         feature,
         isPro: inferIsProFromDailyCap(feature, limit),
       };
@@ -259,24 +259,24 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
 export function getLimitErrorMessage(parsedError: ParsedLimitError): string {
   const { limitType, limit, current, feature } = parsedError;
 
-  if (limitType === 'notebook') {
+  if (limitType === "notebook") {
     return `You've reached your notebook limit (${current}/${limit}).`;
   }
 
-  if (limitType === 'source') {
+  if (limitType === "source") {
     return `You've reached your source limit (${current}/${limit}).`;
   }
 
-  if (limitType === 'daily' && feature) {
+  if (limitType === "daily" && feature) {
     const featureNames: Record<DailyFeature, string> = {
-      chat: 'chat message',
-      flashcard: 'flashcard set',
-      quiz: 'quiz',
-      report: 'report',
-      audio: 'audio overview',
-      writtenQuestion: 'written question set',
-      spreadsheet: 'spreadsheet',
-      slide: 'slide deck',
+      chat: "chat message",
+      flashcard: "flashcard set",
+      quiz: "quiz",
+      report: "report",
+      audio: "audio overview",
+      writtenQuestion: "written question set",
+      spreadsheet: "spreadsheet",
+      slide: "slide deck",
     };
     const featureName = featureNames[feature] || feature;
     return `Daily ${featureName} limit reached (${current}/${limit}).`;
@@ -292,41 +292,41 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
   const { limitType, feature, isPro } = parsedError;
 
   if (isPro) {
-    if (limitType === 'daily') {
-      return 'This limit refreshes on a rolling day—try again later, or contact support if you need a higher cap.';
+    if (limitType === "daily") {
+      return "This limit refreshes on a rolling day—try again later, or contact support if you need a higher cap.";
     }
-    return 'Contact support to increase your limits.';
+    return "Contact support to increase your limits.";
   }
 
-  if (limitType === 'notebook') {
-    return 'Upgrade for up to 100 notebooks.';
+  if (limitType === "notebook") {
+    return "Upgrade for up to 100 notebooks.";
   }
 
-  if (limitType === 'source') {
-    return 'Upgrade for up to 500 sources per notebook.';
+  if (limitType === "source") {
+    return "Upgrade for up to 500 sources per notebook.";
   }
 
-  if (limitType === 'daily' && feature) {
+  if (limitType === "daily" && feature) {
     const proLimits: Record<DailyFeature, string> = {
-      chat: '500 messages/day',
-      flashcard: '100 flashcard sets/day',
-      quiz: '100 quizzes/day',
-      report: '100 reports/day',
-      audio: '5 audio overviews/day',
-      writtenQuestion: '100 question sets/day',
-      spreadsheet: '100 spreadsheets/day',
-      slide: '10 slide decks/day',
+      chat: "500 messages/day",
+      flashcard: "100 flashcard sets/day",
+      quiz: "100 quizzes/day",
+      report: "100 reports/day",
+      audio: "5 audio overviews/day",
+      writtenQuestion: "100 question sets/day",
+      spreadsheet: "100 spreadsheets/day",
+      slide: "10 slide decks/day",
     };
     return `Upgrade for ${proLimits[feature]}.`;
   }
 
-  return 'Upgrade to Pro for higher limits.';
+  return "Upgrade to Pro for higher limits.";
 }
 
 // --- Structured service errors (ConvexError.data.type from convex/_lib/errors.ts) ---
 
 export type ParsedExternalServiceError = {
-  kind: 'external_service';
+  kind: "external_service";
   service: string;
   retryable: boolean;
   statusCode?: number;
@@ -335,7 +335,7 @@ export type ParsedExternalServiceError = {
 };
 
 export type ParsedStorageError = {
-  kind: 'storage';
+  kind: "storage";
   operation: string;
   fileName?: string;
   storageId?: string;
@@ -343,7 +343,7 @@ export type ParsedStorageError = {
 };
 
 export type ParsedInputValidationError = {
-  kind: 'input_validation';
+  kind: "input_validation";
   field?: string;
   detail?: string;
 };
@@ -356,14 +356,14 @@ export type ParsedServiceError =
 function convexErrorDataObject(error: unknown): Record<string, unknown> | null {
   if (error instanceof ConvexError) {
     const d = error.data;
-    if (d && typeof d === 'object' && !Array.isArray(d)) {
+    if (d && typeof d === "object" && !Array.isArray(d)) {
       return d as Record<string, unknown>;
     }
     return null;
   }
-  if (error && typeof error === 'object' && 'data' in error) {
+  if (error && typeof error === "object" && "data" in error) {
     const d = (error as { data: unknown }).data;
-    if (d && typeof d === 'object' && !Array.isArray(d)) {
+    if (d && typeof d === "object" && !Array.isArray(d)) {
       return d as Record<string, unknown>;
     }
   }
@@ -378,32 +378,32 @@ export function parseServiceError(error: unknown): ParsedServiceError | null {
   if (!o) return null;
 
   const t = o.type;
-  if (t === 'EXTERNAL_SERVICE_ERROR') {
-    if (typeof o.service !== 'string' || typeof o.retryable !== 'boolean') return null;
+  if (t === "EXTERNAL_SERVICE_ERROR") {
+    if (typeof o.service !== "string" || typeof o.retryable !== "boolean") return null;
     return {
-      kind: 'external_service',
+      kind: "external_service",
       service: o.service,
       retryable: o.retryable,
-      statusCode: typeof o.statusCode === 'number' ? o.statusCode : undefined,
-      endpoint: typeof o.endpoint === 'string' ? o.endpoint : undefined,
-      detail: typeof o.detail === 'string' ? o.detail : undefined,
+      statusCode: typeof o.statusCode === "number" ? o.statusCode : undefined,
+      endpoint: typeof o.endpoint === "string" ? o.endpoint : undefined,
+      detail: typeof o.detail === "string" ? o.detail : undefined,
     };
   }
-  if (t === 'STORAGE_ERROR') {
-    if (typeof o.operation !== 'string') return null;
+  if (t === "STORAGE_ERROR") {
+    if (typeof o.operation !== "string") return null;
     return {
-      kind: 'storage',
+      kind: "storage",
       operation: o.operation,
-      fileName: typeof o.fileName === 'string' ? o.fileName : undefined,
-      storageId: typeof o.storageId === 'string' ? o.storageId : undefined,
-      detail: typeof o.detail === 'string' ? o.detail : undefined,
+      fileName: typeof o.fileName === "string" ? o.fileName : undefined,
+      storageId: typeof o.storageId === "string" ? o.storageId : undefined,
+      detail: typeof o.detail === "string" ? o.detail : undefined,
     };
   }
-  if (t === 'INPUT_VALIDATION_ERROR') {
+  if (t === "INPUT_VALIDATION_ERROR") {
     return {
-      kind: 'input_validation',
-      field: typeof o.field === 'string' ? o.field : undefined,
-      detail: typeof o.detail === 'string' ? o.detail : undefined,
+      kind: "input_validation",
+      field: typeof o.field === "string" ? o.field : undefined,
+      detail: typeof o.detail === "string" ? o.detail : undefined,
     };
   }
   return null;
@@ -411,26 +411,24 @@ export function parseServiceError(error: unknown): ParsedServiceError | null {
 
 export function getServiceErrorMessage(parsed: ParsedServiceError): string {
   switch (parsed.kind) {
-    case 'external_service':
+    case "external_service":
       return (
         parsed.detail ||
-        `${parsed.service} is temporarily unavailable${parsed.retryable ? '. Try again.' : '.'}`
+        `${parsed.service} is temporarily unavailable${parsed.retryable ? ". Try again." : "."}`
       );
-    case 'storage':
+    case "storage":
       return parsed.detail || `Storage ${parsed.operation} failed.`;
-    case 'input_validation':
-      return parsed.detail || 'Invalid input.';
+    case "input_validation":
+      return parsed.detail || "Invalid input.";
     default:
-      return 'Something went wrong.';
+      return "Something went wrong.";
   }
 }
 
 /**
  * Limit errors first, then structured service errors.
  */
-export function parseAppError(
-  error: unknown
-): ParsedLimitError | ParsedServiceError | null {
+export function parseAppError(error: unknown): ParsedLimitError | ParsedServiceError | null {
   const limit = parseLimitError(error);
   if (limit) return limit;
   return parseServiceError(error);

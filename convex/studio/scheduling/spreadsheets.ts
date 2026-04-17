@@ -30,7 +30,9 @@ export const scheduleSpreadsheet = action({
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
 
     const spreadsheet = await ctx.runMutation(internal.studio.spreadsheets.index.createInternal, {

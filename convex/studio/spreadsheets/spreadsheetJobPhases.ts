@@ -4,17 +4,14 @@
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import type { ActionCtx } from '../../_generated/server';
-import type { Id } from '../../_generated/dataModel';
-import { internal } from '../../_generated/api';
-import { packChunks, validateChunks } from '../../_agents/SpreadsheetGraph';
-import { env } from '../../_lib/env';
-import {
-  createJobLogger,
-  createErrorMetadata,
-} from '../../_agents/_shared/logging';
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import type { ActionCtx } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
+import { internal } from "../../_generated/api";
+import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
+import { env } from "../../_lib/env";
+import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import {
   MAP_PROMPTS,
   REDUCE_PROMPTS,
@@ -22,36 +19,36 @@ import {
   MAP_SYSTEM_PROMPT,
   COLLAPSE_SYSTEM_PROMPT,
   REDUCE_SYSTEM_PROMPT,
-} from '../../_agents/spreadsheet/prompts';
-import { sanitizeUserInput, allWithConcurrency } from '../../_agents/_shared/index';
-import { mergeModelKwargs } from '../../_agents/_shared/llm_factory';
-import { invokeStudioLlm, createLangSmithRunConfig } from '../_job/invokeStudioLlm';
+} from "../../_agents/spreadsheet/prompts";
+import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // CONFIGURATION
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.SPREADSHEET_MAP_CHUNK_TOKENS || '5000', 10),
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.SPREADSHEET_REDUCE_CHUNK_TOKENS || '15000', 10),
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.SPREADSHEET_MAP_CHUNK_TOKENS || "5000", 10),
+  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.SPREADSHEET_REDUCE_CHUNK_TOKENS || "15000", 10),
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
   COLLAPSE_CONCURRENCY: 5,
 } as const;
 
 export type SpreadsheetGenerationPhaseArgs = {
-  spreadsheetId: Id<'spreadsheets'>;
+  spreadsheetId: Id<"spreadsheets">;
   userId: string;
-  notebookId: Id<'notebooks'>;
-  documentIds: Id<'documents'>[];
+  notebookId: Id<"notebooks">;
+  documentIds: Id<"documents">[];
   spreadsheetType?: string;
   customPrompt?: string;
 };
 
 export type ProcessSpreadsheetMapChunkPhaseArgs = {
-  spreadsheetId: Id<'spreadsheets'>;
+  spreadsheetId: Id<"spreadsheets">;
   userId: string;
-  notebookId: Id<'notebooks'>;
+  notebookId: Id<"notebooks">;
   chunkIndex: number;
   totalChunks: number;
   chunk: string;
@@ -60,9 +57,9 @@ export type ProcessSpreadsheetMapChunkPhaseArgs = {
 };
 
 export type FinalizeSpreadsheetPhaseArgs = {
-  spreadsheetId: Id<'spreadsheets'>;
+  spreadsheetId: Id<"spreadsheets">;
   userId: string;
-  notebookId: Id<'notebooks'>;
+  notebookId: Id<"notebooks">;
   spreadsheetType: string;
   customPrompt: string;
 };
@@ -77,8 +74,8 @@ function createMapLLM(): ChatTogetherAI {
     model: env.FAST_LLM,
     temperature: 0.3,
     timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, 'fast'),
-    maxTokens: parseInt(env.SPREADSHEET_MAP_MAX_OUTPUT_TOKENS || '4096', 10),
+    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
+    maxTokens: parseInt(env.SPREADSHEET_MAP_MAX_OUTPUT_TOKENS || "4096", 10),
   });
 }
 
@@ -88,8 +85,8 @@ function createReduceLLM(): ChatTogetherAI {
     model: env.SMART_LLM,
     temperature: 0.5,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: parseInt(env.SPREADSHEET_REDUCE_MAX_OUTPUT_TOKENS || '32000', 10),
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, 'smart'),
+    maxTokens: parseInt(env.SPREADSHEET_REDUCE_MAX_OUTPUT_TOKENS || "32000", 10),
+    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
   });
 }
 
@@ -98,13 +95,13 @@ function createReduceLLM(): ChatTogetherAI {
 // ============================================================
 
 function getMessageContent(response: unknown): string {
-  if (typeof response === 'object' && response !== null) {
+  if (typeof response === "object" && response !== null) {
     const msg = response as { content?: unknown };
-    if (typeof msg.content === 'string') {
+    if (typeof msg.content === "string") {
       return msg.content;
     }
-    if (typeof msg.content === 'object' && msg.content !== null) {
-      if (typeof (msg.content as { toString?: () => string }).toString === 'function') {
+    if (typeof msg.content === "object" && msg.content !== null) {
+      if (typeof (msg.content as { toString?: () => string }).toString === "function") {
         return (msg.content as { toString: () => string }).toString();
       }
     }
@@ -120,14 +117,14 @@ function cleanCsvOutput(output: string): string {
   let cleaned = output.trim();
 
   // Remove markdown code blocks if present
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:csv)?\n?/, '').replace(/\n?```$/, '');
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:csv)?\n?/, "").replace(/\n?```$/, "");
   }
 
   cleaned = cleaned.trim();
 
   // Check if CSV is already properly quoted (heuristic: first line should start with quote)
-  const lines = cleaned.split('\n');
+  const lines = cleaned.split("\n");
   if (lines.length > 0 && lines[0].trim().startsWith('"')) {
     return cleaned;
   }
@@ -139,19 +136,19 @@ function cleanCsvOutput(output: string): string {
       if (!line.trim()) continue;
 
       const fields = parseCsvLine(line);
-      const quotedFields = fields.map(field => {
+      const quotedFields = fields.map((field) => {
         const escaped = field.replace(/"/g, '""');
         return `"${escaped}"`;
       });
 
-      fixedLines.push(quotedFields.join(','));
+      fixedLines.push(quotedFields.join(","));
     }
 
     if (fixedLines.length > 0) {
-      return fixedLines.join('\n');
+      return fixedLines.join("\n");
     }
   } catch (error) {
-    console.warn('[SpreadsheetJob] Failed to auto-format CSV, returning as-is:', error);
+    console.warn("[SpreadsheetJob] Failed to auto-format CSV, returning as-is:", error);
   }
 
   return cleaned;
@@ -159,7 +156,7 @@ function cleanCsvOutput(output: string): string {
 
 function parseCsvLine(line: string): string[] {
   const fields: string[] = [];
-  let currentField = '';
+  let currentField = "";
   let insideQuotes = false;
   let i = 0;
 
@@ -178,9 +175,9 @@ function parseCsvLine(line: string): string[] {
       continue;
     }
 
-    if (char === ',' && !insideQuotes) {
+    if (char === "," && !insideQuotes) {
       fields.push(currentField);
-      currentField = '';
+      currentField = "";
       i++;
       continue;
     }
@@ -199,124 +196,125 @@ function parseCsvLine(line: string): string[] {
 
 export async function runSpreadsheetGenerationPhase(
   ctx: ActionCtx,
-  args: SpreadsheetGenerationPhaseArgs,
+  args: SpreadsheetGenerationPhaseArgs
 ): Promise<void> {
-    "use node";
+  "use node";
 
-    const { spreadsheetId, userId, notebookId, documentIds, spreadsheetType, customPrompt } = args;
+  const { spreadsheetId, userId, notebookId, documentIds, spreadsheetType, customPrompt } = args;
 
-    // Initialize structured logger
-    const logger = createJobLogger({
-      jobType: 'spreadsheet',
-      jobId: spreadsheetId,
-      notebookId,
-      userId,
+  // Initialize structured logger
+  const logger = createJobLogger({
+    jobType: "spreadsheet",
+    jobId: spreadsheetId,
+    notebookId,
+    userId,
+  });
+
+  logger.jobStart({
+    spreadsheetType: spreadsheetType || "custom",
+    docCount: documentIds.length,
+  });
+
+  try {
+    // Phase: Initializing
+    logger.phaseStart("initializing", { progress: 5 });
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
+      spreadsheetId,
+      status: "generating",
+      metadata: {
+        phase: "initializing",
+        progress: 5,
+        currentStep: "Initializing...",
+      },
+    });
+    logger.phaseComplete("initializing");
+
+    // Phase: Loading documents
+    logger.phaseStart("loading_documents", { progress: 15, docCount: documentIds.length });
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
+      spreadsheetId,
+      status: "generating",
+      metadata: {
+        phase: "loading_documents",
+        progress: 15,
+        currentStep: "Loading documents...",
+      },
     });
 
-    logger.jobStart({
-      spreadsheetType: spreadsheetType || 'custom',
-      docCount: documentIds.length,
+    // Get document chunks
+    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+      documentIds,
     });
 
-    try {
-      // Phase: Initializing
-      logger.phaseStart('initializing', { progress: 5 });
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
+    // Extract content from chunk objects
+    const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
+
+    logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
+
+    // Validate and pack chunks
+    const validatedChunks = validateChunks(rawChunks);
+    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+
+    console.log(
+      `[SpreadsheetJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+    );
+
+    if (packedChunks.length === 0) {
+      throw new Error("No valid chunks to process");
+    }
+
+    // Initialize map phase metadata
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
+      spreadsheetId,
+      totalMapTasks: packedChunks.length,
+      spreadsheetType: spreadsheetType || "custom",
+      customPrompt: customPrompt || "",
+    });
+
+    // Schedule each map task as a separate action
+    for (let i = 0; i < packedChunks.length; i++) {
+      await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.processSpreadsheetMapChunk, {
         spreadsheetId,
-        status: 'generating',
-        metadata: {
-          phase: 'initializing',
-          progress: 5,
-          currentStep: 'Initializing...',
-        },
+        userId,
+        notebookId,
+        chunkIndex: i,
+        totalChunks: packedChunks.length,
+        chunk: packedChunks[i],
+        spreadsheetType: spreadsheetType || "custom",
+        customPrompt: customPrompt || "",
       });
-      logger.phaseComplete('initializing');
+      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+    }
 
-      // Phase: Loading documents
-      logger.phaseStart('loading_documents', { progress: 15, docCount: documentIds.length });
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
-        spreadsheetId,
-        status: 'generating',
-        metadata: {
-          phase: 'loading_documents',
-          progress: 15,
-          currentStep: 'Loading documents...',
-        },
-      });
+    logger.info("Map phase initialized", {
+      totalMapTasks: packedChunks.length,
+      chunkSizes: packedChunks.map((c) => c.length),
+    });
+  } catch (error) {
+    const errorMeta = createErrorMetadata(error, "initializing");
 
-      // Get document chunks
-      const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
-        documentIds,
-      });
+    logger.jobError(error, {
+      phase: "initializing",
+      errorType: errorMeta.type,
+      retryable: errorMeta.retryable,
+    });
 
-      // Extract content from chunk objects
-      const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
-
-      logger.phaseComplete('loading_documents', { chunkCount: rawChunks.length });
-
-      // Validate and pack chunks
-      const validatedChunks = validateChunks(rawChunks);
-      const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
-
-      console.log(`[SpreadsheetJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`);
-
-      if (packedChunks.length === 0) {
-        throw new Error('No valid chunks to process');
-      }
-
-      // Initialize map phase metadata
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
-        spreadsheetId,
-        totalMapTasks: packedChunks.length,
-        spreadsheetType: spreadsheetType || 'custom',
-        customPrompt: customPrompt || '',
-      });
-
-      // Schedule each map task as a separate action
-      for (let i = 0; i < packedChunks.length; i++) {
-        await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.processSpreadsheetMapChunk, {
-          spreadsheetId,
-          userId,
-          notebookId,
-          chunkIndex: i,
-          totalChunks: packedChunks.length,
-          chunk: packedChunks[i],
-          spreadsheetType: spreadsheetType || 'custom',
-          customPrompt: customPrompt || '',
-        });
-        console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
-      }
-
-      logger.info('Map phase initialized', {
-        totalMapTasks: packedChunks.length,
-        chunkSizes: packedChunks.map(c => c.length),
-      });
-
-    } catch (error) {
-      const errorMeta = createErrorMetadata(error, 'initializing');
-
-      logger.jobError(error, {
-        phase: 'initializing',
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.markSpreadsheetFailed, {
+      spreadsheetId,
+      error: errorMeta.message,
+      metadata: {
+        phase: "failed",
+        progress: 0,
+        failedAt: Date.now(),
+        errorPhase: "initializing",
         errorType: errorMeta.type,
         retryable: errorMeta.retryable,
-      });
+        stack: errorMeta.stackTrace,
+      },
+    });
 
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.markSpreadsheetFailed, {
-        spreadsheetId,
-        error: errorMeta.message,
-        metadata: {
-          phase: 'failed',
-          progress: 0,
-          failedAt: Date.now(),
-          errorPhase: 'initializing',
-          errorType: errorMeta.type,
-          retryable: errorMeta.retryable,
-          stack: errorMeta.stackTrace,
-        },
-      });
-
-      throw error;
-    }
+    throw error;
+  }
 }
 
 // ============================================================
@@ -325,102 +323,175 @@ export async function runSpreadsheetGenerationPhase(
 
 export async function runProcessSpreadsheetMapChunkPhase(
   ctx: ActionCtx,
-  args: ProcessSpreadsheetMapChunkPhaseArgs,
+  args: ProcessSpreadsheetMapChunkPhaseArgs
 ): Promise<void> {
-    "use node";
+  "use node";
 
-    const { spreadsheetId, userId, notebookId, chunkIndex, totalChunks, chunk, spreadsheetType, customPrompt } = args;
+  const {
+    spreadsheetId,
+    userId,
+    notebookId,
+    chunkIndex,
+    totalChunks,
+    chunk,
+    spreadsheetType,
+    customPrompt,
+  } = args;
 
-    const logger = createJobLogger({
-      jobType: 'spreadsheet',
-      jobId: spreadsheetId,
-      notebookId,
-      userId,
+  const logger = createJobLogger({
+    jobType: "spreadsheet",
+    jobId: spreadsheetId,
+    notebookId,
+    userId,
+  });
+
+  const chunkId = `[Chunk ${chunkIndex + 1}/${totalChunks}]`;
+  console.log(`[SpreadsheetJob] ${chunkId} Starting map processing`);
+
+  try {
+    // Check if spreadsheet still exists
+    const spreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, {
+      id: spreadsheetId,
+    });
+    if (!spreadsheet) {
+      console.log(`[SpreadsheetJob] ${chunkId} Spreadsheet deleted, skipping`);
+      return;
+    }
+
+    // Process with LLM (plain text output)
+    const llm = createMapLLM();
+
+    // If customPrompt is provided, use the custom template
+    // Otherwise, use the predefined template for the spreadsheet type
+    const promptTemplate =
+      customPrompt && customPrompt.trim()
+        ? MAP_PROMPTS["custom"]
+        : MAP_PROMPTS[spreadsheetType] || MAP_PROMPTS["custom"];
+    const prompt = promptTemplate
+      .replace("{chunk}", chunk)
+      .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
+
+    console.log(`[SpreadsheetJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
+
+    const startTime = Date.now();
+    const response = await invokeStudioLlm({
+      invoke: () =>
+        (llm as any).invoke(
+          [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          createLangSmithRunConfig({
+            runName: "SpreadsheetJob.MapProcess",
+            tags: ["agent", "spreadsheet", "map"],
+            metadata: {
+              chunkIndex,
+              spreadsheetType,
+              chunkLength: chunk.length,
+            },
+          })
+        ),
+      timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
+      phaseLabel: "SpreadsheetMap",
+      onRetry: (attempt, error) => {
+        console.log(`[SpreadsheetJob] ${chunkId} Retry attempt ${attempt}/3: ${error.message}`);
+      },
     });
 
-    const chunkId = `[Chunk ${chunkIndex + 1}/${totalChunks}]`;
-    console.log(`[SpreadsheetJob] ${chunkId} Starting map processing`);
+    const elapsed = Date.now() - startTime;
+    const mapOutput = getMessageContent(response);
 
-    try {
-      // Check if spreadsheet still exists
-      const spreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, { id: spreadsheetId });
-      if (!spreadsheet) {
-        console.log(`[SpreadsheetJob] ${chunkId} Spreadsheet deleted, skipping`);
-        return;
-      }
+    console.log(
+      `[SpreadsheetJob] ${chunkId} LLM completed in ${elapsed}ms, output: ${mapOutput.length} chars`
+    );
 
-      // Process with LLM (plain text output)
-      const llm = createMapLLM();
+    // Store result
+    const result = {
+      output: mapOutput,
+      processingTimeMs: elapsed,
+    };
 
-      // If customPrompt is provided, use the custom template
-      // Otherwise, use the predefined template for the spreadsheet type
-      const promptTemplate = (customPrompt && customPrompt.trim())
-        ? MAP_PROMPTS['custom']
-        : (MAP_PROMPTS[spreadsheetType] || MAP_PROMPTS['custom']);
-      const prompt = promptTemplate
-        .replace('{chunk}', chunk)
-        .replace('{customPrompt}', sanitizeUserInput(customPrompt || ''));
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
+      spreadsheetId,
+      chunkIndex,
+      result: JSON.stringify(result),
+    });
 
-      console.log(`[SpreadsheetJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
+    logger.info(`Map chunk completed`, {
+      chunkIndex,
+      elapsed,
+      outputLength: mapOutput.length,
+    });
 
-      const startTime = Date.now();
-      const response = await invokeStudioLlm({
-        invoke: () =>
-          (llm as any).invoke(
-            [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
-            createLangSmithRunConfig({
-              runName: 'SpreadsheetJob.MapProcess',
-              tags: ['agent', 'spreadsheet', 'map'],
-              metadata: {
-                chunkIndex,
-                spreadsheetType,
-                chunkLength: chunk.length,
-              },
-            })
-          ),
-        timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
-        phaseLabel: 'SpreadsheetMap',
-        onRetry: (attempt, error) => {
-          console.log(`[SpreadsheetJob] ${chunkId} Retry attempt ${attempt}/3: ${error.message}`);
-        },
-      });
+    // Check if all maps are complete
+    const updatedSpreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, {
+      id: spreadsheetId,
+    });
+    if (!updatedSpreadsheet) return;
 
-      const elapsed = Date.now() - startTime;
-      const mapOutput = getMessageContent(response);
+    const completedMaps = updatedSpreadsheet.metadata?.mapResults
+      ? Object.keys(updatedSpreadsheet.metadata.mapResults).length
+      : 0;
+    const totalMaps = updatedSpreadsheet.metadata?.totalMapTasks || totalChunks;
 
-      console.log(`[SpreadsheetJob] ${chunkId} LLM completed in ${elapsed}ms, output: ${mapOutput.length} chars`);
+    console.log(`[SpreadsheetJob] Map progress: ${completedMaps}/${totalMaps}`);
 
-      // Store result
-      const result = {
-        output: mapOutput,
-        processingTimeMs: elapsed,
-      };
-
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
+    if (completedMaps >= totalMaps) {
+      console.log(`[SpreadsheetJob] All map tasks complete, scheduling finalization`);
+      await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.finalizeSpreadsheetPhase, {
         spreadsheetId,
-        chunkIndex,
-        result: JSON.stringify(result),
+        userId,
+        notebookId,
+        spreadsheetType,
+        customPrompt,
       });
+    }
+  } catch (error) {
+    const errorMeta = createErrorMetadata(error, "map_processing");
 
-      logger.info(`Map chunk completed`, {
-        chunkIndex,
-        elapsed,
-        outputLength: mapOutput.length,
-      });
+    console.error(`[SpreadsheetJob] ${chunkId} FAILED:`, errorMeta.message);
 
-      // Check if all maps are complete
-      const updatedSpreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, { id: spreadsheetId });
-      if (!updatedSpreadsheet) return;
+    // Store error result
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
+      spreadsheetId,
+      chunkIndex,
+      result: JSON.stringify({
+        _error: true,
+        errorMessage: errorMeta.message,
+        isTimeout: errorMeta.type === "llm_timeout",
+        output: "",
+      }),
+    });
 
-      const completedMaps = updatedSpreadsheet.metadata?.mapResults
-        ? Object.keys(updatedSpreadsheet.metadata.mapResults).length
-        : 0;
-      const totalMaps = updatedSpreadsheet.metadata?.totalMapTasks || totalChunks;
+    logger.warn(`Map chunk failed`, {
+      chunkIndex,
+      error: errorMeta.message,
+      errorType: errorMeta.type,
+    });
 
-      console.log(`[SpreadsheetJob] Map progress: ${completedMaps}/${totalMaps}`);
+    // Check if we should still proceed with partial results
+    const spreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, {
+      id: spreadsheetId,
+    });
+    if (!spreadsheet) return;
 
-      if (completedMaps >= totalMaps) {
-        console.log(`[SpreadsheetJob] All map tasks complete, scheduling finalization`);
+    const completedMaps = spreadsheet.metadata?.mapResults
+      ? Object.keys(spreadsheet.metadata.mapResults).length
+      : 0;
+    const totalMaps = spreadsheet.metadata?.totalMapTasks || totalChunks;
+    const failedMaps = spreadsheet.metadata?.mapResults
+      ? Object.values(spreadsheet.metadata.mapResults).filter((r: any) => {
+          try {
+            const parsed = JSON.parse(r as string);
+            return parsed._error;
+          } catch {
+            return false;
+          }
+        }).length
+      : 0;
+
+    if (completedMaps >= totalMaps) {
+      const successCount = totalMaps - failedMaps;
+      console.log(`[SpreadsheetJob] All tasks done. Success: ${successCount}/${totalMaps}`);
+
+      if (successCount > 0) {
         await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.finalizeSpreadsheetPhase, {
           spreadsheetId,
           userId,
@@ -428,78 +499,20 @@ export async function runProcessSpreadsheetMapChunkPhase(
           spreadsheetType,
           customPrompt,
         });
-      }
-
-    } catch (error) {
-      const errorMeta = createErrorMetadata(error, 'map_processing');
-
-      console.error(`[SpreadsheetJob] ${chunkId} FAILED:`, errorMeta.message);
-
-      // Store error result
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
-        spreadsheetId,
-        chunkIndex,
-        result: JSON.stringify({
-          _error: true,
-          errorMessage: errorMeta.message,
-          isTimeout: errorMeta.type === 'llm_timeout',
-          output: '',
-        }),
-      });
-
-      logger.warn(`Map chunk failed`, {
-        chunkIndex,
-        error: errorMeta.message,
-        errorType: errorMeta.type,
-      });
-
-      // Check if we should still proceed with partial results
-      const spreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, { id: spreadsheetId });
-      if (!spreadsheet) return;
-
-      const completedMaps = spreadsheet.metadata?.mapResults
-        ? Object.keys(spreadsheet.metadata.mapResults).length
-        : 0;
-      const totalMaps = spreadsheet.metadata?.totalMapTasks || totalChunks;
-      const failedMaps = spreadsheet.metadata?.mapResults
-        ? Object.values(spreadsheet.metadata.mapResults).filter(
-          (r: any) => {
-            try {
-              const parsed = JSON.parse(r as string);
-              return parsed._error;
-            } catch {
-              return false;
-            }
-          }
-        ).length
-        : 0;
-
-      if (completedMaps >= totalMaps) {
-        const successCount = totalMaps - failedMaps;
-        console.log(`[SpreadsheetJob] All tasks done. Success: ${successCount}/${totalMaps}`);
-
-        if (successCount > 0) {
-          await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.finalizeSpreadsheetPhase, {
-            spreadsheetId,
-            userId,
-            notebookId,
-            spreadsheetType,
-            customPrompt,
-          });
-        } else {
-          await ctx.runMutation(internal.studio.jobMutations.spreadsheets.markSpreadsheetFailed, {
-            spreadsheetId,
-            error: 'All map tasks failed',
-            metadata: {
-              phase: 'failed',
-              errorPhase: 'map_processing',
-              errorType: 'llm_failure',
-              failedAt: Date.now(),
-            },
-          });
-        }
+      } else {
+        await ctx.runMutation(internal.studio.jobMutations.spreadsheets.markSpreadsheetFailed, {
+          spreadsheetId,
+          error: "All map tasks failed",
+          metadata: {
+            phase: "failed",
+            errorPhase: "map_processing",
+            errorType: "llm_failure",
+            failedAt: Date.now(),
+          },
+        });
       }
     }
+  }
 }
 
 // ============================================================
@@ -508,213 +521,225 @@ export async function runProcessSpreadsheetMapChunkPhase(
 
 export async function runFinalizeSpreadsheetPhase(
   ctx: ActionCtx,
-  args: FinalizeSpreadsheetPhaseArgs,
+  args: FinalizeSpreadsheetPhaseArgs
 ): Promise<void> {
-    "use node";
+  "use node";
 
-    const { spreadsheetId, userId, notebookId, spreadsheetType, customPrompt } = args;
+  const { spreadsheetId, userId, notebookId, spreadsheetType, customPrompt } = args;
 
-    const logger = createJobLogger({
-      jobType: 'spreadsheet',
-      jobId: spreadsheetId,
-      notebookId,
-      userId,
+  const logger = createJobLogger({
+    jobType: "spreadsheet",
+    jobId: spreadsheetId,
+    notebookId,
+    userId,
+  });
+
+  logger.info("Starting finalization phase");
+
+  try {
+    // Get spreadsheet with map results
+    const spreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, {
+      id: spreadsheetId,
+    });
+    if (!spreadsheet) {
+      console.log("[SpreadsheetJob] Spreadsheet deleted during finalization");
+      return;
+    }
+
+    const mapResults = (spreadsheet.metadata?.mapResults as Record<string, string>) || {};
+
+    // Separate successful and failed results
+    const allOutputs: string[] = [];
+    const failedCount = { count: 0 };
+
+    for (const [idx, resultJson] of Object.entries(mapResults)) {
+      try {
+        const parsed = JSON.parse(resultJson);
+        if (parsed._error) {
+          failedCount.count++;
+        } else if (parsed.output) {
+          allOutputs.push(parsed.output);
+        }
+      } catch {
+        failedCount.count++;
+      }
+    }
+
+    console.log(
+      `[SpreadsheetJob] Finalization: ${allOutputs.length} outputs collected, ${failedCount.count} failed chunks`
+    );
+
+    if (allOutputs.length === 0) {
+      throw new Error("No successful outputs generated from any chunk");
+    }
+
+    // Update status for collapsing
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
+      spreadsheetId,
+      status: "generating",
+      metadata: {
+        phase: "collapsing",
+        progress: 70,
+        currentStep: "Consolidating data...",
+      },
     });
 
-    logger.info('Starting finalization phase');
+    // Stage 1: Collapse (if needed)
+    let collapsedOutputs: string[];
 
-    try {
-      // Get spreadsheet with map results
-      const spreadsheet = await ctx.runQuery(internal.studio.spreadsheets.index.getInternal, { id: spreadsheetId });
-      if (!spreadsheet) {
-        console.log('[SpreadsheetJob] Spreadsheet deleted during finalization');
-        return;
+    // Estimate total tokens
+    const estimateTokens = (text: string) => Math.ceil(text.length / 3);
+    const totalTokens = allOutputs.reduce((sum, s) => sum + estimateTokens(s), 0);
+
+    if (totalTokens <= CONFIG.REDUCE_CHUNK_SIZE_TOKENS || allOutputs.length <= 2) {
+      console.log(
+        `[SpreadsheetJob] Skipping collapse (${totalTokens} tokens, ${allOutputs.length} outputs)`
+      );
+      collapsedOutputs = allOutputs;
+    } else {
+      console.log(
+        `[SpreadsheetJob] Collapsing ${allOutputs.length} outputs (${totalTokens} tokens)`
+      );
+      collapsedOutputs = await recursiveCollapse(allOutputs, spreadsheetType, customPrompt);
+    }
+
+    // Update status for reduce
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
+      spreadsheetId,
+      status: "generating",
+      metadata: {
+        phase: "generating_csv",
+        progress: 80,
+        currentStep: "Generating spreadsheet...",
+      },
+    });
+
+    // Stage 2: Reduce (Generate CSV)
+    const reduceLLM = createReduceLLM();
+    const combined = collapsedOutputs.join("\n\n---\n\n");
+
+    // Get the reduce prompt based on spreadsheet type
+    const reducePromptTemplate =
+      customPrompt && customPrompt.trim()
+        ? REDUCE_PROMPTS["custom"]
+        : REDUCE_PROMPTS[spreadsheetType] || REDUCE_PROMPTS["custom"];
+    const prompt = reducePromptTemplate
+      .replace("{spreadsheetType}", spreadsheetType)
+      .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""))
+      .replace("{content}", combined);
+
+    console.log(`[SpreadsheetJob] Reduce prompt: ${prompt.length} chars`);
+
+    const startTime = Date.now();
+    const response = await invokeStudioLlm({
+      invoke: () =>
+        (reduceLLM as any).invoke(
+          [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          createLangSmithRunConfig({
+            runName: "SpreadsheetJob.Reduce",
+            tags: ["agent", "spreadsheet", "reduce"],
+            metadata: {
+              spreadsheetType,
+              collapsedOutputsCount: collapsedOutputs.length,
+            },
+          })
+        ),
+      timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+      phaseLabel: "SpreadsheetReduce",
+    });
+
+    const rawContent = getMessageContent(response);
+    let finalOutput = cleanCsvOutput(rawContent);
+
+    // Handle truncation
+    const responseAny = response as any;
+    const metadata = responseAny.response_metadata || {};
+    const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;
+
+    if (finishReason === "length") {
+      console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
+      const lastNewline = finalOutput.lastIndexOf("\n");
+      if (lastNewline > 0) {
+        finalOutput = finalOutput.substring(0, lastNewline);
       }
+    }
 
-      const mapResults = spreadsheet.metadata?.mapResults as Record<string, string> || {};
+    const elapsed = Date.now() - startTime;
+    console.log(
+      `[SpreadsheetJob] Reduce completed in ${elapsed}ms, output: ${finalOutput.length} chars`
+    );
 
-      // Separate successful and failed results
-      const allOutputs: string[] = [];
-      const failedCount = { count: 0 };
+    // Update status for finalizing
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
+      spreadsheetId,
+      status: "generating",
+      metadata: {
+        phase: "finalizing",
+        progress: 90,
+        currentStep: "Saving results...",
+      },
+    });
 
-      for (const [idx, resultJson] of Object.entries(mapResults)) {
-        try {
-          const parsed = JSON.parse(resultJson);
-          if (parsed._error) {
-            failedCount.count++;
-          } else if (parsed.output) {
-            allOutputs.push(parsed.output);
-          }
-        } catch {
-          failedCount.count++;
-        }
+    // Generate title from first chunk
+    let title = "Spreadsheet";
+    if (allOutputs.length > 0) {
+      try {
+        title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
+          chunk: allOutputs[0],
+        });
+      } catch (e) {
+        console.log("[SpreadsheetJob] Title generation failed, using default");
       }
+    }
 
-      console.log(`[SpreadsheetJob] Finalization: ${allOutputs.length} outputs collected, ${failedCount.count} failed chunks`);
-
-      if (allOutputs.length === 0) {
-        throw new Error('No successful outputs generated from any chunk');
-      }
-
-      // Update status for collapsing
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
-        spreadsheetId,
-        status: 'generating',
-        metadata: {
-          phase: 'collapsing',
-          progress: 70,
-          currentStep: 'Consolidating data...',
-        },
-      });
-
-      // Stage 1: Collapse (if needed)
-      let collapsedOutputs: string[];
-
-      // Estimate total tokens
-      const estimateTokens = (text: string) => Math.ceil(text.length / 3);
-      const totalTokens = allOutputs.reduce((sum, s) => sum + estimateTokens(s), 0);
-
-      if (totalTokens <= CONFIG.REDUCE_CHUNK_SIZE_TOKENS || allOutputs.length <= 2) {
-        console.log(`[SpreadsheetJob] Skipping collapse (${totalTokens} tokens, ${allOutputs.length} outputs)`);
-        collapsedOutputs = allOutputs;
-      } else {
-        console.log(`[SpreadsheetJob] Collapsing ${allOutputs.length} outputs (${totalTokens} tokens)`);
-        collapsedOutputs = await recursiveCollapse(allOutputs, spreadsheetType, customPrompt);
-      }
-
-      // Update status for reduce
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
-        spreadsheetId,
-        status: 'generating',
-        metadata: {
-          phase: 'generating_csv',
-          progress: 80,
-          currentStep: 'Generating spreadsheet...',
-        },
-      });
-
-      // Stage 2: Reduce (Generate CSV)
-      const reduceLLM = createReduceLLM();
-      const combined = collapsedOutputs.join('\n\n---\n\n');
-
-      // Get the reduce prompt based on spreadsheet type
-      const reducePromptTemplate = (customPrompt && customPrompt.trim())
-        ? REDUCE_PROMPTS['custom']
-        : (REDUCE_PROMPTS[spreadsheetType] || REDUCE_PROMPTS['custom']);
-      const prompt = reducePromptTemplate
-        .replace('{spreadsheetType}', spreadsheetType)
-        .replace('{customPrompt}', sanitizeUserInput(customPrompt || ''))
-        .replace('{content}', combined);
-
-      console.log(`[SpreadsheetJob] Reduce prompt: ${prompt.length} chars`);
-
-      const startTime = Date.now();
-      const response = await invokeStudioLlm({
-        invoke: () =>
-          (reduceLLM as any).invoke(
-            [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
-            createLangSmithRunConfig({
-              runName: 'SpreadsheetJob.Reduce',
-              tags: ['agent', 'spreadsheet', 'reduce'],
-              metadata: {
-                spreadsheetType,
-                collapsedOutputsCount: collapsedOutputs.length,
-              },
-            })
-          ),
-        timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-        phaseLabel: 'SpreadsheetReduce',
-      });
-
-      const rawContent = getMessageContent(response);
-      let finalOutput = cleanCsvOutput(rawContent);
-
-      // Handle truncation
-      const responseAny = response as any;
-      const metadata = responseAny.response_metadata || {};
-      const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;
-
-      if (finishReason === 'length') {
-        console.log('[SpreadsheetJob] CSV may be truncated, trimming incomplete last row');
-        const lastNewline = finalOutput.lastIndexOf('\n');
-        if (lastNewline > 0) {
-          finalOutput = finalOutput.substring(0, lastNewline);
-        }
-      }
-
-      const elapsed = Date.now() - startTime;
-      console.log(`[SpreadsheetJob] Reduce completed in ${elapsed}ms, output: ${finalOutput.length} chars`);
-
-      // Update status for finalizing
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.updateSpreadsheetStatus, {
-        spreadsheetId,
-        status: 'generating',
-        metadata: {
-          phase: 'finalizing',
-          progress: 90,
-          currentStep: 'Saving results...',
-        },
-      });
-
-      // Generate title from first chunk
-      let title = 'Spreadsheet';
-      if (allOutputs.length > 0) {
-        try {
-          title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-            chunk: allOutputs[0],
-          });
-        } catch (e) {
-          console.log('[SpreadsheetJob] Title generation failed, using default');
-        }
-      }
-
-      // Save results
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.saveSpreadsheetResults, {
-        spreadsheetId,
-        spreadsheet: finalOutput,
-        metadata: {
-          title,
-          phase: 'completed',
-          progress: 100,
-          completedAt: Date.now(),
-          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-          mapFailedCount: failedCount.count,
-        },
-      });
-
-      // Clear intermediate data
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.clearSpreadsheetMapData, { spreadsheetId });
-
-      logger.jobComplete({
+    // Save results
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.saveSpreadsheetResults, {
+      spreadsheetId,
+      spreadsheet: finalOutput,
+      metadata: {
         title,
-        outputLength: finalOutput.length,
-        mapSuccess: Object.keys(mapResults).length - failedCount.count,
-        mapFailed: failedCount.count,
-      });
+        phase: "completed",
+        progress: 100,
+        completedAt: Date.now(),
+        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+        mapFailedCount: failedCount.count,
+      },
+    });
 
-    } catch (error) {
-      const errorMeta = createErrorMetadata(error, 'finalization');
+    // Clear intermediate data
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.clearSpreadsheetMapData, {
+      spreadsheetId,
+    });
 
-      logger.jobError(error, {
-        phase: 'finalization',
+    logger.jobComplete({
+      title,
+      outputLength: finalOutput.length,
+      mapSuccess: Object.keys(mapResults).length - failedCount.count,
+      mapFailed: failedCount.count,
+    });
+  } catch (error) {
+    const errorMeta = createErrorMetadata(error, "finalization");
+
+    logger.jobError(error, {
+      phase: "finalization",
+      errorType: errorMeta.type,
+      retryable: errorMeta.retryable,
+    });
+
+    await ctx.runMutation(internal.studio.jobMutations.spreadsheets.markSpreadsheetFailed, {
+      spreadsheetId,
+      error: errorMeta.message,
+      metadata: {
+        phase: "failed",
+        errorPhase: "finalization",
         errorType: errorMeta.type,
         retryable: errorMeta.retryable,
-      });
+        failedAt: Date.now(),
+      },
+    });
 
-      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.markSpreadsheetFailed, {
-        spreadsheetId,
-        error: errorMeta.message,
-        metadata: {
-          phase: 'failed',
-          errorPhase: 'finalization',
-          errorType: errorMeta.type,
-          retryable: errorMeta.retryable,
-          failedAt: Date.now(),
-        },
-      });
-
-      throw error;
-    }
+    throw error;
+  }
 }
 
 // ============================================================
@@ -761,14 +786,15 @@ async function recursiveCollapse(
   const collapsed = await allWithConcurrency(
     groups.map((group, idx) => {
       return async () => {
-        const combined = group.join('\n\n---\n\n');
-        const collapsePromptTemplate = (customPrompt && customPrompt.trim())
-          ? COLLAPSE_PROMPTS['custom']
-          : (COLLAPSE_PROMPTS[spreadsheetType] || COLLAPSE_PROMPTS['custom']);
+        const combined = group.join("\n\n---\n\n");
+        const collapsePromptTemplate =
+          customPrompt && customPrompt.trim()
+            ? COLLAPSE_PROMPTS["custom"]
+            : COLLAPSE_PROMPTS[spreadsheetType] || COLLAPSE_PROMPTS["custom"];
 
         const prompt = collapsePromptTemplate
-          .replace('{content}', combined)
-          .replace('{customPrompt}', sanitizeUserInput(customPrompt || ''));
+          .replace("{content}", combined)
+          .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
 
         try {
           const response = await invokeStudioLlm({
@@ -776,15 +802,15 @@ async function recursiveCollapse(
               (reduceLLM as any).invoke(
                 [new SystemMessage(COLLAPSE_SYSTEM_PROMPT), new HumanMessage(prompt)],
                 createLangSmithRunConfig({
-                  runName: 'SpreadsheetJob.CollapseGroup',
-                  tags: ['agent', 'spreadsheet', 'collapse'],
+                  runName: "SpreadsheetJob.CollapseGroup",
+                  tags: ["agent", "spreadsheet", "collapse"],
                   metadata: {
                     fragmentCount: group.length,
                   },
                 })
               ),
             timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-            phaseLabel: 'CollapseGroup',
+            phaseLabel: "CollapseGroup",
           });
 
           return getMessageContent(response);

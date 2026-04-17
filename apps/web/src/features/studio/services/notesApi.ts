@@ -1,20 +1,20 @@
-import type { Note } from '@/shared/types/index';
-import { getReportSubtitle, normalizeReportTypeId } from '@/shared/types/reportTypes';
-import { getSpreadsheetTypeLabel } from './spreadsheetsApi';
-import { pickStudioGenerationFields } from '../utils/studioGenerationLabels';
-import { useQuery } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
+import type { Note } from "@/shared/types/index";
+import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
+import { getSpreadsheetTypeLabel } from "./spreadsheetsApi";
+import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
 function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
   const maybeWrapped = rawData?.nodeData?.nodeData ?? rawData?.nodeData ?? rawData;
-  const normalized = (maybeWrapped && typeof maybeWrapped === 'object') ? { ...maybeWrapped } : {};
+  const normalized = maybeWrapped && typeof maybeWrapped === "object" ? { ...maybeWrapped } : {};
 
-  if (typeof normalized.topic !== 'string' || normalized.topic.trim().length === 0) {
-    normalized.topic = fallbackTitle || 'Mind Map';
+  if (typeof normalized.topic !== "string" || normalized.topic.trim().length === 0) {
+    normalized.topic = fallbackTitle || "Mind Map";
   }
-  if (typeof normalized.id !== 'string' || normalized.id.trim().length === 0) {
-    normalized.id = 'root';
+  if (typeof normalized.id !== "string" || normalized.id.trim().length === 0) {
+    normalized.id = "root";
   }
 
   return normalized;
@@ -27,16 +27,16 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
   const { _type } = dbNote;
 
   switch (_type) {
-    case 'report':
+    case "report":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getReportPreview(dbNote),
-        type: 'report',
-        content: dbNote.content || '',
+        type: "report",
+        content: dbNote.content || "",
         status: dbNote.status,
         metadata: {
-          reportType: dbNote.reportType || dbNote.metadata?.reportType || 'custom',
+          reportType: dbNote.reportType || dbNote.metadata?.reportType || "custom",
           documentIds: dbNote.metadata?.documentIds || [],
           error: dbNote.metadata?.error,
           chunksProcessed: dbNote.metadata?.chunksProcessed,
@@ -44,16 +44,16 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case 'flashcard':
+    case "flashcard":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getFlashcardPreview(dbNote),
-        type: 'flashcard',
+        type: "flashcard",
         flashcards: dbNote.cardsData || [],
         status: dbNote.status,
         metadata: {
-          difficulty: dbNote.metadata?.difficulty || 'medium',
+          difficulty: dbNote.metadata?.difficulty || "medium",
           cardCount: dbNote.cardsData?.length || 0,
           topic: dbNote.metadata?.topic,
           error: dbNote.metadata?.error,
@@ -61,30 +61,30 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case 'quiz':
+    case "quiz":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getQuizPreview(dbNote),
-        type: 'quiz',
+        type: "quiz",
         questions: dbNote.questionsData || [],
         status: dbNote.status,
         metadata: {
           questionCount: dbNote.questionsData?.length || 0,
-          difficulty: dbNote.metadata?.difficulty || 'medium',
+          difficulty: dbNote.metadata?.difficulty || "medium",
           focusArea: dbNote.metadata?.focusArea,
           error: dbNote.metadata?.error,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
 
-    case 'mindmap':
+    case "mindmap": {
       const nodeData = normalizeMindMapNodeData(dbNote.data, dbNote.title);
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getMindMapPreview(dbNote),
-        type: 'mindmap',
+        type: "mindmap",
         mindMapData: { nodeData },
         content: JSON.stringify(dbNote.data),
         status: dbNote.status,
@@ -93,30 +93,31 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
+    }
 
-    case 'audioOverview':
+    case "audioOverview":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getAudioOverviewPreview(dbNote),
-        type: 'audioOverview',
-        audioUrl: dbNote.audioUrl || '',
-        transcript: dbNote.transcript || '',
+        type: "audioOverview",
+        audioUrl: dbNote.audioUrl || "",
+        transcript: dbNote.transcript || "",
         status: dbNote.status,
         metadata: dbNote.metadata,
       };
 
-    case 'slides':
+    case "slides":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getSlidesPreview(dbNote),
-        type: 'slides',
-        slides: Array.isArray(dbNote.data) ? dbNote.data : (dbNote.data?.slides || []),
+        type: "slides",
+        slides: Array.isArray(dbNote.data) ? dbNote.data : dbNote.data?.slides || [],
         status: dbNote.status,
         metadata: {
-          slideType: dbNote.metadata?.slideType || 'detailed_deck',
-          deckLength: dbNote.metadata?.deckLength || 'default',
+          slideType: dbNote.metadata?.slideType || "detailed_deck",
+          deckLength: dbNote.metadata?.deckLength || "default",
           slideCount: dbNote.slideCount || 0,
           customPrompt: dbNote.metadata?.customPrompt,
           error: dbNote.metadata?.error,
@@ -124,16 +125,16 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case 'spreadsheet':
+    case "spreadsheet":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getSpreadsheetPreview(dbNote),
-        type: 'spreadsheet',
-        content: typeof dbNote.data === 'string' ? dbNote.data : (dbNote.data?.content || ''),
+        type: "spreadsheet",
+        content: typeof dbNote.data === "string" ? dbNote.data : dbNote.data?.content || "",
         status: dbNote.status,
         metadata: {
-          spreadsheetType: dbNote.metadata?.spreadsheetType || 'custom',
+          spreadsheetType: dbNote.metadata?.spreadsheetType || "custom",
           documentIds: dbNote.metadata?.documentIds || [],
           error: dbNote.metadata?.error,
           customPrompt: dbNote.metadata?.customPrompt,
@@ -141,18 +142,18 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case 'writtenQuestions':
+    case "writtenQuestions":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getWrittenQuestionsPreview(dbNote),
-        type: 'writtenQuestions',
+        type: "writtenQuestions",
         questions: dbNote.questionsData || [],
         status: dbNote.status,
         metadata: {
           questionCount: dbNote.questionsData?.length || 0,
-          difficulty: dbNote.metadata?.difficulty || 'medium',
-          questionType: dbNote.questionType || 'short',
+          difficulty: dbNote.metadata?.difficulty || "medium",
+          questionType: dbNote.questionType || "short",
           focusArea: dbNote.metadata?.focusArea,
           totalPoints: dbNote.metadata?.totalPoints,
           error: dbNote.metadata?.error,
@@ -160,13 +161,13 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case 'note':
+    case "note":
       return {
         id: dbNote._id,
         title: dbNote.title,
         preview: getNotePreview(dbNote),
-        type: 'note',
-        noteType: dbNote.type || 'chat',
+        type: "note",
+        noteType: dbNote.type || "chat",
         content: dbNote.content,
         messages: dbNote.messages,
         status: dbNote.status,
@@ -187,74 +188,79 @@ function mapDatabaseNoteToNote(dbNote: any): Note {
  * Helper functions for preview text generation
  */
 function capitalizeDifficulty(difficulty: string | undefined): string {
-  const d = (difficulty || 'medium').toLowerCase();
+  const d = (difficulty || "medium").toLowerCase();
   return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
 function getReportPreview(dbNote: any): string {
-  const reportType = normalizeReportTypeId(dbNote.reportType || dbNote.metadata?.reportType || 'custom');
+  const reportType = normalizeReportTypeId(
+    dbNote.reportType || dbNote.metadata?.reportType || "custom"
+  );
   const subtitle = getReportSubtitle(reportType);
-  if (dbNote.status === 'generating') return subtitle;
-  if (dbNote.status === 'failed') return `${subtitle} • Failed`;
+  if (dbNote.status === "generating") return subtitle;
+  if (dbNote.status === "failed") return `${subtitle} • Failed`;
   return subtitle;
 }
 
 function getFlashcardPreview(dbNote: any): string {
   const count = dbNote.cardsData?.length || 0;
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
-  if (dbNote.status === 'generating') return `${count} Flashcard${count !== 1 ? 's' : ''} · ${difficulty}`;
-  if (dbNote.status === 'failed') return `${count} Flashcards · ${difficulty} · Failed`;
-  return `${count} Flashcard${count !== 1 ? 's' : ''} · ${difficulty}`;
+  if (dbNote.status === "generating")
+    return `${count} Flashcard${count !== 1 ? "s" : ""} · ${difficulty}`;
+  if (dbNote.status === "failed") return `${count} Flashcards · ${difficulty} · Failed`;
+  return `${count} Flashcard${count !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
 function getQuizPreview(dbNote: any): string {
   const count = dbNote.questionsData?.length || 0;
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
-  if (dbNote.status === 'generating') return `${count} Question${count !== 1 ? 's' : ''} · ${difficulty}`;
-  if (dbNote.status === 'failed') return `${count} Questions · ${difficulty} · Failed`;
-  return `${count} Question${count !== 1 ? 's' : ''} · ${difficulty}`;
+  if (dbNote.status === "generating")
+    return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
+  if (dbNote.status === "failed") return `${count} Questions · ${difficulty} · Failed`;
+  return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
 function getMindMapPreview(dbNote: any): string {
-  if (dbNote.status === 'generating') return 'Mind Map';
-  if (dbNote.status === 'failed') return 'Mind Map • Failed';
-  return 'Mind Map';
+  if (dbNote.status === "generating") return "Mind Map";
+  if (dbNote.status === "failed") return "Mind Map • Failed";
+  return "Mind Map";
 }
 
 function getAudioOverviewPreview(dbNote: any): string {
-  if (dbNote.status === 'generating') return 'Audio Overview';
-  if (dbNote.status === 'failed') return 'Audio Overview • Failed';
-  return 'Audio Overview';
+  if (dbNote.status === "generating") return "Audio Overview";
+  if (dbNote.status === "failed") return "Audio Overview • Failed";
+  return "Audio Overview";
 }
 
 function getSlidesPreview(dbNote: any): string {
   const count = dbNote.slideCount || 0;
-  if (dbNote.status === 'generating') return `${count} Slide${count !== 1 ? 's' : ''}`;
-  if (dbNote.status === 'failed') return `${count} Slides • Failed`;
-  return `${count} Slide${count !== 1 ? 's' : ''}`;
+  if (dbNote.status === "generating") return `${count} Slide${count !== 1 ? "s" : ""}`;
+  if (dbNote.status === "failed") return `${count} Slides • Failed`;
+  return `${count} Slide${count !== 1 ? "s" : ""}`;
 }
 
 function getSpreadsheetPreview(dbNote: any): string {
-  const spreadsheetType = dbNote.metadata?.spreadsheetType || 'custom';
+  const spreadsheetType = dbNote.metadata?.spreadsheetType || "custom";
   const typeLabel = getSpreadsheetTypeLabel(spreadsheetType);
-  if (dbNote.status === 'generating') return `Spreadsheet • ${typeLabel}`;
-  if (dbNote.status === 'failed') return `Spreadsheet • ${typeLabel} • Failed`;
+  if (dbNote.status === "generating") return `Spreadsheet • ${typeLabel}`;
+  if (dbNote.status === "failed") return `Spreadsheet • ${typeLabel} • Failed`;
   return `Spreadsheet • ${typeLabel}`;
 }
 
 function getWrittenQuestionsPreview(dbNote: any): string {
   const count = dbNote.questionsData?.length || 0;
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
-  if (dbNote.status === 'generating') return `${count} Question${count !== 1 ? 's' : ''} · ${difficulty}`;
-  if (dbNote.status === 'failed') return `${count} Questions · ${difficulty} · Failed`;
-  return `${count} Question${count !== 1 ? 's' : ''} · ${difficulty}`;
+  if (dbNote.status === "generating")
+    return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
+  if (dbNote.status === "failed") return `${count} Questions · ${difficulty} · Failed`;
+  return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
 function getNotePreview(dbNote: any): string {
-  const isChat = dbNote.type === 'chat';
-  if (isChat) return 'Note · Saved Chat';
+  const isChat = dbNote.type === "chat";
+  if (isChat) return "Note · Saved Chat";
   // Manual note
-  return dbNote.content?.substring(0, 100) || 'Empty note';
+  return dbNote.content?.substring(0, 100) || "Empty note";
 }
 
 /**
@@ -266,15 +272,10 @@ function getNotePreview(dbNote: any): string {
  * @param types - Optional filter to load only specific note types
  * @returns Array of Note objects
  */
-export function useNotes(
-  notebookId: string | null,
-  types?: string[]
-): Note[] {
+export function useNotes(notebookId: string | null, types?: string[]): Note[] {
   const notes = useQuery(
     api.notes.index.listAllByNotebook,
-    notebookId
-      ? { notebookId: notebookId as Id<'notebooks'>, types }
-      : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks">, types } : "skip"
   );
 
   // Map raw database notes to frontend Note interfaces
@@ -288,7 +289,7 @@ export function useNotes(
 export function useNoteCounts(notebookId: string | null) {
   return useQuery(
     api.notes.index.countByType,
-    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
 }
 
@@ -298,9 +299,7 @@ export function useNoteCounts(notebookId: string | null) {
 export function useNote(type: string, noteId: string | null) {
   const note = useQuery(
     api.notes.index.getById,
-    noteId && type
-      ? { type, id: noteId as any }
-      : 'skip'
+    noteId && type ? { type, id: noteId as any } : "skip"
   );
   return note ? mapDatabaseNoteToNote(note) : null;
 }
@@ -311,9 +310,7 @@ export function useNote(type: string, noteId: string | null) {
 export function useNotesLoading(notebookId: string | null): boolean {
   const notes = useQuery(
     api.notes.index.listAllByNotebook,
-    notebookId
-      ? { notebookId: notebookId as Id<'notebooks'> }
-      : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
 
   // Convex returns undefined while loading, null on error, and the data when ready
@@ -322,11 +319,11 @@ export function useNotesLoading(notebookId: string | null): boolean {
 
 // Re-export individual hooks for components that need them
 // These still use the optimized individual queries for single-type lookups
-export { useReports } from './reportsApi';
-export { useFlashcards } from './flashcardsApi';
-export { useQuizzes } from './quizzesApi';
-export { useMindMaps } from './mindMapApi';
-export { useAudioOverviews } from './audioApi';
-export { useWrittenQuestions } from './writtenQuestionsApi';
-export { useSlideDecks } from './slidesApi';
-export { useSpreadsheets } from './spreadsheetsApi';
+export { useReports } from "./reportsApi";
+export { useFlashcards } from "./flashcardsApi";
+export { useQuizzes } from "./quizzesApi";
+export { useMindMaps } from "./mindMapApi";
+export { useAudioOverviews } from "./audioApi";
+export { useWrittenQuestions } from "./writtenQuestionsApi";
+export { useSlideDecks } from "./slidesApi";
+export { useSpreadsheets } from "./spreadsheetsApi";

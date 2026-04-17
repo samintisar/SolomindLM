@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Globe, Loader2 } from 'lucide-react';
-import { useToast } from '@/shared/contexts/ToastContext';
+import React, { useState, useEffect } from "react";
+import { X, Globe, Loader2 } from "lucide-react";
+import { useToast } from "@/shared/contexts/ToastContext";
 
 interface UrlInputModalProps {
   isOpen: boolean;
@@ -16,12 +16,12 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({
   isUploading,
 }) => {
   const { error: showError } = useToast();
-  const [urlInput, setUrlInput] = useState('');
+  const [urlInput, setUrlInput] = useState("");
 
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
-      setUrlInput('');
+      setUrlInput("");
     }
   }, [isOpen]);
 
@@ -30,11 +30,11 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({
 
     const urls = urlInput
       .split(/\s+/)
-      .map(url => url.trim())
-      .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0 && (url.startsWith("http://") || url.startsWith("https://")));
 
     if (urls.length === 0) {
-      showError('Please enter at least one valid URL (starting with http:// or https://).');
+      showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;
     }
 
@@ -47,7 +47,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleUpload();
     }
@@ -66,7 +66,10 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({
             </div>
             <h2 className="text-xl font-bold font-sans">Add Website</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -102,7 +105,7 @@ Separate multiple URLs with spaces or new lines"
                   Adding...
                 </>
               ) : (
-                'Add Sources'
+                "Add Sources"
               )}
             </button>
           </div>

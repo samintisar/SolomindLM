@@ -1,26 +1,22 @@
-"use node"
+"use node";
 
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import {
-  createLangSmithRunConfig,
-  invokeWithRetry,
-  invokeWithTimeout,
-} from '../_shared/index.js';
-import type { JobLogger } from '../_shared/logging.js';
+import { createLangSmithRunConfig, invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
+import type { JobLogger } from "../_shared/logging.js";
 
-import { FLASHCARD_CONFIG } from './config.js';
-import { detectSimilarFlashcards, groupFlashcardsByTopic } from './flashcardHeuristics.js';
-import { formatFlashcardsAsText } from './formatFlashcards.js';
+import { FLASHCARD_CONFIG } from "./config.js";
+import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
+import { formatFlashcardsAsText } from "./formatFlashcards.js";
 import {
   COLLAPSE_SYSTEM_PROMPT,
   FlashcardArraySchema,
   REDUCE_SYSTEM_PROMPT,
   type FlashcardResponse,
-} from './prompts.js';
-import type { Flashcard } from './state.js';
-import { createStructuredLLM } from './structuredLlm.js';
+} from "./prompts.js";
+import type { Flashcard } from "./state.js";
+import { createStructuredLLM } from "./structuredLlm.js";
 
 export interface CollapseReduceDeps {
   smartLlm: ChatTogetherAI;
@@ -77,8 +73,8 @@ export async function collapseGroup(
   }
 
   deps.logger.info(`Collapsing ${group.length} outputs (${allCards.length} cards)`, {
-    agent: 'FlashcardGraph',
-    phase: 'collapse_group',
+    agent: "FlashcardGraph",
+    phase: "collapse_group",
     inputCount: group.length,
     mergedCardCount: allCards.length,
   });
@@ -90,7 +86,7 @@ export async function collapseGroup(
   const flashcardsText = formatFlashcardsAsText(allCards);
   const topicGuidance = topic
     ? `\n\nTopic Focus: ${topic} — prioritize cards aligned with this topic while maintaining diversity.`
-    : '';
+    : "";
 
   const prompt = `You are consolidating flashcard sets. Your task is to:
 1. Remove duplicate or highly similar flashcards
@@ -104,28 +100,30 @@ ${flashcardsText}
 Return the condensed flashcards as a JSON array with "front" and "back" fields.`;
 
   const structuredLlm = createStructuredLLM(deps.smartLlm, FlashcardArraySchema);
-  const response = await invokeWithRetry(
-    () => invokeWithTimeout(
-      () => structuredLlm.invoke([
-        new SystemMessage(COLLAPSE_SYSTEM_PROMPT),
-        new HumanMessage(prompt),
-      ], createLangSmithRunConfig({
-        runName: 'FlashcardGraph.CollapseGroup',
-        tags: ['agent', 'flashcard', 'collapse'],
-        metadata: {
-          inputCount: group.length,
-          mergedCardCount: allCards.length,
-        },
-      }) as unknown as Record<string, unknown>),
-      FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
-      'FlashcardCollapseGroup'
-    ),
+  const response = (await invokeWithRetry(
+    () =>
+      invokeWithTimeout(
+        () =>
+          structuredLlm.invoke(
+            [new SystemMessage(COLLAPSE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+            createLangSmithRunConfig({
+              runName: "FlashcardGraph.CollapseGroup",
+              tags: ["agent", "flashcard", "collapse"],
+              metadata: {
+                inputCount: group.length,
+                mergedCardCount: allCards.length,
+              },
+            }) as unknown as Record<string, unknown>
+          ),
+        FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
+        "FlashcardCollapseGroup"
+      ),
     {
       maxAttempts: 2,
       baseDelayMs: 1000,
     },
-    'FlashcardCollapseGroup'
-  ) as FlashcardResponse;
+    "FlashcardCollapseGroup"
+  )) as FlashcardResponse;
 
   return response.flashcards;
 }
@@ -138,8 +136,8 @@ export async function refineFlashcardSelection(
   topic?: string
 ): Promise<Flashcard[]> {
   deps.logger.info(`Selecting ${targetCount} best cards from ${flashcards.length}`, {
-    agent: 'FlashcardGraph',
-    phase: 'refine_selection',
+    agent: "FlashcardGraph",
+    phase: "refine_selection",
     totalFlashcards: flashcards.length,
     targetCount,
   });
@@ -147,19 +145,22 @@ export async function refineFlashcardSelection(
   const similarFlashcards = await detectSimilarFlashcards(flashcards);
 
   if (similarFlashcards.length > 0) {
-    deps.logger.info(`Detected ${similarFlashcards.length} potential duplicate groups - LLM will handle merging`, {
-      agent: 'FlashcardGraph',
-      phase: 'refine_similarity_detection',
-      duplicateGroups: similarFlashcards.length,
-      duplicates: similarFlashcards.slice(0, 5).map(d => ({
-        type: d.similarity,
-        reason: d.reason,
-        flashcards: d.flashcards.map(f => ({
-          front: f.front.substring(0, 60),
-          back: f.back.substring(0, 60),
+    deps.logger.info(
+      `Detected ${similarFlashcards.length} potential duplicate groups - LLM will handle merging`,
+      {
+        agent: "FlashcardGraph",
+        phase: "refine_similarity_detection",
+        duplicateGroups: similarFlashcards.length,
+        duplicates: similarFlashcards.slice(0, 5).map((d) => ({
+          type: d.similarity,
+          reason: d.reason,
+          flashcards: d.flashcards.map((f) => ({
+            front: f.front.substring(0, 60),
+            back: f.back.substring(0, 60),
+          })),
         })),
-      })),
-    });
+      }
+    );
   }
 
   const flashcardsText = formatFlashcardsAsText(flashcards);
@@ -190,7 +191,7 @@ If there are 6+ topics available, select 1-3 cards from each topic.
 Example: If you need 20 cards and have 5 topics, select 4 from each topic
 
 From the ${flashcards.length} flashcards below, select approximately ${targetCount}.
-${topic ? `User preference: ${topic} (but still maintain diversity)` : ''}
+${topic ? `User preference: ${topic} (but still maintain diversity)` : ""}
 
 Available flashcards:
 ${flashcardsText}
@@ -199,52 +200,54 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
 
   const structuredLlm = createStructuredLLM(deps.smartLlm, FlashcardArraySchema);
   const response = await invokeWithRetry(
-    () => invokeWithTimeout(
-      () => structuredLlm.invoke([
-        new SystemMessage(REDUCE_SYSTEM_PROMPT),
-        new HumanMessage(prompt),
-      ], createLangSmithRunConfig({
-        runName: 'FlashcardGraph.RefineSelection',
-        tags: ['agent', 'flashcard', 'reduce'],
-        metadata: {
-          targetCount,
-          difficulty,
-          topic: topic || 'none',
-          candidateCount: flashcards.length,
-        },
-      }) as unknown as Record<string, unknown>),
-      FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
-      'FlashcardRefineSelection'
-    ),
+    () =>
+      invokeWithTimeout(
+        () =>
+          structuredLlm.invoke(
+            [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+            createLangSmithRunConfig({
+              runName: "FlashcardGraph.RefineSelection",
+              tags: ["agent", "flashcard", "reduce"],
+              metadata: {
+                targetCount,
+                difficulty,
+                topic: topic || "none",
+                candidateCount: flashcards.length,
+              },
+            }) as unknown as Record<string, unknown>
+          ),
+        FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
+        "FlashcardRefineSelection"
+      ),
     {
       maxAttempts: 2,
       baseDelayMs: 1000,
     },
-    'FlashcardRefineSelection'
+    "FlashcardRefineSelection"
   );
 
   const selected = (response as FlashcardResponse).flashcards;
 
   deps.logger.info(`Refine selection complete: ${selected.length} cards`, {
-    agent: 'FlashcardGraph',
-    phase: 'refine_selection_complete',
+    agent: "FlashcardGraph",
+    phase: "refine_selection_complete",
     selectedCount: selected.length,
   });
 
   const topicGroups = groupFlashcardsByTopic(selected);
-  deps.logger.info('Topic distribution after refine', {
-    agent: 'FlashcardGraph',
-    phase: 'refine_topic_distribution',
+  deps.logger.info("Topic distribution after refine", {
+    agent: "FlashcardGraph",
+    phase: "refine_topic_distribution",
     topicDistribution: topicGroups,
   });
 
   if (selected.length === 0) {
     deps.logger.phaseError(
-      'refine_selection',
-      new Error('LLM returned empty selection - this should not happen with structured output'),
+      "refine_selection",
+      new Error("LLM returned empty selection - this should not happen with structured output"),
       {
-        agent: 'FlashcardGraph',
-        issue: 'llm_returned_empty',
+        agent: "FlashcardGraph",
+        issue: "llm_returned_empty",
         inputCount: flashcards.length,
         targetCount,
       }
@@ -254,8 +257,8 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
 
   if (selected.length > targetCount) {
     deps.logger.info(`Truncating to ${targetCount} (LLM returned more than requested)`, {
-      agent: 'FlashcardGraph',
-      phase: 'refine_selection_truncate',
+      agent: "FlashcardGraph",
+      phase: "refine_selection_truncate",
       selectedCount: selected.length,
       targetCount,
     });
@@ -263,15 +266,15 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
   }
 
   if (selected.length < targetCount) {
-    const remaining = flashcards.filter(f =>
-      !selected.some(s => s.front === f.front && s.back === f.back)
+    const remaining = flashcards.filter(
+      (f) => !selected.some((s) => s.front === f.front && s.back === f.back)
     );
     const needed = targetCount - selected.length;
 
     if (remaining.length > 0) {
       deps.logger.info(`Filling ${needed} more from remaining ${remaining.length}`, {
-        agent: 'FlashcardGraph',
-        phase: 'refine_selection_fill',
+        agent: "FlashcardGraph",
+        phase: "refine_selection_fill",
         selectedCount: selected.length,
         targetCount,
       });

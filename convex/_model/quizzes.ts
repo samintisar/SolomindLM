@@ -23,7 +23,10 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query.filter((q) => q.eq(q.field("userId"), userId)).order("desc").collect();
+    return await query
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .collect();
   }
   return await query.order("desc").collect();
 }
@@ -36,10 +39,7 @@ export type QuizCreate = {
   metadata?: unknown;
 };
 
-export async function createQuiz(
-  ctx: MutationCtx,
-  data: QuizCreate
-): Promise<Id<"quizzes">> {
+export async function createQuiz(ctx: MutationCtx, data: QuizCreate): Promise<Id<"quizzes">> {
   const now = Date.now();
   return await ctx.db.insert("quizzes", {
     userId: data.userId,
@@ -132,7 +132,7 @@ export async function patchQuiz(
       patch = {
         ...patch,
         metadata: {
-          ...(existing.metadata as Record<string, unknown> ?? {}),
+          ...((existing.metadata as Record<string, unknown>) ?? {}),
           ...(patch.metadata as Record<string, unknown>),
         },
       };
@@ -154,7 +154,8 @@ export async function patchQuizUserAnswer(
   const quiz = await getQuiz(ctx, quizId);
   if (!quiz) throw new Error("Quiz not found");
 
-  const existingUserAnswers = (quiz.metadata as { userAnswers?: Record<number, number> })?.userAnswers || {};
+  const existingUserAnswers =
+    (quiz.metadata as { userAnswers?: Record<number, number> })?.userAnswers || {};
 
   await ctx.db.patch("quizzes", quizId, {
     metadata: {
@@ -168,9 +169,6 @@ export async function patchQuizUserAnswer(
   });
 }
 
-export async function deleteQuiz(
-  ctx: MutationCtx,
-  quizId: Id<"quizzes">
-): Promise<void> {
+export async function deleteQuiz(ctx: MutationCtx, quizId: Id<"quizzes">): Promise<void> {
   await ctx.db.delete("quizzes", quizId);
 }

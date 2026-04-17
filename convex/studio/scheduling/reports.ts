@@ -29,7 +29,9 @@ export const scheduleReport = action({
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
 
     const report = await ctx.runMutation(internal.studio.reports.index.createInternal, {
@@ -56,6 +58,10 @@ export const scheduleReport = action({
       customPrompt: args.customPrompt,
     });
 
-    return { reportId, status: "generating", report: { _id: reportId, title: "Report", status: "generating" } };
+    return {
+      reportId,
+      status: "generating",
+      report: { _id: reportId, title: "Report", status: "generating" },
+    };
   },
 });

@@ -1,11 +1,11 @@
-"use node"
+"use node";
 
 import {
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
-} from '../_shared/index.js';
+} from "../_shared/index.js";
 
-import { FLASHCARD_CONFIG } from './config.js';
+import { FLASHCARD_CONFIG } from "./config.js";
 
 export function packChunks(
   chunks: string[],
@@ -15,7 +15,7 @@ export function packChunks(
     targetSize,
     minChunkLength: 50,
     maxChunkLength: 50000,
-    agentName: 'FlashcardGraph',
+    agentName: "FlashcardGraph",
   });
 }
 
@@ -24,6 +24,6 @@ export function validateChunks(chunks: string[]): string[] {
     targetSize: FLASHCARD_CONFIG.MAP_CHUNK_SIZE_TOKENS,
     minChunkLength: 50,
     maxChunkLength: 50000,
-    agentName: 'FlashcardGraph',
+    agentName: "FlashcardGraph",
   });
 }

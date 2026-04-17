@@ -15,9 +15,7 @@ export default defineSchema({
     isFeatured: v.optional(v.boolean()),
     folderId: v.optional(v.id("folders")),
     /** Overrides env CHAT_GROUNDING_MODE when set: async | sync | off */
-    chatGroundingMode: v.optional(
-      v.union(v.literal("async"), v.literal("sync"), v.literal("off"))
-    ),
+    chatGroundingMode: v.optional(v.union(v.literal("async"), v.literal("sync"), v.literal("off"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -60,8 +58,7 @@ export default defineSchema({
     icon: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   // Documents table
   documents: defineTable({
@@ -291,8 +288,7 @@ export default defineSchema({
     socraticThreadId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user_notebook", ["userId", "notebookId"]),
+  }).index("by_user_notebook", ["userId", "notebookId"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),
@@ -393,8 +389,7 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     processedAt: v.optional(v.number()),
     createdAt: v.number(),
-  })
-    .index("stripe_event", ["stripeEventId"]),
+  }).index("stripe_event", ["stripeEventId"]),
 
   stripePaymentHistory: defineTable({
     userId: v.id("users"),
@@ -421,16 +416,15 @@ export default defineSchema({
     windowStart: v.number(),
     windowEnd: v.number(),
   })
-    .index('by_user_endpoint', ['userId', 'endpoint'])
-    .index('by_user', ['userId']),
+    .index("by_user_endpoint", ["userId", "endpoint"])
+    .index("by_user", ["userId"]),
 
   // Cache versioning for invalidation
   cacheVersions: defineTable({
     agentType: v.string(), // 'flashcard', 'quiz', etc.
     version: v.string(), // 'v1', 'v2', etc.
     updatedAt: v.number(),
-  })
-    .index("by_agent", ["agentType"]),
+  }).index("by_agent", ["agentType"]),
 
   // Cache metrics tracking
   cacheMetrics: defineTable({

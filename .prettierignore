@@ -1,0 +1,5 @@
+convex/_generated
+node_modules
+dist
+.arcserve
+bun.lock

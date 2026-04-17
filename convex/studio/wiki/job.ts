@@ -13,7 +13,10 @@ import type { WikiArticle } from "../../_agents/wiki/prompts";
 
 const CHECKPOINT_V = 1 as const;
 
-function metadataWithCheckpoint(wiki: { metadata?: unknown } | null, checkpoint: Record<string, unknown> | null) {
+function metadataWithCheckpoint(
+  wiki: { metadata?: unknown } | null,
+  checkpoint: Record<string, unknown> | null
+) {
   const prev =
     wiki?.metadata && typeof wiki.metadata === "object" && !Array.isArray(wiki.metadata)
       ? { ...(wiki.metadata as Record<string, unknown>) }
@@ -69,9 +72,7 @@ function serializeErr(e: unknown) {
 
 async function isWikiRunActive(ctx: any, wikiId: any, runId: number): Promise<boolean> {
   const wiki = await ctx.runQuery(internal.studio.wiki.index.getInternal, { wikiId });
-  return Boolean(
-    wiki && wiki.status === "generating" && (wiki.generationRunId ?? 0) === runId
-  );
+  return Boolean(wiki && wiki.status === "generating" && (wiki.generationRunId ?? 0) === runId);
 }
 
 // ============================================================
@@ -99,7 +100,7 @@ export const regenerateWiki = internalAction({
       // Actions have no ctx.db — load documents via internal query (auth-checked).
       const documents = await ctx.runQuery(
         internal.documents.index.listDocumentsForNotebookRefresh,
-        { notebookId, userId },
+        { notebookId, userId }
       );
 
       // #region agent log
@@ -142,9 +143,7 @@ export const regenerateWiki = internalAction({
       }
 
       // Filter for completed documents only
-      const completedDocuments = documents.filter(
-        (doc: any) => doc.status === "completed"
-      );
+      const completedDocuments = documents.filter((doc: any) => doc.status === "completed");
 
       if (completedDocuments.length === 0) {
         if (!(await isWikiRunActive(ctx, wikiId, runId))) {
@@ -229,7 +228,9 @@ export const regenerateWiki = internalAction({
       }
 
       const wikiRow = await ctx.runQuery(internal.studio.wiki.index.getInternal, { wikiId });
-      const sourceExcerpt = chunks.join("\n\n---\n\n").slice(0, WIKI_CONFIG.MAX_RELEVANT_CONTENT_CHARS);
+      const sourceExcerpt = chunks
+        .join("\n\n---\n\n")
+        .slice(0, WIKI_CONFIG.MAX_RELEVANT_CONTENT_CHARS);
 
       const checkpoint = {
         v: CHECKPOINT_V,
@@ -273,7 +274,6 @@ export const regenerateWiki = internalAction({
         phase: "batched_synthesis_scheduled",
         conceptCount: concepts.length,
       };
-
     } catch (error) {
       // #region agent log
       agentDebugLog({
@@ -317,11 +317,10 @@ export const regenerateWikiSynthesizeBatch = internalAction({
         return { wikiId, skipped: true as const };
       }
 
-      const wiki: Record<string, unknown> | null =
-        (await ctx.runQuery(internal.studio.wiki.index.getInternal, { wikiId })) as Record<
-          string,
-          unknown
-        > | null;
+      const wiki: Record<string, unknown> | null = (await ctx.runQuery(
+        internal.studio.wiki.index.getInternal,
+        { wikiId }
+      )) as Record<string, unknown> | null;
       const meta =
         wiki?.metadata && typeof wiki.metadata === "object" && !Array.isArray(wiki.metadata)
           ? (wiki.metadata as Record<string, unknown>)
@@ -345,7 +344,9 @@ export const regenerateWikiSynthesizeBatch = internalAction({
       const state = checkpointBaseState(cp, { wikiId, notebookId, userId });
       const batchArticles = await wikiGraph.synthesizeConceptRange(state, start, end);
 
-      const prevArticles = Array.isArray(cp.conceptArticles) ? (cp.conceptArticles as WikiArticle[]) : [];
+      const prevArticles = Array.isArray(cp.conceptArticles)
+        ? (cp.conceptArticles as WikiArticle[])
+        : [];
       const nextCp: Record<string, unknown> = {
         ...cp,
         conceptArticles: [...prevArticles, ...batchArticles],

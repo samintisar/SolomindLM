@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { FolderItem } from '@/shared/types/index';
+import { useState, useCallback } from "react";
+import { FolderItem } from "@/shared/types/index";
 
 export interface UseFolderHandlersProps {
   onUpdateFolder?: (id: string, updates: Partial<FolderItem>) => void;
@@ -18,8 +18,7 @@ export interface UseFolderHandlersReturn {
   setFolderActiveMenuId: (id: string | null) => void;
 }
 
-export function useFolderHandlers({
-}: UseFolderHandlersProps = {}): UseFolderHandlersReturn {
+export function useFolderHandlers(_props: UseFolderHandlersProps = {}): UseFolderHandlersReturn {
   const [folderActiveMenuId, setFolderActiveMenuId] = useState<string | null>(null);
   const [folderCustomizingId, setFolderCustomizingId] = useState<string | null>(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);

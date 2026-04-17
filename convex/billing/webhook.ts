@@ -19,11 +19,7 @@ export const handleWebhook = internalAction({
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
     try {
-      const event = stripe.webhooks.constructEvent(
-        payload,
-        signature,
-        webhookSecret
-      );
+      const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 
       console.log(`[Stripe webhook] Event type: ${event.type}, ID: ${event.id}`);
 
@@ -61,13 +57,8 @@ async function handleCheckoutCompleted(
 ) {
   const session = event.data.object;
   const subscriptionId =
-    typeof session.subscription === "string"
-      ? session.subscription
-      : session.subscription?.id;
-  const customerId =
-    typeof session.customer === "string"
-      ? session.customer
-      : session.customer?.id;
+    typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+  const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
 
   // Fetch subscription from Stripe API first. We set subscriptionMetadata when
   // creating checkout (subscription_data.metadata), so userId/interval live
@@ -85,7 +76,12 @@ async function handleCheckoutCompleted(
     try {
       const customer = await stripe.customers.retrieve(customerId);
       // Check if customer is not deleted before accessing metadata
-      if ('deleted' in customer && !customer.deleted && 'metadata' in customer && customer.metadata?.convexUserId) {
+      if (
+        "deleted" in customer &&
+        !customer.deleted &&
+        "metadata" in customer &&
+        customer.metadata?.convexUserId
+      ) {
         userId = customer.metadata.convexUserId;
         console.log("[Stripe webhook] Resolved userId from customer metadata:", userId);
       }
@@ -106,7 +102,9 @@ async function handleCheckoutCompleted(
   }
 
   if (!interval) {
-    console.warn("[Stripe webhook] Missing interval in checkout session metadata, defaulting to 'month'");
+    console.warn(
+      "[Stripe webhook] Missing interval in checkout session metadata, defaulting to 'month'"
+    );
   }
 
   const item = subscription.items.data[0];
@@ -115,7 +113,7 @@ async function handleCheckoutCompleted(
   const amount = (price && "unit_amount" in price ? price.unit_amount : 0) ?? 0;
   const currency = (price && "currency" in price ? price.currency : "usd") ?? "usd";
   const intervalFromPrice =
-    (price && typeof price === "object" && "recurring" in price && price.recurring?.interval)
+    price && typeof price === "object" && "recurring" in price && price.recurring?.interval
       ? (price.recurring as { interval: string }).interval
       : (interval as string) || "month";
 
@@ -130,8 +128,7 @@ async function handleCheckoutCompleted(
   let periodEndSec = sub.current_period_end ?? 0;
   if (!periodEndSec && periodStartSec) {
     const isYearly = intervalFromPrice === "year";
-    periodEndSec =
-      periodStartSec + (isYearly ? 365 * 24 * 60 * 60 : 31 * 24 * 60 * 60);
+    periodEndSec = periodStartSec + (isYearly ? 365 * 24 * 60 * 60 : 31 * 24 * 60 * 60);
   }
   const subStatus = sub.status ?? "active";
   const cancelAtPeriodEnd = sub.cancel_at_period_end ?? false;
@@ -203,24 +200,21 @@ async function handleInvoicePaid(ctx: ActionCtx, event: { data: { object: any } 
     customer?: string | { id: string };
   };
   const subscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription?.id;
+    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
 
   if (!subscriptionId) return;
 
   // Resolve userId from our stripeSubscriptions table (we don't use the component DB).
-  const existing = await ctx.runQuery(
-    internal.billing.index.getByStripeSubscriptionIdInternal,
-    { stripeSubscriptionId: subscriptionId }
-  );
+  const existing = await ctx.runQuery(internal.billing.index.getByStripeSubscriptionIdInternal, {
+    stripeSubscriptionId: subscriptionId,
+  });
 
   if (!existing?.userId) return;
 
   const stripeCustomerId =
     typeof invoice.customer === "string"
       ? invoice.customer
-      : (invoice.customer as { id: string })?.id ?? "";
+      : ((invoice.customer as { id: string })?.id ?? "");
 
   await ctx.runMutation(internal.billing.index.upsertSubscription, {
     userId: existing.userId,

@@ -63,10 +63,7 @@ const tools: ChatCompletionTool[] = [
 ];
 
 // --- 2. Implement your functions ---
-function getWeather(args: {
-  location: string;
-  unit?: string;
-}): Record<string, unknown> {
+function getWeather(args: { location: string; unit?: string }): Record<string, unknown> {
   // Replace with real API call
   return {
     location: args.location,
@@ -81,10 +78,7 @@ function getStockPrice(args: { symbol: string }): Record<string, unknown> {
   return { symbol: args.symbol, price: 185.5, currency: "USD" };
 }
 
-const functions: Record<
-  string,
-  (args: any) => Record<string, unknown>
-> = {
+const functions: Record<string, (args: any) => Record<string, unknown>> = {
   getWeather,
   getStockPrice,
 };

@@ -12,9 +12,7 @@ export async function getNotebookMember(
 ): Promise<Doc<"notebookMembers"> | null> {
   return await ctx.db
     .query("notebookMembers")
-    .withIndex("by_notebook_and_user", (q) =>
-      q.eq("notebookId", notebookId).eq("userId", userId)
-    )
+    .withIndex("by_notebook_and_user", (q) => q.eq("notebookId", notebookId).eq("userId", userId))
     .unique();
 }
 
@@ -74,9 +72,6 @@ export async function assertNotebookOwner(
   return notebook;
 }
 
-export function isNotebookOwner(
-  notebook: Doc<"notebooks">,
-  userId: Id<"users">
-): boolean {
+export function isNotebookOwner(notebook: Doc<"notebooks">, userId: Id<"users">): boolean {
   return notebook.userId === userId;
 }

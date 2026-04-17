@@ -1,11 +1,11 @@
-"use node"
+"use node";
 
-import { clearStateKeys } from '../_shared/index.js';
+import { clearStateKeys } from "../_shared/index.js";
 
-import { FLASHCARD_CONFIG } from './config.js';
-import { formatFlashcardsAsText } from './formatFlashcards.js';
-import { callStatusUpdate } from './nodeSplit.js';
-import type { Flashcard, OverallStateType } from './state.js';
+import { FLASHCARD_CONFIG } from "./config.js";
+import { formatFlashcardsAsText } from "./formatFlashcards.js";
+import { callStatusUpdate } from "./nodeSplit.js";
+import type { Flashcard, OverallStateType } from "./state.js";
 
 export interface CollapseNodeDeps {
   estimateTokens: (text: string) => number;
@@ -16,38 +16,42 @@ export async function collapse(
   state: OverallStateType,
   deps: CollapseNodeDeps
 ): Promise<Partial<OverallStateType>> {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log('[FlashcardGraph] ===== COLLAPSE PHASE =====');
-  console.log('='.repeat(80));
+  console.log(`\n${"=".repeat(80)}`);
+  console.log("[FlashcardGraph] ===== COLLAPSE PHASE =====");
+  console.log("=".repeat(80));
 
-  console.log(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    phase: 'collapse',
-    mapOutputsReceived: state.mapOutputs.length,
-    mapOutputsDetails: state.mapOutputs.map((output, idx) => {
-      const cardCount = output.length;
-      const preview = output.length > 0
-        ? `${output[0].front.substring(0, 50)}...`
-        : 'empty';
-      return {
-        index: idx,
-        cards: cardCount,
-        preview,
-      };
-    }),
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        phase: "collapse",
+        mapOutputsReceived: state.mapOutputs.length,
+        mapOutputsDetails: state.mapOutputs.map((output, idx) => {
+          const cardCount = output.length;
+          const preview = output.length > 0 ? `${output[0].front.substring(0, 50)}...` : "empty";
+          return {
+            index: idx,
+            cards: cardCount,
+            preview,
+          };
+        }),
+      },
+      null,
+      2
+    )
+  );
 
   if (!state.mapOutputs || state.mapOutputs.length === 0) {
-    console.error('[FlashcardGraph] Collapse: ERROR - No mapOutputs received!');
-    await callStatusUpdate(state, 'collapsing');
+    console.error("[FlashcardGraph] Collapse: ERROR - No mapOutputs received!");
+    await callStatusUpdate(state, "collapsing");
     return {
       ...state,
       collapsedOutputs: [],
-      status: 'reducing',
+      status: "reducing",
       progress: {
-        phase: 'collapse',
+        phase: "collapse",
         percentage: 60,
-        message: 'No chunks to process',
+        message: "No chunks to process",
         chunksCompleted: 0,
         totalChunks: state.progress?.totalChunks || 0,
       },
@@ -59,29 +63,35 @@ export async function collapse(
   const mapPhaseProgress = Math.min((chunksCompleted / Math.max(totalChunks, 1)) * 50, 50);
   const percentage = Math.min(10 + mapPhaseProgress + 10, 70);
 
-  await callStatusUpdate(state, 'collapsing');
+  await callStatusUpdate(state, "collapsing");
 
   const totalTokens = state.mapOutputs.reduce(
     (sum, flashcards) => sum + deps.estimateTokens(formatFlashcardsAsText(flashcards)),
     0
   );
 
-  console.log(`[FlashcardGraph] Total tokens: ${totalTokens}, Reduce chunk size: ${FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS} tokens`);
+  console.log(
+    `[FlashcardGraph] Total tokens: ${totalTokens}, Reduce chunk size: ${FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS} tokens`
+  );
 
   if (totalTokens <= FLASHCARD_CONFIG.REDUCE_CHUNK_SIZE_TOKENS) {
-    console.log('[FlashcardGraph] Collapse: skipping recursive collapse, using mapOutputs directly');
+    console.log(
+      "[FlashcardGraph] Collapse: skipping recursive collapse, using mapOutputs directly"
+    );
 
     const totalCards = state.mapOutputs.reduce((sum, group) => sum + group.length, 0);
     const estimatedSize = totalCards * 200;
-    console.log(`[FlashcardGraph] Collapse: freeing ~${(estimatedSize / 1024).toFixed(2)} KB from mapOutputs`);
+    console.log(
+      `[FlashcardGraph] Collapse: freeing ~${(estimatedSize / 1024).toFixed(2)} KB from mapOutputs`
+    );
 
     return {
       ...state,
       collapsedOutputs: state.mapOutputs,
-      status: 'reducing',
-      ...clearStateKeys<OverallStateType>(['mapOutputs']),
+      status: "reducing",
+      ...clearStateKeys<OverallStateType>(["mapOutputs"]),
       progress: {
-        phase: 'collapse',
+        phase: "collapse",
         percentage,
         message: `Collected ${chunksCompleted} chunk outputs`,
         chunksCompleted,
@@ -90,20 +100,22 @@ export async function collapse(
     };
   }
 
-  console.log('[FlashcardGraph] Collapse: performing recursive collapse');
+  console.log("[FlashcardGraph] Collapse: performing recursive collapse");
   const collapsed = await deps.recursiveCollapse(state.mapOutputs, state.topic);
 
   const totalCards = state.mapOutputs.reduce((sum, group) => sum + group.length, 0);
   const estimatedSize = totalCards * 200;
-  console.log(`[FlashcardGraph] Collapse: freeing ~${(estimatedSize / 1024).toFixed(2)} KB from mapOutputs`);
+  console.log(
+    `[FlashcardGraph] Collapse: freeing ~${(estimatedSize / 1024).toFixed(2)} KB from mapOutputs`
+  );
 
   return {
     ...state,
     collapsedOutputs: collapsed,
-    status: 'reducing',
-    ...clearStateKeys<OverallStateType>(['mapOutputs']),
+    status: "reducing",
+    ...clearStateKeys<OverallStateType>(["mapOutputs"]),
     progress: {
-      phase: 'collapse',
+      phase: "collapse",
       percentage,
       message: `Collapsed ${chunksCompleted} outputs into ${collapsed.length}`,
       chunksCompleted,

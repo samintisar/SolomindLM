@@ -1,7 +1,7 @@
-"use node"
+"use node";
 
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
   allWithConcurrency,
@@ -9,11 +9,11 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
-} from '../_shared/index.js';
-import type { JobLogger } from '../_shared/logging.js';
-import { createAgentGraphLogger } from '../_shared/logging.js';
+} from "../_shared/index.js";
+import type { JobLogger } from "../_shared/logging.js";
+import { createAgentGraphLogger } from "../_shared/logging.js";
 
-import { GRAPH_CONFIG, SLIDE_COUNT_MAP } from './config.js';
+import { GRAPH_CONFIG, SLIDE_COUNT_MAP } from "./config.js";
 import {
   getRefineSlidePrompt,
   getSlideSelectionPrompt,
@@ -23,15 +23,15 @@ import {
   type Slide,
   type SlideCandidate,
   type SlideSelectionResponse,
-} from './prompts.js';
+} from "./prompts.js";
 import {
   heuristicDedupeSlides,
   preSelectSlides,
   selectSlidesHeuristic,
-} from './slideHeuristics.js';
-import { callStatusUpdate } from './nodeSplit.js';
-import type { OverallStateType } from './state.js';
-import type { StructuredOutputInvoker } from './structuredLlm.js';
+} from "./slideHeuristics.js";
+import { callStatusUpdate } from "./nodeSplit.js";
+import type { OverallStateType } from "./state.js";
+import type { StructuredOutputInvoker } from "./structuredLlm.js";
 
 export interface ReduceNodeDeps {
   smartLlm: ChatTogetherAI;
@@ -46,8 +46,8 @@ async function refineSelectedSlides(
   logger: JobLogger
 ): Promise<Partial<OverallStateType>> {
   logger.info(`Refining ${selectedCandidates.length} slides with image generation prompts...`, {
-    agent: 'SlideDeckGraph',
-    phase: 'refine_slides',
+    agent: "SlideDeckGraph",
+    phase: "refine_slides",
     slidesToRefine: selectedCandidates.length,
   });
 
@@ -68,10 +68,13 @@ async function refineSelectedSlides(
               invokeWithTimeout(
                 () =>
                   (slideStructured as any).invoke(
-                    [new SystemMessage(REFINE_SLIDES_SYSTEM_PROMPT), new HumanMessage(refinePrompt)],
+                    [
+                      new SystemMessage(REFINE_SLIDES_SYSTEM_PROMPT),
+                      new HumanMessage(refinePrompt),
+                    ],
                     createLangSmithRunConfig({
-                      runName: 'SlideDeckGraph.RefineSlide',
-                      tags: ['agent', 'slides', 'refine', 'smart-llm'],
+                      runName: "SlideDeckGraph.RefineSlide",
+                      tags: ["agent", "slides", "refine", "smart-llm"],
                       metadata: {
                         slideNumber: index + 1,
                         slideType: state.slideType,
@@ -79,13 +82,13 @@ async function refineSelectedSlides(
                     })
                   ),
                 GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-                'SlideRefine'
+                "SlideRefine"
               ),
             {
               maxAttempts: 2,
               baseDelayMs: 1000,
             },
-            'SlideRefine'
+            "SlideRefine"
           );
 
           const refinedSlide = refinedSlideRaw as Slide;
@@ -93,18 +96,18 @@ async function refineSelectedSlides(
           refinedSlide.slideNumber = index + 1;
 
           logger.info(`Refined slide ${index + 1}: ${refinedSlide.title}`, {
-            agent: 'SlideDeckGraph',
-            phase: 'refine_slide',
+            agent: "SlideDeckGraph",
+            phase: "refine_slide",
             slideNumber: index + 1,
           });
 
           return refinedSlide;
         } catch (error) {
           logger.phaseError(
-            'refine_slide',
+            "refine_slide",
             error instanceof Error ? error : new Error(String(error)),
             {
-              agent: 'SlideDeckGraph',
+              agent: "SlideDeckGraph",
               index,
               slideNumber: index + 1,
               candidateTitle: candidate.title,
@@ -112,7 +115,8 @@ async function refineSelectedSlides(
           );
 
           throw new Error(
-            `Failed to refine slide ${index + 1} ("${candidate.title}"): ${error instanceof Error ? error.message : String(error)}`
+            `Failed to refine slide ${index + 1} ("${candidate.title}"): ${error instanceof Error ? error.message : String(error)}`,
+            { cause: error }
           );
         }
       };
@@ -120,19 +124,22 @@ async function refineSelectedSlides(
     5
   );
 
-  logger.info(`Slide content generation complete: ${refinedSlidesWithPrompts.length} slides refined`, {
-    agent: 'SlideDeckGraph',
-    phase: 'reduce_complete',
-    slidesWithPromptsCount: refinedSlidesWithPrompts.length,
-  });
+  logger.info(
+    `Slide content generation complete: ${refinedSlidesWithPrompts.length} slides refined`,
+    {
+      agent: "SlideDeckGraph",
+      phase: "reduce_complete",
+      slidesWithPromptsCount: refinedSlidesWithPrompts.length,
+    }
+  );
 
   return {
     ...state,
     slidesWithPrompts: refinedSlidesWithPrompts,
-    status: 'generating_images',
-    ...clearStateKeys<OverallStateType>(['collapsedOutputs', 'chunks']),
+    status: "generating_images",
+    ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),
     progress: {
-      phase: 'reduce',
+      phase: "reduce",
       percentage: 75,
       message: `Slide content ready: ${refinedSlidesWithPrompts.length} slides prepared for image generation`,
       itemsGenerated: refinedSlidesWithPrompts.length,
@@ -145,11 +152,11 @@ export async function reduce(
   state: OverallStateType,
   deps: ReduceNodeDeps
 ): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
-  await callStatusUpdate(state, 'reducing');
+  const logger = createAgentGraphLogger("SlideDeckGraph", "slides");
+  await callStatusUpdate(state, "reducing");
 
-  logger.phaseStart('reduce', {
-    agent: 'SlideDeckGraph',
+  logger.phaseStart("reduce", {
+    agent: "SlideDeckGraph",
     collapsedOutputsCount: state.collapsedOutputs.length,
     slideType: state.slideType,
     deckLength: state.deckLength,
@@ -161,23 +168,23 @@ export async function reduce(
       const parsed = JSON.parse(output) as SlideCandidate[];
       allCandidates.push(...parsed);
     } catch (e) {
-      logger.warn('Failed to parse slide array in reduce', {
-        agent: 'SlideDeckGraph',
-        phase: 'reduce_parse_error',
+      logger.warn("Failed to parse slide array in reduce", {
+        agent: "SlideDeckGraph",
+        phase: "reduce_parse_error",
         error: e instanceof Error ? e.message : String(e),
       });
     }
   }
 
   if (allCandidates.length === 0) {
-    logger.phaseError('reduce', new Error('No candidates generated'), {
-      agent: 'SlideDeckGraph',
+    logger.phaseError("reduce", new Error("No candidates generated"), {
+      agent: "SlideDeckGraph",
     });
     return {
       ...state,
       slidesWithPrompts: [],
       finalOutput: [],
-      status: 'failed',
+      status: "failed",
     };
   }
 
@@ -186,23 +193,32 @@ export async function reduce(
   const maxSlides = countRange.max;
   const targetSlideCount = Math.floor((minSlides + maxSlides) / 2);
 
-  logger.info(`Collected ${allCandidates.length} candidates, targeting ${targetSlideCount} slides`, {
-    agent: 'SlideDeckGraph',
-    phase: 'reduce_initial',
-    totalCandidates: allCandidates.length,
-    minSlides,
-    maxSlides,
-    targetSlideCount,
-  });
+  logger.info(
+    `Collected ${allCandidates.length} candidates, targeting ${targetSlideCount} slides`,
+    {
+      agent: "SlideDeckGraph",
+      phase: "reduce_initial",
+      totalCandidates: allCandidates.length,
+      minSlides,
+      maxSlides,
+      targetSlideCount,
+    }
+  );
 
   if (allCandidates.length <= maxSlides) {
     logger.info(`Skipping LLM selection: ${allCandidates.length} candidates within limit`, {
-      agent: 'SlideDeckGraph',
-      phase: 'reduce_skip_llm',
+      agent: "SlideDeckGraph",
+      phase: "reduce_skip_llm",
       candidateCount: allCandidates.length,
       maxSlides,
     });
-    return refineSelectedSlides(allCandidates, state, targetSlideCount, deps.slideStructured, logger);
+    return refineSelectedSlides(
+      allCandidates,
+      state,
+      targetSlideCount,
+      deps.slideStructured,
+      logger
+    );
   }
 
   const dedupedSlides = heuristicDedupeSlides(allCandidates);
@@ -210,9 +226,12 @@ export async function reduce(
   const preSelectedSlides = preSelectSlides(dedupedSlides, 30);
 
   try {
-    const selectionStructuredLLM = deps.smartLlm.withStructuredOutput<SlideSelectionResponse>(SlideSelectionSchema, {
-      name: 'slide_selection',
-    });
+    const selectionStructuredLLM = deps.smartLlm.withStructuredOutput<SlideSelectionResponse>(
+      SlideSelectionSchema,
+      {
+        name: "slide_selection",
+      }
+    );
 
     const selectionPrompt = getSlideSelectionPrompt({
       candidates: preSelectedSlides,
@@ -230,34 +249,51 @@ export async function reduce(
             (selectionStructuredLLM as any).invoke(
               [new SystemMessage(SLIDE_SELECTION_SYSTEM_PROMPT), new HumanMessage(selectionPrompt)],
               createLangSmithRunConfig({
-                runName: 'SlideDeckGraph.SelectSlides',
-                tags: ['agent', 'slides', 'select', 'smart-llm'],
+                runName: "SlideDeckGraph.SelectSlides",
+                tags: ["agent", "slides", "select", "smart-llm"],
               })
             ),
           GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-          'SlideSelection'
+          "SlideSelection"
         ),
       { maxAttempts: 2, baseDelayMs: 1000 },
-      'SlideSelection'
+      "SlideSelection"
     );
 
     logger.info(`LLM selection: ${preSelectedSlides.length} → ${response.slides.length} slides`, {
-      agent: 'SlideDeckGraph',
-      phase: 'reduce_llm_selection',
+      agent: "SlideDeckGraph",
+      phase: "reduce_llm_selection",
       inputSlides: preSelectedSlides.length,
       outputSlides: response.slides.length,
       reasoning: response.reasoning,
     });
 
-    return refineSelectedSlides(response.slides, state, targetSlideCount, deps.slideStructured, logger);
+    return refineSelectedSlides(
+      response.slides,
+      state,
+      targetSlideCount,
+      deps.slideStructured,
+      logger
+    );
   } catch (error) {
-    logger.warn('LLM selection failed, using heuristic fallback', {
-      agent: 'SlideDeckGraph',
-      phase: 'reduce_llm_failed',
+    logger.warn("LLM selection failed, using heuristic fallback", {
+      agent: "SlideDeckGraph",
+      phase: "reduce_llm_failed",
       error: error instanceof Error ? error.message : String(error),
     });
 
-    const fallbackSlides = selectSlidesHeuristic(preSelectedSlides, targetSlideCount, minSlides, maxSlides);
-    return refineSelectedSlides(fallbackSlides, state, targetSlideCount, deps.slideStructured, logger);
+    const fallbackSlides = selectSlidesHeuristic(
+      preSelectedSlides,
+      targetSlideCount,
+      minSlides,
+      maxSlides
+    );
+    return refineSelectedSlides(
+      fallbackSlides,
+      state,
+      targetSlideCount,
+      deps.slideStructured,
+      logger
+    );
   }
 }

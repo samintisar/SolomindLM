@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Download, ChevronUp, X, RotateCcw, RotateCw } from 'lucide-react';
-import { useResolvedAudioPlaybackUrl } from '../hooks/useResolvedAudioPlaybackUrl';
+import React, { useState, useRef, useEffect } from "react";
+import { Play, Pause, Download, ChevronUp, X, RotateCcw, RotateCw } from "lucide-react";
+import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 
 interface MiniAudioPlayerProps {
   audioUrl: string;
@@ -16,7 +16,7 @@ interface MiniAudioPlayerProps {
 export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
   audioUrl,
   audioOverviewId,
-  title = 'Audio Overview',
+  title = "Audio Overview",
   transcript: _transcript,
   isVisible,
   onClose,
@@ -50,7 +50,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
     const fetchAudio = async () => {
       try {
-        console.log('[MiniAudioPlayer] Fetching audio as blob for seeking support...');
+        console.log("[MiniAudioPlayer] Fetching audio as blob for seeking support...");
         setIsLoading(true);
         setBlobUrl(null);
 
@@ -58,17 +58,17 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const blob = await response.blob();
-        console.log('[MiniAudioPlayer] Audio blob size:', blob.size, 'bytes');
+        console.log("[MiniAudioPlayer] Audio blob size:", blob.size, "bytes");
 
         localBlobUrl = URL.createObjectURL(blob);
 
         if (mounted) {
           setBlobUrl(localBlobUrl);
           setIsLoading(false);
-          console.log('[MiniAudioPlayer] Blob URL created:', localBlobUrl);
+          console.log("[MiniAudioPlayer] Blob URL created:", localBlobUrl);
         }
       } catch (error) {
-        console.error('[MiniAudioPlayer] Failed to fetch audio as blob:', error);
+        console.error("[MiniAudioPlayer] Failed to fetch audio as blob:", error);
         if (mounted) {
           setIsLoading(false);
           // Fall back to streaming from HTTPS URL if blob fetch fails
@@ -82,21 +82,11 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     return () => {
       mounted = false;
       if (localBlobUrl) {
-        console.log('[MiniAudioPlayer] Revoking blob URL');
+        console.log("[MiniAudioPlayer] Revoking blob URL");
         URL.revokeObjectURL(localBlobUrl);
       }
     };
   }, [resolvedPlayback, isVisible]);
-
-  // Add error handling for audio loading
-  const handleAudioError = () => {
-    console.error('[MiniAudioPlayer] Audio failed to load:', {
-      src: audioRef.current?.src,
-      error: 'No supported sources',
-      audioUrl,
-      resolvedPlayback,
-    });
-  };
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -108,7 +98,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     };
 
     const handleLoadedMetadata = () => {
-      console.log('[MiniAudioPlayer loadedmetadata]', {
+      console.log("[MiniAudioPlayer loadedmetadata]", {
         audioDuration: audio.duration,
         readyState: audio.readyState,
         networkState: audio.networkState,
@@ -118,14 +108,13 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
       setDuration(audio.duration);
       // Auto-play when the player is visible and metadata is loaded
       if (isVisible) {
-        audio.play().catch(err => console.error('Autoplay failed:', err));
+        audio.play().catch((err) => console.error("Autoplay failed:", err));
       }
     };
 
     const handleDurationChange = () => {
-      console.log('[MiniAudioPlayer durationchange]', {
+      console.log("[MiniAudioPlayer durationchange]", {
         newDuration: audio.duration,
-        oldDurationState: duration,
       });
       if (isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
@@ -141,23 +130,33 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('durationchange', handleDurationChange);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('error', handleAudioError);
+    const handleAudioError = () => {
+      console.error("[MiniAudioPlayer] Audio failed to load:", {
+        src: audio.src,
+        error: "No supported sources",
+        audioUrl,
+        resolvedPlayback,
+      });
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("durationchange", handleDurationChange);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("error", handleAudioError);
 
     return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('durationchange', handleDurationChange);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('error', handleAudioError);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("durationchange", handleDurationChange);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("error", handleAudioError);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible]);
 
   const togglePlay = async () => {
@@ -171,7 +170,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
         await el.play();
       }
     } catch (e) {
-      console.error('[MiniAudioPlayer] play() failed:', e);
+      console.error("[MiniAudioPlayer] play() failed:", e);
     }
   };
 
@@ -179,14 +178,14 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
     if (audioRef.current) {
       const actualDuration = audioRef.current.duration;
       if (!isFinite(actualDuration)) {
-        console.log('[MiniAudioPlayer handleSeek] blocked - invalid duration', {
+        console.log("[MiniAudioPlayer handleSeek] blocked - invalid duration", {
           actualDuration,
           durationState: duration,
         });
         return;
       }
       const displayedTime = (parseFloat(e.target.value) / 100) * actualDuration;
-      console.log('[MiniAudioPlayer handleSeek]', {
+      console.log("[MiniAudioPlayer handleSeek]", {
         sliderValue: e.target.value,
         durationState: duration,
         audioDuration: actualDuration,
@@ -194,7 +193,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
         calculatedTime: displayedTime,
       });
       audioRef.current.currentTime = displayedTime;
-      console.log('[MiniAudioPlayer handleSeek] after set:', {
+      console.log("[MiniAudioPlayer handleSeek] after set:", {
         currentTimeAfter: audioRef.current.currentTime,
       });
       setProgress(parseFloat(e.target.value));
@@ -218,7 +217,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
       // Check if audio is ready
       if (!isFinite(actualDuration) || actualDuration === 0) {
-        console.warn('[MiniAudioPlayer skip] Cannot skip - audio not ready:', {
+        console.warn("[MiniAudioPlayer skip] Cannot skip - audio not ready:", {
           audioDuration: actualDuration,
           readyState: audioRef.current.readyState,
           networkState: audioRef.current.networkState,
@@ -229,14 +228,14 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 
       const beforeTime = audioRef.current.currentTime;
       const newTime = Math.max(0, Math.min(actualDuration, audioRef.current.currentTime + seconds));
-      console.log('[MiniAudioPlayer skip]', {
+      console.log("[MiniAudioPlayer skip]", {
         seconds,
         audioDuration: actualDuration,
         currentTimeBefore: beforeTime,
         calculatedNewTime: newTime,
       });
       audioRef.current.currentTime = newTime;
-      console.log('[MiniAudioPlayer skip] after set:', {
+      console.log("[MiniAudioPlayer skip] after set:", {
         currentTimeAfter: audioRef.current.currentTime,
       });
     }
@@ -267,7 +266,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
         ref={audioRef}
         src={
           blobUrl ||
-          (typeof resolvedPlayback === 'string' ? resolvedPlayback : undefined) ||
+          (typeof resolvedPlayback === "string" ? resolvedPlayback : undefined) ||
           undefined
         }
       />
@@ -283,7 +282,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             {/* Download Button */}
             <a
-              href={typeof resolvedPlayback === 'string' ? resolvedPlayback : '#'}
+              href={typeof resolvedPlayback === "string" ? resolvedPlayback : "#"}
               download
               className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
               title="Download audio"
@@ -320,7 +319,7 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
             value={progress}
             onChange={handleSeek}
             className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-            style={{ accentColor: 'hsl(var(--primary))' }}
+            style={{ accentColor: "hsl(var(--primary))" }}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{formatTime(currentTime)}</span>
@@ -344,13 +343,9 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
           <button
             onClick={togglePlay}
             className="p-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shrink-0"
-            aria-label={isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? "Pause" : "Play"}
           >
-            {isPlaying ? (
-              <Pause className="w-4 h-4" />
-            ) : (
-              <Play className="w-4 h-4 ml-0.5" />
-            )}
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
           </button>
 
           {/* Skip Forward Button */}
@@ -378,8 +373,8 @@ export const MiniAudioPlayer: React.FC<MiniAudioPlayerProps> = ({
 };
 
 function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return '0:00';
+  if (!isFinite(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }

@@ -1,12 +1,12 @@
-import React from 'react';
-import { NotebookItem, FolderItem } from '@/shared/types/index';
-import { NotebookCard } from '../cards/NotebookCard';
+import React from "react";
+import { NotebookItem, FolderItem } from "@/shared/types/index";
+import { NotebookCard } from "../cards/NotebookCard";
 
 interface FolderExpandedViewProps {
   folder: FolderItem;
   notebooks: NotebookItem[];
   isLoading: boolean;
-  viewMode: 'grid' | 'list';
+  viewMode: "grid" | "list";
   onSelectNotebook: (notebook: NotebookItem) => void;
   // Notebook handlers
   activeMenuId: string | null;

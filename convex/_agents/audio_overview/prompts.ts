@@ -1,5 +1,5 @@
-"use node"
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js';
+"use node";
+import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
 /**
  * Prompts for AudioOverviewGraph.
@@ -13,13 +13,16 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js
 // ============================================================
 
 /** System prompt for map phase dialogue beat extraction */
-export const MAP_SYSTEM_PROMPT = 'You are extracting engaging content for a podcast conversation. Extract key points that would make for interesting discussion.';
+export const MAP_SYSTEM_PROMPT =
+  "You are extracting engaging content for a podcast conversation. Extract key points that would make for interesting discussion.";
 
 /** System prompt for reduce phase script writing */
-export const REDUCE_SYSTEM_PROMPT = 'You are an expert podcast scriptwriter. Write natural, varied two-host dialogue—avoid repetitive openers and stock hooks. Output ONLY valid JSON arrays of dialogue lines.';
+export const REDUCE_SYSTEM_PROMPT =
+  "You are an expert podcast scriptwriter. Write natural, varied two-host dialogue—avoid repetitive openers and stock hooks. Output ONLY valid JSON arrays of dialogue lines.";
 
 /** System prompt for example extraction for anti-repetition */
-export const EXAMPLE_EXTRACTION_SYSTEM_PROMPT = 'You are a text analyzer. Extract concrete examples as a JSON array only.';
+export const EXAMPLE_EXTRACTION_SYSTEM_PROMPT =
+  "You are a text analyzer. Extract concrete examples as a JSON array only.";
 
 // ============================================================
 // Types
@@ -28,12 +31,12 @@ export const EXAMPLE_EXTRACTION_SYSTEM_PROMPT = 'You are a text analyzer. Extrac
 /**
  * Audio type for the overview.
  */
-export type AudioType = 'deep_dive' | 'brief' | 'critique' | 'debate';
+export type AudioType = "deep_dive" | "brief" | "critique" | "debate";
 
 /**
  * Audio length target.
  */
-export type AudioLength = 'short' | 'default' | 'long';
+export type AudioLength = "short" | "default" | "long";
 
 // ============================================================
 // Constants
@@ -233,8 +236,8 @@ Generate the dialogue script as a JSON array. Output ONLY the JSON, no markdown 
  */
 export function getMapPrompt(audioType: AudioType, chunk: string, focus?: string): string {
   const promptTemplate = MAP_PROMPTS[audioType] || MAP_PROMPTS.deep_dive;
-  const focusLine = focus ? `\n\nFOCUS AREA: Prioritize content related to: "${focus}"` : '';
-  return promptTemplate.replace('{chunk}', chunk) + focusLine;
+  const focusLine = focus ? `\n\nFOCUS AREA: Prioritize content related to: "${focus}"` : "";
+  return promptTemplate.replace("{chunk}", chunk) + focusLine;
 }
 
 /**
@@ -250,23 +253,23 @@ export function getReducePrompt(params: {
 }): string {
   const estimatedWords = params.targetLines * ESTIMATED_WORDS_PER_LINE;
 
-  return REDUCE_PROMPT.replace('{coveredTopicsPrompt}', params.coveredTopicsPrompt || '')
-    .replace('{content}', params.content)
-    .replace('{audioType}', params.audioType)
-    .replace('{targetLines}', params.targetLines.toString())
-    .replace('{estimatedWords}', estimatedWords.toString())
-    .replace('{focus}', params.focus || 'general overview');
+  return REDUCE_PROMPT.replace("{coveredTopicsPrompt}", params.coveredTopicsPrompt || "")
+    .replace("{content}", params.content)
+    .replace("{audioType}", params.audioType)
+    .replace("{targetLines}", params.targetLines.toString())
+    .replace("{estimatedWords}", estimatedWords.toString())
+    .replace("{focus}", params.focus || "general overview");
 }
 
 /**
  * Builds the covered topics prompt for anti-repetition.
  */
 export function buildCoveredTopicsPrompt(examples: string[]): string {
-  if (examples.length === 0) return '';
+  if (examples.length === 0) return "";
 
   const selectedExamples = examples.slice(0, 8);
   if (selectedExamples.length > 0) {
-    return `\nEXAMPLES ALREADY USED (please use different ones):\n${selectedExamples.join(', ')}\n`;
+    return `\nEXAMPLES ALREADY USED (please use different ones):\n${selectedExamples.join(", ")}\n`;
   }
-  return '';
+  return "";
 }

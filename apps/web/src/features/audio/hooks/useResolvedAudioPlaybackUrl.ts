@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
-import { useQuery } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { resolveAudioPlaybackUrl } from '../utils/resolveAudioPlaybackUrl';
+import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { resolveAudioPlaybackUrl } from "../utils/resolveAudioPlaybackUrl";
 
 /**
  * `undefined` = still loading (Convex query). `null` = cannot resolve. `string` = HTTPS URL.
@@ -13,9 +13,7 @@ export function useResolvedAudioPlaybackUrl(
 ): string | undefined | null {
   const serverResolved = useQuery(
     api.studio.audio.index.resolvePlaybackUrl,
-    audioOverviewId
-      ? { audioOverviewId: audioOverviewId as Id<'audioOverviews'> }
-      : 'skip'
+    audioOverviewId ? { audioOverviewId: audioOverviewId as Id<"audioOverviews"> } : "skip"
   );
 
   return useMemo((): string | undefined | null => {

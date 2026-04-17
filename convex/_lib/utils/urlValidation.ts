@@ -3,6 +3,6 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
     new URL(url);
     return { valid: true };
   } catch {
-    return { valid: false, error: 'Invalid URL format' };
+    return { valid: false, error: "Invalid URL format" };
   }
 }

@@ -1,7 +1,7 @@
-import { Loader2, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import { ProgressBar } from './ProgressBar';
+import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { ProgressBar } from "./ProgressBar";
 
-export type GenerationStatus = 'draft' | 'generating' | 'completed' | 'failed';
+export type GenerationStatus = "draft" | "generating" | "completed" | "failed";
 
 export interface GenerationMetadata {
   progress?: number;
@@ -20,19 +20,22 @@ interface GenerationProgressProps {
 /**
  * Component for displaying generation progress with status indicators
  */
-export function GenerationProgress({ status, metadata, title, compact = false }: GenerationProgressProps) {
-  if (status === 'generating') {
+export function GenerationProgress({
+  status,
+  metadata,
+  title,
+  compact = false,
+}: GenerationProgressProps) {
+  if (status === "generating") {
     const progress = metadata?.progress ?? 0;
-    const currentStep = metadata?.currentStep || 'Generating...';
+    const currentStep = metadata?.currentStep || "Generating...";
 
     if (compact) {
       return (
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
           <span className="text-muted-foreground">{currentStep}</span>
-          {progress > 0 && (
-            <span className="text-xs text-muted-foreground">({progress}%)</span>
-          )}
+          {progress > 0 && <span className="text-xs text-muted-foreground">({progress}%)</span>}
         </div>
       );
     }
@@ -45,16 +48,14 @@ export function GenerationProgress({ status, metadata, title, compact = false }:
             {title && <p className="font-medium text-foreground">{title}</p>}
             <p className="text-sm text-muted-foreground">{currentStep}</p>
           </div>
-          {progress > 0 && (
-            <span className="text-sm font-medium text-primary">{progress}%</span>
-          )}
+          {progress > 0 && <span className="text-sm font-medium text-primary">{progress}%</span>}
         </div>
         {progress > 0 && <ProgressBar value={progress} />}
       </div>
     );
   }
 
-  if (status === 'completed') {
+  if (status === "completed") {
     if (compact) {
       return (
         <div className="flex items-center gap-2 text-sm">
@@ -75,8 +76,8 @@ export function GenerationProgress({ status, metadata, title, compact = false }:
     );
   }
 
-  if (status === 'failed') {
-    const error = metadata?.error || 'Generation failed';
+  if (status === "failed") {
+    const error = metadata?.error || "Generation failed";
 
     if (compact) {
       return (

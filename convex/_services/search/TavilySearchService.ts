@@ -37,7 +37,19 @@ export const searchInternal = internalAction({
     timeRange: v.optional(v.string()),
     searchDepth: v.optional(v.string()),
   },
-  handler: async (_, { query, maxResults, scoreThreshold, excludeDomains, includeDomains, topic, timeRange, searchDepth }) => {
+  handler: async (
+    _,
+    {
+      query,
+      maxResults,
+      scoreThreshold,
+      excludeDomains,
+      includeDomains,
+      topic,
+      timeRange,
+      searchDepth,
+    }
+  ) => {
     const logger = createServiceLogger("tavily", "searchInternal");
     const startTime = Date.now();
     logger.operationStart({
@@ -72,8 +84,10 @@ export const searchInternal = internalAction({
             include_answer: false,
             include_raw_content: false,
             max_results: maxResults,
-            exclude_domains: excludeDomains && excludeDomains.length > 0 ? excludeDomains : undefined,
-            include_domains: includeDomains && includeDomains.length > 0 ? includeDomains : undefined,
+            exclude_domains:
+              excludeDomains && excludeDomains.length > 0 ? excludeDomains : undefined,
+            include_domains:
+              includeDomains && includeDomains.length > 0 ? includeDomains : undefined,
           }),
         });
 
@@ -132,10 +146,7 @@ const searchCache = createCachedAction(
  * - Normalize multiple spaces to single space
  */
 function normalizeQuery(query: string): string {
-  return query
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, " ");
+  return query.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
 // ============================================================

@@ -84,10 +84,7 @@ export async function updateNotebook(
   await ctx.db.patch("notebooks", notebookId, updateData);
 }
 
-export async function deleteNotebook(
-  ctx: MutationCtx,
-  notebookId: Id<"notebooks">
-): Promise<void> {
+export async function deleteNotebook(ctx: MutationCtx, notebookId: Id<"notebooks">): Promise<void> {
   await ctx.db.delete("notebooks", notebookId);
 }
 

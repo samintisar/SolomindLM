@@ -4,9 +4,9 @@
  * This file contains all helper mutations for job management.
  * Functions are organized by job type for easy navigation.
  */
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { type JobErrorType } from './logging';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { type JobErrorType } from "./logging";
 
 // ============================================================
 // SHARED ERROR UTILITIES
@@ -27,73 +27,69 @@ export const jobErrorMetadataValidator = v.object({
 /**
  * Build enhanced error metadata for database storage.
  */
-function buildErrorMetadata(
-  error: string,
-  phase: string,
-  metadata?: any
-): any {
+function buildErrorMetadata(error: string, phase: string, metadata?: any): any {
   if (metadata?.errorType && metadata?.errorPhase) {
     return {
       error: {
         type: metadata.errorType,
         phase: metadata.errorPhase,
-        message: error.length > 500 ? error.substring(0, 500) + '...' : error,
+        message: error.length > 500 ? error.substring(0, 500) + "..." : error,
         retryable: metadata.retryable ?? false,
         timestamp: metadata.failedAt ?? Date.now(),
         stackTrace: metadata.stack,
       },
       failedAt: metadata.failedAt ?? Date.now(),
-      phase: 'failed',
+      phase: "failed",
     };
   }
 
-  const errorType = metadata?.isTimeout ? 'llm_timeout' : classifyErrorFromMessage(error);
+  const errorType = metadata?.isTimeout ? "llm_timeout" : classifyErrorFromMessage(error);
   const retryable = isRetryableFromType(errorType);
 
   return {
     error: {
       type: errorType,
-      phase: phase || metadata?.errorPhase || metadata?.phase || 'unknown',
-      message: error.length > 500 ? error.substring(0, 500) + '...' : error,
+      phase: phase || metadata?.errorPhase || metadata?.phase || "unknown",
+      message: error.length > 500 ? error.substring(0, 500) + "..." : error,
       retryable,
       timestamp: Date.now(),
       stackTrace: metadata?.stack,
     },
     failedAt: Date.now(),
-    phase: 'failed',
-    errorPhase: phase || metadata?.phase || 'unknown',
-    isTimeout: metadata?.isTimeout ?? errorType === 'llm_timeout',
-    errorName: metadata?.errorName ?? 'Error',
+    phase: "failed",
+    errorPhase: phase || metadata?.phase || "unknown",
+    isTimeout: metadata?.isTimeout ?? errorType === "llm_timeout",
+    errorName: metadata?.errorName ?? "Error",
   };
 }
 
 function classifyErrorFromMessage(message: string): JobErrorType {
   const lower = message.toLowerCase();
 
-  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('524')) {
-    return 'llm_timeout';
+  if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("524")) {
+    return "llm_timeout";
   }
-  if (lower.includes('rate limit') || lower.includes('429')) {
-    return 'rate_limit';
+  if (lower.includes("rate limit") || lower.includes("429")) {
+    return "rate_limit";
   }
-  if (lower.includes('embedding') || lower.includes('vector')) {
-    return 'embedding_failure';
+  if (lower.includes("embedding") || lower.includes("vector")) {
+    return "embedding_failure";
   }
-  if (lower.includes('parse') || lower.includes('json') || lower.includes('invalid')) {
-    return 'parsing_error';
+  if (lower.includes("parse") || lower.includes("json") || lower.includes("invalid")) {
+    return "parsing_error";
   }
-  if (lower.includes('ocr') || lower.includes('extract') || lower.includes('transcript')) {
-    return 'extraction_failure';
+  if (lower.includes("ocr") || lower.includes("extract") || lower.includes("transcript")) {
+    return "extraction_failure";
   }
-  if (lower.includes('storage') || lower.includes('upload')) {
-    return 'storage_error';
+  if (lower.includes("storage") || lower.includes("upload")) {
+    return "storage_error";
   }
 
-  return 'unknown';
+  return "unknown";
 }
 
 function isRetryableFromType(type: JobErrorType): boolean {
-  return ['llm_timeout', 'rate_limit', 'storage_error', 'extraction_failure'].includes(type);
+  return ["llm_timeout", "rate_limit", "storage_error", "extraction_failure"].includes(type);
 }
 
 // ============================================================
@@ -102,7 +98,7 @@ function isRetryableFromType(type: JobErrorType): boolean {
 
 export const updateDocumentJobStatus = internalMutation({
   args: {
-    documentId: v.id('documents'),
+    documentId: v.id("documents"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -118,15 +114,15 @@ export const updateDocumentJobStatus = internalMutation({
 
 export const markDocumentJobFailed = internalMutation({
   args: {
-    documentId: v.id('documents'),
+    documentId: v.id("documents"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const { documentId, error, metadata } = args;
-    const errorMetadata = buildErrorMetadata(error, metadata?.phase || 'unknown', metadata);
+    const errorMetadata = buildErrorMetadata(error, metadata?.phase || "unknown", metadata);
     await ctx.db.patch(documentId, {
-      status: 'failed',
+      status: "failed",
       error,
       metadata: {
         ...metadata,
@@ -142,7 +138,7 @@ export const markDocumentJobFailed = internalMutation({
 
 export const updateFlashcardTitle = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -155,16 +151,16 @@ export const updateFlashcardTitle = internalMutation({
 
 export const saveFlashcardResults = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     flashcards: v.array(v.any()),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.flashcardId, {
       cardsData: args.flashcards,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Flashcards',
+      title: args.metadata?.title ?? "Flashcards",
       metadata: {
         ...args.metadata,
         cardCount: args.flashcards.length,
@@ -176,7 +172,7 @@ export const saveFlashcardResults = internalMutation({
 
 export const updateFlashcardStatus = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -194,18 +190,18 @@ export const updateFlashcardStatus = internalMutation({
 
 export const markFlashcardFailed = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.flashcardId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -218,7 +214,7 @@ export const markFlashcardFailed = internalMutation({
 // Multi-phase flashcard helpers
 export const initFlashcardMapPhase = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     totalMapTasks: v.number(),
     cardCount: v.number(),
     difficulty: v.string(),
@@ -229,11 +225,11 @@ export const initFlashcardMapPhase = internalMutation({
     if (!flashcard) return null;
 
     await ctx.db.patch(args.flashcardId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...flashcard.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -249,7 +245,7 @@ export const initFlashcardMapPhase = internalMutation({
 
 export const storeFlashcardMapResult = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -281,7 +277,7 @@ export const storeFlashcardMapResult = internalMutation({
 
 export const clearFlashcardMapData = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
   },
   handler: async (ctx, args) => {
     const flashcard = await ctx.db.get(args.flashcardId);
@@ -302,16 +298,16 @@ export const clearFlashcardMapData = internalMutation({
 
 export const saveQuizResults = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     questions: v.array(v.any()),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.quizId, {
       questionsData: args.questions,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Quiz',
+      title: args.metadata?.title ?? "Quiz",
       metadata: {
         ...args.metadata,
         questionCount: args.questions.length,
@@ -323,7 +319,7 @@ export const saveQuizResults = internalMutation({
 
 export const updateQuizTitle = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -336,7 +332,7 @@ export const updateQuizTitle = internalMutation({
 
 export const updateQuizStatus = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -354,18 +350,18 @@ export const updateQuizStatus = internalMutation({
 
 export const markQuizFailed = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.quizId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -378,7 +374,7 @@ export const markQuizFailed = internalMutation({
 // Multi-phase quiz helpers
 export const initQuizMapPhase = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     totalMapTasks: v.number(),
     questionCount: v.number(),
     difficulty: v.string(),
@@ -389,11 +385,11 @@ export const initQuizMapPhase = internalMutation({
     if (!quiz) return null;
 
     await ctx.db.patch(args.quizId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...quiz.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -409,7 +405,7 @@ export const initQuizMapPhase = internalMutation({
 
 export const storeQuizMapResult = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -441,7 +437,7 @@ export const storeQuizMapResult = internalMutation({
 
 export const clearQuizMapData = internalMutation({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
   },
   handler: async (ctx, args) => {
     const quiz = await ctx.db.get(args.quizId);
@@ -462,7 +458,7 @@ export const clearQuizMapData = internalMutation({
 
 export const updateWrittenQuestionsTitle = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -475,16 +471,16 @@ export const updateWrittenQuestionsTitle = internalMutation({
 
 export const saveWrittenQuestionsResults = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     questions: v.array(v.any()),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.writtenQuestionId, {
       questionsData: args.questions,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Written Questions',
+      title: args.metadata?.title ?? "Written Questions",
       metadata: {
         ...args.metadata,
         questionCount: args.questions.length,
@@ -496,7 +492,7 @@ export const saveWrittenQuestionsResults = internalMutation({
 
 export const updateWrittenQuestionsStatus = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -514,18 +510,18 @@ export const updateWrittenQuestionsStatus = internalMutation({
 
 export const markWrittenQuestionsFailed = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.writtenQuestionId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -538,7 +534,7 @@ export const markWrittenQuestionsFailed = internalMutation({
 // Multi-phase written questions helpers
 export const initWrittenQuestionsMapPhase = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     totalMapTasks: v.number(),
     questionCount: v.number(),
     difficulty: v.string(),
@@ -550,11 +546,11 @@ export const initWrittenQuestionsMapPhase = internalMutation({
     if (!writtenQuestion) return null;
 
     await ctx.db.patch(args.writtenQuestionId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...writtenQuestion.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -571,7 +567,7 @@ export const initWrittenQuestionsMapPhase = internalMutation({
 
 export const storeWrittenQuestionsMapResult = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -603,7 +599,7 @@ export const storeWrittenQuestionsMapResult = internalMutation({
 
 export const clearWrittenQuestionsMapData = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
   },
   handler: async (ctx, args) => {
     const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
@@ -624,7 +620,7 @@ export const clearWrittenQuestionsMapData = internalMutation({
 
 export const saveReportResults = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     content: v.any(),
     metadata: v.any(),
   },
@@ -634,9 +630,9 @@ export const saveReportResults = internalMutation({
 
     await ctx.db.patch(args.reportId, {
       content: args.content,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Report',
+      title: args.metadata?.title ?? "Report",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -648,7 +644,7 @@ export const saveReportResults = internalMutation({
 
 export const updateReportTitle = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -665,7 +661,7 @@ export const updateReportTitle = internalMutation({
 
 export const updateReportStatus = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -687,7 +683,7 @@ export const updateReportStatus = internalMutation({
 
 export const markReportFailed = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -698,12 +694,12 @@ export const markReportFailed = internalMutation({
 
     const errorMetadata = buildErrorMetadata(
       error,
-      metadata?.errorPhase || metadata?.phase || 'unknown',
+      metadata?.errorPhase || metadata?.phase || "unknown",
       metadata
     );
 
     await ctx.db.patch(reportId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...metadata,
@@ -717,7 +713,7 @@ export const markReportFailed = internalMutation({
 // Multi-phase report helpers
 export const initReportMapPhase = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     totalMapTasks: v.number(),
     reportType: v.string(),
     customPrompt: v.optional(v.string()),
@@ -727,11 +723,11 @@ export const initReportMapPhase = internalMutation({
     if (!report) return null;
 
     await ctx.db.patch(args.reportId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...report.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -746,7 +742,7 @@ export const initReportMapPhase = internalMutation({
 
 export const storeReportMapResult = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -778,7 +774,7 @@ export const storeReportMapResult = internalMutation({
 
 export const clearReportMapData = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
   },
   handler: async (ctx, args) => {
     const report = await ctx.db.get(args.reportId);
@@ -799,16 +795,16 @@ export const clearReportMapData = internalMutation({
 
 export const saveMindMapResults = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     mindmap: v.any(),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.mindmapId, {
       data: args.mindmap,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Mind Map',
+      title: args.metadata?.title ?? "Mind Map",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -819,7 +815,7 @@ export const saveMindMapResults = internalMutation({
 
 export const updateMindMapTitle = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -832,7 +828,7 @@ export const updateMindMapTitle = internalMutation({
 
 export const updateMindMapStatus = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -850,18 +846,18 @@ export const updateMindMapStatus = internalMutation({
 
 export const markMindMapFailed = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.mindmapId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -874,7 +870,7 @@ export const markMindMapFailed = internalMutation({
 // Multi-phase mindmap helpers
 export const initMindMapMapPhase = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     totalMapTasks: v.number(),
   },
   handler: async (ctx, args) => {
@@ -882,11 +878,11 @@ export const initMindMapMapPhase = internalMutation({
     if (!mindmap) return null;
 
     await ctx.db.patch(args.mindmapId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...mindmap.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -899,7 +895,7 @@ export const initMindMapMapPhase = internalMutation({
 
 export const storeMindMapMapResult = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -931,7 +927,7 @@ export const storeMindMapMapResult = internalMutation({
 
 export const clearMindMapMapData = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
   },
   handler: async (ctx, args) => {
     const mindmap = await ctx.db.get(args.mindmapId);
@@ -952,17 +948,17 @@ export const clearMindMapMapData = internalMutation({
 
 export const saveSlideDeckResults = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     slides: v.array(v.any()),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.slideDeckId, {
       data: args.slides,
-      status: 'completed',
+      status: "completed",
       slideCount: args.slides.length,
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Slide Deck',
+      title: args.metadata?.title ?? "Slide Deck",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -973,7 +969,7 @@ export const saveSlideDeckResults = internalMutation({
 
 export const updateSlideDeckTitle = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -986,7 +982,7 @@ export const updateSlideDeckTitle = internalMutation({
 
 export const updateSlideDeckStatus = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -1004,18 +1000,18 @@ export const updateSlideDeckStatus = internalMutation({
 
 export const markSlideDeckFailed = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.slideDeckId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -1028,7 +1024,7 @@ export const markSlideDeckFailed = internalMutation({
 // Multi-phase slide deck helpers
 export const initSlideDeckMapPhase = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     totalMapTasks: v.number(),
     slideCount: v.number(),
   },
@@ -1037,11 +1033,11 @@ export const initSlideDeckMapPhase = internalMutation({
     if (!slideDeck) return null;
 
     await ctx.db.patch(args.slideDeckId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...slideDeck.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -1055,7 +1051,7 @@ export const initSlideDeckMapPhase = internalMutation({
 
 export const storeSlideDeckMapResult = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -1087,7 +1083,7 @@ export const storeSlideDeckMapResult = internalMutation({
 
 export const clearSlideDeckMapData = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
   },
   handler: async (ctx, args) => {
     const slideDeck = await ctx.db.get(args.slideDeckId);
@@ -1108,16 +1104,16 @@ export const clearSlideDeckMapData = internalMutation({
 
 export const saveSpreadsheetResults = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     spreadsheet: v.any(),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.spreadsheetId, {
       data: args.spreadsheet,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Spreadsheet',
+      title: args.metadata?.title ?? "Spreadsheet",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -1128,7 +1124,7 @@ export const saveSpreadsheetResults = internalMutation({
 
 export const updateSpreadsheetTitle = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -1141,7 +1137,7 @@ export const updateSpreadsheetTitle = internalMutation({
 
 export const updateSpreadsheetStatus = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -1159,18 +1155,18 @@ export const updateSpreadsheetStatus = internalMutation({
 
 export const markSpreadsheetFailed = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.spreadsheetId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -1183,7 +1179,7 @@ export const markSpreadsheetFailed = internalMutation({
 // Multi-phase spreadsheet helpers
 export const initSpreadsheetMapPhase = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     totalMapTasks: v.number(),
     spreadsheetType: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
@@ -1193,16 +1189,16 @@ export const initSpreadsheetMapPhase = internalMutation({
     if (!spreadsheet) return null;
 
     await ctx.db.patch(args.spreadsheetId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...spreadsheet.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
-        spreadsheetType: args.spreadsheetType || 'custom',
+        spreadsheetType: args.spreadsheetType || "custom",
         customPrompt: args.customPrompt,
       },
     });
@@ -1212,7 +1208,7 @@ export const initSpreadsheetMapPhase = internalMutation({
 
 export const storeSpreadsheetMapResult = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -1244,7 +1240,7 @@ export const storeSpreadsheetMapResult = internalMutation({
 
 export const clearSpreadsheetMapData = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
   },
   handler: async (ctx, args) => {
     const spreadsheet = await ctx.db.get(args.spreadsheetId);
@@ -1265,7 +1261,7 @@ export const clearSpreadsheetMapData = internalMutation({
 
 export const saveAudioOverviewResults = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
     audioUrl: v.string(),
     transcript: v.string(),
     metadata: v.any(),
@@ -1274,9 +1270,9 @@ export const saveAudioOverviewResults = internalMutation({
     await ctx.db.patch(args.audioOverviewId, {
       transcript: args.transcript,
       audioUrl: args.audioUrl,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Audio Overview',
+      title: args.metadata?.title ?? "Audio Overview",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -1287,7 +1283,7 @@ export const saveAudioOverviewResults = internalMutation({
 
 export const updateAudioOverviewTitle = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -1300,7 +1296,7 @@ export const updateAudioOverviewTitle = internalMutation({
 
 export const updateAudioOverviewStatus = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -1318,18 +1314,18 @@ export const updateAudioOverviewStatus = internalMutation({
 
 export const markAudioOverviewFailed = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.audioOverviewId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -1342,7 +1338,7 @@ export const markAudioOverviewFailed = internalMutation({
 // Multi-phase audio overview helpers
 export const initAudioOverviewMapPhase = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
     totalMapTasks: v.number(),
   },
   handler: async (ctx, args) => {
@@ -1350,11 +1346,11 @@ export const initAudioOverviewMapPhase = internalMutation({
     if (!audioOverview) return null;
 
     await ctx.db.patch(args.audioOverviewId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...audioOverview.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
@@ -1367,7 +1363,7 @@ export const initAudioOverviewMapPhase = internalMutation({
 
 export const storeAudioOverviewMapResult = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -1399,7 +1395,7 @@ export const storeAudioOverviewMapResult = internalMutation({
 
 export const clearAudioOverviewMapData = internalMutation({
   args: {
-    audioOverviewId: v.id('audioOverviews'),
+    audioOverviewId: v.id("audioOverviews"),
   },
   handler: async (ctx, args) => {
     const audioOverview = await ctx.db.get(args.audioOverviewId);

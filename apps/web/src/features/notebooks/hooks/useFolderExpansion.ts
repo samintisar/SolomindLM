@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import type { FolderItem, NotebookItem } from '@/shared/types/index';
-import { useFolderNotebooks } from '../services/foldersApi';
+import { useState, useCallback, useEffect, useMemo } from "react";
+import type { FolderItem, NotebookItem } from "@/shared/types/index";
+import { useFolderNotebooks } from "../services/foldersApi";
 
 export interface UseFolderExpansionProps {
   folders?: FolderItem[];
@@ -14,7 +14,9 @@ export interface UseFolderExpansionReturn {
   toggleFolderExpansion: (folderId: string) => void;
 }
 
-export function useFolderExpansion({ folders = [] }: UseFolderExpansionProps): UseFolderExpansionReturn {
+export function useFolderExpansion({
+  folders = [],
+}: UseFolderExpansionProps): UseFolderExpansionReturn {
   const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
 
   const notebooksQuery = useFolderNotebooks(expandedFolderId);

@@ -23,7 +23,10 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query.filter((q) => q.eq(q.field("userId"), userId)).order("desc").collect();
+    return await query
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .collect();
   }
   return await query.order("desc").collect();
 }
@@ -37,10 +40,7 @@ export type ReportCreate = {
   metadata?: unknown;
 };
 
-export async function createReport(
-  ctx: MutationCtx,
-  data: ReportCreate
-): Promise<Id<"reports">> {
+export async function createReport(ctx: MutationCtx, data: ReportCreate): Promise<Id<"reports">> {
   const now = Date.now();
   return await ctx.db.insert("reports", {
     userId: data.userId,
@@ -122,9 +122,6 @@ export async function patchReport(
   });
 }
 
-export async function deleteReport(
-  ctx: MutationCtx,
-  reportId: Id<"reports">
-): Promise<void> {
+export async function deleteReport(ctx: MutationCtx, reportId: Id<"reports">): Promise<void> {
   await ctx.db.delete("reports", reportId);
 }

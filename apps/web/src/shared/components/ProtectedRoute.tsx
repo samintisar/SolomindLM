@@ -1,13 +1,7 @@
-import { useMemo, useEffect, useState, type ReactNode } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import {
-  useQuery,
-  useMutation,
-  Authenticated,
-  Unauthenticated,
-  AuthLoading,
-} from 'convex/react';
-import { api } from '@convex/_generated/api';
+import { useMemo, useEffect, useState, type ReactNode } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { api } from "@convex/_generated/api";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -16,9 +10,9 @@ interface ProtectedRouteProps {
 
 function stripShareQueryParam(search: string): string {
   const p = new URLSearchParams(search);
-  p.delete('share');
+  p.delete("share");
   const s = p.toString();
-  return s ? `?${s}` : '';
+  return s ? `?${s}` : "";
 }
 
 export function ProtectedRoute({ children, requireNotebookAccess = false }: ProtectedRouteProps) {
@@ -38,7 +32,7 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   const shareToken = useMemo(() => {
     if (!requireNotebookAccess || !notebookId) return null;
-    return new URLSearchParams(location.search).get('share');
+    return new URLSearchParams(location.search).get("share");
   }, [requireNotebookAccess, notebookId, location.search]);
 
   const [redeemFinished, setRedeemFinished] = useState(() => shareToken === null);
@@ -60,7 +54,7 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
           navigate(`${location.pathname}${nextSearch}`, { replace: true });
         }
       } catch (e) {
-        console.error('[ProtectedRoute] redeem share link failed', e);
+        console.error("[ProtectedRoute] redeem share link failed", e);
       } finally {
         if (!cancelled) {
           setRedeemFinished(true);
@@ -75,19 +69,14 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   const notebook = useQuery(
     api.notebooks.index.get,
-    notebookId ? { id: notebookId as any } : 'skip'
+    notebookId ? { id: notebookId as any } : "skip"
   );
 
   const waitingForNotebook =
-    requireNotebookAccess &&
-    notebookId &&
-    (!redeemFinished || notebook === undefined);
+    requireNotebookAccess && notebookId && (!redeemFinished || notebook === undefined);
 
   const notebookAccessDenied =
-    requireNotebookAccess &&
-    notebookId &&
-    redeemFinished &&
-    notebook === null;
+    requireNotebookAccess && notebookId && redeemFinished && notebook === null;
 
   return (
     <>
@@ -122,7 +111,7 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
           {...({
             state: {
               from: `${location.pathname}${location.search}`,
-              message: 'Please sign in to continue',
+              message: "Please sign in to continue",
             },
           } as Record<string, unknown>)}
         />

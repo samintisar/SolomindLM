@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Source } from '@/shared/types';
+import { useState, useMemo } from "react";
+import { Source } from "@/shared/types";
 
 interface UseSourceSearchResult {
   searchQuery: string;
@@ -11,14 +11,12 @@ interface UseSourceSearchResult {
  * Custom hook for searching and filtering sources
  */
 export function useSourceSearch(sources: Source[]): UseSourceSearchResult {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   const filteredSources = useMemo(() => {
     if (!searchQuery.trim()) return sources;
     const query = searchQuery.toLowerCase();
-    return sources.filter(source =>
-      source.title.toLowerCase().includes(query)
-    );
+    return sources.filter((source) => source.title.toLowerCase().includes(query));
   }, [sources, searchQuery]);
 
   return {

@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Output validation utility for LLM agent operations.
  *
@@ -56,13 +56,13 @@ function validateRequiredSections(
   for (const section of requiredSections) {
     // Multiple matching patterns for flexibility
     const patterns = [
-      new RegExp(`##\\s*${section}`, 'i'),      // ## Section Name
-      new RegExp(`###\\s*${section}`, 'i'),     // ### Section Name
-      new RegExp(`\\*\\*${section}\\*\\*`, 'i'), // **Section Name**
-      new RegExp(`${section}`, 'i'),            // Anywhere (case-insensitive)
+      new RegExp(`##\\s*${section}`, "i"), // ## Section Name
+      new RegExp(`###\\s*${section}`, "i"), // ### Section Name
+      new RegExp(`\\*\\*${section}\\*\\*`, "i"), // **Section Name**
+      new RegExp(`${section}`, "i"), // Anywhere (case-insensitive)
     ];
 
-    const sectionFound = patterns.some(pattern => pattern.test(output));
+    const sectionFound = patterns.some((pattern) => pattern.test(output));
 
     if (sectionFound) {
       found.push(section);
@@ -84,10 +84,10 @@ function validateEnding(output: string): { isComplete: boolean; warnings: string
   const warnings: string[] = [];
 
   if (!output || output.trim().length === 0) {
-    return { isComplete: false, warnings: ['Empty output'] };
+    return { isComplete: false, warnings: ["Empty output"] };
   }
 
-  const lastLine = output.trim().split('\n').pop() || '';
+  const lastLine = output.trim().split("\n").pop() || "";
 
   // Check if ends with sentence terminator
   if (
@@ -97,7 +97,7 @@ function validateEnding(output: string): { isComplete: boolean; warnings: string
     !lastLine.match(/^\*\*/) && // Not bold text start
     !lastLine.match(/```/) // Not code block
   ) {
-    warnings.push('Abrupt ending detected (likely truncated)');
+    warnings.push("Abrupt ending detected (likely truncated)");
   }
 
   return {
@@ -156,10 +156,7 @@ function validateItemCount(
  * });
  * ```
  */
-export function validateOutput(
-  output: string,
-  config: ValidationConfig
-): ValidationResult {
+export function validateOutput(output: string, config: ValidationConfig): ValidationResult {
   const missing: string[] = [];
   const warnings: string[] = [];
 
@@ -237,12 +234,12 @@ export const ValidationPresets = {
    */
   study_guide: {
     requiredSections: [
-      'Learning Objectives',
-      'Study Notes',
-      'Quiz Questions',
-      'Answer Key',
-      'Essay Questions',
-      'Glossary',
+      "Learning Objectives",
+      "Study Notes",
+      "Quiz Questions",
+      "Answer Key",
+      "Essay Questions",
+      "Glossary",
     ],
     minItems: 10, // 10 quiz questions
     checkTruncation: true,
@@ -252,7 +249,7 @@ export const ValidationPresets = {
    * Briefing document validation
    */
   briefing: {
-    requiredSections: ['Executive Summary', 'Main Themes', 'Key Findings', 'Recommendations'],
+    requiredSections: ["Executive Summary", "Main Themes", "Key Findings", "Recommendations"],
     checkTruncation: true,
   } as ValidationConfig,
 
@@ -260,7 +257,7 @@ export const ValidationPresets = {
    * Blog post validation
    */
   blog_post: {
-    requiredSections: ['Introduction', 'Conclusion'],
+    requiredSections: ["Introduction", "Conclusion"],
     minItems: 3, // At least 3 key takeaways
     checkTruncation: true,
   } as ValidationConfig,
@@ -277,7 +274,7 @@ export const ValidationPresets = {
         const hasQA = /q:\s*/i.test(output) && /a:\s*/i.test(output);
         return {
           valid: hasQA,
-          message: hasQA ? '' : 'Missing Q&A format',
+          message: hasQA ? "" : "Missing Q&A format",
         };
       },
     ],
@@ -292,11 +289,11 @@ export const ValidationPresets = {
     customRules: [
       (output: string) => {
         // Check for multiple choice format
-        const hasOptions = /^[a-d][\.)]\s*/im.test(output);
+        const hasOptions = /^[a-d][.)]\s*/im.test(output);
         const hasAnswer = /answer:\s*[a-d]/i.test(output);
         return {
           valid: hasOptions && hasAnswer,
-          message: !hasOptions ? 'Missing multiple choice options' : 'Missing answer key',
+          message: !hasOptions ? "Missing multiple choice options" : "Missing answer key",
         };
       },
     ],
@@ -306,7 +303,7 @@ export const ValidationPresets = {
    * Summary validation
    */
   summary: {
-    requiredSections: ['Overview', 'Main Arguments', 'Conclusions'],
+    requiredSections: ["Overview", "Main Arguments", "Conclusions"],
     checkTruncation: true,
   } as ValidationConfig,
 
@@ -315,10 +312,10 @@ export const ValidationPresets = {
    */
   technical_report: {
     requiredSections: [
-      'Executive Summary',
-      'Technical Specifications',
-      'Methodologies',
-      'Findings',
+      "Executive Summary",
+      "Technical Specifications",
+      "Methodologies",
+      "Findings",
     ],
     checkTruncation: true,
   } as ValidationConfig,
@@ -327,7 +324,7 @@ export const ValidationPresets = {
    * Concept explainer validation
    */
   concept_explainer: {
-    requiredSections: ['Introduction', 'Core Concepts', 'Examples'],
+    requiredSections: ["Introduction", "Core Concepts", "Examples"],
     checkTruncation: true,
   } as ValidationConfig,
 
@@ -339,12 +336,16 @@ export const ValidationPresets = {
     customRules: [
       (output: string) => {
         // Check for hierarchical structure (indentation)
-        const hasHierarchy = /^  /m.test(output);
+        const hasHierarchy = /^ {2}/m.test(output);
         // Check for root topic
         const hasRoot = /^#\s+.+/m.test(output);
         return {
           valid: hasHierarchy && hasRoot,
-          message: !hasRoot ? 'Missing root topic (#)' : !hasHierarchy ? 'Missing hierarchical structure' : '',
+          message: !hasRoot
+            ? "Missing root topic (#)"
+            : !hasHierarchy
+              ? "Missing hierarchical structure"
+              : "",
         };
       },
     ],
@@ -395,7 +396,7 @@ export function validateFlashcards(output: string, targetCount: number): Validat
   const answers = output.match(/a:\s*/gi) || [];
 
   if (questions.length !== answers.length) {
-    issues.push('Mismatch between questions and answers');
+    issues.push("Mismatch between questions and answers");
   }
 
   if (questions.length < targetCount * 0.8) {
@@ -431,7 +432,7 @@ export function validateQuiz(output: string, targetCount: number): ValidationRes
   // Check for answer keys
   const hasAnswers = /answer:\s*[a-d]/i.test(output);
   if (!hasAnswers) {
-    issues.push('Missing answer key');
+    issues.push("Missing answer key");
   }
 
   return {

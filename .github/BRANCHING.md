@@ -14,10 +14,10 @@ feature/* (development)
 
 ## Rules
 
-| Branch | Purpose | Protection |
-|--------|---------|------------|
-| `main` | Production-ready code | Protected - requires PR + CI checks |
-| `feature/*` | New features, bug fixes, experiments | None |
+| Branch      | Purpose                              | Protection                          |
+| ----------- | ------------------------------------ | ----------------------------------- |
+| `main`      | Production-ready code                | Protected - requires PR + CI checks |
+| `feature/*` | New features, bug fixes, experiments | None                                |
 
 ## Workflow
 
@@ -61,13 +61,13 @@ git push -u origin feature/your-feature-name
 
 ## Branch Naming Conventions
 
-| Prefix | Usage | Example |
-|--------|-------|---------|
-| `feature/` | New features | `feature/user-authentication` |
-| `fix/` | Bug fixes | `fix/payment-webhook` |
-| `refactor/` | Code refactoring | `refactor/api-structure` |
-| `docs/` | Documentation only | `docs/readme-update` |
-| `chore/` | Maintenance tasks | `chore/update-dependencies` |
+| Prefix      | Usage              | Example                       |
+| ----------- | ------------------ | ----------------------------- |
+| `feature/`  | New features       | `feature/user-authentication` |
+| `fix/`      | Bug fixes          | `fix/payment-webhook`         |
+| `refactor/` | Code refactoring   | `refactor/api-structure`      |
+| `docs/`     | Documentation only | `docs/readme-update`          |
+| `chore/`    | Maintenance tasks  | `chore/update-dependencies`   |
 
 ## Commit Message Guidelines
 
@@ -97,24 +97,26 @@ pwsh -File .github/branch-protection.ps1
 3. Enter `main` as the branch name pattern
 4. Configure:
 
-   | Setting | Value |
-   |---------|-------|
-   | Require a pull request | ✅ (1 approval) |
-   | Require status checks | ✅ |
-   | Require branches to be up to date | ✅ |
-   | Require status checks to pass | `Build (Web)`, `Type Check` (as configured) |
-   | Do not allow bypassing the settings | ✅ |
-   | Require resolution of conversations | Optional |
+   | Setting                             | Value                                       |
+   | ----------------------------------- | ------------------------------------------- |
+   | Require a pull request              | ✅ (1 approval)                             |
+   | Require status checks               | ✅                                          |
+   | Require branches to be up to date   | ✅                                          |
+   | Require status checks to pass       | `Build (Web)`, `Type Check` (as configured) |
+   | Do not allow bypassing the settings | ✅                                          |
+   | Require resolution of conversations | Optional                                    |
 
 5. Click **Create**
 
 ## CI Pipeline Details
 
 The `.github/workflows/ci.yml` runs on:
+
 - Push to `main`
 - Pull requests targeting `main`
 
 Jobs:
+
 1. **Build (Web)** - Builds the React frontend
 2. **Type Check** - Validates TypeScript (when configured)
 

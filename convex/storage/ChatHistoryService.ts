@@ -1,7 +1,7 @@
-import { internalMutation, internalQuery, internalAction } from '../_generated/server';
-import type { Id, Doc } from '../_generated/dataModel';
-import { v } from 'convex/values';
-import { internal } from '../_generated/api';
+import { internalMutation, internalQuery, internalAction } from "../_generated/server";
+import type { Id, Doc } from "../_generated/dataModel";
+import { v } from "convex/values";
+import { internal } from "../_generated/api";
 
 // ============================================================
 // Types
@@ -58,17 +58,15 @@ export interface ReferenceChunk {
 export const getOrCreateConversation = internalMutation({
   args: {
     userId: v.id("users"),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
     const { userId, notebookId } = args;
 
     // Try to get existing conversation
     const existing = await ctx.db
-      .query('conversations')
-      .withIndex('by_user_notebook', (q) =>
-        q.eq('userId', userId).eq('notebookId', notebookId)
-      )
+      .query("conversations")
+      .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
       .first();
 
     if (existing) {
@@ -77,10 +75,10 @@ export const getOrCreateConversation = internalMutation({
     }
 
     // Create new conversation
-    const conversationId = await ctx.db.insert('conversations', {
+    const conversationId = await ctx.db.insert("conversations", {
       userId,
       notebookId,
-      title: 'New Chat',
+      title: "New Chat",
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -95,19 +93,19 @@ export const getOrCreateConversation = internalMutation({
  */
 export const getMessages = internalQuery({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { conversationId, limit = 50 } = args;
 
     const messages = await ctx.db
-      .query('messages')
-      .withIndex('by_conversation', (q) => q.eq('conversationId', conversationId))
-      .order('asc')
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+      .order("asc")
       .take(limit);
 
-    return messages.map(msg => ({
+    return messages.map((msg) => ({
       id: msg._id,
       role: msg.role,
       content: msg.content,
@@ -120,7 +118,7 @@ export const getMessages = internalQuery({
 
 /** Message shape returned by getConversationWithMessages */
 type ConversationMessage = {
-  id: Id<'messages'>;
+  id: Id<"messages">;
   role: string;
   content: string;
   createdAt: number;
@@ -129,7 +127,7 @@ type ConversationMessage = {
 };
 
 /** Return type of getConversationWithMessages */
-type ConversationWithMessages = (Doc<'conversations'> | null) & {
+type ConversationWithMessages = (Doc<"conversations"> | null) & {
   messages: ConversationMessage[];
 };
 
@@ -139,7 +137,7 @@ type ConversationWithMessages = (Doc<'conversations'> | null) & {
 export const getConversationWithMessages = internalAction({
   args: {
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     messageLimit: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<ConversationWithMessages> => {
@@ -148,13 +146,13 @@ export const getConversationWithMessages = internalAction({
     const { userId, notebookId, messageLimit = 50 } = args;
 
     // Get or create conversation
-    const conversationId: Id<'conversations'> = await ctx.runMutation(
+    const conversationId: Id<"conversations"> = await ctx.runMutation(
       internal.storage.ChatHistoryService.getOrCreateConversation,
       { userId: userId as any, notebookId }
     );
 
     // Get conversation details (internal, no auth)
-    const conversation: Doc<'conversations'> | null = await ctx.runQuery(
+    const conversation: Doc<"conversations"> | null = await ctx.runQuery(
       internal.chat.conversations.getInternal,
       { conversationId }
     );
@@ -177,16 +175,16 @@ export const getConversationWithMessages = internalAction({
  */
 export const addUserMessage = internalMutation({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
     userId: v.string(),
     content: v.string(),
   },
   handler: async (ctx, args) => {
     const { conversationId, content } = args;
 
-    const messageId = await ctx.db.insert('messages', {
+    const messageId = await ctx.db.insert("messages", {
       conversationId,
-      role: 'user',
+      role: "user",
       content,
       createdAt: Date.now(),
     });
@@ -205,7 +203,7 @@ export const addUserMessage = internalMutation({
  */
 export const addAssistantMessage = internalMutation({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
     userId: v.string(),
     content: v.string(),
     references: v.optional(v.array(v.any())),
@@ -214,16 +212,18 @@ export const addAssistantMessage = internalMutation({
   handler: async (ctx, args) => {
     const { conversationId, content, references, metadata } = args;
 
-    const messageId = await ctx.db.insert('messages', {
+    const messageId = await ctx.db.insert("messages", {
       conversationId,
-      role: 'assistant',
+      role: "assistant",
       content,
       references,
       metadata: metadata || {},
       createdAt: Date.now(),
     });
 
-    console.log(`[ChatHistoryService] Added assistant message with ${references?.length || 0} references`);
+    console.log(
+      `[ChatHistoryService] Added assistant message with ${references?.length || 0} references`
+    );
 
     // Update conversation updated_at timestamp
     await ctx.db.patch(conversationId, {
@@ -239,7 +239,7 @@ export const addAssistantMessage = internalMutation({
  */
 export const clearConversation = internalMutation({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
     userId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -248,13 +248,13 @@ export const clearConversation = internalMutation({
     // Verify ownership
     const conversation = await ctx.db.get(conversationId);
     if (!conversation || conversation.userId !== userId) {
-      throw new Error('Conversation not found or access denied');
+      throw new Error("Conversation not found or access denied");
     }
 
     // Get all messages
     const messages = await ctx.db
-      .query('messages')
-      .withIndex('by_conversation', (q) => q.eq('conversationId', conversationId))
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
       .collect();
 
     // Delete all messages
@@ -271,7 +271,7 @@ export const clearConversation = internalMutation({
  */
 export const deleteConversation = internalMutation({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
     userId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -280,7 +280,7 @@ export const deleteConversation = internalMutation({
     // Verify ownership
     const conversation = await ctx.db.get(conversationId);
     if (!conversation || conversation.userId !== userId) {
-      throw new Error('Conversation not found or access denied');
+      throw new Error("Conversation not found or access denied");
     }
 
     // Messages will be cascade deleted via schema
@@ -295,7 +295,7 @@ export const deleteConversation = internalMutation({
  */
 export const renameConversation = internalMutation({
   args: {
-    conversationId: v.id('conversations'),
+    conversationId: v.id("conversations"),
     userId: v.string(),
     title: v.string(),
   },
@@ -305,7 +305,7 @@ export const renameConversation = internalMutation({
     // Verify ownership
     const conversation = await ctx.db.get(conversationId);
     if (!conversation || conversation.userId !== userId) {
-      throw new Error('Conversation not found or access denied');
+      throw new Error("Conversation not found or access denied");
     }
 
     await ctx.db.patch(conversationId, { title });
@@ -325,9 +325,9 @@ export const getUserConversations = internalQuery({
     const { userId } = args;
 
     const conversations = await ctx.db
-      .query('conversations')
-      .withIndex('by_user_notebook', (q) => q.eq('userId', userId))
-      .order('desc')
+      .query("conversations")
+      .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
+      .order("desc")
       .collect();
 
     return conversations;

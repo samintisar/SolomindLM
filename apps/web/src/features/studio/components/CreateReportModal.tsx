@@ -1,7 +1,6 @@
-
-import React, { useState, useEffect } from 'react';
-import { X, Pencil, FilePlus2, ChevronLeft } from 'lucide-react';
-import { StudioModalDiscoverPromptsButton } from './StudioModalDiscoverPromptsButton';
+import React, { useState, useEffect } from "react";
+import { X, Pencil, FilePlus2, ChevronLeft } from "lucide-react";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface ReportFormat {
   id: string;
@@ -13,15 +12,15 @@ interface ReportFormat {
 
 const FORMATS: ReportFormat[] = [
   {
-    id: 'custom',
-    title: 'Create Your Own',
-    description: 'Craft reports your way by specifying structure, style, tone, and more',
-    prompt: ''
+    id: "custom",
+    title: "Create Your Own",
+    description: "Craft reports your way by specifying structure, style, tone, and more",
+    prompt: "",
   },
   {
-    id: 'briefing',
-    title: 'Briefing Doc',
-    description: 'Overview of your sources featuring key insights and quotes',
+    id: "briefing",
+    title: "Briefing Doc",
+    description: "Overview of your sources featuring key insights and quotes",
     hasEdit: true,
     prompt: `Create a comprehensive briefing document that synthesizes the main themes and ideas from the sources. Start with a concise Executive Summary that presents the most critical takeaways upfront. The body of the document must provide a detailed and thorough examination of the main themes, evidence, and conclusions found in the sources. This analysis should be structured logically with headings and bullet points to ensure clarity. The tone must be objective and incisive.
 
@@ -38,12 +37,12 @@ const FORMATS: ReportFormat[] = [
 [Significant outcomes and implications]
 
 ## Recommendations
-[Action items based on findings]`
+[Action items based on findings]`,
   },
   {
-    id: 'study_guide',
-    title: 'Study Guide',
-    description: 'Short-answer quiz, suggested essay questions, and glossary of key terms',
+    id: "study_guide",
+    title: "Study Guide",
+    description: "Short-answer quiz, suggested essay questions, and glossary of key terms",
     hasEdit: true,
     prompt: `You are a highly capable research assistant and tutor. Create a detailed study guide designed to review understanding of the sources. Create a quiz with ten short-answer questions (2-3 sentences each) and include a separate answer key. Suggest five essay format questions, but do not supply answers. Also conclude with a comprehensive glossary of key terms with definitions.
 
@@ -63,22 +62,22 @@ const FORMATS: ReportFormat[] = [
 [5 essay prompts for deeper exploration - no answers provided]
 
 ## Glossary
-[Comprehensive list of key terms with definitions]`
+[Comprehensive list of key terms with definitions]`,
   },
   {
-    id: 'blog_post',
-    title: 'Blog Post',
-    description: 'Insightful takeaways distilled into a highly readable article',
+    id: "blog_post",
+    title: "Blog Post",
+    description: "Insightful takeaways distilled into a highly readable article",
     hasEdit: true,
-    prompt: `Act as a thoughtful writer and synthesizer of ideas, tasked with creating an engaging and readable blog post for a popular online publishing platform known for its clean aesthetic and insightful content. Your goal is to distill the top most surprising, counter-intuitive, or impactful takeaways from the provided source materials into a compelling listicle. The writing style should be clean, accessible, and highly scannable, employing a conversational yet intelligent tone. Craft a compelling, click-worthy headline. Begin the article with a short introduction that hooks the reader by establishing a relatable problem or curiosity, then present each of the takeaway points as a distinct section with a clear, bolded subheading. Within each section, use short paragraphs to explain the concept clearly, and don't just summarize; offer a brief analysis or a reflection on why this point is so interesting or important, and if a powerful quote exists in the sources, feature it in a blockquote for emphasis. Conclude the post with a brief, forward-looking summary that leaves the reader with a final thought-provoking question or a powerful takeaway to ponder.`
+    prompt: `Act as a thoughtful writer and synthesizer of ideas, tasked with creating an engaging and readable blog post for a popular online publishing platform known for its clean aesthetic and insightful content. Your goal is to distill the top most surprising, counter-intuitive, or impactful takeaways from the provided source materials into a compelling listicle. The writing style should be clean, accessible, and highly scannable, employing a conversational yet intelligent tone. Craft a compelling, click-worthy headline. Begin the article with a short introduction that hooks the reader by establishing a relatable problem or curiosity, then present each of the takeaway points as a distinct section with a clear, bolded subheading. Within each section, use short paragraphs to explain the concept clearly, and don't just summarize; offer a brief analysis or a reflection on why this point is so interesting or important, and if a powerful quote exists in the sources, feature it in a blockquote for emphasis. Conclude the post with a brief, forward-looking summary that leaves the reader with a final thought-provoking question or a powerful takeaway to ponder.`,
   },
 ];
 
 const SUGGESTED_FORMATS: ReportFormat[] = [
   {
-    id: 'summary',
-    title: 'Summary',
-    description: 'A concise synthesis of the essential information from your sources.',
+    id: "summary",
+    title: "Summary",
+    description: "A concise synthesis of the essential information from your sources.",
     hasEdit: true,
     prompt: `Create a comprehensive yet concise summary that synthesizes the essential information from the sources. Begin with an overview that captures the core subject and purpose. The body should systematically present the main arguments, key evidence supporting those arguments, and important conclusions. Maintain a neutral, objective tone while ensuring all significant points are covered. Use clear headings and bullet points to enhance readability.
 
@@ -92,12 +91,13 @@ const SUGGESTED_FORMATS: ReportFormat[] = [
 [Supporting data, examples, and evidence]
 
 ## Conclusions
-[Significant findings, outcomes, and implications]`
+[Significant findings, outcomes, and implications]`,
   },
   {
-    id: 'technical_report',
-    title: 'Technical Report',
-    description: 'Detailed technical documentation with specifications, methodologies, data analysis, and findings.',
+    id: "technical_report",
+    title: "Technical Report",
+    description:
+      "Detailed technical documentation with specifications, methodologies, data analysis, and findings.",
     hasEdit: true,
     prompt: `Create a detailed technical report that thoroughly documents the technical aspects of the subject matter. Begin with an executive summary of technical findings. The body should include comprehensive sections on technical specifications, methodologies employed, data and metrics analysis, and detailed findings. Use precise technical language and include specific parameters, configurations, and quantitative measurements where applicable. The report should be structured for technical professionals who require in-depth information.
 
@@ -117,12 +117,13 @@ const SUGGESTED_FORMATS: ReportFormat[] = [
 [Detailed examination of technical data]
 
 ## Findings and Conclusions
-[Technical conclusions and recommendations]`
+[Technical conclusions and recommendations]`,
   },
   {
-    id: 'concept_explainer',
-    title: 'Concept Explainer',
-    description: 'Accessible explanations of core concepts with definitions, examples, and relationship mapping.',
+    id: "concept_explainer",
+    title: "Concept Explainer",
+    description:
+      "Accessible explanations of core concepts with definitions, examples, and relationship mapping.",
     hasEdit: true,
     prompt: `Create an accessible and comprehensive explanation of the core concepts found in the sources. Begin with an introduction that explains why these concepts matter and who they are relevant for. For each concept, provide a clear definition, explain how it relates to other concepts, give concrete examples or analogies to aid understanding, and address common misconceptions. Use clear, jargon-free language that makes complex ideas understandable to a non-expert audience. Organize the content logically with concepts building upon each other.
 
@@ -141,12 +142,13 @@ const SUGGESTED_FORMATS: ReportFormat[] = [
 [How concepts interact and connect]
 
 ## Summary
-[Quick reference of the most important points]`
+[Quick reference of the most important points]`,
   },
   {
-    id: 'methodology_overview',
-    title: 'Methodology Overview',
-    description: 'Comprehensive documentation of research methods, frameworks, data collection, and analysis approaches.',
+    id: "methodology_overview",
+    title: "Methodology Overview",
+    description:
+      "Comprehensive documentation of research methods, frameworks, data collection, and analysis approaches.",
     hasEdit: true,
     prompt: `Create a comprehensive overview of the methodological approaches found in the sources. Begin with an introduction that explains the purpose and scope of the methodologies covered. Systematically document the research methods, frameworks applied, data collection techniques, and analysis approaches used. For each method, explain its purpose, how it was implemented, and what it was designed to achieve. Use clear headings and structured formatting to make the information easily accessible to researchers or practitioners who may need to understand or apply these methods.
 
@@ -166,7 +168,7 @@ const SUGGESTED_FORMATS: ReportFormat[] = [
 [How data was processed, analyzed, and interpreted]
 
 ## Methodological Considerations
-[Strengths, limitations, and best practices]`
+[Strengths, limitations, and best practices]`,
   },
 ];
 
@@ -179,21 +181,21 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
   embedded = false,
 }) => {
   const [configuringFormat, setConfiguringFormat] = useState<ReportFormat | null>(null);
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [customPrompt, setCustomPrompt] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
       setConfiguringFormat(null);
-      setCustomPrompt('');
+      setCustomPrompt("");
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleFormatClick = (format: ReportFormat) => {
-    if (format.id === 'custom') {
+    if (format.id === "custom") {
       setConfiguringFormat(format);
-      setCustomPrompt('');
+      setCustomPrompt("");
     } else {
       onSelectFormat(format.id);
     }
@@ -202,7 +204,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
   const handleEditClick = (e: React.MouseEvent, format: ReportFormat) => {
     e.stopPropagation();
     setConfiguringFormat(format);
-    setCustomPrompt(format.prompt || '');
+    setCustomPrompt(format.prompt || "");
   };
 
   const handleGenerate = () => {
@@ -223,12 +225,14 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
       <div
         className={`relative flex w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl ${panelMaxClass}`}
       >
-        
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
             {configuringFormat && (
-              <button onClick={() => setConfiguringFormat(null)} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors -ml-2">
+              <button
+                onClick={() => setConfiguringFormat(null)}
+                className="p-2 hover:bg-secondary/50 rounded-xl transition-colors -ml-2"
+              >
                 <ChevronLeft className="w-5 h-5" />
               </button>
             )}
@@ -237,7 +241,11 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <StudioModalDiscoverPromptsButton />
-            <button type="button" onClick={onClose} className="rounded-xl p-2 transition-colors hover:bg-secondary/50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl p-2 transition-colors hover:bg-secondary/50"
+            >
               <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
@@ -246,13 +254,17 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
         {configuringFormat ? (
           <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-card/50 animate-in slide-in-from-right-4 duration-300">
             <div className="p-6 rounded-xl bg-secondary/20 border border-border">
-               <h4 className="text-lg font-bold mb-2 font-serif">{configuringFormat.title}</h4>
-               <p className="text-sm text-muted-foreground font-serif leading-relaxed">{configuringFormat.description}</p>
+              <h4 className="text-lg font-bold mb-2 font-serif">{configuringFormat.title}</h4>
+              <p className="text-sm text-muted-foreground font-serif leading-relaxed">
+                {configuringFormat.description}
+              </p>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70 font-sans">Describe the report you want to create</h3>
-              <textarea 
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70 font-sans">
+                Describe the report you want to create
+              </h3>
+              <textarea
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Tell SolomindLM how to structure and write your report..."
@@ -261,8 +273,8 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
             </div>
 
             <div className="flex justify-end pt-4">
-              <button 
-                onClick={handleGenerate} 
+              <button
+                onClick={handleGenerate}
                 className="px-8 py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-bold rounded-xl transition-all shadow-md active:scale-95 text-sm"
               >
                 Generate Report
@@ -272,10 +284,17 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
         ) : (
           <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-10 bg-card/50 animate-in slide-in-from-left-4 duration-300">
             <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70 font-sans">Format</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70 font-sans">
+                Format
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {ALL_FORMATS.map((format) => (
-                  <FormatCard key={format.id} format={format} onClick={() => handleFormatClick(format)} onEditClick={(e) => handleEditClick(e, format)} />
+                  <FormatCard
+                    key={format.id}
+                    format={format}
+                    onClick={() => handleFormatClick(format)}
+                    onEditClick={(e) => handleEditClick(e, format)}
+                  />
                 ))}
               </div>
             </div>
@@ -286,14 +305,26 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
   );
 };
 
-const FormatCard: React.FC<{ format: ReportFormat; onClick: () => void; onEditClick: (e: React.MouseEvent) => void; }> = ({ format, onClick, onEditClick }) => (
-  <div onClick={onClick} className="group relative flex flex-col p-5 rounded-xl bg-card border border-border/50 hover:border-primary/40 hover:bg-secondary/30 transition-all cursor-pointer h-48 shadow-sm hover:shadow-md">
+const FormatCard: React.FC<{
+  format: ReportFormat;
+  onClick: () => void;
+  onEditClick: (e: React.MouseEvent) => void;
+}> = ({ format, onClick, onEditClick }) => (
+  <div
+    onClick={onClick}
+    className="group relative flex flex-col p-5 rounded-xl bg-card border border-border/50 hover:border-primary/40 hover:bg-secondary/30 transition-all cursor-pointer h-48 shadow-sm hover:shadow-md"
+  >
     {format.hasEdit && (
-      <button onClick={onEditClick} className="absolute top-3 right-3 p-1.5 rounded-xl bg-background border border-border text-muted-foreground hover:text-primary transition-colors z-10">
+      <button
+        onClick={onEditClick}
+        className="absolute top-3 right-3 p-1.5 rounded-xl bg-background border border-border text-muted-foreground hover:text-primary transition-colors z-10"
+      >
         <Pencil className="w-3 h-3" />
       </button>
     )}
-    <h4 className="text-md font-bold mb-2 font-serif pr-6 group-hover:text-primary transition-colors">{format.title}</h4>
+    <h4 className="text-md font-bold mb-2 font-serif pr-6 group-hover:text-primary transition-colors">
+      {format.title}
+    </h4>
     <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-4 font-serif">
       {format.description}
     </p>

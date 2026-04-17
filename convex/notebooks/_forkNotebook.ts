@@ -36,9 +36,7 @@ export async function performNotebookFork(
     .collect();
 
   if (docs.length > MAX_FORK_DOCUMENTS) {
-    throw new Error(
-      `Notebook has too many sources to fork at once (max ${MAX_FORK_DOCUMENTS}).`
-    );
+    throw new Error(`Notebook has too many sources to fork at once (max ${MAX_FORK_DOCUMENTS}).`);
   }
 
   const docIdMap = new Map<Id<"documents">, Id<"documents">>();
@@ -82,9 +80,7 @@ export async function performNotebookFork(
     .collect();
 
   if (chunks.length > MAX_FORK_CHUNKS) {
-    throw new Error(
-      `Notebook is too large to fork (max ${MAX_FORK_CHUNKS} text chunks).`
-    );
+    throw new Error(`Notebook is too large to fork (max ${MAX_FORK_CHUNKS} text chunks).`);
   }
 
   for (const c of chunks) {

@@ -1,1 +1,1 @@
-export * from './sanitizeMarkdown';
+export * from "./sanitizeMarkdown";

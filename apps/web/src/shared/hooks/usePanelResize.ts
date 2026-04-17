@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from "react";
 
 const MIN_PANEL_WIDTH = 220;
 const getMaxPanelWidth = () => Math.min(window.innerWidth * 0.7, 1400);
@@ -39,18 +39,18 @@ export function usePanelResize() {
     if (isResizingLeft || isResizingRight) {
       window.addEventListener("mousemove", resize);
       window.addEventListener("mouseup", stopResizing);
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
     } else {
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
     }
 
     return () => {
       window.removeEventListener("mousemove", resize);
       window.removeEventListener("mouseup", stopResizing);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
     };
   }, [isResizingLeft, isResizingRight, resize, stopResizing]);
 
@@ -66,12 +66,12 @@ export function usePanelResize() {
       setRightWidth(customEvent.detail.width);
     };
 
-    window.addEventListener('resizeSourcesPanel', handleSourcesPanelResize);
-    window.addEventListener('resizeStudioPanel', handleStudioPanelResize);
+    window.addEventListener("resizeSourcesPanel", handleSourcesPanelResize);
+    window.addEventListener("resizeStudioPanel", handleStudioPanelResize);
 
     return () => {
-      window.removeEventListener('resizeSourcesPanel', handleSourcesPanelResize);
-      window.removeEventListener('resizeStudioPanel', handleStudioPanelResize);
+      window.removeEventListener("resizeSourcesPanel", handleSourcesPanelResize);
+      window.removeEventListener("resizeStudioPanel", handleStudioPanelResize);
     };
   }, []);
 

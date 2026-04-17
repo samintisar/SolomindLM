@@ -1,7 +1,7 @@
-import React from 'react';
-import { Search, Plus, FileStack, Trash2, RefreshCw } from 'lucide-react';
-import { Source } from '@/shared/types';
-import { SourceListItem } from './SourceListItem';
+import React from "react";
+import { Search, Plus, FileStack, Trash2, RefreshCw } from "lucide-react";
+import { Source } from "@/shared/types";
+import { SourceListItem } from "./SourceListItem";
 
 interface SourceListProps {
   sources: Source[];
@@ -67,7 +67,7 @@ export const SourceList: React.FC<SourceListProps> = ({
   };
 
   const handleRenameCancel = () => {
-    onMenuOpen('');
+    onMenuOpen("");
   };
 
   /** Below 300px: icon-only. 300–399px: single-line abbreviations so labels never wrap. */
@@ -83,23 +83,27 @@ export const SourceList: React.FC<SourceListProps> = ({
           <button
             type="button"
             onClick={onAddSource}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? 'px-3' : ''}`}
-            title={actionIconsOnly || actionAbbrevLabels ? 'Add Source' : ''}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? "px-3" : ""}`}
+            title={actionIconsOnly || actionAbbrevLabels ? "Add Source" : ""}
           >
             <Plus className="w-4 h-4 shrink-0" />
             {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">{actionAbbrevLabels ? 'ADD…' : 'Add Source'}</span>
+              <span className="min-w-0 whitespace-nowrap truncate">
+                {actionAbbrevLabels ? "ADD…" : "Add Source"}
+              </span>
             )}
           </button>
           <button
             type="button"
             onClick={onDiscoverClick}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-card border border-border text-foreground rounded-md shadow-xs hover:bg-secondary hover:border-primary/30 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? 'px-3' : ''}`}
-            title={actionIconsOnly || actionAbbrevLabels ? 'Discover sources' : ''}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-card border border-border text-foreground rounded-md shadow-xs hover:bg-secondary hover:border-primary/30 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? "px-3" : ""}`}
+            title={actionIconsOnly || actionAbbrevLabels ? "Discover sources" : ""}
           >
             <Search className="w-4 h-4 text-primary shrink-0" />
             {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">{actionAbbrevLabels ? 'DISC…' : 'Discover'}</span>
+              <span className="min-w-0 whitespace-nowrap truncate">
+                {actionAbbrevLabels ? "DISC…" : "Discover"}
+              </span>
             )}
           </button>
         </div>
@@ -108,24 +112,28 @@ export const SourceList: React.FC<SourceListProps> = ({
             type="button"
             onClick={onDeleteSelected}
             disabled={selectedCount === 0}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-card/80 border border-border/70 text-destructive/90 rounded-md shadow-none hover:bg-destructive/10 hover:border-border hover:text-destructive transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0 ${actionIconsOnly ? 'px-2' : ''}`}
-            title={actionIconsOnly || actionAbbrevLabels ? 'Delete selected' : ''}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-card/80 border border-border/70 text-destructive/90 rounded-md shadow-none hover:bg-destructive/10 hover:border-border hover:text-destructive transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0 ${actionIconsOnly ? "px-2" : ""}`}
+            title={actionIconsOnly || actionAbbrevLabels ? "Delete selected" : ""}
           >
             <Trash2 className="w-4 h-4 shrink-0" />
             {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">{actionAbbrevLabels ? 'DEL…' : 'Delete'}</span>
+              <span className="min-w-0 whitespace-nowrap truncate">
+                {actionAbbrevLabels ? "DEL…" : "Delete"}
+              </span>
             )}
           </button>
           <button
             type="button"
             onClick={onRefreshAll}
             disabled={!canRefreshAll || isRefreshing}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-card/80 border border-border/70 text-muted-foreground rounded-md shadow-none hover:bg-secondary/80 hover:border-border hover:text-foreground transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0 ${actionIconsOnly ? 'px-2' : ''}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-card/80 border border-border/70 text-muted-foreground rounded-md shadow-none hover:bg-secondary/80 hover:border-border hover:text-foreground transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0 ${actionIconsOnly ? "px-2" : ""}`}
             title="Re-fetch web pages and Google Drive imports"
           >
-            <RefreshCw className={`w-4 h-4 shrink-0 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 shrink-0 ${isRefreshing ? "animate-spin" : ""}`} />
             {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">{actionAbbrevLabels ? 'REFRESH…' : 'Refresh all'}</span>
+              <span className="min-w-0 whitespace-nowrap truncate">
+                {actionAbbrevLabels ? "REFRESH…" : "Refresh all"}
+              </span>
             )}
           </button>
         </div>
@@ -150,7 +158,7 @@ export const SourceList: React.FC<SourceListProps> = ({
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-1 font-display">
             <span>
-              {filteredSources.length} {searchQuery.trim() ? `of ${sources.length}` : ''} items
+              {filteredSources.length} {searchQuery.trim() ? `of ${sources.length}` : ""} items
             </span>
             {sources.length > 0 && filteredSources.length > 0 && (
               <button
@@ -158,7 +166,7 @@ export const SourceList: React.FC<SourceListProps> = ({
                 onClick={onToggleAll}
                 className="hover:text-primary transition-colors cursor-pointer select-none font-medium"
               >
-                {allSelected ? 'Deselect all' : 'Select all'}
+                {allSelected ? "Deselect all" : "Select all"}
               </button>
             )}
           </div>
@@ -167,7 +175,9 @@ export const SourceList: React.FC<SourceListProps> = ({
             <div className="text-center py-12">
               <FileStack className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-sm text-muted-foreground">
-                {searchQuery.trim() ? 'No sources match your search.' : 'No sources yet. Add your first source to get started.'}
+                {searchQuery.trim()
+                  ? "No sources match your search."
+                  : "No sources yet. Add your first source to get started."}
               </p>
             </div>
           ) : (

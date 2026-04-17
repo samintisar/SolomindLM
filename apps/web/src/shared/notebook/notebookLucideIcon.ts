@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
 import {
   Folder,
   Book,
@@ -10,7 +10,7 @@ import {
   FileText,
   GraduationCap,
   Lightbulb,
-} from 'lucide-react';
+} from "lucide-react";
 
 const NOTEBOOK_LUCIDE_ICON_MAP: Record<string, LucideIcon> = {
   Folder,

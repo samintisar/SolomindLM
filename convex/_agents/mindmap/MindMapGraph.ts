@@ -1,22 +1,22 @@
-"use node"
+"use node";
 /**
  * MindMapGraph — orchestration and public API for mind map generation.
  */
 
-import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import { END, START, StateGraph, type Send } from '@langchain/langgraph';
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import { END, START, StateGraph, type Send } from "@langchain/langgraph";
 
-import { AGENT_LANGGRAPH_RECURSION_LIMIT } from '../_shared/agent_graph_limits.js';
-import { mergeModelKwargs } from '../_shared/llm_factory.js';
-import { createAgentGraphLogger } from '../_shared/logging.js';
+import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.js";
+import { mergeModelKwargs } from "../_shared/llm_factory.js";
+import { createAgentGraphLogger } from "../_shared/logging.js";
 
-import { validateChunks } from './chunkHelpers.js';
-import { createMapTasks } from './routing.js';
-import { mapProcess, type MindMapMapProcessDeps } from './nodeMap.js';
-import { reduceNode } from './nodeReduce.js';
-import { createSmartFallback as buildSmartFallbackTree } from './fallbacks.js';
-import { parseMarkdownToTree as markdownToMindMapTree } from './parsing.js';
-import { extractConcepts as runConceptExtraction } from './structuredLlm.js';
+import { validateChunks } from "./chunkHelpers.js";
+import { createMapTasks } from "./routing.js";
+import { mapProcess, type MindMapMapProcessDeps } from "./nodeMap.js";
+import { reduceNode } from "./nodeReduce.js";
+import { createSmartFallback as buildSmartFallbackTree } from "./fallbacks.js";
+import { parseMarkdownToTree as markdownToMindMapTree } from "./parsing.js";
+import { extractConcepts as runConceptExtraction } from "./structuredLlm.js";
 import {
   OverallState,
   type ChunkStateType,
@@ -24,10 +24,10 @@ import {
   type FinalMindMap,
   type MindMapNode,
   type OverallStateType,
-} from './state.js';
-import { NODES } from './prompts.js';
+} from "./state.js";
+import { NODES } from "./prompts.js";
 
-export { packChunks, validateChunks } from './chunkHelpers.js';
+export { packChunks, validateChunks } from "./chunkHelpers.js";
 
 /**
  * MindMapGraph class that orchestrates mind map generation.
@@ -45,7 +45,7 @@ export class MindMapGraph {
       model: mapModel,
       temperature: 0.1,
       maxTokens: 8000,
-      modelKwargs: mergeModelKwargs(mapModel, 'fast'),
+      modelKwargs: mergeModelKwargs(mapModel, "fast"),
     });
 
     this.smartLlm = new ChatTogetherAI({
@@ -53,7 +53,7 @@ export class MindMapGraph {
       model: reduceModel,
       temperature: 0.3,
       maxTokens: 16000,
-      modelKwargs: mergeModelKwargs(reduceModel, 'smart'),
+      modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
   }
 
@@ -96,18 +96,18 @@ export class MindMapGraph {
    */
   async generate(chunks: string[]): Promise<FinalMindMap> {
     if (!chunks || chunks.length === 0) {
-      throw new Error('No chunks provided for mind map generation');
+      throw new Error("No chunks provided for mind map generation");
     }
 
     const validated = validateChunks(chunks);
     if (validated.length === 0) {
-      throw new Error('All chunks failed validation (empty or too small)');
+      throw new Error("All chunks failed validation (empty or too small)");
     }
 
-    const logger = createAgentGraphLogger('MindMapGraph', 'mindmap');
+    const logger = createAgentGraphLogger("MindMapGraph", "mindmap");
     logger.info(`Starting mind map generation with ${validated.length} valid chunks`, {
-      agent: 'MindMapGraph',
-      phase: 'initialize',
+      agent: "MindMapGraph",
+      phase: "initialize",
       inputChunks: chunks.length,
       validChunks: validated.length,
     });
@@ -119,22 +119,18 @@ export class MindMapGraph {
     try {
       const result = await graph.invoke({
         allChunks: chunks,
-        status: 'generating',
+        status: "generating",
       });
 
       if (!result.finalOutput) {
-        throw new Error('Graph execution completed but no output generated');
+        throw new Error("Graph execution completed but no output generated");
       }
 
       return result.finalOutput;
     } catch (error) {
-      logger.phaseError(
-        'generate',
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          agent: 'MindMapGraph',
-        }
-      );
+      logger.phaseError("generate", error instanceof Error ? error : new Error(String(error)), {
+        agent: "MindMapGraph",
+      });
 
       throw error;
     }
@@ -157,4 +153,3 @@ export class MindMapGraph {
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });
   }
 }
-

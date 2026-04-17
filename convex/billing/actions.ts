@@ -42,10 +42,7 @@ export const checkStripeConfig = action({
     const monthlyPriceIdSet = !!process.env.STRIPE_PRO_MONTHLY_PRICE_ID;
     const yearlyPriceIdSet = !!process.env.STRIPE_PRO_YEARLY_PRICE_ID;
     const allSet =
-      stripeSecretKeySet &&
-      stripeWebhookSecretSet &&
-      monthlyPriceIdSet &&
-      yearlyPriceIdSet;
+      stripeSecretKeySet && stripeWebhookSecretSet && monthlyPriceIdSet && yearlyPriceIdSet;
     return {
       stripeSecretKeySet,
       stripeWebhookSecretSet,
@@ -82,9 +79,7 @@ export const createCheckoutSession = action({
 
     if (!priceId) {
       const varName =
-        args.interval === "month"
-          ? "STRIPE_PRO_MONTHLY_PRICE_ID"
-          : "STRIPE_PRO_YEARLY_PRICE_ID";
+        args.interval === "month" ? "STRIPE_PRO_MONTHLY_PRICE_ID" : "STRIPE_PRO_YEARLY_PRICE_ID";
       throw new Error(
         `Stripe price ID not configured. Set ${varName} in Convex Dashboard → Settings → Environment Variables (use a Stripe Price ID e.g. price_xxx).`
       );
@@ -125,20 +120,22 @@ export const createCheckoutSession = action({
           return { url: session.url, sessionId: session.sessionId };
         } catch (retryErr: unknown) {
           const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-          throw new Error(
-            `Stripe customer not found and retry failed. ${retryMsg}`
-          );
+          throw new Error(`Stripe customer not found and retry failed. ${retryMsg}`, {
+            cause: retryErr,
+          });
         }
       }
 
       // Stripe "No such price" = price ID not in this account or test/live mismatch
-      if (message.includes("No such price") || (err as { code?: string })?.code === "resource_missing") {
+      if (
+        message.includes("No such price") ||
+        (err as { code?: string })?.code === "resource_missing"
+      ) {
         const varName =
-          args.interval === "month"
-            ? "STRIPE_PRO_MONTHLY_PRICE_ID"
-            : "STRIPE_PRO_YEARLY_PRICE_ID";
+          args.interval === "month" ? "STRIPE_PRO_MONTHLY_PRICE_ID" : "STRIPE_PRO_YEARLY_PRICE_ID";
         throw new Error(
-          `Invalid Stripe price. Update ${varName} in Convex to a Price ID from the same Stripe account and mode (test vs live) as your STRIPE_SECRET_KEY. In Stripe Dashboard → Products, copy the correct price_xxx. Stripe: ${message}`
+          `Invalid Stripe price. Update ${varName} in Convex to a Price ID from the same Stripe account and mode (test vs live) as your STRIPE_SECRET_KEY. In Stripe Dashboard → Products, copy the correct price_xxx. Stripe: ${message}`,
+          { cause: err }
         );
       }
       throw err;
@@ -157,10 +154,7 @@ export const createPortalSession = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const subscription = await ctx.runQuery(
-      internal.billing.index.getByUserIdInternal,
-      { userId }
-    );
+    const subscription = await ctx.runQuery(internal.billing.index.getByUserIdInternal, { userId });
     if (!subscription?.stripeCustomerId) {
       throw new Error("No Stripe customer found");
     }
@@ -184,7 +178,9 @@ export const cancelAtPeriodEnd = action({
     stripeSubscriptionId: v.string(),
     status: v.string(),
   }),
-  handler: async (ctx: ActionCtx): Promise<{
+  handler: async (
+    ctx: ActionCtx
+  ): Promise<{
     stripeSubscriptionId: string;
     status: string;
   }> => {
@@ -224,7 +220,9 @@ export const removeCancelAtPeriodEnd = action({
     stripeSubscriptionId: v.string(),
     status: v.string(),
   }),
-  handler: async (ctx: ActionCtx): Promise<{
+  handler: async (
+    ctx: ActionCtx
+  ): Promise<{
     stripeSubscriptionId: string;
     status: string;
   }> => {

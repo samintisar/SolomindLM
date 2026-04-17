@@ -1,4 +1,5 @@
 # Video Generation API Reference
+
 ## Contents
 
 - [Endpoints](#endpoints)
@@ -10,13 +11,12 @@
 - [Steps](#steps)
 - [Troubleshooting](#troubleshooting)
 
-
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST /v2/videos` | Create video | Submit a video generation job |
-| `GET /v2/videos/{id}` | Get video status | Poll for job completion |
+| Method                | Path             | Description                   |
+| --------------------- | ---------------- | ----------------------------- |
+| `POST /v2/videos`     | Create video     | Submit a video generation job |
+| `GET /v2/videos/{id}` | Get video status | Poll for job completion       |
 
 Base URL: `https://api.together.xyz`
 
@@ -64,33 +64,33 @@ curl -X POST "https://api.together.xyz/v2/videos" \
 
 ### Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `model` | string | Yes | - | Model identifier |
-| `prompt` | string | Yes* | - | Text description (1-32,000 chars) |
-| `width` | integer | No | 1366 | Video width in pixels |
-| `height` | integer | No | 768 | Video height in pixels |
-| `seconds` | string | No | varies | Clip duration override. Supported values depend on the model. |
-| `fps` | integer | No | 24 | Frames per second (15-60) |
-| `steps` | integer | No | varies | Diffusion steps (10-50) |
-| `guidance_scale` | float | No | varies | Prompt adherence (6.0-10.0, avoid >12) |
-| `seed` | integer | No | random | Random seed for reproducibility |
-| `negative_prompt` | string | No | - | Elements to exclude |
-| `frame_images` | array | No | - | Keyframe images: `[{input_image, frame}]` |
-| `reference_images` | array | No | - | Style reference image URLs |
-| `output_format` | string | No | `"MP4"` | `"MP4"` or `"WEBM"` |
-| `output_quality` | integer | No | 20 | Compression quality (lower = higher quality) |
+| Parameter          | Type    | Required | Default | Description                                                   |
+| ------------------ | ------- | -------- | ------- | ------------------------------------------------------------- |
+| `model`            | string  | Yes      | -       | Model identifier                                              |
+| `prompt`           | string  | Yes\*    | -       | Text description (1-32,000 chars)                             |
+| `width`            | integer | No       | 1366    | Video width in pixels                                         |
+| `height`           | integer | No       | 768     | Video height in pixels                                        |
+| `seconds`          | string  | No       | varies  | Clip duration override. Supported values depend on the model. |
+| `fps`              | integer | No       | 24      | Frames per second (15-60)                                     |
+| `steps`            | integer | No       | varies  | Diffusion steps (10-50)                                       |
+| `guidance_scale`   | float   | No       | varies  | Prompt adherence (6.0-10.0, avoid >12)                        |
+| `seed`             | integer | No       | random  | Random seed for reproducibility                               |
+| `negative_prompt`  | string  | No       | -       | Elements to exclude                                           |
+| `frame_images`     | array   | No       | -       | Keyframe images: `[{input_image, frame}]`                     |
+| `reference_images` | array   | No       | -       | Style reference image URLs                                    |
+| `output_format`    | string  | No       | `"MP4"` | `"MP4"` or `"WEBM"`                                           |
+| `output_quality`   | integer | No       | 20      | Compression quality (lower = higher quality)                  |
 
-*Prompt not required for Kling 2.1 Standard/Pro and Kling 1.6 Pro.
+\*Prompt not required for Kling 2.1 Standard/Pro and Kling 1.6 Pro.
 
 ### frame_images Schema
 
 Each element in the `frame_images` array:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `input_image` | string | Image URL or base64-encoded image data |
-| `frame` | number or string | Frame index: `0`, `"first"`, or `"last"` |
+| Field         | Type             | Description                              |
+| ------------- | ---------------- | ---------------------------------------- |
+| `input_image` | string           | Image URL or base64-encoded image data   |
+| `frame`       | number or string | Frame index: `0`, `"first"`, or `"last"` |
 
 Frame number calculation: `frame = seconds x fps` (for specific frame positions).
 
@@ -151,10 +151,12 @@ const job = await client.videos.create({
   model: "minimax/hailuo-02",
   width: 1366,
   height: 768,
-  frame_images: [{
-    input_image: "https://cdn.pixabay.com/photo/2020/05/20/08/27/cat-5195431_1280.jpg",
-    frame: "first",
-  }],
+  frame_images: [
+    {
+      input_image: "https://cdn.pixabay.com/photo/2020/05/20/08/27/cat-5195431_1280.jpg",
+      frame: "first",
+    },
+  ],
 });
 ```
 
@@ -212,24 +214,24 @@ curl -X GET "https://api.together.xyz/v2/videos/$JOB_ID" \
 
 ### Path Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | string | Yes | Job ID from create response |
+| Parameter | Type   | Required | Description                 |
+| --------- | ------ | -------- | --------------------------- |
+| `id`      | string | Yes      | Job ID from create response |
 
 ### Response Schema
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Unique job identifier |
-| `object` | string | Always `"video"` |
-| `model` | string | Model used |
-| `status` | string | `in_progress`, `completed`, or `failed` |
-| `created_at` | number | Unix timestamp of creation |
-| `completed_at` | number | Unix timestamp of completion |
-| `size` | string | Video resolution |
-| `seconds` | string | Clip duration |
-| `outputs` | object | `{cost, video_url}` when completed |
-| `error` | object | `{code, message}` when failed |
+| Field          | Type   | Description                             |
+| -------------- | ------ | --------------------------------------- |
+| `id`           | string | Unique job identifier                   |
+| `object`       | string | Always `"video"`                        |
+| `model`        | string | Model used                              |
+| `status`       | string | `in_progress`, `completed`, or `failed` |
+| `created_at`   | number | Unix timestamp of creation              |
+| `completed_at` | number | Unix timestamp of completion            |
+| `size`         | string | Video resolution                        |
+| `seconds`      | string | Clip duration                           |
+| `outputs`      | object | `{cost, video_url}` when completed      |
+| `error`        | object | `{code, message}` when failed           |
 
 ### Completed Response
 
@@ -252,13 +254,13 @@ curl -X GET "https://api.together.xyz/v2/videos/$JOB_ID" \
 
 ## Job Statuses
 
-| Status | Description |
-|--------|-------------|
-| `queued` | Waiting in queue |
-| `in_progress` | Generating |
-| `completed` | Done -- `outputs.video_url` available |
-| `failed` | Check `error` for details |
-| `cancelled` | Job cancelled |
+| Status        | Description                           |
+| ------------- | ------------------------------------- |
+| `queued`      | Waiting in queue                      |
+| `in_progress` | Generating                            |
+| `completed`   | Done -- `outputs.video_url` available |
+| `failed`      | Check `error` for details             |
+| `cancelled`   | Job cancelled                         |
 
 ## Polling Pattern
 
@@ -285,28 +287,28 @@ while True:
 
 ## Guidance Scale
 
-| Range | Effect |
-|-------|--------|
-| 6.0-7.0 | More creative, less literal |
-| 7.0-9.0 | Balanced (recommended) |
-| 9.0-10.0 | Strict prompt adherence |
-| >12.0 | Avoid -- causes artifacts |
+| Range    | Effect                      |
+| -------- | --------------------------- |
+| 6.0-7.0  | More creative, less literal |
+| 7.0-9.0  | Balanced (recommended)      |
+| 9.0-10.0 | Strict prompt adherence     |
+| >12.0    | Avoid -- causes artifacts   |
 
 ## Steps
 
-| Steps | Effect |
-|-------|--------|
-| 10 | Quick testing, lower quality |
-| 20 | Standard quality |
-| 30-40 | Production-grade |
-| >50 | Diminishing returns |
+| Steps | Effect                       |
+| ----- | ---------------------------- |
+| 10    | Quick testing, lower quality |
+| 20    | Standard quality             |
+| 30-40 | Production-grade             |
+| >50   | Diminishing returns          |
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Prompt mismatch | Increase `guidance_scale` to 8-10 and use more specific language |
-| Visual artifacts | Reduce `guidance_scale` below 12 and increase `steps` to 30-40 |
-| Slow generation | Reduce `steps`, shorten `seconds`, or lower `fps` |
-| URL expired | Download videos immediately after completion |
+| Issue            | Solution                                                             |
+| ---------------- | -------------------------------------------------------------------- |
+| Prompt mismatch  | Increase `guidance_scale` to 8-10 and use more specific language     |
+| Visual artifacts | Reduce `guidance_scale` below 12 and increase `steps` to 30-40       |
+| Slow generation  | Reduce `steps`, shorten `seconds`, or lower `fps`                    |
+| URL expired      | Download videos immediately after completion                         |
 | Unnatural motion | Adjust `fps` and use `negative_prompt` to exclude unwanted artifacts |

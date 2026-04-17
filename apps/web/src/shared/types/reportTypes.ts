@@ -10,45 +10,45 @@ export interface ReportTypeConfig {
 
 export const REPORT_TYPES: Record<string, ReportTypeConfig> = {
   custom: {
-    id: 'custom',
-    displayName: 'Custom',
-    description: 'Custom Report'
+    id: "custom",
+    displayName: "Custom",
+    description: "Custom Report",
   },
   briefing: {
-    id: 'briefing',
-    displayName: 'Briefing Doc',
-    description: 'Briefing Document'
+    id: "briefing",
+    displayName: "Briefing Doc",
+    description: "Briefing Document",
   },
   study_guide: {
-    id: 'study_guide',
-    displayName: 'Study Guide',
-    description: 'Study Guide'
+    id: "study_guide",
+    displayName: "Study Guide",
+    description: "Study Guide",
   },
   blog_post: {
-    id: 'blog_post',
-    displayName: 'Blog Post',
-    description: 'Blog Post'
+    id: "blog_post",
+    displayName: "Blog Post",
+    description: "Blog Post",
   },
   summary: {
-    id: 'summary',
-    displayName: 'Summary',
-    description: 'Summary'
+    id: "summary",
+    displayName: "Summary",
+    description: "Summary",
   },
   technical_report: {
-    id: 'technical_report',
-    displayName: 'Technical Report',
-    description: 'Technical Report'
+    id: "technical_report",
+    displayName: "Technical Report",
+    description: "Technical Report",
   },
   concept_explainer: {
-    id: 'concept_explainer',
-    displayName: 'Concept Explainer',
-    description: 'Concept Explainer'
+    id: "concept_explainer",
+    displayName: "Concept Explainer",
+    description: "Concept Explainer",
   },
   methodology_overview: {
-    id: 'methodology_overview',
-    displayName: 'Methodology Overview',
-    description: 'Methodology Overview'
-  }
+    id: "methodology_overview",
+    displayName: "Methodology Overview",
+    description: "Methodology Overview",
+  },
 };
 
 /**
@@ -57,21 +57,21 @@ export const REPORT_TYPES: Record<string, ReportTypeConfig> = {
  * @returns The normalized report type ID
  */
 export function normalizeReportTypeId(reportTypeId: string): string {
-  if (!reportTypeId) return 'custom';
-  
+  if (!reportTypeId) return "custom";
+
   // If it's already a valid key, return it
   if (reportTypeId in REPORT_TYPES) {
     return reportTypeId;
   }
-  
+
   // Try to normalize by converting to lowercase and replacing spaces with underscores
-  const normalized = reportTypeId.toLowerCase().replace(/\s+/g, '_');
+  const normalized = reportTypeId.toLowerCase().replace(/\s+/g, "_");
   if (normalized in REPORT_TYPES) {
     return normalized;
   }
-  
+
   // Return custom as default
-  return 'custom';
+  return "custom";
 }
 
 /**
@@ -81,7 +81,7 @@ export function normalizeReportTypeId(reportTypeId: string): string {
  */
 export function getReportTypeDisplayName(reportTypeId: string): string {
   const normalized = normalizeReportTypeId(reportTypeId);
-  return REPORT_TYPES[normalized]?.displayName || 'Report';
+  return REPORT_TYPES[normalized]?.displayName || "Report";
 }
 
 /**
@@ -94,4 +94,3 @@ export function getReportSubtitle(reportTypeId: string): string {
   const displayName = getReportTypeDisplayName(normalized);
   return `Report • ${displayName}`;
 }
-

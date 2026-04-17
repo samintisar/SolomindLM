@@ -12,20 +12,21 @@ Use flashcards (`convex/_agents/flashcard/`, `convex/studio/flashcards/`) as the
 ## Step 1: Schema (`convex/schema.ts`)
 
 Add a table following this pattern:
+
 ```typescript
 myFeature: defineTable({
   userId: v.id("users"),
   notebookId: v.id("notebooks"),
   title: v.string(),
-  status: v.string(),          // 'draft' | 'generating' | 'completed' | 'failed'
-  itemsData: v.optional(v.array(v.any())),  // generated content
-  metadata: v.optional(v.any()),            // config params (topic, count, difficulty...)
+  status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
+  itemsData: v.optional(v.array(v.any())), // generated content
+  metadata: v.optional(v.any()), // config params (topic, count, difficulty...)
   createdAt: v.number(),
   updatedAt: v.number(),
 })
   .index("by_notebook", ["notebookId"])
   .index("by_user", ["userId"])
-  .index("by_status", ["status"])
+  .index("by_status", ["status"]);
 ```
 
 ---
@@ -35,6 +36,7 @@ myFeature: defineTable({
 Create 4 files (use `_agents/flashcard/` as template):
 
 **`state.ts`** — LangGraph Annotation state:
+
 ```typescript
 export const OverallState = Annotation.Root({
   documentIds: Annotation<string[]>({ ... }),
@@ -49,6 +51,7 @@ export const OverallState = Annotation.Root({
 ```
 
 **`prompts.ts`** — Zod schemas + types + system prompts:
+
 ```typescript
 export const MyItemSchema = z.object({ ... });
 export const MyItemArraySchema = z.object({ items: z.array(MyItemSchema) });
@@ -56,6 +59,7 @@ export type MyItem = z.infer<typeof MyItemSchema>;
 ```
 
 **`nodes.ts`** — `MyFeatureGraph` class with nodes:
+
 - `splitChunksNode()` — partition docs into chunks
 - `mapProcessNode()` — generate items for one chunk (uses fast LLM)
 - `collapseNode()` — merge partial results
@@ -68,6 +72,7 @@ export type MyItem = z.infer<typeof MyItemSchema>;
 ## Step 3: Convex Job + Mutations (`convex/studio/myfeature/`)
 
 ### `index.ts` — Public + internal mutations/queries
+
 ```typescript
 // Public (called from client)
 export const list = query({ ... });   // list by notebook
@@ -84,6 +89,7 @@ export const getInternal = internalQuery({ ... });
 ```
 
 ### `job.ts` — Multi-phase internalActions (avoids timeouts)
+
 ```typescript
 // Entry point — schedule from action
 export const myFeatureGeneration = internalAction({
@@ -99,6 +105,7 @@ export const finalizeMyFeaturePhase = internalAction({ ... });   // combine + sa
 ```
 
 ### `convex/studio/_shared.ts` — Add scheduling action
+
 ```typescript
 export const scheduleMyFeature = action({
   args: { notebookId: v.id("notebooks"), documentIds: v.array(v.id("documents")), ... },
@@ -117,6 +124,7 @@ export const scheduleMyFeature = action({
 ## Step 4: Model Layer (`convex/_model/myfeature.ts`)
 
 CRUD helpers called by mutations — keeps `index.ts` clean:
+
 ```typescript
 export async function createMyFeature(ctx, data) { ... }
 export async function getMyFeature(ctx, id) { ... }
@@ -212,12 +220,12 @@ Wire into `useStudioHandlers.ts`.
 
 ## Key Patterns
 
-| Pattern | Rule |
-|---------|------|
-| Job scheduling | `ctx.scheduler.runAfter(0, internal.*, args)` — no jobs table |
-| Timeouts | Split into 3+ chained internalActions (map/collapse/reduce phases) |
-| LLM structured output | `llm.withStructuredOutput(ZodSchema)` — never parse raw strings |
-| Parallel processing | LangGraph `Send` API + reducer on `mapOutputs` state |
-| Client → server | Public `action` → `internal` mutations only |
-| Status tracking | Always update status before/after each phase |
-| Smart vs fast LLM | `env.SMART_LLM` for reduce, `env.FAST_LLM` for map chunks |
+| Pattern               | Rule                                                               |
+| --------------------- | ------------------------------------------------------------------ |
+| Job scheduling        | `ctx.scheduler.runAfter(0, internal.*, args)` — no jobs table      |
+| Timeouts              | Split into 3+ chained internalActions (map/collapse/reduce phases) |
+| LLM structured output | `llm.withStructuredOutput(ZodSchema)` — never parse raw strings    |
+| Parallel processing   | LangGraph `Send` API + reducer on `mapOutputs` state               |
+| Client → server       | Public `action` → `internal` mutations only                        |
+| Status tracking       | Always update status before/after each phase                       |
+| Smart vs fast LLM     | `env.SMART_LLM` for reduce, `env.FAST_LLM` for map chunks          |

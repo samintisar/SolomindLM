@@ -1,12 +1,12 @@
-"use node"
+"use node";
 
-import { env } from '../../_lib/env.js';
+import { env } from "../../_lib/env.js";
 
 /**
  * Safely parse integer env vars with fallback.
  */
 const safeParseInt = (val: string | undefined, fallback: number): number => {
-  const parsed = parseInt(val || '', 10);
+  const parsed = parseInt(val || "", 10);
   return isNaN(parsed) ? fallback : parsed;
 };
 

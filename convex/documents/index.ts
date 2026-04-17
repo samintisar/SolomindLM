@@ -11,14 +11,11 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { checkSourceLimit } from "../_lib/limits";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 
 async function deleteAllChunksForDocument(
   ctx: MutationCtx,
-  documentId: Id<"documents">,
+  documentId: Id<"documents">
 ): Promise<void> {
   const chunks = await ctx.db
     .query("documentChunks")
@@ -81,7 +78,9 @@ export const upload = mutation({
 
     if (args.type === "file" && (args.googleDriveFileId || args.googleDriveMimeType)) {
       if (!args.googleDriveFileId || !args.googleDriveMimeType) {
-        throw new Error("googleDriveFileId and googleDriveMimeType must both be set for Drive-backed files");
+        throw new Error(
+          "googleDriveFileId and googleDriveMimeType must both be set for Drive-backed files"
+        );
       }
     }
 
@@ -97,15 +96,17 @@ export const upload = mutation({
       contentType: args.contentType,
       googleDriveFileId: args.googleDriveFileId,
       googleDriveMimeType: args.googleDriveMimeType,
-      fileUrl: (args.type === "url" || args.type === "youtube" || args.type === "text") ? args.source : undefined,
+      fileUrl:
+        args.type === "url" || args.type === "youtube" || args.type === "text"
+          ? args.source
+          : undefined,
       status: "pending",
       createdAt: now,
       updatedAt: now,
     });
 
     // Schedule embedding job; stagger YouTube jobs to avoid Supadata "Limit Exceeded" when uploading multiple at once
-    const delayMs =
-      args.type === 'youtube' ? Math.floor(Math.random() * 8000) : 0;
+    const delayMs = args.type === "youtube" ? Math.floor(Math.random() * 8000) : 0;
     await ctx.scheduler.runAfter(delayMs, internal.documents.embeddingJob.docEmbedding, {
       documentId,
       userId,
@@ -250,9 +251,31 @@ export const getSignedUrl = mutation({
 
 // Known file extensions so we can preserve them when renaming (keeps PDF/DOCX etc. labels correct)
 const FILE_EXTENSIONS = new Set([
-  'pdf', 'docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'txt', 'md', 'markdown',
-  'json', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif',
-  'wav', 'mp3', 'm4a', 'webm', 'flac',
+  "pdf",
+  "docx",
+  "doc",
+  "pptx",
+  "ppt",
+  "xlsx",
+  "xls",
+  "txt",
+  "md",
+  "markdown",
+  "json",
+  "csv",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "svg",
+  "avif",
+  "wav",
+  "mp3",
+  "m4a",
+  "webm",
+  "flac",
 ]);
 
 /**
@@ -320,7 +343,7 @@ export const remove = mutation({
     await deleteAllChunksForDocument(ctx, args.id);
 
     if (document.storageId) {
-      await ctx.storage.delete(document.storageId as Id<'_storage'>);
+      await ctx.storage.delete(document.storageId as Id<"_storage">);
     }
 
     await ctx.db.delete(args.id);
@@ -352,7 +375,7 @@ export const removeMany = mutation({
       await deleteAllChunksForDocument(ctx, id);
 
       if (document.storageId) {
-        await ctx.storage.delete(document.storageId as Id<'_storage'>);
+        await ctx.storage.delete(document.storageId as Id<"_storage">);
       }
 
       await ctx.db.delete(id);
@@ -409,15 +432,11 @@ export const prepareDocumentReembed = internalMutation({
     const after = await ctx.db.get(args.documentId);
     if (!after) throw new Error("Document not found");
 
-    await ctx.scheduler.runAfter(
-      args.delayMs,
-      internal.documents.embeddingJob.docEmbedding,
-      {
-        documentId: args.documentId,
-        userId: after.userId,
-        notebookId: after.notebookId,
-      },
-    );
+    await ctx.scheduler.runAfter(args.delayMs, internal.documents.embeddingJob.docEmbedding, {
+      documentId: args.documentId,
+      userId: after.userId,
+      notebookId: after.notebookId,
+    });
   },
 });
 
@@ -572,9 +591,7 @@ export const getChunks = internalQuery({
     chunkIds: v.array(v.id("documentChunks")),
   },
   handler: async (ctx, args) => {
-    return await Promise.all(
-      args.chunkIds.map((id) => ctx.db.get(id))
-    );
+    return await Promise.all(args.chunkIds.map((id) => ctx.db.get(id)));
   },
 });
 
@@ -633,7 +650,7 @@ export const fetchChunks = internalAction({
 export const keywordSearch = internalQuery({
   args: {
     notebookId: v.id("notebooks"),
-    userId: v.id("users"),  // Note: Using v.id("users") from Better Auth
+    userId: v.id("users"), // Note: Using v.id("users") from Better Auth
     query: v.string(),
     limit: v.optional(v.number()),
     documentIds: v.optional(v.array(v.id("documents"))),
@@ -646,10 +663,7 @@ export const keywordSearch = internalQuery({
     const results = await ctx.db
       .query("documentChunks")
       .withSearchIndex("search_content", (q) =>
-        q
-          .search("content", args.query)
-          .eq("userId", args.userId)
-          .eq("notebookId", args.notebookId)
+        q.search("content", args.query).eq("userId", args.userId).eq("notebookId", args.notebookId)
       )
       .take(limit);
 
@@ -658,21 +672,16 @@ export const keywordSearch = internalQuery({
     // FIXED: Explicit length > 0 check
     let filtered = results;
     if (args.documentIds && args.documentIds.length > 0) {
-      const docIdSet = new Set(
-        args.documentIds.map((id) => id.toString())
-      );
-      filtered = results.filter((r) =>
-        r.documentId !== undefined && docIdSet.has(r.documentId.toString())
+      const docIdSet = new Set(args.documentIds.map((id) => id.toString()));
+      filtered = results.filter(
+        (r) => r.documentId !== undefined && docIdSet.has(r.documentId.toString())
       );
       console.log(`[keywordSearch] after filter=${filtered.length}`);
     }
 
     const uniqueDocIds = [...new Set(filtered.map((r) => r.documentId))];
     type DocId = NonNullable<(typeof filtered)[0]["documentId"]>;
-    const docMetaMap = new Map<
-      DocId,
-      { fileName: string; sourceUrl?: string }
-    >();
+    const docMetaMap = new Map<DocId, { fileName: string; sourceUrl?: string }>();
     for (const id of uniqueDocIds) {
       const doc = await ctx.db.get(id);
       const fileName = doc?.fileName ?? "Document";
@@ -685,33 +694,33 @@ export const keywordSearch = internalQuery({
     return filtered.map((r) => {
       const meta = r.documentId ? docMetaMap.get(r.documentId) : undefined;
       return {
-      _id: r._id,
-      _score: 0,
-      content: r.content,
-      chunkIndex: r.chunkIndex,
-      documentId: r.documentId,
-      sourceTitle: meta?.fileName ?? "Document",
-      sourceUrl: meta?.sourceUrl,
-      // Include chunk metadata for enhanced RAG context
-      metadata: {
-        totalChunks: r.totalChunks,
-        relativePosition: r.relativePosition,
-        chunkLengthChars: r.chunkLengthChars,
-        wordCount: r.wordCount,
-        sentenceCount: r.sentenceCount,
-        pageNumber: r.pageNumber,
-        sectionTitle: r.sectionTitle,
-        sectionLevel: r.sectionLevel,
-        headingPath: r.headingPath,
-        previousChunkPreview: r.previousChunkPreview,
-        nextChunkPreview: r.nextChunkPreview,
-        hasCodeBlock: r.hasCodeBlock,
-        hasMathNotation: r.hasMathNotation,
-        hasTable: r.hasTable,
-        hasBulletList: r.hasBulletList,
-        hasNumberedList: r.hasNumberedList,
-      },
-    };
+        _id: r._id,
+        _score: 0,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        documentId: r.documentId,
+        sourceTitle: meta?.fileName ?? "Document",
+        sourceUrl: meta?.sourceUrl,
+        // Include chunk metadata for enhanced RAG context
+        metadata: {
+          totalChunks: r.totalChunks,
+          relativePosition: r.relativePosition,
+          chunkLengthChars: r.chunkLengthChars,
+          wordCount: r.wordCount,
+          sentenceCount: r.sentenceCount,
+          pageNumber: r.pageNumber,
+          sectionTitle: r.sectionTitle,
+          sectionLevel: r.sectionLevel,
+          headingPath: r.headingPath,
+          previousChunkPreview: r.previousChunkPreview,
+          nextChunkPreview: r.nextChunkPreview,
+          hasCodeBlock: r.hasCodeBlock,
+          hasMathNotation: r.hasMathNotation,
+          hasTable: r.hasTable,
+          hasBulletList: r.hasBulletList,
+          hasNumberedList: r.hasNumberedList,
+        },
+      };
     });
   },
 });
@@ -727,7 +736,7 @@ export const getDocumentDetails = internalQuery({
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.documentId);
     if (!doc) {
-      throw new Error('Document not found');
+      throw new Error("Document not found");
     }
     return {
       storageId: doc.storageId,
@@ -766,30 +775,32 @@ export const getDocumentsByIds = internalQuery({
  */
 export const storeChunk = internalMutation({
   args: {
-    documentId: v.id('documents'),
-    userId: v.id('users'),
-    notebookId: v.id('notebooks'),
+    documentId: v.id("documents"),
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
     content: v.string(),
     chunkIndex: v.number(),
     embedding: v.array(v.float64()),
-    metadata: v.optional(v.object({
-      totalChunks: v.optional(v.number()),
-      relativePosition: v.optional(v.number()),
-      chunkLengthChars: v.optional(v.number()),
-      wordCount: v.optional(v.number()),
-      sentenceCount: v.optional(v.number()),
-      pageNumber: v.optional(v.number()),
-      sectionTitle: v.optional(v.string()),
-      sectionLevel: v.optional(v.number()),
-      headingPath: v.optional(v.array(v.string())),
-      previousChunkPreview: v.optional(v.string()),
-      nextChunkPreview: v.optional(v.string()),
-      hasCodeBlock: v.optional(v.boolean()),
-      hasMathNotation: v.optional(v.boolean()),
-      hasTable: v.optional(v.boolean()),
-      hasBulletList: v.optional(v.boolean()),
-      hasNumberedList: v.optional(v.boolean()),
-    })),
+    metadata: v.optional(
+      v.object({
+        totalChunks: v.optional(v.number()),
+        relativePosition: v.optional(v.number()),
+        chunkLengthChars: v.optional(v.number()),
+        wordCount: v.optional(v.number()),
+        sentenceCount: v.optional(v.number()),
+        pageNumber: v.optional(v.number()),
+        sectionTitle: v.optional(v.string()),
+        sectionLevel: v.optional(v.number()),
+        headingPath: v.optional(v.array(v.string())),
+        previousChunkPreview: v.optional(v.string()),
+        nextChunkPreview: v.optional(v.string()),
+        hasCodeBlock: v.optional(v.boolean()),
+        hasMathNotation: v.optional(v.boolean()),
+        hasTable: v.optional(v.boolean()),
+        hasBulletList: v.optional(v.boolean()),
+        hasNumberedList: v.optional(v.boolean()),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const chunkData: any = {
@@ -822,6 +833,6 @@ export const storeChunk = internalMutation({
       chunkData.hasNumberedList = args.metadata.hasNumberedList;
     }
 
-    await ctx.db.insert('documentChunks', chunkData);
+    await ctx.db.insert("documentChunks", chunkData);
   },
 });

@@ -7,12 +7,14 @@
 ## Context
 
 The current slide generation system uses ZhipuAI's `glm-image` model to generate slide images with text rendering. This approach has several limitations:
+
 - Strict rate limits (~6 images/minute) requiring 10-second delays between requests
 - Sequential processing (concurrency=1) makes generation slow
 - Text rendering quality varies
 - ZhipuAI SDK has stability issues
 
 User requirements:
+
 - ✅ Switch to OpenAI's `gpt-image-1.5` model
 - ✅ Very good text rendering capabilities
 - ✅ Minimize costs
@@ -21,6 +23,7 @@ User requirements:
 ## Solution Overview
 
 Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
+
 - **Higher rate limits**: 5-250 images/minute (vs ~6/minute)
 - **Better text rendering**: OpenAI's model optimized for text in images
 - **Faster generation**: Can process 2-3 slides in parallel
@@ -28,12 +31,12 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 
 ## Configuration
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| Model | `gpt-image-1.5` | OpenAI's latest image generation model |
-| Size | `1536x1024` | 16:9 landscape, closest to current 1728x960 |
-| Quality | `medium` | Balanced text quality and cost (not `high`) |
-| Format | `png` | Lossless, best for text rendering |
+| Parameter   | Value            | Rationale                                       |
+| ----------- | ---------------- | ----------------------------------------------- |
+| Model       | `gpt-image-1.5`  | OpenAI's latest image generation model          |
+| Size        | `1536x1024`      | 16:9 landscape, closest to current 1728x960     |
+| Quality     | `medium`         | Balanced text quality and cost (not `high`)     |
+| Format      | `png`            | Lossless, best for text rendering               |
 | Concurrency | 2 slides (start) | Conservative start, increase to 3 after testing |
 
 ## Architecture
@@ -43,6 +46,7 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 **Location**: `convex/_agents/slides/services/SlideImageGenerationService.ts`
 
 **Responsibilities**:
+
 - Generate slide images using OpenAI API
 - Handle rate limiting and retries
 - Upload images to Convex storage
@@ -82,27 +86,30 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 
 ### Error Handling
 
-| Error Code | Meaning | Handling |
-|------------|---------|----------|
-| 400 | Invalid request | Fail fast, log error, abort |
-| 429 | Rate limit | Exponential backoff: 2s → 4s → 8s → 16s |
-| 500 | Server error | Retry up to 2 times with backoff |
-| 401 | Invalid API key | Fail fast, log configuration error |
+| Error Code | Meaning         | Handling                                |
+| ---------- | --------------- | --------------------------------------- |
+| 400        | Invalid request | Fail fast, log error, abort             |
+| 429        | Rate limit      | Exponential backoff: 2s → 4s → 8s → 16s |
+| 500        | Server error    | Retry up to 2 times with backoff        |
+| 401        | Invalid API key | Fail fast, log configuration error      |
 
 ### Rate Limiting Strategy
 
 **Current (ZhipuAI)**:
+
 - Sequential generation (concurrency=1)
 - 10-second fixed delay between slides
 - ~1 slide per 10-12 seconds
 
 **Proposed (OpenAI)**:
+
 - Concurrency: 2 slides in parallel (can increase to 3 after testing)
 - Batch delay: 1 second between batches
 - Exponential backoff on 429 errors
 - Estimated: 2 slides per 3-5 seconds (3-5x faster)
 
 **Tier-based optimization**:
+
 - Tier 1 (5 IPM): Concurrency=2, delay=2s
 - Tier 2 (20 IPM): Concurrency=3, delay=1s
 - Tier 3+ (50+ IPM): Can increase to concurrency=5
@@ -112,6 +119,7 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 ### 1. SlideImageGenerationService.ts
 
 **Changes**:
+
 - Replace `import ZhipuAI from 'zhipuai'` with `import OpenAI from 'openai'`
 - Update constructor signature
 - Rewrite `generateSlideImage()` for OpenAI API
@@ -124,6 +132,7 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 ### 2. SlideDeckGraph.ts
 
 **Changes**:
+
 - Update service instantiation to pass `OPENAI_API_KEY`
 - Remove `ZHIPU_API_KEY` reference
 
@@ -132,23 +141,27 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 ### 3. .env
 
 **Changes**:
+
 - Add `OPENAI_API_KEY=<your-key-here>` if not present
 - Optionally remove `ZHIPU_API_KEY` if unused elsewhere
 
 ### 4. env.ts
 
 **Changes**:
+
 - Verify `OPENAI_API_KEY` is exported (likely already present)
 - No changes needed if already exported
 
 ## Cost Comparison
 
 ### ZhipuAI (Current)
+
 - Rate limited to ~6 images/minute
 - Sequential processing wastes time
 - Quality varies
 
 ### OpenAI gpt-image-1.5
+
 - **Tier 1**: 5 IPM × $0.04/image = $0.20/minute max
 - **Tier 2**: 20 IPM × $0.04/image = $0.80/minute max
 - Medium quality reduces cost vs high quality
@@ -159,17 +172,20 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 ## Testing Strategy
 
 ### Unit Tests
+
 - Mock OpenAI API responses
 - Test error handling (400, 429, 500)
 - Verify request parameter formatting
 
 ### Integration Tests
+
 - Generate sample slide deck with 5-10 slides
 - Verify text rendering quality
 - Measure generation time (should be 3-5x faster)
 - Test rate limit handling
 
 ### Manual Testing
+
 - Generate slides with complex layouts (multiple text blocks, bullet points)
 - Verify text is crisp and readable
 - Check image dimensions (1536x1024)
@@ -192,12 +208,12 @@ Replace ZhipuAI SDK with OpenAI SDK for slide image generation, leveraging:
 
 ## Risks & Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Text quality lower than expected | High | Test extensively before production, have fallback to ZhipuAI ready |
-| Rate limit tier is low (Tier 1) | Medium | Start conservative, monitor and adjust based on actual limits |
-| OpenAI API instability | Medium | Implement robust retries, have ZhipuAI fallback ready |
-| Resolution change affects layout | Low | 1536x1024 is still high quality, aspect ratio preserved |
+| Risk                             | Impact | Mitigation                                                         |
+| -------------------------------- | ------ | ------------------------------------------------------------------ |
+| Text quality lower than expected | High   | Test extensively before production, have fallback to ZhipuAI ready |
+| Rate limit tier is low (Tier 1)  | Medium | Start conservative, monitor and adjust based on actual limits      |
+| OpenAI API instability           | Medium | Implement robust retries, have ZhipuAI fallback ready              |
+| Resolution change affects layout | Low    | 1536x1024 is still high quality, aspect ratio preserved            |
 
 ## Future Considerations
 

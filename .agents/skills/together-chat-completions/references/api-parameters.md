@@ -1,4 +1,5 @@
 # Chat Completions API Parameters
+
 ## Contents
 
 - [Required Parameters](#required-parameters)
@@ -15,29 +16,28 @@
 - [Debug Mode](#debug-mode)
 - [HTTP Status Codes](#http-status-codes)
 
-
 ## Required Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `model` | string | Model identifier (e.g., `meta-llama/Llama-3.3-70B-Instruct-Turbo`) |
-| `messages` | array | Array of message objects with `role` and `content` |
+| Parameter  | Type   | Description                                                        |
+| ---------- | ------ | ------------------------------------------------------------------ |
+| `model`    | string | Model identifier (e.g., `meta-llama/Llama-3.3-70B-Instruct-Turbo`) |
+| `messages` | array  | Array of message objects with `role` and `content`                 |
 
 ## Generation Parameters
 
-| Parameter | Type | Default | Range | Description |
-|-----------|------|---------|-------|-------------|
-| `max_tokens` | integer | varies | 1+ | Maximum tokens to generate |
-| `temperature` | float | varies | 0-2 | Randomness. Lower = more deterministic |
-| `top_p` | float | 1.0 | 0-1 | Nucleus sampling threshold |
-| `top_k` | integer | - | 1+ | Limit choices per token step |
-| `min_p` | float | - | 0-1 | Alternative to top_p/top_k |
-| `repetition_penalty` | float | 1.0 | - | Higher = less repetition |
-| `presence_penalty` | float | 0 | -2.0 to 2.0 | Penalize tokens already present |
-| `frequency_penalty` | float | 0 | -2.0 to 2.0 | Penalize frequent tokens |
-| `stop` | string[] | - | - | Sequences that stop generation |
-| `n` | integer | 1 | 1-128 | Number of completions to generate |
-| `seed` | integer | - | - | For reproducible outputs |
+| Parameter            | Type     | Default | Range       | Description                            |
+| -------------------- | -------- | ------- | ----------- | -------------------------------------- |
+| `max_tokens`         | integer  | varies  | 1+          | Maximum tokens to generate             |
+| `temperature`        | float    | varies  | 0-2         | Randomness. Lower = more deterministic |
+| `top_p`              | float    | 1.0     | 0-1         | Nucleus sampling threshold             |
+| `top_k`              | integer  | -       | 1+          | Limit choices per token step           |
+| `min_p`              | float    | -       | 0-1         | Alternative to top_p/top_k             |
+| `repetition_penalty` | float    | 1.0     | -           | Higher = less repetition               |
+| `presence_penalty`   | float    | 0       | -2.0 to 2.0 | Penalize tokens already present        |
+| `frequency_penalty`  | float    | 0       | -2.0 to 2.0 | Penalize frequent tokens               |
+| `stop`               | string[] | -       | -           | Sequences that stop generation         |
+| `n`                  | integer  | 1       | 1-128       | Number of completions to generate      |
+| `seed`               | integer  | -       | -           | For reproducible outputs               |
 
 ### Python Example
 
@@ -82,12 +82,12 @@ console.log(response.choices[0].message.content);
 
 ## Output Control
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `stream` | bool | false | Stream tokens as Server-Sent Events |
-| `logprobs` | integer | - | Return top-k token log probs (0-20) |
-| `echo` | bool | false | Include prompt in response |
-| `logit_bias` | object | - | Token ID to bias value mapping |
+| Parameter    | Type    | Default | Description                         |
+| ------------ | ------- | ------- | ----------------------------------- |
+| `stream`     | bool    | false   | Stream tokens as Server-Sent Events |
+| `logprobs`   | integer | -       | Return top-k token log probs (0-20) |
+| `echo`       | bool    | false   | Include prompt in response          |
+| `logit_bias` | object  | -       | Token ID to bias value mapping      |
 
 ### Streaming Example (Python)
 
@@ -119,8 +119,8 @@ for await (const chunk of stream) {
 
 ## Response Format
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter         | Type   | Description              |
+| ----------------- | ------ | ------------------------ |
 | `response_format` | object | Control output structure |
 
 Options:
@@ -163,9 +163,9 @@ response_format: {
 
 ## Function Calling
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `tools` | array | Tool definitions the model can call |
+| Parameter     | Type          | Description                                            |
+| ------------- | ------------- | ------------------------------------------------------ |
+| `tools`       | array         | Tool definitions the model can call                    |
 | `tool_choice` | string/object | `"auto"`, `"required"`, `"none"`, or specific function |
 
 ```python
@@ -218,18 +218,18 @@ const response = await together.chat.completions.create({
 
 ## Safety & Compliance
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter      | Type   | Description                                             |
+| -------------- | ------ | ------------------------------------------------------- |
 | `safety_model` | string | Moderation model (e.g., `meta-llama/Llama-Guard-4-12B`) |
-| `compliance` | string | Set to `"hipaa"` for HIPAA mode |
+| `compliance`   | string | Set to `"hipaa"` for HIPAA mode                         |
 
 ## Reasoning
 
-| Parameter | Type | Values | Description |
-|-----------|------|--------|-------------|
-| `reasoning_effort` | string | `"low"`, `"medium"`, `"high"` | Control reasoning depth (GPT-OSS only) |
-| `reasoning` | object | `{"enabled": true/false}` | Toggle reasoning for hybrid models |
-| `chat_template_kwargs` | object | `{"thinking": true}` | Alternative reasoning toggle |
+| Parameter              | Type   | Values                        | Description                            |
+| ---------------------- | ------ | ----------------------------- | -------------------------------------- |
+| `reasoning_effort`     | string | `"low"`, `"medium"`, `"high"` | Control reasoning depth (GPT-OSS only) |
+| `reasoning`            | object | `{"enabled": true/false}`     | Toggle reasoning for hybrid models     |
+| `chat_template_kwargs` | object | `{"thinking": true}`          | Alternative reasoning toggle           |
 
 ### Reasoning Effort (Python)
 
@@ -309,8 +309,8 @@ for await (const chunk of stream) {
 
 ## Context Handling
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+| Parameter                          | Type   | Default   | Description                                      |
+| ---------------------------------- | ------ | --------- | ------------------------------------------------ |
 | `context_length_exceeded_behavior` | string | `"error"` | `"truncate"` or `"error"` when exceeding context |
 
 ## Message Object
@@ -362,27 +362,27 @@ as the source of truth for the current limit on the model you are calling.
 
 Current account-level LLM baselines from the official Together AI billing docs:
 
-| Build Tier | Lifetime Spend | LLM Rate Limit |
-|------------|----------------|----------------|
-| Build Tier 1 | $5 | 600 RPM |
-| Build Tier 2 | $50 | 1,800 RPM |
-| Build Tier 3 | $100 | 3,000 RPM |
-| Build Tier 4 | $250 | 4,500 RPM |
-| Build Tier 5 | $1,000 | 6,000 RPM |
+| Build Tier   | Lifetime Spend | LLM Rate Limit |
+| ------------ | -------------- | -------------- |
+| Build Tier 1 | $5             | 600 RPM        |
+| Build Tier 2 | $50            | 1,800 RPM      |
+| Build Tier 3 | $100           | 3,000 RPM      |
+| Build Tier 4 | $250           | 4,500 RPM      |
+| Build Tier 5 | $1,000         | 6,000 RPM      |
 
 Rate-limit headers returned on serverless responses:
 
-| Header | Description |
-|--------|-------------|
-| `x-ratelimit-limit` | Maximum request rate currently allowed |
-| `x-ratelimit-remaining` | Remaining request capacity in the current window |
-| `x-ratelimit-reset` | Time until the request window resets |
-| `x-tokenlimit-limit` | Maximum token rate currently allowed |
-| `x-tokenlimit-remaining` | Remaining token capacity in the current window |
-| `x-ratelimit-limit-dynamic` | Dynamic request-rate allowance when enabled |
-| `x-ratelimit-remaining-dynamic` | Remaining dynamic request capacity |
-| `x-tokenlimit-limit-dynamic` | Dynamic token-rate allowance when enabled |
-| `x-tokenlimit-remaining-dynamic` | Remaining dynamic token capacity |
+| Header                           | Description                                      |
+| -------------------------------- | ------------------------------------------------ |
+| `x-ratelimit-limit`              | Maximum request rate currently allowed           |
+| `x-ratelimit-remaining`          | Remaining request capacity in the current window |
+| `x-ratelimit-reset`              | Time until the request window resets             |
+| `x-tokenlimit-limit`             | Maximum token rate currently allowed             |
+| `x-tokenlimit-remaining`         | Remaining token capacity in the current window   |
+| `x-ratelimit-limit-dynamic`      | Dynamic request-rate allowance when enabled      |
+| `x-ratelimit-remaining-dynamic`  | Remaining dynamic request capacity               |
+| `x-tokenlimit-limit-dynamic`     | Dynamic token-rate allowance when enabled        |
+| `x-tokenlimit-remaining-dynamic` | Remaining dynamic token capacity                 |
 
 Best practices:
 
@@ -421,13 +421,15 @@ import Together from "together-ai";
 
 const client = new Together();
 
-const response = await client.chat.completions.create(
-  {
-    model: "openai/gpt-oss-20b",
-    messages: [{ role: "user", content: "Say hello" }],
-  },
-  { headers: { "x-together-debug": "1" } }
-).asResponse();
+const response = await client.chat.completions
+  .create(
+    {
+      model: "openai/gpt-oss-20b",
+      messages: [{ role: "user", content: "Say hello" }],
+    },
+    { headers: { "x-together-debug": "1" } }
+  )
+  .asResponse();
 
 const parsed = await response.json();
 console.log(parsed.choices[0].message.content);
@@ -447,28 +449,28 @@ curl -s -D - -X POST "https://api.together.xyz/v1/chat/completions" \
 
 Common debug headers:
 
-| Header | Description |
-|--------|-------------|
-| `x-request-id` | Unique request ID for support tickets |
-| `x-together-traceid` | Distributed trace ID for internal routing |
-| `x-cluster` | Inference cluster that served the request |
-| `x-engine-pod` | Engine pod that processed the request |
-| `x-api-received` | Timestamp when the API received the request |
-| `x-api-call-start` | Timestamp when inference started |
-| `x-api-call-end` | Timestamp when inference completed |
-| `x-inference-version` | Inference engine version |
+| Header                | Description                                 |
+| --------------------- | ------------------------------------------- |
+| `x-request-id`        | Unique request ID for support tickets       |
+| `x-together-traceid`  | Distributed trace ID for internal routing   |
+| `x-cluster`           | Inference cluster that served the request   |
+| `x-engine-pod`        | Engine pod that processed the request       |
+| `x-api-received`      | Timestamp when the API received the request |
+| `x-api-call-start`    | Timestamp when inference started            |
+| `x-api-call-end`      | Timestamp when inference completed          |
+| `x-inference-version` | Inference engine version                    |
 
 ## HTTP Status Codes
 
-| Code | Description |
-|------|-------------|
-| 200 | Success |
-| 400 | Bad request (invalid params) |
-| 401 | Unauthorized (invalid API key) |
-| 402 | Payment required (spending limit reached) |
-| 403 | Input token count + max_tokens exceeds model context length |
-| 404 | Model not found |
-| 429 | Rate limit exceeded |
-| 500 | Server error |
-| 503 | Service overloaded |
-| 504 | Request timeout |
+| Code | Description                                                 |
+| ---- | ----------------------------------------------------------- |
+| 200  | Success                                                     |
+| 400  | Bad request (invalid params)                                |
+| 401  | Unauthorized (invalid API key)                              |
+| 402  | Payment required (spending limit reached)                   |
+| 403  | Input token count + max_tokens exceeds model context length |
+| 404  | Model not found                                             |
+| 429  | Rate limit exceeded                                         |
+| 500  | Server error                                                |
+| 503  | Service overloaded                                          |
+| 504  | Request timeout                                             |

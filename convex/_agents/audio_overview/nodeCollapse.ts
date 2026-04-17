@@ -1,11 +1,11 @@
-"use node"
+"use node";
 
-import { countTokens } from '../_shared/index.js';
-import type { JobLogger } from '../_shared/logging.js';
-import { createAgentGraphLogger } from '../_shared/logging.js';
+import { countTokens } from "../_shared/index.js";
+import type { JobLogger } from "../_shared/logging.js";
+import { createAgentGraphLogger } from "../_shared/logging.js";
 
-import { GRAPH_CONFIG } from './config.js';
-import type { OverallStateType } from './state.js';
+import { GRAPH_CONFIG } from "./config.js";
+import type { OverallStateType } from "./state.js";
 
 /**
  * Recursively collapses multiple outputs into fewer chunks using actual token counting.
@@ -35,7 +35,7 @@ export async function recursiveCollapse(
   for (const output of outputs) {
     const tokens = countTokens(output);
     if (currentTokens + tokens > maxTokens && currentGroup.length > 0) {
-      collapsed.push(currentGroup.join('\n\n---\n\n'));
+      collapsed.push(currentGroup.join("\n\n---\n\n"));
       currentGroup = [output];
       currentTokens = tokens;
     } else {
@@ -45,16 +45,19 @@ export async function recursiveCollapse(
   }
 
   if (currentGroup.length > 0) {
-    collapsed.push(currentGroup.join('\n\n---\n\n'));
+    collapsed.push(currentGroup.join("\n\n---\n\n"));
   }
 
-  logger.info(`Recursive collapse: ${outputs.length} -> ${collapsed.length} (${totalTokens} tokens)`, {
-    agent: 'AudioOverviewGraph',
-    phase: 'recursive_collapse',
-    inputCount: outputs.length,
-    outputCount: collapsed.length,
-    totalTokens,
-  });
+  logger.info(
+    `Recursive collapse: ${outputs.length} -> ${collapsed.length} (${totalTokens} tokens)`,
+    {
+      agent: "AudioOverviewGraph",
+      phase: "recursive_collapse",
+      inputCount: outputs.length,
+      outputCount: collapsed.length,
+      totalTokens,
+    }
+  );
 
   return collapsed;
 }
@@ -62,31 +65,33 @@ export async function recursiveCollapse(
 /**
  * Collapse map outputs into fewer chunks (collapse phase).
  */
-export async function collapse(
-  state: OverallStateType
-): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('AudioOverviewGraph', 'audio');
+export async function collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {
+  const logger = createAgentGraphLogger("AudioOverviewGraph", "audio");
   const { mapOutputs } = state;
 
-  logger.phaseStart('collapse', {
-    agent: 'AudioOverviewGraph',
+  logger.phaseStart("collapse", {
+    agent: "AudioOverviewGraph",
     inputCount: mapOutputs.length,
   });
 
-  const collapsed = await recursiveCollapse(mapOutputs, GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS / 2, logger);
+  const collapsed = await recursiveCollapse(
+    mapOutputs,
+    GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS / 2,
+    logger
+  );
 
   logger.info(`Collapsed ${mapOutputs.length} outputs to ${collapsed.length}`, {
-    agent: 'AudioOverviewGraph',
-    phase: 'collapse',
+    agent: "AudioOverviewGraph",
+    phase: "collapse",
     outputCount: collapsed.length,
   });
 
   return {
     ...state,
     collapsedOutputs: collapsed,
-    status: 'reducing',
+    status: "reducing",
     progress: {
-      phase: 'collapse',
+      phase: "collapse",
       percentage: 50,
       message: `Consolidated ${mapOutputs.length} chunks`,
     },

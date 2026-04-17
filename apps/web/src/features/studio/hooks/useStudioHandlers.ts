@@ -1,11 +1,11 @@
-import { useState, useCallback, useMemo } from 'react';
-import type { Note, Source } from '@/shared/types/index';
-import type { FlashcardConfig } from '../components/CustomizeFlashcardsModal';
-import type { QuizConfig } from '../components/CustomizeQuizModal';
-import type { AudioConfig } from '../components/CustomizeAudioModal';
-import type { WrittenQuestionsConfig } from '../components/CustomizeWrittenQuestionsModal';
-import type { SlideDeckConfig } from '../components/CustomizeSlidesModal';
-import type { SpreadsheetConfig } from '../components/CustomizeSpreadsheetsModal';
+import { useState, useCallback, useMemo } from "react";
+import type { Note, Source } from "@/shared/types/index";
+import type { FlashcardConfig } from "../components/CustomizeFlashcardsModal";
+import type { QuizConfig } from "../components/CustomizeQuizModal";
+import type { AudioConfig } from "../components/CustomizeAudioModal";
+import type { WrittenQuestionsConfig } from "../components/CustomizeWrittenQuestionsModal";
+import type { SlideDeckConfig } from "../components/CustomizeSlidesModal";
+import type { SpreadsheetConfig } from "../components/CustomizeSpreadsheetsModal";
 import {
   type CreateFlowContext,
   useCreateReportFlow,
@@ -16,8 +16,8 @@ import {
   useCreateSlidesFlow,
   useCreateSpreadsheetFlow,
   useCreateAudioFlow,
-} from './flows';
-import { useToast } from '@/shared/contexts/ToastContext';
+} from "./flows";
+import { useToast } from "@/shared/contexts/ToastContext";
 
 export interface UseStudioHandlersProps {
   notes: Note[];
@@ -32,7 +32,11 @@ export interface UseStudioHandlersProps {
   confirm?: (
     title: string,
     message: string | React.ReactNode,
-    options?: { confirmText?: string; cancelText?: string; variant?: 'danger' | 'warning' | 'default' }
+    options?: {
+      confirmText?: string;
+      cancelText?: string;
+      variant?: "danger" | "warning" | "default";
+    }
   ) => Promise<boolean>;
 }
 
@@ -113,14 +117,14 @@ export function useStudioHandlers({
 
   const handleToolClick = useCallback(
     (toolId: string) => {
-      if (toolId === 'reports') setIsReportModalOpen(true);
-      else if (toolId === 'flashcards') setIsFlashcardModalOpen(true);
-      else if (toolId === 'quiz') setIsQuizModalOpen(true);
-      else if (toolId === 'slides') setIsSlidesModalOpen(true);
-      else if (toolId === 'audio') setIsAudioModalOpen(true);
-      else if (toolId === 'mindmap') createMindMapFlow();
-      else if (toolId === 'writtenQuestions') setIsWrittenQuestionsModalOpen(true);
-      else if (toolId === 'spreadsheets') setIsSpreadsheetsModalOpen(true);
+      if (toolId === "reports") setIsReportModalOpen(true);
+      else if (toolId === "flashcards") setIsFlashcardModalOpen(true);
+      else if (toolId === "quiz") setIsQuizModalOpen(true);
+      else if (toolId === "slides") setIsSlidesModalOpen(true);
+      else if (toolId === "audio") setIsAudioModalOpen(true);
+      else if (toolId === "mindmap") createMindMapFlow();
+      else if (toolId === "writtenQuestions") setIsWrittenQuestionsModalOpen(true);
+      else if (toolId === "spreadsheets") setIsSpreadsheetsModalOpen(true);
     },
     [createMindMapFlow]
   );

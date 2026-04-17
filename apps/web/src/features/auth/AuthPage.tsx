@@ -92,7 +92,7 @@ function AuthHeroMockup() {
             "Third normal form relaxes BCNF slightly: transitive dependencies through prime attributes may remain. Teams often accept 3NF when BCNF decomposition would fragment the schema too much for query patterns.",
         },
       }) as const,
-    [],
+    []
   );
 
   const citeBtnBase =
@@ -166,7 +166,9 @@ function AuthHeroMockup() {
             <aside className="flex w-[min(38%,13.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
               <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm">
                 <FileStack className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="font-display text-sm font-bold uppercase tracking-wide">Sources</span>
+                <span className="font-display text-sm font-bold uppercase tracking-wide">
+                  Sources
+                </span>
               </div>
               <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4 sm:p-5">
                 {sources.map((s) => {
@@ -182,7 +184,9 @@ function AuthHeroMockup() {
                           : "border-border/80 bg-background/60 hover:border-border hover:bg-accent/40"
                       }`}
                     >
-                      <p className="truncate font-sans text-xs font-medium text-foreground">{s.title}</p>
+                      <p className="truncate font-sans text-xs font-medium text-foreground">
+                        {s.title}
+                      </p>
                       <p className="mt-0.5 font-sans text-[11px] text-muted-foreground">{s.kind}</p>
                     </button>
                   );
@@ -194,7 +198,9 @@ function AuthHeroMockup() {
               <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-sm">
                 <div className="flex items-center gap-2 text-foreground">
                   <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="font-display text-sm font-bold uppercase tracking-wide">Chat</span>
+                  <span className="font-display text-sm font-bold uppercase tracking-wide">
+                    Chat
+                  </span>
                 </div>
                 <div className="flex items-center gap-2" aria-hidden>
                   <span className="rounded-lg border border-border bg-card p-2 text-muted-foreground shadow-sm">
@@ -233,11 +239,17 @@ function AuthHeroMockup() {
                     {activityOpen ? (
                       <ul className="space-y-1.5 border-l-2 border-primary/20 py-1 pl-3 font-sans text-xs text-muted-foreground">
                         <li className="flex items-center gap-2">
-                          <Check className="h-3.5 w-3.5 shrink-0 text-vintage-green-600" aria-hidden />
+                          <Check
+                            className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
+                            aria-hidden
+                          />
                           HyDE + embeddings
                         </li>
                         <li className="flex items-center gap-2">
-                          <Check className="h-3.5 w-3.5 shrink-0 text-vintage-green-600" aria-hidden />
+                          <Check
+                            className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
+                            aria-hidden
+                          />
                           Ranked relevant passages
                         </li>
                         <li className="flex items-start gap-2 pt-0.5">
@@ -263,8 +275,8 @@ function AuthHeroMockup() {
                           >
                             1
                           </button>
-                          . Third normal form still allows some dependencies when the right-hand side is a prime
-                          attribute
+                          . Third normal form still allows some dependencies when the right-hand
+                          side is a prime attribute
                           <button
                             type="button"
                             aria-pressed={refKey === 2}
@@ -275,8 +287,8 @@ function AuthHeroMockup() {
                           >
                             2
                           </button>
-                          . In practice, pushing all the way to BCNF can mean more joins, so teams weigh anomaly risk
-                          against query ergonomics.
+                          . In practice, pushing all the way to BCNF can mean more joins, so teams
+                          weigh anomaly risk against query ergonomics.
                         </p>
                       </div>
 
@@ -329,8 +341,12 @@ function AuthHeroMockup() {
         >
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-5 backdrop-blur-sm">
             <Layers className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <span className="font-display text-sm font-bold uppercase tracking-wide text-foreground">Studio</span>
-            <span className="ml-2 font-sans text-xs text-muted-foreground">Create study artifacts from your sources</span>
+            <span className="font-display text-sm font-bold uppercase tracking-wide text-foreground">
+              Studio
+            </span>
+            <span className="ml-2 font-sans text-xs text-muted-foreground">
+              Create study artifacts from your sources
+            </span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <ToolGrid
@@ -410,8 +426,7 @@ export function AuthPage() {
   const { returnTo, bannerMessage, initialMode } = useMemo(() => {
     const state = location.state as { from?: string; message?: string } | null | undefined;
     const rawFrom = state?.from;
-    const fromPath =
-      typeof rawFrom === "string" && rawFrom.startsWith("/") ? rawFrom : "/home";
+    const fromPath = typeof rawFrom === "string" && rawFrom.startsWith("/") ? rawFrom : "/home";
     const modeParam = new URLSearchParams(location.search).get("mode");
     const mode: AuthFormInitialMode = modeParam === "signup" ? "signUp" : "signIn";
     return {

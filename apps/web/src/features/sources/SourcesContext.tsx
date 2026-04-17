@@ -1,5 +1,5 @@
-import { createContext, useContext, ReactNode } from 'react';
-import { Source } from '@/shared/types/index';
+import { createContext, useContext, ReactNode } from "react";
+import { Source } from "@/shared/types/index";
 
 export interface SourcesContextType {
   sources: Source[];
@@ -19,15 +19,11 @@ interface SourcesProviderProps {
 }
 
 export function SourcesProvider({ children, value }: SourcesProviderProps) {
-  return (
-    <SourcesContext.Provider value={value}>
-      {children}
-    </SourcesContext.Provider>
-  );
+  return <SourcesContext.Provider value={value}>{children}</SourcesContext.Provider>;
 }
 
 export function useSourcesContext() {
   const context = useContext(SourcesContext);
-  if (!context) throw new Error('useSourcesContext must be used within SourcesProvider');
+  if (!context) throw new Error("useSourcesContext must be used within SourcesProvider");
   return context;
 }

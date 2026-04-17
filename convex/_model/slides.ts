@@ -23,7 +23,10 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query.filter((q) => q.eq(q.field("userId"), userId)).order("desc").collect();
+    return await query
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .collect();
   }
   return await query.order("desc").collect();
 }
@@ -122,9 +125,6 @@ export async function patchSlideDeck(
   });
 }
 
-export async function deleteSlideDeck(
-  ctx: MutationCtx,
-  slideDeckId: Id<"slides">
-): Promise<void> {
+export async function deleteSlideDeck(ctx: MutationCtx, slideDeckId: Id<"slides">): Promise<void> {
   await ctx.db.delete("slides", slideDeckId);
 }

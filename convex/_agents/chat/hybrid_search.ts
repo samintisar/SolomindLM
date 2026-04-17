@@ -5,15 +5,15 @@
  * TYPE-SAFE: No "use node" directive - this is a library file.
  */
 
-import type { ReferenceChunk, ChunkMetadata } from '../../storage/ChatHistoryService';
-import type { EmbeddingService } from '../../_services/processing/EmbeddingServiceClient';
+import type { ReferenceChunk, ChunkMetadata } from "../../storage/ChatHistoryService";
+import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
 import {
   VectorSearchHandler,
   VectorSearchRunner,
   VectorSearchRawResult,
   VectorSearchConfig,
   RerankFunction,
-} from './vector_search.js';
+} from "./vector_search.js";
 
 // ============================================================
 // Types
@@ -83,8 +83,8 @@ const DEFAULT_HYBRID_CONFIG: Required<HybridSearchConfig> = {
 function preprocessQuery(query: string): string {
   return query
     .toLowerCase()
-    .replace(/[^\w\s'-]/g, ' ')  // Keep hyphens and apostrophes
-    .replace(/\s+/g, ' ')
+    .replace(/[^\w\s'-]/g, " ") // Keep hyphens and apostrophes
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -180,143 +180,143 @@ export class HybridSearchHandler extends VectorSearchHandler {
     const startTime = Date.now();
     console.log(`[HybridSearch] query="${query.slice(0, 80)}..."`);
 
-    try {
-      // Parallel retrieval
-      const [vectorResults, keywordResults] = await Promise.all([
-        this.executeVectorSearch(query, documentIds, preComputedEmbedding),
-        this.executeKeywordSearch(query, documentIds),
-      ]);
+    // Parallel retrieval
+    const [vectorResults, keywordResults] = await Promise.all([
+      this.executeVectorSearch(query, documentIds, preComputedEmbedding),
+      this.executeKeywordSearch(query, documentIds),
+    ]);
 
-      const overlap = vectorResults.length + keywordResults.length;
-      console.log(`[HybridSearch] vector=${vectorResults.length}, keyword=${keywordResults.length}`);
+    const overlap = vectorResults.length + keywordResults.length;
+    console.log(`[HybridSearch] vector=${vectorResults.length}, keyword=${keywordResults.length}`);
 
-      // No fallback: respect the user's document selection strictly
+    // No fallback: respect the user's document selection strictly
 
-      // RRF fusion
-      const fused = reciprocalRankFusion(
-        vectorResults.map((r, i) => ({ ...r, rank: i + 1 })),
-        keywordResults.map((r, i) => ({ ...r, rank: i + 1 })),
-        this.hybridConfig.rrfK
+    // RRF fusion
+    const fused = reciprocalRankFusion(
+      vectorResults.map((r, i) => ({ ...r, rank: i + 1 })),
+      keywordResults.map((r, i) => ({ ...r, rank: i + 1 })),
+      this.hybridConfig.rrfK
+    );
+
+    const overlapCount = fused.filter((r) => r.vectorRank && r.keywordRank).length;
+
+    // Threshold filter
+    let filtered = fused.filter((r) => r.rrfScore >= this.hybridConfig.hybridThreshold);
+    if (filtered.length === 0) filtered = fused; // Fallback
+
+    if (filtered.length === 0 && options?.allowEmpty) {
+      return [];
+    }
+
+    // RRF metadata for merging scores onto final chunks
+    const rrfMetadataMap = new Map<
+      string,
+      Pick<RRFResult, "rrfScore" | "vectorRank" | "keywordRank">
+    >();
+    for (const r of filtered) {
+      const key = `${r._id}-${r.chunkIndex}`;
+      rrfMetadataMap.set(key, {
+        rrfScore: r.rrfScore,
+        vectorRank: r.vectorRank,
+        keywordRank: r.keywordRank,
+      });
+    }
+
+    const poolSize = Math.max(this.hybridConfig.maxResults, this.hybridConfig.rerankTopN);
+    let rankedForMap: (RRFResult & { _score?: number; similarity?: number })[];
+
+    if (options?.skipRerank) {
+      rankedForMap = filtered.slice(0, poolSize) as (RRFResult & {
+        _score?: number;
+        similarity?: number;
+      })[];
+    } else {
+      const augment = retrievalAugmentForRerank?.trim();
+      const rerankQuery = augment
+        ? `${query.trim()}\n\n${augment.length > 2000 ? augment.slice(0, 2000) : augment}`
+        : query;
+      const reranked = await this.rerankResults(rerankQuery, filtered);
+      rankedForMap = reranked.slice(0, this.hybridConfig.maxResults) as (RRFResult & {
+        _score?: number;
+        similarity?: number;
+      })[];
+    }
+
+    // FIX: Preserve positions from the fused results before reranking to maintain citation consistency
+    // Create a map of positions from the fused array (before reranking)
+    const fusedPositionMap = new Map<string, number>();
+    filtered.forEach((r, idx) => {
+      const key = `${r._id}-${r.chunkIndex}`;
+      fusedPositionMap.set(key, idx + 1); // 1-based indexing
+    });
+
+    let finalResults: HybridReferenceChunk[] = rankedForMap.map((r) => {
+      const key = `${r._id}-${r.chunkIndex}`;
+      const rrfMeta = rrfMetadataMap.get(key);
+      const originalPosition = fusedPositionMap.get(key) ?? 0;
+      return {
+        id: String(originalPosition),
+        sourceId: String(r._id),
+        documentId: r.documentId,
+        sourceTitle: r.sourceTitle ?? "Document",
+        sourceUrl: r.sourceUrl,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        similarity: r._score ?? r.similarity ?? r.rrfScore,
+        rrfScore: rrfMeta?.rrfScore,
+        vectorRank: rrfMeta?.vectorRank,
+        keywordRank: rrfMeta?.keywordRank,
+        // Include chunk metadata
+        metadata: r.metadata,
+      };
+    });
+
+    // Telemetry
+    console.log("[HybridSearch] metrics", {
+      query_length: query.length,
+      vector_count: vectorResults.length,
+      keyword_count: keywordResults.length,
+      fused_count: fused.length,
+      overlap_count: overlapCount,
+      top_rrf_score: fused[0]?.rrfScore.toFixed(4),
+      final_count: finalResults.length,
+      latency_ms: Date.now() - startTime,
+    });
+
+    // KEYWORD FALLBACK: If no results from hybrid search in selected docs, try keyword-only search
+    if (finalResults.length === 0 && documentIds && documentIds.length > 0) {
+      console.log(
+        "[HybridSearch] No results from hybrid search in selected docs, trying keyword fallback"
       );
 
-      const overlapCount = fused.filter(r => r.vectorRank && r.keywordRank).length;
+      // Use keyword search with the exact query terms
+      const keywordOnlyResults = await this.executeKeywordSearch(query, documentIds);
 
-      // Threshold filter
-      let filtered = fused.filter(r => r.rrfScore >= this.hybridConfig.hybridThreshold);
-      if (filtered.length === 0) filtered = fused; // Fallback
+      if (keywordOnlyResults.length > 0) {
+        console.log(`[HybridSearch] Keyword fallback found ${keywordOnlyResults.length} results`);
 
-      if (filtered.length === 0 && options?.allowEmpty) {
-        return [];
-      }
+        // Convert to final format without reranking (already keyword-relevant)
+        const limited = keywordOnlyResults.slice(0, this.config.maxResults);
 
-      // RRF metadata for merging scores onto final chunks
-      const rrfMetadataMap = new Map<string, Pick<RRFResult, 'rrfScore' | 'vectorRank' | 'keywordRank'>>();
-      for (const r of filtered) {
-        const key = `${r._id}-${r.chunkIndex}`;
-        rrfMetadataMap.set(key, {
-          rrfScore: r.rrfScore,
-          vectorRank: r.vectorRank,
-          keywordRank: r.keywordRank,
-        });
-      }
-
-      const poolSize = Math.max(this.hybridConfig.maxResults, this.hybridConfig.rerankTopN);
-      let rankedForMap: (RRFResult & { _score?: number; similarity?: number })[];
-
-      if (options?.skipRerank) {
-        rankedForMap = filtered.slice(0, poolSize) as (RRFResult & { _score?: number; similarity?: number })[];
-      } else {
-        const augment = retrievalAugmentForRerank?.trim();
-        const rerankQuery = augment
-          ? `${query.trim()}\n\n${augment.length > 2000 ? augment.slice(0, 2000) : augment}`
-          : query;
-        const reranked = await this.rerankResults(rerankQuery, filtered);
-        rankedForMap = reranked.slice(0, this.hybridConfig.maxResults) as (RRFResult & {
-          _score?: number;
-          similarity?: number;
-        })[];
-      }
-
-      // FIX: Preserve positions from the fused results before reranking to maintain citation consistency
-      // Create a map of positions from the fused array (before reranking)
-      const fusedPositionMap = new Map<string, number>();
-      filtered.forEach((r, idx) => {
-        const key = `${r._id}-${r.chunkIndex}`;
-        fusedPositionMap.set(key, idx + 1); // 1-based indexing
-      });
-
-      let finalResults: HybridReferenceChunk[] = rankedForMap.map((r) => {
-        const key = `${r._id}-${r.chunkIndex}`;
-        const rrfMeta = rrfMetadataMap.get(key);
-        const originalPosition = fusedPositionMap.get(key) ?? 0;
-        return {
-          id: String(originalPosition),
+        // FIX: Preserve positions from the original keyword results
+        finalResults = limited.map((r, index) => ({
+          id: String(index + 1), // Keyword fallback uses simple sequential numbering
           sourceId: String(r._id),
           documentId: r.documentId,
-          sourceTitle: r.sourceTitle ?? 'Document',
+          sourceTitle: r.sourceTitle ?? "Document",
           sourceUrl: r.sourceUrl,
           content: r.content,
           chunkIndex: r.chunkIndex,
-          similarity: r._score ?? r.similarity ?? r.rrfScore,
-          rrfScore: rrfMeta?.rrfScore,
-          vectorRank: rrfMeta?.vectorRank,
-          keywordRank: rrfMeta?.keywordRank,
-          // Include chunk metadata
+          similarity: r._score ?? 0,
+          rrfScore: 1 / (60 + 1), // RRF score for keyword-only result
+          vectorRank: undefined,
+          keywordRank: 1,
           metadata: r.metadata,
-        };
-      });
-
-      // Telemetry
-      console.log('[HybridSearch] metrics', {
-        query_length: query.length,
-        vector_count: vectorResults.length,
-        keyword_count: keywordResults.length,
-        fused_count: fused.length,
-        overlap_count: overlapCount,
-        top_rrf_score: fused[0]?.rrfScore.toFixed(4),
-        final_count: finalResults.length,
-        latency_ms: Date.now() - startTime,
-      });
-
-      // KEYWORD FALLBACK: If no results from hybrid search in selected docs, try keyword-only search
-      if (finalResults.length === 0 && documentIds && documentIds.length > 0) {
-        console.log('[HybridSearch] No results from hybrid search in selected docs, trying keyword fallback');
-
-        // Use keyword search with the exact query terms
-        const keywordOnlyResults = await this.executeKeywordSearch(
-          query,
-          documentIds
-        );
-
-        if (keywordOnlyResults.length > 0) {
-          console.log(`[HybridSearch] Keyword fallback found ${keywordOnlyResults.length} results`);
-
-          // Convert to final format without reranking (already keyword-relevant)
-          const limited = keywordOnlyResults.slice(0, this.config.maxResults);
-
-          // FIX: Preserve positions from the original keyword results
-          finalResults = limited.map((r, index) => ({
-            id: String(index + 1), // Keyword fallback uses simple sequential numbering
-            sourceId: String(r._id),
-            documentId: r.documentId,
-            sourceTitle: r.sourceTitle ?? 'Document',
-            sourceUrl: r.sourceUrl,
-            content: r.content,
-            chunkIndex: r.chunkIndex,
-            similarity: r._score ?? 0,
-            rrfScore: 1 / (60 + 1), // RRF score for keyword-only result
-            vectorRank: undefined,
-            keywordRank: 1,
-            metadata: r.metadata,
-          }));
-        }
+        }));
       }
-
-      return finalResults;
-    } catch (error: any) {
-      // Re-throw error instead of falling back
-      throw error;
     }
+
+    return finalResults;
   }
 
   /**
@@ -327,8 +327,12 @@ export class HybridSearchHandler extends VectorSearchHandler {
     documentIds?: string[],
     preComputedEmbedding?: number[]
   ): Promise<VectorSearchRawResult[]> {
-    const embedding = preComputedEmbedding ?? await this['embeddingService'].embedText(query);
-    return await this['vectorSearchRunner'](embedding, this['config'].vectorMatchCount, documentIds);
+    const embedding = preComputedEmbedding ?? (await this["embeddingService"].embedText(query));
+    return await this["vectorSearchRunner"](
+      embedding,
+      this["config"].vectorMatchCount,
+      documentIds
+    );
   }
 
   private async executeKeywordSearch(
@@ -336,7 +340,11 @@ export class HybridSearchHandler extends VectorSearchHandler {
     documentIds?: string[]
   ): Promise<KeywordSearchRawResult[]> {
     const processedQuery = preprocessQuery(query);
-    return await this.keywordSearchRunner(processedQuery, this.hybridConfig.keywordMatchCount, documentIds);
+    return await this.keywordSearchRunner(
+      processedQuery,
+      this.hybridConfig.keywordMatchCount,
+      documentIds
+    );
   }
 }
 

@@ -1,19 +1,19 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveMindMapResults = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     mindmap: v.any(),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.mindmapId, {
       data: args.mindmap,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Mind Map',
+      title: args.metadata?.title ?? "Mind Map",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -24,7 +24,7 @@ export const saveMindMapResults = internalMutation({
 
 export const updateMindMapTitle = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -37,7 +37,7 @@ export const updateMindMapTitle = internalMutation({
 
 export const updateMindMapStatus = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -55,18 +55,18 @@ export const updateMindMapStatus = internalMutation({
 
 export const markMindMapFailed = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.mindmapId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -79,7 +79,7 @@ export const markMindMapFailed = internalMutation({
 // Multi-phase mindmap helpers
 export const initMindMapMapPhase = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     totalMapTasks: v.number(),
   },
   handler: async (ctx, args) => {
@@ -87,13 +87,13 @@ export const initMindMapMapPhase = internalMutation({
     if (!mindmap) return null;
 
     await ctx.db.patch(args.mindmapId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...mindmap.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
@@ -105,7 +105,7 @@ export const initMindMapMapPhase = internalMutation({
 
 export const storeMindMapMapResult = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -137,7 +137,7 @@ export const storeMindMapMapResult = internalMutation({
 
 export const clearMindMapMapData = internalMutation({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
   },
   handler: async (ctx, args) => {
     const mindmap = await ctx.db.get(args.mindmapId);

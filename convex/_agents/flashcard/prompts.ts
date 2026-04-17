@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Prompt templates and schemas for FlashcardGraph.
  *
@@ -6,25 +6,27 @@
  * related to flashcard generation prompts.
  */
 
-import { z } from 'zod';
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js';
+import { z } from "zod";
+import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
 // ============================================================
 // SCHEMAS
 // ============================================================
 
 export const FlashcardArraySchema = z.object({
-  flashcards: z.array(z.object({
-    type: z.enum(['wh-question', 'fill-blank', 'true-false', 'definition', 'scenario']),
-    front: z.string(),
-    back: z.string(),
-    // FIX: TogetherAI/OpenAI strict output requires .nullable() before .optional()
-    topic: z.string().nullable().optional().describe("Topic category or null if not applicable"),
-  })),
+  flashcards: z.array(
+    z.object({
+      type: z.enum(["wh-question", "fill-blank", "true-false", "definition", "scenario"]),
+      front: z.string(),
+      back: z.string(),
+      // FIX: TogetherAI/OpenAI strict output requires .nullable() before .optional()
+      topic: z.string().nullable().optional().describe("Topic category or null if not applicable"),
+    })
+  ),
 });
 
 export interface Flashcard {
-  type: 'wh-question' | 'fill-blank' | 'true-false' | 'definition' | 'scenario';
+  type: "wh-question" | "fill-blank" | "true-false" | "definition" | "scenario";
   front: string;
   back: string;
   topic?: string | null; // Optional topic field (nullable for TogetherAI/OpenAI strict output)
@@ -39,13 +41,15 @@ export interface FlashcardResponse {
 // ============================================================
 
 /** System prompt for map phase flashcard generation */
-export const MAP_SYSTEM_PROMPT = 'You are an expert educator. Output strictly in JSON.';
+export const MAP_SYSTEM_PROMPT = "You are an expert educator. Output strictly in JSON.";
 
 /** System prompt for collapse phase flashcard consolidation */
-export const COLLAPSE_SYSTEM_PROMPT = 'You are a skilled content consolidator. Output strictly in JSON.';
+export const COLLAPSE_SYSTEM_PROMPT =
+  "You are a skilled content consolidator. Output strictly in JSON.";
 
 /** System prompt for reduce phase flashcard selection and diversification */
-export const REDUCE_SYSTEM_PROMPT = 'You are an expert curriculum designer creating DIVERSE study sets. Your goal is to spread selections across ALL topics, not cluster on one.';
+export const REDUCE_SYSTEM_PROMPT =
+  "You are an expert curriculum designer creating DIVERSE study sets. Your goal is to spread selections across ALL topics, not cluster on one.";
 
 // ============================================================
 // CONSTANTS
@@ -55,13 +59,13 @@ export const REDUCE_SYSTEM_PROMPT = 'You are an expert curriculum designer creat
 // Only include phrases that are strong indicators of external content references
 // Note: "the following" is intentionally excluded - it's commonly used in questions
 export const PROBLEMATIC_PHRASES = [
-  'the diagram',
-  'the above',
-  'as shown',
-  'this chart',
-  'that example',
-  'the table',
-  'this figure',
+  "the diagram",
+  "the above",
+  "as shown",
+  "this chart",
+  "that example",
+  "the table",
+  "this figure",
 ] as const;
 
 // ============================================================
@@ -81,9 +85,9 @@ export const getMapPrompt = (params: {
   const { chunk, cardCount, cardsPerChunk, difficulty, topic } = params;
 
   const difficultyGuidance: Record<string, string> = {
-    easy: 'basic recall and definitions',
-    medium: 'concepts and relationships',
-    hard: 'application and analysis',
+    easy: "basic recall and definitions",
+    medium: "concepts and relationships",
+    hard: "application and analysis",
   };
 
   return `You are an expert educator creating HIGH-QUALITY & RELEVANT study flashcards from educational content.
@@ -94,7 +98,7 @@ HARD LIMIT: Generate ${cardsPerChunk} flashcards maximum from this section. NOT 
 This is part of a larger set targeting ${cardCount} total cards across all chunks.
 
 **Difficulty Level: ${difficulty.toUpperCase()}** (${difficultyGuidance[difficulty] || difficulty})
-${topic ? `**Topic Focus:** ${topic}` : ''}
+${topic ? `**Topic Focus:** ${topic}` : ""}
 
 **CARD VARIETY REQUIREMENT:**
 You MUST generate a DIVERSE mix of flashcard types. Distribute evenly across these 5 types:
@@ -196,7 +200,7 @@ If there are 6+ topics available, select 1-3 cards from each topic.
 Example: If you need 20 cards and have 5 topics, select 4 from each topic
 
 Difficulty: ${difficulty}
-${topic ? `User preference: ${topic} (but still maintain diversity)` : ''}
+${topic ? `User preference: ${topic} (but still maintain diversity)` : ""}
 
 Available flashcards:
 ${content}

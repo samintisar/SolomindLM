@@ -4,8 +4,7 @@
 
 export const EXPORT_MIME_MAP: Record<string, { mimeType: string; extension: string }> = {
   "application/vnd.google-apps.document": {
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     extension: ".docx",
   },
   "application/vnd.google-apps.spreadsheet": {
@@ -25,7 +24,7 @@ export const EXPORT_MIME_MAP: Record<string, { mimeType: string; extension: stri
 export function resolveGoogleDriveDownload(
   fileId: string,
   fileName: string,
-  mimeType: string,
+  mimeType: string
 ): { downloadUrl: string; finalContentType: string; finalFileName: string } {
   let downloadUrl: string;
   let finalContentType: string;
@@ -48,7 +47,7 @@ export function resolveGoogleDriveDownload(
 
 export async function fetchGoogleDriveBlob(
   downloadUrl: string,
-  accessToken: string,
+  accessToken: string
 ): Promise<Blob> {
   const response = await fetch(downloadUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },

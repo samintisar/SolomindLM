@@ -1,6 +1,6 @@
-import React from 'react';
-import { ChevronLeft, FileStack, Copy, Download, ExternalLink } from 'lucide-react';
-import { Source } from '@/shared/types';
+import React from "react";
+import { ChevronLeft, FileStack, Copy, Download, ExternalLink } from "lucide-react";
+import { Source } from "@/shared/types";
 
 interface SourcesPanelHeaderProps {
   viewingSource: Source | null;
@@ -59,62 +59,62 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 <ChevronLeft className="w-5 h-5 shrink-0" />
               </button>
               <div className="min-w-0 flex-1 overflow-hidden">
-              {!allowRename ? (
-                <span className="font-display font-bold text-sm tracking-wide truncate text-foreground">
-                  {viewingSource.title}
-                </span>
-              ) : isRenaming ? (
-                <input
-                  type="text"
-                  value={renameValue}
-                  spellCheck={false}
-                  onChange={(e) => onRenameChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && renameValue.trim()) {
-                      onRenameSubmit(viewingSource.id, renameValue.trim());
-                    } else if (e.key === 'Escape') {
-                      onRenameChange(viewingSource.title);
+                {!allowRename ? (
+                  <span className="font-display font-bold text-sm tracking-wide truncate text-foreground">
+                    {viewingSource.title}
+                  </span>
+                ) : isRenaming ? (
+                  <input
+                    type="text"
+                    value={renameValue}
+                    spellCheck={false}
+                    onChange={(e) => onRenameChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && renameValue.trim()) {
+                        onRenameSubmit(viewingSource.id, renameValue.trim());
+                      } else if (e.key === "Escape") {
+                        onRenameChange(viewingSource.title);
+                        onExitRename();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (renameValue.trim()) {
+                        onRenameSubmit(viewingSource.id, renameValue.trim());
+                      } else {
+                        onRenameChange(viewingSource.title);
+                      }
                       onExitRename();
-                    }
-                  }}
-                  onBlur={() => {
-                    if (renameValue.trim()) {
-                      onRenameSubmit(viewingSource.id, renameValue.trim());
-                    } else {
-                      onRenameChange(viewingSource.title);
-                    }
-                    onExitRename();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                  autoFocus
-                  aria-label="Rename source"
-                />
-              ) : (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    onRenameChange(viewingSource.title);
-                    onEnterRename();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                    autoFocus
+                    aria-label="Rename source"
+                  />
+                ) : (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
                       onRenameChange(viewingSource.title);
                       onEnterRename();
-                    }
-                  }}
-                  className="font-display font-bold text-sm tracking-wide truncate text-foreground cursor-text hover:opacity-80"
-                  title="Click to rename"
-                >
-                  {viewingSource.title}
-                </span>
-              )}
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRenameChange(viewingSource.title);
+                        onEnterRename();
+                      }
+                    }}
+                    className="font-display font-bold text-sm tracking-wide truncate text-foreground cursor-text hover:opacity-80"
+                    title="Click to rename"
+                  >
+                    {viewingSource.title}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {viewingSource.type === 'WEB' && viewingSource.url && (
+              {viewingSource.type === "WEB" && viewingSource.url && (
                 <a
                   href={viewingSource.url}
                   target="_blank"
@@ -171,62 +171,62 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 <ChevronLeft className="w-5 h-5 shrink-0" />
               </button>
               <div className="min-w-0 flex-1 overflow-hidden">
-              {!allowRename ? (
-                <span className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 text-sidebar-foreground">
-                  {viewingSource.title}
-                </span>
-              ) : isRenaming ? (
-                <input
-                  type="text"
-                  value={renameValue}
-                  spellCheck={false}
-                  onChange={(e) => onRenameChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && renameValue.trim()) {
-                      onRenameSubmit(viewingSource.id, renameValue.trim());
-                    } else if (e.key === 'Escape') {
-                      onRenameChange(viewingSource.title);
+                {!allowRename ? (
+                  <span className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 text-sidebar-foreground">
+                    {viewingSource.title}
+                  </span>
+                ) : isRenaming ? (
+                  <input
+                    type="text"
+                    value={renameValue}
+                    spellCheck={false}
+                    onChange={(e) => onRenameChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && renameValue.trim()) {
+                        onRenameSubmit(viewingSource.id, renameValue.trim());
+                      } else if (e.key === "Escape") {
+                        onRenameChange(viewingSource.title);
+                        onExitRename();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (renameValue.trim()) {
+                        onRenameSubmit(viewingSource.id, renameValue.trim());
+                      } else {
+                        onRenameChange(viewingSource.title);
+                      }
                       onExitRename();
-                    }
-                  }}
-                  onBlur={() => {
-                    if (renameValue.trim()) {
-                      onRenameSubmit(viewingSource.id, renameValue.trim());
-                    } else {
-                      onRenameChange(viewingSource.title);
-                    }
-                    onExitRename();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
-                  autoFocus
-                  aria-label="Rename source"
-                />
-              ) : (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    onRenameChange(viewingSource.title);
-                    onEnterRename();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 min-w-0 font-display font-bold text-sm tracking-wide bg-transparent border-0 border-b border-border rounded-none px-0 py-0.5 text-sidebar-foreground focus:outline-none focus:ring-0 focus:border-primary"
+                    autoFocus
+                    aria-label="Rename source"
+                  />
+                ) : (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
                       onRenameChange(viewingSource.title);
                       onEnterRename();
-                    }
-                  }}
-                  className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
-                  title="Click to rename"
-                >
-                  {viewingSource.title}
-                </span>
-              )}
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRenameChange(viewingSource.title);
+                        onEnterRename();
+                      }
+                    }}
+                    className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 cursor-text hover:opacity-80 hover:underline hover:decoration-dotted hover:underline-offset-2 transition-opacity outline-none focus:outline-none focus:opacity-80 bg-transparent"
+                    title="Click to rename"
+                  >
+                    {viewingSource.title}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {viewingSource.type === 'WEB' && viewingSource.url && (
+              {viewingSource.type === "WEB" && viewingSource.url && (
                 <a
                   href={viewingSource.url}
                   target="_blank"
@@ -264,7 +264,9 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
           <>
             <div className="flex items-center gap-2 text-sidebar-foreground">
               <FileStack className="w-4 h-4 shrink-0" />
-              <span className="font-display font-bold text-sm tracking-wide uppercase">Sources</span>
+              <span className="font-display font-bold text-sm tracking-wide uppercase">
+                Sources
+              </span>
               <span className="ml-2 text-xs text-muted-foreground bg-sidebar-accent px-1.5 py-0.5 rounded-xl font-mono">
                 {selectedCount}
               </span>

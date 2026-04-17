@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Retry utility for LLM agent operations.
  *
@@ -6,10 +6,7 @@
  * to avoid retrying non-retryable errors (validation, timeout, auth, etc.).
  */
 
-import {
-  ExternalServiceError,
-  isRetryableHttpStatus,
-} from "../../_lib/errors";
+import { ExternalServiceError, isRetryableHttpStatus } from "../../_lib/errors";
 
 /**
  * Configuration for retry behavior.
@@ -37,14 +34,14 @@ function isRetryableError(error: Error): boolean {
 
   // Don't retry: validation, timeout, auth errors
   const nonRetryablePatterns = [
-    'invalid',
-    'validation',
-    'timeout',
-    'unauthorized',
-    'forbidden',
-    'not found',
-    'authentication',
-    'permission',
+    "invalid",
+    "validation",
+    "timeout",
+    "unauthorized",
+    "forbidden",
+    "not found",
+    "authentication",
+    "permission",
   ];
 
   for (const pattern of nonRetryablePatterns) {
@@ -55,20 +52,20 @@ function isRetryableError(error: Error): boolean {
 
   // Retry: rate limits, server errors (500, 502, 503, 504), network issues
   const retryablePatterns = [
-    'rate limit',
-    'too many requests',
-    '429',
-    '500',
-    '502',
-    '503',
-    '504',
-    'network',
-    'econnreset',
-    'etimedout',
-    'enotfound',
-    'econnrefused',
-    'temporary',
-    'service unavailable',
+    "rate limit",
+    "too many requests",
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
+    "network",
+    "econnreset",
+    "etimedout",
+    "enotfound",
+    "econnrefused",
+    "temporary",
+    "service unavailable",
   ];
 
   for (const pattern of retryablePatterns) {
@@ -181,7 +178,7 @@ export async function invokeWithRetry<T>(
       }
 
       // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -203,7 +200,7 @@ export async function invokeWithRetry<T>(
  */
 export function createRetryWrapper(
   config: RetryConfig
-): (<T>(fn: () => Promise<T>, phase: string) => Promise<T>) {
+): <T>(fn: () => Promise<T>, phase: string) => Promise<T> {
   return <T>(fn: () => Promise<T>, phase: string): Promise<T> => {
     return invokeWithRetry(fn, config, phase);
   };

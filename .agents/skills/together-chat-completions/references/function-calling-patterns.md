@@ -1,4 +1,5 @@
 # Function Calling Patterns Reference
+
 ## Contents
 
 - [6 Calling Patterns](#6-calling-patterns)
@@ -6,7 +7,6 @@
 - [Processing Tool Calls](#processing-tool-calls)
 - [tool_choice Parameter](#toolchoice-parameter)
 - [Supported Models](#supported-models)
-
 
 ## 6 Calling Patterns
 
@@ -191,9 +191,7 @@ const tools = [
 
 const response = await together.chat.completions.create({
   model: "Qwen/Qwen2.5-7B-Instruct-Turbo",
-  messages: [
-    { role: "user", content: "What's the current price of Apple's stock?" },
-  ],
+  messages: [{ role: "user", content: "What's the current price of Apple's stock?" }],
   tools,
 });
 
@@ -252,8 +250,7 @@ const response = await together.chat.completions.create({
     },
     {
       role: "user",
-      content:
-        "What is the current temperature of New York, San Francisco and Chicago?",
+      content: "What is the current temperature of New York, San Francisco and Chicago?",
     },
   ],
   tools: [
@@ -394,8 +391,7 @@ const messages: any[] = [
   },
   {
     role: "user",
-    content:
-      "What is the current temperature of New York, San Francisco and Chicago?",
+    content: "What is the current temperature of New York, San Francisco and Chicago?",
   },
 ];
 
@@ -478,9 +474,7 @@ response2 = client.chat.completions.create(
 ```
 
 ```typescript
-const messages: any[] = [
-  { role: "system", content: "You are a travel planning assistant." },
-];
+const messages: any[] = [{ role: "system", content: "You are a travel planning assistant." }];
 
 // Turn 1: User asks about weather
 messages.push({
@@ -516,8 +510,7 @@ messages.push(final.choices[0].message);
 // Turn 2: Model uses previous weather data to recommend
 messages.push({
   role: "user",
-  content:
-    "Which city has the best weather for outdoor dining? Find me a restaurant there.",
+  content: "Which city has the best weather for outdoor dining? Find me a restaurant there.",
 });
 
 const response2 = await together.chat.completions.create({
@@ -696,12 +689,12 @@ const final = await together.chat.completions.create({
 
 ## tool_choice Parameter
 
-| Value | Behavior |
-|-------|----------|
-| `"auto"` (default) | Model decides whether to call functions |
-| `"required"` | Model must call at least one function |
-| `"none"` | Never call functions |
-| `{"type": "function", "function": {"name": "fn"}}` | Force specific function |
+| Value                                              | Behavior                                |
+| -------------------------------------------------- | --------------------------------------- |
+| `"auto"` (default)                                 | Model decides whether to call functions |
+| `"required"`                                       | Model must call at least one function   |
+| `"none"`                                           | Never call functions                    |
+| `{"type": "function", "function": {"name": "fn"}}` | Force specific function                 |
 
 ## Supported Models
 

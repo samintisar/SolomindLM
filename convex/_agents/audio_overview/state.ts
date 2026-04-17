@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * State definitions for AudioOverviewGraph.
  *
@@ -6,9 +6,9 @@
  * with custom fields for audio overview generation.
  */
 
-import { Annotation } from '@langchain/langgraph';
-import { createGraphState, type ProgressInfo } from '../_shared/state_factory.js';
-import type { AudioType, AudioLength } from './prompts.js';
+import { Annotation } from "@langchain/langgraph";
+import { createGraphState, type ProgressInfo } from "../_shared/state_factory.js";
+import type { AudioType, AudioLength } from "./prompts.js";
 
 // ============================================================
 // Types
@@ -18,7 +18,7 @@ import type { AudioType, AudioLength } from './prompts.js';
  * Dialogue line interface.
  */
 export interface DialogueLine {
-  speaker: 'host_a' | 'host_b';
+  speaker: "host_a" | "host_b";
   text: string;
 }
 
@@ -38,12 +38,12 @@ export const OverallState = createGraphState<{
     // Audio-specific fields
     audioType: Annotation<AudioType>({
       reducer: (_x: AudioType, y?: AudioType) => y ?? _x,
-      default: () => 'deep_dive' as AudioType,
+      default: () => "deep_dive" as AudioType,
     }),
 
     length: Annotation<AudioLength>({
       reducer: (_x: AudioLength, y?: AudioLength) => y ?? _x,
-      default: () => 'default' as AudioLength,
+      default: () => "default" as AudioLength,
     }),
 
     focus: Annotation<string | undefined>({

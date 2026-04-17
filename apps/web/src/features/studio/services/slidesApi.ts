@@ -1,7 +1,7 @@
-import type { Slide, SlideDeckNote } from '@/shared/types/index';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
+import type { Slide, SlideDeckNote } from "@/shared/types/index";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
 export interface CreateSlideDeckParams {
   notebookId: string;
@@ -17,8 +17,8 @@ export interface CreateSlideDeckResponse {
 }
 
 export interface SlideDeckConfig {
-  slideType: 'detailed_deck' | 'presenter_slides';
-  deckLength: 'short' | 'default';
+  slideType: "detailed_deck" | "presenter_slides";
+  deckLength: "short" | "default";
   customPrompt?: string;
 }
 
@@ -27,22 +27,23 @@ export interface SlideDeckConfig {
  */
 function getPreviewText(status: string, metadata?: any): string {
   const phase = metadata?.phase || status;
-  const slideType = metadata?.slideType || 'detailed_deck';
-  const deckLength = metadata?.deckLength || 'default';
+  const slideType = metadata?.slideType || "detailed_deck";
+  const deckLength = metadata?.deckLength || "default";
 
-  const typeLabel = slideType === 'detailed_deck' ? 'Detailed' : 'Presenter';
-  const lengthLabel = deckLength === 'short' ? 'Short' : 'Standard';
+  const typeLabel = slideType === "detailed_deck" ? "Detailed" : "Presenter";
+  const lengthLabel = deckLength === "short" ? "Short" : "Standard";
 
-  const isGenerating = status === 'generating' ||
-    phase === 'generating' ||
-    phase === 'mapping' ||
-    phase === 'collapsing' ||
-    phase === 'reducing';
+  const isGenerating =
+    status === "generating" ||
+    phase === "generating" ||
+    phase === "mapping" ||
+    phase === "collapsing" ||
+    phase === "reducing";
 
   if (isGenerating) {
     return `${typeLabel} • ${lengthLabel} • Generating...`;
   }
-  if (status === 'failed' || phase === 'failed') {
+  if (status === "failed" || phase === "failed") {
     return `Slide Deck • Failed`;
   }
   return `${typeLabel} • ${lengthLabel}`;
@@ -56,13 +57,12 @@ function mapSlideDeckToNote(dbSlideDeck: any): SlideDeckNote {
   let slides: Slide[] = [];
   if (dbSlideDeck.data) {
     try {
-      const parsedData = typeof dbSlideDeck.data === 'string'
-        ? JSON.parse(dbSlideDeck.data)
-        : dbSlideDeck.data;
+      const parsedData =
+        typeof dbSlideDeck.data === "string" ? JSON.parse(dbSlideDeck.data) : dbSlideDeck.data;
 
       slides = (parsedData.slides || []).map((slide: any) => ({
         slide_number: slide.slide_number,
-        slide_url: slide.slide_url || '',
+        slide_url: slide.slide_url || "",
         title: slide.title,
         talking_points: slide.talking_points || [],
         prompt: slide.prompt,
@@ -79,12 +79,12 @@ function mapSlideDeckToNote(dbSlideDeck: any): SlideDeckNote {
     id: dbSlideDeck._id,
     title: dbSlideDeck.title,
     preview: getPreviewText(dbSlideDeck.status, dbSlideDeck.metadata),
-    type: 'slides',
+    type: "slides",
     slides,
     status: dbSlideDeck.status,
     metadata: {
-      slideType: dbSlideDeck.metadata?.slideType || 'detailed_deck',
-      deckLength: dbSlideDeck.metadata?.deckLength || 'default',
+      slideType: dbSlideDeck.metadata?.slideType || "detailed_deck",
+      deckLength: dbSlideDeck.metadata?.deckLength || "default",
       slideCount,
       customPrompt: dbSlideDeck.metadata?.customPrompt,
       error: dbSlideDeck.metadata?.error,
@@ -99,7 +99,7 @@ function mapSlideDeckToNote(dbSlideDeck: any): SlideDeckNote {
 export function useSlideDecks(notebookId: string | null) {
   const slideDecks = useQuery(
     api.studio.slides.index.list,
-    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
   return slideDecks?.map(mapSlideDeckToNote);
 }
@@ -110,7 +110,7 @@ export function useSlideDecks(notebookId: string | null) {
 export function useSlideDeck(slideDeckId: string | null) {
   const slideDeck = useQuery(
     api.studio.slides.index.get,
-    slideDeckId ? { id: slideDeckId as Id<'slides'> } : 'skip'
+    slideDeckId ? { id: slideDeckId as Id<"slides"> } : "skip"
   );
   return slideDeck ? mapSlideDeckToNote(slideDeck) : null;
 }
@@ -123,16 +123,20 @@ export function useCreateSlideDeck() {
 
   return async (params: CreateSlideDeckParams): Promise<CreateSlideDeckResponse> => {
     const result = await generate({
-      notebookId: params.notebookId as Id<'notebooks'>,
-      documentIds: params.documentIds as Id<'documents'>[],
+      notebookId: params.notebookId as Id<"notebooks">,
+      documentIds: params.documentIds as Id<"documents">[],
       slideCount: params.slideCount,
       title: params.title,
     });
 
     return {
       slideDeckId: result,
-      status: 'pending',
-      slideDeck: mapSlideDeckToNote({ _id: result, status: 'pending', title: params.title || 'Slide Deck' }),
+      status: "pending",
+      slideDeck: mapSlideDeckToNote({
+        _id: result,
+        status: "pending",
+        title: params.title || "Slide Deck",
+      }),
     };
   };
 }
@@ -141,38 +145,36 @@ export function useCreateSlideDeck() {
  * Rename a slide deck by ID with optimistic update
  */
 export function useRenameSlideDeck() {
-  const update = useMutation(api.studio.slides.index.update).withOptimisticUpdate((localStore, args) => {
-    const { id, title } = args;
+  const update = useMutation(api.studio.slides.index.update).withOptimisticUpdate(
+    (localStore, args) => {
+      const { id, title } = args;
 
-    // Read the current slide deck to get its notebookId
-    const slideDeck = localStore.getQuery(api.studio.slides.index.get, { id });
-    if (slideDeck) {
-      // Update detail view
-      localStore.setQuery(
-        api.studio.slides.index.get,
-        { id },
-        { ...slideDeck, title }
-      );
+      // Read the current slide deck to get its notebookId
+      const slideDeck = localStore.getQuery(api.studio.slides.index.get, { id });
+      if (slideDeck) {
+        // Update detail view
+        localStore.setQuery(api.studio.slides.index.get, { id }, { ...slideDeck, title });
 
-      // Update list view using the notebookId from the item
-      const listResult = localStore.getQuery(api.studio.slides.index.list, { notebookId: slideDeck.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.slides.index.list,
-          { notebookId: slideDeck.notebookId },
-          listResult.map((sd: { _id: string; [key: string]: unknown }) =>
-            sd._id === id
-              ? { ...sd, title }
-              : sd
-          )
-        );
+        // Update list view using the notebookId from the item
+        const listResult = localStore.getQuery(api.studio.slides.index.list, {
+          notebookId: slideDeck.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.slides.index.list,
+            { notebookId: slideDeck.notebookId },
+            listResult.map((sd: { _id: string; [key: string]: unknown }) =>
+              sd._id === id ? { ...sd, title } : sd
+            )
+          );
+        }
       }
     }
-  });
+  );
 
   return async (slideDeckId: string, newTitle: string) => {
     return await update({
-      id: slideDeckId as Id<'slides'>,
+      id: slideDeckId as Id<"slides">,
       title: newTitle,
     });
   };
@@ -182,26 +184,30 @@ export function useRenameSlideDeck() {
  * Delete a slide deck by ID with optimistic update
  */
 export function useDeleteSlideDeck() {
-  const remove = useMutation(api.studio.slides.index.remove).withOptimisticUpdate((localStore, args) => {
-    // Read the current slide deck to get its notebookId
-    const slideDeck = localStore.getQuery(api.studio.slides.index.get, { id: args.id });
-    if (slideDeck) {
-      // Update list view using the notebookId from the item
-      const listResult = localStore.getQuery(api.studio.slides.index.list, { notebookId: slideDeck.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.slides.index.list,
-          { notebookId: slideDeck.notebookId },
-          listResult.filter((sd: { _id: string }) => sd._id !== args.id)
-        );
+  const remove = useMutation(api.studio.slides.index.remove).withOptimisticUpdate(
+    (localStore, args) => {
+      // Read the current slide deck to get its notebookId
+      const slideDeck = localStore.getQuery(api.studio.slides.index.get, { id: args.id });
+      if (slideDeck) {
+        // Update list view using the notebookId from the item
+        const listResult = localStore.getQuery(api.studio.slides.index.list, {
+          notebookId: slideDeck.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.slides.index.list,
+            { notebookId: slideDeck.notebookId },
+            listResult.filter((sd: { _id: string }) => sd._id !== args.id)
+          );
+        }
       }
-    }
 
-    // Clear detail view
-    localStore.setQuery(api.studio.slides.index.get, { id: args.id }, null);
-  });
+      // Clear detail view
+      localStore.setQuery(api.studio.slides.index.get, { id: args.id }, null);
+    }
+  );
 
   return async (slideDeckId: string) => {
-    await remove({ id: slideDeckId as Id<'slides'> });
+    await remove({ id: slideDeckId as Id<"slides"> });
   };
 }

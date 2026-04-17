@@ -1,6 +1,6 @@
-import { useDocument } from '../services/documentsApi';
+import { useDocument } from "../services/documentsApi";
 
-type DocumentStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type DocumentStatus = "pending" | "processing" | "completed" | "failed";
 
 interface UseDocumentStatusResult {
   status: DocumentStatus;
@@ -11,7 +11,7 @@ interface UseDocumentStatusResult {
 
 export function useDocumentStatus(documentId: string): UseDocumentStatusResult {
   const doc = useDocument(documentId);
-  const status = (doc?.status ?? 'pending') as DocumentStatus;
+  const status = (doc?.status ?? "pending") as DocumentStatus;
 
   return {
     status,

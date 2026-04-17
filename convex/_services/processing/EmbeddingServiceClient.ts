@@ -1,7 +1,7 @@
 "use node";
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { OpenAIEmbeddings } from "@langchain/openai";
 
-const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+const OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
 const OPENAI_EMBEDDING_DIMENSIONS = 1536;
 const OPENAI_BATCH_SIZE = 512;
 

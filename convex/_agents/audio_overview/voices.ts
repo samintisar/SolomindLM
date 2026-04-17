@@ -1,6 +1,6 @@
-"use node"
+"use node";
 
-import { env } from '../../_lib/env';
+import { env } from "../../_lib/env";
 
 /** Together TTS voice IDs (Kokoro by default); override via AUDIO_VOICE_HOST_* env. */
 export const VOICES = {

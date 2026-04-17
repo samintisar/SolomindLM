@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import { ArrowUp, Loader2 } from 'lucide-react';
+import React, { useRef, useEffect, useCallback } from "react";
+import { ArrowUp, Loader2 } from "lucide-react";
 
 interface ChatInputProps {
   value: string;
@@ -9,20 +9,26 @@ interface ChatInputProps {
   notebookId?: string | null;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, disabled, notebookId }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  notebookId,
+}) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
-      textarea.style.height = 'auto';
+      textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
     }
   }, [value]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         onSend();
       }
@@ -47,9 +53,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ value, onChange, onSend, d
           onClick={onSend}
           disabled={!value.trim() || disabled || !notebookId}
           className="p-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-          title={value.trim() ? 'Send message (Enter)' : 'Type a message to send'}
+          title={value.trim() ? "Send message (Enter)" : "Type a message to send"}
         >
-          {disabled ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
+          {disabled ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <ArrowUp className="w-5 h-5" />
+          )}
         </button>
       </div>
     </div>

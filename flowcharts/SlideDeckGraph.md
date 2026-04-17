@@ -118,14 +118,16 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Phase Details
 
 ### 1. Split Chunks Phase
+
 - **Input**: Document chunks, slide type, deck length, custom prompt
 - **Process**: Validates and packs chunks for optimal processing
 - **Output**: Prepared state for map phase
 
 ### 2. Map Phase (Parallel)
+
 - **Input**: Individual chunks
 - **LLM Model**: TogetherAI (structured output)
-- **Process**: 
+- **Process**:
   - Extracts slide concepts from each chunk
   - Generates professional titles (8-12 words)
   - Creates 3-5 complete bullet points (detailed_deck) or 1-2 key phrases (presenter_slides)
@@ -133,6 +135,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 - **Output**: Array of `SlideCandidate` objects per chunk
 
 **SlideCandidate Schema**:
+
 ```typescript
 {
   title: string;           // Compelling, specific title
@@ -143,6 +146,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ```
 
 ### 3. Collapse Phase
+
 - **Input**: All map outputs
 - **Process**:
   - Merges outputs from parallel map tasks
@@ -153,11 +157,13 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ### 4. Reduce Phase (Multi-Stage Selection)
 
 #### Stage 1: Heuristic Deduplication
+
 - Calculates Jaccard similarity between slide pairs
 - Removes duplicates with >75% similarity
 - Preserves diverse content
 
 #### Stage 2: Topic-Based Pre-selection
+
 - Groups slides by topic patterns:
   - Introduction/Foundation
   - Concepts/Definitions
@@ -170,6 +176,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 - Selects balanced representation (max 30 slides for LLM)
 
 #### Stage 3: LLM Selection
+
 - **LLM Model**: TogetherAI (structured output)
 - **Process**: Intelligent narrative arc construction
   - **Hook** (1-2 slides): Why it matters, context
@@ -181,6 +188,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 - **Fallback**: Heuristic topic-based selection if LLM fails
 
 #### Stage 4: Refine with Image Prompts
+
 - **LLM Model**: TogetherAI (structured output)
 - **Process**: Creates detailed glm-image prompts
   - Specifies exact text to render (title, bullets)
@@ -191,6 +199,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 - **Output**: `Slide` objects with comprehensive prompts
 
 **Slide Schema**:
+
 ```typescript
 {
   slideNumber: number;
@@ -206,6 +215,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ### 5. Generate Images Phase
 
 #### Image Generation (ZhipuAI glm-image)
+
 - **Model**: `glm-image`
 - **Resolution**: 1728x960px (16:9 aspect ratio)
 - **Text Rendering**: glm-image excels at rendering text
@@ -217,26 +227,29 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
   - Coffee brown text (#4B3621)
   - Hand-drawn ink illustrations
   - Warm, academic aesthetic
-- **Rate Limiting**: 
+- **Rate Limiting**:
   - Sequential processing (concurrency=1)
   - 30-second delays between requests
   - 1 retry on failure
 
 #### Upload to Convex storage
+
 - **Path**: `{slideDeckId}/slide-{number}-{timestamp}.png` (or equivalent)
 - **Access**: Convex storage URLs for frontend display
 
 ## Slide Types
 
 ### Detailed Deck
+
 - **Layout**: 40% text, 60% visual
-- **Content**: 
+- **Content**:
   - Large title (60pt serif)
   - 3-5 bullet points (28pt sans-serif)
   - Supporting diagram or illustration
 - **Use Case**: Educational presentations, training materials
 
 ### Presenter Slides
+
 - **Layout**: 10% text, 90% visual
 - **Content**:
   - Bold title (72pt serif)
@@ -247,11 +260,13 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Deck Lengths
 
 ### Short Deck
+
 - **Range**: 4-6 slides
 - **Focus**: Big idea + 3 key pillars
 - **Narrative**: Hook → Core Concepts → Impact
 
 ### Standard Deck
+
 - **Range**: 8-12 slides
 - **Focus**: Complete narrative arc
 - **Narrative**: Hook → Foundation → Core → Deep Dive → Application → Conclusion
@@ -259,13 +274,14 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Theme: Vintage Academia
 
 ### Visual Aesthetic
+
 - **Style**: Leonardo da Vinci's notebooks meets modern coffee shop
 - **Backgrounds**: Textured parchment, warm beige, latte tones
-- **Typography**: 
+- **Typography**:
   - Headers: Classical serif (Playfair Display, Garamond)
   - Body: Clean sans-serif
 - **Graphics**: Hand-drawn ink illustrations, sepia diagrams
-- **Colors**: 
+- **Colors**:
   - Primary: Coffee brown (#4B3621)
   - Background: Beige (#F5F5DC)
   - Accents: Forest green, burnt orange, maroon
@@ -274,6 +290,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Quality Assurance
 
 ### Content Quality
+
 - ✓ One concept per slide (cognitive load theory)
 - ✓ Logical flow between slides (scaffolding)
 - ✓ Specific, actionable bullet points (no fragments)
@@ -281,6 +298,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 - ✓ Professional tone and language
 
 ### Technical Quality
+
 - ✓ Perfect text rendering (no spelling errors)
 - ✓ Consistent typography and spacing
 - ✓ High resolution (8k quality)
@@ -288,6 +306,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 - ✓ Theme consistency across all slides
 
 ### Narrative Quality
+
 - ✓ Clear opening hook
 - ✓ Progressive knowledge building
 - ✓ Balanced depth across topics
@@ -297,17 +316,20 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Error Handling
 
 ### Image Generation Failures
+
 - **Retry**: 1 attempt with exponential backoff
 - **Fallback**: Placeholder image URL
 - **Logging**: Detailed error tracking
 - **Continuation**: Process remaining slides
 
 ### LLM Failures
+
 - **Map Phase**: Skip failed chunks, continue with others
 - **Selection Phase**: Fall back to heuristic selection
 - **Refine Phase**: Use template-based fallback prompts
 
 ### Rate Limiting
+
 - **Detection**: Monitor ZhipuAI API responses
 - **Mitigation**: 30-second delays between requests
 - **Graceful Degradation**: Complete what's possible
@@ -315,17 +337,20 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Performance Characteristics
 
 ### Processing Time
+
 - **Map Phase**: ~30-60 seconds (parallel)
 - **Collapse/Reduce**: ~20-40 seconds
 - **Image Generation**: ~2-5 minutes per slide (sequential)
 - **Total**: 10-30 minutes for standard deck
 
 ### Resource Usage
+
 - **Memory**: Cleared after each phase
 - **Tokens**: ~50k-100k total (LLM calls)
 - **Storage**: ~1-5 MB per slide (images)
 
 ### Scalability
+
 - **Chunks**: Handles 10-1000+ chunks via map-reduce
 - **Slides**: Optimized for 4-12 final slides
 - **Concurrency**: Map phase fully parallel
@@ -333,6 +358,7 @@ The SlideDeckGraph generates complete, professional presentation slides using a 
 ## Configuration
 
 ### Environment Variables
+
 ```bash
 # LLM Configuration
 TOGETHER_AI_API_KEY=xxx
@@ -357,6 +383,7 @@ SLIDES_IMAGE_TIMEOUT_MS=60000
 ## Example Workflow
 
 ### Input
+
 ```typescript
 {
   documentIds: ['doc-123', 'doc-456'],
@@ -367,6 +394,7 @@ SLIDES_IMAGE_TIMEOUT_MS=60000
 ```
 
 ### Output
+
 ```typescript
 {
   slides: [
@@ -398,6 +426,7 @@ SLIDES_IMAGE_TIMEOUT_MS=60000
 ## Future Enhancements
 
 ### Potential Improvements
+
 - [ ] Custom theme support (beyond Vintage Academia)
 - [ ] Interactive elements (animations, transitions)
 - [ ] Multi-language support
@@ -408,6 +437,7 @@ SLIDES_IMAGE_TIMEOUT_MS=60000
 - [ ] Accessibility features (alt text, high contrast)
 
 ### Advanced Features
+
 - [ ] Video slide generation
 - [ ] Audio narration synthesis
 - [ ] Collaborative editing

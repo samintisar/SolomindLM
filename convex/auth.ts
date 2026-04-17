@@ -27,7 +27,9 @@ const AUTH_SUB_DIVIDER = "|";
  * Get the authenticated user's ID using Convex Auth.
  * Convex Auth stores subject as "userId|sessionId"; we need the userId part.
  */
-export const getAuthUserId = async (ctx: QueryCtx | MutationCtx | ActionCtx): Promise<Id<"users"> | null> => {
+export const getAuthUserId = async (
+  ctx: QueryCtx | MutationCtx | ActionCtx
+): Promise<Id<"users"> | null> => {
   try {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity?.subject) return null;

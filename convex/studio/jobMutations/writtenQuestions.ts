@@ -1,11 +1,11 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { normalizeMathMarkdownDeep } from '../../_shared/mathMarkdown';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const updateWrittenQuestionsTitle = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -18,7 +18,7 @@ export const updateWrittenQuestionsTitle = internalMutation({
 
 export const saveWrittenQuestionsResults = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     questions: v.array(v.any()),
     metadata: v.any(),
   },
@@ -27,9 +27,9 @@ export const saveWrittenQuestionsResults = internalMutation({
 
     await ctx.db.patch(args.writtenQuestionId, {
       questionsData: normalizedQuestions,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Written Questions',
+      title: args.metadata?.title ?? "Written Questions",
       metadata: {
         ...args.metadata,
         questionCount: normalizedQuestions.length,
@@ -41,7 +41,7 @@ export const saveWrittenQuestionsResults = internalMutation({
 
 export const updateWrittenQuestionsStatus = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -59,18 +59,18 @@ export const updateWrittenQuestionsStatus = internalMutation({
 
 export const markWrittenQuestionsFailed = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.writtenQuestionId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -83,7 +83,7 @@ export const markWrittenQuestionsFailed = internalMutation({
 // Multi-phase written questions helpers
 export const initWrittenQuestionsMapPhase = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     totalMapTasks: v.number(),
     questionCount: v.number(),
     difficulty: v.string(),
@@ -95,13 +95,13 @@ export const initWrittenQuestionsMapPhase = internalMutation({
     if (!writtenQuestion) return null;
 
     await ctx.db.patch(args.writtenQuestionId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...writtenQuestion.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
@@ -117,7 +117,7 @@ export const initWrittenQuestionsMapPhase = internalMutation({
 
 export const storeWrittenQuestionsMapResult = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -149,7 +149,7 @@ export const storeWrittenQuestionsMapResult = internalMutation({
 
 export const clearWrittenQuestionsMapData = internalMutation({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
   },
   handler: async (ctx, args) => {
     const writtenQuestion = await ctx.db.get(args.writtenQuestionId);

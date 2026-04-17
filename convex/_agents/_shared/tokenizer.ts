@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Token counting utility for LLM agent operations.
  *
@@ -12,7 +12,7 @@ const CHARS_PER_TOKEN = 4;
 /**
  * Default model (kept for API compatibility; estimate is model-agnostic).
  */
-const DEFAULT_MODEL = 'gpt-4o';
+const DEFAULT_MODEL = "gpt-4o";
 
 /**
  * Estimates the number of tokens in a text using character count.
@@ -23,7 +23,7 @@ const DEFAULT_MODEL = 'gpt-4o';
  * @returns Estimated number of tokens
  */
 export function countTokens(text: string, _model: string = DEFAULT_MODEL): number {
-  if (!text || typeof text !== 'string') {
+  if (!text || typeof text !== "string") {
     return 0;
   }
   if (text.length === 0) {
@@ -43,7 +43,7 @@ export function countTokensBatch(texts: string[], model: string = DEFAULT_MODEL)
   if (!texts || texts.length === 0) {
     return [];
   }
-  return texts.map((text) => (text && typeof text === 'string' ? countTokens(text, model) : 0));
+  return texts.map((text) => (text && typeof text === "string" ? countTokens(text, model) : 0));
 }
 
 /**
@@ -54,9 +54,13 @@ export function countTokensBatch(texts: string[], model: string = DEFAULT_MODEL)
  * @param _model - Ignored; kept for API compatibility
  * @returns Truncated text
  */
-export function truncateToTokens(text: string, maxTokens: number, _model: string = DEFAULT_MODEL): string {
+export function truncateToTokens(
+  text: string,
+  maxTokens: number,
+  _model: string = DEFAULT_MODEL
+): string {
   if (!text || maxTokens <= 0) {
-    return '';
+    return "";
   }
   const maxChars = maxTokens * CHARS_PER_TOKEN;
   if (text.length <= maxChars) {
@@ -64,7 +68,7 @@ export function truncateToTokens(text: string, maxTokens: number, _model: string
   }
   const truncated = text.slice(0, maxChars);
   // Prefer cutting at last space to avoid mid-word
-  const lastSpace = truncated.lastIndexOf(' ');
+  const lastSpace = truncated.lastIndexOf(" ");
   if (lastSpace > maxChars * 0.8) {
     return truncated.slice(0, lastSpace).trim();
   }

@@ -1,18 +1,16 @@
-import React, { useState, useEffect, lazy, Suspense, useMemo, useRef } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useMemo, useRef } from "react";
+import { MessageSquareText, CheckCircle2, Award, AlertCircle, Eye, ArrowLeft } from "lucide-react";
+import { WrittenQuestionsNote, WrittenQuestionAnswer } from "@/shared/types/index";
 import {
-  MessageSquareText,
-  CheckCircle2,
-  Award,
-  AlertCircle,
-  Eye,
-  ArrowLeft,
-} from 'lucide-react';
-import { WrittenQuestionsNote, WrittenQuestionAnswer } from '@/shared/types/index';
-import { useSubmitWrittenAnswer, useResetWrittenAnswers, useWrittenQuestionSet, useUpdateWrittenQuestionsProgress } from '@/features/studio/services/writtenQuestionsApi';
-import { sanitizeMarkdown } from '@/shared/utils';
+  useSubmitWrittenAnswer,
+  useResetWrittenAnswers,
+  useWrittenQuestionSet,
+  useUpdateWrittenQuestionsProgress,
+} from "@/features/studio/services/writtenQuestionsApi";
+import { sanitizeMarkdown } from "@/shared/utils";
 
 const MarkdownRenderer = lazy(() =>
-  import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
+  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
 export interface WrittenQuestionsViewProps {
@@ -21,12 +19,20 @@ export interface WrittenQuestionsViewProps {
   onBack?: () => void;
 }
 
-export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note, onNoteUpdate, onBack }) => {
+export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
+  note,
+  onNoteUpdate,
+  onBack,
+}) => {
   // Initialize currentIndex from note.metadata.lastViewedIndex if available
   const questions = note.questions || [];
   const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
-  const [currentIndex, setCurrentIndex] = useState(Math.min(initialIndex, Math.max(0, questions.length - 1)));
-  const [userAnswers, setUserAnswers] = useState<Record<string, WrittenQuestionAnswer>>(note.userAnswers || {});
+  const [currentIndex, setCurrentIndex] = useState(
+    Math.min(initialIndex, Math.max(0, questions.length - 1))
+  );
+  const [userAnswers, setUserAnswers] = useState<Record<string, WrittenQuestionAnswer>>(
+    note.userAnswers || {}
+  );
   const [showResults, setShowResults] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
@@ -80,12 +86,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
     );
   }
 
-  const currentAnswer = userAnswers[currentQuestion.id]?.answer || '';
+  const currentAnswer = userAnswers[currentQuestion.id]?.answer || "";
   const currentGradedResult = userAnswers[currentQuestion.id]?.graded
     ? {
         score: userAnswers[currentQuestion.id].score || 0,
         maxScore: userAnswers[currentQuestion.id].maxScore || 0,
-        feedback: userAnswers[currentQuestion.id].feedback || '',
+        feedback: userAnswers[currentQuestion.id].feedback || "",
         strengths: userAnswers[currentQuestion.id].strengths || [],
         improvements: userAnswers[currentQuestion.id].improvements || [],
       }
@@ -96,7 +102,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
   const isGraded = !!currentGradedResult;
 
   // Calculate total progress
-  const answeredCount = Object.keys(userAnswers).filter((qid) => userAnswers[qid]?.answer?.trim().length > 0).length;
+  const answeredCount = Object.keys(userAnswers).filter(
+    (qid) => userAnswers[qid]?.answer?.trim().length > 0
+  ).length;
   const totalCount = questions.length;
 
   const handleSubmitAnswer = async () => {
@@ -112,7 +120,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
         answer: currentAnswer,
       });
 
-      console.log('Grading complete:', result);
+      console.log("Grading complete:", result);
 
       // The useEffect will sync userAnswers from latestNote when the database updates
       // Just notify parent of the update
@@ -120,8 +128,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
         onNoteUpdate(latestNote);
       }
     } catch (error) {
-      console.error('Failed to submit answer:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit answer');
+      console.error("Failed to submit answer:", error);
+      alert(error instanceof Error ? error.message : "Failed to submit answer");
     } finally {
       setIsSubmitting(false);
     }
@@ -144,7 +152,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
   const handleAnswerChange = (answer: string) => {
     setUserAnswers((prev) => ({
       ...prev,
-      [currentQuestion.id]: { ...(prev[currentQuestion.id] || { answer: '', graded: false }), answer },
+      [currentQuestion.id]: {
+        ...(prev[currentQuestion.id] || { answer: "", graded: false }),
+        answer,
+      },
     }));
   };
 
@@ -163,8 +174,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
         onNoteUpdate(latestNote);
       }
     } catch (error) {
-      console.error('Failed to reset answers:', error);
-      alert(error instanceof Error ? error.message : 'Failed to reset answers');
+      console.error("Failed to reset answers:", error);
+      alert(error instanceof Error ? error.message : "Failed to reset answers");
     } finally {
       setIsResetting(false);
     }
@@ -235,7 +246,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                   Resetting...
                 </>
               ) : (
-                'Try Again'
+                "Try Again"
               )}
             </button>
           </div>
@@ -294,7 +305,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
 
           {/* Question Type Badge */}
           <div className="mb-4">
-            {currentQuestion.questionType === 'short' ? (
+            {currentQuestion.questionType === "short" ? (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary text-foreground border border-border">
                 <MessageSquareText className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-xs font-semibold uppercase tracking-wide">SHORT ANSWER</span>
@@ -312,7 +323,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
 
           {/* Question */}
           <div className="w-full prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground mb-6 text-lg md:text-xl">
-            <Suspense fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}>
+            <Suspense
+              fallback={<div className="animate-pulse h-5 bg-secondary/30 rounded w-full" />}
+            >
               <MarkdownRenderer
                 components={{
                   img: () => null,
@@ -321,7 +334,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                   audio: () => null,
                   iframe: () => null,
                   table: ({ children }) => (
-                    <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">{children}</table>
+                    <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
+                      {children}
+                    </table>
                   ),
                   thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
                   tbody: ({ children }) => <tbody>{children}</tbody>,
@@ -332,7 +347,9 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                     </th>
                   ),
                   td: ({ children }) => (
-                    <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">{children}</td>
+                    <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
+                      {children}
+                    </td>
                   ),
                 }}
               >
@@ -348,14 +365,14 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                 value={currentAnswer}
                 onChange={(e) => handleAnswerChange(e.target.value)}
                 placeholder={
-                  currentQuestion.questionType === 'short'
-                    ? 'Type your short answer here (1-3 sentences)...'
-                    : 'Type your detailed answer here...'
+                  currentQuestion.questionType === "short"
+                    ? "Type your short answer here (1-3 sentences)..."
+                    : "Type your detailed answer here..."
                 }
                 disabled={reviewMode}
                 className={`flex-1 w-full bg-background border-2 rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/40 ${
-                  isAnswered ? 'border-primary' : 'border-border'
-                } ${reviewMode ? 'opacity-70 cursor-not-allowed bg-muted/30' : ''}`}
+                  isAnswered ? "border-primary" : "border-border"
+                } ${reviewMode ? "opacity-70 cursor-not-allowed bg-muted/30" : ""}`}
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 font-mono shrink-0">
                 <span>{currentAnswer.length} characters</span>
@@ -380,7 +397,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                   <div className="text-right">
                     <div className="text-sm text-muted-foreground">Score</div>
                     <div className="text-lg font-bold text-foreground">
-                      {Math.round((currentGradedResult.score / currentGradedResult.maxScore) * 100)}%
+                      {Math.round((currentGradedResult.score / currentGradedResult.maxScore) * 100)}
+                      %
                     </div>
                   </div>
                 </div>
@@ -388,9 +406,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
 
               {/* Your Answer */}
               <div className="p-4 bg-secondary/30 rounded-xl border border-border">
-                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Your Answer</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Your Answer
+                </span>
                 <div className="mt-2 text-base leading-relaxed text-foreground whitespace-pre-wrap font-serif">
-                  {userAnswers[currentQuestion.id]?.answer || ''}
+                  {userAnswers[currentQuestion.id]?.answer || ""}
                 </div>
               </div>
 
@@ -412,7 +432,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                   </span>
                   <ul className="mt-2 space-y-2">
                     {currentGradedResult.strengths.map((strength, idx) => (
-                      <li key={idx} className="text-base text-vintage-green-700 dark:text-vintage-green-700 flex items-start gap-2">
+                      <li
+                        key={idx}
+                        className="text-base text-vintage-green-700 dark:text-vintage-green-700 flex items-start gap-2"
+                      >
                         <CheckCircle2 className="w-4 h-4 shrink-0 mt-1" />
                         <span>{strength}</span>
                       </li>
@@ -429,7 +452,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
                   </span>
                   <ul className="mt-2 space-y-2">
                     {currentGradedResult.improvements.map((improvement, idx) => (
-                      <li key={idx} className="text-base text-vintage-orange-700 dark:text-vintage-orange-700 flex items-start gap-2">
+                      <li
+                        key={idx}
+                        className="text-base text-vintage-orange-700 dark:text-vintage-orange-700 flex items-start gap-2"
+                      >
                         <AlertCircle className="w-4 h-4 shrink-0 mt-1" />
                         <span>{improvement}</span>
                       </li>
@@ -457,7 +483,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({ note
               onClick={handleNext}
               className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
             >
-              {currentIndex === questions.length - 1 ? 'Finish' : 'Next'}
+              {currentIndex === questions.length - 1 ? "Finish" : "Next"}
             </button>
           </div>
 

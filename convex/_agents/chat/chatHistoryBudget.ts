@@ -8,10 +8,7 @@ export type HistoryTurn = { role: string; content: string };
  * Keep the most recent turns whose total estimated tokens stay within maxTokens.
  * Walks backward from the end of `turns` (excludes the current user message if it is not in `turns`).
  */
-export function budgetConversationHistory(
-  turns: HistoryTurn[],
-  maxTokens: number
-): HistoryTurn[] {
+export function budgetConversationHistory(turns: HistoryTurn[], maxTokens: number): HistoryTurn[] {
   if (maxTokens <= 0 || turns.length === 0) {
     return [];
   }

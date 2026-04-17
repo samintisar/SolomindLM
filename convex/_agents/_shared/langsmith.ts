@@ -1,8 +1,8 @@
-"use node"
-import { LangChainTracer } from '@langchain/core/tracers/tracer_langchain';
-import { Client } from 'langsmith';
-import { env } from '../../_lib/env';
-import type { JobType } from './logging';
+"use node";
+import { LangChainTracer } from "@langchain/core/tracers/tracer_langchain";
+import { Client } from "langsmith";
+import { env } from "../../_lib/env";
+import type { JobType } from "./logging";
 
 export interface LangSmithRunConfig {
   runName?: string;
@@ -27,7 +27,7 @@ let tracerInstance: LangChainTracer | null = null;
  */
 function isTracingEnabled(): boolean {
   // Check LANGCHAIN_TRACING_V2 first (the new standard), then fallback to LANGSMITH_TRACING
-  return env.LANGCHAIN_TRACING_V2 === 'true' || env.LANGSMITH_TRACING === 'true';
+  return env.LANGCHAIN_TRACING_V2 === "true" || env.LANGSMITH_TRACING === "true";
 }
 
 /**
@@ -49,10 +49,10 @@ function getProjectName(): string {
   }
 
   // Auto-detect environment from Convex URL
-  const convexUrl = env.CONVEX_CLOUD_URL || '';
-  const isProd = convexUrl.includes('prod') || convexUrl.includes('production');
+  const convexUrl = env.CONVEX_CLOUD_URL || "";
+  const isProd = convexUrl.includes("prod") || convexUrl.includes("production");
 
-  return isProd ? 'prod-solomind-agents' : 'dev-solomind-agents';
+  return isProd ? "prod-solomind-agents" : "dev-solomind-agents";
 }
 
 /**
@@ -148,11 +148,7 @@ export function createAgentTraceConfig(
   const timestamp = Date.now();
 
   // Build tags array with consistent format
-  const tags = [
-    `job:${jobType}`,
-    `jobId:${jobId}`,
-    ...(options?.additionalTags || []),
-  ];
+  const tags = [`job:${jobType}`, `jobId:${jobId}`, ...(options?.additionalTags || [])];
 
   // Add notebook tag if available
   if (options?.notebookId) {

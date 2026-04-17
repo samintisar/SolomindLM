@@ -53,10 +53,7 @@ export type FolderCreate = {
   icon?: string;
 };
 
-export async function createFolder(
-  ctx: MutationCtx,
-  data: FolderCreate
-): Promise<Id<"folders">> {
+export async function createFolder(ctx: MutationCtx, data: FolderCreate): Promise<Id<"folders">> {
   const now = Date.now();
   return await ctx.db.insert("folders", {
     userId: data.userId,
@@ -91,10 +88,7 @@ export async function updateFolder(
   await ctx.db.patch("folders", folderId, updateData);
 }
 
-export async function deleteFolder(
-  ctx: MutationCtx,
-  folderId: Id<"folders">
-): Promise<void> {
+export async function deleteFolder(ctx: MutationCtx, folderId: Id<"folders">): Promise<void> {
   await ctx.db.delete("folders", folderId);
 }
 

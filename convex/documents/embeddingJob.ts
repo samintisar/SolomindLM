@@ -1,53 +1,38 @@
 "use node";
-import { internalAction } from '../_generated/server';
-import { v } from 'convex/values';
-import { internal } from '../_generated/api';
-import { MistralOCRService } from '../_services/extraction/MistralOCRService';
-import { AudioTranscriptionService } from '../_services/extraction/AudioTranscriptionService';
-import { SupadataLoaderService } from '../_services/extraction/SupadataLoaderService';
+import { internalAction } from "../_generated/server";
+import { v } from "convex/values";
+import { internal } from "../_generated/api";
+import { MistralOCRService } from "../_services/extraction/MistralOCRService";
+import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
+import { SupadataLoaderService } from "../_services/extraction/SupadataLoaderService";
 import {
   extractDocumentMetadata,
   getFileExtension,
   type DocumentMetadata,
-} from '../_services/processing/DocumentMetadataExtractor';
+} from "../_services/processing/DocumentMetadataExtractor";
 import {
   StructuralChunker,
   type ChunkWithMetadata,
-} from '../_services/processing/StructuralChunker';
-import { createJobLogger, createErrorMetadata } from '../_agents/_shared/logging';
+} from "../_services/processing/StructuralChunker";
+import { createJobLogger, createErrorMetadata } from "../_agents/_shared/logging";
 
 // File extensions that require OCR processing
-const OCR_FILE_EXTENSIONS = [
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.avif',
-  '.pdf',
-  '.pptx',
-  '.docx',
-];
+const OCR_FILE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".avif", ".pdf", ".pptx", ".docx"];
 
-const AUDIO_FILE_EXTENSIONS = [
-  '.wav',
-  '.mp3',
-  '.m4a',
-  '.webm',
-  '.flac',
-];
+const AUDIO_FILE_EXTENSIONS = [".wav", ".mp3", ".m4a", ".webm", ".flac"];
 
 /**
  * Check if a file requires OCR processing based on its extension
  */
 function needsOCR(fileName: string): boolean {
-  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf("."));
   return OCR_FILE_EXTENSIONS.includes(ext);
 }
 
 function needsAudioTranscription(fileName: string): boolean {
-  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf("."));
   return AUDIO_FILE_EXTENSIONS.includes(ext);
 }
-
 
 /**
  * Document embedding job handler
@@ -55,9 +40,9 @@ function needsAudioTranscription(fileName: string): boolean {
  */
 export const docEmbedding = internalAction({
   args: {
-    documentId: v.id('documents'),
+    documentId: v.id("documents"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -66,7 +51,7 @@ export const docEmbedding = internalAction({
 
     // Initialize structured logger
     const logger = createJobLogger({
-      jobType: 'document_embedding',
+      jobType: "document_embedding",
       jobId: documentId,
       notebookId,
       userId,
@@ -74,20 +59,20 @@ export const docEmbedding = internalAction({
 
     logger.jobStart();
 
-    let currentPhase = 'initializing';
+    let currentPhase = "initializing";
 
     try {
       // Phase: Initializing
-      logger.phaseStart('initializing');
+      logger.phaseStart("initializing");
       await ctx.runMutation(internal.documents.index.updateStatus, {
         documentId,
-        status: 'processing',
+        status: "processing",
       });
-      logger.phaseComplete('initializing');
+      logger.phaseComplete("initializing");
 
       // Phase: Loading document
-      logger.phaseStart('loading_document');
-      currentPhase = 'loading_document';
+      logger.phaseStart("loading_document");
+      currentPhase = "loading_document";
 
       // Get document details
       const docDetails = await ctx.runQuery(internal.documents.index.getDocumentDetails, {
@@ -99,64 +84,66 @@ export const docEmbedding = internalAction({
       });
       const chunkUserId = (notebookRow?.userId ?? userId) as string;
 
-      logger.phaseComplete('loading_document', {
+      logger.phaseComplete("loading_document", {
         fileType: docDetails.fileType,
         fileName: docDetails.fileName,
       });
 
-      let extractedText = '';
+      let extractedText = "";
       let extractedTitle: string | undefined;
 
       // Phase: Extraction
-      logger.phaseStart('extraction');
-      currentPhase = 'extraction';
+      logger.phaseStart("extraction");
+      currentPhase = "extraction";
 
-      const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || '');
+      const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
       const supadataLoader = new SupadataLoaderService();
 
-      if (docDetails.fileType === 'youtube') {
-        logger.info('Extracting YouTube transcript');
-        const meta = await supadataLoader.loadTranscriptWithMeta(docDetails.fileUrl || '');
+      if (docDetails.fileType === "youtube") {
+        logger.info("Extracting YouTube transcript");
+        const meta = await supadataLoader.loadTranscriptWithMeta(docDetails.fileUrl || "");
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
-        logger.phaseComplete('extraction', {
+        logger.phaseComplete("extraction", {
           contentLength: extractedText.length,
           title: extractedTitle,
         });
-      } else if (docDetails.fileType === 'text') {
-        logger.info('Processing pasted text');
+      } else if (docDetails.fileType === "text") {
+        logger.info("Processing pasted text");
         // Text is already extracted, stored in metadata
-        extractedText = docDetails.fileUrl || ''; // fileUrl contains the text for type 'text'
-        logger.phaseComplete('extraction', { contentLength: extractedText.length });
-      } else if (docDetails.fileType === 'file') {
+        extractedText = docDetails.fileUrl || ""; // fileUrl contains the text for type 'text'
+        logger.phaseComplete("extraction", { contentLength: extractedText.length });
+      } else if (docDetails.fileType === "file") {
         if (!docDetails.storageId && !docDetails.fileUrl) {
-          throw new Error('File storage ID or URL not found for document: ' + documentId);
+          throw new Error("File storage ID or URL not found for document: " + documentId);
         }
 
         // Check if file is audio and needs transcription
         if (needsAudioTranscription(docDetails.fileName)) {
-          logger.info('Processing audio file with transcription', {
+          logger.info("Processing audio file with transcription", {
             fileName: docDetails.fileName,
           });
 
           // Get file URL from Convex storage
           let fileUrl = docDetails.fileUrl;
           if (!fileUrl && docDetails.storageId) {
-            fileUrl = await ctx.storage.getUrl(docDetails.storageId) ?? undefined;
+            fileUrl = (await ctx.storage.getUrl(docDetails.storageId)) ?? undefined;
           }
 
           if (!fileUrl) {
-            throw new Error('Could not get file URL for audio document: ' + documentId);
+            throw new Error("Could not get file URL for audio document: " + documentId);
           }
 
-          const audioTranscription = new AudioTranscriptionService(process.env.TOGETHER_AI_API_KEY || '');
+          const audioTranscription = new AudioTranscriptionService(
+            process.env.TOGETHER_AI_API_KEY || ""
+          );
           extractedText = await audioTranscription.transcribe(fileUrl);
-          logger.phaseComplete('extraction', {
+          logger.phaseComplete("extraction", {
             contentLength: extractedText.length,
-            method: 'audio_transcription',
+            method: "audio_transcription",
           });
         } else if (needsOCR(docDetails.fileName)) {
-          logger.info('Processing file with OCR', {
+          logger.info("Processing file with OCR", {
             fileName: docDetails.fileName,
           });
 
@@ -164,20 +151,20 @@ export const docEmbedding = internalAction({
           let fileUrl = docDetails.fileUrl;
           if (!fileUrl && docDetails.storageId) {
             // If we have a storageId, get the URL from Convex storage
-            fileUrl = await ctx.storage.getUrl(docDetails.storageId) ?? undefined;
+            fileUrl = (await ctx.storage.getUrl(docDetails.storageId)) ?? undefined;
           }
 
           if (!fileUrl) {
-            throw new Error('Could not get file URL for document: ' + documentId);
+            throw new Error("Could not get file URL for document: " + documentId);
           }
 
           extractedText = await mistralOCR.processDocument(fileUrl);
-          logger.phaseComplete('extraction', {
+          logger.phaseComplete("extraction", {
             contentLength: extractedText.length,
-            method: 'OCR',
+            method: "OCR",
           });
         } else {
-          logger.info('Processing plaintext file', {
+          logger.info("Processing plaintext file", {
             fileName: docDetails.fileName,
           });
 
@@ -186,44 +173,44 @@ export const docEmbedding = internalAction({
             // Read from Convex storage
             const file = await ctx.storage.get(docDetails.storageId);
             if (!file) {
-              throw new Error('File not found in storage');
+              throw new Error("File not found in storage");
             }
             extractedText = await file.text();
           } else if (docDetails.fileUrl) {
             // For external URLs, we'd need to fetch them
             // This is a placeholder - implement URL fetching if needed
-            extractedText = '';
+            extractedText = "";
           }
-          logger.phaseComplete('extraction', {
+          logger.phaseComplete("extraction", {
             contentLength: extractedText.length,
-            method: 'direct_read',
+            method: "direct_read",
           });
         }
-      } else if (docDetails.fileType === 'url') {
-        logger.info('Extracting web page content');
-        const meta = await supadataLoader.loadWebPageWithMeta(docDetails.fileUrl || '');
+      } else if (docDetails.fileType === "url") {
+        logger.info("Extracting web page content");
+        const meta = await supadataLoader.loadWebPageWithMeta(docDetails.fileUrl || "");
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
-        logger.phaseComplete('extraction', {
+        logger.phaseComplete("extraction", {
           contentLength: extractedText.length,
           title: extractedTitle,
         });
       }
 
       if (!extractedText || extractedText.trim().length === 0) {
-        throw new Error('No text extracted from document');
+        throw new Error("No text extracted from document");
       }
 
       // Sanitize extracted text
       const originalLength = extractedText.length;
-      extractedText = extractedText.replace(/\u0000/g, '');
+      extractedText = extractedText.split("\u0000").join("");
       if (originalLength !== extractedText.length) {
-        logger.warn('Removed null bytes from text', {
+        logger.warn("Removed null bytes from text", {
           bytesRemoved: originalLength - extractedText.length,
         });
       }
 
-      logger.info('Text extraction complete', { contentLength: extractedText.length });
+      logger.info("Text extraction complete", { contentLength: extractedText.length });
 
       // Full markdown for source viewer / copy (no overlapping chunk boundaries).
       // Convex document field limit ~1MB UTF-8; cap stored copy for huge PDFs.
@@ -240,12 +227,12 @@ export const docEmbedding = internalAction({
       });
 
       // Phase: Chunking
-      logger.phaseStart('chunking');
-      currentPhase = 'chunking';
+      logger.phaseStart("chunking");
+      currentPhase = "chunking";
 
       const fileExtension = getFileExtension(docDetails.fileName);
       const docMetadata = extractDocumentMetadata(extractedText, fileExtension);
-      logger.info('Document metadata extracted', {
+      logger.info("Document metadata extracted", {
         wordCount: docMetadata.wordCount,
         readingTime: docMetadata.estimatedReadingTimeMinutes,
         structure: docMetadata.documentStructure,
@@ -256,36 +243,42 @@ export const docEmbedding = internalAction({
       const chunker = new StructuralChunker();
       const chunksWithMetadata = await chunker.chunk(extractedText, 1000, 200);
 
-      logger.phaseComplete('chunking', { chunkCount: chunksWithMetadata.length });
+      logger.phaseComplete("chunking", { chunkCount: chunksWithMetadata.length });
 
       // Phase: Setting title
-      logger.phaseStart('setting_title');
-      currentPhase = 'setting_title';
+      logger.phaseStart("setting_title");
+      currentPhase = "setting_title";
 
       let title: string;
 
-      if (docDetails.fileType === 'file') {
+      if (docDetails.fileType === "file") {
         // Keep full file name (with extension) so the UI can show correct type (PDF, DOCX, etc.)
-        title = docDetails.fileName || '';
-      } else if (docDetails.fileType === 'url') {
-        title = extractedTitle || (() => {
-          try {
-            return new URL(docDetails.fileUrl || '').hostname;
-          } catch {
-            return docDetails.fileUrl || 'Web Page';
-          }
-        })();
-      } else if (docDetails.fileType === 'youtube') {
-        title = extractedTitle || (() => {
-          const match = (docDetails.fileUrl || '').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-          return match ? `YouTube: ${match[1]}` : 'YouTube Video';
-        })();
+        title = docDetails.fileName || "";
+      } else if (docDetails.fileType === "url") {
+        title =
+          extractedTitle ||
+          (() => {
+            try {
+              return new URL(docDetails.fileUrl || "").hostname;
+            } catch {
+              return docDetails.fileUrl || "Web Page";
+            }
+          })();
+      } else if (docDetails.fileType === "youtube") {
+        title =
+          extractedTitle ||
+          (() => {
+            const match = (docDetails.fileUrl || "").match(
+              /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+            );
+            return match ? `YouTube: ${match[1]}` : "YouTube Video";
+          })();
       } else {
         // For text input
-        title = 'Pasted Text';
+        title = "Pasted Text";
       }
 
-      logger.info('Title set', { title });
+      logger.info("Title set", { title });
 
       await ctx.runMutation(internal.documents.index.updateTitle, {
         documentId,
@@ -310,30 +303,32 @@ export const docEmbedding = internalAction({
         },
       });
 
-      logger.phaseComplete('setting_title');
+      logger.phaseComplete("setting_title");
 
       // Phase: Embedding
-      logger.phaseStart('embedding');
-      currentPhase = 'embedding';
+      logger.phaseStart("embedding");
+      currentPhase = "embedding";
 
       const embeddingTimer = logger.createTimer();
 
       // Generate embeddings via shared lib (uses OpenAI; cacheable per chunk)
       const embeddingVectors = await Promise.all(
         chunksWithMetadata.map((chunk) =>
-          ctx.runAction(internal._services.ai.embeddings.generateEmbeddingInternal, { text: chunk.content })
+          ctx.runAction(internal._services.ai.embeddings.generateEmbeddingInternal, {
+            text: chunk.content,
+          })
         )
       );
 
       const embeddingDuration = embeddingTimer.end();
-      logger.phaseComplete('embedding', {
+      logger.phaseComplete("embedding", {
         chunkCount: chunksWithMetadata.length,
         durationMs: embeddingDuration,
       });
 
       // Phase: Storing chunks
-      logger.phaseStart('storing_chunks');
-      currentPhase = 'storing_chunks';
+      logger.phaseStart("storing_chunks");
+      currentPhase = "storing_chunks";
 
       // Store chunks with embeddings and metadata
       for (let i = 0; i < chunksWithMetadata.length; i++) {
@@ -366,12 +361,12 @@ export const docEmbedding = internalAction({
         });
       }
 
-      logger.phaseComplete('storing_chunks', { chunksStored: chunksWithMetadata.length });
+      logger.phaseComplete("storing_chunks", { chunksStored: chunksWithMetadata.length });
 
       // Update status to completed
       await ctx.runMutation(internal.documents.index.updateStatus, {
         documentId,
-        status: 'completed',
+        status: "completed",
       });
 
       logger.jobComplete({
@@ -391,7 +386,7 @@ export const docEmbedding = internalAction({
       // Mark as failed
       await ctx.runMutation(internal.documents.index.updateStatus, {
         documentId,
-        status: 'failed',
+        status: "failed",
       });
 
       // Store error in metadata

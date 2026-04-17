@@ -1,11 +1,11 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { normalizeMathMarkdownDeep } from '../../_shared/mathMarkdown';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const updateFlashcardTitle = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -18,7 +18,7 @@ export const updateFlashcardTitle = internalMutation({
 
 export const saveFlashcardResults = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     flashcards: v.array(v.any()),
     metadata: v.any(),
   },
@@ -27,9 +27,9 @@ export const saveFlashcardResults = internalMutation({
 
     await ctx.db.patch(args.flashcardId, {
       cardsData: normalizedFlashcards,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Flashcards',
+      title: args.metadata?.title ?? "Flashcards",
       metadata: {
         ...args.metadata,
         cardCount: normalizedFlashcards.length,
@@ -41,7 +41,7 @@ export const saveFlashcardResults = internalMutation({
 
 export const updateFlashcardStatus = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -59,18 +59,18 @@ export const updateFlashcardStatus = internalMutation({
 
 export const markFlashcardFailed = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.flashcardId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -83,7 +83,7 @@ export const markFlashcardFailed = internalMutation({
 // Multi-phase flashcard helpers
 export const initFlashcardMapPhase = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     totalMapTasks: v.number(),
     cardCount: v.number(),
     difficulty: v.string(),
@@ -94,13 +94,13 @@ export const initFlashcardMapPhase = internalMutation({
     if (!flashcard) return null;
 
     await ctx.db.patch(args.flashcardId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...flashcard.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
@@ -115,7 +115,7 @@ export const initFlashcardMapPhase = internalMutation({
 
 export const storeFlashcardMapResult = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -147,7 +147,7 @@ export const storeFlashcardMapResult = internalMutation({
 
 export const clearFlashcardMapData = internalMutation({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
   },
   handler: async (ctx, args) => {
     const flashcard = await ctx.db.get(args.flashcardId);

@@ -1,9 +1,9 @@
-import React, { Suspense, lazy, useMemo } from 'react';
-import { ReferenceChunk } from '@/shared/types/index';
-import { sanitizeMarkdown } from '@/shared/utils';
+import React, { Suspense, lazy, useMemo } from "react";
+import { ReferenceChunk } from "@/shared/types/index";
+import { sanitizeMarkdown } from "@/shared/utils";
 
 const MarkdownRenderer = lazy(() =>
-  import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
+  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
 const tooltipMarkdownComponents = {
@@ -16,29 +16,31 @@ const tooltipMarkdownComponents = {
   iframe: () => null,
   table: ({ children }: { children?: React.ReactNode }) =>
     React.createElement(
-      'table',
-      { className: 'w-full border-collapse border border-border rounded-lg overflow-hidden text-xs' },
+      "table",
+      {
+        className: "w-full border-collapse border border-border rounded-lg overflow-hidden text-xs",
+      },
       children
     ),
   thead: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('thead', { className: 'bg-secondary/50' }, children),
+    React.createElement("thead", { className: "bg-secondary/50" }, children),
   tbody: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('tbody', null, children),
+    React.createElement("tbody", null, children),
   tr: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('tr', { className: 'border-b border-border' }, children),
+    React.createElement("tr", { className: "border-b border-border" }, children),
   th: ({ children }: { children?: React.ReactNode }) =>
     React.createElement(
-      'th',
+      "th",
       {
         className:
-          'px-2 py-1.5 text-left font-semibold text-foreground border-r border-border last:border-r-0',
+          "px-2 py-1.5 text-left font-semibold text-foreground border-r border-border last:border-r-0",
       },
       children
     ),
   td: ({ children }: { children?: React.ReactNode }) =>
     React.createElement(
-      'td',
-      { className: 'px-2 py-1.5 text-foreground border-r border-border last:border-r-0' },
+      "td",
+      { className: "px-2 py-1.5 text-foreground border-r border-border last:border-r-0" },
       children
     ),
   p: ({ children }: { children?: React.ReactNode }) => (
@@ -69,13 +71,13 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
-  const sanitized = useMemo(() => sanitizeMarkdown(reference.content ?? ''), [reference.content]);
+  const sanitized = useMemo(() => sanitizeMarkdown(reference.content ?? ""), [reference.content]);
 
   return (
     <div
       ref={tooltipRef}
       className="fixed z-50"
-      style={{ left: `${position.x}px`, top: `${position.y}px`, pointerEvents: 'auto' }}
+      style={{ left: `${position.x}px`, top: `${position.y}px`, pointerEvents: "auto" }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -85,7 +87,9 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
         </p>
         <div className="prose font-serif text-sm leading-relaxed max-w-none text-popover-foreground wrap-break-word min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
-            <MarkdownRenderer components={tooltipMarkdownComponents as any}>{sanitized}</MarkdownRenderer>
+            <MarkdownRenderer components={tooltipMarkdownComponents as any}>
+              {sanitized}
+            </MarkdownRenderer>
           </Suspense>
         </div>
       </div>

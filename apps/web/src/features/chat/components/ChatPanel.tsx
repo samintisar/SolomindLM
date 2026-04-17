@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   PanelLeftOpen,
   PanelRightOpen,
@@ -7,21 +7,21 @@ import {
   FileText,
   MoreVertical,
   Download,
-} from 'lucide-react';
-import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { DropdownMenu } from '@/shared/ui/DropdownMenu';
-import { Virtuoso } from 'react-virtuoso';
-import { Message, Note } from '@/shared/types/index';
-import { useToast } from '@/shared/contexts/ToastContext';
-import { useChatStreamingContext } from '../ChatStreamingContext';
-import { exportAsMarkdown } from '../utils/exportChat';
-import { useSaveChat } from '../services/userNotesApi';
-import { RefHandlers } from '../utils/messageRendering';
-import { MessageBubble } from './MessageBubble';
-import { ReferenceTooltip } from './ReferenceTooltip';
-import { ChatEmptyState } from './ChatEmptyState';
-import { ChatInput } from './ChatInput';
-import { useSourcesContext } from '../../sources/SourcesContext';
+} from "lucide-react";
+import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import { Virtuoso } from "react-virtuoso";
+import { Message, Note } from "@/shared/types/index";
+import { useToast } from "@/shared/contexts/ToastContext";
+import { useChatStreamingContext } from "../ChatStreamingContext";
+import { exportAsMarkdown } from "../utils/exportChat";
+import { useSaveChat } from "../services/userNotesApi";
+import { RefHandlers } from "../utils/messageRendering";
+import { MessageBubble } from "./MessageBubble";
+import { ReferenceTooltip } from "./ReferenceTooltip";
+import { ChatEmptyState } from "./ChatEmptyState";
+import { ChatInput } from "./ChatInput";
+import { useSourcesContext } from "../../sources/SourcesContext";
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -40,7 +40,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   toggleLeft,
   toggleRight,
   notebookId,
-  notebookTitle = 'Chat',
+  notebookTitle = "Chat",
   notebookIcon,
   notebookCoverColor,
 }) => {
@@ -61,10 +61,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const { sources } = useSourcesContext();
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<'top' | 'bottom'>('top');
+  const [tooltipPosition, setTooltipPosition] = useState<"top" | "bottom">("top");
   const [tooltipStyle, setTooltipStyle] = useState<{ top?: number; left?: number }>({});
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
-  const [inputMessage, setInputMessage] = useState('');
+  const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -83,30 +83,39 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleDeleteHistory = async () => {
     const confirmed = await confirm(
-      'Clear Chat History',
-      'Are you sure you want to delete all chat history? This action cannot be undone.',
-      { confirmText: 'Clear History', cancelText: 'Cancel', variant: 'danger' }
+      "Clear Chat History",
+      "Are you sure you want to delete all chat history? This action cannot be undone.",
+      { confirmText: "Clear History", cancelText: "Cancel", variant: "danger" }
     );
     if (confirmed) onClearHistory?.();
   };
 
   const handleExportChat = () => {
-    if (messages.length === 0) { toastError('No messages to export'); return; }
+    if (messages.length === 0) {
+      toastError("No messages to export");
+      return;
+    }
     exportAsMarkdown(messages, notebookTitle);
-    success('Chat exported successfully');
+    success("Chat exported successfully");
   };
 
   const handleSaveToNote = async () => {
-    if (messages.length === 0) { toastError('No messages to save'); return; }
-    if (!notebookId) { toastError('No notebook selected'); return; }
+    if (messages.length === 0) {
+      toastError("No messages to save");
+      return;
+    }
+    if (!notebookId) {
+      toastError("No notebook selected");
+      return;
+    }
 
     const placeholderNote: Note = {
       id: `pending-save-${Date.now()}`,
-      title: 'Saved chat',
-      preview: 'Note · Saved Chat',
-      type: 'note',
-      noteType: 'chat',
-      status: 'generating',
+      title: "Saved chat",
+      preview: "Note · Saved Chat",
+      type: "note",
+      noteType: "chat",
+      status: "generating",
       content: undefined,
       messages: [],
       metadata: { messageCount: messages.length, savedAt: new Date().toISOString() },
@@ -119,7 +128,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }));
       await saveChat({ notebookId, messages: serializedMessages, messageCount: messages.length });
     } catch (error) {
-      console.error('Failed to save chat:', error);
+      console.error("Failed to save chat:", error);
     } finally {
       onSaveChatOptimistic?.(null);
     }
@@ -141,7 +150,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleRefLeave = useCallback(() => {
     if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
     hideTooltipTimeoutRef.current = setTimeout(() => {
-      if (!isTooltipHovered) { setHoveredRefId(null); setHoveredMessageId(null); }
+      if (!isTooltipHovered) {
+        setHoveredRefId(null);
+        setHoveredMessageId(null);
+      }
     }, 150);
   }, [isTooltipHovered]);
 
@@ -153,12 +165,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
       const containerRect = messagesContainerRef.current?.getBoundingClientRect();
       if (!containerRect) return;
-      const position = rect.top - containerRect.top > containerRect.bottom - rect.bottom ? 'top' : 'bottom';
+      const position =
+        rect.top - containerRect.top > containerRect.bottom - rect.bottom ? "top" : "bottom";
       setTooltipPosition(position);
       const refCenterX = rect.left - containerRect.left + rect.width / 2;
       const refCenterY = rect.top - containerRect.top;
       setTooltipStyle(
-        position === 'top'
+        position === "top"
           ? { left: refCenterX, top: refCenterY - 2 }
           : { left: refCenterX, top: refCenterY + rect.height + 2 }
       );
@@ -188,11 +201,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       if ((event.target as HTMLElement)?.closest('span[title^="Reference"]')) return;
       closeTooltip();
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, [hoveredRefId, closeTooltip]);
 
@@ -205,16 +218,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const copyMessageAsMarkdown = useCallback(async (message: Message) => {
     const stripRefs = (c: string) => {
-      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s\.,\-:\–\—]*$/i);
+      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s.,\-:–—]*$/i);
       return m ? c.substring(0, m.index).trim() : c;
     };
     try {
       await navigator.clipboard.writeText(
-        message.role === 'assistant' ? stripRefs(message.content) : message.content
+        message.role === "assistant" ? stripRefs(message.content) : message.content
       );
       setCopiedMessageId(message.id);
       setTimeout(() => setCopiedMessageId(null), 2000);
-    } catch { /* clipboard API not available */ }
+    } catch {
+      /* clipboard API not available */
+    }
   }, []);
 
   const handleSendMessage = useCallback(async () => {
@@ -224,12 +239,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // Check if user has selected any sources
     const selectedSources = sources?.filter((s) => s.selected) ?? [];
     if (selectedSources.length === 0) {
-      toastError('Please select at least one source before asking a question');
+      toastError("Please select at least one source before asking a question");
       return;
     }
 
     setIsSending(true);
-    setInputMessage('');
+    setInputMessage("");
     onSendMessage(trimmed);
     setIsSending(false);
   }, [inputMessage, chatInputDisabled, notebookId, onSendMessage, sources, toastError]);
@@ -241,7 +256,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       // Check if user has selected any sources
       const selectedSources = sources?.filter((s) => s.selected) ?? [];
       if (selectedSources.length === 0) {
-        toastError('Please select at least one source before asking a question');
+        toastError("Please select at least one source before asking a question");
         return;
       }
 
@@ -255,7 +270,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     if (virtuosoRef.current && messages.length > 0) {
       setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' });
+        virtuosoRef.current?.scrollToIndex({
+          index: messages.length - 1,
+          align: "end",
+          behavior: "smooth",
+        });
       }, 100);
     }
   }, [messages.length]);
@@ -263,7 +282,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // --- Tooltip position computation ---
 
   const tooltipContent = useMemo(() => {
-    if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current) return null;
+    if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current)
+      return null;
     const hoveredMessage = messages.find((msg) => msg.id === hoveredMessageId);
     const refsArray = Array.isArray(hoveredMessage?.references) ? hoveredMessage.references : [];
     const ref = refsArray.find((r) => Number(r.id) === hoveredRefId);
@@ -272,9 +292,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const tooltipWidth = 384;
     const rawX = (tooltipStyle.left || 0) + containerRect.left - tooltipWidth / 2;
-    const x = Math.max(containerRect.left + 16, Math.min(rawX, containerRect.right - tooltipWidth - 16));
+    const x = Math.max(
+      containerRect.left + 16,
+      Math.min(rawX, containerRect.right - tooltipWidth - 16)
+    );
     const y =
-      tooltipPosition === 'top'
+      tooltipPosition === "top"
         ? containerRect.top + (tooltipStyle.top || 0) - 256 - 2
         : containerRect.top + (tooltipStyle.top || 0);
 
@@ -286,7 +309,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   return (
     <>
       <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-
         {/* Header */}
         <div className="hidden md:flex items-center justify-between p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10 h-14">
           <div className="flex items-center gap-2 text-foreground">
@@ -358,7 +380,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div
           ref={messagesContainerRef}
           className={`flex min-h-0 w-full min-w-0 flex-1 relative chat-panel-graph-grid ${
-            messages.length === 0 ? 'overflow-y-auto overflow-x-hidden' : 'overflow-x-hidden overflow-y-hidden'
+            messages.length === 0
+              ? "overflow-y-auto overflow-x-hidden"
+              : "overflow-x-hidden overflow-y-hidden"
           }`}
         >
           {messages.length === 0 ? (
@@ -377,13 +401,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <Virtuoso
               ref={virtuosoRef}
               className="min-h-0 w-full min-w-0"
-              style={{ height: '100%' }}
+              style={{ height: "100%" }}
               data={memoizedMessages}
               itemContent={(_index, message) => (
                 <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
                   <MessageBubble
                     message={message}
-                    isAssistantStreamActive={message.id === '__streaming__' ? isLoading : false}
+                    isAssistantStreamActive={message.id === "__streaming__" ? isLoading : false}
                     refHandlers={refHandlers}
                     onCopyMessage={copyMessageAsMarkdown}
                     copiedMessageId={copiedMessageId}
@@ -413,7 +437,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               onMouseLeave={() => {
                 setIsTooltipHovered(false);
                 hideTooltipTimeoutRef.current = setTimeout(() => {
-                  if (!isTooltipHovered) { setHoveredRefId(null); setHoveredMessageId(null); }
+                  if (!isTooltipHovered) {
+                    setHoveredRefId(null);
+                    setHoveredMessageId(null);
+                  }
                 }, 100);
               }}
             />
@@ -430,7 +457,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             notebookId={notebookId}
           />
         </div>
-
       </div>
       <ConfirmDialogComponent />
     </>

@@ -1,10 +1,10 @@
-import { useCallback } from 'react';
-import type { Note, SpreadsheetNote } from '@/shared/types/index';
-import { useToast } from '@/shared/contexts/ToastContext';
-import { useCreateSpreadsheet, getSpreadsheetTypeLabel } from '../../services/spreadsheetsApi';
-import type { SpreadsheetConfig } from '../../components/CustomizeSpreadsheetsModal';
-import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
-import type { CreateFlowContext } from './types';
+import { useCallback } from "react";
+import type { Note, SpreadsheetNote } from "@/shared/types/index";
+import { useToast } from "@/shared/contexts/ToastContext";
+import { useCreateSpreadsheet, getSpreadsheetTypeLabel } from "../../services/spreadsheetsApi";
+import type { SpreadsheetConfig } from "../../components/CustomizeSpreadsheetsModal";
+import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import type { CreateFlowContext } from "./types";
 
 export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
   const createSpreadsheet = useCreateSpreadsheet();
@@ -16,12 +16,16 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
       const selectedDocumentIds = ctx.sources.filter((s) => s.selected).map((s) => s.id);
       if (selectedDocumentIds.length === 0) {
         if (ctx.confirm) {
-          await ctx.confirm('No Sources Selected', 'Please select at least one source to generate a spreadsheet', { variant: 'warning' });
+          await ctx.confirm(
+            "No Sources Selected",
+            "Please select at least one source to generate a spreadsheet",
+            { variant: "warning" }
+          );
         }
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        showErrorToast('Please sign in again to continue.');
+        showErrorToast("Please sign in again to continue.");
         return;
       }
 
@@ -30,11 +34,11 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,
-        title: 'Spreadsheet',
+        title: "Spreadsheet",
         preview: `Spreadsheet • ${typeLabel}`,
-        type: 'spreadsheet',
-        content: '',
-        status: 'generating',
+        type: "spreadsheet",
+        content: "",
+        status: "generating",
         metadata: {
           spreadsheetType: config.spreadsheetType,
           documentIds: selectedDocumentIds,
@@ -48,7 +52,7 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
         const { spreadsheetId, spreadsheet } = await createSpreadsheet({
           notebookId: ctx.noteId,
           documentIds: selectedDocumentIds,
-          title: 'Spreadsheet',
+          title: "Spreadsheet",
           spreadsheetType: config.spreadsheetType,
           customPrompt: config.customPrompt,
         });
@@ -56,7 +60,7 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
         const initialNote: SpreadsheetNote = {
           ...spreadsheet,
           id: spreadsheetId,
-          status: (spreadsheet.status ?? 'generating') as SpreadsheetNote['status'],
+          status: (spreadsheet.status ?? "generating") as SpreadsheetNote["status"],
         };
 
         if (ctx.onUpdateNoteFull) {
@@ -67,7 +71,7 @@ export function useCreateSpreadsheetFlow(ctx: CreateFlowContext) {
           placeholderId,
           onDeleteNote: ctx.onDeleteNote,
           toastMessage: "Couldn't start the spreadsheet. Please try again.",
-          devLabel: 'Failed to create spreadsheet',
+          devLabel: "Failed to create spreadsheet",
         });
       }
     },

@@ -14,7 +14,7 @@ export function throwOnResendSendError(error: unknown): never {
 
   if (message.includes("only send testing emails")) {
     throw new Error(
-      "Verification email can only be sent to the address on your Resend account until you verify a domain. Use that email to test, or add a domain at resend.com/domains and set AUTH_RESEND_FROM to an address on that domain.",
+      "Verification email can only be sent to the address on your Resend account until you verify a domain. Use that email to test, or add a domain at resend.com/domains and set AUTH_RESEND_FROM to an address on that domain."
     );
   }
 

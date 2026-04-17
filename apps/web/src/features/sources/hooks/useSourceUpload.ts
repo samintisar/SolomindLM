@@ -1,10 +1,27 @@
-import { useRef, useState, useEffect } from 'react';
-import { useUploadDocument, useCreateDocument } from '../services/documentsApi';
-import { useUserLimits } from '@/features/billing/services/subscriptionApi';
-import { useLimitErrorToast } from '@/shared/hooks/useLimitErrorToast';
-import { useToast } from '@/shared/contexts/ToastContext';
+import { useRef, useState, useEffect } from "react";
+import { useUploadDocument, useCreateDocument } from "../services/documentsApi";
+import { useUserLimits } from "@/features/billing/services/subscriptionApi";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { useToast } from "@/shared/contexts/ToastContext";
 
-const ACCEPTED_FILE_TYPES = ['.pdf', '.docx', '.pptx', '.txt', '.md', '.json', '.csv', '.png', '.jpg', '.jpeg', '.avif', '.wav', '.mp3', '.m4a', '.webm', '.flac'];
+const ACCEPTED_FILE_TYPES = [
+  ".pdf",
+  ".docx",
+  ".pptx",
+  ".txt",
+  ".md",
+  ".json",
+  ".csv",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".avif",
+  ".wav",
+  ".mp3",
+  ".m4a",
+  ".webm",
+  ".flac",
+];
 
 interface UseSourceUploadProps {
   sourcesCount: number;
@@ -73,8 +90,8 @@ export function useSourceUpload({
   const parseUrls = (input: string): string[] => {
     return input
       .split(/\s+/)
-      .map(url => url.trim())
-      .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0 && (url.startsWith("http://") || url.startsWith("https://")));
   };
 
   // Process files (used by both file input and drag & drop)
@@ -82,16 +99,18 @@ export function useSourceUpload({
     if (files.length === 0) return;
 
     if (!userId || !noteId) {
-      showInfo('Please log in and select a notebook before uploading files.');
+      showInfo("Please log in and select a notebook before uploading files.");
       return;
     }
 
     if (sourcesCount >= maxSources) {
       await handleLimitError(
-        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        new Error(
+          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+        ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
         }
       );
       return;
@@ -104,15 +123,15 @@ export function useSourceUpload({
         onDocumentUploaded?.(response.documentId);
       }
     } catch (err) {
-      console.error('Upload failed:', err);
+      console.error("Upload failed:", err);
       const handled = await handleLimitError(err);
       if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : 'Upload failed');
+        showError(err instanceof Error ? err.message : "Upload failed");
       }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
@@ -126,23 +145,25 @@ export function useSourceUpload({
   // URL upload handler
   const handleUrlUpload = async (urls: string[]) => {
     if (!userId || !noteId) {
-      showInfo('Please log in and select a notebook before uploading URLs.');
+      showInfo("Please log in and select a notebook before uploading URLs.");
       return;
     }
 
     if (sourcesCount >= maxSources) {
       await handleLimitError(
-        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        new Error(
+          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+        ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
         }
       );
       return;
     }
 
     if (urls.length === 0) {
-      showError('Please enter at least one valid URL (starting with http:// or https://).');
+      showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;
     }
 
@@ -153,29 +174,29 @@ export function useSourceUpload({
         try {
           const result = await createDocument({
             notebookId: noteId,
-            type: 'url',
+            type: "url",
             source: url,
             fileName: url,
           });
           onDocumentUploaded?.(result.documentId);
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+          const errorMsg = err instanceof Error ? err.message : "Upload failed";
           errors.push(`${url}: ${errorMsg}`);
           console.error(`URL upload failed for ${url}:`, err);
         }
       }
 
       if (errors.length > 0 && errors.length === urls.length) {
-        showError(`Failed to upload all URLs: ${errors.join('; ')}`, { duration: 10_000 });
+        showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
         return;
       } else if (errors.length > 0) {
-        showError(`Some URLs failed: ${errors.join('; ')}`, { duration: 10_000 });
+        showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
       }
     } catch (err) {
-      console.error('URL upload failed:', err);
+      console.error("URL upload failed:", err);
       const handled = await handleLimitError(err);
       if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : 'Upload failed');
+        showError(err instanceof Error ? err.message : "Upload failed");
       }
       throw err;
     } finally {
@@ -186,23 +207,25 @@ export function useSourceUpload({
   // Social Media upload handler (YouTube, TikTok, Instagram, X)
   const handleSocialMediaUpload = async (urls: string[]) => {
     if (!userId || !noteId) {
-      showInfo('Please log in and select a notebook before uploading social media content.');
+      showInfo("Please log in and select a notebook before uploading social media content.");
       return;
     }
 
     if (sourcesCount >= maxSources) {
       await handleLimitError(
-        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        new Error(
+          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+        ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
         }
       );
       return;
     }
 
     if (urls.length === 0) {
-      showError('Please enter at least one valid URL (starting with http:// or https://).');
+      showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;
     }
 
@@ -213,29 +236,29 @@ export function useSourceUpload({
         try {
           const result = await createDocument({
             notebookId: noteId,
-            type: 'youtube',
+            type: "youtube",
             source: url,
-            fileName: 'YouTube Video',
+            fileName: "YouTube Video",
           });
           onDocumentUploaded?.(result.documentId);
         } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+          const errorMsg = err instanceof Error ? err.message : "Upload failed";
           errors.push(`${url}: ${errorMsg}`);
           console.error(`Social media upload failed for ${url}:`, err);
         }
       }
 
       if (errors.length > 0 && errors.length === urls.length) {
-        showError(`Failed to upload all URLs: ${errors.join('; ')}`, { duration: 10_000 });
+        showError(`Failed to upload all URLs: ${errors.join("; ")}`, { duration: 10_000 });
         return;
       } else if (errors.length > 0) {
-        showError(`Some URLs failed: ${errors.join('; ')}`, { duration: 10_000 });
+        showError(`Some URLs failed: ${errors.join("; ")}`, { duration: 10_000 });
       }
     } catch (err) {
-      console.error('Social media upload failed:', err);
+      console.error("Social media upload failed:", err);
       const handled = await handleLimitError(err);
       if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : 'Upload failed');
+        showError(err instanceof Error ? err.message : "Upload failed");
       }
       throw err;
     } finally {
@@ -246,16 +269,18 @@ export function useSourceUpload({
   // Text upload handler
   const handleTextUpload = async (text: string) => {
     if (!userId || !noteId) {
-      showInfo('Please log in and select a notebook before uploading text.');
+      showInfo("Please log in and select a notebook before uploading text.");
       return;
     }
 
     if (sourcesCount >= maxSources) {
       await handleLimitError(
-        new Error(`Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`),
+        new Error(
+          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+        ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: 'Upgrade for up to 500 sources per notebook.',
+          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
         }
       );
       return;
@@ -265,16 +290,16 @@ export function useSourceUpload({
     try {
       const result = await createDocument({
         notebookId: noteId,
-        type: 'text',
+        type: "text",
         source: text,
-        fileName: 'Pasted text',
+        fileName: "Pasted text",
       });
       onDocumentUploaded?.(result.documentId);
     } catch (err) {
-      console.error('Text upload failed:', err);
+      console.error("Text upload failed:", err);
       const handled = await handleLimitError(err);
       if (!handled.isLimitError) {
-        showError(err instanceof Error ? err.message : 'Upload failed');
+        showError(err instanceof Error ? err.message : "Upload failed");
       }
       throw err;
     } finally {
@@ -314,14 +339,14 @@ export function useSourceUpload({
       return;
     }
 
-    const files = Array.from(e.dataTransfer.files).filter(file => {
-      const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    const files = Array.from(e.dataTransfer.files).filter((file) => {
+      const extension = "." + file.name.split(".").pop()?.toLowerCase();
       return ACCEPTED_FILE_TYPES.includes(extension);
     });
 
     if (files.length === 0) {
       showInfo(
-        `No supported files found. Supported types: ${ACCEPTED_FILE_TYPES.map((t) => t.slice(1)).join(', ')}`,
+        `No supported files found. Supported types: ${ACCEPTED_FILE_TYPES.map((t) => t.slice(1)).join(", ")}`
       );
       return;
     }

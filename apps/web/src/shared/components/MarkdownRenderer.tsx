@@ -1,33 +1,32 @@
-import { Streamdown, type StreamdownProps } from 'streamdown';
-import { code } from '@streamdown/code';
-import { createMathPlugin } from '@streamdown/math';
+import { Streamdown, type StreamdownProps } from "streamdown";
+import { code } from "@streamdown/code";
+import { createMathPlugin } from "@streamdown/math";
 
 /** Shared plugins for all app markdown (Shiki + KaTeX). Inline $...$ enabled to match previous app behavior. */
 const mathPlugin = createMathPlugin({
   singleDollarTextMath: true,
-  errorColor: '#6b7280',
+  errorColor: "#6b7280",
 });
 
-export const streamdownPlugins: NonNullable<StreamdownProps['plugins']> = {
+export const streamdownPlugins: NonNullable<StreamdownProps["plugins"]> = {
   code,
   math: mathPlugin,
 };
 
-export interface MarkdownRendererProps
-  extends Pick<
-    StreamdownProps,
-    | 'className'
-    | 'components'
-    | 'controls'
-    | 'isAnimating'
-    | 'lineNumbers'
-    | 'mode'
-    | 'parseIncompleteMarkdown'
-    | 'shikiTheme'
-  > {
+export interface MarkdownRendererProps extends Pick<
+  StreamdownProps,
+  | "className"
+  | "components"
+  | "controls"
+  | "isAnimating"
+  | "lineNumbers"
+  | "mode"
+  | "parseIncompleteMarkdown"
+  | "shikiTheme"
+> {
   children: string;
   /** Word/stream animation; prefer false for static Studio content. */
-  animated?: StreamdownProps['animated'];
+  animated?: StreamdownProps["animated"];
 }
 
 /**
@@ -38,13 +37,13 @@ export default function MarkdownRenderer({
   children,
   components,
   className,
-  mode = 'static',
-  parseIncompleteMarkdown = mode === 'streaming',
+  mode = "static",
+  parseIncompleteMarkdown = mode === "streaming",
   isAnimating = false,
-  animated = mode === 'streaming' ? isAnimating : false,
+  animated = mode === "streaming" ? isAnimating : false,
   controls = false,
   lineNumbers = false,
-  shikiTheme = ['github-light', 'github-dark'],
+  shikiTheme = ["github-light", "github-dark"],
   ...rest
 }: MarkdownRendererProps) {
   return (

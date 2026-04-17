@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Chunk operations utility for LLM agent processing.
  *
@@ -6,7 +6,7 @@
  * LLM API calls while preserving content integrity.
  */
 
-import { countTokens } from './tokenizer.js';
+import { countTokens } from "./tokenizer.js";
 
 /**
  * Configuration for chunk operations.
@@ -27,10 +27,10 @@ export interface ChunkConfig {
 /**
  * Default chunk configuration.
  */
-const DEFAULT_CHUNK_CONFIG: Required<Omit<ChunkConfig, 'targetSize' | 'agentName'>> = {
+const DEFAULT_CHUNK_CONFIG: Required<Omit<ChunkConfig, "targetSize" | "agentName">> = {
   minChunkLength: 50,
   maxChunkLength: 50000,
-  separator: '\n\n',
+  separator: "\n\n",
 };
 
 /**
@@ -53,14 +53,11 @@ const DEFAULT_CHUNK_CONFIG: Required<Omit<ChunkConfig, 'targetSize' | 'agentName
  * // Results in fewer, larger chunks optimized for API calls
  * ```
  */
-export function packChunks(
-  chunks: string[],
-  config: ChunkConfig
-): string[] {
+export function packChunks(chunks: string[], config: ChunkConfig): string[] {
   if (!chunks || chunks.length === 0) return [];
 
   const fullConfig = { ...DEFAULT_CHUNK_CONFIG, ...config };
-  const { targetSize, separator, agentName = 'Agent' } = fullConfig;
+  const { targetSize, separator, agentName = "Agent" } = fullConfig;
 
   console.log(`\n[${agentName}] ===== CHUNK PACKING =====`);
   console.log(`[${agentName}] Original chunks: ${chunks.length}`);
@@ -95,7 +92,9 @@ export function packChunks(
   }
 
   const reduction = Math.round((1 - packed.length / chunks.length) * 100);
-  console.log(`[${agentName}] Packed into: ${packed.length} chunks (${reduction}% fewer API calls)`);
+  console.log(
+    `[${agentName}] Packed into: ${packed.length} chunks (${reduction}% fewer API calls)`
+  );
 
   return packed;
 }
@@ -119,28 +118,27 @@ export function packChunks(
  * // Returns only chunks that meet quality standards
  * ```
  */
-export function validateChunks(
-  chunks: string[],
-  config: ChunkConfig
-): string[] {
+export function validateChunks(chunks: string[], config: ChunkConfig): string[] {
   if (!chunks || chunks.length === 0) return [];
 
   const fullConfig = { ...DEFAULT_CHUNK_CONFIG, ...config };
-  const { minChunkLength, maxChunkLength, agentName = 'Agent' } = fullConfig;
+  const { minChunkLength, maxChunkLength, agentName = "Agent" } = fullConfig;
 
   console.log(`\n[${agentName}] ===== INPUT VALIDATION =====`);
   console.log(`[${agentName}] Input chunks: ${chunks.length}`);
 
   const validated = chunks
     // Filter out invalid types
-    .filter(c => c && typeof c === 'string')
+    .filter((c) => c && typeof c === "string")
     // Truncate oversized chunks
-    .map(c => c.slice(0, maxChunkLength))
+    .map((c) => c.slice(0, maxChunkLength))
     // Filter out chunks that are too short
-    .filter(c => c.trim().length >= minChunkLength);
+    .filter((c) => c.trim().length >= minChunkLength);
 
   console.log(`[${agentName}] Valid chunks: ${validated.length}`);
-  console.log(`[${agentName}] Filtered out: ${chunks.length - validated.length} (too short or invalid)`);
+  console.log(
+    `[${agentName}] Filtered out: ${chunks.length - validated.length} (too short or invalid)`
+  );
 
   return validated;
 }
@@ -158,12 +156,9 @@ export function validateChunks(
  * // Returns 20000 (100k chars / 5 chunks)
  * ```
  */
-export function calculateOptimalChunkSize(
-  totalChars: number,
-  targetChunkCount: number
-): number {
+export function calculateOptimalChunkSize(totalChars: number, targetChunkCount: number): number {
   if (targetChunkCount <= 0) {
-    throw new Error('targetChunkCount must be greater than 0');
+    throw new Error("targetChunkCount must be greater than 0");
   }
 
   return Math.ceil(totalChars / targetChunkCount);
@@ -184,12 +179,9 @@ export function calculateOptimalChunkSize(
  * );
  * ```
  */
-export function splitBySentenceBoundaries(
-  content: string,
-  maxChunkSize: number
-): string[] {
+export function splitBySentenceBoundaries(content: string, maxChunkSize: number): string[] {
   const chunks: string[] = [];
-  let currentChunk = '';
+  let currentChunk = "";
 
   // Sentence boundary patterns (period, exclamation, question mark followed by space)
   const sentenceRegex = /(.+?[.!?])(\s|$)/g;
@@ -235,7 +227,7 @@ export function splitBySentenceBoundaries(
 /**
  * Re-export token counting function from tokenizer module.
  */
-export { countTokens } from './tokenizer.js';
+export { countTokens } from "./tokenizer.js";
 
 /**
  * Gets a preview of a chunk for logging/debugging.
@@ -245,7 +237,7 @@ export { countTokens } from './tokenizer.js';
  * @returns Preview string with length info
  */
 export function getChunkPreview(chunk: string, maxLength: number = 100): string {
-  const cleaned = chunk.replace(/\n/g, ' ');
+  const cleaned = chunk.replace(/\n/g, " ");
   if (cleaned.length <= maxLength) {
     return `[${chunk.length} chars] "${cleaned}"`;
   }

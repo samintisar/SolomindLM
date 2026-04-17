@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface UseStripeRedirectProps {
   isAuthenticated: boolean;
@@ -11,12 +11,12 @@ export function useStripeRedirect({ isAuthenticated, user }: UseStripeRedirectPr
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const canceled = urlParams.get('canceled');
+    const success = urlParams.get("success");
+    const canceled = urlParams.get("canceled");
 
-    if ((success === 'true' || canceled === 'true') && isAuthenticated && user) {
-      navigate('/billing', { replace: true });
-      window.history.replaceState({}, '', window.location.pathname);
+    if ((success === "true" || canceled === "true") && isAuthenticated && user) {
+      navigate("/billing", { replace: true });
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, [isAuthenticated, user, navigate]);
 }

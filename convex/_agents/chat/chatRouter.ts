@@ -3,9 +3,9 @@
  */
 
 export type ChatRoute =
-  | { type: 'direct' }
-  | { type: 'clarify'; question: string }
-  | { type: 'retrieve' };
+  | { type: "direct" }
+  | { type: "clarify"; question: string }
+  | { type: "retrieve" };
 
 const GREETING_RE =
   /^\s*(hi|hello|hey|good\s+(morning|afternoon|evening)|thanks|thank\s+you|thx|bye|goodbye|ok|okay|cool|nice)\b[!?.\s]*$/i;
@@ -36,24 +36,24 @@ export function routeChatMessage(
   const trimmed = userMessage.trim();
   if (trimmed.length === 0) {
     return {
-      type: 'clarify',
-      question: 'What would you like to know about your materials?',
+      type: "clarify",
+      question: "What would you like to know about your materials?",
     };
   }
 
   if (trimmed.length <= 2) {
     return {
-      type: 'clarify',
-      question: 'Could you say a bit more about what you want to study or find in your documents?',
+      type: "clarify",
+      question: "Could you say a bit more about what you want to study or find in your documents?",
     };
   }
 
   if (GREETING_RE.test(trimmed) && trimmed.length < 40) {
-    return { type: 'direct' };
+    return { type: "direct" };
   }
 
   if (META_APP_RE.test(trimmed) && trimmed.length < 120) {
-    return { type: 'direct' };
+    return { type: "direct" };
   }
 
   // Very short vague question — ask for scope (skip "What is X?" / "Define Y?" style)
@@ -61,15 +61,15 @@ export function routeChatMessage(
   if (
     wordCount <= 3 &&
     trimmed.length < 40 &&
-    trimmed.includes('?') &&
+    trimmed.includes("?") &&
     !looksLikeTargetedQuestion(trimmed)
   ) {
     return {
-      type: 'clarify',
+      type: "clarify",
       question:
-        'Your question is quite short. Which topic, document, or concept should I focus on in your notebook?',
+        "Your question is quite short. Which topic, document, or concept should I focus on in your notebook?",
     };
   }
 
-  return { type: 'retrieve' };
+  return { type: "retrieve" };
 }

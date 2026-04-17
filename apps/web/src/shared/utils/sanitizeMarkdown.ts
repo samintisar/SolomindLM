@@ -1,6 +1,6 @@
-import DOMPurify from 'dompurify';
+import DOMPurify from "dompurify";
 
-import { normalizeMathMarkdown, splitByMathDelimiters } from '@convex/_shared/mathMarkdown';
+import { normalizeMathMarkdown, splitByMathDelimiters } from "@convex/_shared/mathMarkdown";
 
 /**
  * Strips ANSI escape codes from text (e.g., [1m, [0m, [31m).
@@ -8,8 +8,8 @@ import { normalizeMathMarkdown, splitByMathDelimiters } from '@convex/_shared/ma
  */
 function stripAnsiCodes(text: string): string {
   // Matches ANSI escape sequences like \x1b[...m or \[...\d
-  return text.replace(/\x1b\[[0-9;]*m/g, '')
-              .replace(/\[[0-9;]*[mK]/g, '');
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*m/g, "").replace(/\[[0-9;]*[mK]/g, "");
 }
 
 /**
@@ -24,7 +24,7 @@ function stripAnsiCodes(text: string): string {
  * as raw HTML from markdown source, so they stay as text/math delimiters.
  */
 export function restoreAngleBracketsAfterDomPurify(content: string): string {
-  return content.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  return content.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
 
 /**
@@ -45,7 +45,7 @@ export function sanitizeMarkdown(content: string): string {
   const segments = splitByMathDelimiters(normalizedMath);
   const sanitized = segments
     .map((part) => {
-      if (part.kind === 'math') {
+      if (part.kind === "math") {
         return part.s;
       }
       const raw = DOMPurify.sanitize(part.s, {
@@ -55,7 +55,7 @@ export function sanitizeMarkdown(content: string): string {
       });
       return restoreAngleBracketsAfterDomPurify(raw);
     })
-    .join('');
+    .join("");
 
   return sanitized;
 }
@@ -66,17 +66,39 @@ export function sanitizeMarkdown(content: string): string {
  */
 export const SANITIZE_CONFIG = {
   ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'b', 'em', 'i', 'u',
-    'a', 'code', 'pre',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'ul', 'ol', 'li',
-    'blockquote',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    'hr',
-    'sub', 'sup',
-    'span', 'div',
+    "p",
+    "br",
+    "strong",
+    "b",
+    "em",
+    "i",
+    "u",
+    "a",
+    "code",
+    "pre",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "hr",
+    "sub",
+    "sup",
+    "span",
+    "div",
   ],
-  ALLOWED_ATTR: ['href', 'title', 'class', 'className', 'style'],
+  ALLOWED_ATTR: ["href", "title", "class", "className", "style"],
   ALLOW_DATA_ATTR: false,
 };
 

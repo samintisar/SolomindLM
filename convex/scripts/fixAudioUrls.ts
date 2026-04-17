@@ -11,9 +11,7 @@ export const fixAudioUrls = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Get all audio overviews
-    const audioOverviews = await ctx.db
-      .query("audioOverviews")
-      .collect();
+    const audioOverviews = await ctx.db.query("audioOverviews").collect();
 
     console.log(`[fixAudioUrls] Found ${audioOverviews.length} audio overviews to check`);
 
@@ -32,7 +30,9 @@ export const fixAudioUrls = internalMutation({
 
       // If it's already a full HTTP/HTTPS URL, skip it
       if (currentUrl.startsWith("http://") || currentUrl.startsWith("https://")) {
-        console.log(`[fixAudioUrls] Skipping ${overview._id} - already has full URL: ${currentUrl}`);
+        console.log(
+          `[fixAudioUrls] Skipping ${overview._id} - already has full URL: ${currentUrl}`
+        );
         skippedCount++;
         continue;
       }

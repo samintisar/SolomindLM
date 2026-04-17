@@ -1,13 +1,13 @@
-import type { QuizQuestion, QuizNote } from '@/shared/types/index';
-import { useQuery, useMutation, useAction } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { useEffect, useRef } from 'react';
+import type { QuizQuestion, QuizNote } from "@/shared/types/index";
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useEffect, useRef } from "react";
 
 export interface CreateQuizParams {
   notebookId: string;
   documentIds: string[];
-  questionCount: 'fewer' | 'standard' | 'more'; // 10, 20, 30
+  questionCount: "fewer" | "standard" | "more"; // 10, 20, 30
   difficulty: string; // 'easy', 'medium', 'hard'
   focus?: string;
 }
@@ -19,7 +19,7 @@ export interface CreateQuizResponse {
 }
 
 /** Map 'fewer' | 'standard' | 'more' to API question count (10, 20, 30) */
-function questionCountToNumber(count: 'fewer' | 'standard' | 'more'): number {
+function questionCountToNumber(count: "fewer" | "standard" | "more"): number {
   const map: Record<string, number> = { fewer: 10, standard: 20, more: 30 };
   return map[count] ?? 20;
 }
@@ -28,13 +28,13 @@ function questionCountToNumber(count: 'fewer' | 'standard' | 'more'): number {
  * Get question count label
  */
 function getQuestionCountLabel(count: string | number): string {
-  if (typeof count === 'string') {
+  if (typeof count === "string") {
     const labels: Record<string, string> = {
-      fewer: '10',
-      standard: '20',
-      more: '30',
+      fewer: "10",
+      standard: "20",
+      more: "30",
     };
-    return labels[count] || '20';
+    return labels[count] || "20";
   }
   return String(count);
 }
@@ -44,20 +44,21 @@ function getQuestionCountLabel(count: string | number): string {
  */
 function getPreviewText(status: string, metadata?: any): string {
   const phase = metadata?.phase || status;
-  const questionCount = metadata?.questionCount || 'standard';
-  const difficulty = metadata?.difficulty || 'medium';
+  const questionCount = metadata?.questionCount || "standard";
+  const difficulty = metadata?.difficulty || "medium";
 
-  const isGenerating = status === 'generating' ||
-    phase === 'generating' ||
-    phase === 'mapping' ||
-    phase === 'collapsing' ||
-    phase === 'reducing';
+  const isGenerating =
+    status === "generating" ||
+    phase === "generating" ||
+    phase === "mapping" ||
+    phase === "collapsing" ||
+    phase === "reducing";
 
   if (isGenerating) {
     return `${getQuestionCountLabel(questionCount)} Questions • ${difficulty} • Generating...`;
   }
-  if (status === 'failed' || phase === 'failed') {
-    return 'Quiz • Failed';
+  if (status === "failed" || phase === "failed") {
+    return "Quiz • Failed";
   }
   return `${getQuestionCountLabel(questionCount)} Questions • ${difficulty}`;
 }
@@ -74,13 +75,13 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
     id: dbQuiz._id,
     title: dbQuiz.title,
     preview: getPreviewText(dbQuiz.status, dbQuiz.metadata),
-    type: 'quiz' as const,
+    type: "quiz" as const,
     questions,
     userAnswers: dbQuiz.metadata?.userAnswers || {},
     status: dbQuiz.status,
     metadata: {
       questionCount,
-      difficulty: dbQuiz.metadata?.difficulty || 'medium',
+      difficulty: dbQuiz.metadata?.difficulty || "medium",
       focusArea: dbQuiz.metadata?.focus,
       lastViewedIndex: dbQuiz.metadata?.lastViewedIndex,
     },
@@ -94,7 +95,7 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
 export function useQuizzes(notebookId: string | null) {
   const quizzes = useQuery(
     api.studio.quizzes.index.list,
-    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
   return quizzes?.map(mapQuizToNote);
 }
@@ -105,7 +106,7 @@ export function useQuizzes(notebookId: string | null) {
 export function useQuiz(quizId: string | null) {
   const quiz = useQuery(
     api.studio.quizzes.index.get,
-    quizId ? { id: quizId as Id<'quizzes'> } : 'skip'
+    quizId ? { id: quizId as Id<"quizzes"> } : "skip"
   );
   return quiz ? mapQuizToNote(quiz) : null;
 }
@@ -118,8 +119,8 @@ export function useCreateQuiz() {
 
   return async (params: CreateQuizParams): Promise<CreateQuizResponse> => {
     const result = await schedule({
-      notebookId: params.notebookId as Id<'notebooks'>,
-      documentIds: params.documentIds as Id<'documents'>[],
+      notebookId: params.notebookId as Id<"notebooks">,
+      documentIds: params.documentIds as Id<"documents">[],
       questionCount: questionCountToNumber(params.questionCount),
       difficulty: params.difficulty,
       focus: params.focus,
@@ -128,7 +129,7 @@ export function useCreateQuiz() {
     return {
       noteId: result.quizId,
       status: result.status,
-      note: { _id: result.quizId, title: result.quiz?.title ?? '', status: result.status },
+      note: { _id: result.quizId, title: result.quiz?.title ?? "", status: result.status },
     };
   };
 }
@@ -137,38 +138,36 @@ export function useCreateQuiz() {
  * Rename a quiz by ID with optimistic update
  */
 export function useRenameQuiz() {
-  const update = useMutation(api.studio.quizzes.index.update).withOptimisticUpdate((localStore, args) => {
-    const { id, title } = args;
+  const update = useMutation(api.studio.quizzes.index.update).withOptimisticUpdate(
+    (localStore, args) => {
+      const { id, title } = args;
 
-    // Get current quiz (has notebookId for list query)
-    const quiz = localStore.getQuery(api.studio.quizzes.index.get, { id });
-    if (quiz) {
-      // Update list view
-      const listResult = localStore.getQuery(api.studio.quizzes.index.list, { notebookId: quiz.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.quizzes.index.list,
-          { notebookId: quiz.notebookId },
-          listResult.map((q: { _id: string; [key: string]: unknown }) =>
-            q._id === id
-              ? { ...q, title }
-              : q
-          )
-        );
+      // Get current quiz (has notebookId for list query)
+      const quiz = localStore.getQuery(api.studio.quizzes.index.get, { id });
+      if (quiz) {
+        // Update list view
+        const listResult = localStore.getQuery(api.studio.quizzes.index.list, {
+          notebookId: quiz.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.quizzes.index.list,
+            { notebookId: quiz.notebookId },
+            listResult.map((q: { _id: string; [key: string]: unknown }) =>
+              q._id === id ? { ...q, title } : q
+            )
+          );
+        }
+
+        // Update detail view
+        localStore.setQuery(api.studio.quizzes.index.get, { id }, { ...quiz, title });
       }
-
-      // Update detail view
-      localStore.setQuery(
-        api.studio.quizzes.index.get,
-        { id },
-        { ...quiz, title }
-      );
     }
-  });
+  );
 
   return async (quizId: string, newTitle: string) => {
     return await update({
-      id: quizId as Id<'quizzes'>,
+      id: quizId as Id<"quizzes">,
       title: newTitle,
     });
   };
@@ -178,25 +177,29 @@ export function useRenameQuiz() {
  * Delete a quiz by ID with optimistic update
  */
 export function useDeleteQuiz() {
-  const remove = useMutation(api.studio.quizzes.index.remove).withOptimisticUpdate((localStore, args) => {
-    const quiz = localStore.getQuery(api.studio.quizzes.index.get, { id: args.id });
-    if (quiz) {
-      const listResult = localStore.getQuery(api.studio.quizzes.index.list, { notebookId: quiz.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.quizzes.index.list,
-          { notebookId: quiz.notebookId },
-          listResult.filter((q: { _id: string }) => q._id !== args.id)
-        );
+  const remove = useMutation(api.studio.quizzes.index.remove).withOptimisticUpdate(
+    (localStore, args) => {
+      const quiz = localStore.getQuery(api.studio.quizzes.index.get, { id: args.id });
+      if (quiz) {
+        const listResult = localStore.getQuery(api.studio.quizzes.index.list, {
+          notebookId: quiz.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.quizzes.index.list,
+            { notebookId: quiz.notebookId },
+            listResult.filter((q: { _id: string }) => q._id !== args.id)
+          );
+        }
       }
-    }
 
-    // Clear detail view
-    localStore.setQuery(api.studio.quizzes.index.get, { id: args.id }, null);
-  });
+      // Clear detail view
+      localStore.setQuery(api.studio.quizzes.index.get, { id: args.id }, null);
+    }
+  );
 
   return async (quizId: string) => {
-    await remove({ id: quizId as Id<'quizzes'> });
+    await remove({ id: quizId as Id<"quizzes"> });
   };
 }
 
@@ -208,7 +211,7 @@ export function useSubmitQuizAnswer() {
 
   return async (quizId: string, questionIndex: number, selectedOption: number) => {
     return await submitAnswer({
-      id: quizId as Id<'quizzes'>,
+      id: quizId as Id<"quizzes">,
       questionIndex,
       selectedOption,
     });
@@ -223,7 +226,7 @@ export function useResetQuizAnswers() {
 
   return async (quizId: string) => {
     return await update({
-      id: quizId as Id<'quizzes'>,
+      id: quizId as Id<"quizzes">,
       metadata: {
         userAnswers: {},
         lastViewedIndex: 0,
@@ -247,7 +250,7 @@ export function useUpdateQuizProgress(quizId: string | null, currentIndex: numbe
     // Debounce the update to avoid excessive API calls during navigation
     timeoutRef.current = setTimeout(() => {
       update({
-        id: quizId as Id<'quizzes'>,
+        id: quizId as Id<"quizzes">,
         metadata: { lastViewedIndex: currentIndex },
       });
     }, 500);

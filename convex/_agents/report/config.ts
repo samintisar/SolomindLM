@@ -1,10 +1,10 @@
-"use node"
+"use node";
 
-import { env } from '../../_lib/env.js';
+import { env } from "../../_lib/env.js";
 
 export const GRAPH_CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_MAP_CHUNK_TOKENS || '5000', 10),
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_REDUCE_CHUNK_TOKENS || '15000', 10),
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_MAP_CHUNK_TOKENS || "5000", 10),
+  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_REDUCE_CHUNK_TOKENS || "15000", 10),
   MAP_TIMEOUT_MS: parseInt(env.REPORT_MAP_TIMEOUT_MS, 10),
   REDUCE_TIMEOUT_MS: parseInt(env.REPORT_REDUCE_TIMEOUT_MS, 10),
 } as const;

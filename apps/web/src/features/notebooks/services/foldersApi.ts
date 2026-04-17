@@ -14,10 +14,7 @@ export function useFolders() {
  * Get a specific folder by ID
  */
 export function useFolder(id: string | null) {
-  return useQuery(
-    api.folders.index.get,
-    id ? { id: id as any } : "skip"
-  );
+  return useQuery(api.folders.index.get, id ? { id: id as any } : "skip");
 }
 
 /**
@@ -57,12 +54,7 @@ export function useCreateFolder() {
     }
   });
 
-  return async (data: {
-    name: string;
-    description?: string;
-    color?: string;
-    icon?: string;
-  }) => {
+  return async (data: { name: string; description?: string; color?: string; icon?: string }) => {
     return await create(data);
   };
 }

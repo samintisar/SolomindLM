@@ -1,14 +1,14 @@
-import React from 'react';
-import { Plus, FolderInput } from 'lucide-react';
-import { NotebookItem, FolderItem } from '@/shared/types/index';
-import { NotebookCard } from '../cards/NotebookCard';
-import { FolderCard } from '../cards/FolderCard';
-import { ListHeader } from '../ListHeader';
+import React from "react";
+import { Plus, FolderInput } from "lucide-react";
+import { NotebookItem, FolderItem } from "@/shared/types/index";
+import { NotebookCard } from "../cards/NotebookCard";
+import { FolderCard } from "../cards/FolderCard";
+import { ListHeader } from "../ListHeader";
 
 interface RecentSectionProps {
   recentNotebooks: NotebookItem[];
   folders: FolderItem[];
-  viewMode: 'grid' | 'list';
+  viewMode: "grid" | "list";
   onCreateNotebook: () => void;
   onCreateFolder?: () => void;
   onSelectNotebook: (notebook: NotebookItem) => void;
@@ -51,7 +51,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
   getSortedNotebooks: _getSortedNotebooks,
 }) => {
   // Filter notebooks without folders for main display
-  const notebooksWithoutFolder = recentNotebooks.filter(nb => !nb.folderId);
+  const notebooksWithoutFolder = recentNotebooks.filter((nb) => !nb.folderId);
 
   return (
     <section className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 pb-20">
@@ -59,7 +59,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
         <h2 className="text-xl font-display font-bold text-foreground">My Notebooks</h2>
       </div>
 
-      {viewMode === 'grid' ? (
+      {viewMode === "grid" ? (
         /* RECENT GRID */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Create Buttons */}
@@ -71,7 +71,9 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
               <div className="w-14 h-14 rounded-xl bg-secondary text-blue-500 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all duration-300 shadow-sm">
                 <FolderInput className="w-7 h-7" />
               </div>
-              <span className="text-base font-bold text-muted-foreground group-hover:text-blue-500 transition-colors font-sans">Create new folder</span>
+              <span className="text-base font-bold text-muted-foreground group-hover:text-blue-500 transition-colors font-sans">
+                Create new folder
+              </span>
             </div>
           )}
           <div
@@ -81,7 +83,9 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
             <div className="w-14 h-14 rounded-xl bg-secondary text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 shadow-sm">
               <Plus className="w-7 h-7" />
             </div>
-            <span className="text-base font-bold text-muted-foreground group-hover:text-primary transition-colors font-sans">Create new notebook</span>
+            <span className="text-base font-bold text-muted-foreground group-hover:text-primary transition-colors font-sans">
+              Create new notebook
+            </span>
           </div>
 
           {/* Folder Cards */}
@@ -94,7 +98,9 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
               onSelectFolder={() => onSelectFolder(folder.id)}
               onOpenFolderCustomize={() => onOpenFolderCustomize(folder.id)}
               onDeleteFolder={onDeleteFolder}
-              onToggleMenu={() => setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)}
+              onToggleMenu={() =>
+                setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)
+              }
               onCloseMenu={() => setFolderActiveMenuId(null)}
             />
           ))}
@@ -130,7 +136,9 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
                 <div className="w-9 h-9 shrink-0 rounded-md bg-secondary text-blue-500 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors">
                   <FolderInput className="w-4 h-4 shrink-0" />
                 </div>
-                <span className="font-medium text-muted-foreground group-hover:text-blue-500 transition-colors font-sans whitespace-nowrap">Create new folder</span>
+                <span className="font-medium text-muted-foreground group-hover:text-blue-500 transition-colors font-sans whitespace-nowrap">
+                  Create new folder
+                </span>
               </div>
             </div>
           )}
@@ -144,7 +152,9 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
               <div className="w-9 h-9 shrink-0 rounded-md bg-secondary text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                 <Plus className="w-4 h-4 shrink-0" />
               </div>
-              <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors font-sans whitespace-nowrap">Create new notebook</span>
+              <span className="font-medium text-muted-foreground group-hover:text-foreground transition-colors font-sans whitespace-nowrap">
+                Create new notebook
+              </span>
             </div>
           </div>
 
@@ -158,7 +168,9 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
                 onSelectFolder={() => onSelectFolder(folder.id)}
                 onOpenFolderCustomize={() => onOpenFolderCustomize(folder.id)}
                 onDeleteFolder={onDeleteFolder}
-                onToggleMenu={() => setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)}
+                onToggleMenu={() =>
+                  setFolderActiveMenuId(folderActiveMenuId === folder.id ? null : folder.id)
+                }
                 onCloseMenu={() => setFolderActiveMenuId(null)}
               />
             </div>

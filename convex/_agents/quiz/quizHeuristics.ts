@@ -1,8 +1,8 @@
-"use node"
+"use node";
 
-import { createAgentGraphLogger } from '../_shared/logging.js';
+import { createAgentGraphLogger } from "../_shared/logging.js";
 
-import type { QuizCandidate } from './prompts.js';
+import type { QuizCandidate } from "./prompts.js";
 
 /**
  * Calculate text similarity between two quiz questions.
@@ -11,17 +11,56 @@ import type { QuizCandidate } from './prompts.js';
 export function calculateSimilarity(q1: QuizCandidate, q2: QuizCandidate): number {
   // Stop words to filter out for better similarity detection
   const stopWords = new Set([
-    'the', 'is', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'by',
-    'for', 'with', 'from', 'as', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
-    'may', 'might', 'must', 'can', 'what', 'which', 'who', 'when', 'where', 'why', 'how'
+    "the",
+    "is",
+    "a",
+    "an",
+    "and",
+    "or",
+    "of",
+    "to",
+    "in",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "from",
+    "as",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "can",
+    "what",
+    "which",
+    "who",
+    "when",
+    "where",
+    "why",
+    "how",
   ]);
 
   // Extract words and filter stop words
   const extractWords = (text: string): Set<string> => {
-    const normalized = text.toLowerCase().trim().replace(/\s+/g, ' ');
-    const words = (normalized.match(/\b\w+\b/g) || []);
-    return new Set(words.filter(w => !stopWords.has(w)));
+    const normalized = text.toLowerCase().trim().replace(/\s+/g, " ");
+    const words = normalized.match(/\b\w+\b/g) || [];
+    return new Set(words.filter((w) => !stopWords.has(w)));
   };
 
   const q1Text = `${q1.question} ${q1.correctAnswer}`;
@@ -39,7 +78,7 @@ export function calculateSimilarity(q1: QuizCandidate, q2: QuizCandidate): numbe
   }
 
   // Calculate Jaccard similarity: intersection / union
-  const intersection = new Set([...words1].filter(w => words2.has(w)));
+  const intersection = new Set([...words1].filter((w) => words2.has(w)));
   const union = new Set([...words1, ...words2]);
   const questionSimilarity = union.size > 0 ? intersection.size / union.size : 0;
 
@@ -52,7 +91,7 @@ export function calculateSimilarity(q1: QuizCandidate, q2: QuizCandidate): numbe
  * This is much faster than LLM-based deduplication and works well for quiz questions.
  */
 export function heuristicDedupe(questions: QuizCandidate[]): QuizCandidate[] {
-  const logger = createAgentGraphLogger('QuizGraph', 'quiz');
+  const logger = createAgentGraphLogger("QuizGraph", "quiz");
   if (questions.length <= 1) return questions;
 
   const SIMILARITY_THRESHOLD = 0.8; // 80% similarity considered duplicate
@@ -73,13 +112,16 @@ export function heuristicDedupe(questions: QuizCandidate[]): QuizCandidate[] {
   }
 
   const uniqueCount = questions.length - toRemove.size;
-  logger.info(`Heuristic dedupe: ${questions.length} → ${uniqueCount} questions (removed ${toRemove.size} duplicates)`, {
-    agent: 'QuizGraph',
-    phase: 'heuristic_dedupe',
-    inputCount: questions.length,
-    duplicatesFound: toRemove.size,
-    outputCount: uniqueCount,
-  });
+  logger.info(
+    `Heuristic dedupe: ${questions.length} → ${uniqueCount} questions (removed ${toRemove.size} duplicates)`,
+    {
+      agent: "QuizGraph",
+      phase: "heuristic_dedupe",
+      inputCount: questions.length,
+      duplicatesFound: toRemove.size,
+      outputCount: uniqueCount,
+    }
+  );
 
   return questions.filter((_, idx) => !toRemove.has(idx));
 }
@@ -105,13 +147,13 @@ export function detectSimilarQuestions(questions: QuizCandidate[]): Array<{
 
       const words1 = new Set(q1.match(/\b\w+\b/g) || []);
       const words2 = new Set(q2.match(/\b\w+\b/g) || []);
-      const intersection = [...words1].filter(w => words2.has(w));
+      const intersection = [...words1].filter((w) => words2.has(w));
       const union = new Set([...words1, ...words2]);
       const overlap = intersection.length / union.size;
 
       if (overlap > 0.7) {
         duplicates.push({
-          similarity: 'high_word_overlap',
+          similarity: "high_word_overlap",
           questions: [
             { index: i, question: questions[i].question },
             { index: j, question: questions[j].question },

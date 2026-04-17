@@ -2,10 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Spreadsheets from "../../_model/spreadsheets";
 
 export const list = query({
@@ -108,7 +105,9 @@ export const generateSpreadsheet = mutation({
     if (!userId) throw new Error("Not authenticated");
     const { notebookId, documentIds, title, spreadsheetType, customPrompt } = args;
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
     await assertCanEditNotebook(ctx, notebookId, userId);
     const spreadsheetId = await Spreadsheets.createSpreadsheet(ctx, {
@@ -117,8 +116,8 @@ export const generateSpreadsheet = mutation({
       title: title || "Spreadsheet",
       data: {},
       metadata: {
-        spreadsheetType: spreadsheetType || 'custom',
-        customPrompt: customPrompt || '',
+        spreadsheetType: spreadsheetType || "custom",
+        customPrompt: customPrompt || "",
       },
       status: "generating",
     });
@@ -127,8 +126,8 @@ export const generateSpreadsheet = mutation({
       userId,
       notebookId,
       documentIds,
-      spreadsheetType: spreadsheetType || 'custom',
-      customPrompt: customPrompt || '',
+      spreadsheetType: spreadsheetType || "custom",
+      customPrompt: customPrompt || "",
     });
     return spreadsheetId;
   },

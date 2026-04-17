@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   X,
   Search,
@@ -17,11 +17,11 @@ import {
   Users,
   Calendar,
   FileText,
-} from 'lucide-react';
-import { Source } from '@/shared/types/index';
-import { useUnifiedDiscovery, useCreateDocument } from '../services/documentsApi';
-import { useToast } from '@/shared/contexts/ToastContext';
-import { useSessionStorage } from '@/hooks/useSessionStorage';
+} from "lucide-react";
+import { Source } from "@/shared/types/index";
+import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi";
+import { useToast } from "@/shared/contexts/ToastContext";
+import { useSessionStorage } from "@/hooks/useSessionStorage";
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
@@ -34,8 +34,8 @@ interface DiscoverSourcesModalProps {
 }
 
 interface FilterState {
-  sourceTypes: ('web' | 'news' | 'academic' | 'finance')[];
-  timeRange?: 'day' | 'week' | 'month' | 'year';
+  sourceTypes: ("web" | "news" | "academic" | "finance")[];
+  timeRange?: "day" | "week" | "month" | "year";
   academic: {
     publicationYearFrom?: number;
     publicationYearTo?: number;
@@ -43,45 +43,45 @@ interface FilterState {
     openAccessOnly?: boolean;
     hasFullText?: boolean;
   };
-  sortBy: 'relevance' | 'date' | 'citations';
+  sortBy: "relevance" | "date" | "citations";
   maxResults: number;
 }
 
 const DEFAULT_FILTERS: FilterState = {
-  sourceTypes: ['web'],
-  sortBy: 'relevance',
+  sourceTypes: ["web"],
+  sortBy: "relevance",
   maxResults: 20,
   academic: {},
 };
 
 const SOURCE_TYPE_CONFIG = {
   web: {
-    label: 'Web',
+    label: "Web",
     icon: Globe,
-    color: 'text-vintage-blue-500',
-    bgColor: 'bg-vintage-blue-50',
-    borderColor: 'border-vintage-blue-200',
+    color: "text-vintage-blue-500",
+    bgColor: "bg-vintage-blue-50",
+    borderColor: "border-vintage-blue-200",
   },
   news: {
-    label: 'News',
+    label: "News",
     icon: Newspaper,
-    color: 'text-vintage-amber-500',
-    bgColor: 'bg-vintage-amber-50',
-    borderColor: 'border-vintage-amber-200',
+    color: "text-vintage-amber-500",
+    bgColor: "bg-vintage-amber-50",
+    borderColor: "border-vintage-amber-200",
   },
   academic: {
-    label: 'Academic',
+    label: "Academic",
     icon: GraduationCap,
-    color: 'text-vintage-green-500',
-    bgColor: 'bg-vintage-green-50',
-    borderColor: 'border-vintage-green-200',
+    color: "text-vintage-green-500",
+    bgColor: "bg-vintage-green-50",
+    borderColor: "border-vintage-green-200",
   },
   finance: {
-    label: 'Finance',
+    label: "Finance",
     icon: TrendingUp,
-    color: 'text-vintage-orange-500',
-    bgColor: 'bg-vintage-orange-50',
-    borderColor: 'border-vintage-orange-200',
+    color: "text-vintage-orange-500",
+    bgColor: "bg-vintage-orange-50",
+    borderColor: "border-vintage-orange-200",
   },
 };
 
@@ -94,7 +94,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   noteId,
   onDocumentUploaded,
 }) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +102,10 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   const [filtersChanged, setFiltersChanged] = useState(false);
 
   // Load/save filter preferences to session storage
-  const [filters, setFilters] = useSessionStorage<FilterState>('discovery-filters', DEFAULT_FILTERS);
+  const [filters, setFilters] = useSessionStorage<FilterState>(
+    "discovery-filters",
+    DEFAULT_FILTERS
+  );
 
   const discover = useUnifiedDiscovery();
   const createDocument = useCreateDocument();
@@ -136,11 +139,11 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       setFiltersChanged(false);
 
       if (response.sources.length === 0) {
-        setError('No sources found. Try a different search query or adjust your filters.');
+        setError("No sources found. Try a different search query or adjust your filters.");
       }
     } catch (err) {
-      console.error('Search error:', err);
-      setError(err instanceof Error ? err.message : 'Search failed. Please try again.');
+      console.error("Search error:", err);
+      setError(err instanceof Error ? err.message : "Search failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -152,14 +155,12 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
     }
 
     // Set loading state for this specific result
-    setResults((prev) =>
-      prev.map((r) => (r.id === result.id ? { ...r, isAdding: true } : r))
-    );
+    setResults((prev) => prev.map((r) => (r.id === result.id ? { ...r, isAdding: true } : r)));
 
     try {
       const response = await createDocument({
         notebookId: noteId,
-        type: 'url',
+        type: "url",
         source: result.url,
         fileName: result.title || result.url,
       });
@@ -168,15 +169,15 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       const newSource: Source = {
         id: response.documentId,
         title: result.title,
-        type: 'WEB',
-        date: new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
+        type: "WEB",
+        date: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
         }),
         selected: true,
-        status: 'pending',
+        status: "pending",
         url: result.url,
-        remoteRefreshKind: 'url',
+        remoteRefreshKind: "url",
       };
 
       onAddSource(newSource);
@@ -186,20 +187,14 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
 
       // Mark as added
       setResults((prev) =>
-        prev.map((r) =>
-          r.url === result.url ? { ...r, isAdded: true, isAdding: false } : r
-        )
+        prev.map((r) => (r.url === result.url ? { ...r, isAdded: true, isAdding: false } : r))
       );
     } catch (err) {
-      console.error('Add source error:', err);
-      showError(err instanceof Error ? err.message : 'Failed to add source');
+      console.error("Add source error:", err);
+      showError(err instanceof Error ? err.message : "Failed to add source");
 
       // Reset loading state
-      setResults((prev) =>
-        prev.map((r) =>
-          r.url === result.url ? { ...r, isAdding: false } : r
-        )
-      );
+      setResults((prev) => prev.map((r) => (r.url === result.url ? { ...r, isAdding: false } : r)));
     }
   };
 
@@ -212,15 +207,15 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   };
 
   const getScoreLabel = (score: number): string => {
-    if (score >= 0.8) return 'High';
-    if (score >= 0.6) return 'Medium';
-    return 'Low';
+    if (score >= 0.8) return "High";
+    if (score >= 0.6) return "Medium";
+    return "Low";
   };
 
   const getScoreColor = (score: number): string => {
-    if (score >= 0.8) return 'text-success';
-    if (score >= 0.6) return 'text-warning';
-    return 'text-muted-foreground';
+    if (score >= 0.8) return "text-success";
+    if (score >= 0.6) return "text-warning";
+    return "text-muted-foreground";
   };
 
   const updateFilters = (newFilters: Partial<FilterState>) => {
@@ -228,11 +223,11 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
     setFiltersChanged(true);
   };
 
-  const toggleSourceType = (type: 'web' | 'news' | 'academic' | 'finance') => {
+  const toggleSourceType = (type: "web" | "news" | "academic" | "finance") => {
     const newTypes = filters.sourceTypes.includes(type)
       ? filters.sourceTypes.filter((t) => t !== type)
       : [...filters.sourceTypes, type];
-    updateFilters({ sourceTypes: newTypes.length > 0 ? newTypes : ['web'] });
+    updateFilters({ sourceTypes: newTypes.length > 0 ? newTypes : ["web"] });
   };
 
   const clearFilters = () => {
@@ -280,8 +275,8 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Users className="w-3 h-3" />
               <span className="line-clamp-1">
-                {result.metadata.authors.slice(0, 3).join(', ')}
-                {result.metadata.authors.length > 3 && ' et al.'}
+                {result.metadata.authors.slice(0, 3).join(", ")}
+                {result.metadata.authors.length > 3 && " et al."}
               </span>
             </div>
           )}
@@ -289,8 +284,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
           {result.metadata.venue && (
             <div className="text-xs text-muted-foreground italic">
               {result.metadata.venue}
-              {result.metadata.publicationYear &&
-                ` • ${result.metadata.publicationYear}`}
+              {result.metadata.publicationYear && ` • ${result.metadata.publicationYear}`}
             </div>
           )}
 
@@ -333,13 +327,13 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
               px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5
               ${
                 result.isAdded || isAtLimit
-                  ? 'bg-secondary text-muted-foreground cursor-default'
+                  ? "bg-secondary text-muted-foreground cursor-default"
                   : result.isAdding
-                  ? 'bg-primary/50 text-primary-foreground cursor-wait'
-                  : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm'
+                    ? "bg-primary/50 text-primary-foreground cursor-wait"
+                    : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm"
               }
             `}
-            title={isAtLimit ? 'Source limit reached' : undefined}
+            title={isAtLimit ? "Source limit reached" : undefined}
           >
             {result.isAdding ? (
               <>
@@ -347,9 +341,9 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                 Adding...
               </>
             ) : result.isAdded ? (
-              'Added'
+              "Added"
             ) : isAtLimit ? (
-              'Limit reached'
+              "Limit reached"
             ) : (
               <>
                 <Plus className="w-3 h-3" />
@@ -421,13 +415,13 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
               px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5
               ${
                 result.isAdded || isAtLimit
-                  ? 'bg-secondary text-muted-foreground cursor-default'
+                  ? "bg-secondary text-muted-foreground cursor-default"
                   : result.isAdding
-                  ? 'bg-primary/50 text-primary-foreground cursor-wait'
-                  : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm'
+                    ? "bg-primary/50 text-primary-foreground cursor-wait"
+                    : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm"
               }
             `}
-            title={isAtLimit ? 'Source limit reached' : undefined}
+            title={isAtLimit ? "Source limit reached" : undefined}
           >
             {result.isAdding ? (
               <>
@@ -435,9 +429,9 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                 Adding...
               </>
             ) : result.isAdded ? (
-              'Added'
+              "Added"
             ) : isAtLimit ? (
-              'Limit reached'
+              "Limit reached"
             ) : (
               <>
                 <Plus className="w-3 h-3" />
@@ -496,11 +490,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                     disabled={isLoading || !query.trim()}
                     className="absolute right-2 top-2 bottom-2 px-5 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                   >
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Search'
-                    )}
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
                   </button>
                 </div>
               </form>
@@ -551,9 +541,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                     <Loader2 className="w-12 h-12 text-primary animate-spin" />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-bold text-lg font-sans">
-                      Searching across sources...
-                    </p>
+                    <p className="font-bold text-lg font-sans">Searching across sources...</p>
                     <p className="text-sm text-muted-foreground font-serif">
                       Finding the most relevant sources for you.
                     </p>
@@ -561,15 +549,13 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                 </div>
               ) : error ? (
                 <div className="flex flex-col items-center justify-center h-64 text-center p-8 bg-destructive/5 rounded-xl border border-destructive/20">
-                  <p className="text-destructive font-medium mb-1">
-                    Search encountered an issue
-                  </p>
+                  <p className="text-destructive font-medium mb-1">Search encountered an issue</p>
                   <p className="text-muted-foreground text-sm">{error}</p>
                 </div>
               ) : results.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                   {results.map((result) =>
-                    result.sourceType === 'academic'
+                    result.sourceType === "academic"
                       ? renderAcademicCard(result)
                       : renderWebCard(result)
                   )}
@@ -590,7 +576,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
           {/* Filter Panel */}
           <div
             className={`w-80 border-l border-border/30 bg-card overflow-y-auto transition-all ${
-              showFilters ? 'translate-x-0' : 'translate-x-full'
+              showFilters ? "translate-x-0" : "translate-x-full"
             }`}
           >
             <div className="p-4 space-y-6">
@@ -614,9 +600,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
 
               {/* Source Types */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase text-muted-foreground">
-                  Source Types
-                </h4>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground">Source Types</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => {
                     const Icon = config.icon;
@@ -630,7 +614,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                           ${
                             isSelected
                               ? `${config.bgColor} ${config.borderColor} ${config.color} border-current`
-                              : 'bg-muted border-border hover:border-border/80'
+                              : "bg-muted border-border hover:border-border/80"
                           }
                         `}
                       >
@@ -644,11 +628,9 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
 
               {/* Time Range */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase text-muted-foreground">
-                  Time Range
-                </h4>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground">Time Range</h4>
                 <select
-                  value={filters.timeRange || ''}
+                  value={filters.timeRange || ""}
                   onChange={(e) =>
                     updateFilters({
                       timeRange: (e.target.value || undefined) as any,
@@ -665,7 +647,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
               </div>
 
               {/* Academic Filters (conditional) */}
-              {filters.sourceTypes.includes('academic') && (
+              {filters.sourceTypes.includes("academic") && (
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold uppercase text-muted-foreground">
                     Academic Filters
@@ -677,14 +659,12 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                       Min Citations
                     </label>
                     <select
-                      value={filters.academic.minCitations || ''}
+                      value={filters.academic.minCitations || ""}
                       onChange={(e) =>
                         updateFilters({
                           academic: {
                             ...filters.academic,
-                            minCitations: e.target.value
-                              ? parseInt(e.target.value)
-                              : undefined,
+                            minCitations: e.target.value ? parseInt(e.target.value) : undefined,
                           },
                         })
                       }
@@ -738,14 +718,10 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
 
               {/* Sort By */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase text-muted-foreground">
-                  Sort By
-                </h4>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground">Sort By</h4>
                 <select
                   value={filters.sortBy}
-                  onChange={(e) =>
-                    updateFilters({ sortBy: e.target.value as any })
-                  }
+                  onChange={(e) => updateFilters({ sortBy: e.target.value as any })}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
                 >
                   <option value="relevance">Relevance</option>
@@ -765,9 +741,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                   max="50"
                   step="5"
                   value={filters.maxResults}
-                  onChange={(e) =>
-                    updateFilters({ maxResults: parseInt(e.target.value) })
-                  }
+                  onChange={(e) => updateFilters({ maxResults: parseInt(e.target.value) })}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">

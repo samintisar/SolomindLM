@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import { Id, type Doc } from '@convex/_generated/dataModel';
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { Id, type Doc } from "@convex/_generated/dataModel";
 import {
   Source,
   Note,
@@ -10,14 +10,14 @@ import {
   AgentGroundingCheck,
   ChatActivityPhase,
   ChatAgentTrace,
-} from '@/shared/types/index';
-import { useSendMessage, useSetMessageFeedback, useSourceSuggestions } from '../services/chatApi';
+} from "@/shared/types/index";
+import { useSendMessage, useSetMessageFeedback, useSourceSuggestions } from "../services/chatApi";
 
 interface UseChatStreamProps {
   activeNotebookId: string | null;
   sources: Source[];
   notes: Note[];
-  documents: Doc<'documents'>[];
+  documents: Doc<"documents">[];
 }
 
 const SKEW_MS = 120_000;
@@ -28,9 +28,9 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
 
   const chatBundle = useQuery(
     api.chat.messages.listByNotebook,
-    activeNotebookId && activeNotebookId !== 'new'
-      ? { notebookId: activeNotebookId as Id<'notebooks'> }
-      : 'skip'
+    activeNotebookId && activeNotebookId !== "new"
+      ? { notebookId: activeNotebookId as Id<"notebooks"> }
+      : "skip"
   );
 
   const messages = chatBundle?.messages ?? [];
@@ -40,7 +40,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
   const remoteGenerationBlocksSend = useMemo(() => {
     if (!chatRemoteGenerating) return false;
     const last = messages[messages.length - 1];
-    return last?.role !== 'assistant';
+    return last?.role !== "assistant";
   }, [chatRemoteGenerating, messages]);
 
   const clearChatHistoryMutation = useMutation(api.chat.messages.clearHistory);
@@ -50,7 +50,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
   const setMessageFeedback = useSetMessageFeedback();
 
   const [isChatStreaming, setIsChatStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingContent, setStreamingContent] = useState("");
   const [streamingReferences, setStreamingReferences] = useState<unknown[] | null>(null);
   const [streamingJustFinished, setStreamingJustFinished] = useState(false);
   const [streamingToolCalls, setStreamingToolCalls] = useState<MessageToolCall[]>([]);
@@ -67,7 +67,10 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
   messagesRef.current = messages;
   const streamStartedAtRef = useRef<number | null>(null);
 
-  const [optimisticSaveNote, setOptimisticSaveNote] = useState<{ notebookId: string; note: Note } | null>(null);
+  const [optimisticSaveNote, setOptimisticSaveNote] = useState<{
+    notebookId: string;
+    note: Note;
+  } | null>(null);
   const displayNotes = useMemo(() => {
     if (!optimisticSaveNote || optimisticSaveNote.notebookId !== activeNotebookId) return notes;
     return [optimisticSaveNote.note, ...notes];
@@ -75,7 +78,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
 
   const resetStreamingState = useCallback(() => {
     setIsChatStreaming(false);
-    setStreamingContent('');
+    setStreamingContent("");
     setStreamingReferences(null);
     setStreamingJustFinished(false);
     setStreamingToolCalls([]);
@@ -87,111 +90,114 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     streamStartedAtRef.current = null;
   }, []);
 
-  const handleSendMessage = useCallback(async (messageText: string) => {
-    if (!activeNotebookId || isChatStreaming) return;
-    if (chatRemoteGenerating) {
-      const last = messagesRef.current.at(-1) as Doc<'messages'> | undefined;
-      if (last?.role !== 'assistant') return;
-      try {
-        await releaseChatGenerationMutation({
-          notebookId: activeNotebookId as Id<'notebooks'>,
-        });
-      } catch {
-        /* best-effort: persist path may have already cleared the refcount */
+  const handleSendMessage = useCallback(
+    async (messageText: string) => {
+      if (!activeNotebookId || isChatStreaming) return;
+      if (chatRemoteGenerating) {
+        const last = messagesRef.current.at(-1) as Doc<"messages"> | undefined;
+        if (last?.role !== "assistant") return;
+        try {
+          await releaseChatGenerationMutation({
+            notebookId: activeNotebookId as Id<"notebooks">,
+          });
+        } catch {
+          /* best-effort: persist path may have already cleared the refcount */
+        }
       }
-    }
 
-    streamStartedAtRef.current = Date.now();
-    setIsChatStreaming(true);
-    setStreamingContent('');
-    setStreamingReferences(null);
-    const selectedDocumentIds = sourcesRef.current
-      .filter((source) => source.selected)
-      .map((source) => source.id);
+      streamStartedAtRef.current = Date.now();
+      setIsChatStreaming(true);
+      setStreamingContent("");
+      setStreamingReferences(null);
+      const selectedDocumentIds = sourcesRef.current
+        .filter((source) => source.selected)
+        .map((source) => source.id);
 
-    setStreamingToolCalls([]);
-    setStreamingTracePhases([]);
-    setStreamingPhase(null);
-    setStreamingPhaseDetail(null);
-    setStreamingGrounding([]);
-    setStreamingClarification(null);
-    setLastAssistantFollowUps(null);
+      setStreamingToolCalls([]);
+      setStreamingTracePhases([]);
+      setStreamingPhase(null);
+      setStreamingPhaseDetail(null);
+      setStreamingGrounding([]);
+      setStreamingClarification(null);
+      setLastAssistantFollowUps(null);
 
-    const onStreamComplete = () => {
-      setIsChatStreaming(false);
-      setStreamingJustFinished(true);
-      // Keep trace, tool calls, phase, and grounding until the synthetic __streaming__ row
-      // is removed (streamingContent cleared after the persisted assistant message arrives).
-      // Clearing them here left a gap where the panel still showed with empty toolCalls, so
-      // AgentActivityPanel fell back to "phases only, tools at end" and looked broken.
-      const len = messagesRef.current.length;
-      messagesLengthWhenStreamCompleteRef.current = len > 0 ? len : -1;
-      streamStartedAtRef.current = null;
-    };
+      const onStreamComplete = () => {
+        setIsChatStreaming(false);
+        setStreamingJustFinished(true);
+        // Keep trace, tool calls, phase, and grounding until the synthetic __streaming__ row
+        // is removed (streamingContent cleared after the persisted assistant message arrives).
+        // Clearing them here left a gap where the panel still showed with empty toolCalls, so
+        // AgentActivityPanel fell back to "phases only, tools at end" and looked broken.
+        const len = messagesRef.current.length;
+        messagesLengthWhenStreamCompleteRef.current = len > 0 ? len : -1;
+        streamStartedAtRef.current = null;
+      };
 
-    try {
-      await sendChatMessage(
-        activeNotebookId,
-        messageText,
-        {
-          onToken: (token) => setStreamingContent((prev) => prev + token),
-          onReferences: (refs) => setStreamingReferences(refs),
-          onStatus: (status, message) => {
-            const allowed: ChatActivityPhase[] = [
-              'searching',
-              'reading',
-              'planning',
-              'thinking',
-              'generating',
-              'writing',
-              'retrieving',
-              'embedding',
-              'ranking',
-              'completed',
-            ];
-            if (allowed.includes(status as ChatActivityPhase)) {
-              setStreamingPhase(status as ChatActivityPhase);
-            } else {
-              setStreamingPhase('thinking');
-            }
-            setStreamingPhaseDetail(message ?? null);
-            const msg = message ?? '';
-            setStreamingTracePhases((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.status === status && last.message === msg) return prev;
-              return [...prev, { status, message: msg }];
-            });
+      try {
+        await sendChatMessage(
+          activeNotebookId,
+          messageText,
+          {
+            onToken: (token) => setStreamingContent((prev) => prev + token),
+            onReferences: (refs) => setStreamingReferences(refs),
+            onStatus: (status, message) => {
+              const allowed: ChatActivityPhase[] = [
+                "searching",
+                "reading",
+                "planning",
+                "thinking",
+                "generating",
+                "writing",
+                "retrieving",
+                "embedding",
+                "ranking",
+                "completed",
+              ];
+              if (allowed.includes(status as ChatActivityPhase)) {
+                setStreamingPhase(status as ChatActivityPhase);
+              } else {
+                setStreamingPhase("thinking");
+              }
+              setStreamingPhaseDetail(message ?? null);
+              const msg = message ?? "";
+              setStreamingTracePhases((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.status === status && last.message === msg) return prev;
+                return [...prev, { status, message: msg }];
+              });
+            },
+            onToolCalls: (tcs) => setStreamingToolCalls(tcs),
+            onGroundingChecks: (checks) => setStreamingGrounding(checks),
+            onClarification: (q) => setStreamingClarification(q),
+            onFollowUps: (qs) => setLastAssistantFollowUps(qs),
+            onComplete: onStreamComplete,
+            onError: resetStreamingState,
           },
-          onToolCalls: (tcs) => setStreamingToolCalls(tcs),
-          onGroundingChecks: (checks) => setStreamingGrounding(checks),
-          onClarification: (q) => setStreamingClarification(q),
-          onFollowUps: (qs) => setLastAssistantFollowUps(qs),
-          onComplete: onStreamComplete,
-          onError: resetStreamingState,
-        },
-        selectedDocumentIds.length > 0 ? selectedDocumentIds : []
-      );
-    } catch {
-      resetStreamingState();
-    }
-  }, [
-    activeNotebookId,
-    isChatStreaming,
-    chatRemoteGenerating,
-    releaseChatGenerationMutation,
-    sendChatMessage,
-    resetStreamingState,
-  ]);
+          selectedDocumentIds.length > 0 ? selectedDocumentIds : []
+        );
+      } catch {
+        resetStreamingState();
+      }
+    },
+    [
+      activeNotebookId,
+      isChatStreaming,
+      chatRemoteGenerating,
+      releaseChatGenerationMutation,
+      sendChatMessage,
+      resetStreamingState,
+    ]
+  );
 
   const handleClearChatHistory = useCallback(async () => {
-    if (!activeNotebookId || activeNotebookId === 'new') return;
+    if (!activeNotebookId || activeNotebookId === "new") return;
     try {
       await clearChatHistoryMutation({
-        notebookId: activeNotebookId as Id<'notebooks'>,
+        notebookId: activeNotebookId as Id<"notebooks">,
       });
       resetStreamingState();
     } catch (error) {
-      console.error('Failed to clear chat history', error);
+      console.error("Failed to clear chat history", error);
       resetStreamingState();
     }
   }, [activeNotebookId, clearChatHistoryMutation, resetStreamingState]);
@@ -201,9 +207,9 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     if (
       streamingJustFinished &&
       (messages.length >= refLen || refLen < 0) &&
-      messages[messages.length - 1]?.role === 'assistant'
+      messages[messages.length - 1]?.role === "assistant"
     ) {
-      setStreamingContent('');
+      setStreamingContent("");
       setStreamingReferences(null);
       setStreamingJustFinished(false);
       setStreamingToolCalls([]);
@@ -218,7 +224,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
   useEffect(() => {
     if (!isChatStreaming || !streamingContent.trim()) return;
     const last = messages[messages.length - 1];
-    if (last?.role !== 'assistant' || !last.content) return;
+    if (last?.role !== "assistant" || !last.content) return;
     if (last.content.trimEnd() !== streamingContent.trimEnd()) return;
 
     setIsChatStreaming(false);
@@ -238,70 +244,75 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     if (t0 == null) return;
     const n = messages.length;
     if (n < 2) return;
-    const assistant = messages[n - 1] as Doc<'messages'>;
-    const user = messages[n - 2] as Doc<'messages'>;
-    if (assistant?.role !== 'assistant' || user?.role !== 'user') return;
+    const assistant = messages[n - 1] as Doc<"messages">;
+    const user = messages[n - 2] as Doc<"messages">;
+    if (assistant?.role !== "assistant" || user?.role !== "user") return;
     const assistantText =
-      typeof assistant.content === 'string' ? assistant.content : String(assistant.content ?? '');
+      typeof assistant.content === "string" ? assistant.content : String(assistant.content ?? "");
     if (!assistantText.trim()) return;
-    if (typeof assistant.createdAt !== 'number' || assistant.createdAt < t0 - SKEW_MS) return;
+    if (typeof assistant.createdAt !== "number" || assistant.createdAt < t0 - SKEW_MS) return;
 
     resetStreamingState();
   }, [isChatStreaming, streamingContent, messages, resetStreamingState]);
 
   const chatDisplayMessages = useMemo((): Message[] => {
-    const list: Message[] = messages.map((msg: Doc<'messages'>, index: number) => {
-      const meta = (msg as Doc<'messages'> & { metadata?: { agentTrace?: ChatAgentTrace } }).metadata;
+    const list: Message[] = messages.map((msg: Doc<"messages">, index: number) => {
+      const meta = (msg as Doc<"messages"> & { metadata?: { agentTrace?: ChatAgentTrace } })
+        .metadata;
       const trace = meta?.agentTrace;
       return {
         id: msg._id,
-        role: msg.role as 'user' | 'assistant',
+        role: msg.role as "user" | "assistant",
         content: msg.content,
         timestamp: new Date(msg.createdAt as number),
         references: msg.references,
-        feedback: (msg as any).feedback as 'up' | 'down' | undefined,
-        followUps: (
+        feedback: (msg as any).feedback as "up" | "down" | undefined,
+        followUps:
           !streamingContent &&
-          msg.role === 'assistant' &&
+          msg.role === "assistant" &&
           index === messages.length - 1 &&
           lastAssistantFollowUps
-        ) ? lastAssistantFollowUps : undefined,
+            ? lastAssistantFollowUps
+            : undefined,
         agentTrace: trace,
       };
     });
     const t0 = streamStartedAtRef.current;
-    const last = messages[messages.length - 1] as Doc<'messages'> | undefined;
-    const prev = messages[messages.length - 2] as Doc<'messages'> | undefined;
+    const last = messages[messages.length - 1] as Doc<"messages"> | undefined;
+    const prev = messages[messages.length - 2] as Doc<"messages"> | undefined;
     const lastAssistantText =
       last?.content == null
-        ? ''
-        : typeof last.content === 'string'
+        ? ""
+        : typeof last.content === "string"
           ? last.content
           : String(last.content);
     const ghostStuckAssistantRow =
       isChatStreaming &&
       !streamingContent.trim() &&
       t0 != null &&
-      last?.role === 'assistant' &&
-      prev?.role === 'user' &&
+      last?.role === "assistant" &&
+      prev?.role === "user" &&
       !!lastAssistantText.trim() &&
-      typeof last.createdAt === 'number' &&
+      typeof last.createdAt === "number" &&
       last.createdAt >= t0 - SKEW_MS;
 
-    if ((isChatStreaming || streamingContent || streamingClarification) && !ghostStuckAssistantRow) {
-      const toolSearching = streamingToolCalls.some((t) => t.status === 'searching');
+    if (
+      (isChatStreaming || streamingContent || streamingClarification) &&
+      !ghostStuckAssistantRow
+    ) {
+      const toolSearching = streamingToolCalls.some((t) => t.status === "searching");
       let phaseForRow: ChatActivityPhase | undefined = streamingClarification
-        ? 'completed'
-        : streamingPhase ??
-          (toolSearching ? 'searching' : streamingContent.trim() ? 'writing' : 'thinking');
+        ? "completed"
+        : (streamingPhase ??
+          (toolSearching ? "searching" : streamingContent.trim() ? "writing" : "thinking"));
       if (streamingContent.trim() && !toolSearching && !streamingClarification) {
         const p = phaseForRow;
-        if (p === 'generating' || p === 'thinking' || p === 'reading') {
-          phaseForRow = 'writing';
+        if (p === "generating" || p === "thinking" || p === "reading") {
+          phaseForRow = "writing";
         }
       }
       const statusDetailForRow =
-        streamingClarification || phaseForRow === 'writing'
+        streamingClarification || phaseForRow === "writing"
           ? undefined
           : (streamingPhaseDetail ?? undefined);
       const streamingTrace =
@@ -315,13 +326,13 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
             }
           : undefined;
       list.push({
-        id: '__streaming__',
-        role: 'assistant',
+        id: "__streaming__",
+        role: "assistant",
         content: streamingClarification
           ? `**Could you clarify?**\n\n${streamingClarification}`
           : streamingContent,
         timestamp: new Date(),
-        references: (streamingReferences as Message['references']) ?? undefined,
+        references: (streamingReferences as Message["references"]) ?? undefined,
         toolCalls: streamingToolCalls.length > 0 ? streamingToolCalls : undefined,
         groundingChecks: streamingGrounding.length > 0 ? streamingGrounding : undefined,
         agentTrace: streamingTrace,
@@ -339,16 +350,16 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
       !ghostStuckAssistantRow;
 
     if (showRemoteOnlyPlaceholder) {
-      const lastMsg = messages[messages.length - 1] as Doc<'messages'> | undefined;
-      if (lastMsg?.role === 'user') {
+      const lastMsg = messages[messages.length - 1] as Doc<"messages"> | undefined;
+      if (lastMsg?.role === "user") {
         list.push({
-          id: '__remote_generating__',
-          role: 'assistant',
-          content: '',
+          id: "__remote_generating__",
+          role: "assistant",
+          content: "",
           timestamp: new Date(),
-          status: 'thinking',
+          status: "thinking",
           statusDetail:
-            'Generating a response… This may be streaming in another tab or device. Detailed tool steps appear in the tab that sent the message.',
+            "Generating a response… This may be streaming in another tab or device. Detailed tool steps appear in the tab that sent the message.",
         });
       }
     }
@@ -369,38 +380,41 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     chatRemoteGenerating,
   ]);
 
-  const handleRetryMessage = useCallback(async (assistantMessageId: string) => {
-    if (isChatStreaming || remoteGenerationBlocksSend) return;
-    const idx = chatDisplayMessages.findIndex((m) => m.id === assistantMessageId);
-    if (idx < 0) return;
+  const handleRetryMessage = useCallback(
+    async (assistantMessageId: string) => {
+      if (isChatStreaming || remoteGenerationBlocksSend) return;
+      const idx = chatDisplayMessages.findIndex((m) => m.id === assistantMessageId);
+      if (idx < 0) return;
 
-    let userContent = '';
-    let userMessageId: string | null = null;
-    for (let i = idx - 1; i >= 0; i--) {
-      if (chatDisplayMessages[i].role === 'user') {
-        userContent = chatDisplayMessages[i].content;
-        userMessageId = chatDisplayMessages[i].id;
-        break;
+      let userContent = "";
+      let userMessageId: string | null = null;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (chatDisplayMessages[i].role === "user") {
+          userContent = chatDisplayMessages[i].content;
+          userMessageId = chatDisplayMessages[i].id;
+          break;
+        }
       }
-    }
-    if (!userContent || !userMessageId) return;
+      if (!userContent || !userMessageId) return;
 
-    await deleteMessagesFromMutation({ messageId: userMessageId as Id<'messages'> });
-    handleSendMessage(userContent);
-  }, [
-    chatDisplayMessages,
-    isChatStreaming,
-    remoteGenerationBlocksSend,
-    handleSendMessage,
-    deleteMessagesFromMutation,
-  ]);
+      await deleteMessagesFromMutation({ messageId: userMessageId as Id<"messages"> });
+      handleSendMessage(userContent);
+    },
+    [
+      chatDisplayMessages,
+      isChatStreaming,
+      remoteGenerationBlocksSend,
+      handleSendMessage,
+      deleteMessagesFromMutation,
+    ]
+  );
 
   const sourceSuggestions = useSourceSuggestions(
-    activeNotebookId && activeNotebookId !== 'new' ? activeNotebookId : null,
+    activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null,
     documents
   );
   const sourceCount = useMemo(
-    () => documents.filter((d: any) => d.status === 'completed').length,
+    () => documents.filter((d: any) => d.status === "completed").length,
     [documents]
   );
 

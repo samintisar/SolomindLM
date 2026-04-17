@@ -1,10 +1,10 @@
-import { useCallback } from 'react';
-import type { Note, FlashcardNote } from '@/shared/types/index';
-import { useToast } from '@/shared/contexts/ToastContext';
-import { useCreateFlashcards } from '../../services/flashcardsApi';
-import type { FlashcardConfig } from '../../components/CustomizeFlashcardsModal';
-import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
-import type { CreateFlowContext } from './types';
+import { useCallback } from "react";
+import type { Note, FlashcardNote } from "@/shared/types/index";
+import { useToast } from "@/shared/contexts/ToastContext";
+import { useCreateFlashcards } from "../../services/flashcardsApi";
+import type { FlashcardConfig } from "../../components/CustomizeFlashcardsModal";
+import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import type { CreateFlowContext } from "./types";
 
 export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
   const createFlashcards = useCreateFlashcards();
@@ -17,12 +17,16 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
       const selectedDocumentIds = ctx.sources.filter((s) => s.selected).map((s) => s.id);
       if (selectedDocumentIds.length === 0) {
         if (ctx.confirm) {
-          await ctx.confirm('No Sources Selected', 'Please select at least one source to generate flashcards', { variant: 'warning' });
+          await ctx.confirm(
+            "No Sources Selected",
+            "Please select at least one source to generate flashcards",
+            { variant: "warning" }
+          );
         }
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        showErrorToast('Please sign in again to continue.');
+        showErrorToast("Please sign in again to continue.");
         return;
       }
 
@@ -30,11 +34,11 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,
-        title: 'Flashcards',
+        title: "Flashcards",
         preview: `${cardCount} Cards • ${config.difficulty}`,
-        type: 'flashcard',
+        type: "flashcard",
         flashcards: [],
-        status: 'generating',
+        status: "generating",
         metadata: { cardCount, difficulty: config.difficulty, topic: config.topic },
       };
 
@@ -48,15 +52,16 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
           difficulty: config.difficulty,
           topic: config.topic || undefined,
         });
-        const flashcardId = (res as { flashcardId?: string }).flashcardId ?? (res as { noteId?: string }).noteId!;
+        const flashcardId =
+          (res as { flashcardId?: string }).flashcardId ?? (res as { noteId?: string }).noteId!;
         const apiNote = (res as { note?: { _id: string; title: string; status: string } }).note;
         const initialNote: FlashcardNote = {
           id: flashcardId,
-          title: apiNote?.title ?? 'Flashcards',
+          title: apiNote?.title ?? "Flashcards",
           preview: `${cardCount} Cards • ${config.difficulty}`,
-          type: 'flashcard',
+          type: "flashcard",
           flashcards: [],
-          status: (apiNote?.status ?? res.status) as FlashcardNote['status'],
+          status: (apiNote?.status ?? res.status) as FlashcardNote["status"],
           metadata: { cardCount, difficulty: config.difficulty, topic: config.topic },
         };
 
@@ -68,7 +73,7 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
           placeholderId,
           onDeleteNote: ctx.onDeleteNote,
           toastMessage: "Couldn't start flashcards. Please try again.",
-          devLabel: 'Failed to create flashcards',
+          devLabel: "Failed to create flashcards",
         });
       }
     },

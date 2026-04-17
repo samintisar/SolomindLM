@@ -1,7 +1,7 @@
-import type { SpreadsheetNote } from '@/shared/types/index';
-import { useQuery, useMutation, useAction } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
+import type { SpreadsheetNote } from "@/shared/types/index";
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
 export interface CreateSpreadsheetParams {
   notebookId: string;
@@ -22,27 +22,24 @@ export interface CreateSpreadsheetResponse {
  */
 export function getSpreadsheetTypeLabel(spreadsheetType: string): string {
   const labels: Record<string, string> = {
-    data_extraction: 'Data Table',
-    comparison_table: 'Comparison',
-    timeline: 'Timeline',
-    financial_summary: 'Financial',
-    custom: 'Custom',
+    data_extraction: "Data Table",
+    comparison_table: "Comparison",
+    timeline: "Timeline",
+    financial_summary: "Financial",
+    custom: "Custom",
   };
-  return labels[spreadsheetType] || 'Spreadsheet';
+  return labels[spreadsheetType] || "Spreadsheet";
 }
 
 /**
  * Get subtitle for spreadsheet based on status and type
  */
-export function getSpreadsheetSubtitle(
-  spreadsheetType: string,
-  status?: string
-): string {
+export function getSpreadsheetSubtitle(spreadsheetType: string, status?: string): string {
   const typeLabel = getSpreadsheetTypeLabel(spreadsheetType);
 
-  if (status === 'generating') {
+  if (status === "generating") {
     return `Spreadsheet • Generating...`;
-  } else if (status === 'failed') {
+  } else if (status === "failed") {
     return `Spreadsheet • Failed`;
   }
   return `Spreadsheet • ${typeLabel}`;
@@ -52,15 +49,18 @@ export function getSpreadsheetSubtitle(
  * Map a database spreadsheet response to the frontend SpreadsheetNote interface
  */
 function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
-  const spreadsheetType = dbSpreadsheet.metadata?.spreadsheetType || 'custom';
+  const spreadsheetType = dbSpreadsheet.metadata?.spreadsheetType || "custom";
   const preview = getSpreadsheetSubtitle(spreadsheetType, dbSpreadsheet.status);
 
   return {
     id: dbSpreadsheet._id,
     title: dbSpreadsheet.title,
     preview,
-    type: 'spreadsheet',
-    content: typeof dbSpreadsheet.data === 'string' ? dbSpreadsheet.data : JSON.stringify(dbSpreadsheet.data || {}, null, 2),
+    type: "spreadsheet",
+    content:
+      typeof dbSpreadsheet.data === "string"
+        ? dbSpreadsheet.data
+        : JSON.stringify(dbSpreadsheet.data || {}, null, 2),
     status: dbSpreadsheet.status,
     metadata: {
       spreadsheetType,
@@ -79,7 +79,7 @@ function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
 export function useSpreadsheets(notebookId: string | null) {
   const spreadsheets = useQuery(
     api.studio.spreadsheets.index.list,
-    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
   return spreadsheets?.map(mapSpreadsheetToNote);
 }
@@ -90,7 +90,7 @@ export function useSpreadsheets(notebookId: string | null) {
 export function useSpreadsheet(spreadsheetId: string | null) {
   const spreadsheet = useQuery(
     api.studio.spreadsheets.index.get,
-    spreadsheetId ? { id: spreadsheetId as Id<'spreadsheets'> } : 'skip'
+    spreadsheetId ? { id: spreadsheetId as Id<"spreadsheets"> } : "skip"
   );
   return spreadsheet ? mapSpreadsheetToNote(spreadsheet) : null;
 }
@@ -103,8 +103,8 @@ export function useCreateSpreadsheet() {
 
   return async (params: CreateSpreadsheetParams): Promise<CreateSpreadsheetResponse> => {
     const result = await schedule({
-      notebookId: params.notebookId as Id<'notebooks'>,
-      documentIds: params.documentIds as Id<'documents'>[],
+      notebookId: params.notebookId as Id<"notebooks">,
+      documentIds: params.documentIds as Id<"documents">[],
       title: params.title,
       spreadsheetType: params.spreadsheetType,
       customPrompt: params.customPrompt,
@@ -125,38 +125,36 @@ export function useCreateSpreadsheet() {
  * Rename a spreadsheet by ID with optimistic update
  */
 export function useRenameSpreadsheet() {
-  const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate((localStore, args) => {
-    const { id, title } = args;
+  const update = useMutation(api.studio.spreadsheets.index.update).withOptimisticUpdate(
+    (localStore, args) => {
+      const { id, title } = args;
 
-    // Read the current spreadsheet to get its notebookId
-    const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id });
-    if (spreadsheet) {
-      // Update detail view
-      localStore.setQuery(
-        api.studio.spreadsheets.index.get,
-        { id },
-        { ...spreadsheet, title }
-      );
+      // Read the current spreadsheet to get its notebookId
+      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id });
+      if (spreadsheet) {
+        // Update detail view
+        localStore.setQuery(api.studio.spreadsheets.index.get, { id }, { ...spreadsheet, title });
 
-      // Update list view using the notebookId from the item
-      const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, { notebookId: spreadsheet.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.spreadsheets.index.list,
-          { notebookId: spreadsheet.notebookId },
-          listResult.map((ss: { _id: string; [key: string]: unknown }) =>
-            ss._id === id
-              ? { ...ss, title }
-              : ss
-          )
-        );
+        // Update list view using the notebookId from the item
+        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
+          notebookId: spreadsheet.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.spreadsheets.index.list,
+            { notebookId: spreadsheet.notebookId },
+            listResult.map((ss: { _id: string; [key: string]: unknown }) =>
+              ss._id === id ? { ...ss, title } : ss
+            )
+          );
+        }
       }
     }
-  });
+  );
 
   return async (spreadsheetId: string, newTitle: string) => {
     return await update({
-      id: spreadsheetId as Id<'spreadsheets'>,
+      id: spreadsheetId as Id<"spreadsheets">,
       title: newTitle,
     });
   };
@@ -166,26 +164,30 @@ export function useRenameSpreadsheet() {
  * Delete a spreadsheet by ID with optimistic update
  */
 export function useDeleteSpreadsheet() {
-  const remove = useMutation(api.studio.spreadsheets.index.remove).withOptimisticUpdate((localStore, args) => {
-    // Read the current spreadsheet to get its notebookId
-    const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id: args.id });
-    if (spreadsheet) {
-      // Update list view using the notebookId from the item
-      const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, { notebookId: spreadsheet.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.spreadsheets.index.list,
-          { notebookId: spreadsheet.notebookId },
-          listResult.filter((ss: { _id: string }) => ss._id !== args.id)
-        );
+  const remove = useMutation(api.studio.spreadsheets.index.remove).withOptimisticUpdate(
+    (localStore, args) => {
+      // Read the current spreadsheet to get its notebookId
+      const spreadsheet = localStore.getQuery(api.studio.spreadsheets.index.get, { id: args.id });
+      if (spreadsheet) {
+        // Update list view using the notebookId from the item
+        const listResult = localStore.getQuery(api.studio.spreadsheets.index.list, {
+          notebookId: spreadsheet.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.spreadsheets.index.list,
+            { notebookId: spreadsheet.notebookId },
+            listResult.filter((ss: { _id: string }) => ss._id !== args.id)
+          );
+        }
       }
-    }
 
-    // Clear detail view
-    localStore.setQuery(api.studio.spreadsheets.index.get, { id: args.id }, null);
-  });
+      // Clear detail view
+      localStore.setQuery(api.studio.spreadsheets.index.get, { id: args.id }, null);
+    }
+  );
 
   return async (spreadsheetId: string) => {
-    await remove({ id: spreadsheetId as Id<'spreadsheets'> });
+    await remove({ id: spreadsheetId as Id<"spreadsheets"> });
   };
 }

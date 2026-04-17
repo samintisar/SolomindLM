@@ -1,7 +1,7 @@
-import { internalMutation, internalAction } from '../_generated/server';
-import type { Doc } from '../_generated/dataModel';
-import { v } from 'convex/values';
-import { internal } from '../_generated/api';
+import { internalMutation, internalAction } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
+import { v } from "convex/values";
+import { internal } from "../_generated/api";
 
 export interface ChunkWithEmbedding {
   content: string;
@@ -15,9 +15,9 @@ export interface ChunkWithEmbedding {
  */
 export const storeChunks = internalMutation({
   args: {
-    documentId: v.id('documents'),
-    userId: v.id('users'),
-    notebookId: v.id('notebooks'),
+    documentId: v.id("documents"),
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
     chunks: v.array(
       v.object({
         content: v.string(),
@@ -29,14 +29,14 @@ export const storeChunks = internalMutation({
   handler: async (ctx, args) => {
     const { documentId, userId, notebookId, chunks } = args;
 
-    console.log('[VectorStore] Storing chunks:', {
+    console.log("[VectorStore] Storing chunks:", {
       documentId,
       chunkCount: chunks.length,
     });
 
     // Insert all chunks
     for (const chunk of chunks) {
-      await ctx.db.insert('documentChunks', {
+      await ctx.db.insert("documentChunks", {
         documentId,
         userId,
         notebookId,
@@ -47,7 +47,7 @@ export const storeChunks = internalMutation({
       });
     }
 
-    console.log('[VectorStore] Chunks stored successfully');
+    console.log("[VectorStore] Chunks stored successfully");
   },
 });
 
@@ -58,43 +58,39 @@ export const storeChunks = internalMutation({
 export const similaritySearch = internalAction({
   args: {
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     queryEmbedding: v.array(v.float64()),
     limit: v.optional(v.number()),
-    documentIds: v.optional(v.array(v.id('documents'))),
+    documentIds: v.optional(v.array(v.id("documents"))),
   },
   handler: async (ctx, args) => {
     "use node";
 
     const { userId, notebookId, queryEmbedding, limit = 5, documentIds } = args;
 
-    console.log('[VectorStore] Performing similarity search:', {
+    console.log("[VectorStore] Performing similarity search:", {
       notebookId,
       limit,
     });
 
     // Perform vector search (filter supports only single eq or q.or; filterFields are userId, notebookId)
-    const results = await ctx.vectorSearch('documentChunks', 'by_embedding', {
+    const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: queryEmbedding,
       limit: (documentIds?.length ? 256 : limit) ?? limit,
-      filter: (q) => q.eq('notebookId', notebookId),
+      filter: (q) => q.eq("notebookId", notebookId),
     });
 
     // Post-filter by userId and documentIds (vector filter can't express AND or filter by documentId)
     const chunkIds = results.map((r) => r._id);
-    const rawChunks: (Doc<'documentChunks'> | null)[] =
+    const rawChunks: (Doc<"documentChunks"> | null)[] =
       chunkIds.length > 0
         ? await ctx.runQuery(internal.documents.index.getChunks, { chunkIds })
         : [];
-    const chunks = rawChunks.filter(
-      (c): c is Doc<'documentChunks'> => c !== null
-    );
+    const chunks = rawChunks.filter((c): c is Doc<"documentChunks"> => c !== null);
     const validIds = new Set(
       chunks
         .filter(
-          (c) =>
-            c.userId === userId &&
-            (!documentIds?.length || documentIds.includes(c.documentId))
+          (c) => c.userId === userId && (!documentIds?.length || documentIds.includes(c.documentId))
         )
         .map((c) => c._id)
     );
@@ -116,7 +112,7 @@ export const similaritySearch = internalAction({
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
-    console.log('[VectorStore] Search completed:', {
+    console.log("[VectorStore] Search completed:", {
       resultCount: enriched.length,
     });
 
@@ -131,11 +127,11 @@ export const similaritySearch = internalAction({
 export const hybridSearch = internalAction({
   args: {
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     queryText: v.string(),
     queryEmbedding: v.array(v.float64()),
     limit: v.optional(v.number()),
-    documentIds: v.optional(v.array(v.id('documents'))),
+    documentIds: v.optional(v.array(v.id("documents"))),
     matchThreshold: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -143,35 +139,31 @@ export const hybridSearch = internalAction({
 
     const { userId, notebookId, queryText, queryEmbedding, limit = 10, documentIds } = args;
 
-    console.log('[VectorStore] Performing hybrid search:', {
+    console.log("[VectorStore] Performing hybrid search:", {
       notebookId,
       queryText,
       limit,
     });
 
     // Perform vector search (filter supports only single eq or q.or; filterFields are userId, notebookId)
-    const results = await ctx.vectorSearch('documentChunks', 'by_embedding', {
+    const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: queryEmbedding,
       limit: (documentIds?.length ? 256 : limit) ?? limit,
-      filter: (q) => q.eq('notebookId', notebookId),
+      filter: (q) => q.eq("notebookId", notebookId),
     });
 
     // Get full chunk data and post-filter by userId and documentIds
     const chunkIds = results.map((r) => r._id);
-    const rawChunks: (Doc<'documentChunks'> | null)[] =
+    const rawChunks: (Doc<"documentChunks"> | null)[] =
       chunkIds.length > 0
         ? await ctx.runQuery(internal.documents.index.getChunks, { chunkIds })
         : [];
-    const allChunks = rawChunks.filter(
-      (c): c is Doc<'documentChunks'> => c !== null
-    );
+    const allChunks = rawChunks.filter((c): c is Doc<"documentChunks"> => c !== null);
     const chunks = allChunks.filter(
-      (c) =>
-        c.userId === userId &&
-        (!documentIds?.length || documentIds.includes(c.documentId))
+      (c) => c.userId === userId && (!documentIds?.length || documentIds.includes(c.documentId))
     );
 
-    console.log('[VectorStore] Hybrid search completed:', {
+    console.log("[VectorStore] Hybrid search completed:", {
       resultCount: chunks.length,
     });
 
@@ -184,15 +176,17 @@ export const hybridSearch = internalAction({
  */
 export const getDocumentChunks = internalAction({
   args: {
-    documentId: v.id('documents'),
+    documentId: v.id("documents"),
   },
-  handler: async (ctx, args): Promise<Doc<'documentChunks'>[]> => {
+  handler: async (ctx, args): Promise<Doc<"documentChunks">[]> => {
     "use node";
 
-    const chunks: Doc<'documentChunks'>[] =
-      await ctx.runQuery(internal.documents.index.listChunksByDocument, {
+    const chunks: Doc<"documentChunks">[] = await ctx.runQuery(
+      internal.documents.index.listChunksByDocument,
+      {
         documentId: args.documentId,
-      });
+      }
+    );
 
     return chunks;
   },
@@ -203,15 +197,15 @@ export const getDocumentChunks = internalAction({
  */
 export const deleteDocumentChunks = internalMutation({
   args: {
-    documentId: v.id('documents'),
+    documentId: v.id("documents"),
   },
   handler: async (ctx, args) => {
     const { documentId } = args;
 
     // Get all chunks for this document
     const chunks = await ctx.db
-      .query('documentChunks')
-      .withIndex('by_document', (q) => q.eq('documentId', documentId))
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", documentId))
       .collect();
 
     // Delete all chunks
@@ -219,7 +213,7 @@ export const deleteDocumentChunks = internalMutation({
       await ctx.db.delete(chunk._id);
     }
 
-    console.log('[VectorStore] Deleted chunks:', {
+    console.log("[VectorStore] Deleted chunks:", {
       documentId,
       count: chunks.length,
     });

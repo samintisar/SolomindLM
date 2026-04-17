@@ -1,12 +1,16 @@
-import React, { useState, useRef, useEffect, ReactNode, ReactElement } from 'react';
+import React, { useState, useRef, useEffect, ReactNode, ReactElement } from "react";
 
 interface DropdownMenuProps {
   trigger: ReactElement<any>;
   children: ReactNode;
-  align?: 'left' | 'right';
+  align?: "left" | "right";
 }
 
-export const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, children, align = 'right' }) => {
+export const DropdownMenu: React.FC<DropdownMenuProps> = ({
+  trigger,
+  children,
+  align = "right",
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -19,19 +23,19 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, children, a
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscape);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, [isOpen]);
 
@@ -41,13 +45,13 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, children, a
     setIsOpen((prev) => !prev);
   };
 
-  const alignClass = align === 'left' ? 'left-0' : 'right-0';
+  const alignClass = align === "left" ? "left-0" : "right-0";
 
   // Clone trigger and add onClick handler
   const triggerWithProps = React.cloneElement(trigger, {
     onClick: handleTriggerClick,
-    'aria-haspopup': 'menu',
-    'aria-expanded': isOpen,
+    "aria-haspopup": "menu",
+    "aria-expanded": isOpen,
   });
 
   return (

@@ -1,11 +1,11 @@
-import React from 'react';
-import { Globe } from 'lucide-react';
-import { NotebookItem } from '@/shared/types/index';
-import { ListHeader } from '../ListHeader';
+import React from "react";
+import { Globe } from "lucide-react";
+import { NotebookItem } from "@/shared/types/index";
+import { ListHeader } from "../ListHeader";
 
 interface FeaturedSectionProps {
   featuredNotebooks: NotebookItem[];
-  viewMode: 'grid' | 'list';
+  viewMode: "grid" | "list";
   onSelectNotebook: (notebook: NotebookItem) => void;
 }
 
@@ -22,7 +22,7 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
         <h2 className="text-xl font-display font-bold text-foreground">Featured notebooks</h2>
       </div>
 
-      {viewMode === 'grid' ? (
+      {viewMode === "grid" ? (
         /* FEATURED GRID */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {featuredNotebooks.map((nb) => (
@@ -33,8 +33,11 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
             >
               {/* Background Image/Color */}
               <div className={`absolute inset-0 ${nb.coverColor} transition-opacity`}>
-                <div className="absolute inset-0 opacity-30 mix-blend-multiply"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
+                <div
+                  className="absolute inset-0 opacity-30 mix-blend-multiply"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                  }}
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
               </div>
@@ -44,9 +47,13 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
                   <div className="w-6 h-6 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-xs font-bold uppercase ring-1 ring-white/30">
                     {nb.author?.charAt(0)}
                   </div>
-                  <span className="text-xs font-medium text-white/90 truncate drop-shadow-sm">{nb.author}</span>
+                  <span className="text-xs font-medium text-white/90 truncate drop-shadow-sm">
+                    {nb.author}
+                  </span>
                 </div>
-                <h3 className="text-lg font-bold leading-tight mb-3 drop-shadow-md line-clamp-2 font-sans tracking-tight">{nb.title}</h3>
+                <h3 className="text-lg font-bold leading-tight mb-3 drop-shadow-md line-clamp-2 font-sans tracking-tight">
+                  {nb.title}
+                </h3>
                 <div className="flex items-center gap-3 text-sm font-medium text-white/80 uppercase tracking-wide">
                   <div className="flex items-center gap-1.5">
                     <Globe className="w-3 h-3 shrink-0" />
@@ -68,12 +75,18 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
               className="group grid grid-cols-[1fr_auto_40px] items-center gap-6 p-4 rounded-xl bg-card border border-border shadow-sm hover:shadow-md hover:border-primary/20 cursor-pointer transition-all"
             >
               <div className="flex items-center gap-4 min-w-0">
-                <div className={`w-10 h-10 rounded-lg ${nb.coverColor} bg-opacity-[3%] flex items-center justify-center shrink-0`}>
-                  <Globe className={`w-5 h-5 ${(nb.coverColor || '').replace('bg-', 'text-')} opacity-50 shrink-0`} />
+                <div
+                  className={`w-10 h-10 rounded-lg ${nb.coverColor} bg-opacity-[3%] flex items-center justify-center shrink-0`}
+                >
+                  <Globe
+                    className={`w-5 h-5 ${(nb.coverColor || "").replace("bg-", "text-")} opacity-50 shrink-0`}
+                  />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-bold text-foreground font-serif truncate">{nb.title}</span>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wide truncate">{nb.author}</span>
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide truncate">
+                    {nb.author}
+                  </span>
                 </div>
               </div>
               <div className="w-20 flex justify-end">

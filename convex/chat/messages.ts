@@ -312,9 +312,7 @@ export const deleteMessagesFrom = mutation({
     // Get all messages in the conversation ordered by creation time
     const allMessages = await ctx.db
       .query("messages")
-      .withIndex("by_conversation", (q) =>
-        q.eq("conversationId", target.conversationId)
-      )
+      .withIndex("by_conversation", (q) => q.eq("conversationId", target.conversationId))
       .order("asc")
       .collect();
 

@@ -103,7 +103,7 @@ type MutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;
 export class Notifications {
   constructor(
     private component: ComponentApi,
-    private options?: { defaultChannel?: string },
+    private options?: { defaultChannel?: string }
   ) {}
 
   async send(ctx: MutationCtx, args: { userId: string; message: string }) {

@@ -1,10 +1,10 @@
-import React, { lazy, Suspense } from 'react';
-import { ArrowLeft, FileText } from 'lucide-react';
-import { UserNote } from '@/shared/types/index';
-import { sanitizeMarkdown } from '@/shared/utils';
+import React, { lazy, Suspense } from "react";
+import { ArrowLeft, FileText } from "lucide-react";
+import { UserNote } from "@/shared/types/index";
+import { sanitizeMarkdown } from "@/shared/utils";
 
 const MarkdownRenderer = lazy(() =>
-  import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
+  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
 export interface UserNoteViewProps {
@@ -14,7 +14,7 @@ export interface UserNoteViewProps {
 
 export const UserNoteView: React.FC<UserNoteViewProps> = ({ note, onBack }) => {
   return (
-    <div className={`flex flex-col h-full bg-background ${onBack ? 'md:pt-0 pt-16' : ''}`}>
+    <div className={`flex flex-col h-full bg-background ${onBack ? "md:pt-0 pt-16" : ""}`}>
       {/* Mobile Back Button */}
       {onBack && (
         <div className="md:hidden absolute top-0 left-0 right-0 flex items-center gap-2 p-4 border-b border-border bg-background/80 backdrop-blur-sm z-20">
@@ -33,7 +33,11 @@ export const UserNoteView: React.FC<UserNoteViewProps> = ({ note, onBack }) => {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-6">
           {note.content ? (
-            <Suspense fallback={<div className="prose prose-sm dark:prose-invert max-w-none">Loading...</div>}>
+            <Suspense
+              fallback={
+                <div className="prose prose-sm dark:prose-invert max-w-none">Loading...</div>
+              }
+            >
               <MarkdownRenderer
                 className="prose prose-sm dark:prose-invert max-w-none
                   prose-headings:font-semibold prose-headings:text-foreground

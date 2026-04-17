@@ -1,12 +1,12 @@
-"use node"
+"use node";
 /**
  * State definitions for MindMapGraph.
  *
  * Contains state interfaces and types using the LangGraph Annotation API.
  */
 
-import { Annotation } from '@langchain/langgraph';
-import { z } from 'zod';
+import { Annotation } from "@langchain/langgraph";
+import { z } from "zod";
 
 // ============================================================
 // SCHEMAS
@@ -38,7 +38,7 @@ export interface FinalMindMap {
 // ============================================================
 
 export const ChunkState = Annotation.Root({
-  content: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => '' }),
+  content: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "" }),
   retryCount: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
   chunkIndex: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
   totalChunks: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
@@ -51,7 +51,7 @@ export const OverallState = Annotation.Root({
       const combined = [...existing, ...(incoming ?? [])];
 
       const seen = new Set<string>();
-      return combined.filter(item => {
+      return combined.filter((item) => {
         const key = `${item.main_theme}|${item.summary}`;
 
         if (seen.has(key)) {
@@ -62,10 +62,10 @@ export const OverallState = Annotation.Root({
         return true;
       });
     },
-    default: () => []
+    default: () => [],
   }),
   finalOutput: Annotation<any>({ reducer: (x, y) => y ?? x, default: () => null }),
-  status: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => 'generating' }),
+  status: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "generating" }),
   progress: Annotation<{
     phase: string;
     percentage: number;
@@ -75,7 +75,7 @@ export const OverallState = Annotation.Root({
     conceptsExtracted?: number;
   }>({
     reducer: (_x, y?: any) => y ?? _x,
-    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+    default: () => ({ phase: "initializing", percentage: 0, message: "Initializing..." }),
   }),
 });
 

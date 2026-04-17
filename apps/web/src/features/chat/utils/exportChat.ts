@@ -1,4 +1,4 @@
-import { Message } from '@/shared/types/index';
+import { Message } from "@/shared/types/index";
 
 /**
  * Convert chat messages to clean markdown format
@@ -9,10 +9,10 @@ function messagesToMarkdown(messages: Message[]): string {
   let markdown = "";
 
   for (const message of messages) {
-    if (message.role === 'user') {
-      markdown += `## You\n\n${(message.content ?? '').trim()}\n\n`;
-    } else if (message.role === 'assistant') {
-      markdown += `## Assistant\n\n${(message.content ?? '').trim()}\n\n`;
+    if (message.role === "user") {
+      markdown += `## You\n\n${(message.content ?? "").trim()}\n\n`;
+    } else if (message.role === "assistant") {
+      markdown += `## Assistant\n\n${(message.content ?? "").trim()}\n\n`;
       markdown += `---\n\n`;
     }
   }
@@ -37,8 +37,8 @@ export function exportAsMarkdown(
   }
 
   const dateStr = timestamp || new Date().toLocaleString();
-  const safeTitle = notebookTitle.replace(/[\\/:*?"<>|]/g, '_').trim() || 'chat';
-  const filename = `chat_${safeTitle}_${new Date().toISOString().split('T')[0]}.md`;
+  const safeTitle = notebookTitle.replace(/[\\/:*?"<>|]/g, "_").trim() || "chat";
+  const filename = `chat_${safeTitle}_${new Date().toISOString().split("T")[0]}.md`;
 
   // Build markdown content with header
   let markdown = `# Chat Export - ${notebookTitle}\n`;
@@ -50,9 +50,9 @@ export function exportAsMarkdown(
   markdown += messagesToMarkdown(messages);
 
   // Create and trigger download
-  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();

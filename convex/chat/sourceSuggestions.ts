@@ -14,7 +14,10 @@ export const getSourceSuggestions = action({
     notebookId: v.id("notebooks"),
     documentSignature: v.string(),
   },
-  handler: async (ctx, args): Promise<{
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
     sourceCount: number;
     summary: string | null;
     suggestions: string[] | null;
@@ -23,12 +26,9 @@ export const getSourceSuggestions = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    return ctx.runAction(
-      internal._agents.chat.sourceSuggestions.generateSuggestionsInternal,
-      {
-        notebookId: args.notebookId,
-        documentSignature: args.documentSignature,
-      },
-    );
+    return ctx.runAction(internal._agents.chat.sourceSuggestions.generateSuggestionsInternal, {
+      notebookId: args.notebookId,
+      documentSignature: args.documentSignature,
+    });
   },
 });

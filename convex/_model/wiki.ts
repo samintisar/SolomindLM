@@ -42,7 +42,10 @@ export async function getWiki(ctx: QueryCtx, wikiId: any): Promise<Doc<"wikis"> 
 /**
  * Get wiki by notebook ID
  */
-export async function getWikiByNotebook(ctx: QueryCtx, notebookId: any): Promise<Doc<"wikis"> | null> {
+export async function getWikiByNotebook(
+  ctx: QueryCtx,
+  notebookId: any
+): Promise<Doc<"wikis"> | null> {
   const wikis = await ctx.db
     .query("wikis")
     .withIndex("by_notebook", (q: any) => q.eq("notebookId", notebookId))
@@ -72,11 +75,7 @@ export async function updateWikiStatus(
 /**
  * Update wiki metadata
  */
-export async function updateWikiMetadata(
-  ctx: MutationCtx,
-  wikiId: any,
-  metadata: any
-) {
+export async function updateWikiMetadata(ctx: MutationCtx, wikiId: any, metadata: any) {
   await ctx.db.patch(wikiId, {
     metadata,
     lastRefreshedAt: Date.now(),
@@ -135,9 +134,7 @@ export async function getWikiArticleByPath(
 ): Promise<Doc<"wikiArticles"> | null> {
   const articles = await ctx.db
     .query("wikiArticles")
-    .withIndex("by_path", (q: any) =>
-      q.eq("wikiId", wikiId).eq("path", path)
-    )
+    .withIndex("by_path", (q: any) => q.eq("wikiId", wikiId).eq("path", path))
     .collect();
 
   return articles[0] || null;
@@ -164,10 +161,7 @@ export async function updateWikiArticle(
 /**
  * Delete all articles for a wiki
  */
-export async function deleteWikiArticles(
-  ctx: MutationCtx,
-  wikiId: any
-) {
+export async function deleteWikiArticles(ctx: MutationCtx, wikiId: any) {
   const articles = await getWikiArticles(ctx, wikiId);
 
   for (const article of articles) {
@@ -178,10 +172,7 @@ export async function deleteWikiArticles(
 /**
  * Delete a wiki and all its articles
  */
-export async function deleteWiki(
-  ctx: MutationCtx,
-  wikiId: any
-) {
+export async function deleteWiki(ctx: MutationCtx, wikiId: any) {
   // Delete all articles first
   await deleteWikiArticles(ctx, wikiId);
 

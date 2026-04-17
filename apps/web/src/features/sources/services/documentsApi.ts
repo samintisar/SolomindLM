@@ -1,8 +1,8 @@
-import type { Document, UploadResponse, UnifiedDiscoveryResult } from '@/shared/types/index';
-import { useQuery, useMutation, useAction } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { ConvexClient } from 'convex/browser';
+import type { Document, UploadResponse, UnifiedDiscoveryResult } from "@/shared/types/index";
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { ConvexClient } from "convex/browser";
 
 // ============================================================
 // Hooks (for use in React components)
@@ -15,7 +15,7 @@ import { ConvexClient } from 'convex/browser';
 export function useDocuments(notebookId: string | null) {
   return useQuery(
     api.documents.index.list,
-    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : {}
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {}
   );
 }
 
@@ -23,10 +23,7 @@ export function useDocuments(notebookId: string | null) {
  * Get a specific document by ID
  */
 export function useDocument(id: string | null) {
-  return useQuery(
-    api.documents.index.get,
-    id ? { id: id as Id<'documents'> } : 'skip'
-  );
+  return useQuery(api.documents.index.get, id ? { id: id as Id<"documents"> } : "skip");
 }
 
 /**
@@ -44,7 +41,7 @@ export function useCreateDocument() {
 
   return async (data: {
     notebookId: string;
-    type: 'file' | 'url' | 'youtube' | 'text';
+    type: "file" | "url" | "youtube" | "text";
     source?: string;
     fileName: string;
     fileSize?: number;
@@ -52,7 +49,7 @@ export function useCreateDocument() {
     contentType?: string;
   }) => {
     return await upload({
-      notebookId: data.notebookId as Id<'notebooks'>,
+      notebookId: data.notebookId as Id<"notebooks">,
       type: data.type,
       source: data.source,
       storageId: data.storageId,
@@ -67,36 +64,32 @@ export function useCreateDocument() {
  * Update a document (rename) with optimistic update
  */
 export function useUpdateDocument() {
-  const update = useMutation(api.documents.index.update).withOptimisticUpdate((localStore, args) => {
-    const { id, title } = args;
+  const update = useMutation(api.documents.index.update).withOptimisticUpdate(
+    (localStore, args) => {
+      const { id, title } = args;
 
-    // Update list view
-    const listResult = localStore.getQuery(api.documents.index.list, {});
-    if (listResult) {
-      localStore.setQuery(
-        api.documents.index.list,
-        {},
-        listResult.map((doc: { _id: string; [key: string]: unknown }) =>
-          doc._id === id
-            ? { ...doc, fileName: title }
-            : doc
-        )
-      );
-    }
+      // Update list view
+      const listResult = localStore.getQuery(api.documents.index.list, {});
+      if (listResult) {
+        localStore.setQuery(
+          api.documents.index.list,
+          {},
+          listResult.map((doc: { _id: string; [key: string]: unknown }) =>
+            doc._id === id ? { ...doc, fileName: title } : doc
+          )
+        );
+      }
 
-    // Update detail view
-    const document = localStore.getQuery(api.documents.index.get, { id });
-    if (document) {
-      localStore.setQuery(
-        api.documents.index.get,
-        { id },
-        { ...document, fileName: title }
-      );
+      // Update detail view
+      const document = localStore.getQuery(api.documents.index.get, { id });
+      if (document) {
+        localStore.setQuery(api.documents.index.get, { id }, { ...document, fileName: title });
+      }
     }
-  });
+  );
 
   return async (id: string, updates: { title: string }) => {
-    return await update({ id: id as Id<'documents'>, title: updates.title });
+    return await update({ id: id as Id<"documents">, title: updates.title });
   };
 }
 
@@ -104,23 +97,25 @@ export function useUpdateDocument() {
  * Delete a document with optimistic update
  */
 export function useDeleteDocument() {
-  const remove = useMutation(api.documents.index.remove).withOptimisticUpdate((localStore, args) => {
-    // Optimistically remove from list
-    const listResult = localStore.getQuery(api.documents.index.list, {});
-    if (listResult) {
-      localStore.setQuery(
-        api.documents.index.list,
-        {},
-        listResult.filter((doc: { _id: string }) => doc._id !== args.id)
-      );
-    }
+  const remove = useMutation(api.documents.index.remove).withOptimisticUpdate(
+    (localStore, args) => {
+      // Optimistically remove from list
+      const listResult = localStore.getQuery(api.documents.index.list, {});
+      if (listResult) {
+        localStore.setQuery(
+          api.documents.index.list,
+          {},
+          listResult.filter((doc: { _id: string }) => doc._id !== args.id)
+        );
+      }
 
-    // Clear detail view
-    localStore.setQuery(api.documents.index.get, { id: args.id }, null);
-  });
+      // Clear detail view
+      localStore.setQuery(api.documents.index.get, { id: args.id }, null);
+    }
+  );
 
   return async (id: string) => {
-    return await remove({ id: id as Id<'documents'> });
+    return await remove({ id: id as Id<"documents"> });
   };
 }
 
@@ -128,16 +123,16 @@ export function useDeleteDocument() {
  * Delete multiple documents with optimistic list updates (notebook-scoped list args).
  */
 export function useRemoveManyDocuments(notebookId: string | null) {
-  const listArgs = notebookId ? { notebookId: notebookId as Id<'notebooks'> } : {};
+  const listArgs = notebookId ? { notebookId: notebookId as Id<"notebooks"> } : {};
   const removeMany = useMutation(api.documents.index.removeMany).withOptimisticUpdate(
-    (localStore, args: { ids: Id<'documents'>[] }) => {
+    (localStore, args: { ids: Id<"documents">[] }) => {
       const listResult = localStore.getQuery(api.documents.index.list, listArgs);
       if (listResult) {
         const idSet = new Set(args.ids.map((id) => id));
         localStore.setQuery(
           api.documents.index.list,
           listArgs,
-          listResult.filter((doc: { _id: string }) => !idSet.has(doc._id as Id<'documents'>))
+          listResult.filter((doc: { _id: string }) => !idSet.has(doc._id as Id<"documents">))
         );
       }
       for (const id of args.ids) {
@@ -148,7 +143,7 @@ export function useRemoveManyDocuments(notebookId: string | null) {
 
   return async (ids: string[]) => {
     if (ids.length === 0) return;
-    await removeMany({ ids: ids as Id<'documents'>[] });
+    await removeMany({ ids: ids as Id<"documents">[] });
   };
 }
 
@@ -159,7 +154,7 @@ export function useRefreshNotebookRemoteSources() {
   const run = useAction(api.documents.refreshRemote.refreshNotebookRemoteSources);
   return async (params: { notebookId: string; accessToken?: string }) => {
     return await run({
-      notebookId: params.notebookId as Id<'notebooks'>,
+      notebookId: params.notebookId as Id<"notebooks">,
       accessToken: params.accessToken,
     });
   };
@@ -172,7 +167,7 @@ export function useRefreshRemoteSource() {
   const run = useAction(api.documents.refreshRemote.refreshRemoteSource);
   return async (params: { documentId: string; accessToken?: string }) => {
     await run({
-      documentId: params.documentId as Id<'documents'>,
+      documentId: params.documentId as Id<"documents">,
       accessToken: params.accessToken,
     });
   };
@@ -184,7 +179,7 @@ export function useRefreshRemoteSource() {
 export function useDocumentContent(documentId: string | null) {
   return useQuery(
     api.documents.index.getContent,
-    documentId ? { id: documentId as Id<'documents'> } : 'skip'
+    documentId ? { id: documentId as Id<"documents"> } : "skip"
   );
 }
 
@@ -205,8 +200,8 @@ export function useUnifiedDiscovery() {
 
   return async (request: {
     query: string;
-    sourceTypes: ('web' | 'news' | 'academic' | 'finance')[];
-    timeRange?: 'day' | 'week' | 'month' | 'year';
+    sourceTypes: ("web" | "news" | "academic" | "finance")[];
+    timeRange?: "day" | "week" | "month" | "year";
     academicFilters?: {
       publicationYearFrom?: number;
       publicationYearTo?: number;
@@ -215,7 +210,7 @@ export function useUnifiedDiscovery() {
       hasFullText?: boolean;
     };
     maxResults: number;
-    sortBy?: 'relevance' | 'date' | 'citations';
+    sortBy?: "relevance" | "date" | "citations";
   }): Promise<{
     sources: UnifiedDiscoveryResult[];
     totalCount: number;
@@ -245,7 +240,7 @@ export function useIngestFromGoogleDrive() {
     accessToken: string;
   }) => {
     return await ingest({
-      notebookId: data.notebookId as Id<'notebooks'>,
+      notebookId: data.notebookId as Id<"notebooks">,
       fileId: data.fileId,
       fileName: data.fileName,
       mimeType: data.mimeType,
@@ -261,7 +256,7 @@ export function useIngestFromGoogleDrive() {
  */
 export async function pollDocumentStatus(
   getDocument: () => Document | null | undefined,
-  onUpdate?: (status: Document['status']) => void,
+  onUpdate?: (status: Document["status"]) => void,
   maxAttempts = 60,
   interval = 2000
 ): Promise<Document> {
@@ -269,10 +264,10 @@ export async function pollDocumentStatus(
     const doc = getDocument();
 
     if (!doc) {
-      throw new Error('Document not found');
+      throw new Error("Document not found");
     }
 
-    if (doc.status === 'completed' || doc.status === 'failed') {
+    if (doc.status === "completed" || doc.status === "failed") {
       return doc;
     }
 
@@ -280,7 +275,7 @@ export async function pollDocumentStatus(
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
 
-  throw new Error('Document processing timed out');
+  throw new Error("Document processing timed out");
 }
 
 /**
@@ -297,21 +292,21 @@ export function useUploadDocument() {
 
     // 2. POST file to Convex storage; response body contains storageId
     const uploadResponse = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
       body: file,
     });
 
     if (!uploadResponse.ok) {
-      throw new Error('Failed to upload file to storage');
+      throw new Error("Failed to upload file to storage");
     }
 
     const { storageId } = await uploadResponse.json();
 
     // 3. Create document record (include contentType so PDFs stay labeled correctly if renamed without extension)
     const result = await createDocument({
-      notebookId: notebookId as Id<'notebooks'>,
-      type: 'file',
+      notebookId: notebookId as Id<"notebooks">,
+      type: "file",
       storageId,
       fileName: file.name,
       fileSize: file.size,
@@ -332,7 +327,7 @@ function getConvexClient(): ConvexClient {
   if (!convexClient) {
     const convexUrl = import.meta.env.VITE_CONVEX_URL;
     if (!convexUrl) {
-      throw new Error('VITE_CONVEX_URL environment variable is not set');
+      throw new Error("VITE_CONVEX_URL environment variable is not set");
     }
     convexClient = new ConvexClient(convexUrl);
   }
@@ -346,19 +341,19 @@ function getConvexClient(): ConvexClient {
 export async function uploadUrl(
   notebookId: string,
   url: string,
-  type: 'url' | 'youtube'
+  type: "url" | "youtube"
 ): Promise<UploadResponse> {
   const client = getConvexClient();
   const result = await client.mutation(api.documents.index.upload, {
-    notebookId: notebookId as Id<'notebooks'>,
+    notebookId: notebookId as Id<"notebooks">,
     type,
     source: url,
-    fileName: type === 'youtube' ? 'YouTube Video' : url,
+    fileName: type === "youtube" ? "YouTube Video" : url,
   });
   return {
     documentId: result.documentId,
-    message: 'Uploaded successfully',
-    status: 'success',
+    message: "Uploaded successfully",
+    status: "success",
   };
 }
 
@@ -368,7 +363,7 @@ export async function uploadUrl(
 export async function getDocumentContent(documentId: string): Promise<string> {
   const client = getConvexClient();
   const result = await client.query(api.documents.index.getContent, {
-    id: documentId as Id<'documents'>,
+    id: documentId as Id<"documents">,
   });
   return result.content;
 }
@@ -377,20 +372,17 @@ export async function getDocumentContent(documentId: string): Promise<string> {
  * Upload pasted text as a document
  * This is an imperative function that can be called outside of React
  */
-export async function uploadText(
-  notebookId: string,
-  text: string
-): Promise<UploadResponse> {
+export async function uploadText(notebookId: string, text: string): Promise<UploadResponse> {
   const client = getConvexClient();
   const result = await client.mutation(api.documents.index.upload, {
-    notebookId: notebookId as Id<'notebooks'>,
-    type: 'text',
+    notebookId: notebookId as Id<"notebooks">,
+    type: "text",
     source: text,
-    fileName: 'Pasted text',
+    fileName: "Pasted text",
   });
   return {
     documentId: result.documentId,
-    message: 'Uploaded successfully',
-    status: 'success',
+    message: "Uploaded successfully",
+    status: "success",
   };
 }

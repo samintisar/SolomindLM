@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Prompt templates for SpreadsheetGraph.
  * STRATEGY: Context-First Aggregation (The "NotebookLM" Approach)
@@ -11,11 +11,14 @@
 // SYSTEM PROMPTS
 // ============================================================
 
-export const MAP_SYSTEM_PROMPT = 'You are a Research Assistant. Analyze the text to identify distinct concepts, methods, or entities. Collect all relevant details and examples for each. Do not format as a table yet.';
+export const MAP_SYSTEM_PROMPT =
+  "You are a Research Assistant. Analyze the text to identify distinct concepts, methods, or entities. Collect all relevant details and examples for each. Do not format as a table yet.";
 
-export const COLLAPSE_SYSTEM_PROMPT = 'You are a Technical Editor. Consolidate fragmented research notes into a Master List of Concepts. Merge details about the same concept into single blocks. Remove exact duplicates.';
+export const COLLAPSE_SYSTEM_PROMPT =
+  "You are a Technical Editor. Consolidate fragmented research notes into a Master List of Concepts. Merge details about the same concept into single blocks. Remove exact duplicates.";
 
-export const REDUCE_SYSTEM_PROMPT = 'You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields.';
+export const REDUCE_SYSTEM_PROMPT =
+  "You are a Data Analyst. Convert the provided Research Briefing into a high-level summary CSV table. Ensure every row represents a unique concept. Follow RFC 4180 CSV standards: enclose all fields in double quotes, escape internal quotes by doubling them, preserve line breaks within quoted fields.";
 
 // ============================================================
 // MAP PROMPTS (Concept Identification)

@@ -1,17 +1,24 @@
-import React from 'react';
-import { FileText, Youtube, Globe, AudioLines, File, FileCode } from 'lucide-react';
-import { LANDING_CONTENT } from '../constants';
+import React from "react";
+import { FileText, Youtube, Globe, AudioLines, File, FileCode } from "lucide-react";
+import { LANDING_CONTENT } from "../constants";
 
 export const ContentShowcase: React.FC = () => {
   const getIconForFormat = (iconName: string) => {
     switch (iconName) {
-      case 'FileText': return FileText;
-      case 'Youtube': return Youtube;
-      case 'Globe': return Globe;
-      case 'AudioLines': return AudioLines;
-      case 'File': return File;
-      case 'FileCode': return FileCode;
-      default: return File;
+      case "FileText":
+        return FileText;
+      case "Youtube":
+        return Youtube;
+      case "Globe":
+        return Globe;
+      case "AudioLines":
+        return AudioLines;
+      case "File":
+        return File;
+      case "FileCode":
+        return FileCode;
+      default:
+        return File;
     }
   };
 

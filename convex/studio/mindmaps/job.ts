@@ -4,20 +4,20 @@
  * @see ./mindmapJobPhases.ts for phase logic.
  */
 
-import { internalAction } from '../../_generated/server';
-import { v } from 'convex/values';
+import { internalAction } from "../../_generated/server";
+import { v } from "convex/values";
 import {
   runMindmapGenerationPhase,
   runProcessMindMapMapChunkPhase,
   runFinalizeMindMapPhase,
-} from './mindmapJobPhases';
+} from "./mindmapJobPhases";
 
 export const mindmapGeneration = internalAction({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
-    documentIds: v.array(v.id('documents')),
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -27,9 +27,9 @@ export const mindmapGeneration = internalAction({
 
 export const processMindMapMapChunk = internalAction({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
@@ -42,9 +42,9 @@ export const processMindMapMapChunk = internalAction({
 
 export const finalizeMindMapPhase = internalAction({
   args: {
-    mindmapId: v.id('mindmaps'),
+    mindmapId: v.id("mindmaps"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
   },
   handler: async (ctx, args) => {
     "use node";

@@ -1,9 +1,5 @@
 import { ConvexError, type Value } from "convex/values";
-import {
-  ExternalServiceError,
-  InputValidationError,
-  StorageError,
-} from "./errors";
+import { ExternalServiceError, InputValidationError, StorageError } from "./errors";
 
 /**
  * Map structured service errors to ConvexError for public API boundaries.

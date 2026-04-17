@@ -13,5 +13,4 @@ export const MARKDOWN_MATH_RULES_BULLETS = `- Inline math: one pair of dollar si
 - Place citation markers like [1] in normal text after math or on the following line — never between the opening and closing $ of one inline math span.
 - Prefer citations after a closing parenthesis or delimiter, e.g. $(\\beta_0 + \\sum_j X_{j,t})$ [1], not $(\\beta_0 + \\sum_j X_{j,t} [1])$, so they stay clickable in the app.`;
 
-export const MARKDOWN_MATH_NOTATION_FOR_APP =
-  `**Math notation (Markdown with KaTeX — required for correct rendering in the app):**\n${MARKDOWN_MATH_RULES_BULLETS}`;
+export const MARKDOWN_MATH_NOTATION_FOR_APP = `**Math notation (Markdown with KaTeX — required for correct rendering in the app):**\n${MARKDOWN_MATH_RULES_BULLETS}`;

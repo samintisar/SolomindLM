@@ -30,7 +30,9 @@ export const scheduleQuiz = action({
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
 
     const quiz = await ctx.runMutation(internal.studio.quizzes.index.createInternal, {
@@ -59,6 +61,10 @@ export const scheduleQuiz = action({
       focus: args.focus,
     });
 
-    return { quizId, status: "generating", quiz: { _id: quizId, title: "Quiz", status: "generating" } };
+    return {
+      quizId,
+      status: "generating",
+      quiz: { _id: quizId, title: "Quiz", status: "generating" },
+    };
   },
 });

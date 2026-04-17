@@ -24,7 +24,7 @@ export interface CardProficiency {
  */
 export function calculateNextReview(
   currentState: { interval: number; easeFactor: number },
-  rating: 'again' | 'hard' | 'good' | 'easy'
+  rating: "again" | "hard" | "good" | "easy"
 ): SM2State {
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
@@ -48,11 +48,11 @@ export function calculateNextReview(
   }
 
   let nextReviewDate: number;
-  if (rating === 'again') {
+  if (rating === "again") {
     nextReviewDate = now + TEN_MINUTES;
-  } else if (rating === 'hard') {
+  } else if (rating === "hard") {
     nextReviewDate = now + Math.round(interval * 1.2 * ONE_DAY);
-  } else if (rating === 'good') {
+  } else if (rating === "good") {
     nextReviewDate = now + interval * ONE_DAY;
   } else {
     nextReviewDate = now + Math.round(interval * 1.3 * ONE_DAY);

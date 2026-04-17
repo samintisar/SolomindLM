@@ -1,5 +1,5 @@
-import { createContext, useContext, ReactNode } from 'react';
-import { Note } from '@/shared/types/index';
+import { createContext, useContext, ReactNode } from "react";
+import { Note } from "@/shared/types/index";
 
 export interface StudioContextType {
   notes: Note[];
@@ -18,15 +18,11 @@ interface StudioProviderProps {
 }
 
 export function StudioProvider({ children, value }: StudioProviderProps) {
-  return (
-    <StudioContext.Provider value={value}>
-      {children}
-    </StudioContext.Provider>
-  );
+  return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
 }
 
 export function useStudioContext() {
   const context = useContext(StudioContext);
-  if (!context) throw new Error('useStudioContext must be used within StudioProvider');
+  if (!context) throw new Error("useStudioContext must be used within StudioProvider");
   return context;
 }

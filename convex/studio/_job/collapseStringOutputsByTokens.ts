@@ -5,7 +5,7 @@
  * Used by audio overview map-result collapse (not the flashcard LLM `recursiveCollapse`, which operates on card arrays).
  */
 
-import { countTokens } from '../../_agents/_shared/index';
+import { countTokens } from "../../_agents/_shared/index";
 
 export function collapseStringOutputsByTokens(outputs: string[], maxTokens: number): string[] {
   if (outputs.length <= 3) {
@@ -25,7 +25,7 @@ export function collapseStringOutputsByTokens(outputs: string[], maxTokens: numb
   for (const output of outputs) {
     const tokens = countTokens(output);
     if (currentTokens + tokens > maxTokens && currentGroup.length > 0) {
-      collapsed.push(currentGroup.join('\n\n---\n\n'));
+      collapsed.push(currentGroup.join("\n\n---\n\n"));
       currentGroup = [output];
       currentTokens = tokens;
     } else {
@@ -35,7 +35,7 @@ export function collapseStringOutputsByTokens(outputs: string[], maxTokens: numb
   }
 
   if (currentGroup.length > 0) {
-    collapsed.push(currentGroup.join('\n\n---\n\n'));
+    collapsed.push(currentGroup.join("\n\n---\n\n"));
   }
 
   return collapsed;

@@ -1,24 +1,30 @@
-"use node"
+"use node";
 
-import { Send } from '@langchain/langgraph';
+import { Send } from "@langchain/langgraph";
 
-import type { OverallStateType } from './state.js';
-import { GRAPH_CONFIG } from './config.js';
-import { chunkHash, packChunks, validateChunks } from './chunkHelpers.js';
+import type { OverallStateType } from "./state.js";
+import { GRAPH_CONFIG } from "./config.js";
+import { chunkHash, packChunks, validateChunks } from "./chunkHelpers.js";
 
-export function routeToMap(state: OverallStateType): Send[] | 'collapse' {
-  console.log('\n' + '='.repeat(80));
-  console.log('[ReportGraph] ===== ROUTE TO MAP PHASE =====');
-  console.log('='.repeat(80));
+export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+  console.log("\n" + "=".repeat(80));
+  console.log("[ReportGraph] ===== ROUTE TO MAP PHASE =====");
+  console.log("=".repeat(80));
 
-  console.log(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    phase: 'route_to_map',
-    documentCount: state.documentIds?.length || 0,
-    documentIds: state.documentIds || [],
-    chunkCount: state.chunks?.length || 0,
-    reportType: state.reportType,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        phase: "route_to_map",
+        documentCount: state.documentIds?.length || 0,
+        documentIds: state.documentIds || [],
+        chunkCount: state.chunks?.length || 0,
+        reportType: state.reportType,
+      },
+      null,
+      2
+    )
+  );
 
   if (state.chunks && state.chunks.length > 0) {
     console.log(`\n[ReportGraph] Chunk breakdown:`);
@@ -26,12 +32,12 @@ export function routeToMap(state: OverallStateType): Send[] | 'collapse' {
       const preview = chunkHash(chunk);
       console.log(`  [${idx + 1}/${state.chunks!.length}] ${preview.substring(0, 150)}...`);
     });
-    console.log('');
+    console.log("");
   }
 
   if (state.chunks.length === 0) {
-    console.warn('[ReportGraph] No chunks to process, routing to collapse');
-    return 'collapse';
+    console.warn("[ReportGraph] No chunks to process, routing to collapse");
+    return "collapse";
   }
 
   const validatedChunks = validateChunks(state.chunks);
@@ -40,9 +46,9 @@ export function routeToMap(state: OverallStateType): Send[] | 'collapse' {
   console.log(`[ReportGraph] Creating ${packedChunks.length} parallel map tasks`);
 
   return packedChunks.map((chunk, idx) => {
-    const preview = chunk.substring(0, 100).replace(/\n/g, ' ');
+    const preview = chunk.substring(0, 100).replace(/\n/g, " ");
     console.log(`  [Task ${idx + 1}/${packedChunks.length}] ${preview}... (${chunk.length} chars)`);
-    return new Send('map_process', {
+    return new Send("map_process", {
       chunk,
       chunkIndex: idx,
       totalChunks: packedChunks.length,

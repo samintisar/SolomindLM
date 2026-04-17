@@ -1,42 +1,71 @@
-import { useState, lazy, Suspense } from 'react';
-import { ChevronLeft, ChevronRight, CheckCircle2, BookOpen } from 'lucide-react';
-import { Flashcard } from '@/shared/types';
-import { sanitizeMarkdown } from '@/shared/utils';
-import { srsSubtextForRating } from '@/features/studio/utils/srsReviewLabels';
+import { useState, lazy, Suspense } from "react";
+import { ChevronLeft, ChevronRight, CheckCircle2, BookOpen } from "lucide-react";
+import { Flashcard } from "@/shared/types";
+import { sanitizeMarkdown } from "@/shared/utils";
+import { srsSubtextForRating } from "@/features/studio/utils/srsReviewLabels";
 
 const MarkdownRenderer = lazy(() =>
-  import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
+  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
 interface StudyModeProps {
   cards: Flashcard[];
-  onComplete: (stats: { reviewed: number; correct: number; incorrect: number; longestStreak: number }) => void;
+  onComplete: (stats: {
+    reviewed: number;
+    correct: number;
+    incorrect: number;
+    longestStreak: number;
+  }) => void;
   onExit: () => void;
 }
 
 /** Neutral cards + saturated left stripe only — readable sans text, no tinted mud fills. */
 const RATING_BUTTONS = [
-  { label: 'Again', rating: 'again' as const, stripeClass: 'border-l-rose-600 dark:border-l-rose-400' },
-  { label: 'Hard', rating: 'hard' as const, stripeClass: 'border-l-amber-600 dark:border-l-amber-400' },
-  { label: 'Good', rating: 'good' as const, stripeClass: 'border-l-blue-600 dark:border-l-blue-400' },
-  { label: 'Easy', rating: 'easy' as const, stripeClass: 'border-l-emerald-600 dark:border-l-emerald-400' },
+  {
+    label: "Again",
+    rating: "again" as const,
+    stripeClass: "border-l-rose-600 dark:border-l-rose-400",
+  },
+  {
+    label: "Hard",
+    rating: "hard" as const,
+    stripeClass: "border-l-amber-600 dark:border-l-amber-400",
+  },
+  {
+    label: "Good",
+    rating: "good" as const,
+    stripeClass: "border-l-blue-600 dark:border-l-blue-400",
+  },
+  {
+    label: "Easy",
+    rating: "easy" as const,
+    stripeClass: "border-l-emerald-600 dark:border-l-emerald-400",
+  },
 ] as const;
 
 const RATING_BUTTON_BASE =
-  'font-sans rounded-xl border border-border bg-card px-3 py-3 pl-3.5 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-muted/60 hover:border-foreground/12 active:scale-[0.99] sm:py-3.5 border-l-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background';
+  "font-sans rounded-xl border border-border bg-card px-3 py-3 pl-3.5 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-muted/60 hover:border-foreground/12 active:scale-[0.99] sm:py-3.5 border-l-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const answerMarkdownComponents = {
   img: () => null,
-  a: ({ children }: { children?: React.ReactNode }) => <span className="text-foreground">{children}</span>,
+  a: ({ children }: { children?: React.ReactNode }) => (
+    <span className="text-foreground">{children}</span>
+  ),
   video: () => null,
   audio: () => null,
   iframe: () => null,
   table: ({ children }: { children?: React.ReactNode }) => (
-    <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">{children}</table>
+    <table className="w-full border-collapse overflow-hidden rounded-lg border border-border">
+      {children}
+    </table>
   ),
-  thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-muted/50">{children}</thead>,
+  thead: ({ children }: { children?: React.ReactNode }) => (
+    <thead className="bg-muted/50">{children}</thead>
+  ),
   tbody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
-  tr: ({ children }: { children?: React.ReactNode }) => <tr className="border-b border-border">{children}</tr>,
+  tr: ({ children }: { children?: React.ReactNode }) => (
+    <tr className="border-b border-border">{children}</tr>
+  ),
   th: ({ children }: { children?: React.ReactNode }) => (
     <th className="border-r border-border px-4 py-2 text-left font-semibold text-foreground last:border-r-0">
       {children}
@@ -66,9 +95,9 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
   const sessionProgressPercent = cards.length > 0 ? (reviewedCards.length / cards.length) * 100 : 0;
   const deckPositionPercent = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
 
-  const handleRating = async (rating: 'again' | 'hard' | 'good' | 'easy') => {
-    const isNewCorrect = rating !== 'again';
-    const isNewIncorrect = rating === 'again';
+  const handleRating = async (rating: "again" | "hard" | "good" | "easy") => {
+    const isNewCorrect = rating !== "again";
+    const isNewIncorrect = rating === "again";
 
     if (isNewCorrect) {
       const newStreak = currentStreak + 1;
@@ -91,7 +120,8 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
       });
     } else {
       const nextIndex = cards.findIndex((_, i) => !reviewedCards.includes(i) && i > currentIndex);
-      const nextUnreviewed = nextIndex !== -1 ? nextIndex : cards.findIndex((_, i) => !reviewedCards.includes(i));
+      const nextUnreviewed =
+        nextIndex !== -1 ? nextIndex : cards.findIndex((_, i) => !reviewedCards.includes(i));
       setCurrentIndex(nextUnreviewed);
       setShowAnswer(false);
     }
@@ -127,26 +157,36 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
 
   const renderCardFront = (card: Flashcard) => {
     switch (card.type) {
-      case 'true-false':
+      case "true-false":
         return (
           <div className="w-full space-y-6 text-center">
             <div className="prose prose-base sm:prose-lg max-w-none text-center">
-              <Suspense fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}>
+              <Suspense
+                fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}
+              >
                 <MarkdownRenderer>{sanitizeMarkdown(card.front)}</MarkdownRenderer>
               </Suspense>
             </div>
             <div className="flex justify-center gap-12 sm:gap-16">
-              <span className="text-lg font-semibold text-emerald-700 sm:text-xl dark:text-emerald-400">✓ True</span>
-              <span className="text-lg font-semibold text-rose-700 sm:text-xl dark:text-rose-400">✗ False</span>
+              <span className="text-lg font-semibold text-emerald-700 sm:text-xl dark:text-emerald-400">
+                ✓ True
+              </span>
+              <span className="text-lg font-semibold text-rose-700 sm:text-xl dark:text-rose-400">
+                ✗ False
+              </span>
             </div>
           </div>
         );
 
-      case 'fill-blank':
+      case "fill-blank":
         return (
           <div className="prose prose-base sm:prose-lg max-w-none text-center">
-            <Suspense fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}>
-              <MarkdownRenderer>{sanitizeMarkdown(card.front.replace(/_+/g, '______'))}</MarkdownRenderer>
+            <Suspense
+              fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}
+            >
+              <MarkdownRenderer>
+                {sanitizeMarkdown(card.front.replace(/_+/g, "______"))}
+              </MarkdownRenderer>
             </Suspense>
           </div>
         );
@@ -154,7 +194,9 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
       default:
         return (
           <div className="prose prose-base sm:prose-lg max-w-none text-center">
-            <Suspense fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}>
+            <Suspense
+              fallback={<div className="mx-auto h-6 w-3/4 animate-pulse rounded bg-muted" />}
+            >
               <MarkdownRenderer>{sanitizeMarkdown(card.front)}</MarkdownRenderer>
             </Suspense>
           </div>
@@ -170,30 +212,42 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
         </div>
 
         <h2 className="mb-2 text-2xl font-semibold tracking-tight sm:text-3xl">Session complete</h2>
-        <p className="mb-8 max-w-sm text-sm text-muted-foreground">You have reviewed all due cards in this set.</p>
+        <p className="mb-8 max-w-sm text-sm text-muted-foreground">
+          You have reviewed all due cards in this set.
+        </p>
 
         <div className="mb-8 grid w-full max-w-xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-            <div className="text-2xl font-bold tabular-nums sm:text-3xl">{reviewedCards.length}</div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Reviewed</div>
+            <div className="text-2xl font-bold tabular-nums sm:text-3xl">
+              {reviewedCards.length}
+            </div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Reviewed
+            </div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums text-emerald-600 sm:text-3xl dark:text-emerald-400">
               {correctCount}
             </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Correct</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Correct
+            </div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums text-rose-600 sm:text-3xl dark:text-rose-400">
               {incorrectCount}
             </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Again</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Again
+            </div>
           </div>
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="text-2xl font-bold tabular-nums text-amber-600 sm:text-3xl dark:text-amber-400">
               {longestStreak}
             </div>
-            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">Best streak</div>
+            <div className="mt-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Best streak
+            </div>
           </div>
         </div>
 
@@ -234,7 +288,9 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm leading-snug text-muted-foreground">
           <span>
-            <span className="font-semibold tabular-nums text-foreground">{reviewedCards.length}</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {reviewedCards.length}
+            </span>
             <span className="font-normal"> of </span>
             <span className="font-semibold tabular-nums text-foreground">{cards.length}</span>
             <span className="font-normal"> reviewed</span>
@@ -279,10 +335,12 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
             </span>
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
               <div className="flex min-h-full w-full min-w-0 flex-col justify-center py-1">
-                <div
-                  className="prose prose-base sm:prose-lg w-full min-w-0 max-w-none text-center leading-relaxed text-foreground [&_p]:leading-relaxed [&_code]:rounded-md [&_code]:border [&_code]:border-border/60 [&_code]:bg-muted/70 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.9em] [&_code]:font-normal [&_code]:text-foreground [&_pre]:text-left [&_pre_code]:border-0 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_.katex]:max-w-full [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto"
-                >
-                  <Suspense fallback={<div className="mx-auto h-6 w-3/4 max-w-full animate-pulse rounded bg-muted" />}>
+                <div className="prose prose-base sm:prose-lg w-full min-w-0 max-w-none text-center leading-relaxed text-foreground [&_p]:leading-relaxed [&_code]:rounded-md [&_code]:border [&_code]:border-border/60 [&_code]:bg-muted/70 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.9em] [&_code]:font-normal [&_code]:text-foreground [&_pre]:text-left [&_pre_code]:border-0 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_.katex]:max-w-full [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto">
+                  <Suspense
+                    fallback={
+                      <div className="mx-auto h-6 w-3/4 max-w-full animate-pulse rounded bg-muted" />
+                    }
+                  >
                     <MarkdownRenderer components={answerMarkdownComponents}>
                       {sanitizeMarkdown(currentCard.back)}
                     </MarkdownRenderer>

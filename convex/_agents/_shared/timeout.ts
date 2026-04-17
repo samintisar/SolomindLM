@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Timeout utility for LLM agent operations.
  *
@@ -37,11 +37,10 @@ export function invokeWithTimeout<T>(
   });
 
   // Race between the actual operation and the timeout
-  return Promise.race([invokeFn(), timeoutPromise])
-    .finally(() => {
-      // Always clear the timeout to prevent memory leaks
-      clearTimeout(timeoutId);
-    });
+  return Promise.race([invokeFn(), timeoutPromise]).finally(() => {
+    // Always clear the timeout to prevent memory leaks
+    clearTimeout(timeoutId);
+  });
 }
 
 /**
@@ -59,7 +58,7 @@ export function invokeWithTimeout<T>(
  */
 export function createTimeoutWrapper(
   timeoutMs: number
-): (<T>(invokeFn: () => Promise<T>, phase: string) => Promise<T>) {
+): <T>(invokeFn: () => Promise<T>, phase: string) => Promise<T> {
   return <T>(invokeFn: () => Promise<T>, phase: string): Promise<T> => {
     return invokeWithTimeout(invokeFn, timeoutMs, phase);
   };

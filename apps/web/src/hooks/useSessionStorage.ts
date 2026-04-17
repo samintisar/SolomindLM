@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 /**
  * Hook to manage state with session storage persistence
@@ -12,7 +12,7 @@ export function useSessionStorage<T>(
 ): [T, (value: T | ((prev: T) => T)) => void] {
   // Get initial value from session storage or use provided initial value
   const [storedValue, setStoredValue] = useState<T>(() => {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return initialValue;
     }
 
@@ -28,12 +28,11 @@ export function useSessionStorage<T>(
   // Update session storage when value changes
   const setValue = (value: T | ((prev: T) => T)) => {
     try {
-      const valueToStore =
-        value instanceof Function ? value(storedValue) : value;
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
 
       setStoredValue(valueToStore);
 
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         window.sessionStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch (error) {

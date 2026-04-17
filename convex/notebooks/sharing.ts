@@ -155,11 +155,7 @@ export const forkNotebookFromToken = mutation({
 
     await checkNotebookLimit(ctx);
 
-    const newNotebookId = await performNotebookFork(
-      ctx,
-      link.notebookId,
-      userId
-    );
+    const newNotebookId = await performNotebookFork(ctx, link.notebookId, userId);
 
     return { newNotebookId };
   },

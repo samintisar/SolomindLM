@@ -1,19 +1,19 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveSpreadsheetResults = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     spreadsheet: v.any(),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.spreadsheetId, {
       data: args.spreadsheet,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Spreadsheet',
+      title: args.metadata?.title ?? "Spreadsheet",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -24,7 +24,7 @@ export const saveSpreadsheetResults = internalMutation({
 
 export const updateSpreadsheetTitle = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -37,7 +37,7 @@ export const updateSpreadsheetTitle = internalMutation({
 
 export const updateSpreadsheetStatus = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -55,18 +55,18 @@ export const updateSpreadsheetStatus = internalMutation({
 
 export const markSpreadsheetFailed = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.spreadsheetId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -79,7 +79,7 @@ export const markSpreadsheetFailed = internalMutation({
 // Multi-phase spreadsheet helpers
 export const initSpreadsheetMapPhase = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     totalMapTasks: v.number(),
     spreadsheetType: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
@@ -89,17 +89,17 @@ export const initSpreadsheetMapPhase = internalMutation({
     if (!spreadsheet) return null;
 
     await ctx.db.patch(args.spreadsheetId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...spreadsheet.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
-        spreadsheetType: args.spreadsheetType || 'custom',
+        spreadsheetType: args.spreadsheetType || "custom",
         customPrompt: args.customPrompt,
       },
     });
@@ -109,7 +109,7 @@ export const initSpreadsheetMapPhase = internalMutation({
 
 export const storeSpreadsheetMapResult = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -141,7 +141,7 @@ export const storeSpreadsheetMapResult = internalMutation({
 
 export const clearSpreadsheetMapData = internalMutation({
   args: {
-    spreadsheetId: v.id('spreadsheets'),
+    spreadsheetId: v.id("spreadsheets"),
   },
   handler: async (ctx, args) => {
     const spreadsheet = await ctx.db.get(args.spreadsheetId);

@@ -30,7 +30,9 @@ export const scheduleFlashcards = action({
 
     const documentIds = args.documentIds ?? [];
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
 
     const flashcard = await ctx.runMutation(internal.studio.flashcards.index.createInternal, {
@@ -59,6 +61,10 @@ export const scheduleFlashcards = action({
       topic: args.topic,
     });
 
-    return { flashcardId, status: "generating", flashcard: { _id: flashcardId, title: "Flashcards", status: "generating" } };
+    return {
+      flashcardId,
+      status: "generating",
+      flashcard: { _id: flashcardId, title: "Flashcards", status: "generating" },
+    };
   },
 });

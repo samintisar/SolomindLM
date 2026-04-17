@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import type { Note, Source } from '@/shared/types/index';
+import type { ReactNode } from "react";
+import type { Note, Source } from "@/shared/types/index";
 
 /** Shared context passed to all create-flow hooks. */
 export interface CreateFlowContext {
@@ -13,7 +13,11 @@ export interface CreateFlowContext {
   confirm?: (
     title: string,
     message: string | ReactNode,
-    options?: { confirmText?: string; cancelText?: string; variant?: 'danger' | 'warning' | 'default' }
+    options?: {
+      confirmText?: string;
+      cancelText?: string;
+      variant?: "danger" | "warning" | "default";
+    }
   ) => Promise<boolean>;
   toast?: {
     success: (message: string) => void;
@@ -22,4 +26,3 @@ export interface CreateFlowContext {
     loading: (message: string) => void;
   };
 }
-

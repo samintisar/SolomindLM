@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Share2 } from 'lucide-react';
-import { useAuth } from '../../features/auth/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { DropdownMenu } from './DropdownMenu';
-import { AvatarDropdown } from '../../features/auth/components/AvatarDropdown';
+import React, { useState, useRef, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { User as UserIcon, Share2 } from "lucide-react";
+import { useAuth } from "../../features/auth/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { DropdownMenu } from "./DropdownMenu";
+import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 
 interface HeaderProps {
   title: string;
@@ -67,9 +67,9 @@ export const Header: React.FC<HeaderProps> = ({
   }, [inputValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSave();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setInputValue(title);
       setIsEditing(false);
     }
@@ -86,10 +86,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b-2 border-border bg-background relative z-[70] transition-all duration-300">
-
       {/* Hidden span for measuring text width */}
-      <span ref={spanRef} className="absolute opacity-0 pointer-events-none text-lg font-display font-bold whitespace-pre">
-        {inputValue || 'Enter title'}
+      <span
+        ref={spanRef}
+        className="absolute opacity-0 pointer-events-none text-lg font-display font-bold whitespace-pre"
+      >
+        {inputValue || "Enter title"}
       </span>
 
       {/* Left Section: logo (Go to Home) separate from notebook name (rename) */}
@@ -108,10 +110,11 @@ export const Header: React.FC<HeaderProps> = ({
             onError={(e) => {
               // Fallback to 'N' if image doesn't exist
               const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
+              target.style.display = "none";
               if (target.parentElement) {
-                target.parentElement.textContent = 'N';
-                (target.parentElement as HTMLElement).className = "w-8 h-8 bg-primary rounded-sm flex items-center justify-center text-primary-foreground font-bold font-serif shadow-sm";
+                target.parentElement.textContent = "N";
+                (target.parentElement as HTMLElement).className =
+                  "w-8 h-8 bg-primary rounded-sm flex items-center justify-center text-primary-foreground font-bold font-serif shadow-sm";
               }
             }}
           />
@@ -196,11 +199,11 @@ export const Header: React.FC<HeaderProps> = ({
             user={user}
             isAuthenticated={isAuthenticated}
             onLogin={() =>
-              navigate('/sign-in', {
+              navigate("/sign-in", {
                 state: {
                   from:
-                    authLocation.pathname === '/'
-                      ? '/home'
+                    authLocation.pathname === "/"
+                      ? "/home"
                       : `${authLocation.pathname}${authLocation.search}`,
                 },
               } as never)
@@ -211,7 +214,6 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </DropdownMenu>
       </div>
-
     </header>
   );
 };

@@ -4,20 +4,20 @@
  * @see ./writtenQuestionsJobPhases.ts for phase logic.
  */
 
-import { internalAction } from '../../_generated/server';
-import { v } from 'convex/values';
+import { internalAction } from "../../_generated/server";
+import { v } from "convex/values";
 import {
   runWrittenQuestionsGenerationPhase,
   runProcessWrittenQuestionsMapChunkPhase,
   runFinalizeWrittenQuestionsPhase,
-} from './writtenQuestionsJobPhases';
+} from "./writtenQuestionsJobPhases";
 
 export const writtenQuestionsGeneration = internalAction({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
-    documentIds: v.array(v.id('documents')),
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
     questionCount: v.number(),
     difficulty: v.string(),
     questionType: v.string(),
@@ -31,9 +31,9 @@ export const writtenQuestionsGeneration = internalAction({
 
 export const processWrittenQuestionsMapChunk = internalAction({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
@@ -51,9 +51,9 @@ export const processWrittenQuestionsMapChunk = internalAction({
 
 export const finalizeWrittenQuestionsPhase = internalAction({
   args: {
-    writtenQuestionId: v.id('writtenQuestions'),
+    writtenQuestionId: v.id("writtenQuestions"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     questionCount: v.number(),
     difficulty: v.string(),
     questionType: v.string(),

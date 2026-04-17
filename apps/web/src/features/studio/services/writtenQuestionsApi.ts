@@ -1,15 +1,15 @@
-import type { WrittenQuestion, WrittenQuestionsNote } from '@/shared/types/index';
-import { useQuery, useMutation, useAction } from 'convex/react';
-import { api } from '@convex/_generated/api';
-import type { Id } from '@convex/_generated/dataModel';
-import { useEffect, useRef } from 'react';
+import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useEffect, useRef } from "react";
 
 export interface CreateWrittenQuestionsParams {
   notebookId: string;
   documentIds: string[];
-  questionCount: 'fewer' | 'standard' | 'more'; // 5, 10, 15
+  questionCount: "fewer" | "standard" | "more"; // 5, 10, 15
   difficulty: string; // 'easy', 'medium', 'hard'
-  questionType: 'short' | 'essay';
+  questionType: "short" | "essay";
   focus?: string;
 }
 
@@ -34,7 +34,7 @@ export interface GradedResult {
 }
 
 /** Map 'fewer' | 'standard' | 'more' to API question count (5, 10, 15) */
-function questionCountToNumber(count: 'fewer' | 'standard' | 'more'): number {
+function questionCountToNumber(count: "fewer" | "standard" | "more"): number {
   const map: Record<string, number> = { fewer: 5, standard: 10, more: 15 };
   return map[count] ?? 10;
 }
@@ -43,13 +43,13 @@ function questionCountToNumber(count: 'fewer' | 'standard' | 'more'): number {
  * Get preview text based on status, actual question count, and question type
  */
 function getPreviewText(status: string, questionCount: number, questionType: string): string {
-  const isGenerating = status === 'generating';
+  const isGenerating = status === "generating";
 
   if (isGenerating) {
     return `${questionCount} Questions • ${questionType} • Generating...`;
   }
-  if (status === 'failed') {
-    return 'Written Questions • Failed';
+  if (status === "failed") {
+    return "Written Questions • Failed";
   }
   return `${questionCount} Questions • ${questionType}`;
 }
@@ -61,19 +61,19 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
   // Questions are stored in the questionsData field
   const questions: WrittenQuestion[] = dbWQ.questionsData || [];
   const questionCount = questions.length;
-  const questionType = dbWQ.questionType || dbWQ.metadata?.questionType || 'short';
+  const questionType = dbWQ.questionType || dbWQ.metadata?.questionType || "short";
 
   return {
     id: dbWQ._id,
     title: dbWQ.title,
     preview: getPreviewText(dbWQ.status, questionCount, questionType),
-    type: 'writtenQuestions' as const,
+    type: "writtenQuestions" as const,
     questions,
     userAnswers: dbWQ.metadata?.userAnswers || {},
     status: dbWQ.status,
     metadata: {
       questionCount,
-      difficulty: dbWQ.metadata?.difficulty || 'medium',
+      difficulty: dbWQ.metadata?.difficulty || "medium",
       questionType,
       focusArea: dbWQ.metadata?.focus,
       lastViewedIndex: dbWQ.metadata?.lastViewedIndex,
@@ -88,7 +88,7 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
 export function useWrittenQuestions(notebookId: string | null) {
   const writtenQuestions = useQuery(
     api.studio.writtenQuestions.index.list,
-    notebookId ? { notebookId: notebookId as Id<'notebooks'> } : 'skip'
+    notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
   return writtenQuestions?.map(mapWrittenQuestionsToNote);
 }
@@ -99,7 +99,7 @@ export function useWrittenQuestions(notebookId: string | null) {
 export function useWrittenQuestionSet(id: string | null) {
   const wq = useQuery(
     api.studio.writtenQuestions.index.get,
-    id ? { id: id as Id<'writtenQuestions'> } : 'skip'
+    id ? { id: id as Id<"writtenQuestions"> } : "skip"
   );
   return wq ? mapWrittenQuestionsToNote(wq) : null;
 }
@@ -112,8 +112,8 @@ export function useCreateWrittenQuestions() {
 
   return async (params: CreateWrittenQuestionsParams): Promise<CreateWrittenQuestionsResponse> => {
     const result = await schedule({
-      notebookId: params.notebookId as Id<'notebooks'>,
-      documentIds: params.documentIds as Id<'documents'>[],
+      notebookId: params.notebookId as Id<"notebooks">,
+      documentIds: params.documentIds as Id<"documents">[],
       questionCount: questionCountToNumber(params.questionCount),
       difficulty: params.difficulty,
       questionType: params.questionType,
@@ -123,7 +123,11 @@ export function useCreateWrittenQuestions() {
     return {
       noteId: result.writtenQuestionId,
       status: result.status,
-      note: { _id: result.writtenQuestionId, title: result.writtenQuestion?.title ?? '', status: result.status },
+      note: {
+        _id: result.writtenQuestionId,
+        title: result.writtenQuestion?.title ?? "",
+        status: result.status,
+      },
     };
   };
 }
@@ -132,38 +136,36 @@ export function useCreateWrittenQuestions() {
  * Rename written questions by ID with optimistic update
  */
 export function useRenameWrittenQuestions() {
-  const update = useMutation(api.studio.writtenQuestions.index.update).withOptimisticUpdate((localStore, args) => {
-    const { id, title } = args;
+  const update = useMutation(api.studio.writtenQuestions.index.update).withOptimisticUpdate(
+    (localStore, args) => {
+      const { id, title } = args;
 
-    // Read the current written questions to get its notebookId
-    const wq = localStore.getQuery(api.studio.writtenQuestions.index.get, { id });
-    if (wq) {
-      // Update detail view
-      localStore.setQuery(
-        api.studio.writtenQuestions.index.get,
-        { id },
-        { ...wq, title }
-      );
+      // Read the current written questions to get its notebookId
+      const wq = localStore.getQuery(api.studio.writtenQuestions.index.get, { id });
+      if (wq) {
+        // Update detail view
+        localStore.setQuery(api.studio.writtenQuestions.index.get, { id }, { ...wq, title });
 
-      // Update list view using the notebookId from the item
-      const listResult = localStore.getQuery(api.studio.writtenQuestions.index.list, { notebookId: wq.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.writtenQuestions.index.list,
-          { notebookId: wq.notebookId },
-          listResult.map((item: { _id: string; [key: string]: unknown }) =>
-            item._id === id
-              ? { ...item, title }
-              : item
-          )
-        );
+        // Update list view using the notebookId from the item
+        const listResult = localStore.getQuery(api.studio.writtenQuestions.index.list, {
+          notebookId: wq.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.writtenQuestions.index.list,
+            { notebookId: wq.notebookId },
+            listResult.map((item: { _id: string; [key: string]: unknown }) =>
+              item._id === id ? { ...item, title } : item
+            )
+          );
+        }
       }
     }
-  });
+  );
 
   return async (id: string, newTitle: string) => {
     return await update({
-      id: id as Id<'writtenQuestions'>,
+      id: id as Id<"writtenQuestions">,
       title: newTitle,
     });
   };
@@ -173,27 +175,37 @@ export function useRenameWrittenQuestions() {
  * Delete written questions by ID with optimistic update
  */
 export function useDeleteWrittenQuestions() {
-  const remove = useMutation(api.studio.writtenQuestions.index.remove).withOptimisticUpdate((localStore, args) => {
-    // Read the current written questions to get its notebookId
-    const wq = localStore.getQuery(api.studio.writtenQuestions.index.get, { id: args.writtenQuestionId });
-    if (wq) {
-      // Update list view using the notebookId from the item
-      const listResult = localStore.getQuery(api.studio.writtenQuestions.index.list, { notebookId: wq.notebookId });
-      if (listResult) {
-        localStore.setQuery(
-          api.studio.writtenQuestions.index.list,
-          { notebookId: wq.notebookId },
-          listResult.filter((item: { _id: string }) => item._id !== args.writtenQuestionId)
-        );
+  const remove = useMutation(api.studio.writtenQuestions.index.remove).withOptimisticUpdate(
+    (localStore, args) => {
+      // Read the current written questions to get its notebookId
+      const wq = localStore.getQuery(api.studio.writtenQuestions.index.get, {
+        id: args.writtenQuestionId,
+      });
+      if (wq) {
+        // Update list view using the notebookId from the item
+        const listResult = localStore.getQuery(api.studio.writtenQuestions.index.list, {
+          notebookId: wq.notebookId,
+        });
+        if (listResult) {
+          localStore.setQuery(
+            api.studio.writtenQuestions.index.list,
+            { notebookId: wq.notebookId },
+            listResult.filter((item: { _id: string }) => item._id !== args.writtenQuestionId)
+          );
+        }
       }
-    }
 
-    // Clear detail view
-    localStore.setQuery(api.studio.writtenQuestions.index.get, { id: args.writtenQuestionId }, null);
-  });
+      // Clear detail view
+      localStore.setQuery(
+        api.studio.writtenQuestions.index.get,
+        { id: args.writtenQuestionId },
+        null
+      );
+    }
+  );
 
   return async (id: string) => {
-    await remove({ writtenQuestionId: id as Id<'writtenQuestions'> });
+    await remove({ writtenQuestionId: id as Id<"writtenQuestions"> });
   };
 }
 
@@ -205,7 +217,7 @@ export function useSubmitWrittenAnswer() {
 
   return async (params: SubmitAnswerParams) => {
     return await submitAndGrade({
-      writtenQuestionsId: params.writtenQuestionsId as Id<'writtenQuestions'>,
+      writtenQuestionsId: params.writtenQuestionsId as Id<"writtenQuestions">,
       questionId: params.questionId,
       answer: params.answer,
     });
@@ -220,7 +232,7 @@ export function useResetWrittenAnswers() {
 
   return async (id: string) => {
     return await update({
-      id: id as Id<'writtenQuestions'>,
+      id: id as Id<"writtenQuestions">,
       metadata: {
         userAnswers: {},
         lastViewedIndex: 0,
@@ -248,7 +260,7 @@ export function useGradedResult(writtenQuestionsId: string | null, questionId: s
   return {
     score: answer.score || 0,
     maxScore: answer.maxScore || 0,
-    feedback: answer.feedback || '',
+    feedback: answer.feedback || "",
     strengths: answer.strengths || [],
     improvements: answer.improvements || [],
   };
@@ -258,7 +270,10 @@ export function useGradedResult(writtenQuestionsId: string | null, questionId: s
  * Persist written questions progress (last viewed question index)
  * Note: Does NOT use optimistic updates to avoid interfering with questions state
  */
-export function useUpdateWrittenQuestionsProgress(writtenQuestionsId: string | null, currentIndex: number) {
+export function useUpdateWrittenQuestionsProgress(
+  writtenQuestionsId: string | null,
+  currentIndex: number
+) {
   const update = useMutation(api.studio.writtenQuestions.index.update);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -269,7 +284,7 @@ export function useUpdateWrittenQuestionsProgress(writtenQuestionsId: string | n
     // Debounce the update to avoid excessive API calls during navigation
     timeoutRef.current = setTimeout(() => {
       update({
-        id: writtenQuestionsId as Id<'writtenQuestions'>,
+        id: writtenQuestionsId as Id<"writtenQuestions">,
         metadata: { lastViewedIndex: currentIndex },
       });
     }, 500);
@@ -296,7 +311,7 @@ export async function pollGradedResult(
     const note = getWQ();
 
     if (!note) {
-      throw new Error('Written questions not found');
+      throw new Error("Written questions not found");
     }
 
     const answer = note.userAnswers?.[questionId];
@@ -306,7 +321,7 @@ export async function pollGradedResult(
       return {
         score: answer.score || 0,
         maxScore: answer.maxScore || 0,
-        feedback: answer.feedback || '',
+        feedback: answer.feedback || "",
         strengths: answer.strengths || [],
         improvements: answer.improvements || [],
       };
@@ -316,5 +331,5 @@ export async function pollGradedResult(
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
 
-  throw new Error('Grading timed out');
+  throw new Error("Grading timed out");
 }

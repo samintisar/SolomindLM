@@ -1,4 +1,4 @@
-import { MARKDOWN_MATH_RULES_BULLETS } from '../_shared/markdownMathPrompt.js';
+import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
 
 /**
  * Streamlined core system prompt (optimized from ~2500 to ~800 tokens).

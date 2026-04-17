@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { X, Edit3, Trash2, Save } from 'lucide-react';
-import { Flashcard } from '@/shared/types';
+import React, { useState, useEffect } from "react";
+import { X, Edit3, Trash2, Save } from "lucide-react";
+import { Flashcard } from "@/shared/types";
 
 interface EditCardModalProps {
   isOpen: boolean;
-  card?: { front: string; back: string; topic?: string | null; type?: Flashcard['type'] };
+  card?: { front: string; back: string; topic?: string | null; type?: Flashcard["type"] };
   cardIndex?: number;
   onSave: (data: { front: string; back: string }) => void;
   onCancel: () => void;
@@ -19,16 +19,16 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
   onCancel,
   onDelete,
 }) => {
-  const [front, setFront] = useState('');
-  const [back, setBack] = useState('');
+  const [front, setFront] = useState("");
+  const [back, setBack] = useState("");
 
   useEffect(() => {
     if (card) {
       setFront(card.front);
       setBack(card.back);
     } else {
-      setFront('');
-      setBack('');
+      setFront("");
+      setBack("");
     }
   }, [card]);
 
@@ -47,7 +47,7 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
   };
 
   const handleDelete = () => {
-    if (onDelete && confirm('Are you sure you want to delete this card?')) {
+    if (onDelete && confirm("Are you sure you want to delete this card?")) {
       onDelete();
     }
   };
@@ -65,17 +65,14 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
-                {isNewCard ? 'Add New Card' : 'Edit Card'}
+                {isNewCard ? "Add New Card" : "Edit Card"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {isNewCard ? 'Create a new flashcard' : 'Edit flashcard content'}
+                {isNewCard ? "Create a new flashcard" : "Edit flashcard content"}
               </p>
             </div>
           </div>
-          <button
-            onClick={onCancel}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
-          >
+          <button onClick={onCancel} className="p-2 hover:bg-muted rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -135,7 +132,7 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
               className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               <Save className="w-4 h-4" />
-              {isNewCard ? 'Add Card' : 'Save Changes'}
+              {isNewCard ? "Add Card" : "Save Changes"}
             </button>
           </div>
         </div>

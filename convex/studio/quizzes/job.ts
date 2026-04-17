@@ -4,20 +4,20 @@
  * @see ./quizJobPhases.ts for phase logic.
  */
 
-import { internalAction } from '../../_generated/server';
-import { v } from 'convex/values';
+import { internalAction } from "../../_generated/server";
+import { v } from "convex/values";
 import {
   runQuizGenerationPhase,
   runProcessQuizMapChunkPhase,
   runFinalizeQuizPhase,
-} from './quizJobPhases';
+} from "./quizJobPhases";
 
 export const quizGeneration = internalAction({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
-    documentIds: v.array(v.id('documents')),
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
     questionCount: v.number(),
     difficulty: v.string(),
     focus: v.optional(v.string()),
@@ -30,9 +30,9 @@ export const quizGeneration = internalAction({
 
 export const processQuizMapChunk = internalAction({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
@@ -49,9 +49,9 @@ export const processQuizMapChunk = internalAction({
 
 export const finalizeQuizPhase = internalAction({
   args: {
-    quizId: v.id('quizzes'),
+    quizId: v.id("quizzes"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     questionCount: v.number(),
     difficulty: v.string(),
     focus: v.optional(v.string()),

@@ -1,11 +1,11 @@
-"use node"
+"use node";
 
 import {
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
-} from '../_shared/index.js';
+} from "../_shared/index.js";
 
-import { GRAPH_CONFIG } from './config.js';
+import { GRAPH_CONFIG } from "./config.js";
 
 /**
  * Wrapper around shared packChunks utility with SlideDeckGraph logging.
@@ -18,7 +18,7 @@ export function packChunks(
     targetSize,
     minChunkLength: 50,
     maxChunkLength: 50000,
-    agentName: 'SlideDeckGraph',
+    agentName: "SlideDeckGraph",
   });
 }
 
@@ -30,6 +30,6 @@ export function validateChunks(chunks: string[]): string[] {
     targetSize: GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS,
     minChunkLength: 50,
     maxChunkLength: 50000,
-    agentName: 'SlideDeckGraph',
+    agentName: "SlideDeckGraph",
   });
 }

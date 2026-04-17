@@ -1,20 +1,20 @@
 // Main Panel Component
-export { StudioPanel } from './StudioPanel';
+export { StudioPanel } from "./StudioPanel";
 
 // Sub-components (extracted from StudioPanel)
-export { ResizeHandle } from './ResizeHandle';
-export { StudioPanelHeader } from './StudioPanelHeader';
-export { NoteIcon } from './NoteIcon';
-export { NoteItem } from './NoteItem';
-export { ToolGrid } from './ToolGrid';
-export { NoteListView } from './NoteListView';
-export { ActiveNoteView } from './ActiveNoteView';
+export { ResizeHandle } from "./ResizeHandle";
+export { StudioPanelHeader } from "./StudioPanelHeader";
+export { NoteIcon } from "./NoteIcon";
+export { NoteItem } from "./NoteItem";
+export { ToolGrid } from "./ToolGrid";
+export { NoteListView } from "./NoteListView";
+export { ActiveNoteView } from "./ActiveNoteView";
 
 // Modals
-export { CreateReportModal } from './CreateReportModal';
-export { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
-export { CustomizeQuizModal } from './CustomizeQuizModal';
-export { CustomizeAudioModal } from './CustomizeAudioModal';
-export { CustomizeWrittenQuestionsModal } from './CustomizeWrittenQuestionsModal';
-export { CustomizeSlidesModal } from './CustomizeSlidesModal';
-export { CustomizeSpreadsheetsModal } from './CustomizeSpreadsheetsModal';
+export { CreateReportModal } from "./CreateReportModal";
+export { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
+export { CustomizeQuizModal } from "./CustomizeQuizModal";
+export { CustomizeAudioModal } from "./CustomizeAudioModal";
+export { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
+export { CustomizeSlidesModal } from "./CustomizeSlidesModal";
+export { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";

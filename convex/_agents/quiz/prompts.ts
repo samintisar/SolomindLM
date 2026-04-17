@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Prompt templates and schemas for QuizGraph.
  * * OPTIMIZED VERSION:
@@ -6,10 +6,10 @@
  * - Expand Phase: Enforces "Scenario Generation" and "Visuals"
  */
 
-import { z } from 'zod';
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js';
+import { z } from "zod";
+import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
-export { GRAPH_CONFIG } from './config.js';
+export { GRAPH_CONFIG } from "./config.js";
 
 // ============================================================
 // SCHEMAS
@@ -17,49 +17,67 @@ export { GRAPH_CONFIG } from './config.js';
 
 // 1. Final Output Schema (The Polish)
 export const QuizQuestionSchema = z.object({
-  question: z.string().describe('The complete question text (scenario-based preferred)'),
-  options: z.array(z.string())
+  question: z.string().describe("The complete question text (scenario-based preferred)"),
+  options: z
+    .array(z.string())
     .min(2)
     .max(5)
-    .describe('List of options (usually 4, but 2 for True/False)'),
-  answer: z.number()
+    .describe("List of options (usually 4, but 2 for True/False)"),
+  answer: z
+    .number()
     .int()
     .min(0)
     .max(4)
-    .describe('Zero-based index of the correct option (0 = First Option). MUST match the index in the options array.'),
-  hint: z.string().describe('A helpful hint that guides logic without giving the answer'),
-  explanation: z.string().describe('Concise explanation citing the context. Explain why the correct answer is right and why each distractor is wrong. Be precise and on-point.'),
+    .describe(
+      "Zero-based index of the correct option (0 = First Option). MUST match the index in the options array."
+    ),
+  hint: z.string().describe("A helpful hint that guides logic without giving the answer"),
+  explanation: z
+    .string()
+    .describe(
+      "Concise explanation citing the context. Explain why the correct answer is right and why each distractor is wrong. Be precise and on-point."
+    ),
 });
 
 // 2. Intermediate Candidate Schema (The Draft)
 export const QuizCandidateSchema = z.object({
   topic: z.string().describe('Short topic identifier (e.g. "Seasonality", "Error Metrics")'),
-  question: z.string().describe('The draft question text (focus on concepts, not specific data values)'),
-  correctAnswer: z.string().describe('The verified correct answer'),
+  question: z
+    .string()
+    .describe("The draft question text (focus on concepts, not specific data values)"),
+  correctAnswer: z.string().describe("The verified correct answer"),
   // CHANGED: "contextSnippet" requires a larger chunk of text to support distractor generation
-  contextSnippet: z.string().describe('A verbatim paragraph or 3-5 sentences from the text that fully explain this concept and mention related concepts (for generating distractors).'),
-  difficulty: z.enum(['easy', 'medium', 'hard']),
+  contextSnippet: z
+    .string()
+    .describe(
+      "A verbatim paragraph or 3-5 sentences from the text that fully explain this concept and mention related concepts (for generating distractors)."
+    ),
+  difficulty: z.enum(["easy", "medium", "hard"]),
 });
 
 export const QuizCandidateArraySchema = z.object({
-  questions: z.array(QuizCandidateSchema).describe('Array of quiz question candidates'),
+  questions: z.array(QuizCandidateSchema).describe("Array of quiz question candidates"),
 });
 
 export const QuizQuestionArraySchema = z.object({
-  questions: z.array(QuizQuestionSchema).describe('Array of quiz questions'),
+  questions: z.array(QuizQuestionSchema).describe("Array of quiz questions"),
 });
 
 // Types inferred from Zod
 export type QuizCandidate = z.infer<typeof QuizCandidateSchema>;
 export type QuizQuestion = z.infer<typeof QuizQuestionSchema>;
-export interface QuizCandidateResponse { questions: QuizCandidate[]; }
-export interface QuizQuestionResponse { questions: QuizQuestion[]; }
+export interface QuizCandidateResponse {
+  questions: QuizCandidate[];
+}
+export interface QuizQuestionResponse {
+  questions: QuizQuestion[];
+}
 
 /** Reduce phase: model returns 1-based indices into the candidate list (avoids echoing full objects / position bias). */
 export const QuizCandidateIndexSelectionSchema = z.object({
   selectedIndices: z
     .array(z.number().int())
-    .describe('1-based indices matching the ID labels in the selection prompt (e.g. ID 3 → 3).'),
+    .describe("1-based indices matching the ID labels in the selection prompt (e.g. ID 3 → 3)."),
 });
 
 export type QuizCandidateIndexSelection = z.infer<typeof QuizCandidateIndexSelectionSchema>;
@@ -70,11 +88,11 @@ export type QuizCandidateIndexSelection = z.infer<typeof QuizCandidateIndexSelec
 
 /** System prompt for map phase candidate generation */
 export const MAP_CANDIDATES_SYSTEM_PROMPT =
-  'You are a professional educator drafting quiz question candidates. You MUST return the requested number of items in the questions array whenever the passage contains any technical, statistical, or instructional content. Empty arrays are not acceptable for non-trivial excerpts—you must derive conceptual questions from definitions, code output, notation, procedures, comparisons, and assumptions stated or implied in the text.';
+  "You are a professional educator drafting quiz question candidates. You MUST return the requested number of items in the questions array whenever the passage contains any technical, statistical, or instructional content. Empty arrays are not acceptable for non-trivial excerpts—you must derive conceptual questions from definitions, code output, notation, procedures, comparisons, and assumptions stated or implied in the text.";
 
 /** System prompt for reduce phase candidate selection */
 export const REDUCE_SELECT_SYSTEM_PROMPT =
-  'You are a quiz curator selecting diverse, high-quality candidate questions for study sets. You choose by the numeric candidate ID (1-based index) from the list—do not favor early IDs unless they are genuinely strongest. Return only the selectedIndices array.';
+  "You are a quiz curator selecting diverse, high-quality candidate questions for study sets. You choose by the numeric candidate ID (1-based index) from the list—do not favor early IDs unless they are genuinely strongest. Return only the selectedIndices array.";
 
 /** System prompt for expand phase distractor generation */
 export const EXPAND_QUESTION_SYSTEM_PROMPT = `You are a professional educator creating rigorous multiple-choice questions.
@@ -104,7 +122,7 @@ export const getCandidateMapPrompt = (params: {
 • "Why does method A outperform method B in this context?"`,
   };
 
-  return `Extract exactly ${questionsPerChunk} testable concepts from this document (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ''}).
+  return `Extract exactly ${questionsPerChunk} testable concepts from this document (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ""}).
 
 **CRITICAL — OUTPUT COUNT:**
 • The JSON field "questions" MUST be an array of exactly ${questionsPerChunk} objects (not fewer, not zero).
@@ -154,7 +172,7 @@ export const getCandidateMapRecoveryPrompt = (params: {
   const { chunk, need, difficulty, focus } = params;
   return `The previous attempt incorrectly returned zero quiz candidates. You must fix this.
 
-Generate exactly ${need} distinct candidates (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ''}). The "questions" array MUST contain ${need} objects.
+Generate exactly ${need} distinct candidates (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ""}). The "questions" array MUST contain ${need} objects.
 
 **HOW TO FIND MATERIAL:**
 • Definitions, theorems, assumptions, notation (e.g. ARMA, ACF, conditional expectation, ML vs OLS).
@@ -180,13 +198,10 @@ export const getCandidateMapTopUpPrompt = (params: {
 }): string => {
   const { chunk, need, difficulty, focus, existingCandidates } = params;
   const avoidList = existingCandidates
-    .map(
-      (c, i) =>
-        `${i + 1}. [${c.topic}] ${c.question.replace(/\s+/g, ' ').trim().slice(0, 160)}`,
-    )
-    .join('\n');
+    .map((c, i) => `${i + 1}. [${c.topic}] ${c.question.replace(/\s+/g, " ").trim().slice(0, 160)}`)
+    .join("\n");
 
-  return `You already drafted ${existingCandidates.length} quiz candidates from this excerpt. Produce exactly ${need} **additional** distinct candidates (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ''}).
+  return `You already drafted ${existingCandidates.length} quiz candidates from this excerpt. Produce exactly ${need} **additional** distinct candidates (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ""}).
 
 **DO NOT** repeat or lightly rephrase these (cover different subtopics, formulas, or procedures):
 ${avoidList}
@@ -215,22 +230,28 @@ interface ExpandSettings {
 
 const EXPAND_SETTINGS: Record<string, ExpandSettings> = {
   easy: {
-    scenarioComplexity: 'Simple, direct scenarios. One clear step to the answer.',
-    distractorQuality: 'Obviously incorrect distractors (opposites, clearly unrelated concepts).',
-    explanationLength: '1-2 sentences total. State the correct answer and briefly mention one key reason why distractors are wrong.',
+    scenarioComplexity: "Simple, direct scenarios. One clear step to the answer.",
+    distractorQuality: "Obviously incorrect distractors (opposites, clearly unrelated concepts).",
+    explanationLength:
+      "1-2 sentences total. State the correct answer and briefly mention one key reason why distractors are wrong.",
     questionStyle: 'Direct questions: "What is X?" or "Which term describes Y?"',
   },
   medium: {
-    scenarioComplexity: 'Moderate scenarios. May require connecting 2-3 concepts.',
-    distractorQuality: 'Plausible distractors (common misconceptions, related but wrong concepts).',
-    explanationLength: '1-2 sentences total. Focus on the key distinction between correct and incorrect options.',
-    questionStyle: 'Understanding-based: "How does X affect Y?" or "Which relationship describes..."',
+    scenarioComplexity: "Moderate scenarios. May require connecting 2-3 concepts.",
+    distractorQuality: "Plausible distractors (common misconceptions, related but wrong concepts).",
+    explanationLength:
+      "1-2 sentences total. Focus on the key distinction between correct and incorrect options.",
+    questionStyle:
+      'Understanding-based: "How does X affect Y?" or "Which relationship describes..."',
   },
   hard: {
-    scenarioComplexity: 'Complex scenarios requiring analysis. May involve multi-step reasoning or synthesis.',
-    distractorQuality: 'Subtle distractors (nuanced differences, partially correct but incomplete answers).',
-    explanationLength: '1-2 sentences total. Cut to the core conceptual distinction - be precise.',
-    questionStyle: 'Application-based: "In scenario X, what is the most likely outcome?" or complex analysis.',
+    scenarioComplexity:
+      "Complex scenarios requiring analysis. May involve multi-step reasoning or synthesis.",
+    distractorQuality:
+      "Subtle distractors (nuanced differences, partially correct but incomplete answers).",
+    explanationLength: "1-2 sentences total. Cut to the core conceptual distinction - be precise.",
+    questionStyle:
+      'Application-based: "In scenario X, what is the most likely outcome?" or complex analysis.',
   },
 };
 
@@ -256,7 +277,7 @@ Correct Answer: "${candidate.correctAnswer}"
 
 INSTRUCTIONS:
 1. **SCENARIO-BASED:** ${settings.questionStyle} Create a hypothetical scenario that fits the ${candidate.difficulty} difficulty level.
-2. **DISTRACTORS:** Use the CONTEXT to find ${candidate.difficulty === 'easy' ? 'obviously incorrect' : candidate.difficulty === 'medium' ? 'plausible but wrong' : 'subtle and nuanced'} options. ${settings.distractorQuality}
+2. **DISTRACTORS:** Use the CONTEXT to find ${candidate.difficulty === "easy" ? "obviously incorrect" : candidate.difficulty === "medium" ? "plausible but wrong" : "subtle and nuanced"} options. ${settings.distractorQuality}
 3. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like
 [Image of linear regression plot]
  or
@@ -289,13 +310,13 @@ export const getCandidateSelectionPrompt = (params: {
 
 **DIFFICULTY BALANCE:**
 • Target: ${difficulty.toUpperCase()} (aim for 70%+)
-• Can use adjacent levels if needed (${difficulty} ↔ ${difficulty === 'easy' ? 'medium' : difficulty === 'hard' ? 'medium' : 'easy/hard'})
+• Can use adjacent levels if needed (${difficulty} ↔ ${difficulty === "easy" ? "medium" : difficulty === "hard" ? "medium" : "easy/hard"})
 
 **DIVERSITY:**
 • Spread across different topics
 • Max 3 questions per narrow concept
 
-${focus ? `**FOCUS:** ${focus}\n` : ''}**CANDIDATES:**
+${focus ? `**FOCUS:** ${focus}\n` : ""}**CANDIDATES:**
 ${candidatesList}
 
 **OUTPUT (STRICT):**
@@ -310,7 +331,7 @@ If you cannot find ${targetCount} that meet minimum quality, still return ${targ
 export function applySelectedCandidateIndices(
   candidates: QuizCandidate[],
   selectedIndices: number[],
-  targetCount: number,
+  targetCount: number
 ): QuizCandidate[] {
   const n = candidates.length;
   if (n === 0 || targetCount <= 0) return [];
@@ -351,5 +372,5 @@ Correct Answer: ${c.correctAnswer}
 Context Snippet: ${c.contextSnippet}
 Difficulty: ${c.difficulty}`;
     })
-    .join('\n\n---\n\n');
+    .join("\n\n---\n\n");
 }

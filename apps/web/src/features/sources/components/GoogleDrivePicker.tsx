@@ -1,34 +1,34 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_BROWSER_API_KEY = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY as string | undefined;
 const GOOGLE_APP_ID = import.meta.env.VITE_GOOGLE_APP_ID as string | undefined;
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+const SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 const GOOGLE_API_KEY_PATTERN = /^AIza[0-9A-Za-z_-]+$/;
-const GOOGLE_CLIENT_ID_SUFFIX = '.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID_SUFFIX = ".apps.googleusercontent.com";
 const GOOGLE_APP_ID_PATTERN = /^\d+$/;
 
 function hasValidGooglePickerConfig() {
   if (!GOOGLE_BROWSER_API_KEY || !GOOGLE_API_KEY_PATTERN.test(GOOGLE_BROWSER_API_KEY)) {
     console.error(
       'Google Drive picker misconfigured: expected VITE_GOOGLE_BROWSER_API_KEY to be a browser API key starting with "AIza". Configure API restrictions and HTTP referrer restrictions in Google Cloud Console.',
-      { apiKeyPresent: Boolean(GOOGLE_BROWSER_API_KEY) },
+      { apiKeyPresent: Boolean(GOOGLE_BROWSER_API_KEY) }
     );
     return false;
   }
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_ID.endsWith(GOOGLE_CLIENT_ID_SUFFIX)) {
     console.error(
-      'Google Drive picker misconfigured: expected VITE_GOOGLE_CLIENT_ID to be a Google OAuth web client ID.',
-      { clientIdPresent: Boolean(GOOGLE_CLIENT_ID) },
+      "Google Drive picker misconfigured: expected VITE_GOOGLE_CLIENT_ID to be a Google OAuth web client ID.",
+      { clientIdPresent: Boolean(GOOGLE_CLIENT_ID) }
     );
     return false;
   }
 
   if (!GOOGLE_APP_ID || !GOOGLE_APP_ID_PATTERN.test(GOOGLE_APP_ID)) {
     console.error(
-      'Google Drive picker misconfigured: expected VITE_GOOGLE_APP_ID to be your Google Cloud project number used by PickerBuilder.setAppId().',
-      { appIdPresent: Boolean(GOOGLE_APP_ID) },
+      "Google Drive picker misconfigured: expected VITE_GOOGLE_APP_ID to be your Google Cloud project number used by PickerBuilder.setAppId().",
+      { appIdPresent: Boolean(GOOGLE_APP_ID) }
     );
     return false;
   }
@@ -64,9 +64,11 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
       (accessToken: string) => {
         if (!hasValidGooglePickerConfig()) return;
 
-        if (typeof google === 'undefined' || !google.picker?.PickerBuilder) {
+        if (typeof google === "undefined" || !google.picker?.PickerBuilder) {
           pendingOpenRef.current = true;
-          console.error('Google Drive picker is not ready yet. The Picker library has not finished loading.');
+          console.error(
+            "Google Drive picker is not ready yet. The Picker library has not finished loading."
+          );
           return;
         }
 
@@ -104,13 +106,13 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
 
         picker.setVisible(true);
       },
-      [onFilesSelected],
+      [onFilesSelected]
     );
 
     const requestAccessToken = useCallback(() => {
       if (!tokenClientRef.current) return;
       tokenClientRef.current.requestAccessToken({
-        prompt: accessTokenRef.current ? '' : 'consent',
+        prompt: accessTokenRef.current ? "" : "consent",
       });
     }, []);
 
@@ -132,22 +134,24 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
           maybeOpenPicker();
 
           if (!pickerInitedRef.current || !gisInitedRef.current || !tokenClientRef.current) {
-            console.warn('Google Drive picker is still loading and will open automatically when ready.');
+            console.warn(
+              "Google Drive picker is still loading and will open automatically when ready."
+            );
           }
         },
       }),
-      [maybeOpenPicker],
+      [maybeOpenPicker]
     );
 
     useEffect(() => {
       if (scriptsLoadedRef.current || !hasValidGooglePickerConfig()) return;
 
-      const gisScript = document.createElement('script');
-      gisScript.src = 'https://accounts.google.com/gsi/client';
+      const gisScript = document.createElement("script");
+      gisScript.src = "https://accounts.google.com/gsi/client";
       gisScript.async = true;
       gisScript.onload = () => {
-        if (typeof google === 'undefined' || !google.accounts?.oauth2) {
-          console.error('Google Identity Services failed to load.');
+        if (typeof google === "undefined" || !google.accounts?.oauth2) {
+          console.error("Google Identity Services failed to load.");
           return;
         }
 
@@ -155,8 +159,8 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
           client_id: GOOGLE_CLIENT_ID!,
           scope: SCOPES,
           callback: (response) => {
-            if ('error' in response && response.error) {
-              console.error('Google Drive OAuth failed.', response);
+            if ("error" in response && response.error) {
+              console.error("Google Drive OAuth failed.", response);
               return;
             }
 
@@ -172,17 +176,17 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
       };
       document.body.appendChild(gisScript);
 
-      const gapiScript = document.createElement('script');
-      gapiScript.src = 'https://apis.google.com/js/api.js';
+      const gapiScript = document.createElement("script");
+      gapiScript.src = "https://apis.google.com/js/api.js";
       gapiScript.async = true;
       gapiScript.onload = () => {
-        if (typeof gapi === 'undefined') {
-          console.error('Google API loader failed to initialize.');
+        if (typeof gapi === "undefined") {
+          console.error("Google API loader failed to initialize.");
           return;
         }
 
-        gapi.load('client:picker', async () => {
-          await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+        gapi.load("client:picker", async () => {
+          await gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest");
           pickerInitedRef.current = true;
           maybeOpenPicker();
         });
@@ -193,7 +197,7 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
     }, [maybeOpenPicker, openPicker]);
 
     return null;
-  },
+  }
 );
 
-GoogleDrivePicker.displayName = 'GoogleDrivePicker';
+GoogleDrivePicker.displayName = "GoogleDrivePicker";

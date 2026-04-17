@@ -52,7 +52,10 @@ export function extractDocumentMetadata(
  */
 function countWords(text: string): number {
   // Split on whitespace and filter empty strings
-  const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+  const words = text
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
   return words.length;
 }
 
@@ -91,7 +94,7 @@ function detectCodeBlocks(text: string): boolean {
 function detectMathNotation(text: string): boolean {
   // Display math: $$...$$
   // Inline math: $...$ (avoid matching currency like $5.00)
-  return /\$\$[\s\S]*?\$\$/.test(text) || /\$[^\$\n]+?\$/.test(text);
+  return /\$\$[\s\S]*?\$\$/.test(text) || /\$[^$\n]+?\$/.test(text);
 }
 
 /**
@@ -112,7 +115,7 @@ function detectImages(text: string, fileExtension?: string): boolean {
   const hasHtmlImages = /<img\s/.test(text);
 
   // PDFs, PPTXs, DOCXs likely contain images
-  const imageFormats = ['.pdf', '.pptx', '.docx'];
+  const imageFormats = [".pdf", ".pptx", ".docx"];
   const isLikelyImageDocument = fileExtension && imageFormats.includes(fileExtension.toLowerCase());
 
   return hasMarkdownImages || hasHtmlImages || !!isLikelyImageDocument;
@@ -129,52 +132,52 @@ function detectLanguage(text: string): string {
   // Check for CJK characters (Chinese, Japanese, Korean)
   if (/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/.test(sample)) {
     // Distinguish between Chinese, Japanese, Korean
-    if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
-    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
-    return 'zh';
+    if (/[\uAC00-\uD7AF]/.test(sample)) return "ko";
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return "ja";
+    return "zh";
   }
 
   // Check for Cyrillic (Russian, Ukrainian, etc.)
   if (/[\u0400-\u04FF]/.test(sample)) {
-    return 'ru';
+    return "ru";
   }
 
   // Check for Arabic
   if (/[\u0600-\u06FF]/.test(sample)) {
-    return 'ar';
+    return "ar";
   }
 
   // Check for Hebrew
   if (/[\u0590-\u05FF]/.test(sample)) {
-    return 'he';
+    return "he";
   }
 
   // Check for Thai
   if (/[\u0E00-\u0E7F]/.test(sample)) {
-    return 'th';
+    return "th";
   }
 
   // Check for extended Latin (European languages with diacritics)
   if (/[À-ÿ]/.test(sample)) {
     // Try to distinguish common European languages
-    if (/[àâäéèêëïîôùûüÿç]/i.test(sample)) return 'fr';
-    if (/[áéíóúüñ¿¡]/i.test(sample)) return 'es';
-    if (/[äöüß]/i.test(sample)) return 'de';
-    if (/[àèéìíîòóùú]/i.test(sample)) return 'it';
-    if (/[ąćęłńóśźż]/i.test(sample)) return 'pl';
-    if (/[ãõáéíóúâêîôûç]/i.test(sample)) return 'pt';
-    return 'eu'; // European (generic)
+    if (/[àâäéèêëïîôùûüÿç]/i.test(sample)) return "fr";
+    if (/[áéíóúüñ¿¡]/i.test(sample)) return "es";
+    if (/[äöüß]/i.test(sample)) return "de";
+    if (/[àèéìíîòóùú]/i.test(sample)) return "it";
+    if (/[ąćęłńóśźż]/i.test(sample)) return "pl";
+    if (/[ãõáéíóúâêîôûç]/i.test(sample)) return "pt";
+    return "eu"; // European (generic)
   }
 
   // Default to English for ASCII-heavy content
-  return 'en';
+  return "en";
 }
 
 /**
  * Get file extension from filename.
  */
 export function getFileExtension(fileName: string): string | undefined {
-  const lastDot = fileName.lastIndexOf('.');
+  const lastDot = fileName.lastIndexOf(".");
   if (lastDot === -1 || lastDot === 0) return undefined;
   return fileName.slice(lastDot).toLowerCase();
 }

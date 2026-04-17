@@ -1,13 +1,13 @@
-"use node"
+"use node";
 
-import { clearStateKeys } from '../_shared/index.js';
-import type { JobLogger } from '../_shared/logging.js';
-import { createAgentGraphLogger } from '../_shared/logging.js';
+import { clearStateKeys } from "../_shared/index.js";
+import type { JobLogger } from "../_shared/logging.js";
+import { createAgentGraphLogger } from "../_shared/logging.js";
 
-import { GRAPH_CONFIG } from './config.js';
-import type { SlideCandidate } from './prompts.js';
-import { callStatusUpdate } from './nodeSplit.js';
-import type { OverallStateType } from './state.js';
+import { GRAPH_CONFIG } from "./config.js";
+import type { SlideCandidate } from "./prompts.js";
+import { callStatusUpdate } from "./nodeSplit.js";
+import type { OverallStateType } from "./state.js";
 
 export interface CollapseNodeDeps {
   estimateTokens: (text: string) => number;
@@ -20,9 +20,9 @@ async function collapseGroup(group: string[], logger: JobLogger): Promise<string
       const parsed = JSON.parse(output) as SlideCandidate[];
       allSlides.push(...parsed);
     } catch (e) {
-      logger.warn('Failed to parse slide array in collapseGroup', {
-        agent: 'SlideDeckGraph',
-        phase: 'collapse_group_parse_error',
+      logger.warn("Failed to parse slide array in collapseGroup", {
+        agent: "SlideDeckGraph",
+        phase: "collapse_group_parse_error",
         error: e instanceof Error ? e.message : String(e),
       });
     }
@@ -37,8 +37,8 @@ async function collapseGroup(group: string[], logger: JobLogger): Promise<string
   });
 
   logger.info(`Collapsed ${allSlides.length} → ${uniqueSlides.length} unique slides`, {
-    agent: 'SlideDeckGraph',
-    phase: 'collapse_group',
+    agent: "SlideDeckGraph",
+    phase: "collapse_group",
     inputSlides: allSlides.length,
     uniqueSlides: uniqueSlides.length,
   });
@@ -53,13 +53,16 @@ async function recursiveCollapse(
   depth: number = 0
 ): Promise<string[]> {
   if (depth >= GRAPH_CONFIG.MAX_COLLAPSE_DEPTH) {
-    logger.warn(`Max collapse depth (${GRAPH_CONFIG.MAX_COLLAPSE_DEPTH}) reached, returning current outputs`, {
-      agent: 'SlideDeckGraph',
-      phase: 'recursive_collapse',
-      depth,
-      maxDepth: GRAPH_CONFIG.MAX_COLLAPSE_DEPTH,
-      outputCount: outputs.length,
-    });
+    logger.warn(
+      `Max collapse depth (${GRAPH_CONFIG.MAX_COLLAPSE_DEPTH}) reached, returning current outputs`,
+      {
+        agent: "SlideDeckGraph",
+        phase: "recursive_collapse",
+        depth,
+        maxDepth: GRAPH_CONFIG.MAX_COLLAPSE_DEPTH,
+        outputCount: outputs.length,
+      }
+    );
     return outputs;
   }
 
@@ -97,13 +100,13 @@ export async function collapse(
   state: OverallStateType,
   deps: CollapseNodeDeps
 ): Promise<Partial<OverallStateType>> {
-  const logger = createAgentGraphLogger('SlideDeckGraph', 'slides');
-  console.log(`\n${'='.repeat(80)}`);
-  console.log('[SlideDeckGraph] ===== COLLAPSE PHASE =====');
-  console.log('='.repeat(80));
+  const logger = createAgentGraphLogger("SlideDeckGraph", "slides");
+  console.log(`\n${"=".repeat(80)}`);
+  console.log("[SlideDeckGraph] ===== COLLAPSE PHASE =====");
+  console.log("=".repeat(80));
 
   const mapOutputsDetails = state.mapOutputs.map((output, idx) => {
-    let slides = 0;
+    let slides: number;
     try {
       const parsed = JSON.parse(output) as SlideCandidate[];
       slides = parsed.length;
@@ -114,7 +117,7 @@ export async function collapse(
       index: idx,
       tokens: deps.estimateTokens(output),
       slides,
-      preview: output.substring(0, 100).replace(/\n/g, ' '),
+      preview: output.substring(0, 100).replace(/\n/g, " "),
     };
   });
 
@@ -122,7 +125,7 @@ export async function collapse(
     JSON.stringify(
       {
         timestamp: new Date().toISOString(),
-        phase: 'collapse',
+        phase: "collapse",
         mapOutputsReceived: state.mapOutputs.length,
         mapOutputsDetails,
       },
@@ -132,59 +135,62 @@ export async function collapse(
   );
 
   if (!state.mapOutputs || state.mapOutputs.length === 0) {
-    logger.phaseError('collapse', new Error('No mapOutputs received'), {
-      agent: 'SlideDeckGraph',
+    logger.phaseError("collapse", new Error("No mapOutputs received"), {
+      agent: "SlideDeckGraph",
     });
-    await callStatusUpdate(state, 'collapsing');
+    await callStatusUpdate(state, "collapsing");
     return {
       ...state,
       collapsedOutputs: [],
-      status: 'reducing',
+      status: "reducing",
     };
   }
 
   const totalTokens = state.mapOutputs.reduce((sum, s) => sum + deps.estimateTokens(s), 0);
 
-  logger.info(`Total tokens: ${totalTokens}, Reduce chunk size: ${GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS} tokens`, {
-    agent: 'SlideDeckGraph',
-    phase: 'collapse',
-    totalTokens,
-    reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS,
-  });
+  logger.info(
+    `Total tokens: ${totalTokens}, Reduce chunk size: ${GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS} tokens`,
+    {
+      agent: "SlideDeckGraph",
+      phase: "collapse",
+      totalTokens,
+      reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS,
+    }
+  );
 
-  await callStatusUpdate(state, 'collapsing');
+  await callStatusUpdate(state, "collapsing");
 
   if (totalTokens <= GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS) {
-    logger.info('Collapse: skipping recursive collapse, using mapOutputs directly', {
-      agent: 'SlideDeckGraph',
-      phase: 'collapse_skip',
+    logger.info("Collapse: skipping recursive collapse, using mapOutputs directly", {
+      agent: "SlideDeckGraph",
+      phase: "collapse_skip",
       totalTokens,
       reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS,
     });
 
     const mapOutputsSize = state.mapOutputs.reduce((sum, s) => sum + s.length * 2, 0);
     logger.info(`Freeing ~${(mapOutputsSize / 1024).toFixed(2)} KB from mapOutputs`, {
-      agent: 'SlideDeckGraph',
-      phase: 'collapse_cleanup',
+      agent: "SlideDeckGraph",
+      phase: "collapse_cleanup",
       memoryFreedKB: (mapOutputsSize / 1024).toFixed(2),
     });
 
     return {
       ...state,
       collapsedOutputs: state.mapOutputs,
-      status: 'reducing',
-      ...clearStateKeys<OverallStateType>(['mapOutputs']),
+      status: "reducing",
+      ...clearStateKeys<OverallStateType>(["mapOutputs"]),
       progress: {
-        phase: 'collapse',
+        phase: "collapse",
         percentage: 70,
         message: `Collected ${state.mapOutputs.length} chunk outputs`,
       },
     };
   }
 
-  logger.info('Collapse: performing recursive collapse', {
-    agent: 'SlideDeckGraph',
-    phase: 'collapse_recursive',
+  logger.info("Collapse: performing recursive collapse", {
+    agent: "SlideDeckGraph",
+    phase: "collapse_recursive",
     totalTokens,
     reduceChunkSize: GRAPH_CONFIG.REDUCE_CHUNK_SIZE_TOKENS,
   });
@@ -192,18 +198,18 @@ export async function collapse(
 
   const mapOutputsSize = state.mapOutputs.reduce((sum, s) => sum + s.length * 2, 0);
   logger.info(`Freeing ~${(mapOutputsSize / 1024).toFixed(2)} KB from mapOutputs`, {
-    agent: 'SlideDeckGraph',
-    phase: 'collapse_cleanup',
+    agent: "SlideDeckGraph",
+    phase: "collapse_cleanup",
     memoryFreedKB: (mapOutputsSize / 1024).toFixed(2),
   });
 
   return {
     ...state,
     collapsedOutputs: collapsed,
-    status: 'reducing',
-    ...clearStateKeys<OverallStateType>(['mapOutputs']),
+    status: "reducing",
+    ...clearStateKeys<OverallStateType>(["mapOutputs"]),
     progress: {
-      phase: 'collapse',
+      phase: "collapse",
       percentage: 70,
       message: `Collapsed ${state.mapOutputs.length} outputs into ${collapsed.length}`,
     },

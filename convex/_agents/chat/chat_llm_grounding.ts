@@ -1,5 +1,5 @@
-import type { ReferenceChunk } from '../../storage/ChatHistoryService';
-import { MARKDOWN_MATH_RULES_BULLETS } from '../_shared/markdownMathPrompt.js';
+import type { ReferenceChunk } from "../../storage/ChatHistoryService";
+import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
 
 /**
  * Builds grounding prompt optimized for research/learning contexts.
@@ -14,12 +14,12 @@ export function buildGroundingPrompt(
     .map((chunk, index) => {
       const meta = chunk.metadata;
       const docType = inferDocumentType(chunk.sourceTitle);
-      const typeLabel = docType ? ` (${docType})` : '';
+      const typeLabel = docType ? ` (${docType})` : "";
 
       let contextHeader = `[${index + 1}] From "${chunk.sourceTitle}"${typeLabel}`;
 
       if (meta?.headingPath && meta.headingPath.length > 0) {
-        contextHeader += ` > ${meta.headingPath.join(' > ')}`;
+        contextHeader += ` > ${meta.headingPath.join(" > ")}`;
       } else if (meta?.sectionTitle) {
         contextHeader += ` > ${meta.sectionTitle}`;
       }
@@ -30,24 +30,28 @@ export function buildGroundingPrompt(
       }
       if (meta?.relativePosition !== undefined) {
         const position =
-          meta.relativePosition < 0.33 ? 'Beginning' : meta.relativePosition < 0.67 ? 'Middle' : 'End';
+          meta.relativePosition < 0.33
+            ? "Beginning"
+            : meta.relativePosition < 0.67
+              ? "Middle"
+              : "End";
         positionInfo.push(`${position} of document`);
       }
       if (positionInfo.length > 0) {
-        contextHeader += ` (${positionInfo.join(', ')})`;
+        contextHeader += ` (${positionInfo.join(", ")})`;
       }
 
       const characteristics: string[] = [];
-      if (meta?.hasCodeBlock) characteristics.push('Contains code');
-      if (meta?.hasMathNotation) characteristics.push('Contains formulas');
-      if (meta?.hasTable) characteristics.push('Contains table');
+      if (meta?.hasCodeBlock) characteristics.push("Contains code");
+      if (meta?.hasMathNotation) characteristics.push("Contains formulas");
+      if (meta?.hasTable) characteristics.push("Contains table");
       if (characteristics.length > 0) {
-        contextHeader += `\n[${characteristics.join(', ')}]`;
+        contextHeader += `\n[${characteristics.join(", ")}]`;
       }
 
-      const sanitizedContent = chunk.content.replace(/\[\d+\]/g, '');
+      const sanitizedContent = chunk.content.replace(/\[\d+\]/g, "");
 
-      let contentWithContext = '';
+      let contentWithContext = "";
 
       if (meta?.previousChunkPreview) {
         contentWithContext += `...${meta.previousChunkPreview}\n\n`;
@@ -71,18 +75,18 @@ export function buildGroundingPrompt(
 
       return formatted;
     })
-    .join('\n\n---\n\n');
+    .join("\n\n---\n\n");
 
-  let contextSection = '';
+  let contextSection = "";
   if (conversationHistory.length > 0) {
     const formattedHistory = conversationHistory
       .map((msg) => {
-        const role = msg.role === 'user' ? 'USER' : 'ASSISTANT';
+        const role = msg.role === "user" ? "USER" : "ASSISTANT";
         const truncatedContent =
-          msg.content.length > 500 ? msg.content.slice(0, 500) + '...' : msg.content;
+          msg.content.length > 500 ? msg.content.slice(0, 500) + "..." : msg.content;
         return `${role}: ${truncatedContent}`;
       })
-      .join('\n');
+      .join("\n");
     contextSection = `# CONVERSATION HISTORY\n${formattedHistory}\n\n`;
   }
 
@@ -139,35 +143,35 @@ Do not write block paragraphs for comparisons.`;
 
   if (lower.match(/equation|formula|formulas|math|latex|notation|subscript|superscript/)) {
     return (
-      'Hint: Use $...$ for inline and $$...$$ for full display equations; never put $ inside $$; ' +
-      'do not nest dollar math (e.g. avoid \\cmd($x$)); wrap every symbolic variable in delimiters (write $x$, not bare x).'
+      "Hint: Use $...$ for inline and $$...$$ for full display equations; never put $ inside $$; " +
+      "do not nest dollar math (e.g. avoid \\cmd($x$)); wrap every symbolic variable in delimiters (write $x$, not bare x)."
     );
   }
 
   if (lower.match(/^(how|why|explain)/)) {
-    return 'Hint: Definition → mechanism/process → examples (if available in sources). Do not provide generic examples not in sources.';
+    return "Hint: Definition → mechanism/process → examples (if available in sources). Do not provide generic examples not in sources.";
   }
 
   if (lower.match(/summarize|overview|main points|key takeaways/)) {
-    return 'Hint: Main themes → key findings → gaps or questions.';
+    return "Hint: Main themes → key findings → gaps or questions.";
   }
 
   if (lower.match(/^discuss|describe|overview of|types of|kinds of|what are/)) {
-    return 'Hint: Cover ALL major aspects mentioned in the sources. Use sections or lists for clarity. Check that you have not skipped important topics present in the documents.';
+    return "Hint: Cover ALL major aspects mentioned in the sources. Use sections or lists for clarity. Check that you have not skipped important topics present in the documents.";
   }
 
   if (lower.match(/list|enumerate/)) {
-    return 'Hint: Use numbered or bulleted lists for clarity. Include citations after each item.';
+    return "Hint: Use numbered or bulleted lists for clarity. Include citations after each item.";
   }
 
-  return '';
+  return "";
 }
 
 /**
  * Checks if query is complex and needs few-shot examples.
  */
 export function isComplexQuery(query: string): boolean {
-  const complexPatterns = ['compare', 'contrast', 'explain how', 'why does', 'difference between'];
+  const complexPatterns = ["compare", "contrast", "explain how", "why does", "difference between"];
   const lower = query.toLowerCase();
   return complexPatterns.some((pattern) => lower.includes(pattern));
 }
@@ -178,11 +182,11 @@ export function isComplexQuery(query: string): boolean {
 export function inferDocumentType(title: string): string | null {
   const lower = title.toLowerCase();
 
-  if (lower.includes('chapter') || lower.includes('textbook')) return 'Textbook';
-  if (lower.includes('lecture')) return 'Lecture';
-  if (lower.includes('paper') || lower.includes('journal')) return 'Paper';
-  if (lower.includes('notes')) return 'Notes';
-  if (lower.includes('slides')) return 'Slides';
+  if (lower.includes("chapter") || lower.includes("textbook")) return "Textbook";
+  if (lower.includes("lecture")) return "Lecture";
+  if (lower.includes("paper") || lower.includes("journal")) return "Paper";
+  if (lower.includes("notes")) return "Notes";
+  if (lower.includes("slides")) return "Slides";
 
   return null;
 }

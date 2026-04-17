@@ -10,7 +10,11 @@ import {
   getProLimit,
   type DailyFeature,
 } from "./errors";
-import { rateLimiter, getFreeLimit as getFreeRateLimit, getProLimit as getProRateLimit } from "./rateLimits";
+import {
+  rateLimiter,
+  getFreeLimit as getFreeRateLimit,
+  getProLimit as getProRateLimit,
+} from "./rateLimits";
 
 /**
  * Check if user has reached their notebook limit

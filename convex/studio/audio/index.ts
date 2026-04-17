@@ -4,10 +4,7 @@ import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
 import { checkDailyLimit } from "../../_lib/limits";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as AudioOverviews from "../../_model/audioOverviews";
 
 /**
@@ -189,7 +186,9 @@ export const generateAudioOverview = mutation({
 
     const { notebookId, documentIds, title, audioType, length, focus } = args;
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
 
     await assertCanEditNotebook(ctx, notebookId, userId);
@@ -299,7 +298,12 @@ export const updateData = internalMutation({
     audioUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    await AudioOverviews.updateAudioOverviewData(ctx, args.audioOverviewId, args.transcript, args.audioUrl);
+    await AudioOverviews.updateAudioOverviewData(
+      ctx,
+      args.audioOverviewId,
+      args.transcript,
+      args.audioUrl
+    );
   },
 });
 

@@ -13,16 +13,16 @@ LangSmith is used for tracing all agent runs in this project. The integration li
 
 LangSmith reads from these env vars (set in Convex):
 
-| Variable | Purpose | Note |
-|---|---|---|
-| `LANGSMITH_TRACING` | Enable tracing | Preferred: `'true'` |
-| `LANGCHAIN_TRACING_V2` | Enable tracing (also works) | Older name, still supported |
-| `LANGSMITH_API_KEY` | LangSmith API key | Preferred |
-| `LANGCHAIN_API_KEY` | LangSmith API key (also works) | Older name, still supported |
-| `LANGSMITH_PROJECT` | Project name override | Preferred |
-| `LANGCHAIN_PROJECT` | Project name override (also works) | Older name, still supported |
-| `LANGSMITH_ENDPOINT` | Custom endpoint | Optional |
-| `LANGCHAIN_CALLBACKS_BACKGROUND` | Async trace flushing | **Set `false` for Convex** (see below) |
+| Variable                         | Purpose                            | Note                                   |
+| -------------------------------- | ---------------------------------- | -------------------------------------- |
+| `LANGSMITH_TRACING`              | Enable tracing                     | Preferred: `'true'`                    |
+| `LANGCHAIN_TRACING_V2`           | Enable tracing (also works)        | Older name, still supported            |
+| `LANGSMITH_API_KEY`              | LangSmith API key                  | Preferred                              |
+| `LANGCHAIN_API_KEY`              | LangSmith API key (also works)     | Older name, still supported            |
+| `LANGSMITH_PROJECT`              | Project name override              | Preferred                              |
+| `LANGCHAIN_PROJECT`              | Project name override (also works) | Older name, still supported            |
+| `LANGSMITH_ENDPOINT`             | Custom endpoint                    | Optional                               |
+| `LANGCHAIN_CALLBACKS_BACKGROUND` | Async trace flushing               | **Set `false` for Convex** (see below) |
 
 > **`LANGCHAIN_CALLBACKS_BACKGROUND` for Convex:** Convex actions are serverless — the process may exit before async background traces flush. Set this to `'false'` to ensure traces complete before the function returns. Omitting it can cause traces to be silently dropped.
 
@@ -32,10 +32,12 @@ LANGCHAIN_CALLBACKS_BACKGROUND=false
 ```
 
 **Auto-detection:** If no project name is set, the code auto-detects dev vs prod from `CONVEX_CLOUD_URL`:
+
 - Contains `'prod'` or `'production'` → `prod-solomind-agents`
 - Otherwise → `dev-solomind-agents`
 
 **Push env vars:**
+
 ```bash
 bun run convex:env:push        # push to dev
 bun run convex:env:push:prod   # push to prod
@@ -46,16 +48,17 @@ bun run convex:env:push:prod   # push to prod
 ## Core Helpers (`_shared/langsmith.ts`)
 
 ### `createJobLangSmithConfig` — Use This in Jobs
+
 The main helper for Convex action tracing. Creates consistent naming/tags for a specific job:
 
 ```typescript
-import { createJobLangSmithConfig } from '../_shared/langsmith.js';
+import { createJobLangSmithConfig } from "../_shared/langsmith.js";
 
 // In a Convex internalAction
-const langSmithConfig = createJobLangSmithConfig('flashcard', flashcardId, {
+const langSmithConfig = createJobLangSmithConfig("flashcard", flashcardId, {
   notebookId,
   userId,
-  additionalTags: ['source:user-request'],
+  additionalTags: ["source:user-request"],
   additionalMetadata: { documentCount: documentIds.length },
 });
 
@@ -67,49 +70,56 @@ const response = await llm.invoke(messages, langSmithConfig);
 ```
 
 **Generated trace attributes:**
+
 - `runName`: `"flashcard_job_abc12345"` (jobType + first 8 chars of jobId)
 - `tags`: `["job:flashcard", "jobId:<id>", "notebook:<id>", ...custom]`
 - `metadata`: `{ jobType, jobId, timestamp, notebookId, userId, ... }`
 
 ### `createAgentTraceConfig` — Get Config Object
-Returns config as a plain object (useful for custom wrappers):
-```typescript
-import { createAgentTraceConfig } from '../_shared/langsmith.js';
 
-const traceConfig = createAgentTraceConfig('report', reportId, {
+Returns config as a plain object (useful for custom wrappers):
+
+```typescript
+import { createAgentTraceConfig } from "../_shared/langsmith.js";
+
+const traceConfig = createAgentTraceConfig("report", reportId, {
   notebookId,
-  runNameOverride: 'my-custom-run-name',
+  runNameOverride: "my-custom-run-name",
 });
 // traceConfig.projectName, .tags, .metadata, .runName
 ```
 
 ### `createLangSmithRunConfig` — Low-Level Callback Config
+
 Creates a callbacks object for direct use with LangChain:
+
 ```typescript
-import { createLangSmithRunConfig } from '../_shared/langsmith.js';
+import { createLangSmithRunConfig } from "../_shared/langsmith.js";
 
 const config = createLangSmithRunConfig({
-  runName: 'my-run',
-  tags: ['custom-tag'],
-  metadata: { key: 'value' },
+  runName: "my-run",
+  tags: ["custom-tag"],
+  metadata: { key: "value" },
 });
 // Returns { callbacks: [tracer], tags, metadata, runName }
 // or {} if tracing is disabled
 ```
 
 ### `isLangSmithEnabled` — Guard for Conditional Logic
+
 ```typescript
-import { isLangSmithEnabled } from '../_shared/langsmith.js';
+import { isLangSmithEnabled } from "../_shared/langsmith.js";
 
 if (isLangSmithEnabled()) {
   // Only log detailed trace info when tracing is on
-  console.log('Tracing enabled, project:', getCurrentProjectName());
+  console.log("Tracing enabled, project:", getCurrentProjectName());
 }
 ```
 
 ### `getCurrentProjectName` — Get Active Project
+
 ```typescript
-import { getCurrentProjectName } from '../_shared/langsmith.js';
+import { getCurrentProjectName } from "../_shared/langsmith.js";
 const project = getCurrentProjectName(); // 'dev-solomind-agents' or 'prod-solomind-agents'
 ```
 
@@ -118,15 +128,15 @@ const project = getCurrentProjectName(); // 'dev-solomind-agents' or 'prod-solom
 ## Typical Usage Pattern in a Convex internalAction
 
 ```typescript
-"use node"
-import { internalAction } from '../../_generated/server.js';
-import { createJobLangSmithConfig } from '../_shared/langsmith.js';
-import { MyFeatureGraph } from '../MyFeatureGraph.js';
+"use node";
+import { internalAction } from "../../_generated/server.js";
+import { createJobLangSmithConfig } from "../_shared/langsmith.js";
+import { MyFeatureGraph } from "../MyFeatureGraph.js";
 
 export const myFeatureGeneration = internalAction({
-  args: { myFeatureId: v.id('myFeature'), notebookId: v.id('notebooks'), userId: v.string() },
+  args: { myFeatureId: v.id("myFeature"), notebookId: v.id("notebooks"), userId: v.string() },
   handler: async (ctx, { myFeatureId, notebookId, userId }) => {
-    const langSmithConfig = createJobLangSmithConfig('myFeature', myFeatureId, {
+    const langSmithConfig = createJobLangSmithConfig("myFeature", myFeatureId, {
       notebookId,
       userId,
     });
@@ -134,7 +144,7 @@ export const myFeatureGeneration = internalAction({
     const graph = new MyFeatureGraph();
     const result = await graph.runGraph(
       { chunks, topic, count },
-      langSmithConfig   // pass through to graph.invoke()
+      langSmithConfig // pass through to graph.invoke()
     );
   },
 });
@@ -147,32 +157,34 @@ export const myFeatureGeneration = internalAction({
 Use these patterns when building evaluations for agents:
 
 ### Create a Dataset
+
 ```typescript
-import { Client } from 'langsmith';
+import { Client } from "langsmith";
 
 const client = new Client({ apiKey: process.env.LANGSMITH_API_KEY });
 
-const dataset = await client.createDataset('flashcard-quality-v1');
+const dataset = await client.createDataset("flashcard-quality-v1");
 await client.createExamples({
-  inputs: [{ text: 'The mitochondria is the powerhouse of the cell.' }],
-  outputs: [{ expectedCount: 2, expectedDifficulty: 'easy' }],
+  inputs: [{ text: "The mitochondria is the powerhouse of the cell." }],
+  outputs: [{ expectedCount: 2, expectedDifficulty: "easy" }],
   datasetId: dataset.id,
 });
 ```
 
 ### Run an Evaluation
+
 ```typescript
-import { evaluate } from 'langsmith/evaluation';
+import { evaluate } from "langsmith/evaluation";
 
 await evaluate(
   async (inputs) => {
     const graph = new FlashcardGraph();
-    return graph.runGraph({ chunks: [inputs.text], topic: '', count: 5 });
+    return graph.runGraph({ chunks: [inputs.text], topic: "", count: 5 });
   },
   {
-    data: 'flashcard-quality-v1',
+    data: "flashcard-quality-v1",
     evaluators: [correctCountEvaluator, qualityEvaluator],
-    experimentPrefix: 'qwen3-80b-baseline',
+    experimentPrefix: "qwen3-80b-baseline",
     maxConcurrency: 4,
   }
 );
@@ -196,7 +208,7 @@ function correctCountEvaluator({
   const actual = outputs.output?.length ?? 0;
   const expected = referenceOutputs?.expectedCount;
   return {
-    key: 'count_accuracy',
+    key: "count_accuracy",
     score: Math.abs(actual - expected) <= 1 ? 1 : 0,
   };
 }
@@ -204,7 +216,8 @@ function correctCountEvaluator({
 // ❌ Wrong — this is the Python style; in JS/TS, outputs and referenceOutputs will be undefined
 // function correctCountEvaluator(inputs, outputs, referenceOutputs) { ... }
 ```
-```
+
+````
 
 ---
 
@@ -225,7 +238,7 @@ function correctCountEvaluator({
 ```typescript
 import { resetTracer } from '../_shared/langsmith.js';
 resetTracer();
-```
+````
 
 ---
 

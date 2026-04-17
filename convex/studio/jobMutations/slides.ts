@@ -1,20 +1,20 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveSlideDeckResults = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     slides: v.array(v.any()),
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.slideDeckId, {
       data: args.slides,
-      status: 'completed',
+      status: "completed",
       slideCount: args.slides.length,
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Slide Deck',
+      title: args.metadata?.title ?? "Slide Deck",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -25,7 +25,7 @@ export const saveSlideDeckResults = internalMutation({
 
 export const updateSlideDeckTitle = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -38,7 +38,7 @@ export const updateSlideDeckTitle = internalMutation({
 
 export const updateSlideDeckStatus = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -56,18 +56,18 @@ export const updateSlideDeckStatus = internalMutation({
 
 export const markSlideDeckFailed = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const errorMetadata = buildErrorMetadata(
       args.error,
-      args.metadata?.phase || 'unknown',
+      args.metadata?.phase || "unknown",
       args.metadata
     );
     await ctx.db.patch(args.slideDeckId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...args.metadata,
@@ -80,7 +80,7 @@ export const markSlideDeckFailed = internalMutation({
 // Multi-phase slide deck helpers
 export const initSlideDeckMapPhase = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     totalMapTasks: v.number(),
     slideCount: v.number(),
   },
@@ -89,13 +89,13 @@ export const initSlideDeckMapPhase = internalMutation({
     if (!slideDeck) return null;
 
     await ctx.db.patch(args.slideDeckId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...slideDeck.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
@@ -108,7 +108,7 @@ export const initSlideDeckMapPhase = internalMutation({
 
 export const storeSlideDeckMapResult = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -140,7 +140,7 @@ export const storeSlideDeckMapResult = internalMutation({
 
 export const clearSlideDeckMapData = internalMutation({
   args: {
-    slideDeckId: v.id('slides'),
+    slideDeckId: v.id("slides"),
   },
   handler: async (ctx, args) => {
     const slideDeck = await ctx.db.get(args.slideDeckId);

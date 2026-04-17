@@ -1,17 +1,28 @@
-
-
 export interface Source {
   id: string;
   title: string;
-  type: 'PDF' | 'TXT' | 'WEB' | 'DOCX' | 'PPTX' | 'IMG' | 'DOC' | 'PPT' | 'XLSX' | 'XLS' | 'MD' | 'JSON' | 'CSV';
+  type:
+    | "PDF"
+    | "TXT"
+    | "WEB"
+    | "DOCX"
+    | "PPTX"
+    | "IMG"
+    | "DOC"
+    | "PPT"
+    | "XLSX"
+    | "XLS"
+    | "MD"
+    | "JSON"
+    | "CSV";
   date: string;
   selected: boolean;
   content?: string;
-  status?: 'pending' | 'processing' | 'completed' | 'failed';
+  status?: "pending" | "processing" | "completed" | "failed";
   /** Original URL for WEB sources (url or youtube); used to open in new tab */
   url?: string;
   /** Kebab Refresh: web page (`url` type, not YouTube) or Google Drive–backed file */
-  remoteRefreshKind?: 'url' | 'drive';
+  remoteRefreshKind?: "url" | "drive";
 }
 
 export interface ReferenceChunk {
@@ -30,7 +41,7 @@ export interface ReferenceChunk {
 export interface MessageToolCall {
   tool: string;
   query: string;
-  status: 'searching' | 'done';
+  status: "searching" | "done";
   resultCount?: number;
 }
 
@@ -52,20 +63,20 @@ export interface ChatAgentTrace {
 }
 
 export type ChatActivityPhase =
-  | 'searching'
-  | 'reading'
-  | 'planning'
-  | 'thinking'
-  | 'generating'
-  | 'writing'
-  | 'retrieving'
-  | 'embedding'
-  | 'ranking'
-  | 'completed';
+  | "searching"
+  | "reading"
+  | "planning"
+  | "thinking"
+  | "generating"
+  | "writing"
+  | "retrieving"
+  | "embedding"
+  | "ranking"
+  | "completed";
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   citations?: number[];
   references?: ReferenceChunk[];
@@ -73,7 +84,7 @@ export interface Message {
   status?: ChatActivityPhase;
   /** Server detail for the current phase (e.g. "Reading 12 passages...") */
   statusDetail?: string;
-  feedback?: 'up' | 'down';
+  feedback?: "up" | "down";
   followUps?: string[];
   toolCalls?: MessageToolCall[];
   groundingChecks?: AgentGroundingCheck[];
@@ -100,7 +111,7 @@ export interface QuizQuestion {
 export interface WrittenQuestion {
   id: string;
   question: string;
-  questionType: 'short' | 'essay';
+  questionType: "short" | "essay";
   rubric: {
     maxPoints: number;
     criteria: string[];
@@ -120,7 +131,7 @@ export interface WrittenQuestionAnswer {
 }
 
 export interface Flashcard {
-  type: 'wh-question' | 'fill-blank' | 'true-false' | 'definition' | 'scenario';
+  type: "wh-question" | "fill-blank" | "true-false" | "definition" | "scenario";
   front: string;
   back: string;
   topic?: string;
@@ -171,18 +182,18 @@ interface BaseNote {
   id: string;
   title: string;
   preview: string;
-  status?: 'draft' | 'generating' | 'completed' | 'failed';
+  status?: "draft" | "generating" | "completed" | "failed";
 }
 
 // Text note - simple content
 export interface TextNote extends BaseNote {
-  type: 'text';
+  type: "text";
   content: string;
 }
 
 // Report note - document-based report with processing phases
 export interface ReportNote extends BaseNote {
-  type: 'report';
+  type: "report";
   content: string;
   metadata: {
     reportType: string;
@@ -194,7 +205,7 @@ export interface ReportNote extends BaseNote {
 
 // Flashcard note - study cards
 export interface FlashcardNote extends BaseNote {
-  type: 'flashcard';
+  type: "flashcard";
   flashcards: Flashcard[];
   metadata: {
     difficulty: string;
@@ -202,7 +213,7 @@ export interface FlashcardNote extends BaseNote {
     topic?: string;
     error?: string;
     lastViewedIndex?: number;
-    studyMode?: 'browse' | 'study';
+    studyMode?: "browse" | "study";
     showMastered?: boolean;
     masteredThreshold?: number;
   } & StudioGenerationMetadata;
@@ -210,7 +221,7 @@ export interface FlashcardNote extends BaseNote {
 
 // Quiz note - multiple choice questions
 export interface QuizNote extends BaseNote {
-  type: 'quiz';
+  type: "quiz";
   questions: QuizQuestion[];
   userAnswers?: Record<number, number>; // question index -> selected option
   metadata: {
@@ -224,7 +235,7 @@ export interface QuizNote extends BaseNote {
 
 // Audio note - audio overview with transcript
 export interface AudioNote extends BaseNote {
-  type: 'audio';
+  type: "audio";
   content: string; // transcript
   metadata: {
     audioUrl: string;
@@ -240,7 +251,7 @@ export interface AudioOverviewNote {
   id: string;
   title: string;
   preview: string;
-  type: 'audioOverview';
+  type: "audioOverview";
   audioUrl: string;
   transcript: string;
   status?: string;
@@ -249,21 +260,21 @@ export interface AudioOverviewNote {
 
 // Mind map note - hierarchical knowledge graph
 export interface MindMapNote extends BaseNote {
-  type: 'mindmap';
+  type: "mindmap";
   mindMapData: MindMapNodeData;
   content: string; // JSON string representation
-  metadata?: ({ error?: string } & StudioGenerationMetadata & Record<string, unknown>);
+  metadata?: { error?: string } & StudioGenerationMetadata & Record<string, unknown>;
 }
 
 // Written questions note - open-ended questions with LLM grading
 export interface WrittenQuestionsNote extends BaseNote {
-  type: 'writtenQuestions';
+  type: "writtenQuestions";
   questions: WrittenQuestion[];
   userAnswers?: Record<string, WrittenQuestionAnswer>;
   metadata: {
     questionCount: number;
-    difficulty: 'easy' | 'medium' | 'hard';
-    questionType: 'short' | 'essay';
+    difficulty: "easy" | "medium" | "hard";
+    questionType: "short" | "essay";
     focusArea?: string;
     totalPoints?: number;
     error?: string;
@@ -273,11 +284,11 @@ export interface WrittenQuestionsNote extends BaseNote {
 
 // Slide deck note - AI-generated presentation slides
 export interface SlideDeckNote extends BaseNote {
-  type: 'slides';
+  type: "slides";
   slides: Slide[];
   metadata: {
-    slideType: 'detailed_deck' | 'presenter_slides';
-    deckLength: 'short' | 'default';
+    slideType: "detailed_deck" | "presenter_slides";
+    deckLength: "short" | "default";
     slideCount: number;
     customPrompt?: string;
     error?: string;
@@ -286,10 +297,15 @@ export interface SlideDeckNote extends BaseNote {
 
 // Spreadsheet note - structured table data
 export interface SpreadsheetNote extends BaseNote {
-  type: 'spreadsheet';
+  type: "spreadsheet";
   content: string; // Markdown table content
   metadata: {
-    spreadsheetType: 'data_extraction' | 'comparison_table' | 'timeline' | 'financial_summary' | 'custom';
+    spreadsheetType:
+      | "data_extraction"
+      | "comparison_table"
+      | "timeline"
+      | "financial_summary"
+      | "custom";
     documentIds: string[];
     error?: string;
     customPrompt?: string;
@@ -298,13 +314,13 @@ export interface SpreadsheetNote extends BaseNote {
 
 // Wiki note - LLM-generated knowledge base with interconnected pages
 export interface WikiNote extends BaseNote {
-  type: 'wiki';
+  type: "wiki";
   content: string; // Main content (index page)
   metadata: {
     totalPages: number;
     lastUpdated: number;
     documentIds: string[];
-    wikiType: 'knowledge_base' | 'research_summary' | 'course_companion';
+    wikiType: "knowledge_base" | "research_summary" | "course_companion";
     error?: string;
     customPrompt?: string;
   } & StudioGenerationMetadata;
@@ -312,8 +328,8 @@ export interface WikiNote extends BaseNote {
 
 // User note - saved chat conversations or manual notes
 export interface UserNote extends BaseNote {
-  type: 'note';
-  noteType: 'chat' | 'manual'; // Distinguish between saved chats and manual notes
+  type: "note";
+  noteType: "chat" | "manual"; // Distinguish between saved chats and manual notes
   content?: string; // For manual notes (markdown content)
   messages?: Message[]; // For saved chats (conversation snapshot)
   metadata: {
@@ -325,55 +341,67 @@ export interface UserNote extends BaseNote {
 }
 
 // Discriminated union - the main Note type
-export type Note = TextNote | ReportNote | FlashcardNote | QuizNote | AudioNote | AudioOverviewNote | MindMapNote | WrittenQuestionsNote | SlideDeckNote | SpreadsheetNote | WikiNote | UserNote;
+export type Note =
+  | TextNote
+  | ReportNote
+  | FlashcardNote
+  | QuizNote
+  | AudioNote
+  | AudioOverviewNote
+  | MindMapNote
+  | WrittenQuestionsNote
+  | SlideDeckNote
+  | SpreadsheetNote
+  | WikiNote
+  | UserNote;
 
 // Type guard functions for checking note types at runtime
 export function isTextNote(note: Note): note is TextNote {
-  return note.type === 'text';
+  return note.type === "text";
 }
 
 export function isReportNote(note: Note): note is ReportNote {
-  return note.type === 'report';
+  return note.type === "report";
 }
 
 export function isFlashcardNote(note: Note): note is FlashcardNote {
-  return note.type === 'flashcard';
+  return note.type === "flashcard";
 }
 
 export function isQuizNote(note: Note): note is QuizNote {
-  return note.type === 'quiz';
+  return note.type === "quiz";
 }
 
 export function isAudioNote(note: Note): note is AudioNote {
-  return note.type === 'audio';
+  return note.type === "audio";
 }
 
 export function isAudioOverviewNote(note: Note): note is AudioOverviewNote {
-  return note.type === 'audioOverview';
+  return note.type === "audioOverview";
 }
 
 export function isMindMapNote(note: Note): note is MindMapNote {
-  return note.type === 'mindmap';
+  return note.type === "mindmap";
 }
 
 export function isWrittenQuestionsNote(note: Note): note is WrittenQuestionsNote {
-  return note.type === 'writtenQuestions';
+  return note.type === "writtenQuestions";
 }
 
 export function isSlideDeckNote(note: Note): note is SlideDeckNote {
-  return note.type === 'slides';
+  return note.type === "slides";
 }
 
 export function isSpreadsheetNote(note: Note): note is SpreadsheetNote {
-  return note.type === 'spreadsheet';
+  return note.type === "spreadsheet";
 }
 
 export function isWikiNote(note: Note): note is WikiNote {
-  return note.type === 'wiki';
+  return note.type === "wiki";
 }
 
 export function isUserNote(note: Note): note is UserNote {
-  return note.type === 'note';
+  return note.type === "note";
 }
 
 export interface NotebookItem {
@@ -408,7 +436,7 @@ export type NotebookOrFolder = NotebookItem | FolderItem;
 
 // Type guard
 export function isFolder(item: NotebookOrFolder): item is FolderItem {
-  return 'notebookCount' in item;
+  return "notebookCount" in item;
 }
 
 export interface Document {
@@ -417,9 +445,9 @@ export interface Document {
   note_id: string;
   title?: string;
   file_name: string;
-  file_type: 'file' | 'url' | 'youtube';
+  file_type: "file" | "url" | "youtube";
   file_url?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: "pending" | "processing" | "completed" | "failed";
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -440,7 +468,7 @@ export interface UnifiedDiscoveryResult {
   url: string;
   snippet: string;
   score: number;
-  sourceType: 'web' | 'news' | 'academic' | 'finance';
+  sourceType: "web" | "news" | "academic" | "finance";
   publishedDate?: string;
   metadata: {
     // Academic-specific
@@ -454,7 +482,7 @@ export interface UnifiedDiscoveryResult {
 
     // Web/News-specific
     domain?: string;
-    relevanceLabel?: 'high' | 'medium' | 'low';
+    relevanceLabel?: "high" | "medium" | "low";
   };
 }
 
@@ -472,8 +500,8 @@ export interface DiscoveryResponse {
  */
 export interface DiscoveryRequest {
   query: string;
-  sourceTypes: ('web' | 'news' | 'academic' | 'finance')[];
-  timeRange?: 'day' | 'week' | 'month' | 'year';
+  sourceTypes: ("web" | "news" | "academic" | "finance")[];
+  timeRange?: "day" | "week" | "month" | "year";
   filters: {
     academic?: {
       publicationYear?: { from?: number; to?: number };
@@ -483,34 +511,31 @@ export interface DiscoveryRequest {
     };
   };
   maxResults: number;
-  sortBy?: 'relevance' | 'date' | 'citations';
+  sortBy?: "relevance" | "date" | "citations";
 }
 
 /**
  * Features that have daily limits
  */
 export type DailyFeature =
-  | 'chat'
-  | 'flashcard'
-  | 'quiz'
-  | 'report'
-  | 'audio'
-  | 'writtenQuestion'
-  | 'spreadsheet'
-  | 'slide';
+  | "chat"
+  | "flashcard"
+  | "quiz"
+  | "report"
+  | "audio"
+  | "writtenQuestion"
+  | "spreadsheet"
+  | "slide";
 
 /**
  * Error codes for different types of limit errors
  */
-export type ErrorCode =
-  | 'NOTEBOOK_LIMIT_REACHED'
-  | 'SOURCE_LIMIT_REACHED'
-  | 'DAILY_LIMIT_REACHED';
+export type ErrorCode = "NOTEBOOK_LIMIT_REACHED" | "SOURCE_LIMIT_REACHED" | "DAILY_LIMIT_REACHED";
 
 /**
  * Types of limits that can be enforced
  */
-export type LimitType = 'notebook' | 'source' | 'daily';
+export type LimitType = "notebook" | "source" | "daily";
 
 /**
  * Structured error data that can be serialized through Convex

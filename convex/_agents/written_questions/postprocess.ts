@@ -1,13 +1,13 @@
-"use node"
+"use node";
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 
-import { clearStateKeys } from '../_shared/index.js';
-import type { JobLogger } from '../_shared/logging.js';
+import { clearStateKeys } from "../_shared/index.js";
+import type { JobLogger } from "../_shared/logging.js";
 
-import { extractTopic } from './questionHeuristics.js';
-import type { WrittenQuestion } from './prompts.js';
-import type { OverallStateType } from './state.js';
+import { extractTopic } from "./questionHeuristics.js";
+import type { WrittenQuestion } from "./prompts.js";
+import type { OverallStateType } from "./state.js";
 
 export function getSelectionPrompt(params: {
   questions: WrittenQuestion[];
@@ -27,22 +27,26 @@ export function getSelectionPrompt(params: {
 
   const questionsText = Object.entries(topicGroups)
     .map(([topic, qs]) => {
-      const qList = qs.map((q, i) =>
-        `  [${i + 1}] ${q.question}\n      Type: ${q.questionType} | Points: ${q.rubric.maxPoints}`
-      ).join('\n');
+      const qList = qs
+        .map(
+          (q, i) =>
+            `  [${i + 1}] ${q.question}\n      Type: ${q.questionType} | Points: ${q.rubric.maxPoints}`
+        )
+        .join("\n");
       return `**${topic.toUpperCase()}** (${qs.length} questions):\n${qList}`;
     })
-    .join('\n\n');
+    .join("\n\n");
 
-  const questionTypeGuidance = questionType === 'short'
-    ? `**SHORT-ANSWER QUESTIONS:**
+  const questionTypeGuidance =
+    questionType === "short"
+      ? `**SHORT-ANSWER QUESTIONS:**
 Must be single, direct questions answerable in 1-3 sentences.
 Select questions that are complete and self-contained.`
-    : `**ESSAY QUESTIONS:**
+      : `**ESSAY QUESTIONS:**
 Must be substantive questions requiring multi-paragraph answers.
 Select questions that test analysis and synthesis.`;
 
-  const pointsInstruction = questionType === 'short' ? '5 points' : '12 points';
+  const pointsInstruction = questionType === "short" ? "5 points" : "12 points";
 
   return `You are an expert educator selecting and refining written questions for an assessment.
 
@@ -74,7 +78,7 @@ POINT VALUES: ${pointsInstruction}
 AVAILABLE QUESTIONS (GROUPED BY TOPIC):
 ${questionsText}
 
-${focus ? `Focus Area: ${focus}` : ''}
+${focus ? `Focus Area: ${focus}` : ""}
 Difficulty: ${difficulty}
 Question Type: ${questionType}
 
@@ -85,8 +89,8 @@ export function dedupeQuestions(questions: WrittenQuestion[]): WrittenQuestion[]
   const normalizeQuestionText = (question: string): string => {
     return question
       .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, " ")
+      .replace(/[^\w\s]/g, "")
       .trim();
   };
 
@@ -124,12 +128,15 @@ export function getSelectionIdsPrompt(params: {
 
   const questionsText = Object.entries(topicGroups)
     .map(([topic, qs]) => {
-      const qList = qs.map((q) =>
-        `  [ID=${q.id}] ${q.question}\n      Type: ${q.questionType} | Points: ${q.rubric.maxPoints}`
-      ).join('\n');
+      const qList = qs
+        .map(
+          (q) =>
+            `  [ID=${q.id}] ${q.question}\n      Type: ${q.questionType} | Points: ${q.rubric.maxPoints}`
+        )
+        .join("\n");
       return `**${topic.toUpperCase()}** (${qs.length} questions):\n${qList}`;
     })
-    .join('\n\n');
+    .join("\n\n");
 
   return `You are an expert educator selecting the best written questions for an assessment.
 
@@ -148,11 +155,11 @@ Selection Criteria:
 
 Requested Difficulty: ${difficulty}
 Requested Question Type: ${questionType}
-${focus ? `Focus Area: ${focus}\n` : ''}
+${focus ? `Focus Area: ${focus}\n` : ""}
 Candidate Questions:
 ${questionsText}
 
-Return a JSON object with a single property \"selectedIds\" containing exactly ${targetCount} chosen IDs.`;
+Return a JSON object with a single property "selectedIds" containing exactly ${targetCount} chosen IDs.`;
 }
 
 export function applySelectedQuestionIds(
@@ -205,15 +212,15 @@ export function finalizeQuestions(
   state: OverallStateType,
   logger: JobLogger
 ): Partial<OverallStateType> {
-  const questionsWithIds = questions.map(q => ({
+  const questionsWithIds = questions.map((q) => ({
     ...q,
-    id: (q.id && q.id.trim()) ? q.id : randomUUID(),
-    questionType: state.questionType as 'short' | 'essay',
+    id: q.id && q.id.trim() ? q.id : randomUUID(),
+    questionType: state.questionType as "short" | "essay",
   }));
 
-  logger.info('Written questions reduce final summary', {
-    agent: 'WrittenQuestionsGraph',
-    phase: 'reduce_final',
+  logger.info("Written questions reduce final summary", {
+    agent: "WrittenQuestionsGraph",
+    phase: "reduce_final",
     finalQuestionCount: questionsWithIds.length,
     finalQuestions: questionsWithIds.map((q, idx) => ({
       index: idx + 1,
@@ -224,26 +231,30 @@ export function finalizeQuestions(
     })),
   });
 
-  logger.info('GENERATION COMPLETE', {
-    agent: 'WrittenQuestionsGraph',
-    phase: 'generation_complete',
+  logger.info("GENERATION COMPLETE", {
+    agent: "WrittenQuestionsGraph",
+    phase: "generation_complete",
     finalQuestionCount: questionsWithIds.length,
     targetQuestionCount: state.questionCount,
     milestone: true,
   });
 
-  const collapsedOutputsSize = state.collapsedOutputs?.reduce((sum, s) => sum + s.length * 2, 0) ?? 0;
+  const collapsedOutputsSize =
+    state.collapsedOutputs?.reduce((sum, s) => sum + s.length * 2, 0) ?? 0;
   const chunksSize = (state.chunks || []).reduce((sum, s) => sum + s.length * 2, 0);
-  logger.info(`Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`, {
-    agent: 'WrittenQuestionsGraph',
-    phase: 'reduce_cleanup',
-    memoryFreedKB: ((collapsedOutputsSize + chunksSize) / 1024).toFixed(2),
-  });
+  logger.info(
+    `Freeing ~${((collapsedOutputsSize + chunksSize) / 1024).toFixed(2)} KB from intermediate data`,
+    {
+      agent: "WrittenQuestionsGraph",
+      phase: "reduce_cleanup",
+      memoryFreedKB: ((collapsedOutputsSize + chunksSize) / 1024).toFixed(2),
+    }
+  );
 
   return {
     ...state,
     finalOutput: questionsWithIds,
-    status: 'completed',
-    ...clearStateKeys<OverallStateType>(['collapsedOutputs', 'chunks']),
+    status: "completed",
+    ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),
   };
 }

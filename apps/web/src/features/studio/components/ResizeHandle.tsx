@@ -1,8 +1,8 @@
-import React from 'react';
+import React from "react";
 
 interface ResizeHandleProps {
   width: number;
-  position: 'left' | 'right';
+  position: "left" | "right";
 }
 
 /**
@@ -26,12 +26,13 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ width, position }) =
       animationFrameId = requestAnimationFrame(() => {
         // Calculate delta based on position
         // When handle is on left, dragging left (negative) expands, right (positive) contracts
-        const delta = position === 'left' ? -(moveEvent.clientX - startX) : moveEvent.clientX - startX;
+        const delta =
+          position === "left" ? -(moveEvent.clientX - startX) : moveEvent.clientX - startX;
         // Max width is 70% of screen width or 1400px, whichever is smaller
         const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
         const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
         // Dispatch custom event that parent can listen to
-        window.dispatchEvent(new CustomEvent('resizeStudioPanel', { detail: { width: newWidth } }));
+        window.dispatchEvent(new CustomEvent("resizeStudioPanel", { detail: { width: newWidth } }));
       });
     };
 
@@ -39,16 +40,16 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ width, position }) =
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
     };
 
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
   };
 
   return (

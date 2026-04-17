@@ -4,7 +4,10 @@ import { v } from "convex/values";
 import { action } from "../../_generated/server";
 import { internal, api } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
-import { WrittenQuestionsGradingService, type WrittenQuestion } from "../../_services/grading/WrittenQuestionsGradingService";
+import {
+  WrittenQuestionsGradingService,
+  type WrittenQuestion,
+} from "../../_services/grading/WrittenQuestionsGradingService";
 
 /**
  * Submit an answer and grade it

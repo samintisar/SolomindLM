@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 /**
  * Push all variables from .env to Convex deployment.
  *
@@ -27,9 +28,10 @@ const dryRun = args.includes("--dry-run");
 const stopOnFirstError = args.includes("--stop-on-first-error");
 const verbose = args.includes("--verbose");
 const envFileIndex = args.indexOf("--env-file");
-const envFilePath = envFileIndex >= 0 && args[envFileIndex + 1]
-  ? path.resolve(process.cwd(), args[envFileIndex + 1])
-  : path.join(projectRoot, ".env");
+const envFilePath =
+  envFileIndex >= 0 && args[envFileIndex + 1]
+    ? path.resolve(process.cwd(), args[envFileIndex + 1])
+    : path.join(projectRoot, ".env");
 
 const SKIP_KEYS = new Set(["CONVEX_DEPLOYMENT", "CONVEX_URL"]);
 const isWindows = process.platform === "win32";
@@ -43,7 +45,10 @@ function parseEnv(content) {
     if (eq <= 0) continue;
     const key = trimmed.slice(0, eq).trim();
     let value = trimmed.slice(eq + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1).replace(/\\(.)/g, "$1");
     }
     if (SKIP_KEYS.has(key)) continue;
@@ -104,7 +109,9 @@ function main() {
       }
       console.error(`Failed: ${key}`);
       if (stopOnFirstError) {
-        console.error("\nStopped on first error. Run the command manually to see the full message:");
+        console.error(
+          "\nStopped on first error. Run the command manually to see the full message:"
+        );
         console.error(`  npx convex env set "${key}=<value>"${prod ? " --prod" : ""}`);
         process.exit(1);
       }

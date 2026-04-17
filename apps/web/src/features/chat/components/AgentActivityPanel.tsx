@@ -1,18 +1,18 @@
-import React, { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { ChevronDown, CircleCheck, FileBox, AlertTriangle } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { ChevronDown, CircleCheck, FileBox, AlertTriangle } from "lucide-react";
 import type {
   MessageToolCall,
   AgentGroundingCheck,
   ChatActivityPhase,
   ReferenceChunk,
-} from '@/shared/types/index';
-import { getStatusMessage } from '../utils/messageStatus';
-import { aggregateRetrievalSources } from '../utils/aggregateRetrievalSources';
+} from "@/shared/types/index";
+import { getStatusMessage } from "../utils/messageStatus";
+import { aggregateRetrievalSources } from "../utils/aggregateRetrievalSources";
 
-const STORAGE_KEY = 'solomind-chat-activity-open';
+const STORAGE_KEY = "solomind-chat-activity-open";
 
 const SOURCE_BADGE_CLASS =
-  'shrink-0 justify-self-end rounded border border-border/60 bg-muted/25 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-foreground/65 dark:border-border/55 dark:bg-muted/20 dark:text-foreground/60';
+  "shrink-0 justify-self-end rounded border border-border/60 bg-muted/25 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-foreground/65 dark:border-border/55 dark:bg-muted/20 dark:text-foreground/60";
 
 const SOURCE_BADGE_LINK_CLASS = `${SOURCE_BADGE_CLASS} cursor-pointer no-underline transition-colors hover:bg-muted/45 hover:text-foreground/85 dark:hover:bg-muted/35 dark:hover:text-foreground/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-card`;
 
@@ -55,33 +55,27 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       () => groundingChecks.filter((g) => g.soft === true),
       [groundingChecks]
     );
-    const showGroundingCallout = hardGroundingChecks.some(
-      (g) => !g.passed || g.issues.length > 0
-    );
+    const showGroundingCallout = hardGroundingChecks.some((g) => !g.passed || g.issues.length > 0);
 
     const hasSearchDocuments = useMemo(
-      () => toolCalls.some((tc) => tc.tool === 'search_documents'),
+      () => toolCalls.some((tc) => tc.tool === "search_documents"),
       [toolCalls]
     );
-    const useClaudeLayout =
-      hasSearchDocuments || (references != null && references.length > 0);
+    const useClaudeLayout = hasSearchDocuments || (references != null && references.length > 0);
 
-    const aggregatedSources = useMemo(
-      () => aggregateRetrievalSources(references),
-      [references]
-    );
+    const aggregatedSources = useMemo(() => aggregateRetrievalSources(references), [references]);
 
     const [expanded, setExpanded] = useState(() => {
-      if (typeof sessionStorage !== 'undefined') {
+      if (typeof sessionStorage !== "undefined") {
         const stored = sessionStorage.getItem(STORAGE_KEY);
-        if (stored === '0') return false;
-        if (stored === '1') return true;
+        if (stored === "0") return false;
+        if (stored === "1") return true;
       }
       const doneHistorical =
         !isStreaming &&
-        (historicalPhase === 'completed' ||
-          historicalPhase === 'generating' ||
-          historicalPhase === 'writing');
+        (historicalPhase === "completed" ||
+          historicalPhase === "generating" ||
+          historicalPhase === "writing");
       if (doneHistorical) {
         return showGroundingCallout;
       }
@@ -90,7 +84,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
     useEffect(() => {
       if (!isStreaming) return;
-      setExpanded(activityPhase !== 'writing');
+      setExpanded(activityPhase !== "writing");
     }, [isStreaming, activityPhase]);
 
     const prevStreamingRef = React.useRef(isStreaming);
@@ -104,8 +98,8 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
     const togglePanel = useCallback(() => {
       setExpanded((prev) => {
         const next = !prev;
-        if (!isStreaming && typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem(STORAGE_KEY, next ? '1' : '0');
+        if (!isStreaming && typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(STORAGE_KEY, next ? "1" : "0");
         }
         return next;
       });
@@ -115,34 +109,33 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       const currentPhase = (activityPhase ?? historicalPhase ?? undefined) as string | undefined;
 
       if (clarificationResponse) {
-        return { headerPrimary: 'Need a bit more context', headerMeta: null as string | null };
+        return { headerPrimary: "Need a bit more context", headerMeta: null as string | null };
       }
 
       if (useClaudeLayout) {
-        const searchTcs = toolCalls.filter((tc) => tc.tool === 'search_documents');
+        const searchTcs = toolCalls.filter((tc) => tc.tool === "search_documents");
         const searchTc = searchTcs[0] ?? toolCalls[0];
-        const q = searchTc?.query?.trim() ?? '';
-        const searching =
-          isStreaming && searchTcs.some((tc) => tc.status === 'searching');
+        const q = searchTc?.query?.trim() ?? "";
+        const searching = isStreaming && searchTcs.some((tc) => tc.status === "searching");
 
         let primary: string;
         if (q) {
           primary = `Searched sources for "${q}"`;
         } else if (aggregatedSources.length > 0 || (references?.length ?? 0) > 0) {
-          primary = 'Searched sources';
+          primary = "Searched sources";
         } else if (searching || hasSearchDocuments) {
-          primary = 'Searching your materials…';
+          primary = "Searching your materials…";
         } else {
-          primary = 'Searched sources';
+          primary = "Searched sources";
         }
 
         const n = aggregatedSources.length;
-        const meta = n > 0 ? `${n} result${n === 1 ? '' : 's'}` : null;
+        const meta = n > 0 ? `${n} result${n === 1 ? "" : "s"}` : null;
         return { headerPrimary: primary, headerMeta: meta };
       }
 
-      if (currentPhase === 'completed') {
-        return { headerPrimary: 'Response complete', headerMeta: null as string | null };
+      if (currentPhase === "completed") {
+        return { headerPrimary: "Response complete", headerMeta: null as string | null };
       }
 
       if (activityDetail?.trim()) {
@@ -153,7 +146,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
       }
 
       const fallback = getStatusMessage(currentPhase);
-      return { headerPrimary: fallback ?? 'Working…', headerMeta: null as string | null };
+      return { headerPrimary: fallback ?? "Working…", headerMeta: null as string | null };
     }, [
       activityPhase,
       activityDetail,
@@ -181,14 +174,11 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
     if (!hasActivity) return null;
 
-    const turnComplete =
-      !isStreaming && (activityPhase ?? historicalPhase) === 'completed';
+    const turnComplete = !isStreaming && (activityPhase ?? historicalPhase) === "completed";
 
     const searchFullyDone =
       hasSearchDocuments &&
-      toolCalls.every(
-        (tc) => tc.tool !== 'search_documents' || tc.status === 'done'
-      );
+      toolCalls.every((tc) => tc.tool !== "search_documents" || tc.status === "done");
     const showClaudeDone =
       useClaudeLayout && turnComplete && (searchFullyDone || aggregatedSources.length > 0);
 
@@ -199,24 +189,20 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
           id={`${panelId}-trigger`}
           aria-expanded={expanded}
           aria-controls={`${panelId}-region`}
-          aria-label={
-            headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary
-          }
+          aria-label={headerMeta ? `${headerPrimary}, ${headerMeta}` : headerPrimary}
           onClick={togglePanel}
           className="group/trigger block w-full max-w-full border-0 bg-transparent p-0 py-0.5 text-left font-sans text-sm font-normal leading-snug text-foreground/78 shadow-none outline-none ring-0 transition-[color,opacity] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-foreground/72 dark:hover:text-foreground"
         >
           <span className="wrap-break-word leading-snug">
-            <span className="text-foreground/82 dark:text-foreground/78">
-              {headerPrimary}
-            </span>
+            <span className="text-foreground/82 dark:text-foreground/78">{headerPrimary}</span>
             {headerMeta ? (
               <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-                {' '}
+                {" "}
                 {headerMeta}
               </span>
             ) : null}
             <ChevronDown
-              className={`ml-0.5 inline-block h-3.5 w-3.5 align-middle text-muted-foreground/55 transition-[color,transform] duration-200 ease-out group-hover/trigger:text-muted-foreground/80 ${expanded ? 'rotate-180' : ''}`}
+              className={`ml-0.5 inline-block h-3.5 w-3.5 align-middle text-muted-foreground/55 transition-[color,transform] duration-200 ease-out group-hover/trigger:text-muted-foreground/80 ${expanded ? "rotate-180" : ""}`}
               strokeWidth={2}
               aria-hidden
             />
@@ -245,7 +231,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                     {aggregatedSources.length > 0 ? (
                       <span className="shrink-0 tabular-nums text-muted-foreground">
                         {aggregatedSources.length} result
-                        {aggregatedSources.length === 1 ? '' : 's'}
+                        {aggregatedSources.length === 1 ? "" : "s"}
                       </span>
                     ) : null}
                   </div>
@@ -254,8 +240,8 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                     {aggregatedSources.length === 0 ? (
                       <p className="m-0 min-w-0 text-[11px] leading-snug text-muted-foreground">
                         {isStreaming && !searchFullyDone
-                          ? 'Searching your materials…'
-                          : 'No matching sections found in your sources.'}
+                          ? "Searching your materials…"
+                          : "No matching sections found in your sources."}
                       </p>
                     ) : (
                       <ul className="m-0 min-w-0 list-none divide-y divide-border/35 p-0 dark:divide-border/40">
@@ -269,7 +255,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                             </span>
                             <span className="shrink-0 whitespace-nowrap text-right text-[11px] text-muted-foreground">
                               {src.sectionCount} relevant section
-                              {src.sectionCount === 1 ? '' : 's'}
+                              {src.sectionCount === 1 ? "" : "s"}
                             </span>
                             {src.openUrl ? (
                               <a
@@ -307,7 +293,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
 
             {showGroundingCallout && (
               <div
-                className={`border-l-2 border-amber-600/45 bg-amber-50/90 py-2 pl-3 pr-2 dark:border-amber-400/50 dark:bg-amber-950/45 ${useClaudeLayout ? 'mt-3' : 'mt-2'}`}
+                className={`border-l-2 border-amber-600/45 bg-amber-50/90 py-2 pl-3 pr-2 dark:border-amber-400/50 dark:bg-amber-950/45 ${useClaudeLayout ? "mt-3" : "mt-2"}`}
               >
                 <div className="flex items-start gap-2 text-amber-950 dark:text-amber-50">
                   <AlertTriangle
@@ -339,7 +325,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                 {softGroundingChecks.map((g, gi) => (
                   <p key={gi} className="text-[11px] leading-snug">
                     {g.message}
-                    {g.issues.length > 0 ? ` (${g.issues.join('; ')})` : ''}
+                    {g.issues.length > 0 ? ` (${g.issues.join("; ")})` : ""}
                   </p>
                 ))}
               </div>
@@ -351,4 +337,4 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
   }
 );
 
-AgentActivityPanel.displayName = 'AgentActivityPanel';
+AgentActivityPanel.displayName = "AgentActivityPanel";

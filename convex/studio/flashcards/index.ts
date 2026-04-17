@@ -1,10 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
 import { getAuthUserId } from "../../auth";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Flashcards from "../../_model/flashcards";
 
 /**
@@ -309,13 +306,15 @@ export const addCard = mutation({
     front: v.string(),
     back: v.string(),
     topic: v.optional(v.string()),
-    type: v.optional(v.union(
-      v.literal("wh-question"),
-      v.literal("fill-blank"),
-      v.literal("true-false"),
-      v.literal("definition"),
-      v.literal("scenario")
-    )),
+    type: v.optional(
+      v.union(
+        v.literal("wh-question"),
+        v.literal("fill-blank"),
+        v.literal("true-false"),
+        v.literal("definition"),
+        v.literal("scenario")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -414,7 +413,7 @@ export const getDueCards = query({
     const dueIndices = Flashcards.getDueCardIndices(cardsData);
 
     // Return due cards with their indices
-    return dueIndices.map(index => ({
+    return dueIndices.map((index) => ({
       index,
       card: cardsData[index],
     }));

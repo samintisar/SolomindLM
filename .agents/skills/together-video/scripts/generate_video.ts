@@ -23,7 +23,7 @@ const client = new Together({
 async function waitForVideo(
   jobId: string,
   pollMs: number = 5000,
-  timeoutMs: number = 600_000,
+  timeoutMs: number = 600_000
 ): Promise<string> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -96,8 +96,7 @@ async function imageToVideo(): Promise<void> {
     height: 768,
     frame_images: [
       {
-        input_image:
-          "https://cdn.pixabay.com/photo/2020/05/20/08/27/cat-5195431_1280.jpg",
+        input_image: "https://cdn.pixabay.com/photo/2020/05/20/08/27/cat-5195431_1280.jpg",
         frame: "first",
       },
     ],

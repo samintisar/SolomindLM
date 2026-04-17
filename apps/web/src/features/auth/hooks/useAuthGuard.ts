@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 interface UseAuthGuardProps {
   isAuthenticated: boolean;
@@ -16,9 +16,9 @@ export function useAuthGuard({ isAuthenticated, isLoading }: UseAuthGuardProps):
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const fromStripe = params.get('success') === 'true' || params.get('canceled') === 'true';
-    if (!isLoading && isAuthenticated && location.pathname === '/' && !fromStripe) {
-      navigate('/home', { replace: true });
+    const fromStripe = params.get("success") === "true" || params.get("canceled") === "true";
+    if (!isLoading && isAuthenticated && location.pathname === "/" && !fromStripe) {
+      navigate("/home", { replace: true });
     }
   }, [isAuthenticated, isLoading, location.pathname, location.search, navigate]);
 }

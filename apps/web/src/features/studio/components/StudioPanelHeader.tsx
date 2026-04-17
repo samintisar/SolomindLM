@@ -1,6 +1,12 @@
-import React, { useRef, useEffect } from 'react';
-import { ChevronRight, PenTool, ArrowLeft, Copy, Download, Loader2, Pencil } from 'lucide-react';
-import { Note, isReportNote, isFlashcardNote, isSpreadsheetNote, isUserNote } from '@/shared/types/index';
+import React, { useRef, useEffect } from "react";
+import { ChevronRight, PenTool, ArrowLeft, Copy, Download, Loader2, Pencil } from "lucide-react";
+import {
+  Note,
+  isReportNote,
+  isFlashcardNote,
+  isSpreadsheetNote,
+  isUserNote,
+} from "@/shared/types/index";
 
 interface StudioPanelHeaderProps {
   activeNote: Note | null;
@@ -86,9 +92,9 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                   spellCheck={false}
                   onChange={(e) => onEditTitleChange(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && editTitle.trim()) {
+                    if (e.key === "Enter" && editTitle.trim()) {
                       onRenameSubmit(activeNote.id, editTitle.trim());
-                    } else if (e.key === 'Escape') {
+                    } else if (e.key === "Escape") {
                       onEditTitleChange(activeNote.title);
                       onEditCancel();
                     }
@@ -135,16 +141,16 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 >
                   <Copy className="w-4 h-4" />
                 </button>
-              <button
-                type="button"
-                onClick={onDownloadReport}
-                disabled={!canCopyOrDownload}
-                className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Download report as Markdown file"
-                aria-label="Download report as Markdown file"
-              >
-                <Download className="w-4 h-4" />
-              </button>
+                <button
+                  type="button"
+                  onClick={onDownloadReport}
+                  disabled={!canCopyOrDownload}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download report as Markdown file"
+                  aria-label="Download report as Markdown file"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
               </div>
             )}
             {isUserNote(activeNote) && (
@@ -236,9 +242,9 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 spellCheck={false}
                 onChange={(e) => onEditTitleChange(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && editTitle.trim()) {
+                  if (e.key === "Enter" && editTitle.trim()) {
                     onRenameSubmit(activeNote.id, editTitle.trim());
-                  } else if (e.key === 'Escape') {
+                  } else if (e.key === "Escape") {
                     onEditTitleChange(activeNote.title);
                     onEditCancel();
                   }
@@ -266,7 +272,7 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                   onEditStart();
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     onEditStart();
                   }

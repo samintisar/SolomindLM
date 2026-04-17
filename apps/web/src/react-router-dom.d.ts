@@ -10,9 +10,7 @@ declare module "react-router-dom" {
     index?: boolean;
     children?: ReactNode;
   }>;
-  export const Link: ComponentType<
-    { to: string; children?: ReactNode } & Record<string, unknown>
-  >;
+  export const Link: ComponentType<{ to: string; children?: ReactNode } & Record<string, unknown>>;
 
   export function useLocation(): {
     pathname: string;

@@ -31,7 +31,10 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query.filter((q) => q.eq(q.field("userId"), userId)).order("desc").collect();
+    return await query
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .collect();
   }
   return await query.order("desc").collect();
 }
@@ -89,10 +92,10 @@ export type FlashcardUpdate = {
  */
 export function updateProficiencyAfterReview(
   proficiency: CardProficiency | undefined,
-  rating: 'again' | 'hard' | 'good' | 'easy'
+  rating: "again" | "hard" | "good" | "easy"
 ): CardProficiency {
   const current = proficiency || initializeProficiency();
-  
+
   // Update statistics
   const updated: CardProficiency = {
     ...current,
@@ -100,7 +103,7 @@ export function updateProficiencyAfterReview(
     lastReviewedAt: Date.now(),
   };
 
-  if (rating === 'again') {
+  if (rating === "again") {
     updated.incorrectCount = current.incorrectCount + 1;
     updated.streak = 0;
   } else {
@@ -212,7 +215,7 @@ export async function patchFlashcard(
       patch = {
         ...patch,
         metadata: {
-          ...(existing.metadata as Record<string, unknown> ?? {}),
+          ...((existing.metadata as Record<string, unknown>) ?? {}),
           ...(patch.metadata as Record<string, unknown>),
         },
       };

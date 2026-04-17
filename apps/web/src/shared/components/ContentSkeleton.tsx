@@ -7,7 +7,7 @@ interface ContentSkeletonProps {
  * Content area loading skeleton
  * Use this for loading text content, document content, etc.
  */
-export function ContentSkeleton({ lines = 8, className = '' }: ContentSkeletonProps) {
+export function ContentSkeleton({ lines = 8, className = "" }: ContentSkeletonProps) {
   return (
     <div className={`space-y-3 ${className}`}>
       {/* Title skeleton */}
@@ -21,7 +21,7 @@ export function ContentSkeleton({ lines = 8, className = '' }: ContentSkeletonPr
           style={{
             width: `${Math.random() * 30 + 70}%`,
             animationDelay: `${i * 50}ms`,
-            animationDuration: '1.5s',
+            animationDuration: "1.5s",
           }}
         />
       ))}

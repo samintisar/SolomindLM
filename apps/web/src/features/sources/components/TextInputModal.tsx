@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, FileText, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { X, FileText, Loader2 } from "lucide-react";
 
 interface TextInputModalProps {
   isOpen: boolean;
@@ -14,12 +14,12 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
   onUpload,
   isUploading,
 }) => {
-  const [textInput, setTextInput] = useState('');
+  const [textInput, setTextInput] = useState("");
 
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
-      setTextInput('');
+      setTextInput("");
     }
   }, [isOpen]);
 
@@ -35,7 +35,7 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleUpload();
     }
@@ -54,7 +54,10 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
             </div>
             <h2 className="text-xl font-bold font-sans">Paste Text</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -87,7 +90,7 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
                   Adding...
                 </>
               ) : (
-                'Add Source'
+                "Add Source"
               )}
             </button>
           </div>

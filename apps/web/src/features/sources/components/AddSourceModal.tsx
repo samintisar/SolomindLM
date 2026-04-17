@@ -1,7 +1,16 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from "react";
 import {
-  X, FileStack, Upload, Link as LinkIcon, Youtube, Clipboard, FileText, Globe, File, HardDrive,
-} from 'lucide-react';
+  X,
+  FileStack,
+  Upload,
+  Link as LinkIcon,
+  Youtube,
+  Clipboard,
+  FileText,
+  Globe,
+  File,
+  HardDrive,
+} from "lucide-react";
 
 const MAX_SOURCES = 100;
 
@@ -59,7 +68,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
       const syntheticEvent = {
         preventDefault: () => {},
         stopPropagation: () => {},
-        currentTarget: document.createElement('div'),
+        currentTarget: document.createElement("div"),
         relatedTarget: null,
       } as unknown as React.DragEvent<HTMLDivElement>;
       onDragLeaveRef.current(syntheticEvent);
@@ -83,7 +92,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
             </div>
             <h2 className="text-xl font-bold">SolomindLM</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -93,7 +105,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-2xl font-medium">Add sources</h3>
               <button
-                onClick={() => { onClose(); onDiscoverClick(); }}
+                onClick={() => {
+                  onClose();
+                  onDiscoverClick();
+                }}
                 className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border hover:bg-secondary/50 transition-colors text-sm font-medium"
               >
                 <Globe className="w-4 h-4" />
@@ -101,8 +116,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               </button>
             </div>
             <p className="text-muted-foreground text-sm leading-relaxed max-w-3xl">
-              Sources let SolomindLM base its responses on the information that matters most to you.<br/>
-              (Examples: marketing plans, course reading, research notes, meeting transcripts, sales documents, etc.)
+              Sources let SolomindLM base its responses on the information that matters most to you.
+              <br />
+              (Examples: marketing plans, course reading, research notes, meeting transcripts, sales
+              documents, etc.)
             </p>
           </div>
 
@@ -127,10 +144,10 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
             onDrop={onDrop}
             className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-4 transition-all group ${
               !canUpload
-                ? 'opacity-50 cursor-not-allowed border-border bg-secondary/5'
+                ? "opacity-50 cursor-not-allowed border-border bg-secondary/5"
                 : isDragging
-                ? 'border-primary bg-primary/10 cursor-pointer scale-[1.02]'
-                : 'border-border bg-secondary/5 hover:bg-secondary/10 cursor-pointer'
+                  ? "border-primary bg-primary/10 cursor-pointer scale-[1.02]"
+                  : "border-border bg-secondary/5 hover:bg-secondary/10 cursor-pointer"
             }`}
           >
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0">
@@ -138,10 +155,17 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
             </div>
             <div className="text-center space-y-2">
               <h3 className="text-lg font-bold text-primary">Upload sources</h3>
-              <p className="text-sm text-muted-foreground">Drag & drop or <span className="text-primary underline decoration-dotted font-medium">choose file</span> to upload</p>
+              <p className="text-sm text-muted-foreground">
+                Drag & drop or{" "}
+                <span className="text-primary underline decoration-dotted font-medium">
+                  choose file
+                </span>{" "}
+                to upload
+              </p>
             </div>
             <p className="text-xs text-muted-foreground/60 text-center max-w-xl mt-4 font-mono">
-              Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG, AVIF, WAV, MP3, M4A, WebM, FLAC
+              Supported file types: PDF, Word, PowerPoint, Text, Markdown, JSON, CSV, PNG, JPEG,
+              AVIF, WAV, MP3, M4A, WebM, FLAC
             </p>
           </div>
 
@@ -227,7 +251,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               <div className="flex-1">
                 <p className="text-sm font-medium text-destructive">Source limit reached</p>
                 <p className="text-xs text-destructive/80 mt-1">
-                  You've reached the maximum of {MAX_SOURCES} sources. Remove some sources to add new ones.
+                  You've reached the maximum of {MAX_SOURCES} sources. Remove some sources to add
+                  new ones.
                 </p>
               </div>
             </div>
@@ -243,14 +268,16 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
           <div className="flex-1 h-2 bg-secondary/50 rounded-xl overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                sourcesCount >= MAX_SOURCES ? 'bg-destructive' : 'bg-primary'
+                sourcesCount >= MAX_SOURCES ? "bg-destructive" : "bg-primary"
               }`}
               style={{ width: `${Math.min((sourcesCount / MAX_SOURCES) * 100, 100)}%` }}
             />
           </div>
-          <span className={`font-mono font-medium ${
-            sourcesCount >= MAX_SOURCES ? 'text-destructive' : 'text-muted-foreground'
-          }`}>
+          <span
+            className={`font-mono font-medium ${
+              sourcesCount >= MAX_SOURCES ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
             {sourcesCount} / {MAX_SOURCES}
           </span>
         </div>

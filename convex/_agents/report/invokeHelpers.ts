@@ -1,8 +1,8 @@
-"use node"
+"use node";
 
-import { PROCESSING_CONFIG } from './config.js';
+import { PROCESSING_CONFIG } from "./config.js";
 
-const LOG_PREFIX = '[ReportGraph]';
+const LOG_PREFIX = "[ReportGraph]";
 
 export async function invokeWithTimeout<T>(
   invokeFn: () => Promise<T>,
@@ -32,7 +32,7 @@ export async function invokeWithTimeout<T>(
     if (timeoutId) clearTimeout(timeoutId);
     const elapsed = Date.now() - startTime;
 
-    if (error instanceof Error && error.message.includes('timeout')) {
+    if (error instanceof Error && error.message.includes("timeout")) {
       const enhancedError = new Error(`${phase} phase exceeded timeout of ${timeoutMs}ms`);
       (enhancedError as any).phase = phase;
       (enhancedError as any).isTimeout = true;
@@ -51,7 +51,10 @@ export async function invokeWithTimeout<T>(
       throw enhancedError;
     }
 
-    console.error(`${LOG_PREFIX} ${phase} error after ${elapsed}ms:`, error instanceof Error ? error.message : String(error));
+    console.error(
+      `${LOG_PREFIX} ${phase} error after ${elapsed}ms:`,
+      error instanceof Error ? error.message : String(error)
+    );
     throw error;
   }
 }
@@ -70,11 +73,13 @@ export async function invokeWithRetry<T>(
     } catch (error) {
       lastError = error as Error;
 
-      if (error instanceof Error &&
-          (error.message.includes('Invalid') ||
-           error.message.includes('validation') ||
-           (error as any).isTimeout === true ||
-           error.message.includes('timeout'))) {
+      if (
+        error instanceof Error &&
+        (error.message.includes("Invalid") ||
+          error.message.includes("validation") ||
+          (error as any).isTimeout === true ||
+          error.message.includes("timeout"))
+      ) {
         (error as any).phase = phase;
         (error as any).attempt = attempt + 1;
         (error as any).maxRetries = maxRetries;
@@ -90,7 +95,7 @@ export async function invokeWithRetry<T>(
       if (attempt < maxRetries - 1) {
         const backoff = PROCESSING_CONFIG.RETRY_BACKOFF_MS * Math.pow(2, attempt);
         console.log(`${LOG_PREFIX} Retrying ${phase} in ${backoff}ms...`);
-        await new Promise(resolve => setTimeout(resolve, backoff));
+        await new Promise((resolve) => setTimeout(resolve, backoff));
       }
     }
   }
@@ -106,13 +111,13 @@ export async function invokeWithRetry<T>(
 }
 
 export function getMessageContent(response: unknown): string {
-  if (typeof response === 'object' && response !== null) {
+  if (typeof response === "object" && response !== null) {
     const msg = response as { content?: unknown };
-    if (typeof msg.content === 'string') {
+    if (typeof msg.content === "string") {
       return msg.content;
     }
-    if (typeof msg.content === 'object' && msg.content !== null) {
-      if (typeof (msg.content as { toString?: () => string }).toString === 'function') {
+    if (typeof msg.content === "object" && msg.content !== null) {
+      if (typeof (msg.content as { toString?: () => string }).toString === "function") {
         return (msg.content as { toString: () => string }).toString();
       }
     }

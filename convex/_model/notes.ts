@@ -6,10 +6,7 @@ import type { Id, Doc } from "../_generated/dataModel";
  * No query/mutation/action exports — used by convex/userNotes.ts and jobs.
  */
 
-export async function getNote(
-  ctx: QueryCtx,
-  noteId: Id<"notes">
-): Promise<Doc<"notes"> | null> {
+export async function getNote(ctx: QueryCtx, noteId: Id<"notes">): Promise<Doc<"notes"> | null> {
   return await ctx.db.get("notes", noteId);
 }
 
@@ -23,7 +20,10 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query.filter((q) => q.eq(q.field("userId"), userId)).order("desc").collect();
+    return await query
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .order("desc")
+      .collect();
   }
   return await query.order("desc").collect();
 }
@@ -40,16 +40,11 @@ export async function listByNotebookShared(
     .order("desc")
     .collect();
   return rows.filter(
-    (n) =>
-      n.type === "manual" ||
-      (n.type === "chat" && n.userId === viewerUserId)
+    (n) => n.type === "manual" || (n.type === "chat" && n.userId === viewerUserId)
   );
 }
 
-export async function listByUser(
-  ctx: QueryCtx,
-  userId: Id<"users">
-): Promise<Doc<"notes">[]> {
+export async function listByUser(ctx: QueryCtx, userId: Id<"users">): Promise<Doc<"notes">[]> {
   return await ctx.db
     .query("notes")
     .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -69,10 +64,7 @@ export type NoteCreate = {
   metadata?: unknown;
 };
 
-export async function createNote(
-  ctx: MutationCtx,
-  data: NoteCreate
-): Promise<Id<"notes">> {
+export async function createNote(ctx: MutationCtx, data: NoteCreate): Promise<Id<"notes">> {
   const now = Date.now();
   return await ctx.db.insert("notes", {
     userId: data.userId,
@@ -123,9 +115,6 @@ export async function updateNote(
   });
 }
 
-export async function deleteNote(
-  ctx: MutationCtx,
-  noteId: Id<"notes">
-): Promise<void> {
+export async function deleteNote(ctx: MutationCtx, noteId: Id<"notes">): Promise<void> {
   await ctx.db.delete("notes", noteId);
 }

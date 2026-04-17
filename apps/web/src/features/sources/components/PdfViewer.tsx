@@ -1,15 +1,16 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { Loader2 } from 'lucide-react';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
+import { Loader2 } from "lucide-react";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 // Configure PDF.js worker for Vite (unpkg has every pdfjs-dist version)
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
 
-const BASE_PAGE_WIDTH = Math.min(420, typeof window !== 'undefined' ? window.innerWidth - 80 : 420);
+// Module-level constant computed once at load time.
+const BASE_PAGE_WIDTH = Math.min(420, typeof window !== "undefined" ? window.innerWidth - 80 : 420);
 /** 100% = minimum (readable baseline); 200% = max for detail */
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 2;
@@ -46,7 +47,7 @@ interface PdfViewerProps {
   className?: string;
 }
 
-export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = '' }) => {
+export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) => {
   const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = '' }) =>
   }, []);
 
   const onDocumentLoadError = useCallback((err: Error) => {
-    setError(err?.message ?? 'Failed to load PDF');
+    setError(err?.message ?? "Failed to load PDF");
     setLoading(false);
   }, []);
 
@@ -92,7 +93,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = '' }) =>
           return next;
         });
       },
-      { root: container, rootMargin: '200px', threshold: 0 }
+      { root: container, rootMargin: "200px", threshold: 0 }
     );
 
     const refs = pageRefs.current;
@@ -123,7 +124,10 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = '' }) =>
         {!loading && numPages > 0 && (
           <>
             <div className="mb-3 flex items-center gap-3">
-              <label htmlFor="pdf-zoom" className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              <label
+                htmlFor="pdf-zoom"
+                className="text-xs font-medium text-muted-foreground whitespace-nowrap"
+              >
                 Zoom
               </label>
               <input

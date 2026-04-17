@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Youtube, Loader2 } from 'lucide-react';
-import { useToast } from '@/shared/contexts/ToastContext';
+import React, { useState, useEffect } from "react";
+import { X, Youtube, Loader2 } from "lucide-react";
+import { useToast } from "@/shared/contexts/ToastContext";
 
 interface SocialMediaInputModalProps {
   isOpen: boolean;
@@ -16,12 +16,12 @@ export const SocialMediaInputModal: React.FC<SocialMediaInputModalProps> = ({
   isUploading,
 }) => {
   const { error: showError } = useToast();
-  const [urlInput, setUrlInput] = useState('');
+  const [urlInput, setUrlInput] = useState("");
 
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
-      setUrlInput('');
+      setUrlInput("");
     }
   }, [isOpen]);
 
@@ -30,11 +30,11 @@ export const SocialMediaInputModal: React.FC<SocialMediaInputModalProps> = ({
 
     const urls = urlInput
       .split(/\s+/)
-      .map(url => url.trim())
-      .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0 && (url.startsWith("http://") || url.startsWith("https://")));
 
     if (urls.length === 0) {
-      showError('Please enter at least one valid URL (starting with http:// or https://).');
+      showError("Please enter at least one valid URL (starting with http:// or https://).");
       return;
     }
 
@@ -47,7 +47,7 @@ export const SocialMediaInputModal: React.FC<SocialMediaInputModalProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleUpload();
     }
@@ -66,13 +66,17 @@ export const SocialMediaInputModal: React.FC<SocialMediaInputModalProps> = ({
             </div>
             <h2 className="text-xl font-bold font-sans">Add Video URL</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-secondary/50 rounded-xl transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Paste video URLs to extract their transcripts. Supports YouTube, TikTok, Instagram, and X (Twitter). Separate multiple URLs with spaces or new lines.
+            Paste video URLs to extract their transcripts. Supports YouTube, TikTok, Instagram, and
+            X (Twitter). Separate multiple URLs with spaces or new lines.
           </p>
           <textarea
             value={urlInput}
@@ -104,7 +108,7 @@ Separate multiple URLs with spaces or new lines"
                   Adding...
                 </>
               ) : (
-                'Add Sources'
+                "Add Sources"
               )}
             </button>
           </div>

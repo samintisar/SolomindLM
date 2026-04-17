@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Prompt templates and schemas for WrittenQuestionsGraph.
  *
@@ -6,8 +6,8 @@
  * related to written question generation prompts.
  */
 
-import { z } from 'zod';
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js';
+import { z } from "zod";
+import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
 // ============================================================
 // SCHEMAS
@@ -16,12 +16,16 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js
 export const WrittenQuestionSchema = z.object({
   id: z.string().describe("Unique identifier for the question"),
   question: z.string().describe("The formulated question text"),
-  questionType: z.enum(['short', 'essay']),
+  questionType: z.enum(["short", "essay"]),
   rubric: z.object({
     maxPoints: z.number(),
-    criteria: z.array(z.string()).describe("Specific grading criteria or keywords required for full points"),
+    criteria: z
+      .array(z.string())
+      .describe("Specific grading criteria or keywords required for full points"),
   }),
-  modelAnswer: z.string().describe("A comprehensive, correct answer derived exclusively from the text"),
+  modelAnswer: z
+    .string()
+    .describe("A comprehensive, correct answer derived exclusively from the text"),
 });
 
 export const WrittenQuestionsArraySchema = z.object({
@@ -31,7 +35,7 @@ export const WrittenQuestionsArraySchema = z.object({
 export interface WrittenQuestion {
   id: string;
   question: string;
-  questionType: 'short' | 'essay';
+  questionType: "short" | "essay";
   rubric: {
     maxPoints: number;
     criteria: string[];
@@ -49,26 +53,28 @@ export interface WrittenQuestionsResponse {
 
 // Problematic phrases that indicate questions aren't self-contained
 export const PROBLEMATIC_PHRASES = [
-  'the diagram',
-  'the above',
-  'as shown',
-  'this chart',
-  'that example',
-  'the table',
-  'this figure',
+  "the diagram",
+  "the above",
+  "as shown",
+  "this chart",
+  "that example",
+  "the table",
+  "this figure",
 ] as const;
 
-export { GRAPH_CONFIG } from './config.js';
+export { GRAPH_CONFIG } from "./config.js";
 
 // ============================================================
 // SYSTEM PROMPTS
 // ============================================================
 
 /** System prompt for map phase written question generation */
-export const MAP_SYSTEM_PROMPT = 'You are a professional educator creating written assessment questions.';
+export const MAP_SYSTEM_PROMPT =
+  "You are a professional educator creating written assessment questions.";
 
 /** System prompt for reduce phase question selection and refinement */
-export const REDUCE_SELECT_SYSTEM_PROMPT = 'You are an expert educator selecting diverse, high-quality written questions for assessments.';
+export const REDUCE_SELECT_SYSTEM_PROMPT =
+  "You are an expert educator selecting diverse, high-quality written questions for assessments.";
 
 // ============================================================
 // PROMPT TEMPLATES
@@ -88,12 +94,12 @@ export const getMapPrompt = (params: {
   const { chunk, questionsPerChunk, difficulty, questionType, focus } = params;
 
   const difficultyGuidance: Record<string, string> = {
-    easy: 'basic recall and definitions - straightforward facts',
-    medium: 'concepts and relationships - requires understanding',
-    hard: 'application and analysis - requires deeper thinking',
+    easy: "basic recall and definitions - straightforward facts",
+    medium: "concepts and relationships - requires understanding",
+    hard: "application and analysis - requires deeper thinking",
   };
 
-  const isEssay = questionType === 'essay';
+  const isEssay = questionType === "essay";
 
   const typeSpecificInstructions = isEssay
     ? `**ESSAY QUESTIONS (12 Points):**
@@ -114,7 +120,7 @@ Generate exactly ${questionsPerChunk} questions based **exclusively** on the tex
 **Configuration:**
 - Difficulty: ${difficulty.toUpperCase()} (${difficultyGuidance[difficulty] || difficulty})
 - Type: ${questionType.toUpperCase()}
-${focus ? `- Focus Topic: ${focus}` : ''}
+${focus ? `- Focus Topic: ${focus}` : ""}
 
 ${typeSpecificInstructions}
 

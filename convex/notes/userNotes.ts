@@ -1,10 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, action } from "../_generated/server";
 import { getAuthUserId } from "../auth";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import * as Notes from "../_model/notes";
 import { internal } from "../_generated/api";
 
@@ -132,15 +129,16 @@ export const saveChat = action({
     conversationId: v.optional(v.id("conversations")),
     metadata: v.optional(v.any()),
   },
-  handler: async (ctx, args): Promise<{ _id: string; title: string; status: string; createdAt: number }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ _id: string; title: string; status: string; createdAt: number }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
     // Generate title from first user message
     let title = "Chat Conversation";
-    const firstUserMessage = args.messages.find(
-      (m: any) => m.role === "user" && m.content
-    );
+    const firstUserMessage = args.messages.find((m: any) => m.role === "user" && m.content);
 
     if (firstUserMessage && firstUserMessage.content) {
       try {

@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { PenTool, Search } from 'lucide-react';
-import { StudioTool, Note } from '@/shared/types/index';
-import { ToolGrid } from './ToolGrid';
-import { NoteItem } from './NoteItem';
+import React, { useState, useMemo } from "react";
+import { PenTool, Search } from "lucide-react";
+import { StudioTool, Note } from "@/shared/types/index";
+import { ToolGrid } from "./ToolGrid";
+import { NoteItem } from "./NoteItem";
 
 interface NoteListViewProps {
   tools: StudioTool[];
@@ -44,7 +44,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   onEditKeyDown,
 }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   const filteredNotes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -56,14 +56,13 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
-      const insideMenu =
-        target.closest('.kebab-menu') || target.closest('[data-note-item-menu]');
+      const insideMenu = target.closest(".kebab-menu") || target.closest("[data-note-item-menu]");
       if (activeMenuId && !insideMenu) {
         setActiveMenuId(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [activeMenuId]);
 
   return (
@@ -89,7 +88,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
         <div className="flex flex-col gap-2">
           {notes.length > 0 && (
             <div className="text-xs text-muted-foreground px-1 mb-1 font-sans">
-              {filteredNotes.length} {searchQuery.trim() ? `of ${notes.length}` : ''} items
+              {filteredNotes.length} {searchQuery.trim() ? `of ${notes.length}` : ""} items
             </div>
           )}
           <div className="space-y-3">
@@ -117,8 +116,8 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
                 <PenTool className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
                 <p className="text-sm text-muted-foreground">
                   {searchQuery.trim()
-                    ? 'No notes match your search.'
-                    : 'No saved notes yet. Create one to get started!'}
+                    ? "No notes match your search."
+                    : "No saved notes yet. Create one to get started!"}
                 </p>
               </div>
             )}

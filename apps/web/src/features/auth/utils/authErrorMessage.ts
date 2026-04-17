@@ -26,12 +26,7 @@ const AUTH_ERROR_MESSAGES: readonly [needle: string, message: string][] = [
 ];
 
 export function getConvexAuthUserMessage(error: unknown, fallback: string): string {
-  const raw =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   if (!raw) return fallback;
   for (const [needle, message] of AUTH_ERROR_MESSAGES) {
     if (raw.includes(needle)) return message;

@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Graph builder for agent operations.
  *
@@ -11,10 +11,10 @@
  * - Conditional routing between nodes
  */
 
-import { StateGraph, START, END } from '@langchain/langgraph';
-import type { Send } from '@langchain/langgraph';
+import { StateGraph, START, END } from "@langchain/langgraph";
+import type { Send } from "@langchain/langgraph";
 
-import { AGENT_LANGGRAPH_RECURSION_LIMIT } from './agent_graph_limits.js';
+import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "./agent_graph_limits.js";
 
 // ============================================================
 // Types
@@ -33,9 +33,7 @@ export type NodeFunction<TState = unknown> = (
  * Route function type for conditional edges.
  * Returns either a string (node name) or an array of Send objects for parallel processing.
  */
-export type RouteFunction<TState = unknown> = (
-  state: TState
-) => string | Send[] | Send[];
+export type RouteFunction<TState = unknown> = (state: TState) => string | Send[] | Send[];
 
 /**
  * Configuration for building a MapReduce-style graph.
@@ -105,25 +103,34 @@ export function buildMapReduceGraph<TState extends Record<string, unknown>>(
 ) {
   const builder = new StateGraph(config.state as never);
 
-  const mapNodeName = config.mapNodeName || 'map';
-  const reduceNodeName = config.reduceNodeName || 'reduce';
-  const collapseNodeName = config.collapseNodeName || 'collapse';
+  const mapNodeName = config.mapNodeName || "map";
+  const reduceNodeName = config.reduceNodeName || "reduce";
+  const collapseNodeName = config.collapseNodeName || "collapse";
 
   // Add map node - wrap to match LangGraph's expected signature
-  builder.addNode(mapNodeName, (async (state: unknown, invocationConfig?: { configurable?: Record<string, unknown> }) => {
+  builder.addNode(mapNodeName, (async (
+    state: unknown,
+    invocationConfig?: { configurable?: Record<string, unknown> }
+  ) => {
     return await config.mapNode(state, invocationConfig);
   }) as never);
 
   // Add collapse node if provided and not skipping
   if (config.collapseNode && !config.skipCollapse) {
-    builder.addNode(collapseNodeName, (async (state: TState, invocationConfig?: { configurable?: Record<string, unknown> }) => {
+    builder.addNode(collapseNodeName, (async (
+      state: TState,
+      invocationConfig?: { configurable?: Record<string, unknown> }
+    ) => {
       return await config.collapseNode!(state, invocationConfig);
     }) as never);
   }
 
   // Add reduce node if provided
   if (config.reduceNode) {
-    builder.addNode(reduceNodeName, (async (state: TState, invocationConfig?: { configurable?: Record<string, unknown> }) => {
+    builder.addNode(reduceNodeName, (async (
+      state: TState,
+      invocationConfig?: { configurable?: Record<string, unknown> }
+    ) => {
       return await config.reduceNode!(state, invocationConfig);
     }) as never);
   }
@@ -188,7 +195,10 @@ export function buildLinearGraph<TState extends Record<string, unknown>>(
 
   // Add all nodes - wrap to match LangGraph's expected signature
   for (const node of config.nodes) {
-    builder.addNode(node.name, (async (state: TState, invocationConfig?: { configurable?: Record<string, unknown> }) => {
+    builder.addNode(node.name, (async (
+      state: TState,
+      invocationConfig?: { configurable?: Record<string, unknown> }
+    ) => {
       return await node.handler(state, invocationConfig);
     }) as never);
   }
@@ -244,14 +254,17 @@ export function buildCustomGraph<TState extends Record<string, unknown>>(
 
   // Add all nodes - wrap to match LangGraph's expected signature
   for (const [name, handler] of Object.entries(nodes)) {
-    builder.addNode(name, (async (state: unknown, invocationConfig?: { configurable?: Record<string, unknown> }) => {
+    builder.addNode(name, (async (
+      state: unknown,
+      invocationConfig?: { configurable?: Record<string, unknown> }
+    ) => {
       return await handler(state, invocationConfig);
     }) as never);
   }
 
   // Add all edges - use as never casts for node names like existing code
   for (const [from, to] of edges) {
-    if (typeof to === 'function') {
+    if (typeof to === "function") {
       builder.addConditionalEdges(from as never, to);
     } else {
       builder.addEdge(from as never, to as never);
@@ -316,9 +329,11 @@ export function createConditionalRoute<TState = any>(
  * builder.addNode('init', updateProgressNode);
  * ```
  */
-export function createProgressNode<TState extends { progress?: any }>(
-  progress: { phase: string; percentage: number; message: string }
-): NodeFunction<TState> {
+export function createProgressNode<TState extends { progress?: any }>(progress: {
+  phase: string;
+  percentage: number;
+  message: string;
+}): NodeFunction<TState> {
   return async (state: TState): Promise<Partial<TState>> => {
     return {
       ...state,

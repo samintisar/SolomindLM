@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Prompt templates and schemas for WikiGraph.
  *
@@ -6,7 +6,7 @@
  * related to wiki knowledge base compilation.
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================================
 // SCHEMAS
@@ -16,13 +16,15 @@ import { z } from 'zod';
  * Schema for concept extraction from source content.
  */
 export const ConceptExtractionSchema = z.object({
-  concepts: z.array(z.object({
-    name: z.string().describe("Short specific title, not a broad category"),
-    summary: z.string().describe("One sentence, ≤160 chars"),
-    importance: z.enum(['high', 'medium', 'low']).describe("high = central to sources"),
-    description: z.string().describe("≤400 chars: definition + why it matters"),
-    relatedConcepts: z.array(z.string()).describe("0–6 other names from this chunk only"),
-  })),
+  concepts: z.array(
+    z.object({
+      name: z.string().describe("Short specific title, not a broad category"),
+      summary: z.string().describe("One sentence, ≤160 chars"),
+      importance: z.enum(["high", "medium", "low"]).describe("high = central to sources"),
+      description: z.string().describe("≤400 chars: definition + why it matters"),
+      relatedConcepts: z.array(z.string()).describe("0–6 other names from this chunk only"),
+    })
+  ),
 });
 
 /**
@@ -30,23 +32,29 @@ export const ConceptExtractionSchema = z.object({
  */
 export const WikiArticleGenerationSchema = z.object({
   summary: z.string().describe("Index line, ≤120 chars, factual"),
-  relatedConcepts: z.array(z.string()).describe("0–8 related concept names (not paths); omit noise"),
-  content: z.string().describe(
-    'Markdown body only (no YAML). Headings: ## Key Points (≤3 bullets), ## Details (≤2 tight paragraphs), ## Related Concepts ([[name]]), ## Sources (bullets). ≤450 words; use \' not " in prose.'
-  ),
+  relatedConcepts: z
+    .array(z.string())
+    .describe("0–8 related concept names (not paths); omit noise"),
+  content: z
+    .string()
+    .describe(
+      "Markdown body only (no YAML). Headings: ## Key Points (≤3 bullets), ## Details (≤2 tight paragraphs), ## Related Concepts ([[name]]), ## Sources (bullets). ≤450 words; use ' not \" in prose."
+    ),
 });
 
 /**
  * Schema for connection detection between concepts.
  */
 export const ConnectionDetectionSchema = z.object({
-  connections: z.array(z.object({
-    path: z.string().describe("connections/slug-two-or-three-words"),
-    title: z.string().describe("≤80 chars, names the link between concepts"),
-    relationship: z.string().describe("≤350 chars: how they interact; no preamble"),
-    concepts: z.array(z.string()).describe("2–3 paths: concepts/slug"),
-    importance: z.enum(['high', 'medium', 'low']),
-  })),
+  connections: z.array(
+    z.object({
+      path: z.string().describe("connections/slug-two-or-three-words"),
+      title: z.string().describe("≤80 chars, names the link between concepts"),
+      relationship: z.string().describe("≤350 chars: how they interact; no preamble"),
+      concepts: z.array(z.string()).describe("2–3 paths: concepts/slug"),
+      importance: z.enum(["high", "medium", "low"]),
+    })
+  ),
 });
 
 // ============================================================
@@ -56,14 +64,14 @@ export const ConnectionDetectionSchema = z.object({
 export interface ConceptExtraction {
   name: string;
   summary: string;
-  importance: 'high' | 'medium' | 'low';
+  importance: "high" | "medium" | "low";
   description: string;
   relatedConcepts: string[];
 }
 
 export interface WikiArticle {
   path: string;
-  type: 'concept' | 'connection' | 'qa' | 'index' | 'log';
+  type: "concept" | "connection" | "qa" | "index" | "log";
   title: string;
   content: string;
   frontmatter: {
@@ -81,15 +89,15 @@ export interface WikiArticle {
 
 /** System prompt for concept extraction phase */
 export const CONCEPT_EXTRACTION_SYSTEM_PROMPT =
-  'Extract distinct, lookup-worthy concepts from the chunk. Be specific; omit fluff. Output JSON only per schema.';
+  "Extract distinct, lookup-worthy concepts from the chunk. Be specific; omit fluff. Output JSON only per schema.";
 
 /** System prompt for article generation phase */
 export const ARTICLE_GENERATION_SYSTEM_PROMPT =
-  'Write dense, neutral wiki prose. Output JSON only per schema; content is markdown body without YAML.';
+  "Write dense, neutral wiki prose. Output JSON only per schema; content is markdown body without YAML.";
 
 /** System prompt for connection detection phase */
 export const CONNECTION_DETECTION_SYSTEM_PROMPT =
-  'Find a few non-obvious cross-concept links worth a standalone note. Output JSON only per schema.';
+  "Find a few non-obvious cross-concept links worth a standalone note. Output JSON only per schema.";
 
 // ============================================================
 // PROMPT TEMPLATES
@@ -106,9 +114,10 @@ export const getConceptExtractionPrompt = (params: {
 }): string => {
   const { content, documentCount, chunkIndex, totalChunks } = params;
 
-  const chunkContext = chunkIndex !== undefined && totalChunks !== undefined
-    ? `This is chunk ${chunkIndex + 1} of ${totalChunks}. Extract concepts from this chunk only - they will be merged with concepts from other chunks.`
-    : '';
+  const chunkContext =
+    chunkIndex !== undefined && totalChunks !== undefined
+      ? `This is chunk ${chunkIndex + 1} of ${totalChunks}. Extract concepts from this chunk only - they will be merged with concepts from other chunks.`
+      : "";
 
   return `Sources: ${documentCount} document(s). ${chunkContext}
 
@@ -132,12 +141,12 @@ export const getArticleGenerationPrompt = (params: {
   return `Concept: **${concept.name}** (${concept.importance})
 Summary: ${concept.summary}
 Detail: ${concept.description}
-Hints: ${concept.relatedConcepts.join(', ') || '—'}
+Hints: ${concept.relatedConcepts.join(", ") || "—"}
 
 Sources excerpt:
 ${relevantContent}
 
-${existingArticles ? `Other articles (cross-link where real):\n${existingArticles}\n` : ''}
+${existingArticles ? `Other articles (cross-link where real):\n${existingArticles}\n` : ""}
 
 Return JSON with:
 - summary: one index line (≤120 chars)
@@ -154,7 +163,7 @@ export const getConnectionDetectionPrompt = (params: {
 }): string => {
   const { concepts, articles } = params;
 
-  const conceptList = concepts.map(c => `- ${c.name} (${c.importance} importance)`).join('\n');
+  const conceptList = concepts.map((c) => `- ${c.name} (${c.importance} importance)`).join("\n");
 
   return `Concepts:
 ${conceptList}

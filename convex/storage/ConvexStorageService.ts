@@ -1,40 +1,40 @@
 "use node";
 
-import { action } from '../_generated/server';
-import { v } from 'convex/values';
+import { action } from "../_generated/server";
+import { v } from "convex/values";
 
 /**
  * Map file extensions to their proper MIME types
  */
 function getMimeType(fileName: string, providedMimeType: string): string {
-  if (providedMimeType && providedMimeType !== 'application/octet-stream') {
+  if (providedMimeType && providedMimeType !== "application/octet-stream") {
     return providedMimeType;
   }
 
-  const ext = fileName.toLowerCase().split('.').pop();
+  const ext = fileName.toLowerCase().split(".").pop();
 
   const mimeTypeMap: Record<string, string> = {
-    md: 'text/markdown',
-    markdown: 'text/markdown',
-    txt: 'text/plain',
-    pdf: 'application/pdf',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    doc: 'application/msword',
-    csv: 'text/csv',
-    json: 'application/json',
-    xml: 'application/xml',
-    html: 'text/html',
-    htm: 'text/html',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    gif: 'image/gif',
-    webp: 'image/webp',
-    svg: 'image/svg+xml',
-    mp3: 'audio/mpeg',
-    wav: 'audio/wav',
-    mp4: 'video/mp4',
-    zip: 'application/zip',
+    md: "text/markdown",
+    markdown: "text/markdown",
+    txt: "text/plain",
+    pdf: "application/pdf",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    doc: "application/msword",
+    csv: "text/csv",
+    json: "application/json",
+    xml: "application/xml",
+    html: "text/html",
+    htm: "text/html",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    mp4: "video/mp4",
+    zip: "application/zip",
   };
 
   return ext && mimeTypeMap[ext] ? mimeTypeMap[ext] : providedMimeType;
@@ -54,7 +54,7 @@ export const uploadFile = action({
 
     const { file, fileName, contentType } = args;
 
-    console.log('[ConvexStorage] Starting file upload:', {
+    console.log("[ConvexStorage] Starting file upload:", {
       fileName,
       contentType,
       fileSize: file.size || file.length,
@@ -62,7 +62,7 @@ export const uploadFile = action({
 
     const fileSize = file.size || file.length;
     if (fileSize === 0) {
-      throw new Error('File is empty');
+      throw new Error("File is empty");
     }
 
     const properMimeType = getMimeType(fileName, contentType);
@@ -70,7 +70,7 @@ export const uploadFile = action({
     const storageId = await ctx.storage.store(file);
     const url = await ctx.storage.getUrl(storageId);
 
-    console.log('[ConvexStorage] Upload successful:', { storageId, url });
+    console.log("[ConvexStorage] Upload successful:", { storageId, url });
 
     return {
       storageId,
@@ -84,7 +84,7 @@ export const uploadFile = action({
  */
 export const getStorageUrl = action({
   args: {
-    storageId: v.id('_storage'),
+    storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -107,20 +107,20 @@ export const uploadAudioBuffer = action({
 
     const { buffer, audioOverviewId } = args;
 
-    console.log('[ConvexStorage] Starting audio upload:', {
+    console.log("[ConvexStorage] Starting audio upload:", {
       audioOverviewId,
       fileSize: buffer.length,
     });
 
     if (buffer.length === 0) {
-      throw new Error('Audio buffer is empty');
+      throw new Error("Audio buffer is empty");
     }
 
-    const blob = new Blob([buffer], { type: 'audio/mpeg' });
+    const blob = new Blob([buffer], { type: "audio/mpeg" });
     const storageId = await ctx.storage.store(blob);
     const url = await ctx.storage.getUrl(storageId);
 
-    console.log('[ConvexStorage] Audio upload successful:', { storageId, url });
+    console.log("[ConvexStorage] Audio upload successful:", { storageId, url });
 
     return {
       storageId,
@@ -136,12 +136,12 @@ export const uploadAudioBuffer = action({
  */
 export const deleteFile = action({
   args: {
-    storageId: v.optional(v.id('_storage')),
+    storageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     "use node";
 
-    console.log('[ConvexStorage] Delete requested (no-op, GC handles cleanup):', args.storageId);
+    console.log("[ConvexStorage] Delete requested (no-op, GC handles cleanup):", args.storageId);
     return;
   },
 });

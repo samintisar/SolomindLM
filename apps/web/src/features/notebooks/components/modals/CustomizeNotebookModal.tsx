@@ -1,20 +1,67 @@
-import React, { useState, useEffect } from 'react';
-import { X, Palette, Settings2, Folder, Type, Book, BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb } from 'lucide-react';
-import { NotebookItem } from '@/shared/types/index';
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Palette,
+  Settings2,
+  Folder,
+  Type,
+  Book,
+  BarChart3,
+  Monitor,
+  Search,
+  Brain,
+  Globe,
+  FileText,
+  GraduationCap,
+  Lightbulb,
+} from "lucide-react";
+import { NotebookItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
-  Folder, Book, BarChart: BarChart3, Monitor, Search, Brain, Globe, FileText, GraduationCap, Lightbulb
+  Folder,
+  Book,
+  BarChart: BarChart3,
+  Monitor,
+  Search,
+  Brain,
+  Globe,
+  FileText,
+  GraduationCap,
+  Lightbulb,
 };
 
 const COVER_COLORS = [
-  'bg-vintage-brown-300', 'bg-vintage-red-300', 'bg-vintage-orange-300', 'bg-vintage-amber-300', 'bg-vintage-amber-400',
-  'bg-vintage-green-300', 'bg-vintage-green-400', 'bg-vintage-blue-300', 'bg-vintage-blue-400', 'bg-vintage-blue-500',
-  'bg-vintage-brown-400', 'bg-vintage-red-400', 'bg-vintage-orange-400', 'bg-vintage-amber-500', 'bg-vintage-green-500',
-  'bg-vintage-blue-200', 'bg-vintage-red-200', 'bg-vintage-orange-200'
+  "bg-vintage-brown-300",
+  "bg-vintage-red-300",
+  "bg-vintage-orange-300",
+  "bg-vintage-amber-300",
+  "bg-vintage-amber-400",
+  "bg-vintage-green-300",
+  "bg-vintage-green-400",
+  "bg-vintage-blue-300",
+  "bg-vintage-blue-400",
+  "bg-vintage-blue-500",
+  "bg-vintage-brown-400",
+  "bg-vintage-red-400",
+  "bg-vintage-orange-400",
+  "bg-vintage-amber-500",
+  "bg-vintage-green-500",
+  "bg-vintage-blue-200",
+  "bg-vintage-red-200",
+  "bg-vintage-orange-200",
 ];
 
 const AVAILABLE_ICONS = [
-  'Folder', 'Book', 'BarChart', 'Monitor', 'Search', 'Brain', 'Globe', 'FileText', 'GraduationCap', 'Lightbulb'
+  "Folder",
+  "Book",
+  "BarChart",
+  "Monitor",
+  "Search",
+  "Brain",
+  "Globe",
+  "FileText",
+  "GraduationCap",
+  "Lightbulb",
 ];
 
 interface CustomizeNotebookModalProps {
@@ -29,16 +76,16 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
   onSave,
 }) => {
   const isCreateMode = !notebook;
-  const [title, setTitle] = useState(notebook?.title || '');
-  const [selectedColor, setSelectedColor] = useState(notebook?.coverColor || 'bg-yellow-500');
-  const [selectedIcon, setSelectedIcon] = useState(notebook?.icon || 'Folder');
+  const [title, setTitle] = useState(notebook?.title || "");
+  const [selectedColor, setSelectedColor] = useState(notebook?.coverColor || "bg-yellow-500");
+  const [selectedIcon, setSelectedIcon] = useState(notebook?.icon || "Folder");
 
   // Update state when notebook prop changes (when data is updated in parent)
   useEffect(() => {
     if (notebook) {
       setTitle(notebook.title);
-      setSelectedColor(notebook.coverColor || 'bg-yellow-500');
-      setSelectedIcon(notebook.icon || 'Folder');
+      setSelectedColor(notebook.coverColor || "bg-yellow-500");
+      setSelectedIcon(notebook.icon || "Folder");
     }
   }, [notebook?.id]); // Only update when notebook ID changes (different notebook selected)
 
@@ -53,7 +100,9 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
       <div className="w-full max-w-md bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="text-lg font-bold font-sans">{isCreateMode ? 'Create notebook' : 'Customize notebook'}</h3>
+          <h3 className="text-lg font-bold font-sans">
+            {isCreateMode ? "Create notebook" : "Customize notebook"}
+          </h3>
           <button onClick={onClose} className="p-1 hover:bg-secondary rounded-xl transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -62,8 +111,10 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
         {/* Preview */}
         <div className="p-6 flex justify-center bg-secondary/10">
           <div className="w-48 aspect-16/10 rounded-xl bg-card border border-border shadow-md flex flex-col ring-1 ring-border/50 overflow-hidden">
-            <div className={`h-[55%] ${selectedColor} bg-opacity-25 flex items-center justify-center`}>
-              <CurrentIcon className={`w-10 h-10 ${selectedColor.replace('bg-', 'text-')}`} />
+            <div
+              className={`h-[55%] ${selectedColor} bg-opacity-25 flex items-center justify-center`}
+            >
+              <CurrentIcon className={`w-10 h-10 ${selectedColor.replace("bg-", "text-")}`} />
             </div>
             <div className="h-[45%] p-3 bg-card">
               <div className="h-2 w-2/3 bg-muted rounded-full mb-2" />
@@ -95,11 +146,11 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
               <Palette className="w-3.5 h-3.5" /> Color
             </label>
             <div className="grid grid-cols-9 gap-2">
-              {COVER_COLORS.map(color => (
+              {COVER_COLORS.map((color) => (
                 <button
                   key={color}
                   onClick={() => setSelectedColor(color)}
-                  className={`w-6 h-6 rounded-xl ${color} ring-2 ring-offset-2 ring-offset-card transition-all hover:scale-110 ${selectedColor === color ? 'ring-primary' : 'ring-transparent'}`}
+                  className={`w-6 h-6 rounded-xl ${color} ring-2 ring-offset-2 ring-offset-card transition-all hover:scale-110 ${selectedColor === color ? "ring-primary" : "ring-transparent"}`}
                 />
               ))}
             </div>
@@ -111,14 +162,14 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
               <Settings2 className="w-3.5 h-3.5 shrink-0" /> Icon
             </label>
             <div className="grid grid-cols-5 gap-3">
-              {AVAILABLE_ICONS.map(iconName => {
+              {AVAILABLE_ICONS.map((iconName) => {
                 const Icon = IconMap[iconName] || Folder;
                 const isSelected = selectedIcon === iconName;
                 return (
                   <button
                     key={iconName}
                     onClick={() => setSelectedIcon(iconName)}
-                    className={`flex items-center justify-center p-2 rounded-lg border transition-all ${isSelected ? 'bg-primary/10 border-primary text-primary' : 'bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+                    className={`flex items-center justify-center p-2 rounded-lg border transition-all ${isSelected ? "bg-primary/10 border-primary text-primary" : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
                   >
                     <Icon className="w-5 h-5" />
                   </button>
@@ -130,7 +181,10 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
 
         {/* Footer */}
         <div className="p-4 border-t border-border bg-secondary/10 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
             Cancel
           </button>
           <button
@@ -138,7 +192,7 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
             disabled={!title.trim()}
             className="px-6 py-2 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isCreateMode ? 'Create' : 'Save'}
+            {isCreateMode ? "Create" : "Save"}
           </button>
         </div>
       </div>

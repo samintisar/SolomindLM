@@ -3,22 +3,20 @@ const INLINE_MATH_PATTERN = /\\\(([\s\S]*?)\\\)/g;
 const INLINE_CODE_OR_FENCE_PATTERN = /(```[\s\S]*?```|`[^`\n]+`)/g;
 const PARENTHESIZED_SEGMENT_PATTERN = /\(([^()\n]{2,240})\)/g;
 const LATEX_COMMAND_PATTERN = /\\[A-Za-z]+/;
-const SUBSCRIPT_OR_SUPERSCRIPT_PATTERN = /(?:^|[^\\])(?:[A-Za-z0-9}\]])[_^](?:\{[^}]+\}|[A-Za-z0-9])/;
+const SUBSCRIPT_OR_SUPERSCRIPT_PATTERN =
+  /(?:^|[^\\])(?:[A-Za-z0-9}\]])[_^](?:\{[^}]+\}|[A-Za-z0-9])/;
 const EQUATION_OPERATOR_PATTERN = /[=<>~]/;
 const VARIABLE_PATTERN = /\b[A-Za-z](?:_[A-Za-z0-9]+|\^\{?[A-Za-z0-9]+\}?|_[{][^}]+[}]|\d+)?\b/;
 
 function decodeMathEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
+  return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
 function trimMathContent(value: string): string {
   return decodeMathEntities(value)
     .trim()
-    .replace(/^\$\$?/, '')
-    .replace(/\$\$?$/, '')
+    .replace(/^\$\$?/, "")
+    .replace(/\$\$?$/, "")
     .trim();
 }
 
@@ -32,12 +30,12 @@ const TRAILING_INLINE_CITATION_RE = /(\s*\[\d+\])+(?:\s*)$/;
 function extractTrailingCitations(math: string): { core: string; tail: string } {
   const m = math.match(TRAILING_INLINE_CITATION_RE);
   if (!m) {
-    return { core: math, tail: '' };
+    return { core: math, tail: "" };
   }
   const tail = m[0];
   const core = math.slice(0, math.length - tail.length).trimEnd();
   if (!core) {
-    return { core: math, tail: '' };
+    return { core: math, tail: "" };
   }
   return { core, tail: tail.trimStart() };
 }
@@ -45,7 +43,7 @@ function extractTrailingCitations(math: string): { core: string; tail: string } 
 function isLikelyMathSegment(value: string): boolean {
   const trimmed = value.trim();
 
-  if (!trimmed || trimmed.includes('$')) {
+  if (!trimmed || trimmed.includes("$")) {
     return false;
   }
 
@@ -96,9 +94,7 @@ function normalizeTextSegment(value: string): string {
   return normalizeMathParentheticals(withCanonicalDelimiters);
 }
 
-export type MathBoundarySegment =
-  | { kind: 'text'; s: string }
-  | { kind: 'math'; s: string };
+export type MathBoundarySegment = { kind: "text"; s: string } | { kind: "math"; s: string };
 
 /**
  * Splits prose into alternating plain-text and math spans ($...$ / $$...$$).
@@ -114,24 +110,24 @@ export function splitByMathDelimiters(value: string): MathBoundarySegment[] {
   let remaining = value;
 
   while (remaining.length > 0) {
-    const dollarAt = remaining.indexOf('$');
+    const dollarAt = remaining.indexOf("$");
     if (dollarAt === -1) {
-      out.push({ kind: 'text', s: remaining });
+      out.push({ kind: "text", s: remaining });
       break;
     }
     if (dollarAt > 0) {
-      out.push({ kind: 'text', s: remaining.slice(0, dollarAt) });
+      out.push({ kind: "text", s: remaining.slice(0, dollarAt) });
       remaining = remaining.slice(dollarAt);
     }
-    const isDisplay = remaining.startsWith('$$');
-    const delim = isDisplay ? '$$' : '$';
+    const isDisplay = remaining.startsWith("$$");
+    const delim = isDisplay ? "$$" : "$";
     const close = remaining.indexOf(delim, delim.length);
     if (close === -1) {
-      out.push({ kind: 'text', s: remaining });
+      out.push({ kind: "text", s: remaining });
       break;
     }
     const mathBlock = remaining.slice(0, close + delim.length);
-    out.push({ kind: 'math', s: mathBlock });
+    out.push({ kind: "math", s: mathBlock });
     remaining = remaining.slice(close + delim.length);
   }
 
@@ -145,17 +141,17 @@ export function splitByMathDelimiters(value: string): MathBoundarySegment[] {
 function stripInnerInlineDollarsInDisplayMath(segment: string): string {
   return splitByMathDelimiters(segment)
     .map((part) => {
-      if (part.kind !== 'math' || !part.s.startsWith('$$') || part.s.length <= 4) {
+      if (part.kind !== "math" || !part.s.startsWith("$$") || part.s.length <= 4) {
         return part.s;
       }
-      if (!part.s.endsWith('$$')) {
+      if (!part.s.endsWith("$$")) {
         return part.s;
       }
       const inner = part.s.slice(2, -2);
-      const fixed = inner.replace(/(?<![\\])\$([^$\n]+)\$/g, '$1');
+      const fixed = inner.replace(/(?<![\\])\$([^$\n]+)\$/g, "$1");
       return `$$${fixed}$$`;
     })
-    .join('');
+    .join("");
 }
 
 /**
@@ -163,10 +159,10 @@ function stripInnerInlineDollarsInDisplayMath(segment: string): string {
  * KaTeX strict mode warns: "Too few columns specified in the {array} column argument."
  */
 function countArrayColumnSpecLetters(spec: string): number {
-  const compact = spec.replace(/\s/g, '').replace(/\|/g, '');
+  const compact = spec.replace(/\s/g, "").replace(/\|/g, "");
   let n = 0;
   for (const ch of compact) {
-    if (ch === 'c' || ch === 'l' || ch === 'r') {
+    if (ch === "c" || ch === "l" || ch === "r") {
       n++;
     }
   }
@@ -181,7 +177,7 @@ function inferMaxColumnsInArrayBody(body: string): number {
     if (!t) {
       continue;
     }
-    const cells = t.split('&').length;
+    const cells = t.split("&").length;
     max = Math.max(max, cells);
   }
   return max;
@@ -191,8 +187,8 @@ function findMatchingArrayEnd(tex: string, bodyStart: number): number {
   let depth = 1;
   let pos = bodyStart;
   while (pos < tex.length) {
-    const nextBegin = tex.indexOf('\\begin{array}', pos);
-    const nextEnd = tex.indexOf('\\end{array}', pos);
+    const nextBegin = tex.indexOf("\\begin{array}", pos);
+    const nextEnd = tex.indexOf("\\end{array}", pos);
     if (nextEnd === -1) {
       return -1;
     }
@@ -204,17 +200,17 @@ function findMatchingArrayEnd(tex: string, bodyStart: number): number {
       if (depth === 0) {
         return nextEnd;
       }
-      pos = nextEnd + '\\end{array}'.length;
+      pos = nextEnd + "\\end{array}".length;
     }
   }
   return -1;
 }
 
 function fixMismatchedArrayEnvironments(tex: string): string {
-  let out = '';
+  let out = "";
   let i = 0;
   while (i < tex.length) {
-    const j = tex.indexOf('\\begin{array}', i);
+    const j = tex.indexOf("\\begin{array}", i);
     if (j === -1) {
       out += tex.slice(i);
       break;
@@ -239,21 +235,21 @@ function fixMismatchedArrayEnvironments(tex: string): string {
     const declared = countArrayColumnSpecLetters(spec);
     const needed = inferMaxColumnsInArrayBody(body);
     if (needed > declared && declared >= 1 && needed <= 32) {
-      out += `\\begin{array}{${'c'.repeat(needed)}}${body}\\end{array}`;
+      out += `\\begin{array}{${"c".repeat(needed)}}${body}\\end{array}`;
     } else {
-      out += tex.slice(j, endIdx + '\\end{array}'.length);
+      out += tex.slice(j, endIdx + "\\end{array}".length);
     }
-    i = endIdx + '\\end{array}'.length;
+    i = endIdx + "\\end{array}".length;
   }
   return out;
 }
 
 function fixArraysInDelimitedMath(mathSpan: string): string {
-  if (!mathSpan.startsWith('$')) {
+  if (!mathSpan.startsWith("$")) {
     return mathSpan;
   }
-  const isDisplay = mathSpan.startsWith('$$');
-  const delim = isDisplay ? '$$' : '$';
+  const isDisplay = mathSpan.startsWith("$$");
+  const delim = isDisplay ? "$$" : "$";
   if (mathSpan.length < 2 * delim.length || !mathSpan.endsWith(delim)) {
     return mathSpan;
   }
@@ -264,16 +260,16 @@ function fixArraysInDelimitedMath(mathSpan: string): string {
 
 function fixArraysInAllMathSpans(segment: string): string {
   return splitByMathDelimiters(segment)
-    .map((part) => (part.kind === 'math' ? fixArraysInDelimitedMath(part.s) : part.s))
-    .join('');
+    .map((part) => (part.kind === "math" ? fixArraysInDelimitedMath(part.s) : part.s))
+    .join("");
 }
 
 function normalizeTextOutsideMathOnly(segment: string): string {
   const arrayFixed = fixArraysInAllMathSpans(segment);
   const stripped = stripInnerInlineDollarsInDisplayMath(arrayFixed);
   return splitByMathDelimiters(stripped)
-    .map((part) => (part.kind === 'text' ? normalizeTextSegment(part.s) : part.s))
-    .join('');
+    .map((part) => (part.kind === "text" ? normalizeTextSegment(part.s) : part.s))
+    .join("");
 }
 
 export function normalizeMathMarkdown(content: string): string {
@@ -284,17 +280,17 @@ export function normalizeMathMarkdown(content: string): string {
   return content
     .split(INLINE_CODE_OR_FENCE_PATTERN)
     .map((segment) => {
-      if (!segment || segment.startsWith('```') || segment.startsWith('`')) {
+      if (!segment || segment.startsWith("```") || segment.startsWith("`")) {
         return segment;
       }
 
       return normalizeTextOutsideMathOnly(segment);
     })
-    .join('');
+    .join("");
 }
 
 export function normalizeMathMarkdownDeep<T>(value: T): T {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return normalizeMathMarkdown(value) as T;
   }
 
@@ -302,7 +298,7 @@ export function normalizeMathMarkdownDeep<T>(value: T): T {
     return value.map((item) => normalizeMathMarkdownDeep(item)) as T;
   }
 
-  if (value && typeof value === 'object') {
+  if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([key, childValue]) => [key, normalizeMathMarkdownDeep(childValue)])
     ) as T;

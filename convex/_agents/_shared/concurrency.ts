@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Concurrency control utilities for agent operations.
  *
@@ -6,7 +6,7 @@
  * Uses p-limit to provide bounded concurrency for Promise.all-like operations.
  */
 
-import pLimit, { type LimitFunction } from 'p-limit';
+import pLimit, { type LimitFunction } from "p-limit";
 
 // ============================================================
 // TYPES
@@ -69,7 +69,7 @@ export async function allWithConcurrency<T>(
   concurrency: number
 ): Promise<T[]> {
   const limiter = getConcurrencyLimiter(concurrency);
-  return Promise.all(tasks.map(task => limiter(task)));
+  return Promise.all(tasks.map((task) => limiter(task)));
 }
 
 /**

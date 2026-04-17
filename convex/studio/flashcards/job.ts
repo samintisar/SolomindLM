@@ -4,20 +4,20 @@
  * @see ./flashcardJobPhases.ts for phase logic.
  */
 
-import { internalAction } from '../../_generated/server';
-import { v } from 'convex/values';
+import { internalAction } from "../../_generated/server";
+import { v } from "convex/values";
 import {
   runFlashcardGenerationPhase,
   runProcessFlashcardMapChunkPhase,
   runFinalizeFlashcardPhase,
-} from './flashcardJobPhases';
+} from "./flashcardJobPhases";
 
 export const flashcardGeneration = internalAction({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
-    documentIds: v.array(v.id('documents')),
+    notebookId: v.id("notebooks"),
+    documentIds: v.array(v.id("documents")),
     cardCount: v.number(),
     difficulty: v.string(),
     topic: v.optional(v.string()),
@@ -30,9 +30,9 @@ export const flashcardGeneration = internalAction({
 
 export const processFlashcardMapChunk = internalAction({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     chunkIndex: v.number(),
     totalChunks: v.number(),
     chunk: v.string(),
@@ -49,9 +49,9 @@ export const processFlashcardMapChunk = internalAction({
 
 export const finalizeFlashcardPhase = internalAction({
   args: {
-    flashcardId: v.id('flashcards'),
+    flashcardId: v.id("flashcards"),
     userId: v.string(),
-    notebookId: v.id('notebooks'),
+    notebookId: v.id("notebooks"),
     cardCount: v.number(),
     difficulty: v.string(),
     topic: v.optional(v.string()),

@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { StudioTool, Note, isAudioOverviewNote } from '@/shared/types/index';
-import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { CreateReportModal } from './CreateReportModal';
-import { CustomizeFlashcardsModal } from './CustomizeFlashcardsModal';
-import { CustomizeQuizModal } from './CustomizeQuizModal';
-import { CustomizeAudioModal } from './CustomizeAudioModal';
-import { CustomizeWrittenQuestionsModal } from './CustomizeWrittenQuestionsModal';
-import { CustomizeSlidesModal } from './CustomizeSlidesModal';
-import { CustomizeSpreadsheetsModal } from './CustomizeSpreadsheetsModal';
-import { ResizeHandle } from './ResizeHandle';
-import { StudioPanelHeader } from './StudioPanelHeader';
-import { NoteListView } from './NoteListView';
-import { ActiveNoteView } from './ActiveNoteView';
-import { MiniAudioPlayer } from '@/features/audio/components/MiniAudioPlayer';
-import { useStudioContext } from '../StudioContext';
-import { useAudioPlayerContext } from '@/features/audio/AudioPlayerContext';
-import { useStudioHandlers } from '../hooks/useStudioHandlers';
-import { useNoteActions } from '../hooks/useNoteActions';
+import React, { useState, useEffect } from "react";
+import { StudioTool, Note, isAudioOverviewNote } from "@/shared/types/index";
+import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { CreateReportModal } from "./CreateReportModal";
+import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
+import { CustomizeQuizModal } from "./CustomizeQuizModal";
+import { CustomizeAudioModal } from "./CustomizeAudioModal";
+import { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
+import { CustomizeSlidesModal } from "./CustomizeSlidesModal";
+import { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";
+import { ResizeHandle } from "./ResizeHandle";
+import { StudioPanelHeader } from "./StudioPanelHeader";
+import { NoteListView } from "./NoteListView";
+import { ActiveNoteView } from "./ActiveNoteView";
+import { MiniAudioPlayer } from "@/features/audio/components/MiniAudioPlayer";
+import { useStudioContext } from "../StudioContext";
+import { useAudioPlayerContext } from "@/features/audio/AudioPlayerContext";
+import { useStudioHandlers } from "../hooks/useStudioHandlers";
+import { useNoteActions } from "../hooks/useNoteActions";
 
 interface StudioPanelProps {
   isOpen: boolean;
@@ -43,22 +43,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   userId,
   noteId,
 }) => {
-  const {
-    notes,
-    onUpdateNote,
-    onUpdateNoteFull,
-    onDeleteNote,
-    onAddNote,
-    onSaveReportContent,
-  } = useStudioContext();
+  const { notes, onUpdateNote, onUpdateNoteFull, onDeleteNote, onAddNote, onSaveReportContent } =
+    useStudioContext();
 
-  const {
-    miniPlayerVisible,
-    miniPlayerData,
-    onPlayAudio,
-    onCloseMiniPlayer,
-    onExpandAudioPlayer,
-  } = useAudioPlayerContext();
+  const { miniPlayerVisible, miniPlayerData, onPlayAudio, onCloseMiniPlayer, onExpandAudioPlayer } =
+    useAudioPlayerContext();
   // State
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
@@ -66,7 +55,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   const [isEditingReportContent, setIsEditingReportContent] = useState(false);
 
   // Derived state
-  const activeNote = notes.find(n => n.id === activeNoteId) || null;
+  const activeNote = notes.find((n) => n.id === activeNoteId) || null;
 
   // Mobile detection
   useEffect(() => {
@@ -74,8 +63,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Custom event handler for setting active note from external sources
@@ -84,15 +73,15 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       const customEvent = event as CustomEvent;
       const noteId = customEvent.detail?.noteId;
       if (noteId) {
-        const note = notes.find(n => n.id === noteId);
+        const note = notes.find((n) => n.id === noteId);
         // Prevent setting generating notes as active
-        if (note && note.status !== 'generating') {
+        if (note && note.status !== "generating") {
           setActiveNoteId(noteId);
         }
       }
     };
-    window.addEventListener('setActiveNote', handleSetActiveNote);
-    return () => window.removeEventListener('setActiveNote', handleSetActiveNote);
+    window.addEventListener("setActiveNote", handleSetActiveNote);
+    return () => window.removeEventListener("setActiveNote", handleSetActiveNote);
   }, [notes]);
 
   // Confirm dialog
@@ -147,20 +136,28 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   // Handle note click (for viewing)
   const handleNoteClick = (note: Note) => {
     // Prevent clicking on generating notes
-    if (note.status === 'generating') {
+    if (note.status === "generating") {
       return;
     }
-    if (note.type === 'quiz' || note.type === 'flashcard' || note.type === 'report' ||
-        note.type === 'mindmap' || note.type === 'audio' || note.type === 'audioOverview' ||
-        note.type === 'writtenQuestions' ||
-        note.type === 'slides' || note.type === 'spreadsheet' || note.type === 'note') {
+    if (
+      note.type === "quiz" ||
+      note.type === "flashcard" ||
+      note.type === "report" ||
+      note.type === "mindmap" ||
+      note.type === "audio" ||
+      note.type === "audioOverview" ||
+      note.type === "writtenQuestions" ||
+      note.type === "slides" ||
+      note.type === "spreadsheet" ||
+      note.type === "note"
+    ) {
       setActiveNoteId(note.id);
     }
   };
 
   // Handle play audio from note item
   const handlePlayAudioFromNote = (note: Note) => {
-    if (note.type === 'audio' && note.metadata.audioUrl) {
+    if (note.type === "audio" && note.metadata.audioUrl) {
       onPlayAudio?.(note.metadata.audioUrl, note.title, note.content, note.id);
     } else if (isAudioOverviewNote(note) && note.audioUrl) {
       onPlayAudio?.(note.audioUrl, note.title, note.transcript, note.id, note.id);
@@ -196,24 +193,28 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   const handleCancelEditReport = () => setIsEditingReportContent(false);
 
   if (!isOpen) {
-    return <>{miniPlayerVisible && miniPlayerData && (
-      <MiniAudioPlayer
-        audioUrl={miniPlayerData.audioUrl}
-        audioOverviewId={miniPlayerData.audioOverviewId}
-        title={miniPlayerData.title}
-        transcript={miniPlayerData.transcript}
-        isVisible={miniPlayerVisible}
-        onClose={onCloseMiniPlayer || (() => {})}
-        onExpand={onExpandAudioPlayer || (() => {})}
-      />
-    )}</>;
+    return (
+      <>
+        {miniPlayerVisible && miniPlayerData && (
+          <MiniAudioPlayer
+            audioUrl={miniPlayerData.audioUrl}
+            audioOverviewId={miniPlayerData.audioOverviewId}
+            title={miniPlayerData.title}
+            transcript={miniPlayerData.transcript}
+            isVisible={miniPlayerVisible}
+            onClose={onCloseMiniPlayer || (() => {})}
+            onExpand={onExpandAudioPlayer || (() => {})}
+          />
+        )}
+      </>
+    );
   }
 
   return (
     <>
       <div
         style={{
-          width: isMobile ? '100%' : width
+          width: isMobile ? "100%" : width,
         }}
         className={`
           relative shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col
@@ -252,7 +253,9 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         />
 
         {/* Main Content */}
-        <div className={`flex-1 w-full relative ${miniPlayerVisible ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div
+          className={`flex-1 w-full relative ${miniPlayerVisible ? "overflow-hidden" : "overflow-y-auto"}`}
+        >
           {activeNote ? (
             <ActiveNoteView
               activeNote={activeNote}

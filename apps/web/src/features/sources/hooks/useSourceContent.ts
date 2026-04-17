@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useDocumentContent } from '../services/documentsApi';
-import { useAuth } from '@/features/auth/AuthContext';
-import { Source } from '@/shared/types';
+import { useState, useEffect } from "react";
+import { useDocumentContent } from "../services/documentsApi";
+import { useAuth } from "@/features/auth/AuthContext";
+import { Source } from "@/shared/types";
 
 interface UseSourceContentResult {
   // State
@@ -44,8 +44,7 @@ export function useSourceContent(): UseSourceContentResult {
   }, [user?.id]);
 
   // Normalize newlines so markdown parses correctly (e.g. \r\n -> \n; preserve structure)
-  const normalizeContentNewlines = (raw: string) =>
-    raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalizeContentNewlines = (raw: string) => raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
   // Get content for a specific source
   const getContent = (sourceId: string): string | undefined => {
@@ -70,7 +69,7 @@ export function useSourceContent(): UseSourceContentResult {
     try {
       await navigator.clipboard.writeText(markdownContent);
     } catch (err) {
-      console.error('Copy failed:', err);
+      console.error("Copy failed:", err);
       throw err;
     }
   };
@@ -80,11 +79,11 @@ export function useSourceContent(): UseSourceContentResult {
     const markdownContent = contentCache[sourceId];
     if (!markdownContent) return;
 
-    const safeName = sourceTitle.replace(/[\\/:*?"<>|]/g, '_').trim() || 'source';
+    const safeName = sourceTitle.replace(/[\\/:*?"<>|]/g, "_").trim() || "source";
     const filename = `${safeName}.md`;
-    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+    const blob = new Blob([markdownContent], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
@@ -94,12 +93,12 @@ export function useSourceContent(): UseSourceContentResult {
   // State modifiers
   const onContentUpdate = (sourceId: string, content: string) => {
     const normalized = normalizeContentNewlines(content);
-    setContentCache(prev => ({
+    setContentCache((prev) => ({
       ...prev,
       [sourceId]: normalized,
     }));
     // Clear any previous errors
-    setContentErrors(prev => {
+    setContentErrors((prev) => {
       const next = { ...prev };
       delete next[sourceId];
       return next;
@@ -108,7 +107,7 @@ export function useSourceContent(): UseSourceContentResult {
   };
 
   const onError = (sourceId: string, error: string) => {
-    setContentErrors(prev => ({
+    setContentErrors((prev) => ({
       ...prev,
       [sourceId]: error,
     }));
@@ -146,7 +145,7 @@ export function useSourceContentFetcher(
   onLoadingStart: (sourceId: string) => void
 ) {
   const documentContent = useDocumentContent(
-    source && source.status === 'completed' ? sourceId : null
+    source && source.status === "completed" ? sourceId : null
   );
 
   useEffect(() => {
@@ -154,7 +153,7 @@ export function useSourceContentFetcher(
       if (documentContent.content) {
         onContentUpdate(sourceId, documentContent.content);
       }
-    } else if (sourceId && source?.status === 'completed') {
+    } else if (sourceId && source?.status === "completed") {
       // Check if we've been waiting too long (might be an error)
       if (documentContent === undefined) {
         onLoadingStart(sourceId);

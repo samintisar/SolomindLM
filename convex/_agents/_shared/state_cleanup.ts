@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * State cleanup utilities for agent operations.
  *
@@ -21,7 +21,7 @@
  * ```
  */
 
-import type { ProgressInfo } from './state_factory.js';
+import type { ProgressInfo } from "./state_factory.js";
 
 // ============================================================
 // Types
@@ -102,7 +102,7 @@ export function createCleanupNode<TState extends Record<string, unknown>>(
     // Log cleanup operation
     const memoryBefore = estimateStateSize(state);
     console.log(`[${agentName}] ===== STATE CLEANUP: ${phase} =====`);
-    console.log(`[${agentName}] Clearing keys: ${keysToClear.join(', ')}`);
+    console.log(`[${agentName}] Clearing keys: ${keysToClear.join(", ")}`);
     console.log(`[${agentName}] Estimated memory before: ${formatBytes(memoryBefore)}`);
 
     // Build cleanup result
@@ -202,16 +202,16 @@ function estimateValueSize(value: unknown): number {
     return 0;
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     // UTF-16 uses 2 bytes per character
     return value.length * 2;
   }
 
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return 8;
   }
 
-  if (typeof value === 'boolean') {
+  if (typeof value === "boolean") {
     return 1;
   }
 
@@ -223,7 +223,7 @@ function estimateValueSize(value: unknown): number {
     return size;
   }
 
-  if (typeof value === 'object') {
+  if (typeof value === "object") {
     let size = 0;
     for (const v of Object.values(value as Record<string, unknown>)) {
       size += estimateValueSize(v);
@@ -238,9 +238,9 @@ function estimateValueSize(value: unknown): number {
  * Formats bytes to human-readable string.
  */
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return "0 B";
 
-  const units = ['B', 'KB', 'MB', 'GB'];
+  const units = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
 
   return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;

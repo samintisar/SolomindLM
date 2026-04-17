@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * State factory for LLM agent operations.
  *
@@ -9,8 +9,8 @@
  * state with duplicate reducer logic.
  */
 
-import { Annotation } from '@langchain/langgraph';
-import type { ProgressInfo as ProgressInfoType } from './progress.js';
+import { Annotation } from "@langchain/langgraph";
+import type { ProgressInfo as ProgressInfoType } from "./progress.js";
 
 // Re-export ProgressInfo for backward compatibility
 export type ProgressInfo = ProgressInfoType;
@@ -67,7 +67,7 @@ export function createGraphState<TOutput = any>(options?: {
 
     mapOutputs: Annotation<string[]>({
       // Reducer concatenates arrays - critical for aggregating parallel outputs
-      reducer: (x: string[], y?: string[]) => y ? x.concat(y) : x,
+      reducer: (x: string[], y?: string[]) => (y ? x.concat(y) : x),
       default: () => [],
     }),
 
@@ -78,21 +78,21 @@ export function createGraphState<TOutput = any>(options?: {
 
     finalOutput: Annotation<TOutput>({
       reducer: (_x: TOutput, y?: TOutput) => y ?? _x,
-      default: () => options?.outputDefault ?? [] as TOutput,
+      default: () => options?.outputDefault ?? ([] as TOutput),
     }),
 
     status: Annotation<string>({
       reducer: (_x: string, y?: string) => y ?? _x,
-      default: () => 'generating',
+      default: () => "generating",
     }),
 
     // Progress tracking for streaming
     progress: Annotation<ProgressInfo>({
       reducer: (x: ProgressInfo, y?: ProgressInfo) => y ?? x,
       default: () => ({
-        phase: 'initializing',
+        phase: "initializing",
         percentage: 0,
-        message: 'Initializing...',
+        message: "Initializing...",
       }),
     }),
   };
@@ -115,9 +115,8 @@ export function createGraphState<TOutput = any>(options?: {
  * type OverallStateType = GraphStateType<typeof OverallState>;
  * ```
  */
-export type GraphStateType<T extends ReturnType<typeof createGraphState>> = T extends ReturnType<typeof createGraphState>
-  ? T['State']
-  : never;
+export type GraphStateType<T extends ReturnType<typeof createGraphState>> =
+  T extends ReturnType<typeof createGraphState> ? T["State"] : never;
 
 /**
  * Creates a minimal state interface for parallel map processing.
@@ -161,4 +160,5 @@ export interface ChunkProcessStateBase {
  * }>;
  * ```
  */
-export type CreateChunkProcessState<T extends Record<string, any> = {}> = ChunkProcessStateBase & T;
+export type CreateChunkProcessState<T extends Record<string, any> = Record<string, never>> =
+  ChunkProcessStateBase & T;

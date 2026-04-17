@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Topic extraction utility for LLM agent operations.
  *
@@ -79,7 +79,7 @@ export class TopicExtractor {
    */
   private extractTopicsInternal(output: string): string[] {
     const topics: string[] = [];
-    const lines = output.split('\n');
+    const lines = output.split("\n");
     let inTopicsSection = false;
 
     for (const line of lines) {
@@ -91,7 +91,11 @@ export class TopicExtractor {
 
       // Exit topics section when hitting another section
       if (inTopicsSection) {
-        if (line.match(/^\*{0,2}(Key|Important|Learning|Surprising|Notable|Actionable|Technical|Supporting)/i)) {
+        if (
+          line.match(
+            /^\*{0,2}(Key|Important|Learning|Surprising|Notable|Actionable|Technical|Supporting)/i
+          )
+        ) {
           break;
         }
 
@@ -117,23 +121,23 @@ export class TopicExtractor {
         const numberedTopics = topicsText.match(/\d+\.\s+([^\d]+?)(?=\s+\d+\.|$)/g);
         if (numberedTopics) {
           const extracted = numberedTopics
-            .map(t => t.replace(/^\d+\.\s*/, '').trim())
-            .filter(t => t.length > 2)
+            .map((t) => t.replace(/^\d+\.\s*/, "").trim())
+            .filter((t) => t.length > 2)
             .slice(0, this.config.maxTopicsPerChunk);
           topics.push(...extracted);
         } else {
           // Final fallback: split by delimiters
           const extractedTopics = topicsText
             .split(/,|;|\n|\d+\.|and|&/i)
-            .map(t => t.trim().replace(/^\*+|\*+$/g, ''))
-            .filter(t => t.length > 3 && !t.match(/Main Topics/i))
+            .map((t) => t.trim().replace(/^\*+|\*+$/g, ""))
+            .filter((t) => t.length > 3 && !t.match(/Main Topics/i))
             .slice(0, this.config.maxTopicsPerChunk);
           topics.push(...extractedTopics);
         }
       }
     }
 
-    return topics.length > 0 ? topics : ['Unknown'];
+    return topics.length > 0 ? topics : ["Unknown"];
   }
 
   /**
@@ -181,11 +185,11 @@ export class TopicExtractor {
 
     if (filterErrors) {
       return unique.filter(
-        t =>
-          !t.includes('Error') &&
-          !t.includes('error') &&
-          !t.includes('timeout') &&
-          !t.includes('Unknown')
+        (t) =>
+          !t.includes("Error") &&
+          !t.includes("error") &&
+          !t.includes("timeout") &&
+          !t.includes("Unknown")
       );
     }
 
@@ -222,10 +226,10 @@ export class TopicExtractor {
  */
 export function createTopicRequirement(topics: string[]): string {
   if (topics.length === 0) {
-    return '';
+    return "";
   }
 
-  const topicList = topics.map((t, i) => `${i + 1}. ${t}`).join('\n');
+  const topicList = topics.map((t, i) => `${i + 1}. ${t}`).join("\n");
 
   return `
 ====================
@@ -247,10 +251,7 @@ Do NOT combine topics or focus primarily on one.
  * @param config - Optional topic extraction configuration
  * @returns Array of extracted topics
  */
-export function extractTopics(
-  output: string,
-  config?: TopicExtractionConfig
-): string[] {
+export function extractTopics(output: string, config?: TopicExtractionConfig): string[] {
   const extractor = new TopicExtractor(config);
   return extractor.extractTopics(output);
 }
@@ -296,7 +297,7 @@ export function selectBalancedByTopic(
   const topicGroups: Record<string, number[]> = {};
   for (let i = 0; i < outputs.length; i++) {
     const outputTopics = extractor.extractTopics(outputs[i]);
-    const primaryTopic = outputTopics[0] || 'Unknown';
+    const primaryTopic = outputTopics[0] || "Unknown";
     if (!topicGroups[primaryTopic]) {
       topicGroups[primaryTopic] = [];
     }

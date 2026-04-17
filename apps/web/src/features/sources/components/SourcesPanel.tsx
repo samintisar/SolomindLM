@@ -1,37 +1,37 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useSourcesContext } from '../SourcesContext';
-import { DiscoverSourcesModal } from './DiscoverSourcesModal';
-import { AddSourceModal } from './AddSourceModal';
-import { UrlInputModal } from './UrlInputModal';
-import { SocialMediaInputModal } from './SocialMediaInputModal';
-import { TextInputModal } from './TextInputModal';
-import { GoogleDrivePicker } from './GoogleDrivePicker';
-import type { GoogleDrivePickerHandle, PickedFile } from './GoogleDrivePicker';
-import { SourceList } from './SourceList';
-import { SourceViewer } from './SourceViewer';
-import { SourcesPanelHeader } from './SourcesPanelHeader';
-import { WikiCard } from './WikiCard';
-import { useSourceUpload } from '../hooks/useSourceUpload';
-import { useSourceContent } from '../hooks/useSourceContent';
-import { useSourceSearch } from '../hooks/useSourceSearch';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useSourcesContext } from "../SourcesContext";
+import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
+import { AddSourceModal } from "./AddSourceModal";
+import { UrlInputModal } from "./UrlInputModal";
+import { SocialMediaInputModal } from "./SocialMediaInputModal";
+import { TextInputModal } from "./TextInputModal";
+import { GoogleDrivePicker } from "./GoogleDrivePicker";
+import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
+import { SourceList } from "./SourceList";
+import { SourceViewer } from "./SourceViewer";
+import { SourcesPanelHeader } from "./SourcesPanelHeader";
+import { WikiCard } from "./WikiCard";
+import { useSourceUpload } from "../hooks/useSourceUpload";
+import { useSourceContent } from "../hooks/useSourceContent";
+import { useSourceSearch } from "../hooks/useSourceSearch";
 import {
   useDocumentContent,
   useDocument,
   useIngestFromGoogleDrive,
   useRefreshNotebookRemoteSources,
   useRefreshRemoteSource,
-} from '../services/documentsApi';
+} from "../services/documentsApi";
 import {
   useWiki,
   useWikiArticle,
   useCreateWiki,
   useRefreshWiki,
   useCancelWikiGeneration,
-} from '../services/wikiApi';
-import type { Source } from '@/shared/types';
-import { requestGoogleDriveAccessToken } from '../utils/requestGoogleDriveAccessToken';
-import { useConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { useToast } from '@/shared/contexts/ToastContext';
+} from "../services/wikiApi";
+import type { Source } from "@/shared/types";
+import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
+import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { useToast } from "@/shared/contexts/ToastContext";
 
 interface SourcesPanelProps {
   isOpen: boolean;
@@ -68,7 +68,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [viewingWikiPath, setViewingWikiPath] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
   const [isMobile, setIsMobile] = useState(false);
 
   // Modal states
@@ -107,16 +107,14 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           });
           onDocumentUploaded?.(result.documentId);
         } catch (err) {
-          console.error('Google Drive upload failed:', err);
+          console.error("Google Drive upload failed:", err);
           showError(
-            err instanceof Error
-              ? err.message
-              : `Failed to import "${file.name}" from Google Drive`,
+            err instanceof Error ? err.message : `Failed to import "${file.name}" from Google Drive`
           );
         }
       }
     },
-    [noteId, ingestFromDrive, onDocumentUploaded, showError],
+    [noteId, ingestFromDrive, onDocumentUploaded, showError]
   );
 
   // Custom hooks
@@ -133,7 +131,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // Fetch document content using the reactive hook
   const viewingSource = useMemo(
-    () => sources.find(s => s.id === viewingSourceId) || null,
+    () => sources.find((s) => s.id === viewingSourceId) || null,
     [sources, viewingSourceId]
   );
 
@@ -141,32 +139,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     if (!viewingWikiPath) return null;
     if (wikiArticle) {
       const date =
-        wikiArticle.frontmatter?.lastUpdated?.split('T')[0] ??
+        wikiArticle.frontmatter?.lastUpdated?.split("T")[0] ??
         new Date(wikiArticle.updatedAt).toLocaleDateString();
       return {
         id: `__wiki__:${viewingWikiPath}`,
         title: wikiArticle.title,
-        type: 'MD',
+        type: "MD",
         date,
         selected: false,
-        status: 'completed',
+        status: "completed",
       };
     }
-    const slug = viewingWikiPath.split('/').filter(Boolean).pop() ?? viewingWikiPath;
-    const fallbackTitle = slug.replace(/-/g, ' ');
+    const slug = viewingWikiPath.split("/").filter(Boolean).pop() ?? viewingWikiPath;
+    const fallbackTitle = slug.replace(/-/g, " ");
     return {
       id: `__wiki__:${viewingWikiPath}`,
       title: fallbackTitle,
-      type: 'MD',
-      date: '',
+      type: "MD",
+      date: "",
       selected: false,
-      status: 'completed',
+      status: "completed",
     };
   }, [viewingWikiPath, wikiArticle]);
 
   const panelViewingSource = viewingWikiPath ? wikiSyntheticSource : viewingSource;
   const documentContent = useDocumentContent(
-    viewingSource && viewingSource.status === 'completed' ? viewingSourceId : null
+    viewingSource && viewingSource.status === "completed" ? viewingSourceId : null
   );
   const viewingDocument = useDocument(viewingSourceId);
 
@@ -180,7 +178,11 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   useEffect(() => {
     if (viewingSourceId && documentContent?.content) {
       onContentUpdateRef.current(viewingSourceId, documentContent.content);
-    } else if (viewingSourceId && viewingSource?.status === 'completed' && documentContent === undefined) {
+    } else if (
+      viewingSourceId &&
+      viewingSource?.status === "completed" &&
+      documentContent === undefined
+    ) {
       onLoadingStartRef.current(viewingSourceId);
     }
   }, [viewingSourceId, documentContent, viewingSource?.status]);
@@ -193,29 +195,26 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Computed values
-  const allSelected =
-    filteredSources.length > 0 && filteredSources.every((s) => s.selected);
-  const selectedCount = sources.filter(s => s.selected).length;
+  const allSelected = filteredSources.length > 0 && filteredSources.every((s) => s.selected);
+  const selectedCount = sources.filter((s) => s.selected).length;
 
-  const markdownContent = viewingSourceId
-    ? sourceContent.getContent(viewingSourceId)
-    : undefined;
+  const markdownContent = viewingSourceId ? sourceContent.getContent(viewingSourceId) : undefined;
   const wikiMarkdown = viewingWikiPath ? wikiArticle?.content : undefined;
   const canCopyOrDownload = viewingWikiPath
     ? Boolean(wikiArticle?.content?.trim())
-    : Boolean(markdownContent && !sourceContent.hasError(viewingSourceId ?? ''));
+    : Boolean(markdownContent && !sourceContent.hasError(viewingSourceId ?? ""));
 
   // Handlers
   const handleDeleteSource = async (sourceId: string, sourceTitle: string) => {
     const confirmed = await confirm(
-      'Delete Source',
+      "Delete Source",
       `Are you sure you want to delete "${sourceTitle}"? This action cannot be undone.`,
-      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+      { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
     );
     if (confirmed) {
       onDeleteSource(sourceId);
@@ -226,31 +225,28 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     const ids = sources.filter((s) => s.selected).map((s) => s.id);
     if (ids.length === 0) return;
     const confirmed = await confirm(
-      'Delete sources',
-      `Delete ${ids.length} selected source${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
-      { confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' }
+      "Delete sources",
+      `Delete ${ids.length} selected source${ids.length === 1 ? "" : "s"}? This cannot be undone.`,
+      { confirmText: "Delete", cancelText: "Cancel", variant: "danger" }
     );
     if (confirmed) {
       await onDeleteSelectedSources(ids);
     }
   };
 
-  const canRefreshAll = useMemo(
-    () => sources.some((s) => s.remoteRefreshKind),
-    [sources]
-  );
+  const canRefreshAll = useMemo(() => sources.some((s) => s.remoteRefreshKind), [sources]);
 
   const handleRefreshAll = useCallback(async () => {
     if (!noteId || isRefreshingAll || !canRefreshAll) return;
     setIsRefreshingAll(true);
     try {
-      const needsDrive = sources.some((s) => s.remoteRefreshKind === 'drive');
+      const needsDrive = sources.some((s) => s.remoteRefreshKind === "drive");
       let accessToken: string | undefined;
       if (needsDrive) {
         try {
           accessToken = await requestGoogleDriveAccessToken();
         } catch (e) {
-          console.warn('Google token not obtained; Drive sources may be skipped.', e);
+          console.warn("Google token not obtained; Drive sources may be skipped.", e);
         }
       }
       const result = await refreshNotebookRemote({
@@ -259,24 +255,24 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       });
       const parts: string[] = [];
       if (result.urlCount > 0) {
-        parts.push(`${result.urlCount} web page${result.urlCount === 1 ? '' : 's'} queued`);
+        parts.push(`${result.urlCount} web page${result.urlCount === 1 ? "" : "s"} queued`);
       }
       if (result.driveRefreshed > 0) {
         parts.push(`${result.driveRefreshed} from Google Drive`);
       }
       if (result.driveSkippedNoToken > 0) {
         parts.push(
-          `${result.driveSkippedNoToken} Drive source${result.driveSkippedNoToken === 1 ? '' : 's'} skipped (sign in with Google to refresh)`
+          `${result.driveSkippedNoToken} Drive source${result.driveSkippedNoToken === 1 ? "" : "s"} skipped (sign in with Google to refresh)`
         );
       }
       if (parts.length === 0) {
-        showInfo('No web or Google Drive sources to refresh in this notebook.');
+        showInfo("No web or Google Drive sources to refresh in this notebook.");
       } else {
-        success(`Refresh started: ${parts.join('. ')}.`);
+        success(`Refresh started: ${parts.join(". ")}.`);
       }
     } catch (err) {
-      console.error('Refresh all failed:', err);
-      showError(err instanceof Error ? err.message : 'Failed to refresh sources');
+      console.error("Refresh all failed:", err);
+      showError(err instanceof Error ? err.message : "Failed to refresh sources");
     } finally {
       setIsRefreshingAll(false);
     }
@@ -297,17 +293,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       if (!source?.remoteRefreshKind) return;
       try {
         let accessToken: string | undefined;
-        if (source.remoteRefreshKind === 'drive') {
+        if (source.remoteRefreshKind === "drive") {
           accessToken = await requestGoogleDriveAccessToken();
         }
         await refreshRemoteSource({
           documentId: sourceId,
           accessToken,
         });
-        showInfo('Refresh started for this source.');
+        showInfo("Refresh started for this source.");
       } catch (err) {
-        console.error('Refresh source failed:', err);
-        showError(err instanceof Error ? err.message : 'Failed to refresh source');
+        console.error("Refresh source failed:", err);
+        showError(err instanceof Error ? err.message : "Failed to refresh source");
       }
     },
     [sources, refreshRemoteSource, showInfo, showError]
@@ -335,10 +331,10 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setIsWikiPending(true);
       const { wikiId } = await createWikiMutation(noteId);
       await refreshWikiMutation(wikiId);
-      success('Knowledge wiki generation started!');
+      success("Knowledge wiki generation started!");
     } catch (err) {
-      console.error('Failed to create wiki:', err);
-      showError(err instanceof Error ? err.message : 'Failed to create wiki');
+      console.error("Failed to create wiki:", err);
+      showError(err instanceof Error ? err.message : "Failed to create wiki");
     } finally {
       setIsWikiPending(false);
     }
@@ -350,10 +346,10 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     try {
       setIsWikiPending(true);
       await refreshWikiMutation(wiki._id);
-      success('Knowledge wiki regeneration started!');
+      success("Knowledge wiki regeneration started!");
     } catch (err) {
-      console.error('Failed to regenerate wiki:', err);
-      showError(err instanceof Error ? err.message : 'Failed to regenerate wiki');
+      console.error("Failed to regenerate wiki:", err);
+      showError(err instanceof Error ? err.message : "Failed to regenerate wiki");
     } finally {
       setIsWikiPending(false);
     }
@@ -365,11 +361,11 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     try {
       const result = await cancelWikiMutation(wiki._id);
       if (result.cancelled) {
-        showInfo('Wiki generation stopped.');
+        showInfo("Wiki generation stopped.");
       }
     } catch (err) {
-      console.error('Failed to cancel wiki generation:', err);
-      showError(err instanceof Error ? err.message : 'Failed to stop wiki generation');
+      console.error("Failed to cancel wiki generation:", err);
+      showError(err instanceof Error ? err.message : "Failed to stop wiki generation");
     } finally {
       setIsWikiPending(false);
     }
@@ -392,7 +388,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   const handleStartRename = (sourceId: string) => {
-    const source = sources.find(s => s.id === sourceId);
+    const source = sources.find((s) => s.id === sourceId);
     if (source) {
       setRenamingId(sourceId);
       setRenameValue(source.title);
@@ -421,9 +417,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     if (viewingWikiPath && wikiArticle?.content) {
       try {
         await navigator.clipboard.writeText(wikiArticle.content);
-        success('Copied wiki article to clipboard');
+        success("Copied wiki article to clipboard");
       } catch {
-        showError('Could not copy to clipboard');
+        showError("Could not copy to clipboard");
       }
       return;
     }
@@ -434,13 +430,14 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const handleDownload = () => {
     if (viewingWikiPath && wikiArticle?.content) {
-      const safeName = (wikiArticle.title || 'wiki-article')
-        .replace(/[^\w\s-]/g, '')
-        .trim()
-        .slice(0, 80) || 'wiki-article';
-      const blob = new Blob([wikiArticle.content], { type: 'text/markdown;charset=utf-8' });
+      const safeName =
+        (wikiArticle.title || "wiki-article")
+          .replace(/[^\w\s-]/g, "")
+          .trim()
+          .slice(0, 80) || "wiki-article";
+      const blob = new Blob([wikiArticle.content], { type: "text/markdown;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `${safeName}.md`;
       a.click();
@@ -470,7 +467,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
         const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
         window.dispatchEvent(
-          new CustomEvent('resizeSourcesPanel', { detail: { width: newWidth } })
+          new CustomEvent("resizeSourcesPanel", { detail: { width: newWidth } })
         );
       });
     };
@@ -479,28 +476,28 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
     };
 
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
   };
 
   return (
     <>
       <div
         style={{
-          width: isOpen ? (isMobile ? '100%' : width) : 0,
+          width: isOpen ? (isMobile ? "100%" : width) : 0,
         }}
         className={`
           relative shrink-0 bg-sidebar border-r-2 border-border h-full flex flex-col
           overflow-hidden
-          ${isOpen ? 'opacity-100' : 'opacity-0'}
+          ${isOpen ? "opacity-100" : "opacity-0"}
           md:w-auto w-full max-w-full
         `}
       >
@@ -529,22 +526,22 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               onToggle={handleToggleSource}
               content={viewingWikiPath ? wikiMarkdown : markdownContent}
               pdfStorageId={
-                !viewingWikiPath && viewingSource?.type === 'PDF'
+                !viewingWikiPath && viewingSource?.type === "PDF"
                   ? viewingDocument?.storageId
                   : undefined
               }
               isLoading={
                 viewingWikiPath
                   ? wikiArticle === undefined
-                  : sourceContent.isLoading(viewingSourceId ?? '')
+                  : sourceContent.isLoading(viewingSourceId ?? "")
               }
               error={
                 viewingWikiPath
                   ? wikiArticle === null
-                    ? 'Wiki article not found'
+                    ? "Wiki article not found"
                     : undefined
-                  : sourceContent.hasError(viewingSourceId ?? '')
-                    ? 'Failed to load content'
+                  : sourceContent.hasError(viewingSourceId ?? "")
+                    ? "Failed to load content"
                     : undefined
               }
               hideInclusionToggle={Boolean(viewingWikiPath)}

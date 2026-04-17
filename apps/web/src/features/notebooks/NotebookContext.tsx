@@ -1,6 +1,6 @@
-import { createContext, useContext, ReactNode } from 'react';
-import { NotebookItem, FolderItem } from '@/shared/types/index';
-import { useSubscriptionStatus } from '../billing/services/subscriptionApi';
+import { createContext, useContext, ReactNode } from "react";
+import { NotebookItem, FolderItem } from "@/shared/types/index";
+import { useSubscriptionStatus } from "../billing/services/subscriptionApi";
 
 export interface NotebookContextType {
   // Derived data
@@ -57,15 +57,11 @@ interface NotebookProviderProps {
 }
 
 export function NotebookProvider({ children, value }: NotebookProviderProps) {
-  return (
-    <NotebookContext.Provider value={value}>
-      {children}
-    </NotebookContext.Provider>
-  );
+  return <NotebookContext.Provider value={value}>{children}</NotebookContext.Provider>;
 }
 
 export function useNotebookContext() {
   const context = useContext(NotebookContext);
-  if (!context) throw new Error('useNotebookContext must be used within NotebookProvider');
+  if (!context) throw new Error("useNotebookContext must be used within NotebookProvider");
   return context;
 }

@@ -1,7 +1,6 @@
-
-import React, { useState } from 'react';
-import { X, Presentation, Check } from 'lucide-react';
-import { StudioModalDiscoverPromptsButton } from './StudioModalDiscoverPromptsButton';
+import React, { useState } from "react";
+import { X, Presentation, Check } from "lucide-react";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeSlidesModalProps {
   isOpen: boolean;
@@ -11,8 +10,8 @@ interface CustomizeSlidesModalProps {
 }
 
 export interface SlideDeckConfig {
-  slideType: 'detailed_deck' | 'presenter_slides';
-  deckLength: 'short' | 'default';
+  slideType: "detailed_deck" | "presenter_slides";
+  deckLength: "short" | "default";
   customPrompt: string;
 }
 
@@ -22,9 +21,9 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
   onGenerate,
   embedded = false,
 }) => {
-  const [slideType, setSlideType] = useState<SlideDeckConfig['slideType']>('detailed_deck');
-  const [deckLength, setDeckLength] = useState<SlideDeckConfig['deckLength']>('default');
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [slideType, setSlideType] = useState<SlideDeckConfig["slideType"]>("detailed_deck");
+  const [deckLength, setDeckLength] = useState<SlideDeckConfig["deckLength"]>("default");
+  const [customPrompt, setCustomPrompt] = useState("");
 
   if (!isOpen) return null;
 
@@ -41,13 +40,17 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-secondary/50 rounded-lg">
-                <Presentation className="w-5 h-5 text-primary" />
+              <Presentation className="w-5 h-5 text-primary" />
             </div>
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Slide Deck</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <StudioModalDiscoverPromptsButton />
-            <button type="button" onClick={onClose} className="rounded-xl p-2 transition-colors hover:bg-secondary/50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl p-2 transition-colors hover:bg-secondary/50"
+            >
               <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
@@ -56,24 +59,44 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
         <div className="p-6 md:p-10 space-y-10 bg-card/50">
           <div className="space-y-10">
             <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Format</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
+                Format
+              </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {([
-                  { value: 'detailed_deck' as const, label: 'Detailed Deck', description: 'A comprehensive deck with full text and details, perfect for emailing or reading on its own.' },
-                  { value: 'presenter_slides' as const, label: 'Presenter Slides', description: 'Clean, visual slides with key talking points to support you while you speak.' }
-                ] as const).map((opt) => (
+                {(
+                  [
+                    {
+                      value: "detailed_deck" as const,
+                      label: "Detailed Deck",
+                      description:
+                        "A comprehensive deck with full text and details, perfect for emailing or reading on its own.",
+                    },
+                    {
+                      value: "presenter_slides" as const,
+                      label: "Presenter Slides",
+                      description:
+                        "Clean, visual slides with key talking points to support you while you speak.",
+                    },
+                  ] as const
+                ).map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => setSlideType(opt.value)}
                     className={`
                       relative flex flex-col p-5 rounded-xl border text-left transition-all h-full
-                      ${slideType === opt.value 
-                        ? 'bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20' 
-                        : 'bg-card border-border/50 hover:border-primary/40 hover:bg-secondary/30'}
+                      ${
+                        slideType === opt.value
+                          ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20"
+                          : "bg-card border-border/50 hover:border-primary/40 hover:bg-secondary/30"
+                      }
                     `}
                   >
                     <div className="flex justify-between items-start mb-3">
-                      <span className={`font-bold text-sm ${slideType === opt.value ? 'text-primary' : 'text-foreground'}`}>{opt.label}</span>
+                      <span
+                        className={`font-bold text-sm ${slideType === opt.value ? "text-primary" : "text-foreground"}`}
+                      >
+                        {opt.label}
+                      </span>
                       {slideType === opt.value && (
                         <div className="p-1 rounded-xl bg-primary text-primary-foreground">
                           <Check className="w-2.5 h-2.5" />
@@ -89,20 +112,26 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
             </div>
 
             <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Length</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
+                Length
+              </label>
               <div className="flex bg-background border border-border rounded-xl p-1 w-fit">
-                {([
-                  { value: 'short' as const, label: 'Short' },
-                  { value: 'default' as const, label: 'Default' }
-                ] as const).map((opt) => (
+                {(
+                  [
+                    { value: "short" as const, label: "Short" },
+                    { value: "default" as const, label: "Default" },
+                  ] as const
+                ).map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => setDeckLength(opt.value)}
                     className={`
                       flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all
-                      ${deckLength === opt.value 
-                        ? 'bg-primary text-primary-foreground shadow-sm' 
-                        : 'text-muted-foreground hover:text-foreground'}
+                      ${
+                        deckLength === opt.value
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }
                     `}
                   >
                     {deckLength === opt.value && <Check className="w-3 h-3" />}
@@ -114,7 +143,9 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
           </div>
 
           <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Area of Focus</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
+              Area of Focus
+            </label>
             <textarea
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}

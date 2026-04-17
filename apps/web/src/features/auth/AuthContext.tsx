@@ -1,9 +1,9 @@
-import { createContext, useContext, ReactNode, useState } from 'react';
-import { useQuery, useConvexAuth } from 'convex/react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '@convex/_generated/api';
-import { useAuthActions } from '@convex-dev/auth/react';
-import { getConvexAuthUserMessage } from '@/features/auth/utils/authErrorMessage';
+import { createContext, useContext, ReactNode, useState } from "react";
+import { useQuery, useConvexAuth } from "convex/react";
+import { useNavigate } from "react-router-dom";
+import { api } from "@convex/_generated/api";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
 
 export interface User {
   id: string;
@@ -39,20 +39,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signIn("google", { redirectTo: "/home" });
     } catch (error) {
-      setAuthError(getConvexAuthUserMessage(error, 'Google sign-in failed'));
+      setAuthError(getConvexAuthUserMessage(error, "Google sign-in failed"));
     }
   };
 
   const signOut = async (): Promise<void> => {
     await authSignOut();
-    navigate('/home', { replace: true });
+    navigate("/home", { replace: true });
   };
 
   const clearAuthError = (): void => setAuthError(null);
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated, authError, signInWithGoogle, signOut, clearAuthError }}
+      value={{
+        user,
+        isLoading,
+        isAuthenticated,
+        authError,
+        signInWithGoogle,
+        signOut,
+        clearAuthError,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -61,6 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 }

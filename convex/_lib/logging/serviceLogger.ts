@@ -22,7 +22,12 @@ export interface ServiceLogger {
   operationError: (error: Error | unknown, meta?: Record<string, unknown>) => void;
 
   apiCall: (api: string, endpoint: string, meta?: Record<string, unknown>) => void;
-  apiError: (api: string, endpoint: string, error: Error | unknown, meta?: Record<string, unknown>) => void;
+  apiError: (
+    api: string,
+    endpoint: string,
+    error: Error | unknown,
+    meta?: Record<string, unknown>
+  ) => void;
   apiSuccess: (
     api: string,
     endpoint: string,
@@ -33,7 +38,12 @@ export interface ServiceLogger {
   cacheHit: (keyHint: string) => void;
   cacheMiss: (keyHint: string) => void;
 
-  performance: (metric: string, value: number, unit: string, meta?: Record<string, unknown>) => void;
+  performance: (
+    metric: string,
+    value: number,
+    unit: string,
+    meta?: Record<string, unknown>
+  ) => void;
 
   info: (message: string, meta?: Record<string, unknown>) => void;
   warn: (message: string, meta?: Record<string, unknown>) => void;
@@ -96,7 +106,11 @@ export function createServiceLogger(
     operationError(error, meta) {
       const err =
         error instanceof Error
-          ? { name: error.name, message: error.message, stack: error.stack?.split("\n").slice(0, 6).join("\n") }
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack?.split("\n").slice(0, 6).join("\n"),
+            }
           : { message: String(error) };
       emit("error", base(), { event: "operation_error", error: err, ...(meta ?? {}) });
     },
@@ -150,7 +164,12 @@ export function createServiceLogger(
           : error !== undefined
             ? { message: String(error) }
             : undefined;
-      emit("error", base(), { event: "error", message, ...(err ? { error: err } : {}), ...(meta ?? {}) });
+      emit("error", base(), {
+        event: "error",
+        message,
+        ...(err ? { error: err } : {}),
+        ...(meta ?? {}),
+      });
     },
 
     debug(message, meta) {

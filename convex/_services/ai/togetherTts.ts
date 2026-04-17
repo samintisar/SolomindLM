@@ -21,7 +21,7 @@ export async function synthesizeSpeechToBuffer(
     input: string;
     voice: string;
     timeoutMs: number;
-  },
+  }
 ): Promise<Buffer> {
   const { model, input, voice, timeoutMs } = params;
   const response = await Promise.race([
@@ -35,7 +35,7 @@ export async function synthesizeSpeechToBuffer(
       stream: false,
     }),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("TTS timeout")), timeoutMs),
+      setTimeout(() => reject(new Error("TTS timeout")), timeoutMs)
     ),
   ]);
   return Buffer.from(await response.arrayBuffer());

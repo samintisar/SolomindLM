@@ -3,15 +3,15 @@
  * Combines error parsing with toast notifications and Stripe checkout flow.
  */
 
-import { useCallback } from 'react';
-import { useToast } from '../contexts/ToastContext';
-import { useCreateCheckout } from '@/features/billing/services/subscriptionApi';
+import { useCallback } from "react";
+import { useToast } from "../contexts/ToastContext";
+import { useCreateCheckout } from "@/features/billing/services/subscriptionApi";
 import {
   parseLimitError,
   getLimitErrorMessage,
   getUpgradeMessage,
   type ParsedLimitError,
-} from '../utils/errorParser';
+} from "../utils/errorParser";
 
 /**
  * Options for handleLimitError
@@ -48,7 +48,10 @@ export function useLimitErrorToast() {
    * Handle an error and show appropriate toast with upgrade CTA if it's a limit error
    */
   const handleLimitError = useCallback(
-    async (error: unknown, options: HandleLimitErrorOptions = {}): Promise<HandleLimitErrorResult> => {
+    async (
+      error: unknown,
+      options: HandleLimitErrorOptions = {}
+    ): Promise<HandleLimitErrorResult> => {
       const parsedError = parseLimitError(error);
 
       if (!parsedError) {
@@ -56,12 +59,7 @@ export function useLimitErrorToast() {
         return { isLimitError: false };
       }
 
-      const {
-        errorMessage,
-        upgradeMessage,
-        showUpgradeButton = true,
-        onUpgrade,
-      } = options;
+      const { errorMessage, upgradeMessage, showUpgradeButton = true, onUpgrade } = options;
 
       // Get messages
       const message = errorMessage || getLimitErrorMessage(parsedError);
@@ -72,11 +70,11 @@ export function useLimitErrorToast() {
         try {
           const successUrl = `${window.location.origin}/billing?success=true`;
           const cancelUrl = `${window.location.origin}/billing?canceled=true`;
-          const { url } = await createCheckout('month', successUrl, cancelUrl);
+          const { url } = await createCheckout("month", successUrl, cancelUrl);
           window.location.href = url;
         } catch (err) {
-          console.error('Failed to open checkout:', err);
-          showError('Failed to open checkout. Please try again.');
+          console.error("Failed to open checkout:", err);
+          showError("Failed to open checkout. Please try again.");
         }
       };
 
@@ -90,7 +88,7 @@ export function useLimitErrorToast() {
         duration: 8000,
         action: effectiveShowUpgrade
           ? {
-              label: 'Upgrade to Pro',
+              label: "Upgrade to Pro",
               onClick: onUpgrade || defaultOnUpgrade,
             }
           : undefined,

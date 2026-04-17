@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Progress tracking utilities for LLM agent operations.
  *
@@ -89,7 +89,7 @@ export class ProgressTracker {
   private totalChunks?: number;
   private totalItems?: number;
   private agentName?: string;
-  private currentPhase: string = 'initializing';
+  private currentPhase: string = "initializing";
   private currentPercentage: number = 0;
   private chunksCompleted: number = 0;
   private itemsGenerated: number = 0;
@@ -98,7 +98,7 @@ export class ProgressTracker {
     this.onProgress = config.onProgress;
     this.totalChunks = config.totalChunks;
     this.totalItems = config.totalItems;
-    this.agentName = config.agentName || 'Agent';
+    this.agentName = config.agentName || "Agent";
   }
 
   /**
@@ -158,7 +158,9 @@ export class ProgressTracker {
   ): Promise<void> {
     const phaseProgress = total > 0 ? (completed / total) * (phaseEnd - phaseStart) : 0;
     const percentage = phaseStart + phaseProgress;
-    const formattedMessage = message.replace('{completed}', String(completed)).replace('{total}', String(total));
+    const formattedMessage = message
+      .replace("{completed}", String(completed))
+      .replace("{total}", String(total));
 
     await this.update(phase, percentage, formattedMessage);
   }
@@ -184,7 +186,7 @@ export class ProgressTracker {
     return {
       phase: this.currentPhase,
       percentage: this.currentPercentage,
-      message: '',
+      message: "",
       chunksCompleted: this.chunksCompleted,
       totalChunks: this.totalChunks,
       itemsGenerated: this.itemsGenerated,
@@ -212,13 +214,13 @@ export const PROGRESS_PHASES = {
  * Standard phase names for all agents.
  */
 export const PHASE_NAMES = {
-  INITIALIZING: 'initializing',
-  SPLIT_CHUNKS: 'split_chunks',
-  MAP: 'mapping',
-  COLLAPSE: 'collapsing',
-  REDUCE: 'reducing',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
+  INITIALIZING: "initializing",
+  SPLIT_CHUNKS: "split_chunks",
+  MAP: "mapping",
+  COLLAPSE: "collapsing",
+  REDUCE: "reducing",
+  COMPLETED: "completed",
+  FAILED: "failed",
 } as const;
 
 // ============================================================

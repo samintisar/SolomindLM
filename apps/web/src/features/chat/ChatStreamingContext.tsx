@@ -1,5 +1,5 @@
-import { createContext, useContext, ReactNode } from 'react';
-import { Message, Note } from '@/shared/types/index';
+import { createContext, useContext, ReactNode } from "react";
+import { Message, Note } from "@/shared/types/index";
 
 export interface ChatStreamingContextType {
   messages: Message[];
@@ -10,7 +10,7 @@ export interface ChatStreamingContextType {
   remoteGenerationBlocksSend: boolean;
   onSendMessage: (messageText: string) => void;
   onClearHistory: () => void;
-  onSetFeedback: (messageId: string, feedback: 'up' | 'down' | null) => void;
+  onSetFeedback: (messageId: string, feedback: "up" | "down" | null) => void;
   onRetry: (assistantMessageId: string) => void;
   onSaveChatOptimistic: (payload: { notebookId: string; note: Note } | null) => void;
   sourceCount: number;
@@ -27,15 +27,12 @@ interface ChatStreamingProviderProps {
 }
 
 export function ChatStreamingProvider({ children, value }: ChatStreamingProviderProps) {
-  return (
-    <ChatStreamingContext.Provider value={value}>
-      {children}
-    </ChatStreamingContext.Provider>
-  );
+  return <ChatStreamingContext.Provider value={value}>{children}</ChatStreamingContext.Provider>;
 }
 
 export function useChatStreamingContext() {
   const context = useContext(ChatStreamingContext);
-  if (!context) throw new Error('useChatStreamingContext must be used within ChatStreamingProvider');
+  if (!context)
+    throw new Error("useChatStreamingContext must be used within ChatStreamingProvider");
   return context;
 }

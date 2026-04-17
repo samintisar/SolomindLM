@@ -1,10 +1,7 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import {
-  fetchGoogleDriveBlob,
-  resolveGoogleDriveDownload,
-} from "./_lib/googleDriveDownload";
+import { fetchGoogleDriveBlob, resolveGoogleDriveDownload } from "./_lib/googleDriveDownload";
 
 export const ingestFromGoogleDrive = action({
   args: {
@@ -25,7 +22,7 @@ export const ingestFromGoogleDrive = action({
     const { downloadUrl, finalContentType, finalFileName } = resolveGoogleDriveDownload(
       fileId,
       fileName,
-      mimeType,
+      mimeType
     );
 
     const blob = await fetchGoogleDriveBlob(downloadUrl, accessToken);

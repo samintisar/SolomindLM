@@ -6,14 +6,14 @@
  */
 export function resolveAudioPlaybackUrl(audioUrl: string): string {
   const trimmed = audioUrl.trim();
-  if (!trimmed) return '';
+  if (!trimmed) return "";
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
 
-  const path = trimmed.startsWith('/') ? trimmed : `/audio/${trimmed}`;
+  const path = trimmed.startsWith("/") ? trimmed : `/audio/${trimmed}`;
 
   const site =
     import.meta.env.VITE_CONVEX_SITE_URL ||
-    import.meta.env.VITE_CONVEX_URL?.replace('.cloud', '.site');
+    import.meta.env.VITE_CONVEX_URL?.replace(".cloud", ".site");
 
   if (site) {
     return new URL(path, site).href;
@@ -21,12 +21,12 @@ export function resolveAudioPlaybackUrl(audioUrl: string): string {
 
   if (import.meta.env.DEV) {
     console.warn(
-      '[resolveAudioPlaybackUrl] Set VITE_CONVEX_URL or VITE_CONVEX_SITE_URL so /audio/ URLs resolve; using same-origin path (needs Vite /audio proxy):',
+      "[resolveAudioPlaybackUrl] Set VITE_CONVEX_URL or VITE_CONVEX_SITE_URL so /audio/ URLs resolve; using same-origin path (needs Vite /audio proxy):",
       path
     );
   } else {
     console.warn(
-      '[resolveAudioPlaybackUrl] VITE_CONVEX_SITE_URL / VITE_CONVEX_URL missing; relative audio URL may fail:',
+      "[resolveAudioPlaybackUrl] VITE_CONVEX_SITE_URL / VITE_CONVEX_URL missing; relative audio URL may fail:",
       path
     );
   }

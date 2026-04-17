@@ -52,7 +52,11 @@ export class AudioTranscriptionService {
 
           if (!response.ok) {
             const details = data ? JSON.stringify(data) : response.statusText;
-            logger.apiError("together", "/audio/transcriptions", new Error(`HTTP ${response.status}`));
+            logger.apiError(
+              "together",
+              "/audio/transcriptions",
+              new Error(`HTTP ${response.status}`)
+            );
             throw createExternalServiceErrorFromResponse(
               "together",
               response.status,
@@ -71,7 +75,7 @@ export class AudioTranscriptionService {
         } catch (error) {
           clearTimeout(timeoutId);
           if (error instanceof Error && error.name === "AbortError") {
-            throw new Error("Audio transcription request timed out");
+            throw new Error("Audio transcription request timed out", { cause: error });
           }
           throw error;
         }
@@ -82,7 +86,7 @@ export class AudioTranscriptionService {
     } catch (error) {
       logger.operationError(error);
       if (error instanceof Error) throw error;
-      throw new Error("Failed to transcribe audio file");
+      throw new Error("Failed to transcribe audio file", { cause: error });
     }
   }
 }

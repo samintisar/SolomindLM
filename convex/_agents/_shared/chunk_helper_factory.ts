@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Chunk helper factory for agent operations.
  *
@@ -12,9 +12,9 @@
 import {
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
-} from './chunk_operations.js';
-import type { ChunkConfig } from './chunk_operations.js';
-import { Send } from '@langchain/langgraph';
+} from "./chunk_operations.js";
+import type { ChunkConfig } from "./chunk_operations.js";
+import { Send } from "@langchain/langgraph";
 
 // ============================================================
 // Types
@@ -70,10 +70,7 @@ export interface ChunkHelpers {
  * const validated = validateChunks(chunks);
  * ```
  */
-export function createChunkHelpers(
-  agentName: string,
-  config: ChunkHelperConfig
-): ChunkHelpers {
+export function createChunkHelpers(agentName: string, config: ChunkHelperConfig): ChunkHelpers {
   const chunkConfig: ChunkConfig = {
     targetSize: config.targetSize,
     minChunkLength: config.minChunkLength ?? 50,
@@ -125,9 +122,9 @@ export function createChunkHelpersFromEnv(
   env: Record<string, string | undefined>,
   defaultTargetSize: number
 ): ChunkHelpers {
-  const normalizedAgentName = agentName.replace(/Graph$/, '');
+  const normalizedAgentName = agentName.replace(/Graph$/, "");
   const envKey = `${normalizedAgentName.toUpperCase()}_MAP_CHUNK_SIZE`;
-  const targetSize = parseInt(env[envKey] || '', 10) || defaultTargetSize;
+  const targetSize = parseInt(env[envKey] || "", 10) || defaultTargetSize;
 
   return createChunkHelpers(agentName, { targetSize });
 }
@@ -154,35 +151,40 @@ export function createChunkHelpersFromEnv(
  */
 export function createMapRoute(
   packChunksFn: (chunks: string[]) => string[],
-  mapNodeName: string = 'map',
-  agentName: string = 'Agent'
-): (state: { chunks: string[] }) => Send[] | 'collapse' {
+  mapNodeName: string = "map",
+  agentName: string = "Agent"
+): (state: { chunks: string[] }) => Send[] | "collapse" {
   return (state: { chunks: string[] }) => {
     if (state.chunks.length === 0) {
-      console.log(JSON.stringify({
-        agent: agentName,
-        phase: 'route_to_map',
-        message: 'No chunks to process, routing to collapse',
-      }));
-      return 'collapse';
+      console.log(
+        JSON.stringify({
+          agent: agentName,
+          phase: "route_to_map",
+          message: "No chunks to process, routing to collapse",
+        })
+      );
+      return "collapse";
     }
 
     const packedChunks = packChunksFn(state.chunks);
 
-    console.log(JSON.stringify({
-      agent: agentName,
-      phase: 'route_to_map',
-      originalChunks: state.chunks.length,
-      packedChunks: packedChunks.length,
-      message: `Creating ${packedChunks.length} parallel map tasks`,
-    }));
-
-    return packedChunks.map((chunk, idx) =>
-      new Send(mapNodeName, {
-        chunk,
-        chunkIndex: idx,
-        totalChunks: packedChunks.length,
+    console.log(
+      JSON.stringify({
+        agent: agentName,
+        phase: "route_to_map",
+        originalChunks: state.chunks.length,
+        packedChunks: packedChunks.length,
+        message: `Creating ${packedChunks.length} parallel map tasks`,
       })
+    );
+
+    return packedChunks.map(
+      (chunk, idx) =>
+        new Send(mapNodeName, {
+          chunk,
+          chunkIndex: idx,
+          totalChunks: packedChunks.length,
+        })
     );
   };
 }

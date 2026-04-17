@@ -1,17 +1,13 @@
 "use node";
-import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { countTokens } from '../../_agents/_shared/tokenizer.js';
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { countTokens } from "../../_agents/_shared/tokenizer.js";
 
 export class TextSplitterService {
-  static async splitText(
-    text: string,
-    chunkSize = 1000,
-    chunkOverlap = 200
-  ): Promise<string[]> {
+  static async splitText(text: string, chunkSize = 1000, chunkOverlap = 200): Promise<string[]> {
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize,
       chunkOverlap,
-      separators: ['\n\n', '\n', '. ', ' ', ''],
+      separators: ["\n\n", "\n", ". ", " ", ""],
       lengthFunction: (t) => countTokens(t),
     });
 
@@ -22,6 +18,5 @@ export class TextSplitterService {
     return countTokens(text);
   }
 
-  static cleanup(): void {
-  }
+  static cleanup(): void {}
 }

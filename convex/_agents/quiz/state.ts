@@ -1,12 +1,12 @@
-"use node"
+"use node";
 /**
  * State definitions for QuizGraph.
  *
  * Contains state interfaces using the LangGraph Annotation API.
  */
 
-import { Annotation } from '@langchain/langgraph';
-import type { QuizQuestion } from './prompts.js';
+import { Annotation } from "@langchain/langgraph";
+import type { QuizQuestion } from "./prompts.js";
 
 // ============================================================
 // STATE DEFINITIONS
@@ -30,14 +30,14 @@ export const OverallState = Annotation.Root({
   }),
   difficulty: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => 'medium',
+    default: () => "medium",
   }),
   focus: Annotation<string | undefined>({
     reducer: (_x: string | undefined, y?: string | undefined) => y ?? _x,
     default: () => undefined,
   }),
   mapOutputs: Annotation<string[]>({
-    reducer: (x: string[], y?: string[]) => y ? x.concat(y) : x,
+    reducer: (x: string[], y?: string[]) => (y ? x.concat(y) : x),
     default: () => [],
   }),
   collapsedOutputs: Annotation<string[]>({
@@ -50,7 +50,7 @@ export const OverallState = Annotation.Root({
   }),
   status: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => 'generating',
+    default: () => "generating",
   }),
   reduceRetryCount: Annotation<number>({
     reducer: (_x: number, y?: number) => y ?? _x,
@@ -66,7 +66,7 @@ export const OverallState = Annotation.Root({
     itemsGenerated?: number;
   }>({
     reducer: (_x, y?: any) => y ?? _x,
-    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing...' }),
+    default: () => ({ phase: "initializing", percentage: 0, message: "Initializing..." }),
   }),
   // Callback for progress updates (not stored in state, passed through)
   onStatusUpdate: Annotation<((status: string) => void | Promise<void>) | undefined>({
@@ -90,4 +90,4 @@ export interface ChunkProcessState {
 }
 
 // Re-export QuizQuestion type for convenience
-export type { QuizQuestion } from './prompts.js';
+export type { QuizQuestion } from "./prompts.js";

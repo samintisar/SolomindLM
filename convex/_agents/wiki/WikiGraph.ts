@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * WikiGraph - Main graph class for wiki knowledge base compilation.
  *
@@ -6,15 +6,15 @@
  * Uses shared utilities from _shared/ for consistency.
  */
 
-import { StateGraph, START, END } from '@langchain/langgraph';
-import { WIKI_CONFIG } from './config.js';
-import { createLLMs } from '../_shared/llm_factory.js';
-import { createAgentGraphLogger } from '../_shared/logging.js';
-import { isLangSmithEnabled, createJobLangSmithConfig } from '../_shared/langsmith.js';
-import { AGENT_LANGGRAPH_RECURSION_LIMIT } from '../_shared/agent_graph_limits.js';
-import { env } from '../../_lib/env.js';
-import type { OverallStateType } from './state.js';
-import type { WikiArticle } from './prompts.js';
+import { StateGraph, START, END } from "@langchain/langgraph";
+import { WIKI_CONFIG } from "./config.js";
+import { createLLMs } from "../_shared/llm_factory.js";
+import { createAgentGraphLogger } from "../_shared/logging.js";
+import { isLangSmithEnabled, createJobLangSmithConfig } from "../_shared/langsmith.js";
+import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.js";
+import { env } from "../../_lib/env.js";
+import type { OverallStateType } from "./state.js";
+import type { WikiArticle } from "./prompts.js";
 import {
   extractConceptsMap,
   collapseConcepts,
@@ -24,12 +24,12 @@ import {
   compileFinal,
   routeToMap,
   splitChunks,
-} from './nodes.js';
-import { OverallState } from './state.js';
+} from "./nodes.js";
+import { OverallState } from "./state.js";
 
 export class WikiGraph {
-  private fastLlm: ReturnType<typeof createLLMs>['fastLlm'];
-  private smartLlm: ReturnType<typeof createLLMs>['smartLlm'];
+  private fastLlm: ReturnType<typeof createLLMs>["fastLlm"];
+  private smartLlm: ReturnType<typeof createLLMs>["smartLlm"];
 
   constructor() {
     // Use shared LLM factory for consistency
@@ -50,49 +50,49 @@ export class WikiGraph {
    * Uses map-reduce pattern with parallel chunk processing.
    */
   buildGraph() {
-    const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+    const logger = createAgentGraphLogger("WikiGraph", "wiki");
 
     // Build custom graph with linear flow after map-reduce
     const builder = new StateGraph(OverallState);
 
     // Split phase: prepare chunks
-    builder.addNode('split_chunks', async (state: any) => {
+    builder.addNode("split_chunks", async (state: any) => {
       return await splitChunks(state);
     });
 
     // Map phase: parallel concept extraction from chunks
-    builder.addNode('extract_concepts_map', async (state: any) => {
+    builder.addNode("extract_concepts_map", async (state: any) => {
       return await extractConceptsMap(state, this.fastLlm);
     });
 
     // Collapse phase: merge and deduplicate concepts
-    builder.addNode('collapse_concepts', async (state: any) => {
+    builder.addNode("collapse_concepts", async (state: any) => {
       return await collapseConcepts(state);
     });
 
     // Reduce phase: synthesize articles, detect connections, compile
-    builder.addNode('reduce_phase', async (state: any) => {
+    builder.addNode("reduce_phase", async (state: any) => {
       return await this.runReducePhase(state);
     });
 
     // Edges: START → split_chunks → routeToMap → extract_concepts_map ×N → collapse_concepts → reduce_phase → END
-    builder.addEdge(START, 'split_chunks' as never);
+    builder.addEdge(START, "split_chunks" as never);
     builder.addConditionalEdges(
-      'split_chunks' as never,
+      "split_chunks" as never,
       routeToMap as any,
-      { extract_concepts_map: 'extract_concepts_map', collapse: 'collapse_concepts' } as any
+      { extract_concepts_map: "extract_concepts_map", collapse: "collapse_concepts" } as any
     );
-    builder.addEdge('extract_concepts_map' as never, 'collapse_concepts' as never);
-    builder.addEdge('collapse_concepts' as never, 'reduce_phase' as never);
-    builder.addEdge('reduce_phase' as never, END as never);
+    builder.addEdge("extract_concepts_map" as never, "collapse_concepts" as never);
+    builder.addEdge("collapse_concepts" as never, "reduce_phase" as never);
+    builder.addEdge("reduce_phase" as never, END as never);
 
     const graph = builder.compile().withConfig({
       recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT,
     });
 
-    logger.info('Wiki graph built successfully', {
-      agent: 'WikiGraph',
-      phases: ['map', 'collapse', 'reduce'],
+    logger.info("Wiki graph built successfully", {
+      agent: "WikiGraph",
+      phases: ["map", "collapse", "reduce"],
     });
 
     return graph;
@@ -102,33 +102,33 @@ export class WikiGraph {
    * Graph that stops after concept collapse (map + merge). Used with batched reduce actions.
    */
   buildMapCollapseGraph() {
-    const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+    const logger = createAgentGraphLogger("WikiGraph", "wiki");
     const builder = new StateGraph(OverallState);
 
-    builder.addNode('split_chunks', async (state: any) => {
+    builder.addNode("split_chunks", async (state: any) => {
       return await splitChunks(state);
     });
-    builder.addNode('extract_concepts_map', async (state: any) => {
+    builder.addNode("extract_concepts_map", async (state: any) => {
       return await extractConceptsMap(state, this.fastLlm);
     });
-    builder.addNode('collapse_concepts', async (state: any) => {
+    builder.addNode("collapse_concepts", async (state: any) => {
       return await collapseConcepts(state);
     });
 
-    builder.addEdge(START, 'split_chunks' as never);
+    builder.addEdge(START, "split_chunks" as never);
     builder.addConditionalEdges(
-      'split_chunks' as never,
+      "split_chunks" as never,
       routeToMap as any,
-      { extract_concepts_map: 'extract_concepts_map', collapse: 'collapse_concepts' } as any
+      { extract_concepts_map: "extract_concepts_map", collapse: "collapse_concepts" } as any
     );
-    builder.addEdge('extract_concepts_map' as never, 'collapse_concepts' as never);
-    builder.addEdge('collapse_concepts' as never, END as never);
+    builder.addEdge("extract_concepts_map" as never, "collapse_concepts" as never);
+    builder.addEdge("collapse_concepts" as never, END as never);
 
     const graph = builder.compile().withConfig({
       recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT,
     });
 
-    logger.info('Wiki map+collapse graph built', { agent: 'WikiGraph' });
+    logger.info("Wiki map+collapse graph built", { agent: "WikiGraph" });
     return graph;
   }
 
@@ -144,7 +144,7 @@ export class WikiGraph {
   }): Promise<OverallStateType> {
     const graph = this.buildMapCollapseGraph();
     const langSmithConfig = isLangSmithEnabled()
-      ? createJobLangSmithConfig('wiki', input.wikiId, {
+      ? createJobLangSmithConfig("wiki", input.wikiId, {
           notebookId: input.notebookId,
           userId: input.userId,
         })
@@ -180,13 +180,13 @@ export class WikiGraph {
     finalOutput: WikiArticle[];
     indexContent: string;
     logContent: string;
-    progress: Awaited<ReturnType<typeof compileFinal>>['progress'];
+    progress: Awaited<ReturnType<typeof compileFinal>>["progress"];
   }> {
     const merged = await this.runConnectionsAndCompile(state, state.conceptArticles || []);
     return {
       finalOutput: (merged.finalOutput || []) as WikiArticle[],
-      indexContent: (merged.indexContent || '') as string,
-      logContent: (merged.logContent || '') as string,
+      indexContent: (merged.indexContent || "") as string,
+      logContent: (merged.logContent || "") as string,
       progress: merged.progress!,
     };
   }
@@ -195,28 +195,28 @@ export class WikiGraph {
     state: OverallStateType,
     conceptArticles: WikiArticle[]
   ): Promise<Partial<OverallStateType>> {
-    const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+    const logger = createAgentGraphLogger("WikiGraph", "wiki");
 
-    logger.info('Starting connection detection', {
-      agent: 'WikiGraph',
-      phase: 'reduce',
-      step: 'detect_connections',
+    logger.info("Starting connection detection", {
+      agent: "WikiGraph",
+      phase: "reduce",
+      step: "detect_connections",
     });
 
     const connectionResult = await detectConnections(state, this.smartLlm, conceptArticles);
     const allArticles = connectionResult.finalOutput || [];
 
-    logger.info('Starting final compilation', {
-      agent: 'WikiGraph',
-      phase: 'reduce',
-      step: 'compile',
+    logger.info("Starting final compilation", {
+      agent: "WikiGraph",
+      phase: "reduce",
+      step: "compile",
     });
 
     const finalResult = await compileFinal(state, allArticles);
 
-    logger.info('Reduce phase complete', {
-      agent: 'WikiGraph',
-      phase: 'reduce',
+    logger.info("Reduce phase complete", {
+      agent: "WikiGraph",
+      phase: "reduce",
       articlesGenerated: finalResult.finalOutput?.length || 0,
     });
 
@@ -231,12 +231,12 @@ export class WikiGraph {
    * This runs sequentially after collapse phase.
    */
   private async runReducePhase(state: OverallStateType): Promise<Partial<OverallStateType>> {
-    const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+    const logger = createAgentGraphLogger("WikiGraph", "wiki");
 
-    logger.info('Starting article synthesis', {
-      agent: 'WikiGraph',
-      phase: 'reduce',
-      step: 'synthesize',
+    logger.info("Starting article synthesis", {
+      agent: "WikiGraph",
+      phase: "reduce",
+      step: "synthesize",
     });
 
     const synthesizeResult = await synthesizeArticles(state, this.smartLlm);
@@ -263,12 +263,12 @@ export class WikiGraph {
     finalOutput: WikiArticle[];
     indexContent: string;
     logContent: string;
-    progress: Awaited<ReturnType<typeof compileFinal>>['progress'];
+    progress: Awaited<ReturnType<typeof compileFinal>>["progress"];
   }> {
-    const logger = createAgentGraphLogger('WikiGraph', 'wiki');
+    const logger = createAgentGraphLogger("WikiGraph", "wiki");
 
-    logger.info('Starting wiki compilation', {
-      agent: 'WikiGraph',
+    logger.info("Starting wiki compilation", {
+      agent: "WikiGraph",
       wikiId: input.wikiId,
       notebookId: input.notebookId,
       userId: input.userId,
@@ -279,7 +279,7 @@ export class WikiGraph {
     const graph = this.buildGraph();
 
     const langSmithConfig = isLangSmithEnabled()
-      ? createJobLangSmithConfig('wiki', input.wikiId, {
+      ? createJobLangSmithConfig("wiki", input.wikiId, {
           notebookId: input.notebookId,
           userId: input.userId,
         })
@@ -296,8 +296,8 @@ export class WikiGraph {
       langSmithConfig
     );
 
-    logger.info('Wiki compilation complete', {
-      agent: 'WikiGraph',
+    logger.info("Wiki compilation complete", {
+      agent: "WikiGraph",
       wikiId: input.wikiId,
       articlesGenerated: result.finalOutput?.length || 0,
       status: result.status,

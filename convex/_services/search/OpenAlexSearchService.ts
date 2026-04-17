@@ -44,7 +44,19 @@ export const searchInternal = internalAction({
     hasFullText: v.optional(v.boolean()),
     sortBy: v.optional(v.string()),
   },
-  handler: async (_, { query, maxResults, publicationYearFrom, publicationYearTo, minCitations, openAccessOnly, hasFullText, sortBy }) => {
+  handler: async (
+    _,
+    {
+      query,
+      maxResults,
+      publicationYearFrom,
+      publicationYearTo,
+      minCitations,
+      openAccessOnly,
+      hasFullText,
+      sortBy,
+    }
+  ) => {
     const logger = createServiceLogger("openalex", "searchInternal");
     const startTime = Date.now();
     const baseUrl = env.OPENALEX_BASE_URL || "https://api.openalex.org";
@@ -114,71 +126,71 @@ export const searchInternal = internalAction({
         };
       }, "openalex_search");
 
-    // Extract and transform results
-    const papers: AcademicPaper[] = (data.results || []).map((work: any) => {
-      // Extract authors
-      const authors = (work.authorships || [])
-        .map((auth: any) => auth.author?.display_name)
-        .filter(Boolean);
+      // Extract and transform results
+      const papers: AcademicPaper[] = (data.results || []).map((work: any) => {
+        // Extract authors
+        const authors = (work.authorships || [])
+          .map((auth: any) => auth.author?.display_name)
+          .filter(Boolean);
 
-      // Extract venue
-      const venue = work.primary_location?.source?.display_name ||
-                   work.host_venue?.display_name ||
-                   work.type;
+        // Extract venue
+        const venue =
+          work.primary_location?.source?.display_name || work.host_venue?.display_name || work.type;
 
-      // Extract publication date
-      const publicationYear = work.publication_year;
-      const publishedDate = work.publication_date;
+        // Extract publication date
+        const publicationYear = work.publication_year;
+        const publishedDate = work.publication_date;
 
-      // Extract open access info
-      const openAccess = work.open_access?.is_oa || false;
-      const hasFullText = !!work.best_oa_location?.pdf_url ||
-                         !!work.best_oa_location?.landing_page_url ||
-                         openAccess;
+        // Extract open access info
+        const openAccess = work.open_access?.is_oa || false;
+        const hasFullText =
+          !!work.best_oa_location?.pdf_url ||
+          !!work.best_oa_location?.landing_page_url ||
+          openAccess;
 
-      // Build URL (prefer PDF, then landing page, then OpenAlex page)
-      const pdfUrl = work.best_oa_location?.pdf_url;
-      const landingUrl = work.best_oa_location?.landing_page_url;
-      const openAlexUrl = work.id;
-      const url = pdfUrl || landingUrl || openAlexUrl;
+        // Build URL (prefer PDF, then landing page, then OpenAlex page)
+        const pdfUrl = work.best_oa_location?.pdf_url;
+        const landingUrl = work.best_oa_location?.landing_page_url;
+        const openAlexUrl = work.id;
+        const url = pdfUrl || landingUrl || openAlexUrl;
 
-      // Build snippet (abstract or first sentence of title)
-      let snippet = work.title || "";
-      if (work.abstract) {
-        // OpenAlex abstracts are XML-tagged, clean them up
-        snippet = work.abstract
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .substring(0, 500);
-      } else if (work.title) {
-        snippet = work.title;
-      }
+        // Build snippet (abstract or first sentence of title)
+        let snippet = work.title || "";
+        if (work.abstract) {
+          // OpenAlex abstracts are XML-tagged, clean them up
+          snippet = work.abstract
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .substring(0, 500);
+        } else if (work.title) {
+          snippet = work.title;
+        }
 
-      // Calculate score (combination of citation count and recency)
-      const citationScore = Math.min(work.cited_by_count || 0, 1000) / 1000; // Max 1.0 for 1000+ citations
-      const recencyScore = publicationYear ? Math.min(publicationYear, 2024) / 2024 : 0.5;
-      const score = (citationScore * 0.7) + (recencyScore * 0.3);
+        // Calculate score (combination of citation count and recency)
+        const citationScore = Math.min(work.cited_by_count || 0, 1000) / 1000; // Max 1.0 for 1000+ citations
+        const recencyScore = publicationYear ? Math.min(publicationYear, 2024) / 2024 : 0.5;
+        const score = citationScore * 0.7 + recencyScore * 0.3;
 
-      return {
-        id: work.id,
-        title: work.title || "Untitled",
-        url: url,
-        snippet,
-        score,
-        publishedDate,
-        publicationYear,
-        authors,
-        venue,
-        citationCount: work.cited_by_count || 0,
-        openAccess,
-        hasFullText,
-        type: work.type || 'article',
-      };
-    });
+        return {
+          id: work.id,
+          title: work.title || "Untitled",
+          url: url,
+          snippet,
+          score,
+          publishedDate,
+          publicationYear,
+          authors,
+          venue,
+          citationCount: work.cited_by_count || 0,
+          openAccess,
+          hasFullText,
+          type: work.type || "article",
+        };
+      });
 
-    // Sort by score (descending) - this is our internal relevance score
-    papers.sort((a, b) => b.score - a.score);
+      // Sort by score (descending) - this is our internal relevance score
+      papers.sort((a, b) => b.score - a.score);
 
       logger.operationComplete({ count: papers.length, durationMs: Date.now() - startTime });
       return papers;
@@ -202,10 +214,7 @@ const searchCache = createCachedAction(
  * Normalize query for better cache hits
  */
 function normalizeQuery(query: string): string {
-  return query
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, " ");
+  return query.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
 // ============================================================

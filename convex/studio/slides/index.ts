@@ -3,10 +3,7 @@ import { mutation, query, internalMutation, internalQuery } from "../../_generat
 import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
 import { checkDailyLimit } from "../../_lib/limits";
-import {
-  assertCanEditNotebook,
-  assertCanReadNotebook,
-} from "../../_lib/notebookAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Slides from "../../_model/slides";
 
 // List, get, create, update, remove use model functions
@@ -112,7 +109,9 @@ export const generateSlideDeck = mutation({
     await checkDailyLimit(ctx, userId, "slide");
     const { notebookId, documentIds, slideCount, title } = args;
     if (documentIds.length === 0) {
-      throw new Error("Please select at least one source. Content generation uses only your selected sources.");
+      throw new Error(
+        "Please select at least one source. Content generation uses only your selected sources."
+      );
     }
     await assertCanEditNotebook(ctx, notebookId, userId);
     const slideDeckId = await Slides.createSlideDeck(ctx, {

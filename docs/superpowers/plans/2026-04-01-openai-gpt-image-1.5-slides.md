@@ -14,17 +14,23 @@
 
 **Creating:** None
 **Modifying:**
+
 - `convex/_agents/slides/services/SlideImageGenerationService.ts` - Core image generation service class
 - `convex/_agents/slides/SlideDeckGraph.ts` - Graph class that instantiates the service
 - `.env` - Environment variables (local file, not in git)
 - `convex/_lib/env.ts` - Verify OPENAI_API_KEY export
 
 **Key Interfaces (preserved):**
+
 ```typescript
 class SlideImageGenerationService {
-  async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer>
-  async uploadImage(imageBuffer: Buffer, slideNumber: number, slideDeckId: string): Promise<string>
-  async generateSlideImages(slides: Slide[], slideDeckId: string, concurrency?: number): Promise<Slide[]>
+  async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer>;
+  async uploadImage(imageBuffer: Buffer, slideNumber: number, slideDeckId: string): Promise<string>;
+  async generateSlideImages(
+    slides: Slide[],
+    slideDeckId: string,
+    concurrency?: number
+  ): Promise<Slide[]>;
 }
 ```
 
@@ -33,6 +39,7 @@ class SlideImageGenerationService {
 ## Task 1: Install OpenAI SDK Dependency
 
 **Files:**
+
 - Modify: `package.json` (root)
 
 **Context:** The project uses Bun as package manager. OpenAI SDK is required for image generation API calls.
@@ -61,6 +68,7 @@ git commit -m "deps: add openai sdk for slide image generation"
 ## Task 2: Update Environment Variables
 
 **Files:**
+
 - Modify: `.env`
 - Verify: `convex/_lib/env.ts`
 
@@ -114,6 +122,7 @@ Note: If .env was already modified and has uncommitted changes, this will includ
 ## Task 3: Read Current SlideImageGenerationService Implementation
 
 **Files:**
+
 - Read: `convex/_agents/slides/services/SlideImageGenerationService.ts`
 
 **Context:** Need to understand current implementation before rewriting. This is a read-only task to prepare for modifications.
@@ -125,6 +134,7 @@ Use Serena's `find_symbol` tool to read the full class:
 Read: `convex/_agents/slides/services/SlideImageGenerationService.ts` lines 1-302
 
 Pay attention to:
+
 - Constructor (how ZhipuAI client is initialized)
 - `generateSlideImage()` method (API call structure)
 - Error handling patterns
@@ -140,6 +150,7 @@ No commit for this task (read-only)
 ## Task 4: Replace Constructor and Imports
 
 **Files:**
+
 - Modify: `convex/_agents/slides/services/SlideImageGenerationService.ts`
 
 **Context:** Replace ZhipuAI SDK import and client initialization with OpenAI SDK.
@@ -147,18 +158,21 @@ No commit for this task (read-only)
 - [ ] **Step 1: Replace import statement**
 
 Current (around line 1-3):
+
 ```typescript
-import ZhipuAI from 'zhipuai';
+import ZhipuAI from "zhipuai";
 ```
 
 Replace with:
+
 ```typescript
-import OpenAI from 'openai';
+import OpenAI from "openai";
 ```
 
 - [ ] **Step 2: Update constructor parameter and client initialization**
 
 Current constructor (around lines 18-30):
+
 ```typescript
 constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>) {
   if (!apiKey || apiKey.trim().length === 0) {
@@ -176,6 +190,7 @@ constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) =>
 ```
 
 Replace with:
+
 ```typescript
 constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) => Promise<string>) {
   if (!apiKey || apiKey.trim().length === 0) {
@@ -195,11 +210,13 @@ constructor(apiKey: string, uploadStorage: (buffer: Buffer, fileName: string) =>
 - [ ] **Step 3: Update client property type declaration**
 
 Current (around line 20):
+
 ```typescript
 private client: ZhipuAI;
 ```
 
 Replace with:
+
 ```typescript
 private client: OpenAI;
 ```
@@ -216,6 +233,7 @@ git commit -m "refactor: replace ZhipuAI with OpenAI client in constructor"
 ## Task 5: Rewrite generateSlideImage() Method
 
 **Files:**
+
 - Modify: `convex/_agents/slides/services/SlideImageGenerationService.ts`
 
 **Context:** Replace ZhipuAI API call with OpenAI API call. OpenAI uses `/v1/images/generations` endpoint with different request/response structure.
@@ -223,6 +241,7 @@ git commit -m "refactor: replace ZhipuAI with OpenAI client in constructor"
 - [ ] **Step 1: Replace API call in generateSlideImage()**
 
 Current method body (around lines 36-110):
+
 ```typescript
 async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer> {
   const startTime = Date.now();
@@ -360,6 +379,7 @@ async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer> {
 ```
 
 Replace with:
+
 ```typescript
 async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer> {
   const startTime = Date.now();
@@ -534,11 +554,13 @@ async generateSlideImage(prompt: string, slideNumber: number): Promise<Buffer> {
 - [ ] **Step 2: Update retry count for better rate limit handling**
 
 Current (around line 22):
+
 ```typescript
 private maxRetries = 1;
 ```
 
 Replace with:
+
 ```typescript
 private maxRetries = 2; // More retries for rate limit handling
 ```
@@ -561,6 +583,7 @@ git commit -m "refactor: rewrite generateSlideImage to use OpenAI gpt-image-1.5
 ## Task 6: Rewrite generateSlideImages() Method for Concurrency
 
 **Files:**
+
 - Modify: `convex/_agents/slides/services/SlideImageGenerationService.ts`
 
 **Context:** Update from sequential (concurrency=1, 10s delays) to parallel (concurrency=2, 1s batch delays).
@@ -568,6 +591,7 @@ git commit -m "refactor: rewrite generateSlideImage to use OpenAI gpt-image-1.5
 - [ ] **Step 1: Replace generateSlideImages() method**
 
 Current method (around lines 240-302):
+
 ```typescript
 async generateSlideImages(
   slides: Slide[],
@@ -646,6 +670,7 @@ async generateSlideImages(
 ```
 
 Replace with:
+
 ```typescript
 async generateSlideImages(
   slides: Slide[],
@@ -787,6 +812,7 @@ git commit -m "perf: update slide generation to use concurrency
 ## Task 7: Update Service Instantiation in SlideDeckGraph
 
 **Files:**
+
 - Modify: `convex/_agents/slides/SlideDeckGraph.ts` (or wherever service is instantiated)
 
 **Context:** Update the code that creates SlideImageGenerationService to pass OPENAI_API_KEY instead of ZHIPU_API_KEY.
@@ -796,25 +822,22 @@ git commit -m "perf: update slide generation to use concurrency
 Search for: `new SlideImageGenerationService`
 
 Look in:
+
 - `convex/_agents/slides/SlideDeckGraph.ts`
 - `convex/_agents/slides/nodes.ts` (if SlideDeckGraph doesn't have it)
 
 - [ ] **Step 2: Update the instantiation**
 
 Find code that looks like:
+
 ```typescript
-const imageService = new SlideImageGenerationService(
-  env.ZHIPU_API_KEY,
-  uploadStorage
-);
+const imageService = new SlideImageGenerationService(env.ZHIPU_API_KEY, uploadStorage);
 ```
 
 Replace with:
+
 ```typescript
-const imageService = new SlideImageGenerationService(
-  env.OPENAI_API_KEY,
-  uploadStorage
-);
+const imageService = new SlideImageGenerationService(env.OPENAI_API_KEY, uploadStorage);
 ```
 
 - [ ] **Step 3: Commit instantiation change**
@@ -829,6 +852,7 @@ git commit -m "refactor: use OPENAI_API_KEY for slide image service"
 ## Task 8: Type Check and Build Verification
 
 **Files:**
+
 - Test: All modified files
 
 **Context:** Ensure TypeScript compilation succeeds after all changes.
@@ -840,6 +864,7 @@ Run: `bun run typecheck:convex`
 Expected: No type errors, output shows success
 
 If errors occur:
+
 1. Check that OpenAI import is correct
 2. Verify client type declaration
 3. Check method signatures match interface
@@ -867,6 +892,7 @@ If no errors, no commit needed.
 ## Task 9: Update Documentation and Comments
 
 **Files:**
+
 - Modify: `convex/_agents/slides/services/SlideImageGenerationService.ts`
 - Modify: `CLAUDE.md` (if ZhipuAI is mentioned)
 
@@ -877,6 +903,7 @@ If no errors, no commit needed.
 Find the class comment above `export class SlideImageGenerationService`.
 
 Current likely says:
+
 ```typescript
 /**
  * Generate slide images using ZhipuAI glm-image model
@@ -884,6 +911,7 @@ Current likely says:
 ```
 
 Replace with:
+
 ```typescript
 /**
  * Generate slide images using OpenAI gpt-image-1.5 model
@@ -903,6 +931,7 @@ Replace with:
 Find comment above `generateSlideImage()`:
 
 Current:
+
 ```typescript
 /**
  * Generate a slide image using ZhipuAI glm-image model.
@@ -911,6 +940,7 @@ Current:
 ```
 
 Replace with:
+
 ```typescript
 /**
  * Generate a slide image using OpenAI gpt-image-1.5 model.
@@ -928,6 +958,7 @@ Replace with:
 Find comment above `generateSlideImages()`:
 
 Current:
+
 ```typescript
 /**
  * Generate all slide images sequentially with rate limiting.
@@ -938,6 +969,7 @@ Current:
 ```
 
 Replace with:
+
 ```typescript
 /**
  * Generate all slide images with optimized batching.
@@ -972,6 +1004,7 @@ git commit -m "docs: update comments to reflect OpenAI gpt-image-1.5 usage"
 ## Task 10: Manual Testing and Verification
 
 **Files:**
+
 - Test: Full slide generation flow
 
 **Context:** Manually test the changes to ensure they work correctly.
@@ -987,6 +1020,7 @@ Expected: Server starts, shows "Convex haul ready" or similar
 Use the web UI or run a Convex function to generate a slide deck with 5-10 slides.
 
 Example via CLI:
+
 ```bash
 bun x convex run internal.studio.slides.job.generateSlideDeck '{"notebookId":"your-notebook-id","documentIds":["doc-id"]}'
 ```
@@ -996,6 +1030,7 @@ Replace with actual IDs from your database.
 - [ ] **Step 3: Monitor logs**
 
 Watch for:
+
 - "Generating slide X with OpenAI gpt-image-1.5..." messages
 - "Slide X generated successfully" messages
 - "Processing batch 1: slides 1-2" messages
@@ -1005,6 +1040,7 @@ Watch for:
 - [ ] **Step 4: Verify output**
 
 Check:
+
 1. Slides generated successfully (check storage URLs)
 2. Images are 1536x1024 resolution
 3. Text is crisp and readable
@@ -1014,6 +1050,7 @@ Check:
 - [ ] **Step 5: Test error handling**
 
 Try generating without OPENAI_API_KEY set:
+
 - Should see clear error message about missing key
 - Should fail gracefully with proper logging
 
@@ -1041,6 +1078,7 @@ git commit -m "test: document OpenAI slide generation test results"
 ## Task 11: Deploy to Production
 
 **Files:**
+
 - Deploy: All changes
 
 **Context:** Deploy the changes to production Convex deployment.
@@ -1068,6 +1106,7 @@ Expected: Logs show Convex is running
 Trigger a slide generation in production environment (via web UI or API).
 
 Monitor logs for:
+
 - OpenAI API calls
 - Successful generations
 - No errors
@@ -1075,6 +1114,7 @@ Monitor logs for:
 - [ ] **Step 5: Monitor for issues**
 
 Watch for:
+
 1. Rate limit errors (should be handled with backoff)
 2. Quality issues (text rendering)
 3. Performance improvements
@@ -1094,6 +1134,7 @@ git push origin v1.0.0-openai-slides
 ## Task 12: Remove ZhipuAI Dependencies (Optional)
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `.env` (if ZHIPU_API_KEY not used elsewhere)
 
@@ -1159,20 +1200,24 @@ After completing all tasks, verify:
 ## Expected Outcomes
 
 **Performance:**
+
 - Generation time: ~3-5 seconds per 2 slides (vs 10-12 seconds per slide before)
 - Overall: 3-5x faster for multi-slide decks
 
 **Quality:**
+
 - Crisp text rendering at 1536x1024
 - No artifacts or distortions
 - Maintains vintage academia aesthetic
 
 **Cost:**
+
 - Medium quality reduces cost vs high quality
 - Faster generation = less compute overhead
 - Estimated 30-50% cost reduction
 
 **Reliability:**
+
 - Graceful rate limit handling with exponential backoff
 - Clear error messages for auth and invalid requests
 - Higher rate limits (5-250 IPM) reduce throttling

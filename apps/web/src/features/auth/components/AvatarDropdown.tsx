@@ -1,13 +1,13 @@
-import React from 'react';
-import { LogIn, LogOut, Sun, Moon } from 'lucide-react';
-import type { User } from '../AuthContext';
+import React from "react";
+import { LogIn, LogOut, Sun, Moon } from "lucide-react";
+import type { User } from "../AuthContext";
 
 interface AvatarDropdownProps {
   user: User | null;
   isAuthenticated: boolean;
   onLogin: () => void;
   onLogout: () => void;
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
   toggleTheme: () => void;
 }
 
@@ -23,7 +23,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
     await onLogout();
   };
 
-  const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? 'Signed in' : null);
+  const displayLabel = user?.email ?? user?.name ?? (isAuthenticated ? "Signed in" : null);
 
   return (
     <>
@@ -44,12 +44,12 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
           className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
           role="menuitem"
         >
-          {theme === 'dark' ? (
+          {theme === "dark" ? (
             <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
           ) : (
             <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
           )}
-          <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+          <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
         </button>
 
         {/* Login/Logout */}
@@ -63,7 +63,7 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
           ) : (
             <LogIn className="w-4 h-4 text-muted-foreground shrink-0" />
           )}
-          <span>{isAuthenticated ? 'Logout' : 'Login'}</span>
+          <span>{isAuthenticated ? "Logout" : "Login"}</span>
         </button>
       </div>
     </>

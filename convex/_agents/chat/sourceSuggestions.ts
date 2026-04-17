@@ -18,9 +18,7 @@ import { env } from "../../_lib/env";
 
 /** Best-effort fixes before JSON.parse (models sometimes emit trailing commas). */
 function repairJsonObjectText(json: string): string {
-  return json
-    .replace(/,\s*}/g, "}")
-    .replace(/,\s*]/g, "]");
+  return json.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
 }
 
 function parseSuggestionsPayload(raw: string): {
@@ -66,7 +64,7 @@ function parseSuggestionsPayload(raw: string): {
 
 async function generateSuggestionsWithModel(
   model: string,
-  prompt: string,
+  prompt: string
 ): Promise<{ summary: string; suggestions: string[] }> {
   const response = await uncachedLlmCall({
     model,
@@ -102,9 +100,7 @@ export const generateSuggestionsInternal = internalAction({
       notebookId: args.notebookId,
     });
 
-    const completed: any[] = (documents as any[]).filter(
-      (d: any) => d.status === "completed"
-    );
+    const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
 
     if (completed.length === 0) {
       return null;
@@ -147,7 +143,7 @@ Keep suggestions short (under 10 words each) and varied. Output a single JSON ob
         if (env.SMART_LLM !== env.FAST_LLM) {
           console.warn(
             "[sourceSuggestions] fast model failed, retrying with smart model:",
-            firstError,
+            firstError
           );
           parsed = await generateSuggestionsWithModel(env.SMART_LLM, prompt);
         } else {

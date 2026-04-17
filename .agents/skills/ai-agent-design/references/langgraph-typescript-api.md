@@ -16,15 +16,16 @@ import { MemorySaver } from "@langchain/langgraph";
 ## StateAnnotation Patterns
 
 ### Basic annotation
+
 ```typescript
 const MyState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
     reducer: messagesStateReducer, // handles add/remove/update
     default: () => [],
   }),
-  field: Annotation<string>,          // last-write-wins (default)
+  field: Annotation<string>, // last-write-wins (default)
   counter: Annotation<number>({
-    reducer: (a, b) => a + b,         // custom accumulator
+    reducer: (a, b) => a + b, // custom accumulator
     default: () => 0,
   }),
 });
@@ -32,6 +33,7 @@ type State = typeof MyState.State;
 ```
 
 ### Accessing state type
+
 ```typescript
 // Use typeof MyState.State for node function signatures
 async function myNode(state: typeof MyState.State): Promise<Partial<typeof MyState.State>> {
@@ -46,23 +48,23 @@ const graph = new StateGraph(MyState)
   // Static edges
   .addNode("node_a", nodeAFunction)
   .addNode("node_b", nodeBFunction)
-  .addEdge(START, "node_a")           // START is "__start__"
+  .addEdge(START, "node_a") // START is "__start__"
   .addEdge("node_a", "node_b")
-  .addEdge("node_b", END)             // END is "__end__"
-  
+  .addEdge("node_b", END) // END is "__end__"
+
   // Conditional edges
   .addConditionalEdges(
     "router_node",
-    (state) => state.intent,           // returns string key
+    (state) => state.intent, // returns string key
     {
-      "billing": "billing_handler",
-      "tech": "tech_handler",
-      "default": END,                  // fallback
+      billing: "billing_handler",
+      tech: "tech_handler",
+      default: END, // fallback
     }
   )
   .compile({
-    checkpointer: new MemorySaver(),   // enable persistence
-    recursionLimit: 25,                // default is 25, set explicitly
+    checkpointer: new MemorySaver(), // enable persistence
+    recursionLimit: 25, // default is 25, set explicitly
   });
 ```
 
@@ -78,9 +80,9 @@ const result = await graph.invoke(
 // Streaming (preferred for long-running agents)
 for await (const chunk of graph.stream(
   { input: "user query" },
-  { 
+  {
     configurable: { thread_id: "thread-123" },
-    streamMode: "values",   // "values" | "updates" | "debug"
+    streamMode: "values", // "values" | "updates" | "debug"
   }
 )) {
   console.log(chunk);
@@ -104,10 +106,9 @@ async function approvalNode(state: State) {
 }
 
 // Resuming after human responds
-await graph.invoke(
-  new Command({ resume: { approved: true } }),
-  { configurable: { thread_id: "thread-123" } }
-);
+await graph.invoke(new Command({ resume: { approved: true } }), {
+  configurable: { thread_id: "thread-123" },
+});
 ```
 
 ## Multi-Agent: Command and Send
@@ -118,16 +119,14 @@ import { Command, Send } from "@langchain/langgraph";
 // Command: direct routing from a node
 function supervisorNode(state: State) {
   return new Command({
-    goto: "worker_a",                  // or array for parallel: ["worker_a", "worker_b"]
+    goto: "worker_a", // or array for parallel: ["worker_a", "worker_b"]
     update: { currentTask: "analyze" },
   });
 }
 
 // Send: fan-out to parallel nodes with different state
 function fanOutNode(state: State) {
-  return state.tasks.map(task => 
-    new Send("process_task", { ...state, currentTask: task })
-  );
+  return state.tasks.map((task) => new Send("process_task", { ...state, currentTask: task }));
 }
 ```
 
@@ -141,14 +140,15 @@ const myTool = tool(
   async (input: { param: string }) => {
     try {
       const result = await doSomething(input.param);
-      return JSON.stringify(result);  // always return string
+      return JSON.stringify(result); // always return string
     } catch (e) {
       return `Error: ${(e as Error).message}`; // return errors, don't throw
     }
   },
   {
     name: "my_tool",
-    description: "Clear description of what this does and when to use it. Include what NOT to use it for if relevant.",
+    description:
+      "Clear description of what this does and when to use it. Include what NOT to use it for if relevant.",
     schema: z.object({
       param: z.string().describe("What this parameter represents"),
     }),

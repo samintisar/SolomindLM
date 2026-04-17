@@ -1,8 +1,8 @@
-import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { NotebookItem } from '@/shared/types/index';
-import { useCreateNotebook, useUpdateNotebook, useDeleteNotebook } from '../services/notebooksApi';
-import { useLimitErrorToast } from '@/shared/hooks/useLimitErrorToast';
+import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { NotebookItem } from "@/shared/types/index";
+import { useCreateNotebook, useUpdateNotebook, useDeleteNotebook } from "../services/notebooksApi";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 
 interface UseNotebookCRUDProps {
   isAuthenticated: boolean;
@@ -32,64 +32,70 @@ export function useNotebookCRUD({
 
   const handleCreateNotebook = useCallback(async () => {
     if (!isAuthenticated || !user) {
-      onRequireAuth?.('Sign in to create a notebook.');
+      onRequireAuth?.("Sign in to create a notebook.");
       return;
     }
 
     try {
       const newNotebook = await createNotebook({
-        title: 'Untitled Notebook',
-        coverColor: 'bg-yellow-500',
-        icon: 'Folder',
+        title: "Untitled Notebook",
+        coverColor: "bg-yellow-500",
+        icon: "Folder",
       });
       navigate(`/notebook/${newNotebook.id}`);
     } catch (error) {
-      console.error('Failed to create notebook:', error);
+      console.error("Failed to create notebook:", error);
       const handled = await handleLimitError(error);
       if (!handled.isLimitError) {
-        alertError(error, 'Failed to create notebook');
+        alertError(error, "Failed to create notebook");
       }
     }
   }, [isAuthenticated, user, createNotebook, navigate, handleLimitError, onRequireAuth]);
 
-  const handleUpdateNotebook = useCallback(async (id: string, updates: Partial<NotebookItem>) => {
-    if (!isAuthenticated || !user) {
-      onRequireAuth?.('Sign in to update notebooks.');
-      return;
-    }
-
-    try {
-      const updatePayload: any = {};
-      if (updates.title !== undefined) updatePayload.title = updates.title;
-      if (updates.coverColor !== undefined) updatePayload.coverColor = updates.coverColor;
-      if (updates.icon !== undefined) updatePayload.icon = updates.icon;
-      if (updates.isFeatured !== undefined) updatePayload.isFeatured = updates.isFeatured;
-
-      await updateNotebook(id, updatePayload);
-
-      if (activeNotebookId === id && updates.title) {
-        setNotebookTitle(updates.title);
+  const handleUpdateNotebook = useCallback(
+    async (id: string, updates: Partial<NotebookItem>) => {
+      if (!isAuthenticated || !user) {
+        onRequireAuth?.("Sign in to update notebooks.");
+        return;
       }
-    } catch (error) {
-      alertError(error, 'Failed to update notebook');
-    }
-  }, [isAuthenticated, user, updateNotebook, activeNotebookId, setNotebookTitle, onRequireAuth]);
 
-  const handleDeleteNotebook = useCallback(async (id: string) => {
-    if (!isAuthenticated || !user) {
-      onRequireAuth?.('Sign in to delete notebooks.');
-      return;
-    }
+      try {
+        const updatePayload: any = {};
+        if (updates.title !== undefined) updatePayload.title = updates.title;
+        if (updates.coverColor !== undefined) updatePayload.coverColor = updates.coverColor;
+        if (updates.icon !== undefined) updatePayload.icon = updates.icon;
+        if (updates.isFeatured !== undefined) updatePayload.isFeatured = updates.isFeatured;
 
-    try {
-      await deleteNotebook(id);
-      if (activeNotebookId === id) {
-        navigate('/');
+        await updateNotebook(id, updatePayload);
+
+        if (activeNotebookId === id && updates.title) {
+          setNotebookTitle(updates.title);
+        }
+      } catch (error) {
+        alertError(error, "Failed to update notebook");
       }
-    } catch (error) {
-      alertError(error, 'Failed to delete notebook');
-    }
-  }, [isAuthenticated, user, deleteNotebook, activeNotebookId, navigate, onRequireAuth]);
+    },
+    [isAuthenticated, user, updateNotebook, activeNotebookId, setNotebookTitle, onRequireAuth]
+  );
+
+  const handleDeleteNotebook = useCallback(
+    async (id: string) => {
+      if (!isAuthenticated || !user) {
+        onRequireAuth?.("Sign in to delete notebooks.");
+        return;
+      }
+
+      try {
+        await deleteNotebook(id);
+        if (activeNotebookId === id) {
+          navigate("/");
+        }
+      } catch (error) {
+        alertError(error, "Failed to delete notebook");
+      }
+    },
+    [isAuthenticated, user, deleteNotebook, activeNotebookId, navigate, onRequireAuth]
+  );
 
   return {
     handleCreateNotebook,

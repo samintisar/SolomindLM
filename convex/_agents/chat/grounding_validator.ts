@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Grounding validator for chat responses.
  *
@@ -6,12 +6,9 @@
  * with appropriate citations.
  */
 
-import type { ReferenceChunk } from '../../storage/ChatHistoryService';
-import type { EmbeddingService } from '../../_services/processing/EmbeddingServiceClient';
-import {
-  matchAllInlineCitations,
-  stripInlineCitationMarkers,
-} from '../_shared/citationExtract.js';
+import type { ReferenceChunk } from "../../storage/ChatHistoryService";
+import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import { matchAllInlineCitations, stripInlineCitationMarkers } from "../_shared/citationExtract.js";
 
 // ============================================================
 // Types
@@ -58,13 +55,13 @@ function truncateForEmbedding(text: string): string {
  * Phrases that indicate uncertainty and should trigger warnings.
  */
 const UNCERTAIN_PHRASES = [
-  'i think',
-  'probably',
-  'might be',
-  'could be',
-  'it seems',
-  'maybe',
-  'i believe',
+  "i think",
+  "probably",
+  "might be",
+  "could be",
+  "it seems",
+  "maybe",
+  "i believe",
 ] as const;
 
 // ============================================================
@@ -102,7 +99,7 @@ export function validateGrounding(
   const citations = matchAllInlineCitations(response);
 
   if (citations.length === 0) {
-    issues.push('No citations found in response');
+    issues.push("No citations found in response");
   }
 
   // Verify cited IDs exist
@@ -169,7 +166,7 @@ export function isArtifactContent(content: string): boolean {
   }
 
   // Check if it's a valid JSON array (try parsing)
-  if (trimmed.startsWith('[')) {
+  if (trimmed.startsWith("[")) {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
@@ -204,7 +201,7 @@ export function isArtifactContent(content: string): boolean {
  */
 function cosineSimilarity(vec1: number[], vec2: number[]): number {
   if (vec1.length !== vec2.length) {
-    throw new Error('Vector dimensions must match');
+    throw new Error("Vector dimensions must match");
   }
 
   let dotProduct = 0;
@@ -260,7 +257,7 @@ export async function validateSemanticGrounding(
   const citedSourceText = uniqueCitedIds
     .map((id) => sources[id - 1]?.content?.slice(0, 3000))
     .filter(Boolean)
-    .join('\n\n');
+    .join("\n\n");
 
   if (!citedSourceText) {
     return { isGrounded: true, missingCitations: false, issues: [] };
@@ -271,7 +268,7 @@ export async function validateSemanticGrounding(
 
   console.log(
     `[SemanticGrounding] Whole-response check: ${uniqueCitedIds.length} cited sources, ` +
-    `response=${cleanResponse.length} chars, sources=${citedSourceText.length} chars`
+      `response=${cleanResponse.length} chars, sources=${citedSourceText.length} chars`
   );
 
   try {
@@ -281,7 +278,9 @@ export async function validateSemanticGrounding(
     ]);
 
     const similarity = cosineSimilarity(responseEmbed, sourceEmbed);
-    console.log(`[SemanticGrounding] Whole-response similarity: ${similarity.toFixed(3)} (threshold: ${GROUNDING_THRESHOLD})`);
+    console.log(
+      `[SemanticGrounding] Whole-response similarity: ${similarity.toFixed(3)} (threshold: ${GROUNDING_THRESHOLD})`
+    );
 
     if (similarity < GROUNDING_THRESHOLD) {
       issues.push(
@@ -289,7 +288,7 @@ export async function validateSemanticGrounding(
       );
     }
   } catch (error) {
-    console.error('[SemanticGrounding] Embedding computation failed:', error);
+    console.error("[SemanticGrounding] Embedding computation failed:", error);
     // Don't fail validation on embedding errors
   }
 

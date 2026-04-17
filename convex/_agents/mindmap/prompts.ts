@@ -1,5 +1,5 @@
-"use node"
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js';
+"use node";
+import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
 /**
  * Prompt templates for MindMapGraph.
@@ -12,10 +12,12 @@ import { MARKDOWN_MATH_NOTATION_FOR_APP } from '../_shared/markdownMathPrompt.js
 // ============================================================
 
 /** System prompt for map phase concept extraction */
-export const MAP_SYSTEM_PROMPT = 'Extract main theme, 2–3 sentence summary, and 10–20 key concepts.';
+export const MAP_SYSTEM_PROMPT =
+  "Extract main theme, 2–3 sentence summary, and 10–20 key concepts.";
 
 /** System prompt for reduce phase mind map generation */
-export const REDUCE_SYSTEM_PROMPT = 'You are a Mind Map Architect. Create hierarchical markdown outlines.';
+export const REDUCE_SYSTEM_PROMPT =
+  "You are a Mind Map Architect. Create hierarchical markdown outlines.";
 
 // ============================================================
 // PROMPT TEMPLATES
@@ -97,6 +99,6 @@ Generate the mind map now.`;
 // ============================================================
 
 export const NODES = {
-  MAP_PROCESS: 'map_process',
-  REDUCE_NODE: 'reduce_node',
+  MAP_PROCESS: "map_process",
+  REDUCE_NODE: "reduce_node",
 } as const;

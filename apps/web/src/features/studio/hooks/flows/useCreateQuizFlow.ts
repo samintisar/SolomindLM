@@ -1,10 +1,10 @@
-import { useCallback } from 'react';
-import type { Note, QuizNote } from '@/shared/types/index';
-import { useToast } from '@/shared/contexts/ToastContext';
-import { useCreateQuiz } from '../../services/quizzesApi';
-import type { QuizConfig } from '../../components/CustomizeQuizModal';
-import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
-import type { CreateFlowContext } from './types';
+import { useCallback } from "react";
+import type { Note, QuizNote } from "@/shared/types/index";
+import { useToast } from "@/shared/contexts/ToastContext";
+import { useCreateQuiz } from "../../services/quizzesApi";
+import type { QuizConfig } from "../../components/CustomizeQuizModal";
+import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import type { CreateFlowContext } from "./types";
 
 export function useCreateQuizFlow(ctx: CreateFlowContext) {
   const createQuiz = useCreateQuiz();
@@ -17,12 +17,16 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
       const selectedDocumentIds = ctx.sources.filter((s) => s.selected).map((s) => s.id);
       if (selectedDocumentIds.length === 0) {
         if (ctx.confirm) {
-          await ctx.confirm('No Sources Selected', 'Please select at least one source to generate a quiz', { variant: 'warning' });
+          await ctx.confirm(
+            "No Sources Selected",
+            "Please select at least one source to generate a quiz",
+            { variant: "warning" }
+          );
         }
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        showErrorToast('Please sign in again to continue.');
+        showErrorToast("Please sign in again to continue.");
         return;
       }
 
@@ -30,11 +34,11 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,
-        title: 'Quiz',
+        title: "Quiz",
         preview: `${questionCount} Questions • ${config.difficulty}`,
-        type: 'quiz',
+        type: "quiz",
         questions: [],
-        status: 'generating',
+        status: "generating",
         metadata: { questionCount, difficulty: config.difficulty, focusArea: config.focus },
       };
 
@@ -48,15 +52,16 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
           difficulty: config.difficulty,
           focus: config.focus || undefined,
         });
-        const quizId = (resQuiz as { quizId?: string }).quizId ?? (resQuiz as { noteId?: string }).noteId!;
+        const quizId =
+          (resQuiz as { quizId?: string }).quizId ?? (resQuiz as { noteId?: string }).noteId!;
         const apiNote = (resQuiz as { note?: { _id: string; title: string; status: string } }).note;
         const initialNote: QuizNote = {
           id: quizId,
-          title: apiNote?.title ?? 'Quiz',
+          title: apiNote?.title ?? "Quiz",
           preview: `${questionCount} Questions • ${config.difficulty}`,
-          type: 'quiz',
+          type: "quiz",
           questions: [],
-          status: (apiNote?.status ?? resQuiz.status) as QuizNote['status'],
+          status: (apiNote?.status ?? resQuiz.status) as QuizNote["status"],
           metadata: { questionCount, difficulty: config.difficulty, focusArea: config.focus },
         };
 
@@ -68,7 +73,7 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
           placeholderId,
           onDeleteNote: ctx.onDeleteNote,
           toastMessage: "Couldn't start the quiz. Please try again.",
-          devLabel: 'Failed to create quiz',
+          devLabel: "Failed to create quiz",
         });
       }
     },

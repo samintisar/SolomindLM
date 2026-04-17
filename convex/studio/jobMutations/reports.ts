@@ -1,11 +1,11 @@
-import { internalMutation } from '../../_generated/server';
-import { v } from 'convex/values';
-import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from '../../_shared/mathMarkdown';
-import { buildErrorMetadata } from './jobErrorUtils';
+import { internalMutation } from "../../_generated/server";
+import { v } from "convex/values";
+import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveReportResults = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     content: v.any(),
     metadata: v.any(),
   },
@@ -13,15 +13,16 @@ export const saveReportResults = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
-    const normalizedContent = typeof args.content === 'string'
-      ? normalizeMathMarkdown(args.content)
-      : normalizeMathMarkdownDeep(args.content);
+    const normalizedContent =
+      typeof args.content === "string"
+        ? normalizeMathMarkdown(args.content)
+        : normalizeMathMarkdownDeep(args.content);
 
     await ctx.db.patch(args.reportId, {
       content: normalizedContent,
-      status: 'completed',
+      status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? 'Report',
+      title: args.metadata?.title ?? "Report",
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
@@ -33,7 +34,7 @@ export const saveReportResults = internalMutation({
 
 export const updateReportTitle = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     title: v.string(),
   },
   handler: async (ctx, args) => {
@@ -50,7 +51,7 @@ export const updateReportTitle = internalMutation({
 
 export const updateReportStatus = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     status: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -72,7 +73,7 @@ export const updateReportStatus = internalMutation({
 
 export const markReportFailed = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     error: v.string(),
     metadata: v.optional(v.any()),
   },
@@ -83,12 +84,12 @@ export const markReportFailed = internalMutation({
 
     const errorMetadata = buildErrorMetadata(
       error,
-      metadata?.errorPhase || metadata?.phase || 'unknown',
+      metadata?.errorPhase || metadata?.phase || "unknown",
       metadata
     );
 
     await ctx.db.patch(reportId, {
-      status: 'failed',
+      status: "failed",
       updatedAt: Date.now(),
       metadata: {
         ...metadata,
@@ -102,7 +103,7 @@ export const markReportFailed = internalMutation({
 // Multi-phase report helpers
 export const initReportMapPhase = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     totalMapTasks: v.number(),
     reportType: v.string(),
     customPrompt: v.optional(v.string()),
@@ -112,13 +113,13 @@ export const initReportMapPhase = internalMutation({
     if (!report) return null;
 
     await ctx.db.patch(args.reportId, {
-      status: 'generating',
+      status: "generating",
       updatedAt: Date.now(),
       metadata: {
         ...report.metadata,
-        phase: 'map_processing',
+        phase: "map_processing",
         progress: 30,
-        currentStep: 'Processing content...',
+        currentStep: "Processing content...",
         totalMapTasks: args.totalMapTasks,
         completedMapTasks: 0,
         mapResults: {},
@@ -132,7 +133,7 @@ export const initReportMapPhase = internalMutation({
 
 export const storeReportMapResult = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
     chunkIndex: v.number(),
     result: v.string(),
   },
@@ -164,7 +165,7 @@ export const storeReportMapResult = internalMutation({
 
 export const clearReportMapData = internalMutation({
   args: {
-    reportId: v.id('reports'),
+    reportId: v.id("reports"),
   },
   handler: async (ctx, args) => {
     const report = await ctx.db.get(args.reportId);

@@ -1,16 +1,16 @@
-import React from 'react';
-import { ArrowRight, Check } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
+import React from "react";
+import { ArrowRight, Check } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
 
 interface FinalCTAProps {
   onGetStarted: () => void;
 }
 
 const benefits = [
-  'Generate flashcards from any PDF in seconds',
-  'Create quizzes from videos and articles',
-  'Turn notes into mind maps automatically',
-  'Export to Anki, Quizlet, and more'
+  "Generate flashcards from any PDF in seconds",
+  "Create quizzes from videos and articles",
+  "Turn notes into mind maps automatically",
+  "Export to Anki, Quizlet, and more",
 ];
 
 export const FinalCTA: React.FC<FinalCTAProps> = ({ onGetStarted }) => {

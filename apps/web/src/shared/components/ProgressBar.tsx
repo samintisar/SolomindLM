@@ -7,7 +7,7 @@ interface ProgressBarProps {
 /**
  * Progress bar component for displaying completion percentage
  */
-export function ProgressBar({ value, className = '', showLabel = false }: ProgressBarProps) {
+export function ProgressBar({ value, className = "", showLabel = false }: ProgressBarProps) {
   const clampedValue = Math.min(100, Math.max(0, value));
 
   return (

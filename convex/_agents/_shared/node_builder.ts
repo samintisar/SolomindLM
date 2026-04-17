@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * Node builder for agent operations.
  *
@@ -11,18 +11,15 @@
  * - Error handling and logging
  */
 
-import type { BaseLanguageModel } from '@langchain/core/language_models/base';
-import type { BaseMessage, MessageContent } from '@langchain/core/messages';
-import { Send } from '@langchain/langgraph';
+import type { BaseLanguageModel } from "@langchain/core/language_models/base";
+import type { BaseMessage, MessageContent } from "@langchain/core/messages";
+import { Send } from "@langchain/langgraph";
 
 // Import shared utilities
-import {
-  invokeWithTimeout,
-  invokeWithRetry,
-} from './index.js';
-import { createAgentGraphLogger, type JobLogger } from './logging.js';
-import type { RetryConfig } from './retry.js';
-import type { ProgressInfo } from './state_factory.js';
+import { invokeWithTimeout, invokeWithRetry } from "./index.js";
+import { createAgentGraphLogger, type JobLogger } from "./logging.js";
+import type { RetryConfig } from "./retry.js";
+import type { ProgressInfo } from "./state_factory.js";
 
 // ============================================================
 // Types
@@ -132,19 +129,20 @@ export function createLLMNode<TInput = unknown, TOutput = unknown>(
       // Prepare messages
       const userMessage = options.getUserMessage(input);
       const messages = [
-        { role: 'system' as const, content: options.systemMessage },
-        typeof userMessage === 'string'
-          ? { role: 'human' as const, content: userMessage }
+        { role: "system" as const, content: options.systemMessage },
+        typeof userMessage === "string"
+          ? { role: "human" as const, content: userMessage }
           : userMessage,
       ];
 
       // Invoke LLM with timeout and retry
       const response = await invokeWithRetry(
-        () => invokeWithTimeout(
-          () => llm.invoke(messages as BaseMessage[]),
-          config.timeoutMs,
-          `${config.agentName}${config.phase}`
-        ),
+        () =>
+          invokeWithTimeout(
+            () => llm.invoke(messages as BaseMessage[]),
+            config.timeoutMs,
+            `${config.agentName}${config.phase}`
+          ),
         config.retryConfig || {
           maxAttempts: 3,
           baseDelayMs: 1000,
@@ -171,8 +169,7 @@ export function createLLMNode<TInput = unknown, TOutput = unknown>(
     } catch (error) {
       const elapsed = Date.now() - startTime;
 
-      const err =
-        error instanceof Error ? error : new Error(String(error));
+      const err = error instanceof Error ? error : new Error(String(error));
       logger.phaseError(config.phase, err, {
         agent: config.agentName,
         processingTimeMs: elapsed,
@@ -239,11 +236,7 @@ export function createCollapseNode<TState extends { mapOutputs: string[] }>(
       inputCount: state.mapOutputs.length,
     });
 
-    const collapsed = recursiveCollapse(
-      state.mapOutputs,
-      maxOutputsPerCollapse,
-      logger
-    );
+    const collapsed = recursiveCollapse(state.mapOutputs, maxOutputsPerCollapse, logger);
 
     logger.info(`Collapsed ${state.mapOutputs.length} outputs to ${collapsed.length}`, {
       agent: config.agentName,
@@ -281,12 +274,12 @@ function recursiveCollapse(
   const collapsed: string[] = [];
   for (let i = 0; i < outputs.length; i += maxOutputsPerCollapse) {
     const batch = outputs.slice(i, i + maxOutputsPerCollapse);
-    collapsed.push(batch.join('\n\n---\n\n'));
+    collapsed.push(batch.join("\n\n---\n\n"));
   }
 
   logger.info(`Recursive collapse: ${outputs.length} -> ${collapsed.length}`, {
-    agent: 'NodeBuilder',
-    phase: 'recursive_collapse',
+    agent: "NodeBuilder",
+    phase: "recursive_collapse",
     inputCount: outputs.length,
     outputCount: collapsed.length,
   });
@@ -312,16 +305,16 @@ function recursiveCollapse(
 export function createMapRouteFunction<TState extends { chunks: string[] }>(
   packChunksFn: (chunks: string[]) => string[],
   config: NodeConfig
-): (state: TState) => Send[] | 'collapse' {
+): (state: TState) => Send[] | "collapse" {
   return (state: TState) => {
     const logger = loggerForNodeConfig(config);
 
     if (state.chunks.length === 0) {
-      logger.warn('No chunks to process, routing to collapse', {
+      logger.warn("No chunks to process, routing to collapse", {
         agent: config.agentName,
         phase: config.phase,
       });
-      return 'collapse';
+      return "collapse";
     }
 
     const packedChunks = packChunksFn(state.chunks);
@@ -333,12 +326,13 @@ export function createMapRouteFunction<TState extends { chunks: string[] }>(
       packedChunks: packedChunks.length,
     });
 
-    return packedChunks.map((chunk, idx) =>
-      new Send('map', {
-        chunk,
-        chunkIndex: idx,
-        totalChunks: packedChunks.length,
-      })
+    return packedChunks.map(
+      (chunk, idx) =>
+        new Send("map", {
+          chunk,
+          chunkIndex: idx,
+          totalChunks: packedChunks.length,
+        })
     );
   };
 }

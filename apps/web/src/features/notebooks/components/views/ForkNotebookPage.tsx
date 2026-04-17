@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useMutation, useQuery } from 'convex/react';
-import { api } from '@convex/_generated/api';
+import { useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 
 /**
  * Landing page for fork-only share links: /share/fork/:token
@@ -17,10 +17,7 @@ export function ForkNotebookPage() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
-  const preview = useQuery(
-    api.notebooks.sharing.peekShareToken,
-    token ? { token } : 'skip'
-  );
+  const preview = useQuery(api.notebooks.sharing.peekShareToken, token ? { token } : "skip");
 
   const handleFork = async () => {
     if (!token) return;
@@ -30,7 +27,7 @@ export function ForkNotebookPage() {
       const { newNotebookId } = await fork({ token });
       navigate(`/notebook/${newNotebookId}`, { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not duplicate notebook');
+      setError(e instanceof Error ? e.message : "Could not duplicate notebook");
     } finally {
       setWorking(false);
     }
@@ -39,20 +36,19 @@ export function ForkNotebookPage() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-md mx-auto text-center">
       <h1 className="text-2xl font-bold font-sans mb-2">Duplicate notebook</h1>
-      {preview === undefined && (
-        <p className="text-muted-foreground text-sm">Loading…</p>
-      )}
+      {preview === undefined && <p className="text-muted-foreground text-sm">Loading…</p>}
       {preview === null && (
         <p className="text-destructive text-sm">This link is invalid or has been revoked.</p>
       )}
-      {preview && preview.kind !== 'fork' && (
+      {preview && preview.kind !== "fork" && (
         <p className="text-destructive text-sm">This link is not a fork link.</p>
       )}
-      {preview && preview.kind === 'fork' && (
+      {preview && preview.kind === "fork" && (
         <>
           <p className="text-muted-foreground text-sm mb-6">
-            You will get a copy of <span className="font-medium text-foreground">{preview.title}</span>{' '}
-            in your account (sources, Studio, manual notes). Chat history is not copied.
+            You will get a copy of{" "}
+            <span className="font-medium text-foreground">{preview.title}</span> in your account
+            (sources, Studio, manual notes). Chat history is not copied.
           </p>
           <button
             type="button"
@@ -60,14 +56,14 @@ export function ForkNotebookPage() {
             onClick={() => void handleFork()}
             className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 disabled:opacity-50"
           >
-            {working ? 'Duplicating…' : 'Duplicate to my account'}
+            {working ? "Duplicating…" : "Duplicate to my account"}
           </button>
         </>
       )}
       {error && <p className="text-destructive text-sm mt-4">{error}</p>}
       <button
         type="button"
-        onClick={() => navigate('/home')}
+        onClick={() => navigate("/home")}
         className="mt-8 text-sm text-muted-foreground hover:text-foreground underline"
       >
         Back to home

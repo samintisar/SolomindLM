@@ -1,15 +1,15 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
-import { CheckSquare, Square, XCircle, Loader2, FileText, FileType } from 'lucide-react';
-import { Source } from '@/shared/types';
-import { sanitizeMarkdown } from '@/shared/utils';
-import { useGetSignedUrl } from '../services/documentsApi';
-import { PdfViewer } from './PdfViewer';
+import React, { lazy, Suspense, useState, useEffect } from "react";
+import { CheckSquare, Square, XCircle, Loader2, FileText, FileType } from "lucide-react";
+import { Source } from "@/shared/types";
+import { sanitizeMarkdown } from "@/shared/utils";
+import { useGetSignedUrl } from "../services/documentsApi";
+import { PdfViewer } from "./PdfViewer";
 
 const MarkdownRenderer = lazy(() =>
-  import('@/shared/components/MarkdownRenderer').then((m) => ({ default: m.default }))
+  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
-type PdfViewMode = 'pdf' | 'markdown';
+type PdfViewMode = "pdf" | "markdown";
 
 interface SourceViewerProps {
   source: Source;
@@ -32,17 +32,17 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   error,
   hideInclusionToggle,
 }) => {
-  const isPdfSource = source.type === 'PDF';
+  const isPdfSource = source.type === "PDF";
   const canShowPdf = isPdfSource && pdfStorageId;
-  const [viewMode, setViewMode] = useState<PdfViewMode>('markdown');
+  const [viewMode, setViewMode] = useState<PdfViewMode>("markdown");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfUrlLoading, setPdfUrlLoading] = useState(false);
   const getSignedUrl = useGetSignedUrl();
 
   // Fetch PDF signed URL only when user switches to Original PDF tab (avoids loading PDF until needed)
   useEffect(() => {
-    if (viewMode !== 'pdf' || !pdfStorageId) {
-      if (viewMode !== 'pdf') setPdfUrl(null);
+    if (viewMode !== "pdf" || !pdfStorageId) {
+      if (viewMode !== "pdf") setPdfUrl(null);
       return;
     }
     if (pdfUrl) return; // already have URL
@@ -70,7 +70,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             onClick={() => onToggle(source.id)}
             className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer select-none"
             aria-pressed={source.selected}
-            aria-label={source.selected ? 'Included (click to exclude)' : 'Excluded (click to include)'}
+            aria-label={
+              source.selected ? "Included (click to exclude)" : "Excluded (click to include)"
+            }
           >
             {source.selected ? (
               <CheckSquare className="w-4 h-4 shrink-0" aria-hidden />
@@ -83,7 +85,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       </div>
 
       {/* Error State */}
-      {source.status === 'failed' && (
+      {source.status === "failed" && (
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2">
             <XCircle className="w-5 h-5 text-destructive shrink-0" />
@@ -124,26 +126,26 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         <div className="flex gap-1 rounded-lg border border-border bg-muted/50 p-1">
           <button
             type="button"
-            onClick={() => setViewMode('markdown')}
+            onClick={() => setViewMode("markdown")}
             className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
-              viewMode === 'markdown'
-                ? 'border-border bg-card dark:bg-secondary text-foreground shadow-sm'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              viewMode === "markdown"
+                ? "border-border bg-card dark:bg-secondary text-foreground shadow-sm"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
-            aria-pressed={viewMode === 'markdown'}
+            aria-pressed={viewMode === "markdown"}
           >
             <FileType className="h-4 w-4" />
             Markdown
           </button>
           <button
             type="button"
-            onClick={() => setViewMode('pdf')}
+            onClick={() => setViewMode("pdf")}
             className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
-              viewMode === 'pdf'
-                ? 'border-border bg-card dark:bg-secondary text-foreground shadow-sm'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+              viewMode === "pdf"
+                ? "border-border bg-card dark:bg-secondary text-foreground shadow-sm"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
-            aria-pressed={viewMode === 'pdf'}
+            aria-pressed={viewMode === "pdf"}
           >
             <FileText className="h-4 w-4" />
             Original PDF
@@ -154,7 +156,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       {/* Content Display */}
       {!isLoading && !error && (
         <>
-          {canShowPdf && viewMode === 'pdf' ? (
+          {canShowPdf && viewMode === "pdf" ? (
             pdfUrlLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -167,7 +169,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
             )
           ) : (
             <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
-              <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
+              <Suspense
+                fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}
+              >
                 <MarkdownRenderer
                   components={{
                     img: () => null,
@@ -195,7 +199,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                     ),
                   }}
                 >
-                  {sanitizeMarkdown(content || 'No content available.')}
+                  {sanitizeMarkdown(content || "No content available.")}
                 </MarkdownRenderer>
               </Suspense>
             </div>

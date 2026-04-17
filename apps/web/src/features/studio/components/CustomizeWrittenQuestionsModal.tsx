@@ -1,7 +1,6 @@
-
-import React, { useState } from 'react';
-import { X, MessageSquareText, Check } from 'lucide-react';
-import { StudioModalDiscoverPromptsButton } from './StudioModalDiscoverPromptsButton';
+import React, { useState } from "react";
+import { X, MessageSquareText, Check } from "lucide-react";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeWrittenQuestionsModalProps {
   isOpen: boolean;
@@ -11,9 +10,9 @@ interface CustomizeWrittenQuestionsModalProps {
 }
 
 export interface WrittenQuestionsConfig {
-  count: 'fewer' | 'standard' | 'more';
-  difficulty: 'easy' | 'medium' | 'hard';
-  questionType: 'short' | 'essay';
+  count: "fewer" | "standard" | "more";
+  difficulty: "easy" | "medium" | "hard";
+  questionType: "short" | "essay";
   focus: string;
 }
 
@@ -23,10 +22,10 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
   onGenerate,
   embedded = false,
 }) => {
-  const [count, setCount] = useState<WrittenQuestionsConfig['count']>('standard');
-  const [difficulty, setDifficulty] = useState<WrittenQuestionsConfig['difficulty']>('medium');
-  const [questionType, setQuestionType] = useState<WrittenQuestionsConfig['questionType']>('short');
-  const [focus, setFocus] = useState('');
+  const [count, setCount] = useState<WrittenQuestionsConfig["count"]>("standard");
+  const [difficulty, setDifficulty] = useState<WrittenQuestionsConfig["difficulty"]>("medium");
+  const [questionType, setQuestionType] = useState<WrittenQuestionsConfig["questionType"]>("short");
+  const [focus, setFocus] = useState("");
 
   if (!isOpen) return null;
 
@@ -45,11 +44,17 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             <div className="p-2 bg-secondary/50 rounded-lg">
               <MessageSquareText className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-xl font-bold font-sans tracking-tight">Customize Written Questions</h2>
+            <h2 className="text-xl font-bold font-sans tracking-tight">
+              Customize Written Questions
+            </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <StudioModalDiscoverPromptsButton />
-            <button type="button" onClick={onClose} className="rounded-xl p-2 transition-colors hover:bg-secondary/50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl p-2 transition-colors hover:bg-secondary/50"
+            >
               <X className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
@@ -61,20 +66,24 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
               Number of Questions
             </label>
             <div className="flex w-full min-w-0 bg-background border border-border rounded-xl p-1">
-              {(['fewer', 'standard', 'more'] as const).map((opt) => (
+              {(["fewer", "standard", "more"] as const).map((opt) => (
                 <button
                   key={opt}
                   type="button"
                   onClick={() => setCount(opt)}
                   className={`
                     flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition-all sm:px-3
-                    ${count === opt
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'}
+                    ${
+                      count === opt
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }
                   `}
                 >
                   {count === opt && <Check className="h-3 w-3 shrink-0" aria-hidden />}
-                  <span className="whitespace-nowrap">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
+                  <span className="whitespace-nowrap">
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -86,16 +95,18 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
                 Question Type
               </label>
               <div className="flex w-full min-w-0 bg-background border border-border rounded-xl p-1">
-                {(['short', 'essay'] as const).map((opt) => (
+                {(["short", "essay"] as const).map((opt) => (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => setQuestionType(opt)}
                     className={`
                       flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all
-                      ${questionType === opt
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'}
+                      ${
+                        questionType === opt
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }
                     `}
                   >
                     {questionType === opt && <Check className="h-3 w-3 shrink-0" aria-hidden />}
@@ -110,16 +121,18 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
                 Difficulty Level
               </label>
               <div className="flex w-full min-w-0 bg-background border border-border rounded-xl p-1">
-                {(['easy', 'medium', 'hard'] as const).map((opt) => (
+                {(["easy", "medium", "hard"] as const).map((opt) => (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => setDifficulty(opt)}
                     className={`
                       flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition-all sm:px-2.5
-                      ${difficulty === opt
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'}
+                      ${
+                        difficulty === opt
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }
                     `}
                   >
                     {difficulty === opt && <Check className="h-3 w-3 shrink-0" aria-hidden />}
@@ -131,7 +144,9 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
           </div>
 
           <div className="space-y-4">
-            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">Area of Focus</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
+              Area of Focus
+            </label>
             <textarea
               value={focus}
               onChange={(e) => setFocus(e.target.value)}

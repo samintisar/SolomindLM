@@ -1,7 +1,7 @@
 "use node";
 
-import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { countTokens } from '../../_agents/_shared/tokenizer.js';
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { countTokens } from "../../_agents/_shared/tokenizer.js";
 
 /**
  * Chunk-level metadata extracted during chunking.
@@ -82,11 +82,7 @@ export class StructuralChunker {
     // Process each section
     for (const section of sections) {
       // Split section content into chunks
-      const sectionChunks = await this.chunkSection(
-        section.content,
-        chunkSize,
-        chunkOverlap
-      );
+      const sectionChunks = await this.chunkSection(section.content, chunkSize, chunkOverlap);
 
       for (const chunkContent of sectionChunks) {
         const metadata = this.extractChunkMetadata(
@@ -119,11 +115,11 @@ export class StructuralChunker {
    * Parse document into sections based on headings.
    */
   private parseIntoSections(document: string): DocumentSection[] {
-    const lines = document.split('\n');
+    const lines = document.split("\n");
     const sections: DocumentSection[] = [];
 
     let currentSection: DocumentSection = {
-      content: '',
+      content: "",
       headingPath: [],
       level: 0,
       pageNumber: 1,
@@ -147,17 +143,17 @@ export class StructuralChunker {
 
         // Start new section
         currentSection = {
-          content: '',
-          headingPath: this.headingStack.map(h => h.title),
+          content: "",
+          headingPath: this.headingStack.map((h) => h.title),
           level,
           pageNumber: this.currentPageNumber,
           startOffset: 0, // Track approximate position if needed
         };
-      } else if (line.includes('\x0C') || line.includes('PAGE_BREAK')) {
+      } else if (line.includes("\x0C") || line.includes("PAGE_BREAK")) {
         // Form feed or explicit page break marker
         this.currentPageNumber++;
       } else {
-        currentSection.content += line + '\n';
+        currentSection.content += line + "\n";
       }
     }
 
@@ -193,8 +189,11 @@ export class StructuralChunker {
     section: DocumentSection,
     previousChunkContent: string | null
   ): ChunkMetadata {
-    const words = content.trim().split(/\s+/).filter(w => w.length > 0);
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const words = content
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+    const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
 
     return {
       chunkIndex,
@@ -204,14 +203,11 @@ export class StructuralChunker {
       wordCount: words.length,
       sentenceCount: sentences.length,
       pageNumber: section.pageNumber > 1 ? section.pageNumber : null,
-      sectionTitle: section.headingPath.length > 0
-        ? section.headingPath[section.headingPath.length - 1]
-        : null,
+      sectionTitle:
+        section.headingPath.length > 0 ? section.headingPath[section.headingPath.length - 1] : null,
       sectionLevel: section.level > 0 ? section.level : null,
       headingPath: section.headingPath,
-      previousChunkPreview: previousChunkContent
-        ? previousChunkContent.slice(-100)
-        : null,
+      previousChunkPreview: previousChunkContent ? previousChunkContent.slice(-100) : null,
       nextChunkPreview: null, // Will be set in post-processing
       hasCodeBlock: this.detectCodeBlock(content),
       hasMathNotation: this.detectMathNotation(content),
@@ -232,7 +228,7 @@ export class StructuralChunker {
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize,
       chunkOverlap,
-      separators: ['\n\n', '\n', '. ', ' ', ''],
+      separators: ["\n\n", "\n", ". ", " ", ""],
       lengthFunction: (t) => countTokens(t),
     });
 
@@ -246,7 +242,7 @@ export class StructuralChunker {
   }
 
   private detectMathNotation(content: string): boolean {
-    return /\$\$[\s\S]*?\$\$/.test(content) || /\$[^\$\n]+?\$/.test(content);
+    return /\$\$[\s\S]*?\$\$/.test(content) || /\$[^$\n]+?\$/.test(content);
   }
 
   private detectTable(content: string): boolean {

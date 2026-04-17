@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Structured chat response with citations.
@@ -11,7 +11,7 @@ export interface ChatResponse {
   /** The answer in markdown format with inline citation markers */
   answer_markdown: string;
   /** Confidence level based on source coverage */
-  confidence: 'high' | 'medium' | 'low';
+  confidence: "high" | "medium" | "low";
 }
 
 /**
@@ -38,18 +38,18 @@ export const ChatResponseSchema = z.object({
   answer_markdown: z
     .string()
     .describe(
-      'The answer in markdown format. ' +
-        'CRITICAL: Use INLINE citations ONLY - place plain ASCII [1], [2] after each factual claim (never \\[1\\] — backslashes break detection). ' +
+      "The answer in markdown format. " +
+        "CRITICAL: Use INLINE citations ONLY - place plain ASCII [1], [2] after each factual claim (never \\[1\\] — backslashes break detection). " +
         'DO NOT add a "Sources:" footer or list at the end. ' +
-        'Start with a direct answer, then provide supporting details with inline citations. ' +
-        'Math: wrap all formulas in $...$ or $$...$$; never use $ inside $$; do not nest dollar math.'
+        "Start with a direct answer, then provide supporting details with inline citations. " +
+        "Math: wrap all formulas in $...$ or $$...$$; never use $ inside $$; do not nest dollar math."
     ),
   confidence: z
-    .enum(['high', 'medium', 'low'])
+    .enum(["high", "medium", "low"])
     .describe(
-      'Confidence level: ' +
-        'high = question directly addressed by 2+ sources with consistent information, ' +
-        'medium = question partially addressed or single source only, ' +
-        'low = tangential information or contradictory sources'
+      "Confidence level: " +
+        "high = question directly addressed by 2+ sources with consistent information, " +
+        "medium = question partially addressed or single source only, " +
+        "low = tangential information or contradictory sources"
     ),
 });

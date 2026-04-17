@@ -1,6 +1,6 @@
-import React from 'react';
-import { Twitter } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Twitter } from "lucide-react";
+import { Link } from "react-router-dom";
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -24,9 +24,7 @@ export const Footer: React.FC = () => {
       <div className="max-w-[1500px] w-full mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Brand */}
-          <div className="text-sm text-muted-foreground">
-            &copy; {currentYear} SolomindLM
-          </div>
+          <div className="text-sm text-muted-foreground">&copy; {currentYear} SolomindLM</div>
 
           {/* Links */}
           <nav className="flex items-center gap-6">

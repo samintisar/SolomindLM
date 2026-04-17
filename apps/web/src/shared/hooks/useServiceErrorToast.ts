@@ -1,12 +1,12 @@
-import { useCallback } from 'react';
-import { useToast } from '@/shared/contexts/ToastContext';
+import { useCallback } from "react";
+import { useToast } from "@/shared/contexts/ToastContext";
 import {
   getLimitErrorMessage,
   getServiceErrorMessage,
   parseAppError,
   type ParsedLimitError,
   type ParsedServiceError,
-} from '@/shared/utils/errorParser';
+} from "@/shared/utils/errorParser";
 
 /**
  * Maps Convex / structured app errors to in-app toasts (ToastProvider).
@@ -18,10 +18,10 @@ export function useServiceErrorToast() {
     (err: unknown) => {
       const parsed = parseAppError(err);
       if (!parsed) {
-        toastError(err instanceof Error ? err.message : 'Something went wrong');
+        toastError(err instanceof Error ? err.message : "Something went wrong");
         return;
       }
-      if ('isLimitError' in parsed && (parsed as ParsedLimitError).isLimitError) {
+      if ("isLimitError" in parsed && (parsed as ParsedLimitError).isLimitError) {
         toastError(getLimitErrorMessage(parsed as ParsedLimitError));
         return;
       }

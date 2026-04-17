@@ -16,6 +16,7 @@ description: Use when working with the Convex backend in this project — settin
 ### Option A — Bulk push from .env (preferred for multiple vars)
 
 `bun run convex:env:push` is a **custom project script** (`archive/push-convex-env.js`) that reads `.env` and calls `bun x convex env set` for each variable. It is NOT a native Convex CLI feature.
+
 ```bash
 # 1. Edit .env at project root
 # 2. Push to dev:
@@ -29,6 +30,7 @@ bun run convex:env:push:dry
 ```
 
 ### Option B — Native CLI (single var or fallback if script is missing)
+
 ```bash
 # Dev:
 bun x convex env set FAST_LLM "Qwen/Qwen3.5-9B"
@@ -46,6 +48,7 @@ bun x convex env get FAST_LLM
 ```
 
 ### Env Var Constraints
+
 - Max **40 character** names (see `WQ_` prefix pattern in `_lib/env.ts` for workarounds)
 - Names: letters, numbers, underscores only; must start with letter
 - Max value size: 8KB
@@ -53,17 +56,18 @@ bun x convex env get FAST_LLM
 
 ### Where Vars Live
 
-| File | Purpose |
-|------|---------|
-| `.env` (root) | Convex backend vars — pushed to Convex server |
-| `apps/web/.env.local` | Vite frontend vars (`VITE_*` prefix) — never pushed to Convex |
-| `convex/_lib/env.ts` | Typed access layer with fallback defaults — edit `.env` not this |
+| File                  | Purpose                                                          |
+| --------------------- | ---------------------------------------------------------------- |
+| `.env` (root)         | Convex backend vars — pushed to Convex server                    |
+| `apps/web/.env.local` | Vite frontend vars (`VITE_*` prefix) — never pushed to Convex    |
+| `convex/_lib/env.ts`  | Typed access layer with fallback defaults — edit `.env` not this |
 
 ---
 
 ## File Structure Conventions
 
 Directories with `_` prefix are **excluded from Convex API generation**:
+
 - `_agents/` — LangGraph agents (not callable directly)
 - `_lib/` — utilities, env, limits, errors
 - `_model/` — database CRUD helpers
@@ -77,15 +81,16 @@ Functions in `convex/domain/index.ts` → `api.domain.index.*`
 
 ### Capability Matrix
 
-| Capability | Query | Mutation | Action |
-|---|---|---|---|
-| DB read/write | ✅ direct | ✅ direct | ❌ via `ctx.runQuery/runMutation` |
-| Transactional | ✅ | ✅ | ❌ |
-| Real-time reactive | ✅ | ❌ | ❌ |
-| `fetch()` external APIs | ❌ | ❌ | ✅ |
-| Schedule jobs | ❌ | ✅ | ✅ |
+| Capability              | Query     | Mutation  | Action                            |
+| ----------------------- | --------- | --------- | --------------------------------- |
+| DB read/write           | ✅ direct | ✅ direct | ❌ via `ctx.runQuery/runMutation` |
+| Transactional           | ✅        | ✅        | ❌                                |
+| Real-time reactive      | ✅        | ❌        | ❌                                |
+| `fetch()` external APIs | ❌        | ❌        | ✅                                |
+| Schedule jobs           | ❌        | ✅        | ✅                                |
 
 ### Patterns
+
 ```typescript
 // Public query — reactive, read-only, direct DB access
 export const myQuery = query({
@@ -131,6 +136,7 @@ export const myInternalAction = internalAction({ ... });
 ```
 
 ### Auth Pattern
+
 ```typescript
 import { getAuthUserId } from "@convex-dev/auth/server";
 const userId = await getAuthUserId(ctx); // returns null if not logged in
@@ -141,10 +147,14 @@ const userId = await getAuthUserId(ctx); // returns null if not logged in
 ## Job Scheduling
 
 Jobs are scheduled directly — **no jobs table**, no queue abstraction:
+
 ```typescript
 // Schedule immediately:
 await ctx.scheduler.runAfter(0, internal.studio.flashcards.job.flashcardGeneration, {
-  flashcardId, userId, notebookId, documentIds,
+  flashcardId,
+  userId,
+  notebookId,
+  documentIds,
 });
 
 // Schedule with delay (ms):
@@ -154,6 +164,7 @@ await ctx.scheduler.runAfter(60_000, internal.domain.job.followUp, { userId });
 ### Timeout Strategy
 
 Convex actions have execution time limits (see [official scheduling docs](https://docs.convex.dev/scheduling)). Split long jobs into multiple chained `internalAction`s to avoid timeouts:
+
 - Phase 1: load docs, chunk, schedule map tasks
 - Phase 2: `processXxxMapChunk()` — one chunk per action
 - Phase 3: `finalizeXxxPhase()` — combine + reduce + save
@@ -163,6 +174,7 @@ Convex actions have execution time limits (see [official scheduling docs](https:
 ## Status Pattern for Generated Content
 
 All studio content follows: `draft` → `generating` → `completed` | `failed`
+
 ```typescript
 await ctx.runMutation(internal.studio.flashcards.index.updateStatus, {
   flashcardId,
@@ -177,6 +189,7 @@ await ctx.runMutation(internal.studio.flashcards.index.updateData, {
 ---
 
 ## Deployment
+
 ```bash
 # Always typecheck first:
 bun run typecheck:convex
@@ -194,6 +207,7 @@ bun x convex dev
 ---
 
 ## Dev/Debug Utilities
+
 ```bash
 # Run a function directly (useful for testing without the UI):
 bun x convex run studio/flashcards/index:list '{"notebookId": "abc123"}'
@@ -222,13 +236,13 @@ bun x convex ai-files status
 
 ## Common Mistakes
 
-| Mistake | Fix |
-|---------|-----|
-| Editing `convex/_lib/env.ts` to change a model/key | Edit `.env` + run `bun run convex:env:push` |
-| `bun x convex deploy --prod` | No `--prod` on deploy; target is set by env config |
-| Calling `api.*` from inside a Convex function | Use `internal.*` for server-to-server calls |
-| Querying DB directly inside an action | Use `ctx.runQuery()` / `ctx.runMutation()` |
-| Putting files in root `convex/` vs `_*` dirs | Only root-level `convex/*.ts` files become public API |
-| Env var name > 40 chars | Use abbreviated prefix (`WQ_` instead of `WRITTEN_QUESTIONS_`) |
-| Running both typechecks simultaneously | Run `typecheck:convex` and `typecheck:web` separately |
-| Forgetting to run `convex dev` after schema changes | `convex dev` auto-regenerates types in `convex/_generated/` |
+| Mistake                                             | Fix                                                            |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| Editing `convex/_lib/env.ts` to change a model/key  | Edit `.env` + run `bun run convex:env:push`                    |
+| `bun x convex deploy --prod`                        | No `--prod` on deploy; target is set by env config             |
+| Calling `api.*` from inside a Convex function       | Use `internal.*` for server-to-server calls                    |
+| Querying DB directly inside an action               | Use `ctx.runQuery()` / `ctx.runMutation()`                     |
+| Putting files in root `convex/` vs `_*` dirs        | Only root-level `convex/*.ts` files become public API          |
+| Env var name > 40 chars                             | Use abbreviated prefix (`WQ_` instead of `WRITTEN_QUESTIONS_`) |
+| Running both typechecks simultaneously              | Run `typecheck:convex` and `typecheck:web` separately          |
+| Forgetting to run `convex dev` after schema changes | `convex dev` auto-regenerates types in `convex/_generated/`    |

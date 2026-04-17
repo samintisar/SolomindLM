@@ -41,17 +41,19 @@ export const rerankInternal = internalAction({
     topN: v.number(),
   },
   handler: async (_, { query, documents, model, topN }) => {
-    console.log('[RerankInternal] Starting reranking...');
-    console.log(`[RerankInternal] query="${query.slice(0, 50)}...", docs=${documents.length}, model=${model}, topN=${topN}`);
-    
+    console.log("[RerankInternal] Starting reranking...");
+    console.log(
+      `[RerankInternal] query="${query.slice(0, 50)}...", docs=${documents.length}, model=${model}, topN=${topN}`
+    );
+
     const apiKey = env.ZEROENTROPY_API_KEY;
     if (!apiKey) {
-      console.error('[RerankInternal] ZEROENTROPY_API_KEY is not configured');
+      console.error("[RerankInternal] ZEROENTROPY_API_KEY is not configured");
       throw new Error("ZEROENTROPY_API_KEY is not configured");
     }
 
     try {
-      const { ZeroEntropy } = await import('zeroentropy');
+      const { ZeroEntropy } = await import("zeroentropy");
       const zclient = new ZeroEntropy({ apiKey });
 
       const response = await zclient.models.rerank({
@@ -61,8 +63,8 @@ export const rerankInternal = internalAction({
         top_n: topN,
       });
 
-      console.log('[RerankInternal] ZeroEntropy response:', JSON.stringify(response).slice(0, 500));
-      console.log('[RerankInternal] Results count:', response.results?.length ?? 0);
+      console.log("[RerankInternal] ZeroEntropy response:", JSON.stringify(response).slice(0, 500));
+      console.log("[RerankInternal] Results count:", response.results?.length ?? 0);
 
       // Return results with indices for mapping back to original documents
       const results = (response.results || []).map((item: any, index: number) => ({
@@ -71,10 +73,10 @@ export const rerankInternal = internalAction({
         relevance_score: item.relevance_score,
       }));
 
-      console.log('[RerankInternal] Mapped results:', results.length);
+      console.log("[RerankInternal] Mapped results:", results.length);
       return results;
     } catch (error) {
-      console.error('[RerankInternal] Error:', error);
+      console.error("[RerankInternal] Error:", error);
       throw error;
     }
   },
@@ -84,10 +86,10 @@ export const rerankInternal = internalAction({
 // Cached Wrapper
 // ============================================================
 
-const rerankCache = createCachedAction(
-  internal._agents.chat.rerankCache.rerankInternal,
-  { ttl: withJitter(CACHE_TTL.rerank, 0.2), name: "rerank" }
-);
+const rerankCache = createCachedAction(internal._agents.chat.rerankCache.rerankInternal, {
+  ttl: withJitter(CACHE_TTL.rerank, 0.2),
+  name: "rerank",
+});
 
 // ============================================================
 // Public Functions
@@ -132,28 +134,28 @@ export async function cachedRerank(
 
   // Sort by CONTENT (not ID) for cache key stability
   // Same content = cache hit, regardless of document ID
-  const sortedDocs = [...documents].sort((a, b) =>
-    a.content.localeCompare(b.content)
-  );
+  const sortedDocs = [...documents].sort((a, b) => a.content.localeCompare(b.content));
 
   // Build cache key components (for logging/debugging)
-  const docIds = sortedDocs.map(d => d.id).join(',');
-  const contentHash = hashInput(sortedDocs.map(d => d.content).join('|'));
+  const docIds = sortedDocs.map((d) => d.id).join(",");
+  const contentHash = hashInput(sortedDocs.map((d) => d.content).join("|"));
   const queryHash = hashInput(normalizedQuery);
-  console.log(`[RerankCache] key: model=${model}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`);
+  console.log(
+    `[RerankCache] key: model=${model}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`
+  );
 
   // Call cached action with NORMALIZED query and documents content
   const results = await rerankCache.fetch(ctx, {
     query: normalizedQuery,
-    documents: sortedDocs.map(d => d.content),
+    documents: sortedDocs.map((d) => d.content),
     model,
     topN,
   });
 
   // Handle null/undefined results
   if (!results || !Array.isArray(results)) {
-    console.error('[RerankCache] Invalid results from cache:', typeof results, results);
-    throw new Error('Reranking returned invalid results');
+    console.error("[RerankCache] Invalid results from cache:", typeof results, results);
+    throw new Error("Reranking returned invalid results");
   }
 
   console.log(`[RerankCache] Got ${results.length} results from cache`);
@@ -174,7 +176,7 @@ export async function cachedRerank(
   }
 
   // Add any documents not in reranked results (preserving original order)
-  const rerankedIds = new Set(reranked.map(r => r.id));
+  const rerankedIds = new Set(reranked.map((r) => r.id));
   for (const doc of documents) {
     if (!rerankedIds.has(doc.id)) {
       reranked.push({

@@ -1,6 +1,6 @@
-import { createContext, useContext, useCallback, useState, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useState, ReactNode } from "react";
 
-export type ToastType = 'success' | 'error' | 'info' | 'loading';
+export type ToastType = "success" | "error" | "info" | "loading";
 
 export interface Toast {
   id: string;
@@ -35,14 +35,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const newToast: Toast = {
       id,
       message,
-      type: options.type || 'info',
+      type: options.type || "info",
       duration: options.duration ?? DEFAULT_DURATION,
       action: options.action,
     };
 
     setToasts((prev) => [...prev, newToast]);
 
-    if (newToast.type !== 'loading' && newToast.duration) {
+    if (newToast.type !== "loading" && newToast.duration) {
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, newToast.duration);
@@ -51,26 +51,38 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
-  const success = useCallback((message: string, options?: Partial<Toast>) => {
-    return toast(message, { ...options, type: 'success' });
-  }, [toast]);
+  const success = useCallback(
+    (message: string, options?: Partial<Toast>) => {
+      return toast(message, { ...options, type: "success" });
+    },
+    [toast]
+  );
 
-  const error = useCallback((message: string, options?: Partial<Toast>) => {
-    const { duration: durationOverride, ...rest } = options ?? {};
-    return toast(message, {
-      ...rest,
-      type: 'error',
-      duration: durationOverride ?? 6000,
-    });
-  }, [toast]);
+  const error = useCallback(
+    (message: string, options?: Partial<Toast>) => {
+      const { duration: durationOverride, ...rest } = options ?? {};
+      return toast(message, {
+        ...rest,
+        type: "error",
+        duration: durationOverride ?? 6000,
+      });
+    },
+    [toast]
+  );
 
-  const info = useCallback((message: string, options?: Partial<Toast>) => {
-    return toast(message, { ...options, type: 'info' });
-  }, [toast]);
+  const info = useCallback(
+    (message: string, options?: Partial<Toast>) => {
+      return toast(message, { ...options, type: "info" });
+    },
+    [toast]
+  );
 
-  const loading = useCallback((message: string, options?: Partial<Toast>) => {
-    return toast(message, { ...options, type: 'loading', duration: Infinity });
-  }, [toast]);
+  const loading = useCallback(
+    (message: string, options?: Partial<Toast>) => {
+      return toast(message, { ...options, type: "loading", duration: Infinity });
+    },
+    [toast]
+  );
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -86,7 +98,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function useToast(): ToastContextValue {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
+    throw new Error("useToast must be used within a ToastProvider");
   }
   return context;
 }

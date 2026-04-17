@@ -2,14 +2,14 @@
 
 ## Role of Convex in an Agent System
 
-| Concern | Owned By |
-|---|---|
-| Ephemeral execution state (current node, message history) | LangGraph checkpointer |
-| Business/persistent state (user data, run history, results) | Convex DB |
-| Real-time UI updates (status, streaming output) | Convex subscriptions |
-| Human-in-the-loop coordination | Convex mutations + LangGraph interrupt() |
-| Cross-session memory | Convex vector search |
-| Scheduled/background agent runs | Convex scheduler |
+| Concern                                                     | Owned By                                 |
+| ----------------------------------------------------------- | ---------------------------------------- |
+| Ephemeral execution state (current node, message history)   | LangGraph checkpointer                   |
+| Business/persistent state (user data, run history, results) | Convex DB                                |
+| Real-time UI updates (status, streaming output)             | Convex subscriptions                     |
+| Human-in-the-loop coordination                              | Convex mutations + LangGraph interrupt() |
+| Cross-session memory                                        | Convex vector search                     |
+| Scheduled/background agent runs                             | Convex scheduler                         |
 
 ---
 
@@ -33,15 +33,19 @@ export default defineSchema({
     ),
     input: v.string(),
     currentStep: v.optional(v.string()),
-    events: v.array(v.object({
-      type: v.string(),        // "llm_call" | "tool_call" | "tool_result" | "state_update"
-      content: v.string(),
-      timestamp: v.number(),
-    })),
-    pendingApproval: v.optional(v.object({
-      question: v.string(),
-      context: v.string(),
-    })),
+    events: v.array(
+      v.object({
+        type: v.string(), // "llm_call" | "tool_call" | "tool_result" | "state_update"
+        content: v.string(),
+        timestamp: v.number(),
+      })
+    ),
+    pendingApproval: v.optional(
+      v.object({
+        question: v.string(),
+        context: v.string(),
+      })
+    ),
     output: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
     tokenUsage: v.optional(v.number()),
@@ -58,9 +62,9 @@ export default defineSchema({
     userId: v.string(),
     sessionId: v.optional(v.string()),
     content: v.string(),
-    summary: v.optional(v.string()),    // compressed version for context injection
+    summary: v.optional(v.string()), // compressed version for context injection
     embedding: v.optional(v.array(v.float64())),
-    importance: v.number(),             // 0-1, used to prune low-value memories
+    importance: v.number(), // 0-1, used to prune low-value memories
     createdAt: v.number(),
     lastAccessed: v.optional(v.number()),
   })
@@ -71,7 +75,7 @@ export default defineSchema({
       filterFields: ["userId"],
     }),
 
-  // Tool call audit log (separate from events for querying)  
+  // Tool call audit log (separate from events for querying)
   toolCallLog: defineTable({
     runId: v.string(),
     toolName: v.string(),
@@ -125,16 +129,19 @@ export const appendEvent = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db
       .query("agentRuns")
-      .withIndex("by_runId", q => q.eq("runId", args.runId))
+      .withIndex("by_runId", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error(`Run ${args.runId} not found`);
-    
+
     await ctx.db.patch(run._id, {
-      events: [...run.events, {
-        type: args.type,
-        content: args.content,
-        timestamp: Date.now(),
-      }],
+      events: [
+        ...run.events,
+        {
+          type: args.type,
+          content: args.content,
+          timestamp: Date.now(),
+        },
+      ],
       updatedAt: Date.now(),
     });
   },
@@ -153,10 +160,10 @@ export const setAwaitingApproval = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db
       .query("agentRuns")
-      .withIndex("by_runId", q => q.eq("runId", args.runId))
+      .withIndex("by_runId", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error("Run not found");
-    
+
     await ctx.db.patch(run._id, {
       status: "awaiting_approval",
       pendingApproval: { question: args.question, context: args.context },
@@ -179,10 +186,10 @@ export const completeRun = mutation({
   handler: async (ctx, args) => {
     const run = await ctx.db
       .query("agentRuns")
-      .withIndex("by_runId", q => q.eq("runId", args.runId))
+      .withIndex("by_runId", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error("Run not found");
-    
+
     await ctx.db.patch(run._id, {
       status: "complete",
       output: args.output,
@@ -210,7 +217,7 @@ export const getRunStatus = query({
   handler: async (ctx, args) => {
     return ctx.db
       .query("agentRuns")
-      .withIndex("by_runId", q => q.eq("runId", args.runId))
+      .withIndex("by_runId", (q) => q.eq("runId", args.runId))
       .first();
   },
 });
@@ -226,19 +233,18 @@ export const searchMemory = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const results = await ctx.db.query("agentMemory")
+    const results = await ctx.db
+      .query("agentMemory")
       .withVectorSearch("by_embedding", {
         vector: args.embedding,
         limit: args.limit ?? 5,
-        filter: q => q.eq("userId", args.userId),
+        filter: (q) => q.eq("userId", args.userId),
       })
       .collect();
-    
+
     // Update last accessed timestamp
-    await Promise.all(results.map(r => 
-      ctx.db.patch(r._id, { lastAccessed: Date.now() })
-    ));
-    
+    await Promise.all(results.map((r) => ctx.db.patch(r._id, { lastAccessed: Date.now() })));
+
     return results;
   },
 });
@@ -292,7 +298,7 @@ export const runAgentInBackground = internalAction({
     // This runs in a Convex action (can call external APIs)
     // Initialize and run your LangGraph graph here
     const result = await graph.invoke({ input: args.input });
-    
+
     await ctx.runMutation(internal.agentRuns.completeRun, {
       runId: args.runId,
       output: result.output,
@@ -305,14 +311,13 @@ export const scheduleAgent = mutation({
   args: { input: v.string(), delayMs: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const runId = crypto.randomUUID();
-    await ctx.db.insert("agentRuns", { runId, status: "running", /* ... */ });
-    
-    await ctx.scheduler.runAfter(
-      args.delayMs ?? 0,
-      internal.scheduledAgent.runAgentInBackground,
-      { runId, input: args.input }
-    );
-    
+    await ctx.db.insert("agentRuns", { runId, status: "running" /* ... */ });
+
+    await ctx.scheduler.runAfter(args.delayMs ?? 0, internal.scheduledAgent.runAgentInBackground, {
+      runId,
+      input: args.input,
+    });
+
     return runId;
   },
 });
@@ -333,7 +338,7 @@ const crons = cronJobs();
 crons.weekly(
   "prune old memories",
   { dayOfWeek: "sunday", hourUTC: 2, minuteUTC: 0 },
-  internal.agentMemory.pruneOldMemories,
+  internal.agentMemory.pruneOldMemories
 );
 export default crons;
 
@@ -341,13 +346,11 @@ export default crons;
 export const pruneOldMemories = internalMutation({
   handler: async (ctx) => {
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000; // 90 days
-    const old = await ctx.db.query("agentMemory")
-      .filter(q => q.and(
-        q.lt(q.field("createdAt"), cutoff),
-        q.lt(q.field("importance"), 0.3)
-      ))
+    const old = await ctx.db
+      .query("agentMemory")
+      .filter((q) => q.and(q.lt(q.field("createdAt"), cutoff), q.lt(q.field("importance"), 0.3)))
       .collect();
-    await Promise.all(old.map(m => ctx.db.delete(m._id)));
+    await Promise.all(old.map((m) => ctx.db.delete(m._id)));
   },
 });
 ```

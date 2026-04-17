@@ -7,9 +7,9 @@
  * ChatAgent calls search(userId, noteId, query, documentIds).
  */
 
-import { env } from '../../_lib/env';
-import type { ReferenceChunk, ChunkMetadata } from '../../storage/ChatHistoryService';
-import type { EmbeddingService } from '../../_services/processing/EmbeddingServiceClient';
+import { env } from "../../_lib/env";
+import type { ReferenceChunk, ChunkMetadata } from "../../storage/ChatHistoryService";
+import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
 
 // Re-export ReferenceChunk for other modules
 export type { ReferenceChunk };
@@ -114,7 +114,7 @@ export class VectorSearchHandler {
   ): Promise<ReferenceChunk[]> {
     if (!this.embeddingService || !this.vectorSearchRunner) {
       throw new Error(
-        'VectorSearchHandler must be constructed with embeddingService and vectorSearchRunner when using search(userId, noteId, query, documentIds).'
+        "VectorSearchHandler must be constructed with embeddingService and vectorSearchRunner when using search(userId, noteId, query, documentIds)."
       );
     }
 
@@ -124,10 +124,10 @@ export class VectorSearchHandler {
     );
 
     if (preComputedEmbedding) {
-      console.log('[VectorSearch] Using pre-computed HyDE embedding');
+      console.log("[VectorSearch] Using pre-computed HyDE embedding");
     }
-    const queryEmbedding = preComputedEmbedding ?? await this.embeddingService.embedText(query);
-    let raw = await this.vectorSearchRunner(
+    const queryEmbedding = preComputedEmbedding ?? (await this.embeddingService.embedText(query));
+    const raw = await this.vectorSearchRunner(
       queryEmbedding,
       this.config.vectorMatchCount,
       documentIds
@@ -154,7 +154,7 @@ export class VectorSearchHandler {
       });
     }
 
-    let filtered = withScore.filter(
+    const filtered = withScore.filter(
       (r) => (r.similarity ?? 0) >= this.config.vectorMatchThreshold
     );
     console.log(`[VectorSearch] After threshold: ${filtered.length} results`);
@@ -176,9 +176,7 @@ export class VectorSearchHandler {
 
     let ranked: (VectorSearchRawResult & { similarity?: number })[];
     if (options?.skipRerank) {
-      ranked = [...deduped].sort(
-        (a, b) => (b.similarity ?? 0) - (a.similarity ?? 0)
-      );
+      ranked = [...deduped].sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
     } else {
       ranked = await this.rerankResults(rerankQuery, deduped);
     }
@@ -203,7 +201,7 @@ export class VectorSearchHandler {
         id: String(originalPosition),
         sourceId: String(r._id),
         documentId: r.documentId,
-        sourceTitle: r.sourceTitle ?? 'Document',
+        sourceTitle: r.sourceTitle ?? "Document",
         sourceUrl: r.sourceUrl,
         content: r.content,
         chunkIndex: r.chunkIndex,
@@ -231,8 +229,8 @@ export class VectorSearchHandler {
           const maxScore = Math.max(...scores);
           throw new Error(
             `No results found in your selected documents. Found ${raw.length} chunks but all scores are below threshold. ` +
-            `Max score: ${maxScore.toFixed(4)}, Threshold: ${this.config.vectorMatchThreshold}. ` +
-            `The selected documents may not contain relevant information for your query.`
+              `Max score: ${maxScore.toFixed(4)}, Threshold: ${this.config.vectorMatchThreshold}. ` +
+              `The selected documents may not contain relevant information for your query.`
           );
         }
       } else {
@@ -246,8 +244,8 @@ export class VectorSearchHandler {
           const maxScore = Math.max(...scores);
           throw new Error(
             `No results found. Found ${raw.length} chunks but all scores are below threshold. ` +
-            `Max score: ${maxScore.toFixed(4)}, Threshold: ${this.config.vectorMatchThreshold}. ` +
-            `This may indicate an issue with embedding quality or document processing.`
+              `Max score: ${maxScore.toFixed(4)}, Threshold: ${this.config.vectorMatchThreshold}. ` +
+              `This may indicate an issue with embedding quality or document processing.`
           );
         }
       }
@@ -276,9 +274,7 @@ export class VectorSearchHandler {
   ): Promise<(VectorSearchRawResult & { similarity?: number })[]> {
     const key = env.ZEROENTROPY_API_KEY;
     if (!key || results.length <= this.config.rerankThreshold) {
-      console.log(
-        `[VectorSearch] Skipping reranking: key=${!!key}, results=${results.length}`
-      );
+      console.log(`[VectorSearch] Skipping reranking: key=${!!key}, results=${results.length}`);
       return results;
     }
 
@@ -319,19 +315,19 @@ export class VectorSearchHandler {
         console.log(`[VectorSearch] Reranked ${reranked.length} documents (cached)`);
         return reranked;
       } catch (err: any) {
-        console.error('[VectorSearch] Cached rerank failed, falling back:', err?.message);
+        console.error("[VectorSearch] Cached rerank failed, falling back:", err?.message);
         // Fall through to direct API call
       }
     }
 
     // Direct API call (original implementation)
-    const model = env.ZEROENTROPY_RERANK_MODEL || 'zerank-2';
+    const model = env.ZEROENTROPY_RERANK_MODEL || "zerank-2";
     const maxRetries = 3;
     const baseDelay = 1000;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const { ZeroEntropy } = await import('zeroentropy');
+        const { ZeroEntropy } = await import("zeroentropy");
         const zclient = new ZeroEntropy({ apiKey: key });
         const documents = results.map((r) => r.content);
 
@@ -344,7 +340,7 @@ export class VectorSearchHandler {
 
         const resultMap = new Map(results.map((r) => [r.content, r]));
         const reranked: (VectorSearchRawResult & { similarity?: number })[] = [];
-        const seen = new Set<(VectorSearchRawResult & { similarity?: number })>();
+        const seen = new Set<VectorSearchRawResult & { similarity?: number }>();
 
         if (response.results && Array.isArray(response.results)) {
           for (const item of response.results as { text?: string; document?: string }[]) {
@@ -367,8 +363,7 @@ export class VectorSearchHandler {
         console.log(`[VectorSearch] Reranked ${reranked.length} documents`);
         return reranked;
       } catch (err: any) {
-        const is429 =
-          err?.statusCode === 429 || err?.status === 429;
+        const is429 = err?.statusCode === 429 || err?.status === 429;
         const last = attempt === maxRetries - 1;
         if (is429 && !last) {
           const delay = baseDelay * Math.pow(2, attempt);
@@ -378,7 +373,7 @@ export class VectorSearchHandler {
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        console.error('[VectorSearch] Rerank failed:', err?.message);
+        console.error("[VectorSearch] Rerank failed:", err?.message);
         return results;
       }
     }

@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { NotebookItem } from '@/shared/types/index';
+import { useState, useCallback } from "react";
+import { NotebookItem } from "@/shared/types/index";
 
 export interface UseNotebookHandlersProps {
   notebooks: NotebookItem[];

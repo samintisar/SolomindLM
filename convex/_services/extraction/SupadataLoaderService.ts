@@ -1,9 +1,9 @@
-"use node"
-import { Supadata, SupadataError } from '@supadata/js';
-import { env } from '../../_lib/env';
-import { validateUrl } from '../../_lib/utils/urlValidation.js';
-import { invokeWithRetry } from '../../_agents/_shared/retry.js';
-import { createServiceLogger } from '../../_lib/logging/serviceLogger';
+"use node";
+import { Supadata, SupadataError } from "@supadata/js";
+import { env } from "../../_lib/env";
+import { validateUrl } from "../../_lib/utils/urlValidation.js";
+import { invokeWithRetry } from "../../_agents/_shared/retry.js";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 
 /**
  * SupadataLoaderService handles content extraction from:
@@ -24,57 +24,68 @@ export class SupadataLoaderService {
    * Ensures only plain text content is returned
    */
   private stripMedia(text: string): string {
-    return text
-      // Remove markdown images: ![alt](url) or ![alt][ref]
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
-      .replace(/!\[([^\]]*)\]\[[^\]]+\]/g, '')
-      // Remove reference-style image definitions: [id]: url
-      .replace(/^\s*\[[^\]]+\]:\s*\S+.*$/gm, '')
-      // Remove HTML <img> tags
-      .replace(/<img[^>]*>/gi, '')
-      .replace(/<img[^>]*\/>/gi, '')
-      // Remove HTML <video> tags
-      .replace(/<video[^>]*>.*?<\/video>/gis, '')
-      // Remove HTML <audio> tags
-      .replace(/<audio[^>]*>.*?<\/audio>/gis, '')
-      // Remove HTML <picture> tags
-      .replace(/<picture[^>]*>.*?<\/picture>/gis, '')
-      // Remove HTML <source> tags
-      .replace(/<source[^>]*>/gi, '')
-      .replace(/<source[^>]*\/>/gi, '')
-      // Remove HTML <figure> tags with media (keep caption text)
-      .replace(/<figure[^>]*>(.*?)<\/figure>/gis, (_, content) => {
-        // Extract text from <figcaption> if present, otherwise remove
-        const figcaption = content.match(/<figcaption[^>]*>(.*?)<\/figcaption>/is);
-        return figcaption ? figcaption[1].trim() : '';
-      })
-      // Remove iframe tags (embedded videos, maps, etc.)
-      .replace(/<iframe[^>]*>.*?<\/iframe>/gis, '')
-      // Remove embed tags
-      .replace(/<embed[^>]*>/gi, '')
-      .replace(/<embed[^>]*\/>/gi, '')
-      // Remove object tags
-      .replace(/<object[^>]*>.*?<\/object>/gis, '')
-      // Remove SVG elements
-      .replace(/<svg[^>]*>.*?<\/svg>/gis, '')
-      // Remove data URIs (embedded images, videos, audio)
-      .replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, '')
-      .replace(/data:video\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, '')
-      .replace(/data:audio\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, '')
-      // Remove markdown-style media file references
-      .replace(/\[([^\]]*)\]\([^)]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)[^)]*\)/gi, '')
-      // Remove image URLs in brackets often found in scraped content
-      .replace(/\[?https?:\/\/[^\s\]]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico)(\?[^\]\s]*)?\]?/gi, '')
-      // Remove standalone media URLs (http/https)
-      .replace(/https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)(\?[^\s]*)?\b/gi, '')
-      // Remove media file extensions that might appear as standalone references
-      .replace(/\b\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, '')
-      // Remove file paths with media extensions
-      .replace(/[^\s]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, '')
-      // Clean up extra whitespace and line breaks
-      .replace(/\n\s*\n\s*\n+/g, '\n\n')
-      .replace(/^\s+|\s+$/g, '')
-      .trim();
+    return (
+      text
+        // Remove markdown images: ![alt](url) or ![alt][ref]
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "")
+        .replace(/!\[([^\]]*)\]\[[^\]]+\]/g, "")
+        // Remove reference-style image definitions: [id]: url
+        .replace(/^\s*\[[^\]]+\]:\s*\S+.*$/gm, "")
+        // Remove HTML <img> tags
+        .replace(/<img[^>]*>/gi, "")
+        .replace(/<img[^>]*\/>/gi, "")
+        // Remove HTML <video> tags
+        .replace(/<video[^>]*>.*?<\/video>/gis, "")
+        // Remove HTML <audio> tags
+        .replace(/<audio[^>]*>.*?<\/audio>/gis, "")
+        // Remove HTML <picture> tags
+        .replace(/<picture[^>]*>.*?<\/picture>/gis, "")
+        // Remove HTML <source> tags
+        .replace(/<source[^>]*>/gi, "")
+        .replace(/<source[^>]*\/>/gi, "")
+        // Remove HTML <figure> tags with media (keep caption text)
+        .replace(/<figure[^>]*>(.*?)<\/figure>/gis, (_, content) => {
+          // Extract text from <figcaption> if present, otherwise remove
+          const figcaption = content.match(/<figcaption[^>]*>(.*?)<\/figcaption>/is);
+          return figcaption ? figcaption[1].trim() : "";
+        })
+        // Remove iframe tags (embedded videos, maps, etc.)
+        .replace(/<iframe[^>]*>.*?<\/iframe>/gis, "")
+        // Remove embed tags
+        .replace(/<embed[^>]*>/gi, "")
+        .replace(/<embed[^>]*\/>/gi, "")
+        // Remove object tags
+        .replace(/<object[^>]*>.*?<\/object>/gis, "")
+        // Remove SVG elements
+        .replace(/<svg[^>]*>.*?<\/svg>/gis, "")
+        // Remove data URIs (embedded images, videos, audio)
+        .replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
+        .replace(/data:video\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
+        .replace(/data:audio\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
+        // Remove markdown-style media file references
+        .replace(
+          /\[([^\]]*)\]\([^)]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)[^)]*\)/gi,
+          ""
+        )
+        // Remove image URLs in brackets often found in scraped content
+        .replace(
+          /\[?https?:\/\/[^\s\]]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico)(\?[^\]\s]*)?\]?/gi,
+          ""
+        )
+        // Remove standalone media URLs (http/https)
+        .replace(
+          /https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)(\?[^\s]*)?\b/gi,
+          ""
+        )
+        // Remove media file extensions that might appear as standalone references
+        .replace(/\b\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, "")
+        // Remove file paths with media extensions
+        .replace(/[^\s]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, "")
+        // Clean up extra whitespace and line breaks
+        .replace(/\n\s*\n\s*\n+/g, "\n\n")
+        .replace(/^\s+|\s+$/g, "")
+        .trim()
+    );
   }
 
   /**
@@ -85,14 +96,14 @@ export class SupadataLoaderService {
    * @param lang - Language code (default: 'en' for English)
    * @returns Plain text transcript
    */
-  async loadTranscript(url: string, lang = 'en'): Promise<string> {
+  async loadTranscript(url: string, lang = "en"): Promise<string> {
     // Validate URL to prevent SSRF attacks
     const validation = validateUrl(url);
     if (!validation.valid) {
       throw new Error(`Invalid URL: ${validation.error}`);
     }
 
-    const logger = createServiceLogger('supadata', 'loadTranscript');
+    const logger = createServiceLogger("supadata", "loadTranscript");
     logger.operationStart({ lang });
 
     const fetchOne = async (): Promise<string> => {
@@ -101,30 +112,37 @@ export class SupadataLoaderService {
     };
 
     // Retry on rate limit (e.g. "Limit Exceeded") when multiple transcripts are fetched at once
-    return invokeWithRetry(fetchOne, {
-      maxAttempts: 5,
-      baseDelayMs: 2000,
-      jitter: true,
-      retryableErrors: (err) =>
-        /limit exceeded|rate limit|too many requests|429/i.test(err.message),
-      onRetry: (attempt, error, delayMs) =>
-        logger.warn('Rate limited, retrying transcript fetch', {
-          attempt,
-          delayMs,
-          message: error.message,
-        }),
-    }, 'loadTranscript');
+    return invokeWithRetry(
+      fetchOne,
+      {
+        maxAttempts: 5,
+        baseDelayMs: 2000,
+        jitter: true,
+        retryableErrors: (err) =>
+          /limit exceeded|rate limit|too many requests|429/i.test(err.message),
+        onRetry: (attempt, error, delayMs) =>
+          logger.warn("Rate limited, retrying transcript fetch", {
+            attempt,
+            delayMs,
+            message: error.message,
+          }),
+      },
+      "loadTranscript"
+    );
   }
 
   /**
    * Get transcript plus video title when available. Used by DocEmbeddingJob for display names.
    */
-  async loadTranscriptWithMeta(url: string, lang = 'en'): Promise<{ title: string; content: string }> {
+  async loadTranscriptWithMeta(
+    url: string,
+    lang = "en"
+  ): Promise<{ title: string; content: string }> {
     const validation = validateUrl(url);
     if (!validation.valid) {
       throw new Error(`Invalid URL: ${validation.error}`);
     }
-    const logger = createServiceLogger('supadata', 'loadTranscriptWithMeta');
+    const logger = createServiceLogger("supadata", "loadTranscriptWithMeta");
     return invokeWithRetry(
       () => this.loadTranscriptWithMetaInternal(url, lang),
       {
@@ -134,37 +152,40 @@ export class SupadataLoaderService {
         retryableErrors: (err) =>
           /limit exceeded|rate limit|too many requests|429/i.test(err.message),
         onRetry: (attempt, error, delayMs) =>
-          logger.warn('Rate limited, retrying transcript with meta', {
+          logger.warn("Rate limited, retrying transcript with meta", {
             attempt,
             delayMs,
             message: error.message,
           }),
       },
-      'loadTranscriptWithMeta'
+      "loadTranscriptWithMeta"
     );
   }
 
-  private async loadTranscriptWithMetaInternal(url: string, lang: string): Promise<{ title: string; content: string }> {
-    const logger = createServiceLogger('supadata', 'transcriptInternal');
+  private async loadTranscriptWithMetaInternal(
+    url: string,
+    lang: string
+  ): Promise<{ title: string; content: string }> {
+    const logger = createServiceLogger("supadata", "transcriptInternal");
     const transcriptResult = await this.supadata.transcript({
       url,
       lang,
       text: true,
-      mode: 'auto',
+      mode: "auto",
     });
 
-    if ('jobId' in transcriptResult) {
-      logger.info('Started async transcript job', {
+    if ("jobId" in transcriptResult) {
+      logger.info("Started async transcript job", {
         jobId: (transcriptResult as { jobId: string }).jobId,
       });
       return this.pollForTranscriptWithMeta((transcriptResult as { jobId: string }).jobId);
     }
 
     const result = transcriptResult as string | { content?: string; title?: string };
-    const title = typeof result === 'object' && result && 'title' in result ? (result.title ?? '') : '';
-    const text = typeof result === 'string'
-      ? result
-      : (result?.content ?? JSON.stringify(result ?? ''));
+    const title =
+      typeof result === "object" && result && "title" in result ? (result.title ?? "") : "";
+    const text =
+      typeof result === "string" ? result : (result?.content ?? JSON.stringify(result ?? ""));
     logger.operationComplete({ charCount: text.length });
     return { title, content: this.stripMedia(text) };
   }
@@ -180,33 +201,36 @@ export class SupadataLoaderService {
   /**
    * Poll for async transcript job completion; returns title when available from API
    */
-  private async pollForTranscriptWithMeta(jobId: string, maxAttempts = 30): Promise<{ title: string; content: string }> {
-    const logger = createServiceLogger('supadata', 'pollTranscript');
+  private async pollForTranscriptWithMeta(
+    jobId: string,
+    maxAttempts = 30
+  ): Promise<{ title: string; content: string }> {
+    const logger = createServiceLogger("supadata", "pollTranscript");
     logger.operationStart({ jobId, maxAttempts });
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const jobResult = await this.supadata.transcript.getJobStatus(jobId);
 
-      if (jobResult.status === 'completed') {
+      if (jobResult.status === "completed") {
         const result = jobResult.result as { content?: string; title?: string } | undefined;
         const content = result?.content;
-        const title = (result as { title?: string } | undefined)?.title ?? '';
-        const text = typeof content === 'string'
-          ? content
-          : JSON.stringify(content ?? '');
+        const title = (result as { title?: string } | undefined)?.title ?? "";
+        const text = typeof content === "string" ? content : JSON.stringify(content ?? "");
         logger.operationComplete({ charCount: text.length, jobId });
         return { title, content: this.stripMedia(text) };
-      } else if (jobResult.status === 'failed') {
-        throw new Error(`Transcript job failed: ${(jobResult as { error?: { message?: string } }).error?.message || 'Unknown error'}`);
+      } else if (jobResult.status === "failed") {
+        throw new Error(
+          `Transcript job failed: ${(jobResult as { error?: { message?: string } }).error?.message || "Unknown error"}`
+        );
       }
 
-      logger.debug('Transcript job pending', {
+      logger.debug("Transcript job pending", {
         status: jobResult.status,
         attempt,
         maxAttempts,
         jobId,
       });
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
     }
 
     throw new Error(`Transcript job timed out after ${maxAttempts} attempts`);
@@ -232,13 +256,16 @@ export class SupadataLoaderService {
       throw new Error(`Invalid URL: ${validation.error}`);
     }
 
-    const logger = createServiceLogger('supadata', 'scrapeWebPage');
+    const logger = createServiceLogger("supadata", "scrapeWebPage");
     logger.operationStart({});
 
     try {
-      const scrapeResult = await this.supadata.web.scrape(url) as { content?: string; title?: string };
-      const text = scrapeResult.content || '';
-      const title = scrapeResult.title ?? '';
+      const scrapeResult = (await this.supadata.web.scrape(url)) as {
+        content?: string;
+        title?: string;
+      };
+      const text = scrapeResult.content || "";
+      const title = scrapeResult.title ?? "";
       const cleanedText = this.stripMedia(text);
       logger.operationComplete({
         rawChars: text.length,
@@ -247,8 +274,8 @@ export class SupadataLoaderService {
       return { title, content: cleanedText };
     } catch (e) {
       if (e instanceof SupadataError) {
-        logger.error('Scrape failed', e, { code: e.error });
-        throw new Error(`Failed to scrape web page: ${e.message}`);
+        logger.error("Scrape failed", e, { code: e.error });
+        throw new Error(`Failed to scrape web page: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -267,7 +294,7 @@ export class SupadataLoaderService {
       throw new Error(`Invalid URL: ${validation.error}`);
     }
 
-    const logger = createServiceLogger('supadata', 'mapWebsite');
+    const logger = createServiceLogger("supadata", "mapWebsite");
     logger.operationStart({});
 
     try {
@@ -276,8 +303,8 @@ export class SupadataLoaderService {
       return siteMap;
     } catch (e) {
       if (e instanceof SupadataError) {
-        logger.error('Map failed', e, { code: e.error });
-        throw new Error(`Failed to map website: ${e.message}`);
+        logger.error("Map failed", e, { code: e.error });
+        throw new Error(`Failed to map website: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -297,7 +324,7 @@ export class SupadataLoaderService {
       throw new Error(`Invalid URL: ${validation.error}`);
     }
 
-    const logger = createServiceLogger('supadata', 'crawlWebsite');
+    const logger = createServiceLogger("supadata", "crawlWebsite");
     logger.operationStart({ limit });
 
     try {
@@ -308,22 +335,22 @@ export class SupadataLoaderService {
       for (let attempt = 1; attempt <= 30; attempt++) {
         const crawlResults = await this.supadata.web.getCrawlResults(jobId);
 
-        if (crawlResults.status === 'completed') {
+        if (crawlResults.status === "completed") {
           logger.operationComplete({ pageCount: crawlResults.pages?.length || 0, jobId });
           return crawlResults;
-        } else if (crawlResults.status === 'failed') {
-          throw new Error('Crawl job failed');
+        } else if (crawlResults.status === "failed") {
+          throw new Error("Crawl job failed");
         }
 
-        logger.debug('Crawl pending', { status: crawlResults.status, attempt, jobId });
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        logger.debug("Crawl pending", { status: crawlResults.status, attempt, jobId });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
-      throw new Error('Crawl job timed out');
+      throw new Error("Crawl job timed out");
     } catch (e) {
       if (e instanceof SupadataError) {
-        logger.error('Crawl failed', e, { code: e.error });
-        throw new Error(`Failed to crawl website: ${e.message}`);
+        logger.error("Crawl failed", e, { code: e.error });
+        throw new Error(`Failed to crawl website: ${e.message}`, { cause: e });
       }
       throw e;
     }
@@ -335,9 +362,9 @@ export class SupadataLoaderService {
    */
   extractVideoId(url: string): string {
     const regex =
-      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+      /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
     const match = url.match(regex);
-    if (!match?.[1]) throw new Error('Invalid YouTube URL');
+    if (!match?.[1]) throw new Error("Invalid YouTube URL");
     return match[1];
   }
 
@@ -346,14 +373,14 @@ export class SupadataLoaderService {
    */
   isSupportedPlatform(url: string): boolean {
     const supportedDomains = [
-      'youtube.com',
-      'youtu.be',
-      'tiktok.com',
-      'instagram.com',
-      'twitter.com',
-      'x.com',
+      "youtube.com",
+      "youtu.be",
+      "tiktok.com",
+      "instagram.com",
+      "twitter.com",
+      "x.com",
     ];
-    return supportedDomains.some(domain => url.includes(domain));
+    return supportedDomains.some((domain) => url.includes(domain));
   }
 
   /**

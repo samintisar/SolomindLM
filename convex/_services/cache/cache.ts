@@ -5,19 +5,18 @@
 
 // TTL configurations (in milliseconds)
 export const CACHE_TTL = {
-  agent: 60 * 60 * 1000,              // 1 hour for agent runs
+  agent: 60 * 60 * 1000, // 1 hour for agent runs
   embedding: 7 * 24 * 60 * 60 * 1000, // 7 days for embeddings
-  
-  // New TTLs (base values, jitter added at runtime)
-  rerank: 15 * 60 * 1000,             // 15 min for reranking
-  search: 60 * 60 * 1000,             // 1 hour for web search
-  documentContent: 60 * 60 * 1000,    // 1 hour for document content
-  notebookList: 5 * 60 * 1000,        // 5 min for notebook lists
-  subscription: 60 * 1000,            // 1 min for subscription status
-  generatedContent: 7 * 24 * 60 * 60 * 1000, // 7 days for LLM outputs
-  sourceSuggestions: 30 * 60 * 1000,       // 30 min for source suggestions
-} as const;
 
+  // New TTLs (base values, jitter added at runtime)
+  rerank: 15 * 60 * 1000, // 15 min for reranking
+  search: 60 * 60 * 1000, // 1 hour for web search
+  documentContent: 60 * 60 * 1000, // 1 hour for document content
+  notebookList: 5 * 60 * 1000, // 5 min for notebook lists
+  subscription: 60 * 1000, // 1 min for subscription status
+  generatedContent: 7 * 24 * 60 * 60 * 1000, // 7 days for LLM outputs
+  sourceSuggestions: 30 * 60 * 1000, // 30 min for source suggestions
+} as const;
 
 /**
  * Add jitter to TTL to prevent thundering herd (mass simultaneous cache expiration)

@@ -1,10 +1,10 @@
-import { useCallback } from 'react';
-import type { Note, WrittenQuestionsNote } from '@/shared/types/index';
-import { useToast } from '@/shared/contexts/ToastContext';
-import { useCreateWrittenQuestions } from '../../services/writtenQuestionsApi';
-import type { WrittenQuestionsConfig } from '../../components/CustomizeWrittenQuestionsModal';
-import { useStudioGenerationCatch } from '../useStudioGenerationCatch';
-import type { CreateFlowContext } from './types';
+import { useCallback } from "react";
+import type { Note, WrittenQuestionsNote } from "@/shared/types/index";
+import { useToast } from "@/shared/contexts/ToastContext";
+import { useCreateWrittenQuestions } from "../../services/writtenQuestionsApi";
+import type { WrittenQuestionsConfig } from "../../components/CustomizeWrittenQuestionsModal";
+import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import type { CreateFlowContext } from "./types";
 
 export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
   const createWrittenQuestions = useCreateWrittenQuestions();
@@ -17,12 +17,16 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
       const selectedDocumentIds = ctx.sources.filter((s) => s.selected).map((s) => s.id);
       if (selectedDocumentIds.length === 0) {
         if (ctx.confirm) {
-          await ctx.confirm('No Sources Selected', 'Please select at least one source to generate written questions', { variant: 'warning' });
+          await ctx.confirm(
+            "No Sources Selected",
+            "Please select at least one source to generate written questions",
+            { variant: "warning" }
+          );
         }
         return;
       }
       if (!ctx.userId || !ctx.noteId) {
-        showErrorToast('Please sign in again to continue.');
+        showErrorToast("Please sign in again to continue.");
         return;
       }
 
@@ -30,11 +34,11 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,
-        title: 'Written Questions',
+        title: "Written Questions",
         preview: `${questionCount} Questions • ${config.questionType}`,
-        type: 'writtenQuestions',
+        type: "writtenQuestions",
         questions: [],
-        status: 'generating',
+        status: "generating",
         metadata: {
           questionCount,
           difficulty: config.difficulty,
@@ -54,15 +58,17 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
           questionType: config.questionType,
           focus: config.focus || undefined,
         });
-        const writtenQuestionsId = (resWQ as { writtenQuestionsId?: string }).writtenQuestionsId ?? (resWQ as { noteId?: string }).noteId!;
+        const writtenQuestionsId =
+          (resWQ as { writtenQuestionsId?: string }).writtenQuestionsId ??
+          (resWQ as { noteId?: string }).noteId!;
         const apiNote = (resWQ as { note?: { _id: string; title: string; status: string } }).note;
         const initialNote: WrittenQuestionsNote = {
           id: writtenQuestionsId,
-          title: apiNote?.title ?? 'Written Questions',
+          title: apiNote?.title ?? "Written Questions",
           preview: `${questionCount} Questions • ${config.questionType}`,
-          type: 'writtenQuestions',
+          type: "writtenQuestions",
           questions: [],
-          status: (apiNote?.status ?? resWQ.status) as WrittenQuestionsNote['status'],
+          status: (apiNote?.status ?? resWQ.status) as WrittenQuestionsNote["status"],
           metadata: {
             questionCount,
             difficulty: config.difficulty,
@@ -79,7 +85,7 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
           placeholderId,
           onDeleteNote: ctx.onDeleteNote,
           toastMessage: "Couldn't start written questions. Please try again.",
-          devLabel: 'Failed to create written questions',
+          devLabel: "Failed to create written questions",
         });
       }
     },

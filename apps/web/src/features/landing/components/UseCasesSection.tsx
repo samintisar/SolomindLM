@@ -1,5 +1,5 @@
-import React from 'react';
-import { GraduationCap, Microscope, Languages, Briefcase, BookOpen, Users } from 'lucide-react';
+import React from "react";
+import { GraduationCap, Microscope, Languages, Briefcase, BookOpen, Users } from "lucide-react";
 
 interface UseCase {
   icon: React.ElementType;
@@ -13,52 +13,52 @@ interface UseCase {
 const useCases: UseCase[] = [
   {
     icon: GraduationCap,
-    title: 'Medical Students',
-    description: 'Turn dense lectures and research papers into memorizable flashcards and quizzes.',
-    example: 'Upload a 50-page anatomy lecture → Get 200+ flashcards with diagrams',
-    color: 'text-rose-600',
-    borderColor: 'border-l-rose-500'
+    title: "Medical Students",
+    description: "Turn dense lectures and research papers into memorizable flashcards and quizzes.",
+    example: "Upload a 50-page anatomy lecture → Get 200+ flashcards with diagrams",
+    color: "text-rose-600",
+    borderColor: "border-l-rose-500",
   },
   {
     icon: Microscope,
-    title: 'Researchers',
-    description: 'Extract key findings from papers and generate literature reviews instantly.',
-    example: 'Upload 10 research papers → Get comprehensive summary and citations',
-    color: 'text-blue-600',
-    borderColor: 'border-l-blue-500'
+    title: "Researchers",
+    description: "Extract key findings from papers and generate literature reviews instantly.",
+    example: "Upload 10 research papers → Get comprehensive summary and citations",
+    color: "text-blue-600",
+    borderColor: "border-l-blue-500",
   },
   {
     icon: Languages,
-    title: 'Language Learners',
-    description: 'Create vocabulary lists and grammar exercises from any content.',
-    example: 'Upload a Spanish article → Get personalized vocabulary quiz',
-    color: 'text-emerald-600',
-    borderColor: 'border-l-emerald-500'
+    title: "Language Learners",
+    description: "Create vocabulary lists and grammar exercises from any content.",
+    example: "Upload a Spanish article → Get personalized vocabulary quiz",
+    color: "text-emerald-600",
+    borderColor: "border-l-emerald-500",
   },
   {
     icon: Briefcase,
-    title: 'Professionals',
-    description: 'Summarize industry reports and stay updated with minimal reading time.',
-    example: 'Upload a market report → Get executive summary and key insights',
-    color: 'text-amber-600',
-    borderColor: 'border-l-amber-500'
+    title: "Professionals",
+    description: "Summarize industry reports and stay updated with minimal reading time.",
+    example: "Upload a market report → Get executive summary and key insights",
+    color: "text-amber-600",
+    borderColor: "border-l-amber-500",
   },
   {
     icon: BookOpen,
-    title: 'Lifelong Learners',
-    description: 'Turn any topic into a structured learning experience.',
-    example: 'Upload a philosophy book → Answer written questions with instant AI-powered feedback',
-    color: 'text-purple-600',
-    borderColor: 'border-l-purple-500'
+    title: "Lifelong Learners",
+    description: "Turn any topic into a structured learning experience.",
+    example: "Upload a philosophy book → Answer written questions with instant AI-powered feedback",
+    color: "text-purple-600",
+    borderColor: "border-l-purple-500",
   },
   {
     icon: Users,
-    title: 'Study Groups',
-    description: 'Collaborate on shared study materials and track progress together.',
-    example: 'Share flashcard deck → Practice together with real-time sync',
-    color: 'text-indigo-600',
-    borderColor: 'border-l-indigo-500'
-  }
+    title: "Study Groups",
+    description: "Collaborate on shared study materials and track progress together.",
+    example: "Share flashcard deck → Practice together with real-time sync",
+    color: "text-indigo-600",
+    borderColor: "border-l-indigo-500",
+  },
 ];
 
 export const UseCasesSection: React.FC = () => {

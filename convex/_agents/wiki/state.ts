@@ -1,4 +1,4 @@
-"use node"
+"use node";
 /**
  * State definitions for WikiGraph.
  *
@@ -6,8 +6,8 @@
  * Follows project's map-reduce pattern for parallel chunk processing.
  */
 
-import { Annotation } from '@langchain/langgraph';
-import type { WikiArticle, ConceptExtraction } from './prompts.js';
+import { Annotation } from "@langchain/langgraph";
+import type { WikiArticle, ConceptExtraction } from "./prompts.js";
 
 // ============================================================
 // STATE DEFINITIONS
@@ -28,19 +28,19 @@ export const OverallState = Annotation.Root({
   }),
   wikiId: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   notebookId: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   userId: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   // Map phase outputs - parallel concept extraction from chunks
   mapOutputs: Annotation<ConceptExtraction[][]>({
-    reducer: (x: ConceptExtraction[][], y?: ConceptExtraction[][]) => y ? x.concat(y) : x,
+    reducer: (x: ConceptExtraction[][], y?: ConceptExtraction[][]) => (y ? x.concat(y) : x),
     default: () => [],
   }),
   // Collapsed concepts after deduplication/merging
@@ -66,15 +66,15 @@ export const OverallState = Annotation.Root({
   // Index and log content
   indexContent: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   logContent: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   status: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => 'draft',
+    default: () => "draft",
   }),
   // Progress tracking for streaming updates
   progress: Annotation<{
@@ -87,7 +87,11 @@ export const OverallState = Annotation.Root({
     totalChunks?: number;
   }>({
     reducer: (_x, y?: any) => y ?? _x,
-    default: () => ({ phase: 'initializing', percentage: 0, message: 'Initializing wiki compilation...' }),
+    default: () => ({
+      phase: "initializing",
+      percentage: 0,
+      message: "Initializing wiki compilation...",
+    }),
   }),
 });
 
@@ -100,7 +104,7 @@ export type OverallStateType = typeof OverallState.State;
 export const ChunkProcessState = Annotation.Root({
   chunk: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   chunkIndex: Annotation<number>({
     reducer: (_x: number, y?: number) => y ?? _x,
@@ -116,19 +120,19 @@ export const ChunkProcessState = Annotation.Root({
   }),
   wikiId: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   notebookId: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
   userId: Annotation<string>({
     reducer: (_x: string, y?: string) => y ?? _x,
-    default: () => '',
+    default: () => "",
   }),
 });
 
 export type ChunkProcessStateType = typeof ChunkProcessState.State;
 
 // Re-export types for convenience
-export type { WikiArticle, ConceptExtraction } from './prompts.js';
+export type { WikiArticle, ConceptExtraction } from "./prompts.js";
