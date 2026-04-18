@@ -9,6 +9,7 @@ import { SourcesPanel } from "@/features/sources/components/SourcesPanel";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { StudioPanel } from "@/features/studio/components/StudioPanel";
 import { STUDIO_TOOLS } from "@/shared/constants";
+import { isNativeShell } from "@/utils/platformDetection";
 
 export function NotebookView() {
   const { user } = useAuth();
@@ -85,8 +86,14 @@ export function NotebookView() {
   return (
     <AudioPlayerProvider value={audioPlayerContextValue}>
       <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
-        {/* Mobile Navigation Bar */}
-        <div className="md:hidden flex items-center justify-around border-b border-border bg-background sticky top-0 z-60 h-12">
+        {/* Mobile panel tabs: top on web; bottom-fixed in native shell so it clears the native tab bar */}
+        <div
+          className={`md:hidden flex items-center justify-around border-border bg-background z-60 h-12 ${
+            isNativeShell()
+              ? "fixed bottom-0 left-0 right-0 border-t pb-[env(safe-area-inset-bottom,0px)]"
+              : "sticky top-0 border-b"
+          }`}
+        >
           <button
             onClick={() => setMobileActiveTab("sources")}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
@@ -171,7 +178,11 @@ export function NotebookView() {
         </div>
 
         {/* Mobile Layout */}
-        <div className="md:hidden flex-1 overflow-hidden w-full flex flex-col">
+        <div
+          className={`md:hidden flex-1 overflow-hidden w-full flex flex-col ${
+            isNativeShell() ? "pb-[calc(3rem+env(safe-area-inset-bottom,0px))]" : ""
+          }`}
+        >
           {mobileActiveTab === "sources" && (
             <div className="flex-1 w-full overflow-hidden">
               <SourcesPanel

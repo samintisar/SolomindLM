@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { isNativeShell } from "@/utils/platformDetection";
 import { NotebookItem } from "@/shared/types/index";
 import { useCreateNotebook, useUpdateNotebook, useDeleteNotebook } from "../services/notebooksApi";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
@@ -88,7 +89,7 @@ export function useNotebookCRUD({
       try {
         await deleteNotebook(id);
         if (activeNotebookId === id) {
-          navigate("/");
+          navigate(isNativeShell() ? "/home" : "/");
         }
       } catch (error) {
         alertError(error, "Failed to delete notebook");

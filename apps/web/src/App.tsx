@@ -32,6 +32,7 @@ import { useGenerateUploadUrl, useCreateDocument } from "./features/sources/serv
 import { useSubscriptionStatus } from "./features/billing/services/subscriptionApi";
 import { useStripeRedirect } from "./features/auth/hooks/useStripeRedirect";
 import { useAuthGuard } from "./features/auth/hooks/useAuthGuard";
+import { isNativeShell } from "@/utils/platformDetection";
 import { useSourceManager } from "./features/sources/hooks/useSourceManager";
 import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
 import { useNotebookCRUD } from "./features/notebooks/hooks/useNotebookCRUD";
@@ -50,6 +51,12 @@ const AppContent: React.FC = () => {
 
   useStripeRedirect({ isAuthenticated, user });
   useAuthGuard({ isAuthenticated, isLoading });
+
+  useEffect(() => {
+    if (!isNativeShell() || location.pathname !== "/") return;
+    if (isLoading) return;
+    navigate(isAuthenticated ? "/home" : "/sign-in", { replace: true });
+  }, [location.pathname, isAuthenticated, isLoading, navigate]);
 
   const onRequireAuth = useCallback(
     (errorMessage: string) => {
@@ -170,7 +177,7 @@ const AppContent: React.FC = () => {
   }, [shareModalOpen, urlNotebookId, activeNotebook]);
 
   const handleLogoClick = () => {
-    navigate("/");
+    navigate(isNativeShell() ? "/home" : "/");
     setActiveNotebookId(null);
   };
 
@@ -286,7 +293,7 @@ const AppContent: React.FC = () => {
       <div
         className={`w-full bg-background text-foreground font-serif ${isPublicPage ? "" : "flex flex-col h-screen overflow-hidden"}`}
       >
-        {!isPublicPage && (
+        {!isPublicPage && !isNativeShell() && (
           <Header
             title={notebookTitle}
             onRename={(newTitle: string) => {

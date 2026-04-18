@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import App from "./App";
+import { MobileConvexAuthBridge } from "./features/auth/components/MobileConvexAuthBridge";
 import "streamdown/styles.css";
 import "./index.css";
 
@@ -20,6 +21,7 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ConvexAuthProvider client={convex}>
+      <MobileConvexAuthBridge />
       <App />
     </ConvexAuthProvider>
   </React.StrictMode>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { isNativeShell } from "@/utils/platformDetection";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 
@@ -61,13 +62,15 @@ export function ForkNotebookPage() {
         </>
       )}
       {error && <p className="text-destructive text-sm mt-4">{error}</p>}
-      <button
-        type="button"
-        onClick={() => navigate("/home")}
-        className="mt-8 text-sm text-muted-foreground hover:text-foreground underline"
-      >
-        Back to home
-      </button>
+      {!isNativeShell() && (
+        <button
+          type="button"
+          onClick={() => navigate("/home")}
+          className="mt-8 text-sm text-muted-foreground hover:text-foreground underline"
+        >
+          Back to home
+        </button>
+      )}
     </main>
   );
 }

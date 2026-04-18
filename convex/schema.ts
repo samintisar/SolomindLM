@@ -440,6 +440,17 @@ export default defineSchema({
     .index("by_type", ["cacheType"])
     .index("by_agent", ["agentType"]),
 
+  // Expo / native app push tokens (registered from mobile shell when authenticated)
+  mobilePushTokens: defineTable({
+    userId: v.id("users"),
+    expoPushToken: v.string(),
+    platform: v.union(v.literal("ios"), v.literal("android"), v.literal("web")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["expoPushToken"]),
+
   // Search analytics for discovery services
   searchAnalytics: defineTable({
     userId: v.id("users"),

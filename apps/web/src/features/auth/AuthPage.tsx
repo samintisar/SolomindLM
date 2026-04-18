@@ -13,6 +13,7 @@ import {
   Send,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
+import { isNativeShell } from "@/utils/platformDetection";
 import { AuthFormPanel, type AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
 import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
@@ -154,14 +155,15 @@ function AuthHeroMockup() {
         </div>
       </div>
 
-      <>
-        <div
-          id="auth-hero-panel-chat"
-          role="tabpanel"
-          aria-labelledby="auth-hero-tab-chat"
-          hidden={mode !== "chat"}
-          className="relative z-10 flex min-h-0 flex-1 flex-col gap-3 pt-[7.25rem] sm:pt-[7.75rem]"
-        >
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+        <div className="relative min-h-0 flex-1">
+          <div
+            id="auth-hero-panel-chat"
+            role="tabpanel"
+            aria-labelledby="auth-hero-tab-chat"
+            hidden={mode !== "chat"}
+            className="absolute inset-0 flex min-h-0 flex-col gap-3 overflow-hidden pt-[5rem] sm:pt-[5.25rem]"
+          >
           <div className="flex min-h-0 flex-1 gap-3 px-4 pb-4 pt-1 sm:gap-4 sm:px-5 sm:pb-5">
             <aside className="flex w-[min(38%,13.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
               <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm">
@@ -332,32 +334,42 @@ function AuthHeroMockup() {
           </div>
         </div>
 
-        <div
-          id="auth-hero-panel-studio"
-          role="tabpanel"
-          aria-labelledby="auth-hero-tab-studio"
-          hidden={mode !== "studio"}
-          className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden pt-[7.25rem] sm:pt-[7.75rem]"
-        >
-          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-5 backdrop-blur-sm">
-            <Layers className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <span className="font-display text-sm font-bold uppercase tracking-wide text-foreground">
-              Studio
-            </span>
-            <span className="ml-2 font-sans text-xs text-muted-foreground">
-              Create study artifacts from your sources
-            </span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-            <ToolGrid
-              tools={STUDIO_TOOLS}
-              onToolClick={handleStudioToolClick}
-              width={420}
-              activeToolId={studioModal}
-            />
+          <div
+            id="auth-hero-panel-studio"
+            role="tabpanel"
+            aria-labelledby="auth-hero-tab-studio"
+            hidden={mode !== "studio"}
+            className="absolute inset-0 flex min-h-0 flex-col overflow-hidden pt-[5rem] sm:pt-[5.25rem]"
+          >
+            <div className="flex min-h-0 flex-1 px-4 pb-4 pt-1 sm:px-5 sm:pb-5">
+              <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm sm:px-5">
+                  <Layers className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="font-display text-sm font-bold uppercase tracking-wide text-foreground">
+                    Studio
+                  </span>
+                  <span className="ml-2 min-w-0 flex-1 truncate font-sans text-xs text-muted-foreground">
+                    Create study artifacts from your sources
+                  </span>
+                </div>
+                <div
+                  className="chat-panel-graph-grid relative min-h-0 flex-1 overflow-y-auto"
+                  style={{ backgroundColor: "var(--background)" }}
+                >
+                  <div className="p-4 sm:p-5">
+                    <ToolGrid
+                      tools={STUDIO_TOOLS}
+                      onToolClick={handleStudioToolClick}
+                      width={420}
+                      activeToolId={studioModal}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </>
+      </div>
 
       <CreateReportModal
         isOpen={studioModal === "reports"}
@@ -422,6 +434,7 @@ export function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
+  const nativeShell = isNativeShell();
 
   const { returnTo, bannerMessage, initialMode } = useMemo(() => {
     const state = location.state as { from?: string; message?: string } | null | undefined;
@@ -456,42 +469,59 @@ export function AuthPage() {
       />
 
       <header className="relative z-1 flex shrink-0 items-center justify-between px-6 py-5 sm:px-10">
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 text-stone-900 transition hover:opacity-80"
-          aria-label="SolomindLM home"
-        >
-          <img src="/SolomindLM_logo.png" alt="" className="h-8 w-8 object-contain" />
-          <span className="font-serif text-lg font-semibold tracking-tight">SolomindLM</span>
-        </Link>
-        <Link
-          to="/"
-          className="rounded-xl border border-stone-300/80 bg-white/60 px-4 py-2 text-base font-sans font-medium text-stone-700 shadow-sm transition hover:bg-white"
-        >
-          Back to home
-        </Link>
+        {nativeShell ? (
+          <div className="flex items-center gap-2.5 text-stone-900">
+            <img src="/SolomindLM_logo.png" alt="" className="h-8 w-8 object-contain" />
+            <span className="font-serif text-lg font-semibold tracking-tight">SolomindLM</span>
+          </div>
+        ) : (
+          <>
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 text-stone-900 transition hover:opacity-80"
+              aria-label="SolomindLM home"
+            >
+              <img src="/SolomindLM_logo.png" alt="" className="h-8 w-8 object-contain" />
+              <span className="font-serif text-lg font-semibold tracking-tight">SolomindLM</span>
+            </Link>
+            <Link
+              to="/"
+              className="rounded-xl border border-stone-300/80 bg-white/60 px-4 py-2 text-base font-sans font-medium text-stone-700 shadow-sm transition hover:bg-white"
+            >
+              Back to home
+            </Link>
+          </>
+        )}
       </header>
 
       <main
         className="chat-panel-graph-grid relative z-1 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-6 py-10 sm:px-10 sm:py-12"
         style={{ backgroundColor: "#FDFBF7" }}
       >
-        <div className="mx-auto grid w-full max-w-7xl -translate-y-4 grid-cols-1 gap-12 sm:-translate-y-6 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:items-stretch lg:gap-x-10 lg:gap-y-8 lg:-translate-y-10 xl:gap-x-14 2xl:max-w-[90rem]">
+        <div
+          className={
+            nativeShell
+              ? "mx-auto grid w-full max-w-lg grid-cols-1 gap-8 py-4"
+              : "mx-auto grid w-full max-w-7xl -translate-y-4 grid-cols-1 gap-12 sm:-translate-y-6 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:items-stretch lg:gap-x-10 lg:gap-y-8 lg:-translate-y-10 xl:gap-x-14 2xl:max-w-[90rem]"
+          }
+        >
           <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:justify-end">
             <div className="flex w-full max-w-lg flex-col lg:h-full lg:min-h-0">
               <div className="flex w-full flex-col items-center lg:h-full lg:min-h-0 lg:justify-center">
                 <div className="w-full">
-                  <div className="relative z-10 px-2 text-center sm:px-0 lg:pointer-events-none">
-                    <h1 className="mx-auto max-w-[18ch] font-serif text-4xl font-normal leading-tight tracking-tight text-stone-900 sm:max-w-none sm:text-5xl lg:text-[2.75rem]">
-                      Think deeper,
-                      <br />
-                      learn faster.
-                    </h1>
-                    <p className="mx-auto mt-3 max-w-md font-sans text-base text-stone-600 sm:mt-4 sm:text-lg">
-                      Ground your research in real sources.
-                    </p>
-                  </div>
-                  <div className="relative z-0 mt-10 lg:mt-8">
+                  {!nativeShell && (
+                    <div className="relative z-10 px-2 text-center sm:px-0 lg:pointer-events-none">
+                      <h1 className="mx-auto max-w-[18ch] font-serif text-4xl font-normal leading-tight tracking-tight text-stone-900 sm:max-w-none sm:text-5xl lg:text-[2.75rem]">
+                        Think deeper,
+                        <br />
+                        learn faster.
+                      </h1>
+                      <p className="mx-auto mt-3 max-w-md font-sans text-base text-stone-600 sm:mt-4 sm:text-lg">
+                        Ground your research in real sources.
+                      </p>
+                    </div>
+                  )}
+                  <div className={nativeShell ? "relative z-0 mt-2" : "relative z-0 mt-10 lg:mt-8"}>
                     <AuthFormPanel
                       authError={bannerMessage}
                       onAuthenticated={handleAuthenticated}
@@ -503,9 +533,11 @@ export function AuthPage() {
             </div>
           </div>
 
-          <div className="flex h-full w-full min-h-0 justify-center lg:min-h-[min(93svh,65rem)] lg:justify-start">
-            <AuthHeroMockup />
-          </div>
+          {!nativeShell && (
+            <div className="flex h-full w-full min-h-0 justify-center lg:min-h-[min(93svh,65rem)] lg:justify-start">
+              <AuthHeroMockup />
+            </div>
+          )}
         </div>
       </main>
 

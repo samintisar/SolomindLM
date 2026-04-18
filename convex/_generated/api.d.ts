@@ -229,6 +229,7 @@ import type * as notebooks_index from "../notebooks/index.js";
 import type * as notebooks_sharing from "../notebooks/sharing.js";
 import type * as notes_index from "../notes/index.js";
 import type * as notes_userNotes from "../notes/userNotes.js";
+import type * as push_index from "../push/index.js";
 import type * as scripts_fixAudioUrls from "../scripts/fixAudioUrls.js";
 import type * as scripts_runFixAudioUrls from "../scripts/runFixAudioUrls.js";
 import type * as server from "../server.js";
@@ -509,6 +510,7 @@ declare const fullApi: ApiFromModules<{
   "notebooks/sharing": typeof notebooks_sharing;
   "notes/index": typeof notes_index;
   "notes/userNotes": typeof notes_userNotes;
+  "push/index": typeof push_index;
   "scripts/fixAudioUrls": typeof scripts_fixAudioUrls;
   "scripts/runFixAudioUrls": typeof scripts_runFixAudioUrls;
   server: typeof server;

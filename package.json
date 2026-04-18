@@ -5,7 +5,8 @@
   "packageManager": "bun@1.2.2",
   "workspaces": {
     "packages": [
-      "apps/web"
+      "apps/web",
+      "apps/mobile"
     ]
   },
   "engines": {
@@ -14,11 +15,13 @@
   },
   "scripts": {
     "dev": "bun run --elide-lines=0 --filter \"./apps/**\" dev",
-    "dev:web": "bun run --elide-lines=0 --filter @solomindlm/web dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "dev:mobile": "bun run --cwd apps/mobile dev",
     "build": "bun run --filter \"./apps/**\" build",
     "build:prod": "bun run --filter @solomindlm/web build",
     "typecheck:convex": "bun x tsgo --noEmit -p convex/tsconfig.json",
     "typecheck:web": "bun x tsgo --noEmit -p apps/web/tsconfig.json",
+    "typecheck:mobile": "bun x tsgo --noEmit -p apps/mobile/tsconfig.json",
     "convex:env:push": "node scripts/push-convex-env.js",
     "convex:env:push:prod": "node scripts/push-convex-env.js --prod",
     "convex:env:push:dry": "node scripts/push-convex-env.js --dry-run",

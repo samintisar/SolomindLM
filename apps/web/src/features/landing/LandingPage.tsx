@@ -1,4 +1,7 @@
 import React from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/features/auth/AuthContext";
+import { isNativeShell } from "@/utils/platformDetection";
 import { NavigationHeader } from "./components/NavigationHeader";
 import { HeroSection } from "./components/HeroSection";
 import { FeaturesGrid } from "./components/FeaturesGrid";
@@ -21,6 +24,15 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isNativeShell()) {
+    if (isLoading) {
+      return <div className="min-h-screen bg-[#FDFBF7]" />;
+    }
+    return <Navigate to={isAuthenticated ? "/home" : "/sign-in"} replace />;
+  }
+
   return (
     <>
       <SEOMeta
