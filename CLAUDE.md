@@ -316,11 +316,9 @@ This project uses the **context7 MCP server** for live documentation lookup of l
 - **LSP staleness:** If Serena seems unaware of recent changes, call `restart_language_server` to resync. This can happen after using built-in tools for edits.
 
 <!-- convex-ai-start -->
-
 This project uses [Convex](https://convex.dev) as its backend.
 
 When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
 
 Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
-
 <!-- convex-ai-end -->

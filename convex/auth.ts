@@ -1,6 +1,7 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
+import { v } from "convex/values";
 import { query, type QueryCtx, type MutationCtx, type ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { ResendOTP } from "./ResendOTP";
@@ -44,8 +45,15 @@ export const getAuthUserId = async (
 /**
  * Get current user with profile data
  */
+const currentUserValidator = v.object({
+  id: v.string(),
+  email: v.optional(v.string()),
+  name: v.optional(v.string()),
+});
+
 export const getCurrentUser = query({
   args: {},
+  returns: v.union(v.null(), currentUserValidator),
   handler: async (ctx) => {
     try {
       const identity = await ctx.auth.getUserIdentity();
@@ -63,7 +71,8 @@ export const getCurrentUser = query({
         email: user.email ?? undefined,
         name: user.name ?? undefined,
       };
-    } catch {
+    } catch (e) {
+      console.error("getCurrentUser", e);
       return null;
     }
   },

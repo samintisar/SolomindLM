@@ -143,7 +143,9 @@ Create the `ConvexReactClient` at module scope, not inside a component:
 ```tsx
 // Bad: re-creates the client on every render
 function App() {
-  const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+  const convex = new ConvexReactClient(
+    import.meta.env.VITE_CONVEX_URL as string,
+  );
   return <ConvexProvider client={convex}>...</ConvexProvider>;
 }
 
@@ -170,7 +172,7 @@ createRoot(document.getElementById("root")!).render(
     <ConvexProvider client={convex}>
       <App />
     </ConvexProvider>
-  </StrictMode>
+  </StrictMode>,
 );
 ```
 
@@ -194,7 +196,11 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
 // app/layout.tsx
 import { ConvexClientProvider } from "./ConvexClientProvider";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <body>

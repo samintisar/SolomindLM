@@ -15,14 +15,15 @@ export {
  * Get subscription for the current user (from custom table)
  */
 export const get = query({
+  args: {},
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
     const subscription = await ctx.db
       .query("stripeSubscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("status"), "active"))
+      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
       .first();
 
     return subscription;
@@ -33,14 +34,15 @@ export const get = query({
  * Get current subscription (alias for get, used by frontend)
  */
 export const getCurrent = query({
+  args: {},
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
     const subscription = await ctx.db
       .query("stripeSubscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("status"), "active"))
+      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
       .first();
 
     return subscription;
@@ -48,32 +50,18 @@ export const getCurrent = query({
 });
 
 /**
- * Get subscription by Stripe subscription ID
- */
-export const getByStripeSubscriptionId = query({
-  args: { stripeSubscriptionId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("stripeSubscriptions")
-      .withIndex("stripe_subscription", (q) =>
-        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
-      )
-      .first();
-  },
-});
-
-/**
  * Check if user has premium subscription
  */
 export const isPremium = query({
+  args: {},
+  returns: v.boolean(),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return false;
 
     const subscription = await ctx.db
       .query("stripeSubscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("status"), "active"))
+      .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
       .first();
 
     return !!subscription;
@@ -90,8 +78,7 @@ export const getByUserIdInternal = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("stripeSubscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("status"), "active"))
+      .withIndex("by_user_and_status", (q) => q.eq("userId", args.userId).eq("status", "active"))
       .first();
   },
 });

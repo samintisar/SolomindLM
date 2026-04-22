@@ -402,15 +402,34 @@ export const deleteCard = mutation({
 export const getDueCards = query({
   args: {
     id: v.id("flashcards"),
+    /** Client clock for “due” — avoids Date.now() in the query (stable + reactive when args update). */
+    nowMs: v.number(),
   },
+  returns: v.array(
+    v.object({
+      index: v.number(),
+      card: v.any(),
+    })
+  ),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+
     const flashcard = await Flashcards.getFlashcard(ctx, args.id);
     if (!flashcard) {
       throw new Error("Flashcard set not found");
     }
 
+    try {
+      await assertCanReadNotebook(ctx, flashcard.notebookId, userId);
+    } catch {
+      return [];
+    }
+
     const cardsData = flashcard.cardsData as any[];
-    const dueIndices = Flashcards.getDueCardIndices(cardsData);
+    const dueIndices = Flashcards.getDueCardIndices(cardsData, args.nowMs);
 
     // Return due cards with their indices
     return dueIndices.map((index) => ({

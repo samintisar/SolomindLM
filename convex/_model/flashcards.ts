@@ -31,8 +31,11 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query
-      .filter((q) => q.eq(q.field("userId"), userId))
+    return await ctx.db
+      .query("flashcards")
+      .withIndex("by_notebook_and_user", (q) =>
+        q.eq("notebookId", notebookId).eq("userId", userId)
+      )
       .order("desc")
       .collect();
   }
@@ -129,12 +132,15 @@ export function updateProficiencyAfterReview(
  * @param proficiency - Card proficiency data
  * @returns true if card is due (nextReviewDate <= now or not yet reviewed)
  */
-export function isCardDue(proficiency: CardProficiency | undefined): boolean {
+export function isCardDue(
+  proficiency: CardProficiency | undefined,
+  nowMs: number = Date.now()
+): boolean {
   if (!proficiency || !proficiency.nextReviewDate) {
     // New card (never reviewed) - always due
     return true;
   }
-  return proficiency.nextReviewDate <= Date.now();
+  return proficiency.nextReviewDate <= nowMs;
 }
 
 /**
@@ -142,8 +148,7 @@ export function isCardDue(proficiency: CardProficiency | undefined): boolean {
  * @param cardsData - Array of cards with proficiency data
  * @returns Array of indices for due cards
  */
-export function getDueCardIndices(cardsData: any[]): number[] {
-  const now = Date.now();
+export function getDueCardIndices(cardsData: any[], nowMs: number): number[] {
   return cardsData
     .map((card, index) => ({ card, index }))
     .filter(({ card }) => {
@@ -151,7 +156,7 @@ export function getDueCardIndices(cardsData: any[]): number[] {
       if (!proficiency || !proficiency.nextReviewDate) {
         return true; // New card
       }
-      return proficiency.nextReviewDate <= now;
+      return proficiency.nextReviewDate <= nowMs;
     })
     .map(({ index }) => index);
 }

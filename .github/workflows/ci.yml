@@ -26,6 +26,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Assert Vercel production build runs convex deploy
+        run: |
+          if ! grep -qF 'convex deploy' apps/web/vercel.json; then
+            echo "::error::apps/web/vercel.json buildCommand must include convex deploy for non-preview, or production Convex and Vite can drift"
+            exit 1
+          fi
+          if ! grep -qF 'VERCEL_ENV' apps/web/vercel.json; then
+            echo "::error::buildCommand should branch on VERCEL_ENV (preview = build only, else = convex deploy + build)"
+            exit 1
+          fi
+          if ! grep -qF 'preview' apps/web/vercel.json; then
+            echo "::error::buildCommand should keep preview on build-only to avoid preview overwriting prod Convex"
+            exit 1
+          fi
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:

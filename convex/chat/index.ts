@@ -82,14 +82,22 @@ export const releaseChatGenerationInternal = internalMutation({
  */
 export const list = query({
   args: {},
+  returns: v.array(
+    v.object({
+      id: v.id("conversations"),
+      notebookId: v.id("notebooks"),
+      notebookTitle: v.string(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+  ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
     const conversations = await ctx.db
       .query("conversations")
-      .withIndex("by_user_notebook")
-      .filter((q) => q.eq(q.field("userId"), userId))
+      .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
 

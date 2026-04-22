@@ -27,8 +27,7 @@ export async function checkNotebookLimit(ctx: MutationCtx): Promise<void> {
   // Check if user has an active subscription
   const subscription = await ctx.db
     .query("stripeSubscriptions")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
-    .filter((q: any) => q.eq(q.field("status"), "active"))
+    .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
     .first();
 
   const isPro = !!subscription;
@@ -37,7 +36,7 @@ export async function checkNotebookLimit(ctx: MutationCtx): Promise<void> {
   // Count existing notebooks
   const notebooks = await ctx.db
     .query("notebooks")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
 
   if (notebooks.length >= limit) {
@@ -56,8 +55,7 @@ export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Pr
   // Check if user has an active subscription
   const subscription = await ctx.db
     .query("stripeSubscriptions")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
-    .filter((q: any) => q.eq(q.field("status"), "active"))
+    .withIndex("by_user_and_status", (q) => q.eq("userId", userId).eq("status", "active"))
     .first();
 
   const isPro = !!subscription;
@@ -66,7 +64,7 @@ export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Pr
   // Count existing documents for this notebook
   const documents = await ctx.db
     .query("documents")
-    .withIndex("by_notebook", (q: any) => q.eq("notebookId", notebookId))
+    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId as Id<"notebooks">))
     .collect();
 
   if (documents.length >= limit) {
@@ -95,8 +93,9 @@ export async function checkDailyLimit(
   // Check subscription status
   const subscription = await ctx.db
     .query("stripeSubscriptions")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
-    .filter((q: any) => q.eq(q.field("status"), "active"))
+    .withIndex("by_user_and_status", (q) =>
+      q.eq("userId", userId as Id<"users">).eq("status", "active")
+    )
     .first();
 
   const isPro = !!subscription;
@@ -107,7 +106,7 @@ export async function checkDailyLimit(
   // This will throw RateLimitError when exceeded
   try {
     await rateLimiter.limit(ctx, limitKey, { key: userId, throws: true });
-  } catch (error) {
+  } catch {
     // Convert RateLimitError to our structured LimitError
     const limit = isPro ? getProRateLimit(feature) : getFreeRateLimit(feature);
 
