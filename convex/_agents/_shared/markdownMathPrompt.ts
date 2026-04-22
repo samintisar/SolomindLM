@@ -11,6 +11,7 @@ export const MARKDOWN_MATH_RULES_BULLETS = `- Inline math: one pair of dollar si
 - Every expression that uses backslash-LaTeX (\\sum, \\beta, \\dots, \\tag, etc.), Greek letters, or subscripts/superscripts meant as math must lie entirely inside $...$ or $$...$$; undelimited lines show as broken raw text.
 - Use KaTeX-supported LaTeX only (no custom packages or unsupported environments). \\tag{n} on display equations is allowed when needed.
 - Place citation markers like [1] in normal text after math or on the following line — never between the opening and closing $ of one inline math span.
-- Prefer citations after a closing parenthesis or delimiter, e.g. $(\\beta_0 + \\sum_j X_{j,t})$ [1], not $(\\beta_0 + \\sum_j X_{j,t} [1])$, so they stay clickable in the app.`;
+- Prefer citations after a closing parenthesis or delimiter, e.g. $(\\beta_0 + \\sum_j X_{j,t})$ [1], not $(\\beta_0 + \\sum_j X_{j,t} [1])$, so they stay clickable in the app.
+- **GFM pipe tables (| col | col |):** Every ASCII | starts a new column, even inside $...$ or $$...$$, which splits formulas and breaks rendering (e.g. $\\hat{y}_{t+h|t}$ becomes two cells). **Never** use a raw | for math vertical bars in table cells. Use LaTeX instead: e.g. $\\hat{y}_{t+h\\mid t}$, $P(A\\mid B)$, or $\\lvert x \\rvert$. For a dense grid of equations, prefer one $$...$$ per line, a bullet list, or a table in HTML; avoid pipe tables when any cell would need |.`;
 
 export const MARKDOWN_MATH_NOTATION_FOR_APP = `**Math notation (Markdown with KaTeX — required for correct rendering in the app):**\n${MARKDOWN_MATH_RULES_BULLETS}`;
