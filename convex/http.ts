@@ -139,6 +139,8 @@ http.route({
   }),
 });
 
+// Playback by Convex storage ID. IDs are unguessable; treat URLs as capability links.
+// For stricter control, prefer signed `storage.getUrl` links or validate document ownership in an authenticated path.
 http.route({
   path: "/audio/" + ":storageId",
   method: "GET",

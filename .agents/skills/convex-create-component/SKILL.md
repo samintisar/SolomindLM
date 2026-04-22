@@ -111,7 +111,7 @@ export const listUnread = query({
       userId: v.string(),
       message: v.string(),
       read: v.boolean(),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     return await ctx.db

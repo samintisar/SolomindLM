@@ -3,7 +3,7 @@ import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface CreateFlashcardsParams {
   notebookId: string;
@@ -342,12 +342,19 @@ export function useCardReview() {
 }
 
 /**
- * Get cards that are due for review
+ * Get cards that are due for review.
+ * `nowMs` is refreshed on an interval so the query re-runs as the clock advances (no Date.now in the Convex query).
  */
 export function useDueCards(flashcardId: string | null) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [flashcardId]);
+
   return useQuery(
     api.studio.flashcards.index.getDueCards,
-    flashcardId ? { id: flashcardId as Id<"flashcards"> } : "skip"
+    flashcardId ? { id: flashcardId as Id<"flashcards">, nowMs } : "skip"
   );
 }
 
@@ -440,6 +447,7 @@ export async function getDueCards(
   const client = getConvexClient();
   return await client.query(api.studio.flashcards.index.getDueCards, {
     id: flashcardId as Id<"flashcards">,
+    nowMs: Date.now(),
   });
 }
 

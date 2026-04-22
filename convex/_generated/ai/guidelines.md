@@ -56,8 +56,8 @@ export default defineSchema({
       v.object({
         kind: v.literal("success"),
         value: v.number(),
-      })
-    )
+      }),
+    ),
   ),
 });
 ```

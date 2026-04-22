@@ -94,7 +94,9 @@ export default defineSchema({
   })
     .index("by_notebook", ["notebookId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    // Documents with storageId set (file uploads)
+    .index("by_storage", ["storageId"]),
 
   // Vector search for RAG
   documentChunks: defineTable({
@@ -181,6 +183,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -380,6 +383,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"])
     .index("stripe_subscription", ["stripeSubscriptionId"]),
 
   stripeWebhookEvents: defineTable({

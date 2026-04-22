@@ -30,6 +30,8 @@ async function deleteAllChunksForDocument(
  * Get a presigned URL for uploading a file to Convex Storage
  */
 export const generateUploadUrl = mutation({
+  args: {},
+  returns: v.string(),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
@@ -230,13 +232,14 @@ export const getContent = query({
  */
 export const getSignedUrl = mutation({
   args: { storageId: v.string() },
+  returns: v.union(v.null(), v.string()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
     const document = await ctx.db
       .query("documents")
-      .filter((q) => q.eq(q.field("storageId"), args.storageId))
+      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
       .first();
 
     if (!document) {
