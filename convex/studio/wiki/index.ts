@@ -298,6 +298,18 @@ export const getInternal = internalQuery({
 });
 
 /**
+ * Get wiki by notebook ID (internal, no auth check)
+ */
+export const getInternalByNotebook = internalQuery({
+  args: {
+    notebookId: v.id("notebooks"),
+  },
+  handler: async (ctx: any, args: any) => {
+    return await getWikiByNotebook(ctx, args.notebookId);
+  },
+});
+
+/**
  * Get wiki articles internal
  */
 export const getArticlesInternal = internalQuery({

@@ -187,6 +187,27 @@ export async function streamChatResponse(
   });
   const keywordSearchChunkUserId = (notebookDoc?.userId ?? userId) as Id<"users">;
 
+  // Fetch wiki articles for enriched RAG context
+  let wikiArticles: Array<{ title: string; content: string; path: string }> | undefined;
+  try {
+    const wiki = await ctx.runQuery(internal.studio.wiki.index.getInternalByNotebook, {
+      notebookId: notebookIdTyped,
+    });
+    if (wiki?.status === "completed" && wiki._id) {
+      const articles = await ctx.runQuery(internal.studio.wiki.index.getArticlesInternal, {
+        wikiId: wiki._id,
+      });
+      wikiArticles = articles
+        .filter((a: any) => a.type === "concept" || a.type === "connection")
+        .map((a: any) => ({ title: a.title, content: a.content, path: a.path }));
+      console.log(
+        `[ChatStream] Loaded ${wikiArticles!.length} wiki articles for RAG enrichment`
+      );
+    }
+  } catch (e) {
+    console.warn("[ChatStream] Wiki article fetch failed, continuing without wiki context:", e);
+  }
+
   console.log("[ChatStream] Starting stream:", streamId);
 
   // Get conversation history
@@ -512,6 +533,7 @@ export async function streamChatResponse(
         conversationHistory,
         documentIds,
         groundingMode: notebookGrounding,
+        wikiArticles,
       },
       message
     )) {

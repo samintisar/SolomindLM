@@ -9,7 +9,17 @@ import { internal } from "../../_generated/api";
 import { WikiGraph } from "../../_agents/wiki/WikiGraph";
 import { WIKI_CONFIG } from "../../_agents/wiki/config";
 import type { OverallStateType } from "../../_agents/wiki/state";
-import type { WikiArticle } from "../../_agents/wiki/prompts";
+import type { WikiArticle, ConceptExtraction } from "../../_agents/wiki/prompts";
+import { WikiArticleGenerationSchema } from "../../_agents/wiki/prompts";
+import {
+  ARTICLE_GENERATION_SYSTEM_PROMPT,
+  getArticleGenerationPrompt,
+} from "../../_agents/wiki/prompts";
+import { createLLMs } from "../../_agents/_shared/llm_factory.js";
+import { invokeWithRetry, invokeWithTimeout } from "../../_agents/_shared/index.js";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import { createLangSmithRunConfig } from "../../_agents/_shared/langsmith.js";
+import { env } from "../../_lib/env.js";
 
 const CHECKPOINT_V = 1 as const;
 
@@ -492,5 +502,275 @@ export const regenerateWikiSynthesizeBatch = internalAction({
       }
       throw error;
     }
+  },
+});
+
+// ============================================================
+// INCREMENTAL INGEST: Patch wiki on new source
+// ============================================================
+
+function slugify(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, "-");
+}
+
+/**
+ * Ingest a single new document into an existing wiki.
+ * Extracts concepts from the new source, diffs against existing articles,
+ * patches affected ones and creates articles for genuinely new concepts.
+ */
+export const ingestSourceIntoWiki = internalAction({
+  args: {
+    wikiId: v.id("wikis"),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx: any, args: any) => {
+    const { wikiId, notebookId, userId, documentId } = args;
+
+    const wiki = await ctx.runQuery(internal.studio.wiki.index.getInternal, { wikiId });
+    if (!wiki || wiki.status !== "completed") {
+      return { wikiId, skipped: true, reason: "wiki_not_completed" };
+    }
+
+    // Fetch new document chunks
+    const docChunks = await ctx.runQuery(internal.documents.index.listChunksByDocument, {
+      documentId,
+    });
+    const chunks = docChunks.map((c: any) => c.content);
+    if (chunks.length === 0) {
+      return { wikiId, skipped: true, reason: "no_chunks" };
+    }
+
+    // Extract concepts from new source only
+    const wikiGraph = new WikiGraph();
+    const collapsedState = await wikiGraph.runMapAndCollapse({
+      documentIds: [documentId],
+      chunks,
+      wikiId,
+      notebookId,
+      userId,
+    });
+
+    const incomingConcepts = collapsedState.collapsedConcepts || [];
+    if (incomingConcepts.length === 0) {
+      return { wikiId, skipped: true, reason: "no_concepts" };
+    }
+
+    // Fetch existing wiki articles
+    const existingArticles = await ctx.runQuery(
+      internal.studio.wiki.index.getArticlesInternal,
+      { wikiId }
+    );
+    const conceptArticles = existingArticles.filter(
+      (a: any) => a.type === "concept" || a.type === "connection"
+    );
+    const existingTitles = new Map(
+      conceptArticles.map((a: any) => [a.title.toLowerCase().trim(), a])
+    );
+
+    // Diff: match incoming concepts against existing articles
+    const toUpdate: { concept: ConceptExtraction; article: any }[] = [];
+    const toCreate: ConceptExtraction[] = [];
+
+    for (const concept of incomingConcepts) {
+      const normalized = concept.name.toLowerCase().trim();
+      const existing = existingTitles.get(normalized);
+      if (existing) {
+        toUpdate.push({ concept, article: existing });
+      } else {
+        toCreate.push(concept);
+      }
+    }
+
+    // Build source excerpt for generation
+    const joinedChunks = chunks.join("\n\n---\n\n");
+    const maxChars = WIKI_CONFIG.MAX_RELEVANT_CONTENT_CHARS;
+    const sourceExcerpt = joinedChunks.length > maxChars ? joinedChunks.slice(0, maxChars) : joinedChunks;
+
+    const llms = createLLMs({
+      apiKey: env.TOGETHER_AI_API_KEY,
+      mapModel: env.FAST_LLM,
+      reduceModel: env.SMART_LLM,
+      temperatures: { map: 0.3, reduce: 0.6 },
+      maxTokens: { map: 8000, reduce: WIKI_CONFIG.REDUCE_MAX_TOKENS },
+    });
+
+    // Patch affected articles
+    for (const { concept, article } of toUpdate) {
+      try {
+        const structuredLlm = (llms.smartLlm as any).withStructuredOutput(WikiArticleGenerationSchema);
+        const prompt = getArticleGenerationPrompt({
+          concept,
+          relevantContent: sourceExcerpt,
+          sources: [documentId],
+        });
+        const result = await invokeWithRetry(
+          () =>
+            invokeWithTimeout(
+              () =>
+                structuredLlm.invoke(
+                  [
+                    new SystemMessage(ARTICLE_GENERATION_SYSTEM_PROMPT),
+                    new HumanMessage(prompt),
+                  ],
+                  createLangSmithRunConfig({
+                    runName: "WikiIngest.PatchArticle",
+                    tags: ["agent", "wiki", "ingest"],
+                  }) as unknown as Record<string, unknown>
+                ),
+              WIKI_CONFIG.REDUCE_TIMEOUT_MS,
+              "WikiIngestPatch"
+            ),
+          { maxAttempts: 2, baseDelayMs: 1000 },
+          "WikiIngestPatch"
+        );
+
+        const gen = result as { summary: string; relatedConcepts: string[]; content: string };
+        const mergedSources = [
+          ...new Set([...(article.sources || []).map(String), documentId]),
+        ];
+        const slug = slugify(concept.name) || "concept";
+        const related = (gen.relatedConcepts || [])
+          .map((r: string) => {
+            const t = r.trim().replace(/^\[\[|\]\]$/g, "");
+            if (!t) return "";
+            return t.startsWith("concepts/") ? t : `concepts/${slugify(t)}`;
+          })
+          .filter(Boolean);
+
+        await ctx.runMutation(internal.studio.wiki.index.updateArticleInternal, {
+          articleId: article._id,
+          content: gen.content.trim(),
+          frontmatter: {
+            slug,
+            summary: (gen.summary || concept.summary || "").trim().slice(0, 200),
+            sources: mergedSources,
+            relatedConcepts: related,
+            lastUpdated: new Date().toISOString(),
+          },
+          wordCount: gen.content.trim().split(/\s+/).length,
+        });
+      } catch (e) {
+        console.warn(`[WikiIngest] Failed to patch article "${concept.name}":`, e);
+      }
+    }
+
+    // Create articles for new concepts
+    for (const concept of toCreate) {
+      try {
+        const structuredLlm = (llms.smartLlm as any).withStructuredOutput(WikiArticleGenerationSchema);
+        const prompt = getArticleGenerationPrompt({
+          concept,
+          relevantContent: sourceExcerpt,
+          sources: [documentId],
+        });
+        const result = await invokeWithRetry(
+          () =>
+            invokeWithTimeout(
+              () =>
+                structuredLlm.invoke(
+                  [
+                    new SystemMessage(ARTICLE_GENERATION_SYSTEM_PROMPT),
+                    new HumanMessage(prompt),
+                  ],
+                  createLangSmithRunConfig({
+                    runName: "WikiIngest.NewArticle",
+                    tags: ["agent", "wiki", "ingest"],
+                  }) as unknown as Record<string, unknown>
+                ),
+              WIKI_CONFIG.REDUCE_TIMEOUT_MS,
+              "WikiIngestCreate"
+            ),
+          { maxAttempts: 2, baseDelayMs: 1000 },
+          "WikiIngestCreate"
+        );
+
+        const gen = result as { summary: string; relatedConcepts: string[]; content: string };
+        const slug = slugify(concept.name) || "concept";
+        const related = (gen.relatedConcepts || [])
+          .map((r: string) => {
+            const t = r.trim().replace(/^\[\[|\]\]$/g, "");
+            if (!t) return "";
+            return t.startsWith("concepts/") ? t : `concepts/${slugify(t)}`;
+          })
+          .filter(Boolean);
+
+        await ctx.runMutation(internal.studio.wiki.index.createArticleInternal, {
+          wikiId,
+          path: `concepts/${slug}`,
+          type: "concept",
+          title: concept.name,
+          content: gen.content.trim(),
+          sources: [documentId],
+          frontmatter: {
+            slug,
+            summary: (gen.summary || concept.summary || "").trim().slice(0, 200),
+            sources: [documentId],
+            relatedConcepts: related,
+            lastUpdated: new Date().toISOString(),
+          },
+          wordCount: gen.content.trim().split(/\s+/).length,
+        });
+      } catch (e) {
+        console.warn(`[WikiIngest] Failed to create article for "${concept.name}":`, e);
+      }
+    }
+
+    // Rebuild index
+    const allArticles = await ctx.runQuery(
+      internal.studio.wiki.index.getArticlesInternal,
+      { wikiId }
+    );
+    const { buildDeterministicWikiIndex } = await import(
+      "../../_agents/wiki/nodes.js"
+    );
+    const indexContent = buildDeterministicWikiIndex(
+      allArticles.map((a: any) => ({
+        path: a.path,
+        type: a.type,
+        title: a.title,
+        content: a.content,
+        frontmatter: a.frontmatter || {},
+      }))
+    );
+
+    // Upsert index article
+    const existingIndex = allArticles.find((a: any) => a.path === "index");
+    if (existingIndex) {
+      await ctx.runMutation(internal.studio.wiki.index.updateArticleInternal, {
+        articleId: existingIndex._id,
+        content: indexContent,
+        frontmatter: {
+          slug: "index",
+          summary: "Table of contents for the knowledge base",
+          sources: allArticles.flatMap((a: any) => a.sources || []),
+          relatedConcepts: [],
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Update wiki metadata
+    const wikiFresh = await ctx.runQuery(internal.studio.wiki.index.getInternal, { wikiId });
+    const prev =
+      wikiFresh?.metadata && typeof wikiFresh.metadata === "object"
+        ? { ...(wikiFresh.metadata as Record<string, unknown>) }
+        : {};
+    await ctx.runMutation(internal.studio.wiki.index.updateMetadataInternal, {
+      wikiId,
+      metadata: {
+        ...prev,
+        lastIngestAt: new Date().toISOString(),
+        lastIngestDocumentId: documentId,
+      },
+    });
+
+    return {
+      wikiId,
+      status: "completed",
+      patched: toUpdate.length,
+      created: toCreate.length,
+    };
   },
 });

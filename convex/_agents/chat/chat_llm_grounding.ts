@@ -1,14 +1,16 @@
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
+import type { WikiArticleContext } from "../ChatAgent.js";
 
 /**
  * Builds grounding prompt optimized for research/learning contexts.
- * Enhanced with chunk metadata for better context awareness.
+ * Enhanced with chunk metadata and optional wiki article context.
  */
 export function buildGroundingPrompt(
   chunks: ReferenceChunk[],
   userMessage: string,
-  conversationHistory: Array<{ role: string; content: string }>
+  conversationHistory: Array<{ role: string; content: string }>,
+  wikiArticles?: WikiArticleContext[]
 ): string {
   const formattedChunks = chunks
     .map((chunk, index) => {
@@ -113,7 +115,12 @@ ${MARKDOWN_MATH_RULES_BULLETS}
 
 `;
 
-  return `# SOURCE DOCUMENTS
+  const wikiSection =
+    wikiArticles && wikiArticles.length > 0
+      ? `# COMPILED KNOWLEDGE BASE\nThe following wiki articles were compiled from your sources. Use them as synthesized context alongside the raw source passages below. Wiki articles do NOT count as cited sources — cite the numbered source passages only.\n\n${wikiArticles.map((a) => `## ${a.title}\n${a.content}`).join("\n\n---\n\n")}\n\n`
+      : "";
+
+  return `${wikiSection}# SOURCE DOCUMENTS
 ${formattedChunks}
 
 ${contextSection}${citationReminder}# CURRENT QUESTION

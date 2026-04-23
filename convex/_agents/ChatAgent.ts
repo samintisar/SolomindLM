@@ -19,6 +19,12 @@ import { routeChatMessage } from "./chat/chatRouter.js";
 // Types
 // ============================================================
 
+export interface WikiArticleContext {
+  title: string;
+  content: string;
+  path: string;
+}
+
 export interface ChatAgentContext {
   userId: string;
   noteId: string;
@@ -26,6 +32,8 @@ export interface ChatAgentContext {
   documentIds?: string[];
   /** Overrides env CHAT_GROUNDING_MODE when set */
   groundingMode?: "async" | "sync" | "off";
+  /** Pre-fetched wiki articles for notebook-level context enrichment */
+  wikiArticles?: WikiArticleContext[];
 }
 
 export interface StreamChunk {
@@ -508,14 +516,21 @@ export class ChatAgent {
       return;
     }
 
-    yield* this.streamRagAnswerFromChunks(context, userMessage, recentTurns, rankedChunks);
+    yield* this.streamRagAnswerFromChunks(
+      context,
+      userMessage,
+      recentTurns,
+      rankedChunks,
+      context.wikiArticles
+    );
   }
 
   private async *streamRagAnswerFromChunks(
     context: ChatAgentContext,
     userMessage: string,
     recentTurns: Array<{ role: string; content: string }>,
-    allChunks: ReferenceChunk[]
+    allChunks: ReferenceChunk[],
+    wikiArticles?: WikiArticleContext[]
   ): AsyncGenerator<StreamChunk> {
     const mode = this.resolveGroundingMode(context);
 
@@ -526,7 +541,12 @@ export class ChatAgent {
     yield { type: "status", status: "thinking", message: "Formulating answer..." };
 
     let structuredResponse: ChatResponse = await withTimeout(
-      this.llmWrapper.generateStructuredResponse(allChunks, userMessage, recentTurns),
+      this.llmWrapper.generateStructuredResponse(
+        allChunks,
+        userMessage,
+        recentTurns,
+        wikiArticles
+      ),
       RESPONSE_GENERATION_TIMEOUT_MS,
       "response_generation"
     );
@@ -566,7 +586,12 @@ export class ChatAgent {
         } else {
           console.warn("[ChatAgent] Grounding failed — retrying with strict grounding");
           structuredResponse = await withTimeout(
-            this.llmWrapper.generateWithStrictGrounding(allChunks, userMessage, recentTurns),
+            this.llmWrapper.generateWithStrictGrounding(
+              allChunks,
+              userMessage,
+              recentTurns,
+              wikiArticles
+            ),
             RESPONSE_GENERATION_TIMEOUT_MS,
             "strict_grounding_retry"
           );

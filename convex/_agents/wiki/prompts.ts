@@ -38,7 +38,7 @@ export const WikiArticleGenerationSchema = z.object({
   content: z
     .string()
     .describe(
-      "Markdown body only (no YAML). Headings: ## Key Points (≤3 bullets), ## Details (≤2 tight paragraphs), ## Related Concepts ([[name]]), ## Sources (bullets). ≤450 words; use ' not \" in prose."
+      "Markdown body only (no YAML). Natural structure: lead with definition, use headers only when warranted. Link related concepts as [[Name]]. ≤600 words for high-importance, ≤150 for low. Use ' not \" in prose."
     ),
 });
 
@@ -92,8 +92,18 @@ export const CONCEPT_EXTRACTION_SYSTEM_PROMPT =
   "Extract distinct, lookup-worthy concepts from the chunk. Be specific; omit fluff. Output JSON only per schema.";
 
 /** System prompt for article generation phase */
-export const ARTICLE_GENERATION_SYSTEM_PROMPT =
-  "Write dense, neutral wiki prose. Output JSON only per schema; content is markdown body without YAML.";
+export const ARTICLE_GENERATION_SYSTEM_PROMPT = `You are compiling a personal knowledge base wiki. Write articles like a brilliant colleague would write internal documentation — clear, direct, substantive.
+
+Guidelines:
+- Lead with a 1–2 sentence definition or summary
+- Use headers naturally, only when the content warrants them
+- Include concrete examples, numbers, or formulas when present in sources
+- Link related concepts using [[Concept Name]] syntax
+- Cite sources inline as [doc-id] not in a separate section
+- Length should match importance: minor concept = 100 words, central concept = 600 words
+- No boilerplate sections — if there's nothing to say under a heading, omit it entirely
+
+Output JSON only per schema; content is markdown body without YAML.`;
 
 /** System prompt for connection detection phase */
 export const CONNECTION_DETECTION_SYSTEM_PROMPT =
@@ -151,7 +161,7 @@ ${existingArticles ? `Other articles (cross-link where real):\n${existingArticle
 Return JSON with:
 - summary: one index line (≤120 chars)
 - relatedConcepts: names only (0–8), no paths
-- content: markdown body only — ## Key Points (≤3 bullets), ## Details (≤2 short paragraphs), ## Related Concepts (≥2 [[wikilinks]]), ## Sources (bullets). ≤450 words. No YAML. Use apostrophes, not double quotes, in prose.`;
+- content: markdown body — lead with a 1–2 sentence definition. Use headers naturally (only when content warrants). Include [[wikilinks]] to related concepts inline. Embed examples, numbers, formulas from sources. ${concept.importance === "high" ? "Up to 600 words" : concept.importance === "low" ? "Up to 150 words" : "Up to 350 words"}. No YAML. Use apostrophes, not double quotes, in prose.`;
 };
 
 /**

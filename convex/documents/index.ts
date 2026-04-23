@@ -751,6 +751,23 @@ export const getDocumentDetails = internalQuery({
 });
 
 /**
+ * Internal: Get document timestamps for stale-check comparisons.
+ */
+export const getDocumentTimestamps = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId);
+    if (!doc) return null;
+    return {
+      updatedAt: doc.updatedAt ?? undefined,
+      _creationTime: doc._creationTime,
+    };
+  },
+});
+
+/**
  * Internal: Get document titles by IDs (for chat reference tooltips)
  */
 export const getDocumentsByIds = internalQuery({

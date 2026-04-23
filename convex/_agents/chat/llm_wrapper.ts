@@ -24,6 +24,7 @@ import {
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
 } from "./chat_retrieval_subqueries.js";
+import type { WikiArticleContext } from "../ChatAgent.js";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
 export { ChatResponseSchema } from "./chat_llm_types.js";
@@ -245,10 +246,17 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
   async generateWithStrictGrounding(
     chunks: ReferenceChunk[],
     userMessage: string,
-    conversationHistory: Array<{ role: string; content: string }> = []
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    wikiArticles?: WikiArticleContext[]
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Retrying with strict grounding");
-    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, true);
+    return this._generateStructuredResponse(
+      chunks,
+      userMessage,
+      conversationHistory,
+      true,
+      wikiArticles
+    );
   }
 
   /**
@@ -257,21 +265,30 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
    * @param chunks - Reference chunks to use as context
    * @param userMessage - The user's question
    * @param conversationHistory - Previous conversation turns for context
+   * @param wikiArticles - Optional pre-compiled wiki articles for enriched context
    * @returns Structured chat response with citations
    */
   async generateStructuredResponse(
     chunks: ReferenceChunk[],
     userMessage: string,
-    conversationHistory: Array<{ role: string; content: string }> = []
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    wikiArticles?: WikiArticleContext[]
   ): Promise<ChatResponse> {
-    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, false);
+    return this._generateStructuredResponse(
+      chunks,
+      userMessage,
+      conversationHistory,
+      false,
+      wikiArticles
+    );
   }
 
   private async _generateStructuredResponse(
     chunks: ReferenceChunk[],
     userMessage: string,
     conversationHistory: Array<{ role: string; content: string }>,
-    strictGrounding: boolean
+    strictGrounding: boolean,
+    wikiArticles?: WikiArticleContext[]
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Generating structured response with citations");
 
@@ -289,7 +306,12 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       name: "chat_response",
     });
 
-    const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
+    const groundedPrompt = buildGroundingPrompt(
+      chunks,
+      userMessage,
+      conversationHistory,
+      wikiArticles
+    );
 
     console.log(
       "[ChatLLMWrapper] Full grounded prompt (first 2000 chars):",
