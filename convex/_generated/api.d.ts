@@ -217,6 +217,8 @@ import type * as chat_index from "../chat/index.js";
 import type * as chat_messages from "../chat/messages.js";
 import type * as chat_sourceSuggestions from "../chat/sourceSuggestions.js";
 import type * as chat_stream from "../chat/stream.js";
+import type * as chat_voiceTranscription from "../chat/voiceTranscription.js";
+import type * as chat_voiceTranscriptionAccess from "../chat/voiceTranscriptionAccess.js";
 import type * as documents_embeddingJob from "../documents/embeddingJob.js";
 import type * as documents_embeddings from "../documents/embeddings.js";
 import type * as documents_index from "../documents/index.js";
@@ -498,6 +500,8 @@ declare const fullApi: ApiFromModules<{
   "chat/messages": typeof chat_messages;
   "chat/sourceSuggestions": typeof chat_sourceSuggestions;
   "chat/stream": typeof chat_stream;
+  "chat/voiceTranscription": typeof chat_voiceTranscription;
+  "chat/voiceTranscriptionAccess": typeof chat_voiceTranscriptionAccess;
   "documents/embeddingJob": typeof documents_embeddingJob;
   "documents/embeddings": typeof documents_embeddings;
   "documents/index": typeof documents_index;

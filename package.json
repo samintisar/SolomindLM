@@ -29,7 +29,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "bun run test:web && bun run test:convex",
+    "test:watch": "bun run --cwd apps/web test:watch",
+    "test:web": "bun run --cwd apps/web test",
+    "test:web:watch": "bun run --cwd apps/web test:watch",
+    "test:web:coverage": "bun run --cwd apps/web test:coverage",
+    "test:convex": "cd convex && bun run test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2, Mic } from "lucide-react";
+import type { Id } from "@convex/_generated/dataModel";
+import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 
 interface ChatInputProps {
   value: string;
@@ -7,6 +9,8 @@ interface ChatInputProps {
   onSend: () => void;
   disabled?: boolean;
   notebookId?: string | null;
+  onAppendTranscription?: (text: string) => void;
+  onVoiceError?: (message: string) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -15,8 +19,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
   disabled,
   notebookId,
+  onAppendTranscription,
+  onVoiceError,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const voice = useChatVoiceTranscription({
+    notebookId: (notebookId ?? null) as Id<"notebooks"> | null,
+    disabled: Boolean(disabled) || !onAppendTranscription,
+    onTranscribed: (text) => {
+      onAppendTranscription?.(text);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+    onError: (message) => onVoiceError?.(message) ?? console.error(message),
+  });
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -48,7 +64,47 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         onKeyDown={handleKeyDown}
         disabled={disabled}
       />
-      <div className="flex justify-end items-center px-1.5 pb-0.5">
+      <div className="flex justify-between items-center gap-2 px-1.5 pb-0.5 w-full">
+        {onAppendTranscription ? (
+          <div className="flex items-center gap-1.5 min-h-10">
+            {voice.voiceState === "recording" && (
+              <span
+                className="text-xs tabular-nums text-muted-foreground font-medium min-w-[2.5rem]"
+                aria-live="polite"
+              >
+                {voice.formatElapsed}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => void voice.toggleRecording()}
+              disabled={Boolean(disabled) || !notebookId || voice.voiceState === "transcribing"}
+              className={`shrink-0 w-10 h-10 rounded-full border-2 border-border bg-background flex items-center justify-center hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                voice.voiceState === "recording" ? "ring-2 ring-destructive/40" : ""
+              }`}
+              title={
+                voice.voiceState === "recording"
+                  ? "Stop and transcribe"
+                  : voice.voiceState === "transcribing"
+                    ? "Transcribing…"
+                    : "Dictate (microphone)"
+              }
+              aria-pressed={voice.voiceState === "recording" ? "true" : "false"}
+            >
+              {voice.voiceState === "transcribing" ? (
+                <Loader2 className="w-4 h-4 animate-spin text-foreground" />
+              ) : (
+                <Mic
+                  className={
+                    voice.voiceState === "recording" ? "w-4 h-4 text-destructive" : "w-4 h-4"
+                  }
+                />
+              )}
+            </button>
+          </div>
+        ) : (
+          <span className="min-w-0" />
+        )}
         <button
           onClick={onSend}
           disabled={!value.trim() || disabled || !notebookId}

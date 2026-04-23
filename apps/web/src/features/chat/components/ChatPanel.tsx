@@ -455,6 +455,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             onSend={handleSendMessage}
             disabled={chatInputDisabled}
             notebookId={notebookId}
+            onAppendTranscription={(text) => {
+              setInputMessage((prev) => {
+                const t = text.trim();
+                if (!t) {
+                  return prev;
+                }
+                if (!prev.trim()) {
+                  return t;
+                }
+                return `${prev} ${t}`;
+              });
+            }}
+            onVoiceError={toastError}
           />
         </div>
       </div>
