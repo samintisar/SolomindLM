@@ -323,46 +323,6 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_type", ["type"]),
 
-  // Wikis - Knowledge base compilation from notebook sources
-  wikis: defineTable({
-    userId: v.id("users"),
-    notebookId: v.id("notebooks"),
-    title: v.string(), // "Knowledge Base"
-    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
-    generatedAt: v.number(),
-    lastRefreshedAt: v.optional(v.number()),
-    metadata: v.optional(v.any()), // article counts, stats
-    error: v.optional(v.string()), // Error message if failed
-    /** Incremented on each refresh/cancel so in-flight jobs can detect stale runs */
-    generationRunId: v.optional(v.number()),
-  })
-    .index("by_notebook", ["notebookId"])
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
-
-  // Wiki articles - Individual concept/connection/qa articles
-  wikiArticles: defineTable({
-    wikiId: v.id("wikis"),
-    path: v.string(), // "concepts/entities", "connections/relationships", "index", "log", etc.
-    type: v.union(
-      v.literal("concept"),
-      v.literal("connection"),
-      v.literal("qa"),
-      v.literal("index"),
-      v.literal("log")
-    ),
-    title: v.string(),
-    content: v.string(), // Markdown content
-    sources: v.array(v.id("documents")), // Which source documents this came from
-    frontmatter: v.optional(v.any()), // YAML frontmatter data (slug, summary, related concepts, etc.)
-    wordCount: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_wiki", ["wikiId"])
-    .index("by_path", ["wikiId", "path"])
-    .index("by_type", ["wikiId", "type"]),
-
   // Stripe
   stripeSubscriptions: defineTable({
     userId: v.id("users"),

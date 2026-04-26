@@ -17,8 +17,6 @@ interface SourcesPanelHeaderProps {
   onRenameChange: (value: string) => void;
   onRenameSubmit: (id: string, newTitle: string) => void;
   onResizeStart: (e: React.MouseEvent) => void;
-  /** False for wiki articles (read-only title). */
-  allowRename?: boolean;
 }
 
 export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
@@ -36,7 +34,6 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
   onRenameChange,
   onRenameSubmit,
   onResizeStart,
-  allowRename = true,
 }) => {
   return (
     <>
@@ -59,11 +56,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 <ChevronLeft className="w-5 h-5 shrink-0" />
               </button>
               <div className="min-w-0 flex-1 overflow-hidden">
-                {!allowRename ? (
-                  <span className="font-display font-bold text-sm tracking-wide truncate text-foreground">
-                    {viewingSource.title}
-                  </span>
-                ) : isRenaming ? (
+                {isRenaming ? (
                   <input
                     type="text"
                     value={renameValue}
@@ -171,11 +164,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 <ChevronLeft className="w-5 h-5 shrink-0" />
               </button>
               <div className="min-w-0 flex-1 overflow-hidden">
-                {!allowRename ? (
-                  <span className="font-display font-bold text-sm tracking-wide truncate text-left min-w-0 flex-1 text-sidebar-foreground">
-                    {viewingSource.title}
-                  </span>
-                ) : isRenaming ? (
+                {isRenaming ? (
                   <input
                     type="text"
                     value={renameValue}

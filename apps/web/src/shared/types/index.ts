@@ -312,20 +312,6 @@ export interface SpreadsheetNote extends BaseNote {
   } & StudioGenerationMetadata;
 }
 
-// Wiki note - LLM-generated knowledge base with interconnected pages
-export interface WikiNote extends BaseNote {
-  type: "wiki";
-  content: string; // Main content (index page)
-  metadata: {
-    totalPages: number;
-    lastUpdated: number;
-    documentIds: string[];
-    wikiType: "knowledge_base" | "research_summary" | "course_companion";
-    error?: string;
-    customPrompt?: string;
-  } & StudioGenerationMetadata;
-}
-
 // User note - saved chat conversations or manual notes
 export interface UserNote extends BaseNote {
   type: "note";
@@ -352,7 +338,6 @@ export type Note =
   | WrittenQuestionsNote
   | SlideDeckNote
   | SpreadsheetNote
-  | WikiNote
   | UserNote;
 
 // Type guard functions for checking note types at runtime
@@ -394,10 +379,6 @@ export function isSlideDeckNote(note: Note): note is SlideDeckNote {
 
 export function isSpreadsheetNote(note: Note): note is SpreadsheetNote {
   return note.type === "spreadsheet";
-}
-
-export function isWikiNote(note: Note): note is WikiNote {
-  return note.type === "wiki";
 }
 
 export function isUserNote(note: Note): note is UserNote {
