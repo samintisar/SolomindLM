@@ -4,21 +4,21 @@ import { spawnSync } from "child_process";
 /** Repo root: run E2E from the project root (`bunx playwright test`). */
 const repoRoot = process.cwd();
 
-if (!process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD) {
-  throw new Error(
-    "E2E_TEST_EMAIL and E2E_TEST_PASSWORD environment variables are required. " +
-      "Set them before running tests: E2E_TEST_EMAIL=you@example.com E2E_TEST_PASSWORD=yourpass bunx playwright test"
-  );
-}
-
-const TEST_EMAIL = process.env.E2E_TEST_EMAIL!;
-const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD!;
-
 /**
  * Global setup: authenticate once and save storage state.
  * All workers reuse this auth state instead of logging in per test.
  */
 async function globalSetup(config: FullConfig) {
+  if (!process.env.E2E_TEST_EMAIL?.trim() || !process.env.E2E_TEST_PASSWORD) {
+    throw new Error(
+      "E2E_TEST_EMAIL and E2E_TEST_PASSWORD environment variables are required. " +
+        "Set them before running tests: E2E_TEST_EMAIL=you@example.com E2E_TEST_PASSWORD=yourpass bunx playwright test"
+    );
+  }
+
+  const TEST_EMAIL = process.env.E2E_TEST_EMAIL!;
+  const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD!;
+
   const { baseURL } = config.projects[0].use;
   const browser = await chromium.launch();
   const context = await browser.newContext({ baseURL });

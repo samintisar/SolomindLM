@@ -23,6 +23,7 @@ if (existsSync(envPath)) {
  * These tests require:
  *   1. A running web dev server (bun run dev:web)
  *   2. A running Convex dev backend (bun x convex dev)
+ *   3. E2E_TEST_EMAIL / E2E_TEST_PASSWORD (GitHub Actions: repository secrets)
  *
  * Run locally:
  *   bunx playwright test
@@ -30,6 +31,12 @@ if (existsSync(envPath)) {
  * Run with UI:
  *   bunx playwright test --ui
  */
+const hasE2ECreds = Boolean(
+  process.env.E2E_TEST_EMAIL?.trim() && process.env.E2E_TEST_PASSWORD?.trim()
+);
+/** In CI, skip E2E when repo secrets are missing (0 tests, exit 0). Add E2E_TEST_* secrets to run for real. */
+const skipE2EInCI = process.env.CI === "true" && !hasE2ECreds;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -39,14 +46,16 @@ export default defineConfig({
   reporter: process.env.CI ? "html" : "line",
   timeout: 30_000,
   expect: { timeout: 5_000 },
+  // CI without secrets: ignore all spec files
+  testIgnore: skipE2EInCI ? "**/*.ts" : undefined,
 
-  globalSetup: "./e2e/global-setup.ts",
+  globalSetup: skipE2EInCI ? undefined : "./e2e/global-setup.ts",
 
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:5173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    storageState: ".auth/storageState.json",
+    ...(!skipE2EInCI ? { storageState: ".auth/storageState.json" as const } : {}),
   },
 
   projects: [

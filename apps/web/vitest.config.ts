@@ -8,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    // Monorepo / Linux CI: avoid a second React copy (useState on null in context tests)
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
       // Runtime .ts so Vitest can resolve `export { api }` (d.ts has no JS exports)
