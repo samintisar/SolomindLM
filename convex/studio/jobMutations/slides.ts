@@ -146,7 +146,7 @@ export const clearSlideDeckMapData = internalMutation({
     const slideDeck = await ctx.db.get(args.slideDeckId);
     if (!slideDeck) return null;
 
-    const { mapResults, ...restMetadata } = slideDeck.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = slideDeck.metadata || {};
     await ctx.db.patch(args.slideDeckId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

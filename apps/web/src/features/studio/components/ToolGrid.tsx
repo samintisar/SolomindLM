@@ -36,7 +36,7 @@ const IconMap: Record<string, React.FC<any>> = {
  */
 export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, width, activeToolId }) => {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="studio-tool-grid">
       <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 font-display">
         Create
       </h3>
@@ -47,6 +47,7 @@ export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, width, a
           return (
             <div
               key={tool.id}
+              aria-label={tool.label}
               onClick={() => onToolClick(tool.id)}
               className={`group flex flex-col justify-between p-3 h-24 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer ${
                 isActive ? "ring-2 ring-primary/40 border-primary/45 shadow-md" : ""

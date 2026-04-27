@@ -42,7 +42,6 @@ export function validateInput(state: OverallStateType): Partial<OverallStateType
   if (errors.length > 0) {
     console.error("[ReportGraph] Validation failed:", errors);
     return {
-      ...state,
       status: "error",
       finalOutput: `# Validation Error\n\n${errors.map((e) => `- ${e}`).join("\n")}\n\nPlease fix these issues and try again.`,
     };

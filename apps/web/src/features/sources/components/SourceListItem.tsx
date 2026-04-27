@@ -11,6 +11,7 @@ import {
   Edit2,
   Trash2,
   RefreshCw,
+  GraduationCap,
 } from "lucide-react";
 import { Source } from "@/shared/types";
 
@@ -58,9 +59,26 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
 
   const getIcon = () => {
     if (source.type === "WEB") return <Globe className="w-5 h-5" />;
+    if (source.type === "PAPER") return <GraduationCap className="w-5 h-5" />;
     if (source.type === "IMG") return <File className="w-5 h-5" />;
     return <FileText className="w-5 h-5" />;
   };
+
+  /** Short subtitle for papers — sentence case, no badge (see meta row below title). */
+  const paperMetaHint = (): string | null => {
+    if (source.type !== "PAPER" || !source.paper) return null;
+    if (status === "processing" || source.paper.ingestionStatus === "pending") return null;
+    if (status === "failed" || source.paper.ingestionStatus === "failed") return null;
+    if (source.paper.ingestionStatus === "metadata_only") {
+      return source.paper.fulltextStatus === "external_only" ? "External" : "Abstract";
+    }
+    if (source.paper.ingestionStatus === "ingested") {
+      return source.paper.fulltextStatus === "available" ? "Full text" : "Indexed";
+    }
+    return null;
+  };
+
+  const paperHint = paperMetaHint();
 
   return (
     <div
@@ -102,8 +120,18 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
               </div>
             )}
           </div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide font-sans">
-            {source.type} • {source.date}
+          <p
+            className="text-xs text-muted-foreground font-sans leading-snug truncate"
+            title={paperHint ?? undefined}
+          >
+            <span className="uppercase tracking-wide">{source.type}</span>
+            <span> • {source.date}</span>
+            {paperHint && status === "completed" && (
+              <span className="font-normal normal-case tracking-normal text-muted-foreground/85">
+                {" "}
+                · {paperHint}
+              </span>
+            )}
           </p>
         </div>
         {!isRenaming && (
@@ -153,7 +181,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                           onRefreshSource(source.id);
                           onMenuOpen("");
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary border-b border-border transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
                       >
                         <RefreshCw className="w-4 h-4" />
                         Refresh
@@ -165,7 +193,7 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
                         e.stopPropagation();
                         onStartRename(source.id);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary border-b border-border transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
                       Rename

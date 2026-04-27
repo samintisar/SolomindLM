@@ -11,7 +11,7 @@ import { AudioTranscriptionService } from "../_services/extraction/AudioTranscri
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 
 /** Per-user, per-hour rate limit on voice transcription calls. */
-const MAX_VOICE_TRANSCRIPTIONS_PER_HOUR = 20;
+const _MAX_VOICE_TRANSCRIPTIONS_PER_HOUR = 20;
 
 /**
  * Transcribe an ephemeral audio clip in Convex storage (uploaded for this flow only)

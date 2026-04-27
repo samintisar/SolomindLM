@@ -12,7 +12,6 @@ import { env } from "../../_lib/env";
 import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { z } from "zod";
 import {
   getCandidateMapPrompt,
   getCandidateMapRecoveryPrompt,
@@ -22,13 +21,11 @@ import {
   applySelectedCandidateIndices,
   QuizCandidateArraySchema,
   QuizCandidateIndexSelectionSchema,
-  QuizQuestionArraySchema,
   QuizQuestionSchema,
   type QuizCandidate,
   type QuizCandidateIndexSelection,
   type QuizCandidateResponse,
   type QuizQuestion,
-  type QuizQuestionResponse,
   MAP_CANDIDATES_SYSTEM_PROMPT,
   REDUCE_SELECT_SYSTEM_PROMPT,
   EXPAND_QUESTION_SYSTEM_PROMPT,
@@ -617,7 +614,7 @@ export async function runFinalizeQuizPhase(
     const allCandidates: QuizCandidate[] = [];
     const failedCount = { count: 0 };
 
-    for (const [idx, resultJson] of Object.entries(mapResults)) {
+    for (const [_idx, resultJson] of Object.entries(mapResults)) {
       try {
         const parsed = JSON.parse(resultJson);
         if (parsed._error) {
@@ -802,7 +799,7 @@ export async function runFinalizeQuizPhase(
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
         chunk: titleContent,
       });
-    } catch (e) {
+    } catch (_e) {
       console.log("[QuizJob] Title generation failed, using default");
     }
 

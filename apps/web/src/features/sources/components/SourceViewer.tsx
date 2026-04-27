@@ -19,8 +19,6 @@ interface SourceViewerProps {
   pdfStorageId?: string | null;
   isLoading: boolean;
   error: string | undefined;
-  /** Wiki (and similar) viewers are not chat sources — hide the include/exclude control. */
-  hideInclusionToggle?: boolean;
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -30,7 +28,6 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   pdfStorageId,
   isLoading,
   error,
-  hideInclusionToggle,
 }) => {
   const isPdfSource = source.type === "PDF";
   const canShowPdf = isPdfSource && pdfStorageId;
@@ -59,29 +56,25 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
       <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50">
         <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm">
-          {hideInclusionToggle ? `Wiki • ${source.type}` : `${source.type} • ${source.date}`}
+          {source.type} • {source.date}
         </span>
 
-        {hideInclusionToggle ? (
-          <span className="text-xs text-muted-foreground">Notebook wiki</span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onToggle(source.id)}
-            className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer select-none"
-            aria-pressed={source.selected}
-            aria-label={
-              source.selected ? "Included (click to exclude)" : "Excluded (click to include)"
-            }
-          >
-            {source.selected ? (
-              <CheckSquare className="w-4 h-4 shrink-0" aria-hidden />
-            ) : (
-              <Square className="w-4 h-4 shrink-0 opacity-60" aria-hidden />
-            )}
-            <span>Included</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => onToggle(source.id)}
+          className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer select-none"
+          aria-pressed={source.selected}
+          aria-label={
+            source.selected ? "Included (click to exclude)" : "Excluded (click to include)"
+          }
+        >
+          {source.selected ? (
+            <CheckSquare className="w-4 h-4 shrink-0" aria-hidden />
+          ) : (
+            <Square className="w-4 h-4 shrink-0 opacity-60" aria-hidden />
+          )}
+          <span>Included</span>
+        </button>
       </div>
 
       {/* Error State */}

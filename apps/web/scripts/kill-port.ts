@@ -93,7 +93,7 @@ async function killProcess(pid: string): Promise<boolean> {
       await killProc.exited;
     }
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

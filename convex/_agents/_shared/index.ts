@@ -156,6 +156,14 @@ export {
   type CleanupResult,
 } from "./state_cleanup.js";
 
+// LangGraph partial-update helpers (avoid duplicating concat reducer fields)
+export {
+  withoutMapOutputs,
+  withoutExtractedConcepts,
+  withoutResearchEvidence,
+  mapOutputsMergeReducer,
+} from "./stateUpdateHelpers.js";
+
 // LangSmith tracing utilities
 export { createLangSmithRunConfig, type LangSmithRunConfig } from "./langsmith.js";
 

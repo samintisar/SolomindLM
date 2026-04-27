@@ -15,7 +15,7 @@ type AuthStep =
   | { kind: "resetVerification"; email: string };
 
 const inputClass =
-  "w-full px-3 py-2.5 rounded-lg text-sm text-stone-900 placeholder:text-stone-400 bg-[#F5F0E8] border border-stone-300/70 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 font-sans shadow-none";
+  "w-full px-3 py-2.5 rounded-lg text-sm text-foreground placeholder:text-muted-foreground bg-vintage-amber-50 border border-border/70 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 font-sans shadow-none";
 
 interface AuthFormPanelProps {
   authError?: string;
@@ -139,14 +139,14 @@ export function AuthFormPanel({
     "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition hover:opacity-95 disabled:pointer-events-none disabled:opacity-50";
 
   const btnOutline =
-    "inline-flex w-full items-center justify-center gap-3 rounded-xl border-2 border-stone-300 bg-[#F0EBE3] px-4 py-3 text-sm font-medium text-stone-800 transition hover:bg-[#E8E2D8] disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex w-full items-center justify-center gap-3 rounded-xl border-2 border-border bg-vintage-amber-100 px-4 py-3 text-sm font-medium text-vintage-amber-700 transition hover:bg-vintage-amber-200 disabled:pointer-events-none disabled:opacity-50";
 
   return (
     <div
-      className={`rounded-2xl border border-stone-200/90 bg-white/90 p-6 shadow-lg shadow-stone-200/40 backdrop-blur-sm sm:p-8${className ? ` ${className}` : ""}`}
+      className={`rounded-2xl border border-border/90 bg-card/90 p-6 shadow-lg shadow-primary/5 backdrop-blur-sm sm:p-8${className ? ` ${className}` : ""}`}
     >
       <div className="mb-6 text-center">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+        <h2 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
           {modalTitle}
         </h2>
       </div>
@@ -196,10 +196,10 @@ export function AuthFormPanel({
 
             <div className="relative py-0.5">
               <div className="absolute inset-0 flex items-center" aria-hidden>
-                <span className="w-full border-t border-stone-200" />
+                <span className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-white px-3 font-sans text-sm font-medium tracking-wide text-stone-500">
+                <span className="bg-card px-3 font-sans text-sm font-medium tracking-wide text-muted-foreground">
                   Or continue with email
                 </span>
               </div>
@@ -225,7 +225,7 @@ export function AuthFormPanel({
                 />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-stone-500 transition hover:bg-stone-200/60 hover:text-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                   onClick={() => setShowAuthPassword((v) => !v)}
                   aria-label={showAuthPassword ? "Hide password" : "Show password"}
                 >
@@ -266,7 +266,7 @@ export function AuthFormPanel({
                   </button>
                   <button
                     type="button"
-                    className="text-stone-600 underline-offset-2 hover:text-stone-800 hover:underline"
+                    className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                     onClick={() => {
                       setError("");
                       setStep("forgot");
@@ -293,9 +293,9 @@ export function AuthFormPanel({
 
         {typeof step === "object" && step.kind === "emailVerification" ? (
           <>
-            <p className="text-sm leading-relaxed text-stone-600 font-sans">
+            <p className="text-sm leading-relaxed text-muted-foreground font-sans">
               We sent an 8-digit code to{" "}
-              <span className="font-medium text-stone-900">{step.email}</span>. Enter it below to
+              <span className="font-medium text-foreground">{step.email}</span>. Enter it below to
               continue.
             </p>
             <form className="space-y-3" onSubmit={handleEmailVerificationSubmit}>
@@ -336,7 +336,7 @@ export function AuthFormPanel({
 
         {step === "forgot" ? (
           <>
-            <p className="text-sm leading-relaxed text-stone-600 font-sans">
+            <p className="text-sm leading-relaxed text-muted-foreground font-sans">
               Enter your email and we will send you a code to reset your password.
             </p>
             <form className="space-y-3" onSubmit={handleForgotSubmit}>
@@ -375,9 +375,9 @@ export function AuthFormPanel({
 
         {typeof step === "object" && step.kind === "resetVerification" ? (
           <>
-            <p className="text-sm leading-relaxed text-stone-600 font-sans">
+            <p className="text-sm leading-relaxed text-muted-foreground font-sans">
               Enter the code we sent to{" "}
-              <span className="font-medium text-stone-900">{step.email}</span> and choose a new
+              <span className="font-medium text-foreground">{step.email}</span> and choose a new
               password.
             </p>
             <form className="space-y-3" onSubmit={handleResetVerificationSubmit}>
@@ -402,7 +402,7 @@ export function AuthFormPanel({
                 />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-stone-500 transition hover:bg-stone-200/60 hover:text-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                   onClick={() => setShowNewPassword((v) => !v)}
                   aria-label={showNewPassword ? "Hide new password" : "Show new password"}
                 >
@@ -438,19 +438,19 @@ export function AuthFormPanel({
         ) : null}
 
         {step === "signIn" || step === "signUp" ? (
-          <div className="border-t border-stone-200 pt-5 text-center">
-            <p className="text-sm text-stone-500 font-sans">
+          <div className="border-t border-border pt-5 text-center">
+            <p className="text-sm text-muted-foreground font-sans">
               By signing in, you agree to our{" "}
               <Link
                 to="/terms"
-                className="text-stone-700 underline-offset-2 hover:text-stone-900 hover:underline"
+                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               >
                 Terms of Service
               </Link>{" "}
               and{" "}
               <Link
                 to="/privacy"
-                className="text-stone-700 underline-offset-2 hover:text-stone-900 hover:underline"
+                className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               >
                 Privacy Policy
               </Link>

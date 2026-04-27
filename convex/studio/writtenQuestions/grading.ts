@@ -2,7 +2,7 @@
 
 import { v } from "convex/values";
 import { action } from "../../_generated/server";
-import { internal, api } from "../../_generated/api";
+import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
 import {
   WrittenQuestionsGradingService,
@@ -25,21 +25,16 @@ export const submitAndGrade = action({
 
     const { writtenQuestionsId, questionId, answer } = args;
 
-    // Get the written question set first to verify ownership and get the question
-    const writtenQuestion = await ctx.runQuery(api.studio.writtenQuestions.index.get, {
-      id: writtenQuestionsId,
-    });
+    const writtenQuestion = await ctx.runQuery(
+      internal.studio.writtenQuestions.index.getWrittenQuestionForUserInternal,
+      {
+        id: writtenQuestionsId,
+        userId,
+      }
+    );
 
     if (!writtenQuestion) {
       throw new Error("Written question set not found");
-    }
-
-    const canEdit = await ctx.runQuery(internal.notebooks.index.canEditNotebookInternal, {
-      notebookId: writtenQuestion.notebookId,
-      userId,
-    });
-    if (!canEdit) {
-      throw new Error("Access denied");
     }
 
     // Find the specific question

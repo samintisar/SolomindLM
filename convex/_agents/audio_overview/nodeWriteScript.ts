@@ -7,6 +7,7 @@ import {
   invokeWithRetry,
   sanitizeUserInput,
   createLangSmithRunConfig,
+  withoutMapOutputs,
 } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 import type { OverallStateType, DialogueLine } from "./state.js";
@@ -71,7 +72,7 @@ export async function writeScript(
         DIALOGUE_CHUNK_SIZE,
         targetLines - chunkIndex * DIALOGUE_CHUNK_SIZE
       );
-      const estimatedWordsThisChunk = linesThisChunk * ESTIMATED_WORDS_PER_LINE;
+      const _estimatedWordsThisChunk = linesThisChunk * ESTIMATED_WORDS_PER_LINE;
 
       // Build covered examples prompt for anti-repetition
       let coveredTopicsPrompt = "";
@@ -228,7 +229,7 @@ ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
             const extracted = JSON.parse(extractionText.substring(exJsonStart, exJsonEnd + 1));
             (extracted || []).forEach((e: string) => coveredExamples.add(e.trim()));
           }
-        } catch (extractionError) {
+        } catch (_extractionError) {
           // Silently fail - example extraction is optional
         }
       } catch (parseError) {
@@ -299,7 +300,7 @@ ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
   }
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     dialogueScript: fullDialogueScript,
     status: "synthesizing",
     progress: {

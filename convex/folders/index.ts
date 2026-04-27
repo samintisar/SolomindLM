@@ -3,6 +3,7 @@ import { mutation, query } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { getAuthUserId } from "../auth";
 import * as Folders from "../_model/folders";
+import { MAX_DOCS_TO_COUNT } from "../_lib/queryCaps";
 
 /** Shape folder + notebook count for API response */
 function toFolderDTO(
@@ -81,10 +82,12 @@ export const getNotebooks = query({
     // Get source counts for each notebook
     const notebooksWithCounts = await Promise.all(
       notebooks.map(async (notebook) => {
-        const documents = await ctx.db
+        const docBatch = await ctx.db
           .query("documents")
           .withIndex("by_notebook", (q) => q.eq("notebookId", notebook._id))
-          .collect();
+          .take(MAX_DOCS_TO_COUNT + 1);
+        const sourceCount =
+          docBatch.length > MAX_DOCS_TO_COUNT ? MAX_DOCS_TO_COUNT : docBatch.length;
 
         return {
           id: notebook._id,
@@ -94,7 +97,7 @@ export const getNotebooks = query({
             day: "numeric",
             year: "numeric",
           }),
-          sourceCount: documents.length,
+          sourceCount,
           coverColor: notebook.coverColor ?? "bg-yellow-500",
           icon: notebook.icon ?? "Folder",
           isFeatured: notebook.isFeatured ?? false,

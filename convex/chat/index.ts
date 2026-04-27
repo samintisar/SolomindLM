@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { getNotebookAccess } from "../_lib/notebookAccess";
+import {
+  assertCanReadConversation,
+  assertCanEditConversation,
+} from "../_lib/conversationAccess";
+import * as ConvModel from "../_model/conversations";
 
 /**
  * Get or create a conversation for a notebook
@@ -9,25 +15,29 @@ export const ensureConversation = internalMutation({
   args: {
     notebookId: v.id("notebooks"),
     userId: v.id("users"),
+    conversationId: v.optional(v.id("conversations")),
   },
   handler: async (ctx, args) => {
-    // Look for existing conversation
-    const existing = await ctx.db
-      .query("conversations")
-      .withIndex("by_user_notebook", (q) =>
-        q.eq("userId", args.userId).eq("notebookId", args.notebookId)
-      )
-      .first();
-
-    if (existing) {
-      // Update timestamp
-      await ctx.db.patch(existing._id, {
-        updatedAt: Date.now(),
-      });
-      return existing._id;
+    const access = await getNotebookAccess(ctx, args.notebookId, args.userId);
+    if (!access) {
+      throw new Error("Access denied");
     }
 
-    // Create new conversation
+    if (args.conversationId) {
+      const existing = await ctx.db.get(args.conversationId);
+      if (existing && existing.notebookId === args.notebookId) {
+        await ctx.db.patch(existing._id, { updatedAt: Date.now() });
+        return existing._id;
+      }
+    }
+
+    const inNotebook = await ConvModel.listConversationsInNotebook(ctx, args.notebookId);
+    const sorted = inNotebook.sort((a, b) => b.updatedAt - a.updatedAt);
+    if (sorted[0]) {
+      await ctx.db.patch(sorted[0]._id, { updatedAt: Date.now() });
+      return sorted[0]._id;
+    }
+
     const conversationId = await ctx.db.insert("conversations", {
       userId: args.userId,
       notebookId: args.notebookId,
@@ -95,13 +105,8 @@ export const list = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const conversations = await ctx.db
-      .query("conversations")
-      .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
+    const conversations = await ConvModel.getUserConversations(ctx, userId);
 
-    // Get notebook info for each conversation
     const result = await Promise.all(
       conversations.map(async (conv) => {
         const notebook = await ctx.db.get(conv.notebookId);
@@ -132,11 +137,7 @@ export const getMessages = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return { messages: [], cursor: null, isDone: true };
 
-    // Verify user owns the conversation
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    await assertCanReadConversation(ctx, args.conversationId, userId);
 
     const messages = await ctx.db
       .query("messages")
@@ -174,6 +175,53 @@ export const getMessagesInternal = internalQuery({
       cursor: messages.continueCursor,
       isDone: messages.isDone,
     };
+  },
+});
+
+/** Recent messages for deep-research writer context (newest-first window, returned oldest-first). */
+export const getRecentConversationTurnsForResearchInternal = internalQuery({
+  args: {
+    conversationId: v.id("conversations"),
+    maxMessages: v.number(),
+  },
+  returns: v.array(
+    v.object({
+      role: v.string(),
+      content: v.string(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const cap = Math.min(48, Math.max(1, args.maxMessages));
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .order("desc")
+      .take(cap);
+    return rows
+      .reverse()
+      .map((m) => ({ role: m.role, content: m.content }));
+  },
+});
+
+/**
+ * Resolve the user message row for the current chat turn (HTTP stream runs after sendMessageOptimistic).
+ * Prefers exact content match among recent user messages, then the latest user message.
+ */
+export const getLatestUserMessageIdForPlanInternal = internalQuery({
+  args: {
+    conversationId: v.id("conversations"),
+    content: v.string(),
+  },
+  returns: v.union(v.id("messages"), v.null()),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .order("desc")
+      .take(40);
+    const userMsgs = rows.filter((m) => m.role === "user");
+    const exact = userMsgs.find((m) => m.content === args.content);
+    return (exact ?? userMsgs[0])?._id ?? null;
   },
 });
 
@@ -287,11 +335,7 @@ export const remove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    // Verify ownership
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    await assertCanEditConversation(ctx, args.conversationId, userId);
 
     // Delete all messages
     const messages = await ctx.db
@@ -319,11 +363,7 @@ export const clearMessages = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    // Verify ownership
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    await assertCanEditConversation(ctx, args.conversationId, userId);
 
     // Delete all messages
     const messages = await ctx.db

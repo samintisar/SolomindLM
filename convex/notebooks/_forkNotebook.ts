@@ -31,8 +31,9 @@ export async function performNotebookFork(
 
   const docs = await ctx.db
     .query("documents")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
-    .filter((q) => q.eq(q.field("status"), "completed"))
+    .withIndex("by_notebook_and_status", (q) =>
+      q.eq("notebookId", sourceNotebookId).eq("status", "completed")
+    )
     .collect();
 
   if (docs.length > MAX_FORK_DOCUMENTS) {

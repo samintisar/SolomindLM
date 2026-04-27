@@ -581,7 +581,7 @@ export async function runFinalizeWrittenQuestionsPhase(
     const allQuestions: WrittenQuestion[] = [];
     const failedCount = { count: 0 };
 
-    for (const [idx, resultJson] of Object.entries(mapResults)) {
+    for (const [_idx, resultJson] of Object.entries(mapResults)) {
       try {
         const parsed = JSON.parse(resultJson);
         if (parsed._error) {
@@ -708,7 +708,7 @@ export async function runFinalizeWrittenQuestionsPhase(
         title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
           chunk: titleContent,
         });
-      } catch (e) {
+      } catch (_e) {
         console.log("[WrittenQuestionsJob] Title generation failed, using default");
       }
     }

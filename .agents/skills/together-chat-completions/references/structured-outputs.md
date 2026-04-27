@@ -1,5 +1,4 @@
 # Structured Outputs Reference
-
 ## Contents
 
 - [Three Modes](#three-modes)
@@ -8,6 +7,7 @@
 - [Supported Models](#supported-models)
 - [Troubleshooting](#troubleshooting)
 - [Prompting Best Practices](#prompting-best-practices)
+
 
 ## Three Modes
 
@@ -61,7 +61,6 @@ print(json.dumps(output, indent=2))
 ```
 
 Output:
-
 ```json
 {
   "title": "Morning Routine",
@@ -84,8 +83,12 @@ const together = new Together();
 
 const voiceNoteSchema = z.object({
   title: z.string().describe("A title for the voice note"),
-  summary: z.string().describe("A short one sentence summary of the voice note."),
-  actionItems: z.array(z.string()).describe("A list of action items from the voice note"),
+  summary: z
+    .string()
+    .describe("A short one sentence summary of the voice note."),
+  actionItems: z
+    .array(z.string())
+    .describe("A list of action items from the voice note"),
 });
 const jsonSchema = z.toJSONSchema(voiceNoteSchema);
 
@@ -297,7 +300,8 @@ const completion = await together.chat.completions.create({
   messages: [
     {
       role: "system",
-      content: "Classify the sentiment of the text as positive, neutral, or negative.",
+      content:
+        "Classify the sentiment of the text as positive, neutral, or negative.",
     },
     { role: "user", content: "Wow. I loved the movie!" },
   ],
@@ -400,7 +404,8 @@ const completion = await together.chat.completions.create({
   messages: [
     {
       role: "system",
-      content: "You are a helpful math tutor. Guide the user through the solution step by step.",
+      content:
+        "You are a helpful math tutor. Guide the user through the solution step by step.",
     },
     { role: "user", content: "how can I solve 8x + 7 = -23" },
   ],
@@ -501,7 +506,6 @@ console.log(`Title: ${result.title}`);
 ## Supported Models
 
 ### Top Models (json_schema, json_object, regex)
-
 - `openai/gpt-oss-120b`
 - `openai/gpt-oss-20b`
 - `moonshotai/Kimi-K2.5`
@@ -516,7 +520,6 @@ console.log(`Title: ${result.title}`);
 - `meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8`
 
 ### Additional Supported Models
-
 - `meta-llama/Llama-3.3-70B-Instruct-Turbo`
 - `Qwen/Qwen2.5-7B-Instruct-Turbo`
 - `google/gemma-3n-E4B-it`

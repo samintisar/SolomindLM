@@ -257,7 +257,6 @@ export function createStateWithProgress<T extends { progress?: ProgressInfo }>(
   progress: Partial<ProgressInfo>
 ): Partial<T> {
   return {
-    ...state,
     progress: {
       ...state.progress,
       ...progress,

@@ -718,6 +718,53 @@
   width: 100%;
 }
 
+/*
+ * Streamdown fenced blocks: light panel + github-light Shiki (see MarkdownRenderer).
+ * Global prose `.prose pre` sets muted bg; scoped rules below keep the panel light so token colors stay legible.
+ */
+[data-streamdown="code-block"] {
+  background-color: oklch(0.985 0.012 88);
+  border-color: oklch(0.82 0.032 84);
+}
+
+[data-streamdown="code-block-header"] {
+  color: oklch(0.4 0.045 65);
+}
+
+[data-streamdown="code-block-body"] {
+  background-color: oklch(0.995 0.008 92) !important;
+  border-color: oklch(0.86 0.028 84) !important;
+}
+
+.prose [data-streamdown="code-block-body"] pre {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  background-color: var(--sdm-bg, transparent) !important;
+  color: var(--sdm-fg, inherit) !important;
+}
+
+.prose [data-streamdown="code-block-body"] pre code {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/* Keep fenced blocks light on dark app theme (paper-style) for readability */
+.dark [data-streamdown="code-block"] {
+  background-color: oklch(0.985 0.012 88);
+  border-color: oklch(0.72 0.03 84);
+}
+
+.dark [data-streamdown="code-block-header"] {
+  color: oklch(0.38 0.045 65);
+}
+
+.dark [data-streamdown="code-block-body"] {
+  background-color: oklch(0.995 0.008 92) !important;
+  border-color: oklch(0.78 0.028 84) !important;
+}
+
 /* Dark mode prose adjustments */
 .dark .prose {
   color: var(--foreground);

@@ -1,5 +1,4 @@
 # Reasoning Models Reference
-
 ## Contents
 
 - [Full Model Table](#full-model-table)
@@ -10,22 +9,22 @@
 - [Structured Outputs with Reasoning](#structured-outputs-with-reasoning)
 - [Best Practices by Model](#best-practices-by-model)
 
+
 ## Full Model Table
 
-| Model         | API String                  | Type                    | Context | Tool Calling       |
-| ------------- | --------------------------- | ----------------------- | ------- | ------------------ |
-| DeepSeek R1   | `deepseek-ai/DeepSeek-R1`   | Reasoning only          | 164K    | No                 |
-| DeepSeek V3.1 | `deepseek-ai/DeepSeek-V3.1` | Hybrid (off by default) | 164K    | Non-reasoning only |
-| GLM-5         | `zai-org/GLM-5`             | Hybrid (on by default)  | 200K    | Yes                |
-| GPT-OSS 120B  | `openai/gpt-oss-120b`       | Adjustable effort       | 128K    | No                 |
-| GPT-OSS 20B   | `openai/gpt-oss-20b`        | Adjustable effort       | 128K    | No                 |
-| Kimi K2.5     | `moonshotai/Kimi-K2.5`      | Hybrid (on by default)  | 256K    | Yes                |
-| MiniMax M2.5  | `MiniMaxAI/MiniMax-M2.5`    | Reasoning only          | 229K    | No                 |
-| Qwen3.5 397B  | `Qwen/Qwen3.5-397B-A17B`    | Hybrid (on by default)  | 128K    | No                 |
-| Qwen3.5 9B    | `Qwen/Qwen3.5-9B`           | Hybrid (on by default)  | 128K    | No                 |
+| Model | API String | Type | Context | Tool Calling |
+|-------|-----------|------|---------|--------------|
+| DeepSeek R1 | `deepseek-ai/DeepSeek-R1` | Reasoning only | 164K | No |
+| DeepSeek V3.1 | `deepseek-ai/DeepSeek-V3.1` | Hybrid (off by default) | 164K | Non-reasoning only |
+| GLM-5 | `zai-org/GLM-5` | Hybrid (on by default) | 200K | Yes |
+| GPT-OSS 120B | `openai/gpt-oss-120b` | Adjustable effort | 128K | No |
+| GPT-OSS 20B | `openai/gpt-oss-20b` | Adjustable effort | 128K | No |
+| Kimi K2.5 | `moonshotai/Kimi-K2.5` | Hybrid (on by default) | 256K | Yes |
+| MiniMax M2.5 | `MiniMaxAI/MiniMax-M2.5` | Reasoning only | 229K | No |
+| Qwen3.5 397B | `Qwen/Qwen3.5-397B-A17B` | Hybrid (on by default) | 128K | No |
+| Qwen3.5 9B | `Qwen/Qwen3.5-9B` | Hybrid (on by default) | 128K | No |
 
 **Type definitions:**
-
 - **Reasoning only**: Always produces reasoning tokens. Cannot be toggled off.
 - **Hybrid**: Supports both reasoning and non-reasoning modes via `reasoning={"enabled": True/False}`.
 - **Adjustable effort**: Supports `reasoning_effort` parameter (`"low"`, `"medium"`, `"high"`).
@@ -34,11 +33,11 @@
 
 GPT-OSS models support `reasoning_effort` to control reasoning depth:
 
-| Level      | Behavior                       | Best For                         |
-| ---------- | ------------------------------ | -------------------------------- |
-| `"low"`    | Minimal thinking, fast         | Simple factual questions         |
-| `"medium"` | Balanced (recommended default) | Most tasks                       |
-| `"high"`   | Extensive thinking, thorough   | Complex math, code, logic proofs |
+| Level | Behavior | Best For |
+|-------|----------|----------|
+| `"low"` | Minimal thinking, fast | Simple factual questions |
+| `"medium"` | Balanced (recommended default) | Most tasks |
+| `"high"` | Extensive thinking, thorough | Complex math, code, logic proofs |
 
 ### Python
 
@@ -101,7 +100,6 @@ curl -X POST "https://api.together.xyz/v1/chat/completions" \
 Hybrid models support `reasoning={"enabled": True/False}` to toggle reasoning on or off.
 
 **Models supporting this parameter:**
-
 - `deepseek-ai/DeepSeek-V3.1` (off by default)
 - `Qwen/Qwen3.5-397B-A17B` (on by default)
 - `Qwen/Qwen3.5-9B` (on by default)
@@ -292,7 +290,9 @@ import type { ChatCompletionChunk } from "together-ai/resources/chat/completions
 
 const stream = await together.chat.completions.stream({
   model: "moonshotai/Kimi-K2.5",
-  messages: [{ role: "user", content: "Which number is bigger, 9.11 or 9.9?" }],
+  messages: [
+    { role: "user", content: "Which number is bigger, 9.11 or 9.9?" },
+  ],
 } as any);
 
 for await (const chunk of stream) {
@@ -335,7 +335,6 @@ for await (const chunk of stream) {
 ```
 
 Output:
-
 ```
 <think>
 Let me compare 9.9 and 9.11...
@@ -433,7 +432,8 @@ const completion = await together.chat.completions.create({
   messages: [
     {
       role: "system",
-      content: "You are a helpful math tutor. Guide the user through the solution step by step.",
+      content:
+        "You are a helpful math tutor. Guide the user through the solution step by step.",
     },
     { role: "user", content: "how can I solve 8x + 7 = -23" },
   ],
@@ -455,7 +455,6 @@ if (completion?.choices?.[0]?.message?.content) {
 ## Best Practices by Model
 
 ### DeepSeek R1
-
 - **Temperature:** 0.5-0.7 (recommended 0.6)
 - **Top-p:** 0.95 recommended
 - **System prompts:** Omit -- put all instructions in user message
@@ -466,19 +465,16 @@ if (completion?.choices?.[0]?.message?.content) {
 - Avoid micromanaging reasoning steps
 
 ### Kimi K2.5
-
 - Temperature 1.0 for thinking mode, 0.6 for instant mode
 - Supports both reasoning and non-reasoning modes
 - Excels at multi-turn tool calling with reasoning interleaved
 
 ### GLM-5
-
 - Thinking is enabled by default
 - Supports Preserved Thinking: set `"clear_thinking": false` in `chat_template_kwargs`
 - Preserved Thinking retains reasoning across turns for better agentic workflows
 
 ### GPT-OSS
-
 - Use `reasoning_effort` to control depth
 - Set `max_tokens` to ~30,000 with `reasoning_effort="high"`
 - Build Tier 1+ required

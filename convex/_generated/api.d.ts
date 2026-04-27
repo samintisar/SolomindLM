@@ -36,6 +36,7 @@ import type * as _agents__shared_node_builder from "../_agents/_shared/node_buil
 import type * as _agents__shared_progress from "../_agents/_shared/progress.js";
 import type * as _agents__shared_retry from "../_agents/_shared/retry.js";
 import type * as _agents__shared_sanitization from "../_agents/_shared/sanitization.js";
+import type * as _agents__shared_stateUpdateHelpers from "../_agents/_shared/stateUpdateHelpers.js";
 import type * as _agents__shared_state_cleanup from "../_agents/_shared/state_cleanup.js";
 import type * as _agents__shared_state_factory from "../_agents/_shared/state_factory.js";
 import type * as _agents__shared_timeout from "../_agents/_shared/timeout.js";
@@ -52,18 +53,26 @@ import type * as _agents_audio_overview_nodeWriteScript from "../_agents/audio_o
 import type * as _agents_audio_overview_prompts from "../_agents/audio_overview/prompts.js";
 import type * as _agents_audio_overview_state from "../_agents/audio_overview/state.js";
 import type * as _agents_audio_overview_voices from "../_agents/audio_overview/voices.js";
+import type * as _agents_chat_ChatAgent from "../_agents/chat/ChatAgent.js";
+import type * as _agents_chat_chatConfig from "../_agents/chat/chatConfig.js";
 import type * as _agents_chat_chatHistoryBudget from "../_agents/chat/chatHistoryBudget.js";
 import type * as _agents_chat_chatRouter from "../_agents/chat/chatRouter.js";
 import type * as _agents_chat_chat_llm_grounding from "../_agents/chat/chat_llm_grounding.js";
 import type * as _agents_chat_chat_llm_prompts from "../_agents/chat/chat_llm_prompts.js";
 import type * as _agents_chat_chat_llm_types from "../_agents/chat/chat_llm_types.js";
 import type * as _agents_chat_chat_retrieval_subqueries from "../_agents/chat/chat_retrieval_subqueries.js";
+import type * as _agents_chat_chunkContext from "../_agents/chat/chunkContext.js";
 import type * as _agents_chat_grounding_validator from "../_agents/chat/grounding_validator.js";
 import type * as _agents_chat_hybrid_search from "../_agents/chat/hybrid_search.js";
 import type * as _agents_chat_llm_wrapper from "../_agents/chat/llm_wrapper.js";
+import type * as _agents_chat_queryExpansion from "../_agents/chat/queryExpansion.js";
 import type * as _agents_chat_rerankCache from "../_agents/chat/rerankCache.js";
+import type * as _agents_chat_searchQueryRefiner from "../_agents/chat/searchQueryRefiner.js";
 import type * as _agents_chat_sourceSuggestions from "../_agents/chat/sourceSuggestions.js";
+import type * as _agents_chat_streamSlice from "../_agents/chat/streamSlice.js";
+import type * as _agents_chat_types from "../_agents/chat/types.js";
 import type * as _agents_chat_vector_search from "../_agents/chat/vector_search.js";
+import type * as _agents_chat_withTimeout from "../_agents/chat/withTimeout.js";
 import type * as _agents_flashcard_FlashcardGraph from "../_agents/flashcard/FlashcardGraph.js";
 import type * as _agents_flashcard_chunkHelpers from "../_agents/flashcard/chunkHelpers.js";
 import type * as _agents_flashcard_collapseReduceLlm from "../_agents/flashcard/collapseReduceLlm.js";
@@ -97,6 +106,7 @@ import type * as _agents_quiz_nodeCollapse from "../_agents/quiz/nodeCollapse.js
 import type * as _agents_quiz_nodeMap from "../_agents/quiz/nodeMap.js";
 import type * as _agents_quiz_nodeReduce from "../_agents/quiz/nodeReduce.js";
 import type * as _agents_quiz_nodeSplit from "../_agents/quiz/nodeSplit.js";
+import type * as _agents_quiz_optionLabels from "../_agents/quiz/optionLabels.js";
 import type * as _agents_quiz_postprocess from "../_agents/quiz/postprocess.js";
 import type * as _agents_quiz_prompts from "../_agents/quiz/prompts.js";
 import type * as _agents_quiz_quizHeuristics from "../_agents/quiz/quizHeuristics.js";
@@ -118,6 +128,12 @@ import type * as _agents_report_routing from "../_agents/report/routing.js";
 import type * as _agents_report_state from "../_agents/report/state.js";
 import type * as _agents_report_structuredLlm from "../_agents/report/structuredLlm.js";
 import type * as _agents_report_topicAnalysis from "../_agents/report/topicAnalysis.js";
+import type * as _agents_research_graph from "../_agents/research/graph.js";
+import type * as _agents_research_index from "../_agents/research/index.js";
+import type * as _agents_research_nodes from "../_agents/research/nodes.js";
+import type * as _agents_research_prompts from "../_agents/research/prompts.js";
+import type * as _agents_research_state from "../_agents/research/state.js";
+import type * as _agents_research_types from "../_agents/research/types.js";
 import type * as _agents_slides_SlideDeckGraph from "../_agents/slides/SlideDeckGraph.js";
 import type * as _agents_slides_chunkHelpers from "../_agents/slides/chunkHelpers.js";
 import type * as _agents_slides_config from "../_agents/slides/config.js";
@@ -144,11 +160,6 @@ import type * as _agents_spreadsheet_nodeReduce from "../_agents/spreadsheet/nod
 import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompts.js";
 import type * as _agents_spreadsheet_routing from "../_agents/spreadsheet/routing.js";
 import type * as _agents_spreadsheet_state from "../_agents/spreadsheet/state.js";
-import type * as _agents_wiki_WikiGraph from "../_agents/wiki/WikiGraph.js";
-import type * as _agents_wiki_config from "../_agents/wiki/config.js";
-import type * as _agents_wiki_nodes from "../_agents/wiki/nodes.js";
-import type * as _agents_wiki_prompts from "../_agents/wiki/prompts.js";
-import type * as _agents_wiki_state from "../_agents/wiki/state.js";
 import type * as _agents_written_questions_WrittenQuestionsGraph from "../_agents/written_questions/WrittenQuestionsGraph.js";
 import type * as _agents_written_questions_chunkHelpers from "../_agents/written_questions/chunkHelpers.js";
 import type * as _agents_written_questions_config from "../_agents/written_questions/config.js";
@@ -162,18 +173,25 @@ import type * as _agents_written_questions_questionHeuristics from "../_agents/w
 import type * as _agents_written_questions_routing from "../_agents/written_questions/routing.js";
 import type * as _agents_written_questions_state from "../_agents/written_questions/state.js";
 import type * as _agents_written_questions_structuredLlm from "../_agents/written_questions/structuredLlm.js";
+import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
+import type * as _lib_e5Embedding from "../_lib/e5Embedding.js";
 import type * as _lib_env from "../_lib/env.js";
 import type * as _lib_errors from "../_lib/errors.js";
 import type * as _lib_googleDriveDownload from "../_lib/googleDriveDownload.js";
 import type * as _lib_limits from "../_lib/limits.js";
 import type * as _lib_logging_serviceLogger from "../_lib/logging/serviceLogger.js";
 import type * as _lib_notebookAccess from "../_lib/notebookAccess.js";
+import type * as _lib_queryCaps from "../_lib/queryCaps.js";
 import type * as _lib_rateLimits from "../_lib/rateLimits.js";
 import type * as _lib_resendSendError from "../_lib/resendSendError.js";
+import type * as _lib_resolveOpenAlexSourceUrl from "../_lib/resolveOpenAlexSourceUrl.js";
 import type * as _lib_serviceErrors from "../_lib/serviceErrors.js";
 import type * as _lib_shareToken from "../_lib/shareToken.js";
 import type * as _lib_srsScheduling from "../_lib/srsScheduling.js";
 import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
+import type * as _migration_index from "../_migration/index.js";
+import type * as _migration_reembedBatchesWorker from "../_migration/reembedBatchesWorker.js";
+import type * as _migration_reembedChunks from "../_migration/reembedChunks.js";
 import type * as _model_audioOverviews from "../_model/audioOverviews.js";
 import type * as _model_conversations from "../_model/conversations.js";
 import type * as _model_documents from "../_model/documents.js";
@@ -186,7 +204,6 @@ import type * as _model_quizzes from "../_model/quizzes.js";
 import type * as _model_reports from "../_model/reports.js";
 import type * as _model_slides from "../_model/slides.js";
 import type * as _model_spreadsheets from "../_model/spreadsheets.js";
-import type * as _model_wiki from "../_model/wiki.js";
 import type * as _model_writtenQuestions from "../_model/writtenQuestions.js";
 import type * as _services_ai_embeddings from "../_services/ai/embeddings.js";
 import type * as _services_ai_titleGenerator from "../_services/ai/titleGenerator.js";
@@ -222,7 +239,10 @@ import type * as chat_voiceTranscriptionAccess from "../chat/voiceTranscriptionA
 import type * as documents_embeddingJob from "../documents/embeddingJob.js";
 import type * as documents_embeddings from "../documents/embeddings.js";
 import type * as documents_index from "../documents/index.js";
+import type * as documents_paperRecord from "../documents/paperRecord.js";
 import type * as documents_refreshRemote from "../documents/refreshRemote.js";
+import type * as e2e_cleanupFolders from "../e2e/cleanupFolders.js";
+import type * as e2e_cleanupNotebooks from "../e2e/cleanupNotebooks.js";
 import type * as folders_index from "../folders/index.js";
 import type * as googleDrive from "../googleDrive.js";
 import type * as http from "../http.js";
@@ -232,6 +252,8 @@ import type * as notebooks_sharing from "../notebooks/sharing.js";
 import type * as notes_index from "../notes/index.js";
 import type * as notes_userNotes from "../notes/userNotes.js";
 import type * as push_index from "../push/index.js";
+import type * as research_index from "../research/index.js";
+import type * as research_mapEvidenceForDb from "../research/mapEvidenceForDb.js";
 import type * as scripts_fixAudioUrls from "../scripts/fixAudioUrls.js";
 import type * as scripts_runFixAudioUrls from "../scripts/runFixAudioUrls.js";
 import type * as server from "../server.js";
@@ -277,8 +299,6 @@ import type * as studio_slides_slideDeckJobPhases from "../studio/slides/slideDe
 import type * as studio_spreadsheets_index from "../studio/spreadsheets/index.js";
 import type * as studio_spreadsheets_job from "../studio/spreadsheets/job.js";
 import type * as studio_spreadsheets_spreadsheetJobPhases from "../studio/spreadsheets/spreadsheetJobPhases.js";
-import type * as studio_wiki_index from "../studio/wiki/index.js";
-import type * as studio_wiki_job from "../studio/wiki/job.js";
 import type * as studio_writtenQuestions_grading from "../studio/writtenQuestions/grading.js";
 import type * as studio_writtenQuestions_index from "../studio/writtenQuestions/index.js";
 import type * as studio_writtenQuestions_job from "../studio/writtenQuestions/job.js";
@@ -319,6 +339,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/progress": typeof _agents__shared_progress;
   "_agents/_shared/retry": typeof _agents__shared_retry;
   "_agents/_shared/sanitization": typeof _agents__shared_sanitization;
+  "_agents/_shared/stateUpdateHelpers": typeof _agents__shared_stateUpdateHelpers;
   "_agents/_shared/state_cleanup": typeof _agents__shared_state_cleanup;
   "_agents/_shared/state_factory": typeof _agents__shared_state_factory;
   "_agents/_shared/timeout": typeof _agents__shared_timeout;
@@ -335,18 +356,26 @@ declare const fullApi: ApiFromModules<{
   "_agents/audio_overview/prompts": typeof _agents_audio_overview_prompts;
   "_agents/audio_overview/state": typeof _agents_audio_overview_state;
   "_agents/audio_overview/voices": typeof _agents_audio_overview_voices;
+  "_agents/chat/ChatAgent": typeof _agents_chat_ChatAgent;
+  "_agents/chat/chatConfig": typeof _agents_chat_chatConfig;
   "_agents/chat/chatHistoryBudget": typeof _agents_chat_chatHistoryBudget;
   "_agents/chat/chatRouter": typeof _agents_chat_chatRouter;
   "_agents/chat/chat_llm_grounding": typeof _agents_chat_chat_llm_grounding;
   "_agents/chat/chat_llm_prompts": typeof _agents_chat_chat_llm_prompts;
   "_agents/chat/chat_llm_types": typeof _agents_chat_chat_llm_types;
   "_agents/chat/chat_retrieval_subqueries": typeof _agents_chat_chat_retrieval_subqueries;
+  "_agents/chat/chunkContext": typeof _agents_chat_chunkContext;
   "_agents/chat/grounding_validator": typeof _agents_chat_grounding_validator;
   "_agents/chat/hybrid_search": typeof _agents_chat_hybrid_search;
   "_agents/chat/llm_wrapper": typeof _agents_chat_llm_wrapper;
+  "_agents/chat/queryExpansion": typeof _agents_chat_queryExpansion;
   "_agents/chat/rerankCache": typeof _agents_chat_rerankCache;
+  "_agents/chat/searchQueryRefiner": typeof _agents_chat_searchQueryRefiner;
   "_agents/chat/sourceSuggestions": typeof _agents_chat_sourceSuggestions;
+  "_agents/chat/streamSlice": typeof _agents_chat_streamSlice;
+  "_agents/chat/types": typeof _agents_chat_types;
   "_agents/chat/vector_search": typeof _agents_chat_vector_search;
+  "_agents/chat/withTimeout": typeof _agents_chat_withTimeout;
   "_agents/flashcard/FlashcardGraph": typeof _agents_flashcard_FlashcardGraph;
   "_agents/flashcard/chunkHelpers": typeof _agents_flashcard_chunkHelpers;
   "_agents/flashcard/collapseReduceLlm": typeof _agents_flashcard_collapseReduceLlm;
@@ -380,6 +409,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/quiz/nodeMap": typeof _agents_quiz_nodeMap;
   "_agents/quiz/nodeReduce": typeof _agents_quiz_nodeReduce;
   "_agents/quiz/nodeSplit": typeof _agents_quiz_nodeSplit;
+  "_agents/quiz/optionLabels": typeof _agents_quiz_optionLabels;
   "_agents/quiz/postprocess": typeof _agents_quiz_postprocess;
   "_agents/quiz/prompts": typeof _agents_quiz_prompts;
   "_agents/quiz/quizHeuristics": typeof _agents_quiz_quizHeuristics;
@@ -401,6 +431,12 @@ declare const fullApi: ApiFromModules<{
   "_agents/report/state": typeof _agents_report_state;
   "_agents/report/structuredLlm": typeof _agents_report_structuredLlm;
   "_agents/report/topicAnalysis": typeof _agents_report_topicAnalysis;
+  "_agents/research/graph": typeof _agents_research_graph;
+  "_agents/research/index": typeof _agents_research_index;
+  "_agents/research/nodes": typeof _agents_research_nodes;
+  "_agents/research/prompts": typeof _agents_research_prompts;
+  "_agents/research/state": typeof _agents_research_state;
+  "_agents/research/types": typeof _agents_research_types;
   "_agents/slides/SlideDeckGraph": typeof _agents_slides_SlideDeckGraph;
   "_agents/slides/chunkHelpers": typeof _agents_slides_chunkHelpers;
   "_agents/slides/config": typeof _agents_slides_config;
@@ -427,11 +463,6 @@ declare const fullApi: ApiFromModules<{
   "_agents/spreadsheet/prompts": typeof _agents_spreadsheet_prompts;
   "_agents/spreadsheet/routing": typeof _agents_spreadsheet_routing;
   "_agents/spreadsheet/state": typeof _agents_spreadsheet_state;
-  "_agents/wiki/WikiGraph": typeof _agents_wiki_WikiGraph;
-  "_agents/wiki/config": typeof _agents_wiki_config;
-  "_agents/wiki/nodes": typeof _agents_wiki_nodes;
-  "_agents/wiki/prompts": typeof _agents_wiki_prompts;
-  "_agents/wiki/state": typeof _agents_wiki_state;
   "_agents/written_questions/WrittenQuestionsGraph": typeof _agents_written_questions_WrittenQuestionsGraph;
   "_agents/written_questions/chunkHelpers": typeof _agents_written_questions_chunkHelpers;
   "_agents/written_questions/config": typeof _agents_written_questions_config;
@@ -445,18 +476,25 @@ declare const fullApi: ApiFromModules<{
   "_agents/written_questions/routing": typeof _agents_written_questions_routing;
   "_agents/written_questions/state": typeof _agents_written_questions_state;
   "_agents/written_questions/structuredLlm": typeof _agents_written_questions_structuredLlm;
+  "_lib/conversationAccess": typeof _lib_conversationAccess;
+  "_lib/e5Embedding": typeof _lib_e5Embedding;
   "_lib/env": typeof _lib_env;
   "_lib/errors": typeof _lib_errors;
   "_lib/googleDriveDownload": typeof _lib_googleDriveDownload;
   "_lib/limits": typeof _lib_limits;
   "_lib/logging/serviceLogger": typeof _lib_logging_serviceLogger;
   "_lib/notebookAccess": typeof _lib_notebookAccess;
+  "_lib/queryCaps": typeof _lib_queryCaps;
   "_lib/rateLimits": typeof _lib_rateLimits;
   "_lib/resendSendError": typeof _lib_resendSendError;
+  "_lib/resolveOpenAlexSourceUrl": typeof _lib_resolveOpenAlexSourceUrl;
   "_lib/serviceErrors": typeof _lib_serviceErrors;
   "_lib/shareToken": typeof _lib_shareToken;
   "_lib/srsScheduling": typeof _lib_srsScheduling;
   "_lib/utils/urlValidation": typeof _lib_utils_urlValidation;
+  "_migration/index": typeof _migration_index;
+  "_migration/reembedBatchesWorker": typeof _migration_reembedBatchesWorker;
+  "_migration/reembedChunks": typeof _migration_reembedChunks;
   "_model/audioOverviews": typeof _model_audioOverviews;
   "_model/conversations": typeof _model_conversations;
   "_model/documents": typeof _model_documents;
@@ -469,7 +507,6 @@ declare const fullApi: ApiFromModules<{
   "_model/reports": typeof _model_reports;
   "_model/slides": typeof _model_slides;
   "_model/spreadsheets": typeof _model_spreadsheets;
-  "_model/wiki": typeof _model_wiki;
   "_model/writtenQuestions": typeof _model_writtenQuestions;
   "_services/ai/embeddings": typeof _services_ai_embeddings;
   "_services/ai/titleGenerator": typeof _services_ai_titleGenerator;
@@ -505,7 +542,10 @@ declare const fullApi: ApiFromModules<{
   "documents/embeddingJob": typeof documents_embeddingJob;
   "documents/embeddings": typeof documents_embeddings;
   "documents/index": typeof documents_index;
+  "documents/paperRecord": typeof documents_paperRecord;
   "documents/refreshRemote": typeof documents_refreshRemote;
+  "e2e/cleanupFolders": typeof e2e_cleanupFolders;
+  "e2e/cleanupNotebooks": typeof e2e_cleanupNotebooks;
   "folders/index": typeof folders_index;
   googleDrive: typeof googleDrive;
   http: typeof http;
@@ -515,6 +555,8 @@ declare const fullApi: ApiFromModules<{
   "notes/index": typeof notes_index;
   "notes/userNotes": typeof notes_userNotes;
   "push/index": typeof push_index;
+  "research/index": typeof research_index;
+  "research/mapEvidenceForDb": typeof research_mapEvidenceForDb;
   "scripts/fixAudioUrls": typeof scripts_fixAudioUrls;
   "scripts/runFixAudioUrls": typeof scripts_runFixAudioUrls;
   server: typeof server;
@@ -560,8 +602,6 @@ declare const fullApi: ApiFromModules<{
   "studio/spreadsheets/index": typeof studio_spreadsheets_index;
   "studio/spreadsheets/job": typeof studio_spreadsheets_job;
   "studio/spreadsheets/spreadsheetJobPhases": typeof studio_spreadsheets_spreadsheetJobPhases;
-  "studio/wiki/index": typeof studio_wiki_index;
-  "studio/wiki/job": typeof studio_wiki_job;
   "studio/writtenQuestions/grading": typeof studio_writtenQuestions_grading;
   "studio/writtenQuestions/index": typeof studio_writtenQuestions_index;
   "studio/writtenQuestions/job": typeof studio_writtenQuestions_job;
@@ -595,655 +635,8 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
-  stripe: {
-    private: {
-      handleCheckoutSessionCompleted: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          metadata?: any;
-          mode: string;
-          stripeCheckoutSessionId: string;
-          stripeCustomerId?: string;
-        },
-        null
-      >;
-      handleCustomerCreated: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          email?: string;
-          metadata?: any;
-          name?: string;
-          stripeCustomerId: string;
-        },
-        null
-      >;
-      handleCustomerUpdated: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          email?: string;
-          metadata?: any;
-          name?: string;
-          stripeCustomerId: string;
-        },
-        null
-      >;
-      handleInvoiceCreated: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          amountDue: number;
-          amountPaid: number;
-          created: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeInvoiceId: string;
-          stripeSubscriptionId?: string;
-        },
-        null
-      >;
-      handleInvoicePaid: FunctionReference<
-        "mutation",
-        "internal",
-        { amountPaid: number; stripeInvoiceId: string },
-        null
-      >;
-      handleInvoicePaymentFailed: FunctionReference<
-        "mutation",
-        "internal",
-        { stripeInvoiceId: string },
-        null
-      >;
-      handlePaymentIntentSucceeded: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          amount: number;
-          created: number;
-          currency: string;
-          metadata?: any;
-          status: string;
-          stripeCustomerId?: string;
-          stripePaymentIntentId: string;
-        },
-        null
-      >;
-      handleSubscriptionCreated: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          priceId: string;
-          quantity?: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-        },
-        null
-      >;
-      handleSubscriptionDeleted: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          cancelAt?: number;
-          cancelAtPeriodEnd?: boolean;
-          currentPeriodEnd?: number;
-          stripeSubscriptionId: string;
-        },
-        null
-      >;
-      handleSubscriptionUpdated: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          priceId?: string;
-          quantity?: number;
-          status: string;
-          stripeSubscriptionId: string;
-        },
-        null
-      >;
-      listSubscriptionsWithCreationTime: FunctionReference<
-        "query",
-        "internal",
-        { stripeCustomerId: string },
-        Array<{
-          _creationTime: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-        }>
-      >;
-      updatePaymentCustomer: FunctionReference<
-        "mutation",
-        "internal",
-        { stripeCustomerId: string; stripePaymentIntentId: string },
-        null
-      >;
-      updateSubscriptionQuantityInternal: FunctionReference<
-        "mutation",
-        "internal",
-        { quantity: number; stripeSubscriptionId: string },
-        null
-      >;
-    };
-    public: {
-      createOrUpdateCustomer: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          email?: string;
-          metadata?: any;
-          name?: string;
-          stripeCustomerId: string;
-        },
-        string
-      >;
-      getCheckoutSession: FunctionReference<
-        "query",
-        "internal",
-        { stripeCheckoutSessionId: string },
-        {
-          metadata?: any;
-          mode: string;
-          status: string;
-          stripeCheckoutSessionId: string;
-          stripeCustomerId?: string;
-        } | null
-      >;
-      getCustomer: FunctionReference<
-        "query",
-        "internal",
-        { stripeCustomerId: string },
-        {
-          email?: string;
-          metadata?: any;
-          name?: string;
-          stripeCustomerId: string;
-          userId?: string;
-        } | null
-      >;
-      getCustomerByEmail: FunctionReference<
-        "query",
-        "internal",
-        { email: string },
-        {
-          email?: string;
-          metadata?: any;
-          name?: string;
-          stripeCustomerId: string;
-          userId?: string;
-        } | null
-      >;
-      getCustomerByUserId: FunctionReference<
-        "query",
-        "internal",
-        { userId: string },
-        {
-          email?: string;
-          metadata?: any;
-          name?: string;
-          stripeCustomerId: string;
-          userId?: string;
-        } | null
-      >;
-      getPayment: FunctionReference<
-        "query",
-        "internal",
-        { stripePaymentIntentId: string },
-        {
-          amount: number;
-          created: number;
-          currency: string;
-          metadata?: any;
-          orgId?: string;
-          status: string;
-          stripeCustomerId?: string;
-          stripePaymentIntentId: string;
-          userId?: string;
-        } | null
-      >;
-      getSubscription: FunctionReference<
-        "query",
-        "internal",
-        { stripeSubscriptionId: string },
-        {
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          orgId?: string;
-          priceId: string;
-          quantity?: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-          userId?: string;
-        } | null
-      >;
-      getSubscriptionByOrgId: FunctionReference<
-        "query",
-        "internal",
-        { orgId: string },
-        {
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          orgId?: string;
-          priceId: string;
-          quantity?: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-          userId?: string;
-        } | null
-      >;
-      listCheckoutSessions: FunctionReference<
-        "query",
-        "internal",
-        { stripeCustomerId: string },
-        Array<{
-          metadata?: any;
-          mode: string;
-          status: string;
-          stripeCheckoutSessionId: string;
-          stripeCustomerId?: string;
-        }>
-      >;
-      listInvoices: FunctionReference<
-        "query",
-        "internal",
-        { stripeCustomerId: string },
-        Array<{
-          amountDue: number;
-          amountPaid: number;
-          created: number;
-          orgId?: string;
-          status: string;
-          stripeCustomerId: string;
-          stripeInvoiceId: string;
-          stripeSubscriptionId?: string;
-          userId?: string;
-        }>
-      >;
-      listInvoicesByOrgId: FunctionReference<
-        "query",
-        "internal",
-        { orgId: string },
-        Array<{
-          amountDue: number;
-          amountPaid: number;
-          created: number;
-          orgId?: string;
-          status: string;
-          stripeCustomerId: string;
-          stripeInvoiceId: string;
-          stripeSubscriptionId?: string;
-          userId?: string;
-        }>
-      >;
-      listInvoicesByUserId: FunctionReference<
-        "query",
-        "internal",
-        { userId: string },
-        Array<{
-          amountDue: number;
-          amountPaid: number;
-          created: number;
-          orgId?: string;
-          status: string;
-          stripeCustomerId: string;
-          stripeInvoiceId: string;
-          stripeSubscriptionId?: string;
-          userId?: string;
-        }>
-      >;
-      listPayments: FunctionReference<
-        "query",
-        "internal",
-        { stripeCustomerId: string },
-        Array<{
-          amount: number;
-          created: number;
-          currency: string;
-          metadata?: any;
-          orgId?: string;
-          status: string;
-          stripeCustomerId?: string;
-          stripePaymentIntentId: string;
-          userId?: string;
-        }>
-      >;
-      listPaymentsByOrgId: FunctionReference<
-        "query",
-        "internal",
-        { orgId: string },
-        Array<{
-          amount: number;
-          created: number;
-          currency: string;
-          metadata?: any;
-          orgId?: string;
-          status: string;
-          stripeCustomerId?: string;
-          stripePaymentIntentId: string;
-          userId?: string;
-        }>
-      >;
-      listPaymentsByUserId: FunctionReference<
-        "query",
-        "internal",
-        { userId: string },
-        Array<{
-          amount: number;
-          created: number;
-          currency: string;
-          metadata?: any;
-          orgId?: string;
-          status: string;
-          stripeCustomerId?: string;
-          stripePaymentIntentId: string;
-          userId?: string;
-        }>
-      >;
-      listSubscriptions: FunctionReference<
-        "query",
-        "internal",
-        { stripeCustomerId: string },
-        Array<{
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          orgId?: string;
-          priceId: string;
-          quantity?: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-          userId?: string;
-        }>
-      >;
-      listSubscriptionsByOrgId: FunctionReference<
-        "query",
-        "internal",
-        { orgId: string },
-        Array<{
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          orgId?: string;
-          priceId: string;
-          quantity?: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-          userId?: string;
-        }>
-      >;
-      listSubscriptionsByUserId: FunctionReference<
-        "query",
-        "internal",
-        { userId: string },
-        Array<{
-          cancelAt?: number;
-          cancelAtPeriodEnd: boolean;
-          currentPeriodEnd: number;
-          metadata?: any;
-          orgId?: string;
-          priceId: string;
-          quantity?: number;
-          status: string;
-          stripeCustomerId: string;
-          stripeSubscriptionId: string;
-          userId?: string;
-        }>
-      >;
-      updateSubscriptionMetadata: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          metadata: any;
-          orgId?: string;
-          stripeSubscriptionId: string;
-          userId?: string;
-        },
-        null
-      >;
-      updateSubscriptionQuantity: FunctionReference<
-        "action",
-        "internal",
-        { quantity: number; stripeSubscriptionId: string },
-        null
-      >;
-    };
-  };
-  persistentTextStreaming: {
-    lib: {
-      addChunk: FunctionReference<
-        "mutation",
-        "internal",
-        { final: boolean; streamId: string; text: string },
-        any
-      >;
-      createStream: FunctionReference<"mutation", "internal", {}, any>;
-      deleteStream: FunctionReference<
-        "mutation",
-        "internal",
-        { streamId: string },
-        null
-      >;
-      getStreamStatus: FunctionReference<
-        "query",
-        "internal",
-        { streamId: string },
-        "pending" | "streaming" | "done" | "error" | "timeout"
-      >;
-      getStreamText: FunctionReference<
-        "query",
-        "internal",
-        { streamId: string },
-        {
-          status: "pending" | "streaming" | "done" | "error" | "timeout";
-          text: string;
-        }
-      >;
-      setStreamStatus: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          status: "pending" | "streaming" | "done" | "error" | "timeout";
-          streamId: string;
-        },
-        any
-      >;
-    };
-  };
-  actionCache: {
-    crons: {
-      purge: FunctionReference<
-        "mutation",
-        "internal",
-        { expiresAt?: number },
-        null
-      >;
-    };
-    lib: {
-      get: FunctionReference<
-        "query",
-        "internal",
-        { args: any; name: string; ttl: number | null },
-        { kind: "hit"; value: any } | { expiredEntry?: string; kind: "miss" }
-      >;
-      put: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          args: any;
-          expiredEntry?: string;
-          name: string;
-          ttl: number | null;
-          value: any;
-        },
-        { cacheHit: boolean; deletedExpiredEntry: boolean }
-      >;
-      remove: FunctionReference<
-        "mutation",
-        "internal",
-        { args: any; name: string },
-        null
-      >;
-      removeAll: FunctionReference<
-        "mutation",
-        "internal",
-        { batchSize?: number; before?: number; name?: string },
-        null
-      >;
-    };
-  };
-  rateLimiter: {
-    lib: {
-      checkRateLimit: FunctionReference<
-        "query",
-        "internal",
-        {
-          config:
-            | {
-                capacity?: number;
-                kind: "token bucket";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: null;
-              }
-            | {
-                capacity?: number;
-                kind: "fixed window";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: number;
-              };
-          count?: number;
-          key?: string;
-          name: string;
-          reserve?: boolean;
-          throws?: boolean;
-        },
-        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
-      >;
-      clearAll: FunctionReference<
-        "mutation",
-        "internal",
-        { before?: number },
-        null
-      >;
-      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
-      getValue: FunctionReference<
-        "query",
-        "internal",
-        {
-          config:
-            | {
-                capacity?: number;
-                kind: "token bucket";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: null;
-              }
-            | {
-                capacity?: number;
-                kind: "fixed window";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: number;
-              };
-          key?: string;
-          name: string;
-          sampleShards?: number;
-        },
-        {
-          config:
-            | {
-                capacity?: number;
-                kind: "token bucket";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: null;
-              }
-            | {
-                capacity?: number;
-                kind: "fixed window";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: number;
-              };
-          shard: number;
-          ts: number;
-          value: number;
-        }
-      >;
-      rateLimit: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          config:
-            | {
-                capacity?: number;
-                kind: "token bucket";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: null;
-              }
-            | {
-                capacity?: number;
-                kind: "fixed window";
-                maxReserved?: number;
-                period: number;
-                rate: number;
-                shards?: number;
-                start?: number;
-              };
-          count?: number;
-          key?: string;
-          name: string;
-          reserve?: boolean;
-          throws?: boolean;
-        },
-        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
-      >;
-      resetRateLimit: FunctionReference<
-        "mutation",
-        "internal",
-        { key?: string; name: string },
-        null
-      >;
-    };
-    time: {
-      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
-    };
-  };
+  stripe: import("@convex-dev/stripe/_generated/component.js").ComponentApi<"stripe">;
+  persistentTextStreaming: import("@convex-dev/persistent-text-streaming/_generated/component.js").ComponentApi<"persistentTextStreaming">;
+  actionCache: import("@convex-dev/action-cache/_generated/component.js").ComponentApi<"actionCache">;
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
 };

@@ -9,8 +9,7 @@ import type { ChunkStateType, ConceptExtraction, OverallStateType } from "./stat
 
 export interface MindMapMapProcessDeps {
   extractConcepts: (content: string) => Promise<ConceptExtraction>;
-  onMapSuccess: () => void;
-  onPermanentChunkFailure: () => number;
+  /** If permanent chunk failures reach this (summed in graph state), reduce will abort. */
   maxTotalFailures: number;
 }
 
@@ -57,8 +56,6 @@ export async function mapProcess(
       mainTheme: extraction.main_theme,
     });
 
-    deps.onMapSuccess();
-
     return {
       extractedConcepts: [extraction],
       progress: {
@@ -104,31 +101,16 @@ export async function mapProcess(
       });
     }
 
-    const totalFailures = deps.onPermanentChunkFailure();
-    if (totalFailures >= deps.maxTotalFailures) {
-      logger.phaseError(
-        "map_process",
-        new Error(`CIRCUIT BREAKER: ${totalFailures} failures - stopping generation`),
-        {
-          agent: "MindMapGraph",
-          totalFailures,
-        }
-      );
-
-      throw new Error(`Circuit breaker tripped: ${totalFailures} chunks failed permanently`, {
-        cause: e,
-      });
-    }
-
     logger.phaseError(
       "map_process",
-      new Error(`Chunk failed permanently (${totalFailures} total failures)`),
+      new Error(`Chunk failed permanently; incrementing graph failure counter`),
       {
         agent: "MindMapGraph",
         attempts: retryCount + 1,
-        totalFailures,
+        maxTotalFailures: deps.maxTotalFailures,
       }
     );
-    return { extractedConcepts: [] };
+    // Summed in OverallState.permanentMapFailures; reduce may abort if too many.
+    return { permanentMapFailures: 1, extractedConcepts: [] };
   }
 }

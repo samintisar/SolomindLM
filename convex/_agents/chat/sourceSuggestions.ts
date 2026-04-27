@@ -12,7 +12,7 @@
 
 import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
-import { api } from "../../_generated/api";
+import { internal } from "../../_generated/api";
 import { uncachedLlmCall } from "../_shared/cachedLlm";
 import { env } from "../../_lib/env";
 
@@ -94,11 +94,16 @@ export const generateSuggestionsInternal = internalAction({
   args: {
     notebookId: v.id("notebooks"),
     documentSignature: v.string(),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const documents = await ctx.runQuery(api.documents.index.list, {
-      notebookId: args.notebookId,
-    });
+    const documents = await ctx.runQuery(
+      internal.documents.index.listDocumentsForNotebookReadInternal,
+      {
+        notebookId: args.notebookId,
+        userId: args.userId,
+      }
+    );
 
     const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
 

@@ -23,8 +23,11 @@ export async function listByNotebook(
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId));
 
   if (userId) {
-    return await query
-      .filter((q) => q.eq(q.field("userId"), userId))
+    return await ctx.db
+      .query("quizzes")
+      .withIndex("by_notebook_and_user", (q) =>
+        q.eq("notebookId", notebookId).eq("userId", userId)
+      )
       .order("desc")
       .collect();
   }

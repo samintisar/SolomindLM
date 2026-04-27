@@ -155,7 +155,7 @@ export const clearWrittenQuestionsMapData = internalMutation({
     const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
     if (!writtenQuestion) return null;
 
-    const { mapResults, ...restMetadata } = writtenQuestion.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = writtenQuestion.metadata || {};
     await ctx.db.patch(args.writtenQuestionId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

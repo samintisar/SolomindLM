@@ -4,6 +4,31 @@ import { Source } from "../types";
 export function documentToSource(doc: any): Source {
   let type: Source["type"] = "PDF";
 
+  if (doc.fileType === "paper_record") {
+    const pr = doc.paperRecord;
+    return {
+      id: doc._id,
+      title: doc.fileName || "Paper",
+      type: "PAPER",
+      date: new Date(doc.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      selected: true,
+      content: "",
+      status: doc.status,
+      url: doc.fileUrl as string | undefined,
+      paper: pr
+        ? {
+            doi: pr.doi,
+            openAlexId: pr.openAlexId,
+            fulltextStatus: doc.fulltextStatus,
+            ingestionStatus: doc.ingestionStatus,
+          }
+        : {
+            fulltextStatus: doc.fulltextStatus,
+            ingestionStatus: doc.ingestionStatus,
+          },
+    };
+  }
+
   if (doc.fileType === "youtube") {
     type = "WEB";
   } else if (doc.fileType === "url") {

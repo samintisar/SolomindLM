@@ -13,7 +13,6 @@ import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logg
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { z } from "zod";
 import OpenAI from "openai";
 import {
   getCandidateMapPrompt,
@@ -734,7 +733,7 @@ export async function runFinalizeSlideDeckPhase(
 ): Promise<void> {
   "use node";
 
-  const { slideDeckId, userId, notebookId, slideCount, deckLength } = args;
+  const { slideDeckId, userId, notebookId, slideCount: _slideCount, deckLength } = args;
 
   const logger = createJobLogger({
     jobType: "slides",
@@ -746,7 +745,7 @@ export async function runFinalizeSlideDeckPhase(
   logger.info("Starting finalization phase");
 
   // Storage upload function
-  const uploadStorage = async (buffer: Buffer, fileName: string) => {
+  const uploadStorage = async (buffer: Buffer, _fileName: string) => {
     const uint8Array = new Uint8Array(buffer);
     const blob = new Blob([uint8Array], { type: "application/octet-stream" });
     const storageId = await ctx.storage.store(blob);
@@ -771,7 +770,7 @@ export async function runFinalizeSlideDeckPhase(
     const allCandidates: SlideCandidate[] = [];
     const failedCount = { count: 0 };
 
-    for (const [idx, resultJson] of Object.entries(mapResults)) {
+    for (const [_idx, resultJson] of Object.entries(mapResults)) {
       try {
         const parsed = JSON.parse(resultJson);
         if (parsed._error) {
@@ -1018,7 +1017,7 @@ export async function runFinalizeSlideDeckPhase(
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
         chunk: titleContent,
       });
-    } catch (e) {
+    } catch (_e) {
       console.log("[SlideDeckJob] Title generation failed, using default");
     }
 

@@ -38,6 +38,7 @@ import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
 import { useNotebookCRUD } from "./features/notebooks/hooks/useNotebookCRUD";
 import { useFolderCRUD } from "./features/notebooks/hooks/useFolderCRUD";
 import { useChatStream } from "./features/chat/hooks/useChatStream";
+import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
 import "mind-elixir/style.css";
 
 const AppContent: React.FC = () => {
@@ -46,6 +47,7 @@ const AppContent: React.FC = () => {
   const location = useLocation();
 
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [notebookTitle, setNotebookTitle] = useState("Notebook");
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
@@ -86,8 +88,12 @@ const AppContent: React.FC = () => {
     notebookId: activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null,
   });
   const noteCRUD = useNoteCRUD({ activeNotebookId });
+  const conversationCRUD = useConversationCRUD(
+    activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null
+  );
   const chatStream = useChatStream({
     activeNotebookId,
+    activeConversationId,
     sources: sourceManager.sources,
     notes: noteCRUD.notes,
     documents,
@@ -102,6 +108,13 @@ const AppContent: React.FC = () => {
   const folderCRUD = useFolderCRUD({ isAuthenticated, user, onRequireAuth });
 
   const subscriptionStatus = useSubscriptionStatus();
+
+  // Auto-select the most recently updated conversation when the list loads
+  useEffect(() => {
+    if (!activeConversationId && conversationCRUD.conversations && conversationCRUD.conversations.length > 0) {
+      setActiveConversationId(conversationCRUD.conversations[0]._id);
+    }
+  }, [activeConversationId, conversationCRUD.conversations]);
 
   const currentView = useMemo(() => {
     if (location.pathname === "/") return "landing";
@@ -154,9 +167,11 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
       setActiveNotebookId(urlNotebookId);
+      setActiveConversationId(null);
     }
     if (!urlNotebookId && currentView !== "notebook") {
       setActiveNotebookId(null);
+      setActiveConversationId(null);
     }
   }, [urlNotebookId, currentView]);
 
@@ -247,6 +262,7 @@ const AppContent: React.FC = () => {
       remoteChatGenerating: chatStream.remoteChatGenerating,
       remoteGenerationBlocksSend: chatStream.remoteGenerationBlocksSend,
       onSendMessage: chatStream.handleSendMessage,
+      consumeResearchExecuteStream: chatStream.consumeResearchExecuteStream,
       onClearHistory: chatStream.handleClearChatHistory,
       onSetFeedback: chatStream.setMessageFeedback,
       onRetry: chatStream.handleRetryMessage,
@@ -255,8 +271,29 @@ const AppContent: React.FC = () => {
       sourceSummary: chatStream.sourceSummary,
       suggestions: chatStream.suggestions,
       isLoadingSuggestions: chatStream.isLoadingSuggestions,
+      activeConversationId,
+      conversations: conversationCRUD.conversations,
+      onSelectConversation: setActiveConversationId,
+      onCreateConversation: conversationCRUD.handleCreate,
+      onRenameConversation: conversationCRUD.handleRename,
+      onDeleteConversation: async (id: string) => {
+        const list = conversationCRUD.conversations;
+        const wasOnlyThread =
+          list != null && list.length === 1 && list[0]._id === id;
+        await conversationCRUD.handleDelete(id);
+        if (wasOnlyThread) {
+          const newId = await conversationCRUD.handleCreate();
+          setActiveConversationId(newId ?? null);
+          return;
+        }
+        if (activeConversationId === id) {
+          setActiveConversationId(null);
+        }
+      },
+      externalSources: chatStream.externalSources,
+      clearExternalSources: chatStream.clearExternalSources,
     }),
-    [chatStream]
+    [chatStream, activeConversationId, conversationCRUD]
   );
 
   const sourcesContextValue = useMemo(

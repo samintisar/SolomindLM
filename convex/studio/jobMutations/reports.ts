@@ -171,7 +171,7 @@ export const clearReportMapData = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
-    const { packedChunks, mapResults, ...restMetadata } = report.metadata || {};
+    const { packedChunks: _packedChunks, mapResults: _mapResults, ...restMetadata } = report.metadata || {};
     await ctx.db.patch(args.reportId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

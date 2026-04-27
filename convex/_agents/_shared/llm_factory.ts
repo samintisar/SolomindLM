@@ -10,7 +10,6 @@
  */
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 
 // ============================================================
 // Types

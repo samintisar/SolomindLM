@@ -50,8 +50,7 @@ function parseArgs(): ParsedArgs {
 
   const mode = (get("--mode") ?? "rest") as Mode;
   const responseFormat = (get("--response-format") ?? "mp3") as ParsedArgs["responseFormat"];
-  const responseEncoding = (get("--response-encoding") ??
-    "pcm_s16le") as ParsedArgs["responseEncoding"];
+  const responseEncoding = (get("--response-encoding") ?? "pcm_s16le") as ParsedArgs["responseEncoding"];
   const alignment = (get("--alignment") ?? "none") as ParsedArgs["alignment"];
   const segment = (get("--segment") ?? "sentence") as ParsedArgs["segment"];
   const sampleRate = get("--sample-rate");
@@ -159,10 +158,7 @@ async function generateStream(args: ParsedArgs): Promise<void> {
 
   for await (const chunk of response as AsyncIterable<unknown>) {
     for (const event of parseStreamingPayloads(chunk)) {
-      if (
-        event.type === "conversation.item.audio_output.delta" &&
-        typeof event.delta === "string"
-      ) {
+      if (event.type === "conversation.item.audio_output.delta" && typeof event.delta === "string") {
         rawChunks.push(Buffer.from(event.delta, "base64"));
       }
       if (event.type === "conversation.item.word_timestamps") {

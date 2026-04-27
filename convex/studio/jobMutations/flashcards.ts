@@ -153,7 +153,7 @@ export const clearFlashcardMapData = internalMutation({
     const flashcard = await ctx.db.get(args.flashcardId);
     if (!flashcard) return null;
 
-    const { mapResults, ...restMetadata } = flashcard.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = flashcard.metadata || {};
     await ctx.db.patch(args.flashcardId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

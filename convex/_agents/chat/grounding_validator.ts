@@ -273,8 +273,8 @@ export async function validateSemanticGrounding(
 
   try {
     const [responseEmbed, sourceEmbed] = await Promise.all([
-      embeddingService.embedText(truncateForEmbedding(cleanResponse)),
-      embeddingService.embedText(truncateForEmbedding(citedSourceText)),
+      embeddingService.embedText(truncateForEmbedding(cleanResponse), "passage"),
+      embeddingService.embedText(truncateForEmbedding(citedSourceText), "passage"),
     ]);
 
     const similarity = cosineSimilarity(responseEmbed, sourceEmbed);

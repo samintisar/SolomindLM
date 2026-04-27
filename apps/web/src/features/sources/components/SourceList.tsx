@@ -29,7 +29,6 @@ interface SourceListProps {
   onRefreshAll: () => void;
   canRefreshAll: boolean;
   isRefreshing: boolean;
-  beforeSearch?: React.ReactNode;
 }
 
 export const SourceList: React.FC<SourceListProps> = ({
@@ -58,7 +57,6 @@ export const SourceList: React.FC<SourceListProps> = ({
   onRefreshAll,
   canRefreshAll,
   isRefreshing,
-  beforeSearch,
 }) => {
   const handleRenameSubmit = (id: string, newTitle: string) => {
     if (newTitle.trim()) {
@@ -138,9 +136,6 @@ export const SourceList: React.FC<SourceListProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Wiki Card or other content above search */}
-      {beforeSearch}
 
       {/* Search & List */}
       <div className="space-y-2">

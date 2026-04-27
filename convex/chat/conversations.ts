@@ -1,6 +1,8 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "../auth";
+import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { assertCanReadConversation } from "../_lib/conversationAccess";
 import * as Conversations from "../_model/conversations";
 
 /**
@@ -14,13 +16,7 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const conversation = await Conversations.getConversation(ctx, args.conversationId);
-
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
-
-    return conversation;
+    return await assertCanReadConversation(ctx, args.conversationId, userId);
   },
 });
 
@@ -35,18 +31,14 @@ export const getOrCreate = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    // Try to find existing conversation
-    const existing = await Conversations.getConversationByUserAndNotebook(
-      ctx,
-      userId,
-      args.notebookId
-    );
+    await assertCanReadNotebook(ctx, args.notebookId, userId);
+
+    const existing = await Conversations.getPrimaryConversationForNotebook(ctx, args.notebookId);
 
     if (existing) {
       return existing;
     }
 
-    // Return null - caller should create if needed
     return null;
   },
 });
@@ -61,6 +53,25 @@ export const list = query({
     if (!userId) return [];
 
     return await Conversations.getUserConversations(ctx, userId);
+  },
+});
+
+/**
+ * List all conversations for a specific notebook, ordered by most recently updated
+ */
+export const listForNotebook = query({
+  args: {
+    notebookId: v.id("notebooks"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    await assertCanReadNotebook(ctx, args.notebookId, userId);
+
+    const conversations = await Conversations.listConversationsInNotebook(ctx, args.notebookId);
+
+    return conversations.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   },
 });
 

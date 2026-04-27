@@ -245,7 +245,7 @@ export function buildLinearGraph<TState extends Record<string, unknown>>(
  * );
  * ```
  */
-export function buildCustomGraph<TState extends Record<string, unknown>>(
+export function buildCustomGraph<_TState extends Record<string, unknown>>(
   state: Record<string, unknown>,
   nodes: Record<string, NodeFunction<unknown>>,
   edges: Array<[string, string | RouteFunction<unknown>]>
@@ -336,7 +336,6 @@ export function createProgressNode<TState extends { progress?: any }>(progress: 
 }): NodeFunction<TState> {
   return async (state: TState): Promise<Partial<TState>> => {
     return {
-      ...state,
       progress: {
         ...state.progress,
         ...progress,

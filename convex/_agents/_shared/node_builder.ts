@@ -198,7 +198,7 @@ function defaultResultHandler<TOutput>(
   startTime: number,
   config: NodeConfig
 ): Partial<TOutput> {
-  const elapsed = Date.now() - startTime;
+  const _elapsed = Date.now() - startTime;
 
   return {
     [config.phase]: response,

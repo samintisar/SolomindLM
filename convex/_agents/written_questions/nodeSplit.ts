@@ -52,12 +52,8 @@ export async function splitChunks(state: OverallStateType): Promise<Partial<Over
   await callStatusUpdate(state, "split_chunks");
 
   return {
-    ...state,
     chunks: packedChunks,
     status: "mapping",
-    mapOutputs: state.mapOutputs || [],
-    collapsedOutputs: state.collapsedOutputs || [],
-    finalOutput: state.finalOutput || [],
     progress: {
       phase: "split_chunks",
       percentage: 5,

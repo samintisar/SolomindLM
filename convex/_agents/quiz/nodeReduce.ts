@@ -9,6 +9,7 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
+  withoutMapOutputs,
 } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
@@ -70,7 +71,6 @@ export async function reduce(
     });
     await callStatusUpdate(state, "failed");
     return {
-      ...state,
       finalOutput: [],
       status: "failed",
     };
@@ -220,7 +220,7 @@ export async function reduce(
 
       if (fallback.length === 0 && retryCount < 1) {
         return new Send("reduce", {
-          ...state,
+          ...withoutMapOutputs(state),
           reduceRetryCount: retryCount + 1,
         } as any);
       }
@@ -231,7 +231,6 @@ export async function reduce(
 
   if (!selectedCandidates || selectedCandidates.length === 0) {
     return {
-      ...state,
       finalOutput: [],
       status: "failed",
     };
@@ -280,7 +279,6 @@ export async function reduce(
 
   if (expandedQuestions.length === 0) {
     return {
-      ...state,
       finalOutput: [],
       status: "failed",
     };

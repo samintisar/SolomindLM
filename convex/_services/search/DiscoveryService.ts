@@ -1,6 +1,6 @@
 "use node";
 
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "../../auth";
 import { action } from "../../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
@@ -27,6 +27,11 @@ export interface UnifiedDiscoveryResult {
     hasFullText?: boolean;
     publicationYear?: number;
     type?: string;
+    doi?: string;
+    openAlexId?: string;
+    pdfUrl?: string;
+    landingPageUrl?: string;
+    license?: string;
 
     // Web/News-specific
     domain?: string;
@@ -49,6 +54,7 @@ export interface DiscoveryRequest {
       hasFullText?: boolean;
     };
   };
+  /** Cap on merged list; split evenly across each selected source type (e.g. 20 with web+academic → 10 each). */
   maxResults: number;
   sortBy?: "relevance" | "date" | "citations";
 }
@@ -58,7 +64,7 @@ export interface DiscoveryRequest {
  * Tavily scores: 0-1 (mostly 0.6-1.0)
  * OpenAlex scores: 0-1 (calculated from citations + recency)
  */
-function normalizeScore(score: number, sourceType: string): number {
+function normalizeScore(score: number, _sourceType: string): number {
   // Scores are already normalized to 0-1 range from both APIs
   return Math.min(Math.max(score, 0), 1);
 }
@@ -114,6 +120,11 @@ function transformOpenAlexResult(result: any): UnifiedDiscoveryResult {
       hasFullText: result.hasFullText,
       publicationYear: result.publicationYear,
       type: result.type,
+      doi: result.doi,
+      openAlexId: result.openAlexWorkId,
+      pdfUrl: result.pdfUrl,
+      landingPageUrl: result.landingPageUrl,
+      license: result.license,
     },
   };
 }
@@ -208,16 +219,13 @@ export const discover = action({
     } = args;
 
     const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const logger = createServiceLogger("discovery", "discover", {
       userId: userId ?? undefined,
     });
     const startTime = Date.now();
-    logger.operationStart({
-      sourceTypes: sourceTypes.join(","),
-      maxResults,
-      sortBy,
-      queryLen: query.length,
-    });
 
     // Determine which source types to search
     const searchWeb = sourceTypes.includes("web");
@@ -225,18 +233,29 @@ export const discover = action({
     const searchFinance = sourceTypes.includes("finance");
     const searchAcademic = sourceTypes.includes("academic");
 
+    const tavilyTopics: Array<"web" | "news" | "finance"> = [];
+    if (searchWeb) tavilyTopics.push("web");
+    if (searchNews) tavilyTopics.push("news");
+    if (searchFinance) tavilyTopics.push("finance");
+
+    const numSearchChannels = tavilyTopics.length + (searchAcademic ? 1 : 0);
+    const maxPerChannel =
+      numSearchChannels > 0 ? Math.ceil(maxResults / numSearchChannels) : maxResults;
+
+    logger.operationStart({
+      sourceTypes: sourceTypes.join(","),
+      maxResults,
+      maxPerChannel,
+      sortBy,
+      queryLen: query.length,
+    });
+
     // Prepare search promises for parallel execution with timing
     const searchPromises: Promise<{
       sourceType: string;
       results: UnifiedDiscoveryResult[];
       duration: number;
     }>[] = [];
-
-    // Tavily searches (web, news, finance)
-    const tavilyTopics: Array<"web" | "news" | "finance"> = [];
-    if (searchWeb) tavilyTopics.push("web");
-    if (searchNews) tavilyTopics.push("news");
-    if (searchFinance) tavilyTopics.push("finance");
 
     // For each Tavily topic, create a search promise with timing
     for (const topic of tavilyTopics) {
@@ -247,7 +266,7 @@ export const discover = action({
         internal._services.search.TavilySearchService.discoverSourcesInternal,
         {
           query,
-          maxResults: maxResults,
+          maxResults: maxPerChannel,
           topic: tavilyTopic,
           timeRange: timeRange as any,
           searchDepth: "basic",
@@ -289,7 +308,7 @@ export const discover = action({
         internal._services.search.OpenAlexSearchService.discoverAcademicPapersInternal,
         {
           query,
-          maxResults: maxResults,
+          maxResults: maxPerChannel,
           publicationYearFrom: academicFilters?.publicationYearFrom,
           publicationYearTo: academicFilters?.publicationYearTo,
           minCitations: academicFilters?.minCitations,
@@ -360,7 +379,7 @@ export const discover = action({
       totalCount: finalResults.length,
       sourceTypeCounts: searchResults.reduce(
         (acc, { sourceType, results }) => {
-          acc[sourceType] = Math.min(results.length, Math.ceil(maxResults / searchResults.length));
+          acc[sourceType] = Math.min(results.length, maxPerChannel);
           return acc;
         },
         {} as Record<string, number>
@@ -385,6 +404,10 @@ export const discoverSources = action({
   ): Promise<{
     sources: Array<{ title: string; url: string; snippet: string; score: number }>;
   }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const result = await (ctx.runAction as any)(
       internal._services.search.TavilySearchService.discoverSourcesInternal,
       {

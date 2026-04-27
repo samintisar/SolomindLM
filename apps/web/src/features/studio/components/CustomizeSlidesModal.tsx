@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Presentation, Check } from "lucide-react";
+import { X, Presentation } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeSlidesModalProps {
@@ -97,11 +97,6 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
                       >
                         {opt.label}
                       </span>
-                      {slideType === opt.value && (
-                        <div className="p-1 rounded-xl bg-primary text-primary-foreground">
-                          <Check className="w-2.5 h-2.5" />
-                        </div>
-                      )}
                     </div>
                     <p className="text-[13px] text-muted-foreground leading-relaxed font-serif">
                       {opt.description}
@@ -126,7 +121,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
                     key={opt.value}
                     onClick={() => setDeckLength(opt.value)}
                     className={`
-                      flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all
+                      flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
                       ${
                         deckLength === opt.value
                           ? "bg-primary text-primary-foreground shadow-sm"
@@ -134,7 +129,6 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
                       }
                     `}
                   >
-                    {deckLength === opt.value && <Check className="w-3 h-3" />}
                     {opt.label}
                   </button>
                 ))}

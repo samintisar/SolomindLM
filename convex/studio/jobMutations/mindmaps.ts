@@ -143,7 +143,7 @@ export const clearMindMapMapData = internalMutation({
     const mindmap = await ctx.db.get(args.mindmapId);
     if (!mindmap) return null;
 
-    const { mapResults, ...restMetadata } = mindmap.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = mindmap.metadata || {};
     await ctx.db.patch(args.mindmapId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

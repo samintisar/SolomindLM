@@ -81,6 +81,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
 
   return (
     <div
+      data-testid="studio-note-card"
       onClick={() => {
         if (!isGenerating) onClick();
       }}

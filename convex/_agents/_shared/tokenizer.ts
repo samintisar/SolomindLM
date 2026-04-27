@@ -57,12 +57,14 @@ export function countTokensBatch(texts: string[], model: string = DEFAULT_MODEL)
 export function truncateToTokens(
   text: string,
   maxTokens: number,
-  _model: string = DEFAULT_MODEL
+  _model: string = DEFAULT_MODEL,
+  /** Tighter = safer when real tokenizers exceed len/4 (dense code, CJK, etc.) */
+  charsPerToken: number = CHARS_PER_TOKEN
 ): string {
   if (!text || maxTokens <= 0) {
     return "";
   }
-  const maxChars = maxTokens * CHARS_PER_TOKEN;
+  const maxChars = maxTokens * charsPerToken;
   if (text.length <= maxChars) {
     return text;
   }

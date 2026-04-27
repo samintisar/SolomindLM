@@ -8,6 +8,25 @@ export type ChatVoiceState = "idle" | "recording" | "transcribing";
 /** Stay under AudioTranscriptionService 120s HTTP timeout; leave margin for upload + action. */
 const MAX_RECORDING_MS = 90_000;
 
+/** Cover upload + Convex action; bail out so UI never sticks on "transcribing" if the network stalls. */
+const TRANSCRIBE_CHAIN_TIMEOUT_MS = 130_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 function pickRecorderMimeType(): string | null {
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
   for (const c of candidates) {
@@ -139,23 +158,29 @@ export function useChatVoiceTranscription({
     }
 
     try {
-      const uploadUrl = await generateUploadUrl();
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": mimeType || "application/octet-stream" },
-        body: blob,
-      });
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload audio");
-      }
-      const { storageId } = (await uploadResponse.json()) as { storageId: string };
-      if (!storageId) {
-        throw new Error("Upload failed — unexpected response");
-      }
-      const { text } = await transcribeChatAudio({
-        storageId: storageId as Id<"_storage">,
-        notebookId,
-      });
+      const { text } = await withTimeout(
+        (async () => {
+          const uploadUrl = await generateUploadUrl();
+          const uploadResponse = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": mimeType || "application/octet-stream" },
+            body: blob,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error("Failed to upload audio");
+          }
+          const { storageId } = (await uploadResponse.json()) as { storageId: string };
+          if (!storageId) {
+            throw new Error("Upload failed — unexpected response");
+          }
+          return transcribeChatAudio({
+            storageId: storageId as Id<"_storage">,
+            notebookId,
+          });
+        })(),
+        TRANSCRIBE_CHAIN_TIMEOUT_MS,
+        "Transcription took too long"
+      );
       if (!mountedRef.current) return;
       if (text.trim()) {
         onTranscribed(text);
@@ -259,6 +284,10 @@ export function useChatVoiceTranscription({
   }, [disabled, notebookId, voiceState, startRecording, stopAndUpload]);
 
   useEffect(() => {
+    // Must reset on mount: Strict Mode runs cleanup then remount; without this, `mountedRef`
+    // stays false and `stopAndUpload`'s `finally` skips `goToIdle()`, leaving the mic stuck on
+    // "transcribing" forever.
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       clearTimers();

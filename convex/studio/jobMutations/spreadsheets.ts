@@ -147,7 +147,7 @@ export const clearSpreadsheetMapData = internalMutation({
     const spreadsheet = await ctx.db.get(args.spreadsheetId);
     if (!spreadsheet) return null;
 
-    const { mapResults, ...restMetadata } = spreadsheet.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = spreadsheet.metadata || {};
     await ctx.db.patch(args.spreadsheetId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

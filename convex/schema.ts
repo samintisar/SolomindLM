@@ -1,6 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import {
+  fulltextStatusValidator,
+  ingestionStatusValidator,
+  paperRecordValidator,
+} from "./documents/paperRecord";
 
 export default defineSchema({
   // Convex Auth tables (users, sessions, accounts, verificationTokens)
@@ -65,7 +70,7 @@ export default defineSchema({
     userId: v.id("users"),
     notebookId: v.id("notebooks"),
     fileName: v.string(),
-    fileType: v.string(), // 'file' | 'url' | 'youtube' | 'text'
+    fileType: v.string(), // 'file' | 'url' | 'youtube' | 'text' | 'paper_record'
     fileSize: v.optional(v.number()),
     fileUrl: v.optional(v.string()),
     storageId: v.optional(v.string()), // Convex Storage ID
@@ -89,12 +94,19 @@ export default defineSchema({
     maxHeadingLevel: v.optional(v.number()),
     /** Full extracted text for UI copy/view (not chunk-overlapped). RAG still uses documentChunks. */
     extractedMarkdown: v.optional(v.string()),
+    /** Discovery-added research paper metadata + OA resolver fields */
+    paperRecord: v.optional(paperRecordValidator),
+    /** Whether an OA/full-text ingest path exists vs metadata-only vs external publisher */
+    fulltextStatus: v.optional(fulltextStatusValidator),
+    /** Ingest pipeline outcome for paper_record (orthogonal to `status` processing flag) */
+    ingestionStatus: v.optional(ingestionStatusValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
+    .index("by_notebook_and_status", ["notebookId", "status"])
     // Documents with storageId set (file uploads)
     .index("by_storage", ["storageId"]),
 
@@ -129,7 +141,7 @@ export default defineSchema({
     .index("by_document", ["documentId"])
     .index("by_notebook", ["notebookId"])
     .vectorIndex("by_embedding", {
-      dimensions: 1536, // NOTE: dimensions (plural), not dimension
+      dimensions: 1024, // NOTE: dimensions (plural), not dimension - updated for Together AI intfloat/multilingual-e5-large-instruct
       vectorField: "embedding",
       filterFields: ["userId", "notebookId"],
     })
@@ -151,6 +163,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -168,6 +181,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -199,6 +213,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -214,6 +229,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -230,6 +246,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -245,6 +262,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -261,6 +279,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -291,7 +310,9 @@ export default defineSchema({
     socraticThreadId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user_notebook", ["userId", "notebookId"]),
+  })
+    .index("by_user_notebook", ["userId", "notebookId"])
+    .index("by_notebook", ["notebookId"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),
@@ -323,48 +344,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_type", ["type"]),
-
-  // Wikis - Knowledge base compilation from notebook sources
-  wikis: defineTable({
-    userId: v.id("users"),
-    notebookId: v.id("notebooks"),
-    title: v.string(), // "Knowledge Base"
-    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
-    generatedAt: v.number(),
-    lastRefreshedAt: v.optional(v.number()),
-    metadata: v.optional(v.any()), // article counts, stats
-    error: v.optional(v.string()), // Error message if failed
-    /** Incremented on each refresh/cancel so in-flight jobs can detect stale runs */
-    generationRunId: v.optional(v.number()),
-  })
-    .index("by_notebook", ["notebookId"])
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
-
-  // Wiki articles - Individual concept/connection/qa articles
-  wikiArticles: defineTable({
-    wikiId: v.id("wikis"),
-    path: v.string(), // "concepts/entities", "connections/relationships", "index", "log", etc.
-    type: v.union(
-      v.literal("concept"),
-      v.literal("connection"),
-      v.literal("qa"),
-      v.literal("index"),
-      v.literal("log")
-    ),
-    title: v.string(),
-    content: v.string(), // Markdown content
-    sources: v.array(v.id("documents")), // Which source documents this came from
-    frontmatter: v.optional(v.any()), // YAML frontmatter data (slug, summary, related concepts, etc.)
-    wordCount: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_wiki", ["wikiId"])
-    .index("by_path", ["wikiId", "path"])
-    .index("by_type", ["wikiId", "type"]),
 
   // Stripe
   stripeSubscriptions: defineTable({
@@ -472,6 +454,92 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_timestamp", ["timestamp"])
     .index("by_source_types", ["sourceTypes"]),
+
+  // Deep Research - user-approved research plans
+  researchPlans: defineTable({
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
+    conversationId: v.id("conversations"),
+    messageId: v.id("messages"),
+    query: v.string(),
+    subQuestions: v.array(
+      v.object({
+        id: v.string(),
+        question: v.string(),
+        searchQueries: v.array(v.string()),
+        sourceChannels: v.array(v.string()), // "notebook" | "web" | "academic" | "news"
+        status: v.union(
+          v.literal("pending"),
+          v.literal("researching"),
+          v.literal("completed")
+        ),
+      })
+    ),
+    sourcePolicy: v.object({
+      channels: v.array(v.string()),
+      domainAllowlist: v.optional(v.array(v.string())),
+      dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
+      maxResultsPerChannel: v.optional(v.number()),
+      credibilityTier: v.optional(v.string()), // "primary" | "secondary" | "any"
+      requirePrimarySources: v.optional(v.boolean()),
+      recencyDays: v.optional(v.number()),
+      dedupeStrategy: v.optional(v.string()), // "strict" | "semantic" | "off"
+    }),
+    status: v.string(), // "draft" | "approved" | "rejected"
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
+
+  // Deep Research - execution state (separate from plans for re-runs)
+  researchRuns: defineTable({
+    planId: v.id("researchPlans"),
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
+    conversationId: v.id("conversations"),
+    status: v.string(), // "pending" | "running" | "completed" | "failed" | "cancelled"
+    currentIteration: v.number(),
+    maxIterations: v.number(), // hard cap, default 2
+    streamId: v.optional(v.string()),
+    resultMessageId: v.optional(v.id("messages")),
+    error: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_plan", ["planId"])
+    /** Latest run per plan: eq(planId) then order by createdAt */
+    .index("by_planId_and_createdAt", ["planId", "createdAt"])
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
+
+  // Deep Research - typed, queryable evidence per run
+  researchEvidence: defineTable({
+    runId: v.id("researchRuns"),
+    subQuestionId: v.string(),
+    sourceType: v.string(), // "notebook" | "web" | "academic" | "news"
+    sourceTitle: v.string(),
+    sourceUrl: v.optional(v.string()),
+    content: v.string(),
+    relevanceScore: v.optional(v.number()),
+    credibilityTier: v.optional(v.string()),
+    iteration: v.number(), // which pass found this evidence
+    metadata: v.optional(
+      v.object({
+        documentId: v.optional(v.id("documents")),
+        chunkIndex: v.optional(v.number()),
+        domain: v.optional(v.string()),
+        publishedAt: v.optional(v.number()),
+      })
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_run", ["runId"])
+    .index("by_run_and_subquestion", ["runId", "subQuestionId"])
+    .index("by_source_type", ["sourceType"]),
 
   // Note: Direct scheduling used instead of jobs table
   // Jobs are scheduled directly via ctx.scheduler.runAfter() from mutations

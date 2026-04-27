@@ -2,20 +2,24 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "../auth";
 import {
   markdownFromMistralOcrResponse,
   stripMistralOcrMedia,
 } from "./extraction/MistralOCRService";
 
 // PDF/DOCX extraction is handled by Mistral OCR in DocEmbeddingJob (MistralOCRService).
-// No PDFCO_API_KEY or CLOUDCONVERT_API_KEY needed.
 
 /**
  * Scrape a URL using Supadata API
  */
 export const scrapeUrl = action({
   args: { url: v.string() },
-  handler: async (_, args): Promise<{ title: string; content: string }> => {
+  handler: async (ctx, args): Promise<{ title: string; content: string }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const apiKey = process.env.SUPADATA_API_KEY;
     if (!apiKey) {
       throw new Error("SUPADATA_API_KEY is not set");
@@ -48,7 +52,11 @@ export const scrapeUrl = action({
  */
 export const getYouTubeTranscript = action({
   args: { url: v.string() },
-  handler: async (_, args): Promise<{ title: string; content: string }> => {
+  handler: async (ctx, args): Promise<{ title: string; content: string }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     // Extract video ID from URL
     const videoIdMatch = args.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
     if (!videoIdMatch) {
@@ -93,7 +101,11 @@ export const extractFromUrl = scrapeUrl;
  */
 export const extractFromYouTube = action({
   args: { videoId: v.string() },
-  handler: async (_, args): Promise<{ title: string; content: string }> => {
+  handler: async (ctx, args): Promise<{ title: string; content: string }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const apiKey = process.env.SUPADATA_API_KEY;
     if (!apiKey) {
       throw new Error("SUPADATA_API_KEY is not set");
@@ -126,7 +138,11 @@ export const extractFromYouTube = action({
  */
 export const extractFromOCR = action({
   args: { fileUrl: v.string() },
-  handler: async (_, args): Promise<string> => {
+  handler: async (ctx, args): Promise<string> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const apiKey = process.env.MISTRAL_API_KEY;
     if (!apiKey) {
       throw new Error("MISTRAL_API_KEY is not set");

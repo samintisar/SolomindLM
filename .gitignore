@@ -156,3 +156,9 @@ convex-exports/*.zip
 .serena/
 .vercel
 .env*.local
+
+# Playwright
+playwright-report/
+test-results/
+.auth/
+.env.e2e

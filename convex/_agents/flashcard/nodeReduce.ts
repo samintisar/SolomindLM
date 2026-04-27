@@ -1,6 +1,6 @@
 "use node";
 
-import { clearStateKeys, validateFlashcards } from "../_shared/index.js";
+import { clearStateKeys, validateFlashcards, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger, type JobLogger } from "../_shared/logging.js";
 
 import {
@@ -101,7 +101,6 @@ export async function reduceFlashcards(
     );
     await callStatusUpdate(state, "failed");
     return {
-      ...state,
       finalOutput: [],
       status: "failed",
     };
@@ -225,7 +224,7 @@ export async function reduceFlashcards(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     finalOutput: finalFlashcards,
     status: "completed",
     ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),

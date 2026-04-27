@@ -6,6 +6,7 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
+import { mapOutputsMergeReducer } from "../_shared/stateUpdateHelpers.js";
 import type { Flashcard } from "./prompts.js";
 
 // ============================================================
@@ -40,7 +41,7 @@ export const OverallState = Annotation.Root({
   mapOutputs: Annotation<Flashcard[][]>({
     // Reducer concatenates arrays - critical for aggregating parallel outputs
     // Fixed: handle undefined y to prevent runtime errors
-    reducer: (x: Flashcard[][], y?: Flashcard[][]) => (y ? x.concat(y) : x),
+    reducer: (x, y) => mapOutputsMergeReducer(x, y),
     default: () => [],
   }),
   collapsedOutputs: Annotation<Flashcard[][]>({

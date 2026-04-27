@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 
-import { clearStateKeys } from "../_shared/index.js";
+import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
@@ -22,7 +22,6 @@ export async function collapse(state: OverallStateType): Promise<Partial<Overall
     });
     await callStatusUpdate(state, "collapsing");
     return {
-      ...state,
       collapsedOutputs: [],
       status: "reducing",
     };
@@ -113,7 +112,6 @@ export async function collapse(state: OverallStateType): Promise<Partial<Overall
     );
 
     return {
-      ...state,
       collapsedOutputs: [],
       status: "failed",
     };
@@ -146,7 +144,7 @@ export async function collapse(state: OverallStateType): Promise<Partial<Overall
   });
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     collapsedOutputs: [JSON.stringify(allQuestions)],
     status: "reducing",
     ...clearStateKeys<OverallStateType>(["mapOutputs"]),

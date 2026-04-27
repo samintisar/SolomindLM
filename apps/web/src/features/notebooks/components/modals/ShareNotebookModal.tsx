@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { X, Copy, Check, Users, GitFork, Ban, Loader2 } from "lucide-react";
+import { X, Copy, Check, Users, GitFork, Ban, Loader2, Lock } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useToast } from "@/shared/contexts/ToastContext";
+import { Button } from "@/shared/components/ui/button";
 
 interface ShareNotebookModalProps {
   notebookId: string;
@@ -21,6 +22,65 @@ type ShareLinkRow = {
   revokedAt: number | null;
   active: boolean;
 };
+
+function formatLinkTimestamp(ts: number): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(ts));
+  } catch {
+    return new Date(ts).toLocaleString();
+  }
+}
+
+function LinkUrlRow({
+  url,
+  copyKey,
+  copied,
+  onCopy,
+}: {
+  url: string;
+  copyKey: string;
+  copied: string | null;
+  onCopy: (key: string, text: string) => void;
+}) {
+  const done = copied === copyKey;
+  return (
+    <div className="mt-4 animate-in fade-in duration-200">
+      <p className="mb-2 text-xs text-muted-foreground">Copy and share this URL with your invitee.</p>
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+        <div
+          className="min-w-0 flex-1 rounded-lg border border-border/80 bg-muted/40 px-3 py-2.5 shadow-sm"
+          title={url}
+        >
+          <p className="truncate font-mono text-[11px] leading-normal text-foreground/90 sm:text-xs">
+            {url}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant={done ? "outline" : "default"}
+          size="sm"
+          className="h-9 w-full shrink-0 gap-1.5 px-4 sm:w-auto"
+          onClick={() => void onCopy(copyKey, url)}
+        >
+          {done ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              <span>Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              <span>Copy link</span>
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebookId, onClose }) => {
   const { success, error: showError } = useToast();
@@ -70,10 +130,8 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
           : `${origin}/share/fork/${res.token}`;
       if (kind === "collaborate") {
         setCoworkUrl(url);
-        setForkUrl(null);
       } else {
         setForkUrl(url);
-        setCoworkUrl(null);
       }
     } catch (e) {
       showError(e instanceof Error ? e.message : "Could not create share link");
@@ -101,141 +159,175 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
-        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-          <h3 className="text-lg font-bold font-sans">Share notebook</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 font-sans backdrop-blur-sm animate-in fade-in duration-200">
+      <div
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-notebook-title"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
+          <div className="min-w-0 pr-2">
+            <h3 id="share-notebook-title" className="text-lg font-bold text-foreground">
+              Share notebook
+            </h3>
+            <p className="mt-1 text-sm leading-snug text-muted-foreground">
+              Generate a signed-in link to collaborate or to let someone duplicate this notebook into
+              their account.
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 hover:bg-secondary rounded-xl transition-colors"
+            className="shrink-0 rounded-xl p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            aria-label="Close"
           >
-            <X className="w-5 h-5 text-muted-foreground" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-4 space-y-6 overflow-y-auto">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
-              <Users className="w-4 h-4" />
-              Work in the same notebook
-            </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              People with the link can sign in and edit sources and Studio content with you. Chat
-              stays private per person.
-            </p>
-            <div className="flex justify-center">
-              <button
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="grid gap-0 md:grid-cols-2 md:divide-x md:divide-border">
+            {/* Cowork */}
+            <section className="flex flex-col border-b border-border p-6 md:border-b-0 md:pr-8">
+              <div className="mb-4 space-y-1">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Cowork
+                </div>
+                <p className="text-sm font-semibold text-foreground">Shared workspace</p>
+                <p className="text-sm text-muted-foreground">
+                  Editors can manage sources, folders, Studio, and chat. Chat threads stay in sync for
+                  everyone on this notebook.
+                </p>
+              </div>
+              <Button
                 type="button"
+                className="w-full"
                 disabled={busy !== null}
                 onClick={() => void handleCreate("collaborate")}
-                className="w-fit py-2 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
               >
-                {busy === "collaborate" ? "Creating…" : "Create cowork link"}
-              </button>
-            </div>
-            {coworkUrl && (
-              <div className="mt-2 flex gap-2">
-                <input
-                  readOnly
-                  className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-muted/40 truncate"
-                  value={coworkUrl}
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCopy("cowork", coworkUrl)}
-                  className="shrink-0 p-2 rounded border border-border hover:bg-secondary"
-                  title="Copy link"
-                >
-                  {copied === "cowork" ? (
-                    <Check className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
+                {busy === "collaborate" ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating link…
+                  </span>
+                ) : (
+                  "Create cowork link"
+                )}
+              </Button>
+              {coworkUrl ? (
+                <LinkUrlRow url={coworkUrl} copyKey="cowork" copied={copied} onCopy={handleCopy} />
+              ) : null}
+            </section>
 
-          <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
-              <GitFork className="w-4 h-4" />
-              Duplicate to their account
-            </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Anyone with the link can create their own copy (sources, Studio, manual notes).
-              Conversations are not copied.
-            </p>
-            <div className="flex justify-center">
-              <button
+            {/* Duplicate */}
+            <section className="flex flex-col p-6 md:pl-8">
+              <div className="mb-4 space-y-1">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  <GitFork className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Duplicate
+                </div>
+                <p className="text-sm font-semibold text-foreground">Copy to their account</p>
+                <p className="text-sm text-muted-foreground">
+                  Recipients get sources, Studio work, and manual notes they own. Conversations are
+                  not copied.
+                </p>
+              </div>
+              <Button
                 type="button"
+                variant="outline"
+                className="w-full border-border/80 bg-background/50 font-medium hover:bg-secondary/80"
                 disabled={busy !== null}
                 onClick={() => void handleCreate("fork")}
-                className="w-fit py-2 px-4 rounded-lg border border-border bg-secondary/50 text-sm font-medium hover:bg-secondary disabled:opacity-50"
               >
-                {busy === "fork" ? "Creating…" : "Create fork link"}
-              </button>
-            </div>
-            {forkUrl && (
-              <div className="mt-2 flex gap-2">
-                <input
-                  readOnly
-                  className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-muted/40 truncate"
-                  value={forkUrl}
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCopy("fork", forkUrl)}
-                  className="shrink-0 p-2 rounded border border-border hover:bg-secondary"
-                  title="Copy link"
-                >
-                  {copied === "fork" ? (
-                    <Check className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            )}
+                {busy === "fork" ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating link…
+                  </span>
+                ) : (
+                  "Create duplicate link"
+                )}
+              </Button>
+              {forkUrl ? (
+                <LinkUrlRow url={forkUrl} copyKey="fork" copied={copied} onCopy={handleCopy} />
+              ) : null}
+            </section>
           </div>
 
-          {activeLinks.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                Active links
-              </p>
-              <ul className="space-y-2">
-                {activeLinks.map((l: ShareLinkRow) => (
+          {activeLinks.length > 0 ? (
+            <div className="border-t border-border px-6 py-5">
+              <div className="mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-medium text-foreground">Active links</h4>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {activeLinks.length}
+                </span>
+              </div>
+              <ul className="overflow-hidden rounded-lg border border-border/80 bg-muted/20">
+                {activeLinks.map((l: ShareLinkRow, i: number) => (
                   <li
                     key={l.id}
-                    className="flex items-center justify-between gap-2 text-sm py-1.5 border-b border-border/60 last:border-0"
+                    className={`flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 px-3 py-3 sm:px-4 ${
+                      i > 0 ? "border-t border-border/60" : ""
+                    }`}
                   >
-                    <span>
-                      {l.kind === "collaborate" ? "Cowork" : "Fork"} · created{" "}
-                      {new Date(l.createdAt).toLocaleDateString()}
-                    </span>
-                    <button
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span
+                          className={
+                            l.kind === "collaborate"
+                              ? "rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                              : "rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-foreground"
+                          }
+                        >
+                          {l.kind === "collaborate" ? "Cowork" : "Duplicate"}
+                        </span>
+                        <time
+                          className="text-xs text-muted-foreground"
+                          dateTime={new Date(l.createdAt).toISOString()}
+                        >
+                          {formatLinkTimestamp(l.createdAt)}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-xs leading-snug text-muted-foreground/90">
+                        Anyone with this link can use it until you revoke it.
+                      </p>
+                    </div>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       disabled={revokingId === l.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRevoke(l.id as Id<"notebookShareLinks">);
                       }}
-                      className="shrink-0 p-1.5 rounded hover:bg-destructive/10 text-destructive disabled:opacity-50"
-                      title="Remove link"
-                      aria-label="Remove share link"
+                      className="w-full justify-center text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto sm:justify-end sm:shrink-0"
+                      title="Revoke this link"
                     >
                       {revokingId === l.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Ban className="w-4 h-4" />
+                        <>
+                          <Ban className="mr-1.5 h-3.5 w-3.5" />
+                          Revoke
+                        </>
                       )}
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
             </div>
-          )}
+          ) : null}
+
+          <div className="flex gap-3 border-t border-border bg-secondary/10 px-6 py-4">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Links require sign-in. You remain the owner; coworkers join as editors until you remove
+              access or revoke a link.
+            </p>
+          </div>
         </div>
       </div>
     </div>

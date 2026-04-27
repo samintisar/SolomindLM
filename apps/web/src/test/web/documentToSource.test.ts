@@ -91,4 +91,29 @@ describe("documentToSource", () => {
     });
     expect(result.remoteRefreshKind).toBe("drive");
   });
+
+  it("maps paper_record to PAPER with bibliographic metadata", () => {
+    const result = documentToSource({
+      _id: "paper1",
+      fileName: "Sample Paper Title",
+      fileType: "paper_record",
+      fileUrl: "https://doi.org/10.1000/xyz",
+      status: "completed",
+      createdAt: Date.now(),
+      paperRecord: {
+        abstract: "Abstract text.",
+        authors: ["Author One"],
+        doi: "10.1000/xyz",
+        isOa: true,
+      },
+      fulltextStatus: "available",
+      ingestionStatus: "ingested",
+    });
+    expect(result.type).toBe("PAPER");
+    expect(result.title).toBe("Sample Paper Title");
+    expect(result.url).toBe("https://doi.org/10.1000/xyz");
+    expect(result.paper?.doi).toBe("10.1000/xyz");
+    expect(result.paper?.fulltextStatus).toBe("available");
+    expect(result.paper?.ingestionStatus).toBe("ingested");
+  });
 });

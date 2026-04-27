@@ -2,6 +2,8 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
+import { getAuthUserId } from "../auth";
 
 /**
  * Map file extensions to their proper MIME types
@@ -52,6 +54,11 @@ export const uploadFile = action({
   handler: async (ctx, args) => {
     "use node";
 
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
+
     const { file, fileName, contentType } = args;
 
     console.log("[ConvexStorage] Starting file upload:", {
@@ -65,7 +72,7 @@ export const uploadFile = action({
       throw new Error("File is empty");
     }
 
-    const properMimeType = getMimeType(fileName, contentType);
+    const _properMimeType = getMimeType(fileName, contentType);
 
     const storageId = await ctx.storage.store(file);
     const url = await ctx.storage.getUrl(storageId);
@@ -89,6 +96,17 @@ export const getStorageUrl = action({
   handler: async (ctx, args) => {
     "use node";
 
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
+    const canAccess = await ctx.runQuery(internal.documents.index.userCanAccessStorage, {
+      userId,
+      storageId: args.storageId,
+    });
+    if (!canAccess) {
+      throw new Error("Access denied");
+    }
     const url = await ctx.storage.getUrl(args.storageId);
     return url;
   },
@@ -104,6 +122,11 @@ export const uploadAudioBuffer = action({
   },
   handler: async (ctx, args) => {
     "use node";
+
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
 
     const { buffer, audioOverviewId } = args;
 
@@ -141,6 +164,19 @@ export const deleteFile = action({
   handler: async (ctx, args) => {
     "use node";
 
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
+    if (args.storageId) {
+      const canAccess = await ctx.runQuery(internal.documents.index.userCanAccessStorage, {
+        userId,
+        storageId: args.storageId,
+      });
+      if (!canAccess) {
+        throw new Error("Access denied");
+      }
+    }
     console.log("[ConvexStorage] Delete requested (no-op, GC handles cleanup):", args.storageId);
     return;
   },

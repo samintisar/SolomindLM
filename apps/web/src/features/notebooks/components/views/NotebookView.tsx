@@ -1,11 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useNotebookContext } from "@/features/notebooks/NotebookContext";
 import { useSourcesContext } from "@/features/sources/SourcesContext";
 import { useStudioContext } from "@/features/studio/StudioContext";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
 import { usePanelResize } from "@/shared/hooks/usePanelResize";
-import { SourcesPanel } from "@/features/sources/components/SourcesPanel";
+import {
+  SourcesPanel,
+  type SourcesPanelFocusRequest,
+} from "@/features/sources/components/SourcesPanel";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { StudioPanel } from "@/features/studio/components/StudioPanel";
 import { STUDIO_TOOLS } from "@/shared/constants";
@@ -29,6 +32,9 @@ export function NotebookView() {
   const [mobileActiveTab, setMobileActiveTab] = useState<"sources" | "chat" | "studio">("sources");
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
   const [isStudioOpen, setIsStudioOpen] = useState(true);
+  const [sourceFocusRequest, setSourceFocusRequest] = useState<SourcesPanelFocusRequest | null>(
+    null
+  );
 
   // Mini Audio Player state
   const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
@@ -41,6 +47,19 @@ export function NotebookView() {
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
   const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
+
+  const clearSourceFocusRequest = useCallback(() => {
+    setSourceFocusRequest(null);
+  }, []);
+
+  const handleOpenNotebookSourceFromChat = useCallback((documentId: string) => {
+    setIsSourcesOpen(true);
+    setMobileActiveTab("sources");
+    setSourceFocusRequest((prev) => ({
+      documentId,
+      seq: (prev?.seq ?? 0) + 1,
+    }));
+  }, []);
 
   const handlePlayAudio = (
     audioUrl: string,
@@ -138,6 +157,8 @@ export function NotebookView() {
             userId={user?.id}
             noteId={urlNotebookId}
             onDocumentUploaded={() => {}}
+            focusSourceRequest={sourceFocusRequest}
+            onFocusSourceHandled={clearSourceFocusRequest}
           />
 
           {isSourcesOpen && (
@@ -156,6 +177,7 @@ export function NotebookView() {
             notebookTitle={notebookTitle}
             notebookIcon={activeNotebook?.icon}
             notebookCoverColor={activeNotebook?.coverColor}
+            onOpenNotebookSource={handleOpenNotebookSourceFromChat}
           />
 
           {isStudioOpen && (
@@ -193,6 +215,8 @@ export function NotebookView() {
                 userId={user?.id}
                 noteId={urlNotebookId}
                 onDocumentUploaded={() => {}}
+                focusSourceRequest={sourceFocusRequest}
+                onFocusSourceHandled={clearSourceFocusRequest}
               />
             </div>
           )}
@@ -207,6 +231,7 @@ export function NotebookView() {
                 notebookTitle={notebookTitle}
                 notebookIcon={activeNotebook?.icon}
                 notebookCoverColor={activeNotebook?.coverColor}
+                onOpenNotebookSource={handleOpenNotebookSourceFromChat}
               />
             </div>
           )}

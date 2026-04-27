@@ -552,7 +552,7 @@ export async function runFinalizeSpreadsheetPhase(
     const allOutputs: string[] = [];
     const failedCount = { count: 0 };
 
-    for (const [idx, resultJson] of Object.entries(mapResults)) {
+    for (const [_idx, resultJson] of Object.entries(mapResults)) {
       try {
         const parsed = JSON.parse(resultJson);
         if (parsed._error) {
@@ -687,7 +687,7 @@ export async function runFinalizeSpreadsheetPhase(
         title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
           chunk: allOutputs[0],
         });
-      } catch (e) {
+      } catch (_e) {
         console.log("[SpreadsheetJob] Title generation failed, using default");
       }
     }

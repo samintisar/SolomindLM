@@ -1,6 +1,6 @@
 "use node";
 
-import { clearStateKeys } from "../_shared/index.js";
+import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
@@ -131,7 +131,6 @@ export async function collapse(
     });
     await callStatusUpdate(state, "collapsing");
     return {
-      ...state,
       collapsedOutputs: [],
       status: "reducing",
     };
@@ -167,7 +166,7 @@ export async function collapse(
     });
 
     return {
-      ...state,
+      ...withoutMapOutputs(state),
       collapsedOutputs: state.mapOutputs,
       status: "reducing",
       ...clearStateKeys<OverallStateType>(["mapOutputs"]),
@@ -195,7 +194,7 @@ export async function collapse(
   });
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     collapsedOutputs: collapsed,
     status: "reducing",
     ...clearStateKeys<OverallStateType>(["mapOutputs"]),

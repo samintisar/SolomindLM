@@ -11,10 +11,36 @@ import {
   ChatActivityPhase,
   ChatAgentTrace,
 } from "@/shared/types/index";
-import { useSendMessage, useSetMessageFeedback, useSourceSuggestions } from "../services/chatApi";
+import {
+  useSendMessage,
+  useSetMessageFeedback,
+  useSourceSuggestions,
+  consumePersistentTextStream,
+} from "../services/chatApi";
+
+function researchProgressToStreamingActivity(progress: {
+  phase: string;
+  subQuestionId?: string;
+  sourcesFound?: number;
+}): { phase: ChatActivityPhase; detail: string } {
+  const n = progress.sourcesFound ?? 0;
+  if (progress.phase === "writing") {
+    return { phase: "writing", detail: "Synthesizing research report…" };
+  }
+  if (progress.phase === "retrieving_notebook") {
+    const found =
+      n > 0 ? `Notebook search · ${n} chunk${n === 1 ? "" : "s"} found` : "Searching your notebook…";
+    return { phase: "retrieving", detail: found };
+  }
+  return {
+    phase: "thinking",
+    detail: progress.phase.replace(/_/g, " "),
+  };
+}
 
 interface UseChatStreamProps {
   activeNotebookId: string | null;
+  activeConversationId: string | null;
   sources: Source[];
   notes: Note[];
   documents: Doc<"documents">[];
@@ -22,14 +48,17 @@ interface UseChatStreamProps {
 
 const SKEW_MS = 120_000;
 
-export function useChatStream({ activeNotebookId, sources, notes, documents }: UseChatStreamProps) {
+export function useChatStream({ activeNotebookId, activeConversationId, sources, notes, documents }: UseChatStreamProps) {
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
 
   const chatBundle = useQuery(
     api.chat.messages.listByNotebook,
     activeNotebookId && activeNotebookId !== "new"
-      ? { notebookId: activeNotebookId as Id<"notebooks"> }
+      ? {
+          notebookId: activeNotebookId as Id<"notebooks">,
+          conversationId: activeConversationId ? (activeConversationId as Id<"conversations">) : undefined,
+        }
       : "skip"
   );
 
@@ -62,6 +91,14 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
   const [streamingGrounding, setStreamingGrounding] = useState<AgentGroundingCheck[]>([]);
   const [streamingClarification, setStreamingClarification] = useState<string | null>(null);
   const [lastAssistantFollowUps, setLastAssistantFollowUps] = useState<string[] | null>(null);
+  const [streamingResearchPlan, setStreamingResearchPlan] = useState<{
+    planId: string;
+    subQuestions: unknown[];
+    sourcePolicy: unknown;
+  } | null>(null);
+  const [externalSources, setExternalSources] = useState<
+    Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }>
+  >([]);
   const messagesLengthWhenStreamCompleteRef = useRef(0);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -87,11 +124,17 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     setStreamingPhaseDetail(null);
     setStreamingGrounding([]);
     setStreamingClarification(null);
+    setStreamingResearchPlan(null);
+    setExternalSources([]);
     streamStartedAtRef.current = null;
   }, []);
 
   const handleSendMessage = useCallback(
-    async (messageText: string) => {
+    async (
+      messageText: string,
+      deepResearch?: boolean,
+      sourcePolicy?: { channels: string[] }
+    ) => {
       if (!activeNotebookId || isChatStreaming) return;
       if (chatRemoteGenerating) {
         const last = messagesRef.current.at(-1) as Doc<"messages"> | undefined;
@@ -109,9 +152,11 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
       setIsChatStreaming(true);
       setStreamingContent("");
       setStreamingReferences(null);
-      const selectedDocumentIds = sourcesRef.current
-        .filter((source) => source.selected)
-        .map((source) => source.id);
+      const hasNotebookSearch =
+        sourcePolicy?.channels?.includes("notebook") ?? true;
+      const selectedDocumentIds = hasNotebookSearch
+        ? sourcesRef.current.filter((source) => source.selected).map((source) => source.id)
+        : [];
 
       setStreamingToolCalls([]);
       setStreamingTracePhases([]);
@@ -169,11 +214,39 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
             onToolCalls: (tcs) => setStreamingToolCalls(tcs),
             onGroundingChecks: (checks) => setStreamingGrounding(checks),
             onClarification: (q) => setStreamingClarification(q),
+            onResearchPlan: (plan) => setStreamingResearchPlan(plan),
+            onResearchProgress: (p) => {
+              const { phase, detail } = researchProgressToStreamingActivity(p);
+              const allowed: ChatActivityPhase[] = [
+                "searching",
+                "reading",
+                "planning",
+                "thinking",
+                "generating",
+                "writing",
+                "retrieving",
+                "embedding",
+                "ranking",
+                "completed",
+              ];
+              const st = allowed.includes(phase) ? phase : "thinking";
+              setStreamingPhase(st);
+              setStreamingPhaseDetail(detail);
+              setStreamingTracePhases((prev) => {
+                const last = prev[prev.length - 1];
+                if (last && last.status === st && last.message === detail) return prev;
+                return [...prev, { status: st, message: detail }];
+              });
+            },
             onFollowUps: (qs) => setLastAssistantFollowUps(qs),
+            onExternalSources: (sources) => setExternalSources(sources),
             onComplete: onStreamComplete,
             onError: resetStreamingState,
           },
-          selectedDocumentIds.length > 0 ? selectedDocumentIds : []
+          selectedDocumentIds.length > 0 ? selectedDocumentIds : [],
+          deepResearch,
+          sourcePolicy,
+          activeConversationId ?? undefined,
         );
       } catch {
         resetStreamingState();
@@ -181,6 +254,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     },
     [
       activeNotebookId,
+      activeConversationId,
       isChatStreaming,
       chatRemoteGenerating,
       releaseChatGenerationMutation,
@@ -194,13 +268,14 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     try {
       await clearChatHistoryMutation({
         notebookId: activeNotebookId as Id<"notebooks">,
+        conversationId: activeConversationId ? (activeConversationId as Id<"conversations">) : undefined,
       });
       resetStreamingState();
     } catch (error) {
       console.error("Failed to clear chat history", error);
       resetStreamingState();
     }
-  }, [activeNotebookId, clearChatHistoryMutation, resetStreamingState]);
+  }, [activeNotebookId, activeConversationId, clearChatHistoryMutation, resetStreamingState]);
 
   useEffect(() => {
     const refLen = messagesLengthWhenStreamCompleteRef.current;
@@ -218,6 +293,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
       setStreamingPhaseDetail(null);
       setStreamingGrounding([]);
       setStreamingClarification(null);
+      setStreamingResearchPlan(null);
     }
   }, [streamingJustFinished, messages]);
 
@@ -257,7 +333,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
 
   const chatDisplayMessages = useMemo((): Message[] => {
     const list: Message[] = messages.map((msg: Doc<"messages">, index: number) => {
-      const meta = (msg as Doc<"messages"> & { metadata?: { agentTrace?: ChatAgentTrace } })
+      const meta = (msg as Doc<"messages"> & { metadata?: { agentTrace?: ChatAgentTrace; researchPlanId?: string; isResearchPlan?: boolean } })
         .metadata;
       const trace = meta?.agentTrace;
       return {
@@ -275,6 +351,9 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
             ? lastAssistantFollowUps
             : undefined,
         agentTrace: trace,
+        researchPlan: meta?.isResearchPlan && meta?.researchPlanId
+          ? streamingResearchPlan ?? { planId: meta.researchPlanId, subQuestions: [], sourcePolicy: {} }
+          : undefined,
       };
     });
     const t0 = streamStartedAtRef.current;
@@ -339,6 +418,7 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
         status: phaseForRow,
         statusDetail: statusDetailForRow,
         clarificationQuestion: streamingClarification ?? undefined,
+        externalSources: externalSources.length > 0 ? externalSources : undefined,
       });
     }
 
@@ -375,6 +455,8 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     streamingPhaseDetail,
     streamingGrounding,
     streamingClarification,
+    streamingResearchPlan,
+    externalSources,
     lastAssistantFollowUps,
     isChatStreaming,
     chatRemoteGenerating,
@@ -418,6 +500,79 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     [documents]
   );
 
+  const consumeResearchExecuteStream = useCallback(
+    async (response: Response) => {
+      if (isChatStreaming) return;
+
+      const onResearchStreamComplete = () => {
+        setIsChatStreaming(false);
+        setStreamingJustFinished(true);
+        const len = messagesRef.current.length;
+        messagesLengthWhenStreamCompleteRef.current = len > 0 ? len : -1;
+        streamStartedAtRef.current = null;
+      };
+
+      const pushStatus = (status: string, message?: string) => {
+        const allowed: ChatActivityPhase[] = [
+          "searching",
+          "reading",
+          "planning",
+          "thinking",
+          "generating",
+          "writing",
+          "retrieving",
+          "embedding",
+          "ranking",
+          "completed",
+        ];
+        const phase = allowed.includes(status as ChatActivityPhase)
+          ? (status as ChatActivityPhase)
+          : "thinking";
+        setStreamingPhase(phase);
+        setStreamingPhaseDetail(message ?? null);
+        const msg = message ?? "";
+        setStreamingTracePhases((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.status === phase && last.message === msg) return prev;
+          return [...prev, { status: phase, message: msg }];
+        });
+      };
+
+      setIsChatStreaming(true);
+      setStreamingContent("");
+      setStreamingReferences(null);
+      setStreamingToolCalls([]);
+      setStreamingGrounding([]);
+      setStreamingClarification(null);
+      setStreamingPhase("planning");
+      setStreamingPhaseDetail("Running approved research…");
+      setStreamingTracePhases([{ status: "planning", message: "Running approved research…" }]);
+      streamStartedAtRef.current = Date.now();
+
+      try {
+        await consumePersistentTextStream(response, {
+          onToken: (token) => setStreamingContent((prev) => prev + token),
+          onReferences: (refs) => setStreamingReferences(refs),
+          onStatus: (status, message) => pushStatus(status, message),
+          onResearchProgress: (p) => {
+            const { phase, detail } = researchProgressToStreamingActivity(p);
+            pushStatus(phase, detail);
+          },
+          onToolCalls: (tcs) => setStreamingToolCalls(tcs),
+          onGroundingChecks: (checks) => setStreamingGrounding(checks),
+          onComplete: onResearchStreamComplete,
+          onError: () => {
+            resetStreamingState();
+          },
+        });
+      } catch {
+        resetStreamingState();
+        throw new Error("Research stream failed");
+      }
+    },
+    [isChatStreaming, resetStreamingState]
+  );
+
   return {
     chatDisplayMessages,
     isChatStreaming,
@@ -429,9 +584,12 @@ export function useChatStream({ activeNotebookId, sources, notes, documents }: U
     setMessageFeedback,
     handleRetryMessage,
     setOptimisticSaveNote,
+    consumeResearchExecuteStream,
     sourceCount,
     sourceSummary: sourceSuggestions.summary,
     suggestions: sourceSuggestions.suggestions,
     isLoadingSuggestions: sourceSuggestions.isLoading,
+    externalSources,
+    clearExternalSources: () => setExternalSources([]),
   };
 }

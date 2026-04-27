@@ -2,7 +2,7 @@
 
 import { randomUUID } from "crypto";
 
-import { clearStateKeys } from "../_shared/index.js";
+import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
 
 import { extractTopic } from "./questionHeuristics.js";
@@ -252,7 +252,7 @@ export function finalizeQuestions(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     finalOutput: questionsWithIds,
     status: "completed",
     ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),

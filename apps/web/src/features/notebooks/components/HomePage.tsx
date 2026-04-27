@@ -51,7 +51,6 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   const onDeleteFolder = ctx.deleteFolder;
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const onRequireAuth = ctx.onRequireAuth;
-  const isAuthenticated = ctx.isAuthenticated;
 
   const [activeTab, setActiveTab] = useState("All");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -81,11 +80,6 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
 
   // Handlers for creating notebooks and folders via modal
   const handleCreateNotebookFromModal = async (data: NotebookCreateData) => {
-    if (!isAuthenticated) {
-      onRequireAuth("Sign in to create a notebook.");
-      notebookHandlers.closeCustomize();
-      return;
-    }
     try {
       await createNotebookHook({
         title: data.title,
@@ -101,7 +95,7 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
       if (!handled.isLimitError) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-        if (errorMessage.includes("Unauthorized")) {
+        if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
           notebookHandlers.closeCustomize();
           if (onRequireAuth) onRequireAuth("You need to sign in to create a notebook.");
         }
@@ -120,11 +114,6 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   };
 
   const handleCreateFolderFromModal = async (data: FolderCreateData) => {
-    if (!isAuthenticated) {
-      onRequireAuth("Sign in to create a folder.");
-      folderHandlers.closeFolderCustomize();
-      return;
-    }
     try {
       await createFolderHook({
         name: data.name,
@@ -137,7 +126,7 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
       console.error("Failed to create folder:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-      if (errorMessage.includes("Unauthorized")) {
+      if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
         folderHandlers.closeFolderCustomize();
         if (onRequireAuth) onRequireAuth("You need to sign in to create a folder.");
       }

@@ -1,4 +1,9 @@
-import type { Document, UploadResponse, UnifiedDiscoveryResult } from "@/shared/types/index";
+import type {
+  Document,
+  PaperRecordInput,
+  UploadResponse,
+  UnifiedDiscoveryResult,
+} from "@/shared/types/index";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -39,15 +44,32 @@ export function useGenerateUploadUrl() {
 export function useCreateDocument() {
   const upload = useMutation(api.documents.index.upload);
 
-  return async (data: {
-    notebookId: string;
-    type: "file" | "url" | "youtube" | "text";
-    source?: string;
-    fileName: string;
-    fileSize?: number;
-    storageId?: string;
-    contentType?: string;
-  }) => {
+  return async (
+    data:
+      | {
+          notebookId: string;
+          type: "file" | "url" | "youtube" | "text";
+          source?: string;
+          fileName: string;
+          fileSize?: number;
+          storageId?: string;
+          contentType?: string;
+        }
+      | {
+          notebookId: string;
+          type: "paper_record";
+          fileName: string;
+          paperRecord: PaperRecordInput;
+        }
+  ) => {
+    if (data.type === "paper_record") {
+      return await upload({
+        notebookId: data.notebookId as Id<"notebooks">,
+        type: "paper_record",
+        fileName: data.fileName,
+        paperRecord: data.paperRecord,
+      });
+    }
     return await upload({
       notebookId: data.notebookId as Id<"notebooks">,
       type: data.type,
@@ -194,6 +216,8 @@ export function useGetSignedUrl() {
 /**
  * Unified discovery service that searches across multiple source types
  * Supports web, news, academic, and finance sources with advanced filtering
+ *
+ * `maxResults` is a total cap across all selected types (split evenly per channel, e.g. 20 with web + academic → 10 each).
  */
 export function useUnifiedDiscovery() {
   const discover = useAction(api._services.search.DiscoveryService.discover);

@@ -18,7 +18,6 @@ export type JobType =
   | "slides"
   | "spreadsheet"
   | "written_questions"
-  | "wiki"
   | "document_embedding"
   /** Shared graph / node-builder paths without a Convex job document */
   | "agent_graph";

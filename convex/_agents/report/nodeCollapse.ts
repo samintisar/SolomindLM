@@ -4,7 +4,12 @@ import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { env } from "../../_lib/env.js";
-import { allWithConcurrency, clearStateKeys, createLangSmithRunConfig } from "../_shared/index.js";
+import {
+  allWithConcurrency,
+  clearStateKeys,
+  createLangSmithRunConfig,
+  withoutMapOutputs,
+} from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
@@ -150,7 +155,6 @@ export async function collapse(
   if (validOutputs.length === 0) {
     console.error("[ReportGraph] Collapse: ERROR - All chunks failed during map phase!");
     return {
-      ...state,
       collapsedOutputs: [],
       finalOutput:
         "# Error\n\nUnable to generate report. All source chunks failed to process. Please try again with smaller documents or different content.",
@@ -213,7 +217,7 @@ export async function collapse(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     collapsedOutputs: collapsed,
     status: "reducing",
     ...clearStateKeys<OverallStateType>(["mapOutputs"]),

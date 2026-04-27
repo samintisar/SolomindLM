@@ -33,11 +33,12 @@ export async function checkNotebookLimit(ctx: MutationCtx): Promise<void> {
   const isPro = !!subscription;
   const limit = isPro ? 100 : 5;
 
-  // Count existing notebooks
+  // Count up to limit+1 to avoid unbounded collect()
+  const cap = limit + 1;
   const notebooks = await ctx.db
     .query("notebooks")
     .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
+    .take(cap);
 
   if (notebooks.length >= limit) {
     throw createNotebookLimitError(notebooks.length, limit, isPro);
@@ -61,11 +62,11 @@ export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Pr
   const isPro = !!subscription;
   const limit = isPro ? 500 : 20;
 
-  // Count existing documents for this notebook
+  const cap = limit + 1;
   const documents = await ctx.db
     .query("documents")
     .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId as Id<"notebooks">))
-    .collect();
+    .take(cap);
 
   if (documents.length >= limit) {
     throw createSourceLimitError(documents.length, limit, isPro);

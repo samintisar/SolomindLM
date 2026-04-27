@@ -41,6 +41,19 @@ export const getInternal = internalQuery({
   },
 });
 
+/**
+ * Internal: Load written-question set when the user can edit the notebook (actions without query auth).
+ */
+export const getWrittenQuestionForUserInternal = internalQuery({
+  args: { id: v.id("writtenQuestions"), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const wq = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
+    if (!wq) return null;
+    await assertCanEditNotebook(ctx, wq.notebookId, args.userId);
+    return wq;
+  },
+});
+
 export const create = mutation({
   args: {
     notebookId: v.id("notebooks"),

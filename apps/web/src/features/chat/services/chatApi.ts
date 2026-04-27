@@ -10,7 +10,7 @@ import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useAuthToken } from "@convex-dev/auth/react";
 
 // Convex HTTP actions use the .site URL. Derive from .cloud if only VITE_CONVEX_URL is set.
-const CONVEX_SITE_URL =
+export const CONVEX_SITE_URL =
   import.meta.env.VITE_CONVEX_SITE_URL ||
   import.meta.env.VITE_CONVEX_URL?.replace(".cloud", ".site");
 if (!CONVEX_SITE_URL) {
@@ -42,6 +42,16 @@ export interface ParsedStreamData {
   followUps?: string[];
   clarification?: { question: string };
   error?: { message: string; type?: string };
+  researchPlan?: { planId: string; subQuestions: unknown[]; sourcePolicy: unknown };
+  researchProgress?: { phase: string; subQuestionId?: string; sourcesFound?: number };
+  /** External sources discovered during non-Deep-Research chat */
+  externalSources?: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    sourceType: string;
+    score?: number;
+  }>;
   isDone: boolean;
 }
 
@@ -79,6 +89,10 @@ export interface SendMessageCallbacks {
   onGroundingChecks?: (checks: AgentGroundingCheck[]) => void;
   onFollowUps?: (questions: string[]) => void;
   onClarification?: (question: string) => void;
+  onResearchPlan?: (plan: { planId: string; subQuestions: unknown[]; sourcePolicy: unknown }) => void;
+  onResearchProgress?: (progress: { phase: string; subQuestionId?: string; sourcesFound?: number }) => void;
+  /** External sources discovered from web/academic/news/finance search */
+  onExternalSources?: (sources: Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }>) => void;
   onComplete: () => void;
   onError: (error: string | ChatError) => void;
 }
@@ -197,8 +211,26 @@ export function parseStreamBody(body: string): ParsedStreamData {
       } catch {
         // Ignore parse errors
       }
+    } else if (line.startsWith("__RESEARCH_PLAN:")) {
+      try {
+        result.researchPlan = JSON.parse(line.slice("__RESEARCH_PLAN:".length));
+      } catch {
+        // Ignore parse errors
+      }
+    } else if (line.startsWith("__RESEARCH_PROGRESS:")) {
+      try {
+        result.researchProgress = JSON.parse(line.slice("__RESEARCH_PROGRESS:".length));
+      } catch {
+        // Ignore parse errors
+      }
     } else if (line.startsWith("__DONE")) {
       result.isDone = true;
+    } else if (line.startsWith("__EXTERNAL_SOURCES:")) {
+      try {
+        result.externalSources = JSON.parse(line.slice("__EXTERNAL_SOURCES:".length));
+      } catch {
+        // Ignore parse errors
+      }
     } else {
       // Regular text content
       currentText += line + "\n";
@@ -220,6 +252,134 @@ export function parseStreamBody(body: string): ParsedStreamData {
 // ============================================================
 // Chat API Service
 // ============================================================
+
+/**
+ * Read a Convex persistent-text HTTP response (chat/stream, research/execute, …)
+ * and invoke the same callbacks as {@link useSendMessage}.
+ */
+export async function consumePersistentTextStream(
+  response: Response,
+  callbacks: SendMessageCallbacks
+): Promise<void> {
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) {
+    throw new Error("No response body received");
+  }
+
+  let buffer = "";
+  let lastProcessedLength = 0;
+  let completed = false;
+  let lastReferencesJson: string | null = null;
+  let lastToolCallsJson: string | null = null;
+  let lastFollowUpsJson: string | null = null;
+  let lastStatusJson: string | null = null;
+  let lastGroundingJson: string | null = null;
+  let lastClarificationJson: string | null = null;
+  let lastResearchProgressJson: string | null = null;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
+      }
+
+      const parsed = parseStreamBody(buffer);
+
+      if (parsed.text.length > lastProcessedLength) {
+        const newText = parsed.text.slice(lastProcessedLength);
+        callbacks.onToken(newText);
+        lastProcessedLength = parsed.text.length;
+      }
+
+      if (parsed.references) {
+        const j = JSON.stringify(parsed.references);
+        if (j !== lastReferencesJson) {
+          lastReferencesJson = j;
+          callbacks.onReferences(parsed.references);
+        }
+      }
+      if (parsed.status) {
+        const sj = JSON.stringify(parsed.status);
+        if (sj !== lastStatusJson) {
+          lastStatusJson = sj;
+          callbacks.onStatus?.(parsed.status.status, parsed.status.message);
+        }
+      }
+      if (parsed.toolCalls) {
+        const j = JSON.stringify(parsed.toolCalls);
+        if (j !== lastToolCallsJson) {
+          lastToolCallsJson = j;
+          callbacks.onToolCalls?.(parsed.toolCalls);
+        }
+      }
+      if (parsed.followUps) {
+        const j = JSON.stringify(parsed.followUps);
+        if (j !== lastFollowUpsJson) {
+          lastFollowUpsJson = j;
+          callbacks.onFollowUps?.(parsed.followUps);
+        }
+      }
+      if (parsed.clarification) {
+        const cj = JSON.stringify(parsed.clarification);
+        if (cj !== lastClarificationJson) {
+          lastClarificationJson = cj;
+          callbacks.onClarification?.(parsed.clarification.question);
+        }
+      }
+      if (parsed.groundingChecks && parsed.groundingChecks.length > 0) {
+        const gj = JSON.stringify(parsed.groundingChecks);
+        if (gj !== lastGroundingJson) {
+          lastGroundingJson = gj;
+          callbacks.onGroundingChecks?.(parsed.groundingChecks);
+        }
+      }
+      if (parsed.researchPlan) {
+        callbacks.onResearchPlan?.(parsed.researchPlan);
+      }
+      if (parsed.researchProgress) {
+        const rj = JSON.stringify(parsed.researchProgress);
+        if (rj !== lastResearchProgressJson) {
+          lastResearchProgressJson = rj;
+          callbacks.onResearchProgress?.(parsed.researchProgress);
+        }
+      }
+      if (parsed.error) {
+        callbacks.onError(parsed.error);
+        break;
+      }
+      if (parsed.externalSources) {
+        callbacks.onExternalSources?.(parsed.externalSources);
+      }
+      if (parsed.isDone) {
+        completed = true;
+        callbacks.onComplete();
+        try {
+          await reader.cancel();
+        } catch {
+          /* stream may already be closed */
+        }
+        break;
+      }
+
+      if (done) {
+        if (!completed) {
+          callbacks.onComplete();
+        }
+        break;
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      /* already released */
+    }
+  }
+}
 
 /**
  * Get conversation history for a notebook
@@ -251,10 +411,12 @@ export function useChatHistory(notebookId: string | null) {
  * Note: This functionality is not yet implemented in the Convex API
  */
 export function useRenameConversation() {
-  // TODO: Implement updateTitle mutation in convex/chat.ts
-  return async (_conversationId: string, _title: string) => {
-    throw new Error("Rename conversation is not yet implemented");
-  };
+  const renameMutation = useMutation(api.chat.messages.renameConversation);
+  return useCallback(
+    (conversationId: string, title: string) =>
+      renameMutation({ conversationId: conversationId as Id<"conversations">, title }),
+    [renameMutation]
+  );
 }
 
 /**
@@ -298,7 +460,10 @@ export function useSendMessage() {
       notebookId: string,
       message: string,
       callbacks: SendMessageCallbacks,
-      documentIds?: string[]
+      documentIds?: string[],
+      deepResearch?: boolean,
+      sourcePolicy?: { channels: string[] },
+      conversationId?: string
     ) => {
       let tempMessageId: string | null;
 
@@ -312,7 +477,10 @@ export function useSendMessage() {
 
       const releaseGenerationIfSafe = async () => {
         try {
-          await releaseChatGeneration({ notebookId: notebookId as Id<"notebooks"> });
+          await releaseChatGeneration({
+            notebookId: notebookId as Id<"notebooks">,
+            conversationId: conversationId ? (conversationId as Id<"conversations">) : undefined,
+          });
         } catch {
           // Best-effort: server job may have already decremented the refcount
         }
@@ -325,6 +493,7 @@ export function useSendMessage() {
           notebookId: notebookId as Id<"notebooks">,
           message,
           documentIds,
+          conversationId: conversationId ? (conversationId as Id<"conversations">) : undefined,
         });
 
         tempMessageId = result.tempMessageId;
@@ -346,6 +515,10 @@ export function useSendMessage() {
             notebookId,
             message,
             documentIds,
+            conversationId: conversationId || undefined,
+            userMessageId: result.messageId,
+            deepResearch: deepResearch || undefined,
+            sourcePolicy: sourcePolicy ?? undefined,
           }),
         });
 
@@ -362,116 +535,7 @@ export function useSendMessage() {
 
         streamJobMayHaveStarted = true;
 
-        // Step 4: Read the streaming response
-        // With Persistent Text Streaming, this is raw text with embedded metadata
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) {
-          throw new Error("No response body received");
-        }
-
-        let buffer = "";
-        let lastProcessedLength = 0;
-        let completed = false;
-        let lastReferencesJson: string | null = null;
-        let lastToolCallsJson: string | null = null;
-        let lastFollowUpsJson: string | null = null;
-        let lastStatusJson: string | null = null;
-        let lastGroundingJson: string | null = null;
-        let lastClarificationJson: string | null = null;
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-
-            if (value) {
-              buffer += decoder.decode(value, { stream: true });
-            }
-
-            // Parse the current buffer for metadata markers (including final chunk when done)
-            const parsed = parseStreamBody(buffer);
-
-            // Only call onToken with new text since last processed
-            if (parsed.text.length > lastProcessedLength) {
-              const newText = parsed.text.slice(lastProcessedLength);
-              callbacks.onToken(newText);
-              lastProcessedLength = parsed.text.length;
-            }
-
-            // Handle metadata (dedupe: parseStreamBody re-scans the full buffer every chunk)
-            if (parsed.references) {
-              const j = JSON.stringify(parsed.references);
-              if (j !== lastReferencesJson) {
-                lastReferencesJson = j;
-                callbacks.onReferences(parsed.references);
-              }
-            }
-            if (parsed.status) {
-              const sj = JSON.stringify(parsed.status);
-              if (sj !== lastStatusJson) {
-                lastStatusJson = sj;
-                callbacks.onStatus?.(parsed.status.status, parsed.status.message);
-              }
-            }
-            if (parsed.toolCalls) {
-              const j = JSON.stringify(parsed.toolCalls);
-              if (j !== lastToolCallsJson) {
-                lastToolCallsJson = j;
-                callbacks.onToolCalls?.(parsed.toolCalls);
-              }
-            }
-            if (parsed.followUps) {
-              const j = JSON.stringify(parsed.followUps);
-              if (j !== lastFollowUpsJson) {
-                lastFollowUpsJson = j;
-                callbacks.onFollowUps?.(parsed.followUps);
-              }
-            }
-            if (parsed.clarification) {
-              const cj = JSON.stringify(parsed.clarification);
-              if (cj !== lastClarificationJson) {
-                lastClarificationJson = cj;
-                callbacks.onClarification?.(parsed.clarification.question);
-              }
-            }
-            if (parsed.groundingChecks && parsed.groundingChecks.length > 0) {
-              const gj = JSON.stringify(parsed.groundingChecks);
-              if (gj !== lastGroundingJson) {
-                lastGroundingJson = gj;
-                callbacks.onGroundingChecks?.(parsed.groundingChecks);
-              }
-            }
-            if (parsed.error) {
-              callbacks.onError(parsed.error);
-              break;
-            }
-            if (parsed.isDone) {
-              completed = true;
-              callbacks.onComplete();
-              try {
-                await reader.cancel();
-              } catch {
-                /* stream may already be closed */
-              }
-              break;
-            }
-
-            // Stream ended: ensure we always clear loading state even if __DONE wasn't in buffer
-            if (done) {
-              if (!completed) {
-                callbacks.onComplete();
-              }
-              break;
-            }
-          }
-        } finally {
-          try {
-            reader.releaseLock();
-          } catch {
-            /* already released or locked by cancel */
-          }
-        }
+        await consumePersistentTextStream(response, callbacks);
       } catch (error) {
         if (!streamJobMayHaveStarted) {
           await releaseGenerationIfSafe();

@@ -27,6 +27,141 @@ export interface AcademicPaper {
   openAccess: boolean;
   hasFullText: boolean;
   type: string;
+  /** Raw DOI string (no URL prefix) when present */
+  doi?: string;
+  /** Full OpenAlex work ID URL, e.g. https://openalex.org/W123 */
+  openAlexWorkId?: string;
+  /** Best OA PDF URL when OpenAlex exposes one */
+  pdfUrl?: string;
+  /** Publisher or repository landing page */
+  landingPageUrl?: string;
+  /** License string when present on location objects */
+  license?: string;
+}
+
+type OpenAlexLocation = {
+  pdf_url?: string | null;
+  landing_page_url?: string | null;
+  is_oa?: boolean | null;
+  license?: string | null;
+};
+
+type OpenAlexWork = {
+  id?: string;
+  doi?: string | null;
+  ids?: {
+    doi?: string | null;
+    openalex?: string | null;
+  } | null;
+  best_oa_location?: OpenAlexLocation | null;
+  primary_location?: OpenAlexLocation | null;
+  locations?: OpenAlexLocation[] | null;
+  open_access?: {
+    is_oa?: boolean | null;
+    oa_url?: string | null;
+  } | null;
+  has_content?: {
+    pdf?: boolean | null;
+  } | null;
+};
+
+function isUsableArticleUrl(url: unknown): url is string {
+  if (typeof url !== "string" || url.trim().length === 0) return false;
+
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      parsed.hostname !== "openalex.org"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function pickFirstUsableUrl(urls: unknown[]): string | undefined {
+  return urls.find(isUsableArticleUrl);
+}
+
+function resolveArticleUrl(work: OpenAlexWork): string {
+  const locations = work.locations ?? [];
+  const oaLocations = locations.filter((location) => location.is_oa);
+
+  return (
+    pickFirstUsableUrl([
+      work.best_oa_location?.pdf_url,
+      work.open_access?.oa_url,
+      ...oaLocations.map((location) => location.pdf_url),
+      ...locations.map((location) => location.pdf_url),
+      work.primary_location?.pdf_url,
+      work.best_oa_location?.landing_page_url,
+      work.primary_location?.landing_page_url,
+      ...oaLocations.map((location) => location.landing_page_url),
+      ...locations.map((location) => location.landing_page_url),
+      work.doi,
+      work.ids?.doi,
+    ]) ||
+    work.ids?.openalex ||
+    work.id ||
+    ""
+  );
+}
+
+function hasArticleContent(work: OpenAlexWork): boolean {
+  const locations = work.locations ?? [];
+  return Boolean(
+    work.has_content?.pdf ||
+      work.open_access?.oa_url ||
+      work.best_oa_location?.pdf_url ||
+      locations.some((location) => location.pdf_url)
+  );
+}
+
+function pickLicense(work: OpenAlexWork): string | undefined {
+  const candidates = [
+    work.best_oa_location?.license,
+    work.primary_location?.license,
+    ...(work.locations ?? []).map((l) => l.license),
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return undefined;
+}
+
+function pickPdfUrl(work: OpenAlexWork): string | undefined {
+  const locations = work.locations ?? [];
+  const oaLocs = locations.filter((l) => l.is_oa);
+  const ordered = [
+    work.best_oa_location?.pdf_url,
+    work.open_access?.oa_url,
+    ...oaLocs.map((l) => l.pdf_url),
+    ...locations.map((l) => l.pdf_url),
+    work.primary_location?.pdf_url,
+  ];
+  const hit = ordered.find(isUsableArticleUrl);
+  return hit;
+}
+
+function pickLandingPageUrl(work: OpenAlexWork): string | undefined {
+  const locations = work.locations ?? [];
+  const oaLocs = locations.filter((l) => l.is_oa);
+  const ordered = [
+    work.best_oa_location?.landing_page_url,
+    work.primary_location?.landing_page_url,
+    ...oaLocs.map((l) => l.landing_page_url),
+    ...locations.map((l) => l.landing_page_url),
+  ];
+  const hit = ordered.find(isUsableArticleUrl);
+  return hit;
+}
+
+function normalizeDoiFromWork(work: { doi?: string | null; ids?: { doi?: string | null } | null }):
+  | string
+  | undefined {
+  const raw = work.ids?.doi || work.doi;
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  return raw.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim() || undefined;
 }
 
 // ============================================================
@@ -76,7 +211,7 @@ export const searchInternal = internalAction({
       filters.push(`open_access.is_oa:true`);
     }
     if (hasFullText) {
-      filters.push(`has_fulltext:true`);
+      filters.push(`has_content.pdf:true`);
     }
 
     let sortParam = "";
@@ -128,6 +263,7 @@ export const searchInternal = internalAction({
 
       // Extract and transform results
       const papers: AcademicPaper[] = (data.results || []).map((work: any) => {
+        const openAlexWork = work as OpenAlexWork;
         // Extract authors
         const authors = (work.authorships || [])
           .map((auth: any) => auth.author?.display_name)
@@ -143,16 +279,20 @@ export const searchInternal = internalAction({
 
         // Extract open access info
         const openAccess = work.open_access?.is_oa || false;
-        const hasFullText =
-          !!work.best_oa_location?.pdf_url ||
-          !!work.best_oa_location?.landing_page_url ||
-          openAccess;
-
-        // Build URL (prefer PDF, then landing page, then OpenAlex page)
-        const pdfUrl = work.best_oa_location?.pdf_url;
-        const landingUrl = work.best_oa_location?.landing_page_url;
-        const openAlexUrl = work.id;
-        const url = pdfUrl || landingUrl || openAlexUrl;
+        const hasFullText = hasArticleContent(openAlexWork);
+        const url = resolveArticleUrl(openAlexWork);
+        const doi = normalizeDoiFromWork(work);
+        const pdfUrl = pickPdfUrl(openAlexWork);
+        const landingPageUrl = pickLandingPageUrl(openAlexWork);
+        const license = pickLicense(openAlexWork);
+        const openAlexWorkId =
+          typeof work.id === "string" && work.id.startsWith("https://openalex.org/")
+            ? work.id
+            : typeof work.ids?.openalex === "string"
+              ? work.ids.openalex
+              : typeof work.id === "string"
+                ? work.id
+                : undefined;
 
         // Build snippet (abstract or first sentence of title)
         let snippet = work.title || "";
@@ -186,6 +326,11 @@ export const searchInternal = internalAction({
           openAccess,
           hasFullText,
           type: work.type || "article",
+          doi,
+          openAlexWorkId,
+          pdfUrl,
+          landingPageUrl,
+          license,
         };
       });
 
@@ -207,7 +352,7 @@ export const searchInternal = internalAction({
 
 const searchCache = createCachedAction(
   internal._services.search.OpenAlexSearchService.searchInternal,
-  { ttl: withJitter(CACHE_TTL.search * 24, 0.15), name: "openalex-search" } // 24h cache for academic papers
+  { ttl: withJitter(CACHE_TTL.search * 24, 0.15), name: "openalex-search-v2" } // 24h cache for academic papers
 );
 
 /**

@@ -17,6 +17,7 @@ import {
   useUpdateQuizProgress,
 } from "@/features/studio/services/quizzesApi";
 import { sanitizeMarkdown } from "@/shared/utils";
+import { normalizeStoredQuizQuestion, stripQuizOptionLabel } from "@/shared/utils/quizOptionLabels";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -75,10 +76,20 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
 
   const questions = note.questions;
   const currentQuestion = questions[currentIndex];
+  const displayQuestion = useMemo(
+    () => normalizeStoredQuizQuestion(currentQuestion),
+    [currentQuestion]
+  );
+  const selectedForDisplay = useMemo(() => {
+    const u = userAnswers[currentIndex];
+    if (u === undefined) return null;
+    if (currentQuestion.options.length === 5 && u === 4) return 3;
+    if (u >= displayQuestion.options.length) return displayQuestion.options.length - 1;
+    return u;
+  }, [userAnswers, currentIndex, currentQuestion, displayQuestion.options.length]);
 
   // Derived state
   const isAnswered = userAnswers[currentIndex] !== undefined;
-  const selectedOption = userAnswers[currentIndex] ?? null;
 
   const handleSelect = async (index: number) => {
     if (isAnswered || reviewMode) return;
@@ -290,10 +301,11 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
           </div>
 
           <div className="space-y-4 flex-1 pb-10">
-            {currentQuestion.options.map((option, idx) => {
+            {displayQuestion.options.map((option, idx) => {
               let stateStyles = "border-border hover:bg-secondary/50 hover:border-primary/50";
-              const isCorrect = idx === currentQuestion.answer;
-              const isIncorrectSelection = idx === selectedOption && idx !== currentQuestion.answer;
+              const isCorrect = idx === displayQuestion.answer;
+              const isIncorrectSelection =
+                idx === selectedForDisplay && idx !== displayQuestion.answer;
 
               if (reviewMode || isAnswered) {
                 if (isCorrect) {
@@ -305,7 +317,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                 } else {
                   stateStyles = "opacity-50 border-border";
                 }
-              } else if (selectedOption === idx) {
+              } else if (selectedForDisplay === idx) {
                 stateStyles = "border-primary bg-primary/5";
               }
 
@@ -354,14 +366,14 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                           p: ({ children }) => <span className="font-medium">{children}</span>,
                         }}
                       >
-                        {sanitizeMarkdown(option)}
+                        {sanitizeMarkdown(stripQuizOptionLabel(option))}
                       </MarkdownRenderer>
                     </Suspense>
                   </div>
-                  {isAnswered && idx === currentQuestion.answer && (
+                  {isAnswered && idx === displayQuestion.answer && (
                     <CheckCircle2 className="w-5 h-5 text-success" />
                   )}
-                  {isAnswered && idx === selectedOption && idx !== currentQuestion.answer && (
+                  {isAnswered && idx === selectedForDisplay && idx !== displayQuestion.answer && (
                     <XCircle className="w-5 h-5 text-destructive" />
                   )}
                 </button>

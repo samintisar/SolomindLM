@@ -24,15 +24,57 @@ export async function getConversationByUserAndNotebook(
     .first();
 }
 
+/** All threads in a notebook (for Cowork: shared across owner + editors). */
+export async function listConversationsInNotebook(
+  ctx: QueryCtx,
+  notebookId: Id<"notebooks">
+): Promise<Doc<"conversations">[]> {
+  return await ctx.db
+    .query("conversations")
+    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+    .collect();
+}
+
+/** Most recently updated thread in a notebook, or null. */
+export async function getPrimaryConversationForNotebook(
+  ctx: QueryCtx,
+  notebookId: Id<"notebooks">
+): Promise<Doc<"conversations"> | null> {
+  const all = await listConversationsInNotebook(ctx, notebookId);
+  if (all.length === 0) {
+    return null;
+  }
+  return all.sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+}
+
+/**
+ * Conversations in every notebook the user can access (owned + Cowork memberships).
+ */
 export async function getUserConversations(
   ctx: QueryCtx,
   userId: Id<"users">
 ): Promise<Doc<"conversations">[]> {
-  return await ctx.db
-    .query("conversations")
-    .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
-    .order("desc")
+  const owned = await ctx.db
+    .query("notebooks")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
+  const memberships = await ctx.db
+    .query("notebookMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  const notebookIds = new Set<Id<"notebooks">>();
+  for (const n of owned) {
+    notebookIds.add(n._id);
+  }
+  for (const m of memberships) {
+    notebookIds.add(m.notebookId);
+  }
+  const all: Doc<"conversations">[] = [];
+  for (const notebookId of notebookIds) {
+    const convs = await listConversationsInNotebook(ctx, notebookId);
+    all.push(...convs);
+  }
+  return all.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export type ConversationCreate = {

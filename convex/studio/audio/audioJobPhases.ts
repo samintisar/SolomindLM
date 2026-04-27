@@ -23,10 +23,8 @@ import {
   buildCoveredTopicsPrompt,
   TARGET_LINE_COUNTS,
   DIALOGUE_CHUNK_SIZE,
-  ESTIMATED_WORDS_PER_LINE,
   MAP_SYSTEM_PROMPT,
   REDUCE_SYSTEM_PROMPT,
-  EXAMPLE_EXTRACTION_SYSTEM_PROMPT,
   type AudioType,
   type AudioLength,
 } from "../../_agents/audio_overview/prompts";
@@ -453,7 +451,7 @@ export async function runFinalizeAudioOverviewPhase(
     const allBeats: string[] = [];
     const failedCount = { count: 0 };
 
-    for (const [idx, resultJson] of Object.entries(mapResults)) {
+    for (const [_idx, resultJson] of Object.entries(mapResults)) {
       try {
         const parsed = JSON.parse(resultJson);
         if (parsed._error) {
@@ -678,7 +676,7 @@ export async function runFinalizeAudioOverviewPhase(
             timeoutMs: CONFIG.TTS_TIMEOUT_MS,
           });
           return { index: globalIndex, buffer };
-        } catch (error) {
+        } catch (_error) {
           console.log(`[AudioJob] Failed line ${globalIndex + 1}`);
           return { index: globalIndex, buffer: null };
         }
@@ -745,7 +743,7 @@ export async function runFinalizeAudioOverviewPhase(
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
         chunk: combined.substring(0, 2000),
       });
-    } catch (e) {
+    } catch (_e) {
       console.log("[AudioJob] Title generation failed, using default");
     }
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -24,56 +24,55 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const iconColors = {
-    danger: "text-destructive bg-destructive/10",
-    warning: "text-warning bg-warning/10",
-    default: "text-primary bg-primary/10",
-  };
-
   const confirmButtonStyles = {
     danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
     warning: "bg-warning text-warning-foreground hover:bg-warning/90",
     default: "bg-primary text-primary-foreground hover:bg-primary/90",
   };
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-md bg-card border border-border rounded-xl shadow-2xl animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${iconColors[variant]}`}>
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <h2 className="text-xl font-bold font-sans">{title}</h2>
-          </div>
-          <button
-            onClick={onCancel}
-            className="p-1 hover:bg-secondary/50 rounded-xl transition-colors text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-5 h-5" />
-          </button>
+  const content = (
+    <div
+      data-confirm-dialog-root
+      className="fixed inset-0 z-300 flex items-center justify-center p-4 font-sans antialiased"
+      role="presentation"
+    >
+      <div
+        className="absolute inset-0 bg-foreground/25 backdrop-blur-[1px] animate-in fade-in duration-150"
+        onClick={onCancel}
+        aria-hidden
+      />
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-desc"
+        className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-6 text-left shadow-lg animate-in fade-in zoom-in-95 duration-150"
+      >
+        <h2
+          id="confirm-dialog-title"
+          className="text-lg font-semibold leading-snug tracking-tight text-foreground"
+        >
+          {title}
+        </h2>
+        <div
+          id="confirm-dialog-desc"
+          className="mt-2 text-sm leading-relaxed text-muted-foreground"
+        >
+          {typeof message === "string" ? <p className="m-0">{message}</p> : message}
         </div>
 
-        {/* Body */}
-        <div className="p-6">
-          <div className="text-sm text-foreground leading-relaxed">
-            {typeof message === "string" ? <p>{message}</p> : message}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 pt-0">
+        <div className="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row sm:gap-2">
           <button
+            type="button"
             onClick={onCancel}
-            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 font-medium transition-colors"
+            className="inline-flex h-9 w-full items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted/80 sm:w-auto"
           >
             {cancelText}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${confirmButtonStyles[variant]}`}
+            className={`inline-flex h-9 w-full min-w-20 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors sm:w-auto ${confirmButtonStyles[variant]}`}
           >
             {confirmText}
           </button>
@@ -81,6 +80,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 };
 
 // Hook for using the dialog
@@ -92,12 +93,20 @@ export const useConfirmDialog = () => {
     confirmText?: string;
     cancelText?: string;
     variant?: "danger" | "warning" | "default";
-    onConfirm?: () => void;
   }>({
     isOpen: false,
     title: "",
     message: "",
   });
+
+  const resolveRef = React.useRef<((value: boolean) => void) | null>(null);
+
+  const finish = React.useCallback((result: boolean) => {
+    setState((prev) => ({ ...prev, isOpen: false }));
+    const resolve = resolveRef.current;
+    resolveRef.current = null;
+    resolve?.(result);
+  }, []);
 
   const confirm = React.useCallback(
     (
@@ -110,6 +119,7 @@ export const useConfirmDialog = () => {
       }
     ): Promise<boolean> => {
       return new Promise((resolve) => {
+        resolveRef.current = resolve;
         setState({
           isOpen: true,
           title,
@@ -117,10 +127,6 @@ export const useConfirmDialog = () => {
           confirmText: options?.confirmText,
           cancelText: options?.cancelText,
           variant: options?.variant || "default",
-          onConfirm: () => {
-            setState((prev) => ({ ...prev, isOpen: false }));
-            resolve(true);
-          },
         });
       });
     },
@@ -128,10 +134,6 @@ export const useConfirmDialog = () => {
   );
 
   const Dialog = React.useCallback(() => {
-    const handleCancel = () => {
-      setState((prev) => ({ ...prev, isOpen: false }));
-    };
-
     return (
       <ConfirmDialog
         isOpen={state.isOpen}
@@ -140,11 +142,11 @@ export const useConfirmDialog = () => {
         confirmText={state.confirmText}
         cancelText={state.cancelText}
         variant={state.variant}
-        onConfirm={() => state.onConfirm?.()}
-        onCancel={handleCancel}
+        onConfirm={() => finish(true)}
+        onCancel={() => finish(false)}
       />
     );
-  }, [state]);
+  }, [state, finish]);
 
   return { confirm, ConfirmDialogComponent: Dialog };
 };

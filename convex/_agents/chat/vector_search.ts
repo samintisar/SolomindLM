@@ -8,6 +8,7 @@
  */
 
 import { env } from "../../_lib/env";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import type { ReferenceChunk, ChunkMetadata } from "../../storage/ChatHistoryService";
 import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
 
@@ -110,7 +111,7 @@ export class VectorSearchHandler {
     preComputedEmbedding?: number[],
     /** Extra text (e.g. HyDE paragraph) appended for reranking only — does not change the embedding. */
     retrievalAugmentForRerank?: string,
-    options?: { skipRerank?: boolean; allowEmpty?: boolean }
+    options?: { skipRerank?: boolean; allowEmpty?: boolean; quiet?: boolean }
   ): Promise<ReferenceChunk[]> {
     if (!this.embeddingService || !this.vectorSearchRunner) {
       throw new Error(
@@ -118,13 +119,24 @@ export class VectorSearchHandler {
       );
     }
 
-    console.log(`[VectorSearch] query="${query.slice(0, 80)}..."`);
-    console.log(
-      `[VectorSearch] params: threshold=${this.config.vectorMatchThreshold}, count=${this.config.vectorMatchCount}, rerankTopN=${this.config.rerankTopN}`
-    );
+    const quiet = options?.quiet === true;
+    const log = createServiceLogger("vectorSearch", "search", {
+      userId,
+      notebookId: noteId,
+    });
+    const t0 = Date.now();
 
-    if (preComputedEmbedding) {
-      console.log("[VectorSearch] Using pre-computed HyDE embedding");
+    if (!quiet) {
+      log.debug("query", { preview: query.slice(0, 120), length: query.length });
+      log.debug("params", {
+        threshold: this.config.vectorMatchThreshold,
+        count: this.config.vectorMatchCount,
+        rerankTopN: this.config.rerankTopN,
+      });
+    }
+
+    if (!quiet && preComputedEmbedding) {
+      log.debug("embedding", { source: "precomputed_hyde" });
     }
     const queryEmbedding = preComputedEmbedding ?? (await this.embeddingService.embedText(query));
     const raw = await this.vectorSearchRunner(
@@ -133,7 +145,9 @@ export class VectorSearchHandler {
       documentIds
     );
 
-    console.log(`[VectorSearch] Raw results from runner: ${raw.length}`);
+    if (!quiet) {
+      log.debug("raw_results", { count: raw.length });
+    }
 
     // No fallback: respect the user's document selection strictly
 
@@ -142,10 +156,9 @@ export class VectorSearchHandler {
       similarity: r._score ?? 0,
     }));
 
-    // Debug: Log all scores before filtering
-    if (raw.length > 0) {
+    if (!quiet && raw.length > 0) {
       const scores = withScore.map((r) => r.similarity);
-      console.log(`[VectorSearch] Scores:`, {
+      log.debug("scores", {
         min: Math.min(...scores),
         max: Math.max(...scores),
         avg: scores.reduce((a, b) => a + b, 0) / scores.length,
@@ -154,15 +167,33 @@ export class VectorSearchHandler {
       });
     }
 
-    const filtered = withScore.filter(
+    let filtered = withScore.filter(
       (r) => (r.similarity ?? 0) >= this.config.vectorMatchThreshold
     );
-    console.log(`[VectorSearch] After threshold: ${filtered.length} results`);
+    if (!quiet) {
+      log.debug("after_threshold", { count: filtered.length });
+    }
 
-    // No threshold fallback when documentIds are strictly enforced
+    // Align with vectorSearchRunner last-resort: if the runner returned candidates but
+    // none meet the global threshold, still use the best-scoring chunks (weak retrieval).
+    if (filtered.length === 0 && raw.length > 0) {
+      const take = Math.min(
+        Math.max(this.config.vectorMatchCount, this.config.maxResults),
+        raw.length
+      );
+      log.warn("Weak fallback: no chunks above threshold; using top by score", {
+        threshold: this.config.vectorMatchThreshold,
+        take,
+      });
+      filtered = [...withScore]
+        .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+        .slice(0, take);
+    }
 
     const deduped = this.deduplicateResults(filtered);
-    console.log(`[VectorSearch] After dedup: ${deduped.length}`);
+    if (!quiet) {
+      log.debug("after_dedup", { count: deduped.length });
+    }
 
     const allowEmpty = options?.allowEmpty === true;
     if (deduped.length === 0 && allowEmpty) {
@@ -178,7 +209,7 @@ export class VectorSearchHandler {
     if (options?.skipRerank) {
       ranked = [...deduped].sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
     } else {
-      ranked = await this.rerankResults(rerankQuery, deduped);
+      ranked = await this.rerankResults(rerankQuery, deduped, quiet);
     }
 
     const pool = options?.skipRerank
@@ -211,7 +242,11 @@ export class VectorSearchHandler {
       };
     });
 
-    console.log(`[VectorSearch] final: ${finalResults.length} results`);
+    const latencyMs = Date.now() - t0;
+    log.performance("vector_search", latencyMs, "ms", {
+      quiet,
+      final_count: finalResults.length,
+    });
 
     if (finalResults.length === 0 && allowEmpty) {
       return [];
@@ -270,17 +305,24 @@ export class VectorSearchHandler {
 
   protected async rerankResults(
     query: string,
-    results: (VectorSearchRawResult & { similarity?: number })[]
+    results: (VectorSearchRawResult & { similarity?: number })[],
+    quiet?: boolean
   ): Promise<(VectorSearchRawResult & { similarity?: number })[]> {
     const key = env.ZEROENTROPY_API_KEY;
     if (!key || results.length <= this.config.rerankThreshold) {
-      console.log(`[VectorSearch] Skipping reranking: key=${!!key}, results=${results.length}`);
+      if (!quiet) {
+        const log = createServiceLogger("vectorSearch", "rerank");
+        log.debug("skip_rerank", { hasKey: !!key, results: results.length });
+      }
       return results;
     }
 
     // If a cached reranking function is provided, use it
     if (this.rerankFn) {
-      console.log(`[VectorSearch] Using cached reranking function`);
+      if (!quiet) {
+        const log = createServiceLogger("vectorSearch", "rerank");
+        log.debug("rerank_path", { source: "cached_fn" });
+      }
       try {
         const documents = results.map((r) => ({
           id: r._id,
@@ -312,10 +354,14 @@ export class VectorSearchHandler {
           }
         }
 
-        console.log(`[VectorSearch] Reranked ${reranked.length} documents (cached)`);
+        if (!quiet) {
+          const log = createServiceLogger("vectorSearch", "rerank");
+          log.debug("rerank_complete", { count: reranked.length, path: "cached" });
+        }
         return reranked;
       } catch (err: any) {
-        console.error("[VectorSearch] Cached rerank failed, falling back:", err?.message);
+        const log = createServiceLogger("vectorSearch", "rerank");
+        log.error("cached_rerank_failed", err, { message: err?.message });
         // Fall through to direct API call
       }
     }
@@ -338,42 +384,49 @@ export class VectorSearchHandler {
           top_n: this.config.rerankTopN,
         });
 
-        const resultMap = new Map(results.map((r) => [r.content, r]));
         const reranked: (VectorSearchRawResult & { similarity?: number })[] = [];
-        const seen = new Set<VectorSearchRawResult & { similarity?: number }>();
+        const seen = new Set<string>();
 
         if (response.results && Array.isArray(response.results)) {
-          for (const item of response.results as { text?: string; document?: string }[]) {
-            const text = item.text ?? item.document;
-            const original = text ? resultMap.get(text) : undefined;
-            if (original && !seen.has(original)) {
-              reranked.push(original);
-              seen.add(original);
-            }
+          for (const item of response.results) {
+            const idx = item.index;
+            if (typeof idx !== "number" || idx < 0 || idx >= results.length) continue;
+            const original = results[idx];
+            if (!original) continue;
+            const k = `${original._id}-${original.chunkIndex}`;
+            if (seen.has(k)) continue;
+            seen.add(k);
+            reranked.push({
+              ...original,
+              similarity: item.relevance_score ?? original.similarity,
+            });
           }
         }
 
         for (const r of results) {
-          if (!seen.has(r)) {
+          const k = `${r._id}-${r.chunkIndex}`;
+          if (!seen.has(k)) {
             reranked.push(r);
-            seen.add(r);
+            seen.add(k);
           }
         }
 
-        console.log(`[VectorSearch] Reranked ${reranked.length} documents`);
+        if (!quiet) {
+          const log = createServiceLogger("vectorSearch", "rerank");
+          log.debug("rerank_complete", { count: reranked.length, path: "zeroentropy" });
+        }
         return reranked;
       } catch (err: any) {
+        const log = createServiceLogger("vectorSearch", "rerank");
         const is429 = err?.statusCode === 429 || err?.status === 429;
         const last = attempt === maxRetries - 1;
         if (is429 && !last) {
           const delay = baseDelay * Math.pow(2, attempt);
-          console.warn(
-            `[VectorSearch] Rate limit (429), retry in ${delay}ms (${attempt + 1}/${maxRetries})`
-          );
+          log.warn("rate_limit_retry", { delayMs: delay, attempt: attempt + 1, maxRetries });
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        console.error("[VectorSearch] Rerank failed:", err?.message);
+        log.error("rerank_failed", err, { message: err?.message });
         return results;
       }
     }

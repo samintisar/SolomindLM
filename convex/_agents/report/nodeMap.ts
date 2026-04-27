@@ -4,7 +4,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { createLangSmithRunConfig } from "../_shared/index.js";
 
-import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
+import { PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
 import { invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
 import { MAP_PROMPTS, MAP_SYSTEM_PROMPT } from "./prompts.js";
