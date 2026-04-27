@@ -82,8 +82,16 @@ export async function runExecuteGraph(
   const writerResult = await writerNode(state, deps);
   state = { ...state, ...writerResult };
 
+  // Order evidence the same way as buildWriterPrompt (sub-question order, then per-SQ order)
+  const bySub: Record<string, EvidenceEntry[]> = {};
+  for (const e of state.evidence) {
+    if (!bySub[e.subQuestionId]) bySub[e.subQuestionId] = [];
+    bySub[e.subQuestionId]!.push(e);
+  }
+  const orderedEvidence = subQuestions.flatMap((sq) => bySub[sq.id] ?? []);
+
   return {
     finalResponse: state.finalResponse,
-    evidence: state.evidence,
+    evidence: orderedEvidence,
   };
 }

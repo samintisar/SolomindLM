@@ -39,13 +39,12 @@ export const getLatestRunForPlan = query({
     } catch {
       return null;
     }
-    const runs = await ctx.db
+    const run = await ctx.db
       .query("researchRuns")
-      .withIndex("by_plan", (q) => q.eq("planId", args.planId))
-      .collect();
-    if (runs.length === 0) return null;
-    runs.sort((a, b) => b.createdAt - a.createdAt);
-    return runs[0] ?? null;
+      .withIndex("by_planId_and_createdAt", (q) => q.eq("planId", args.planId))
+      .order("desc")
+      .first();
+    return run ?? null;
   },
 });
 
@@ -101,6 +100,18 @@ export const getRunInternal = internalQuery({
   args: { runId: v.id("researchRuns") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.runId);
+  },
+});
+
+/** Latest run for a plan (for HTTP idempotency). */
+export const getLatestResearchRunByPlan = internalQuery({
+  args: { planId: v.id("researchPlans") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("researchRuns")
+      .withIndex("by_planId_and_createdAt", (q) => q.eq("planId", args.planId))
+      .order("desc")
+      .first();
   },
 });
 
@@ -250,9 +261,9 @@ export const updateRunProgress = internalMutation({
   },
   handler: async (ctx, args) => {
     const updates: Record<string, unknown> = { updatedAt: Date.now() };
-    if (args.status) updates.status = args.status;
+    if (args.status !== undefined) updates.status = args.status;
     if (args.currentIteration !== undefined) updates.currentIteration = args.currentIteration;
-    if (args.error) updates.error = args.error;
+    if (args.error !== undefined) updates.error = args.error;
     if (args.status === "completed" || args.status === "failed") {
       updates.completedAt = Date.now();
     }

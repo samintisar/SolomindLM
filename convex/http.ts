@@ -484,21 +484,38 @@ http.route({
       if (plan.userId !== (userId as any)) return errorResponse("Not authorized", 403);
       if (plan.status !== "approved") return errorResponse("Plan not approved", 400);
 
-      const streamId = await streaming.createStream(ctx);
-
-      const runId = await ctx.runMutation(internal.research.index.createResearchRun, {
+      const latestRun = await ctx.runQuery(internal.research.index.getLatestResearchRunByPlan, {
         planId: planId as any,
-        userId,
-        notebookId: plan.notebookId,
-        conversationId: plan.conversationId,
-        streamId,
       });
 
-      await ctx.scheduler.runAfter(0, internal.chat.stream.runResearchExecute, {
-        streamId,
-        runId,
-        userId,
-      });
+      const reusable =
+        latestRun &&
+        latestRun.streamId &&
+        latestRun.status !== "failed" &&
+        latestRun.status !== "cancelled";
+
+      let streamId: string;
+      let runId: any;
+
+      if (reusable) {
+        streamId = latestRun.streamId as string;
+        runId = latestRun._id;
+      } else {
+        streamId = await streaming.createStream(ctx);
+        runId = await ctx.runMutation(internal.research.index.createResearchRun, {
+          planId: planId as any,
+          userId,
+          notebookId: plan.notebookId,
+          conversationId: plan.conversationId,
+          streamId,
+        });
+
+        await ctx.scheduler.runAfter(0, internal.chat.stream.runResearchExecute, {
+          streamId,
+          runId,
+          userId,
+        });
+      }
 
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();

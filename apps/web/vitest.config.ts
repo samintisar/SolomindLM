@@ -10,7 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@convex/_generated/api": path.resolve(__dirname, "./src/convex-generated-api.d.ts"),
+      // Runtime .ts so Vitest can resolve `export { api }` (d.ts has no JS exports)
+      "@convex/_generated/api": path.resolve(__dirname, "./src/test/mocks/convexGeneratedApi.ts"),
       "@convex/_generated/dataModel": path.resolve(
         __dirname,
         "./src/convex-generated-dataModel.d.ts"

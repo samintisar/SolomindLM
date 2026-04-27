@@ -178,6 +178,31 @@ export const getMessagesInternal = internalQuery({
   },
 });
 
+/** Recent messages for deep-research writer context (newest-first window, returned oldest-first). */
+export const getRecentConversationTurnsForResearchInternal = internalQuery({
+  args: {
+    conversationId: v.id("conversations"),
+    maxMessages: v.number(),
+  },
+  returns: v.array(
+    v.object({
+      role: v.string(),
+      content: v.string(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const cap = Math.min(48, Math.max(1, args.maxMessages));
+    const rows = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .order("desc")
+      .take(cap);
+    return rows
+      .reverse()
+      .map((m) => ({ role: m.role, content: m.content }));
+  },
+});
+
 /**
  * Resolve the user message row for the current chat turn (HTTP stream runs after sendMessageOptimistic).
  * Prefers exact content match among recent user messages, then the latest user message.

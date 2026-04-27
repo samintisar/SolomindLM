@@ -15,7 +15,11 @@ export const SubQuestionSchema = z.object({
 });
 
 export const PlannerOutputSchema = z.object({
-  subQuestions: z.array(SubQuestionSchema).describe("3-7 focused sub-questions"),
+  subQuestions: z
+    .array(SubQuestionSchema)
+    .min(3)
+    .max(7)
+    .describe("3-7 focused sub-questions"),
 });
 
 export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
@@ -51,16 +55,18 @@ export function buildWriterPrompt(
   subQuestions: Array<{ id: string; question: string }>,
   evidenceBySubQuestion: Record<string, Array<{ sourceTitle: string; sourceUrl?: string; content: string; sourceType: string }>>
 ): string {
+  let globalN = 0;
   const subQuestionSection = subQuestions
     .map((sq) => {
       const evidence = evidenceBySubQuestion[sq.id] ?? [];
       const evidenceSection =
         evidence.length > 0
           ? evidence
-              .map(
-                (e, i) =>
-                  `[${i + 1}] (${e.sourceType}: ${e.sourceTitle}${e.sourceUrl ? ` - ${e.sourceUrl}` : ""})\n${e.content}`
-              )
+              .map((e) => {
+                globalN += 1;
+                const n = globalN;
+                return `[${n}] (${e.sourceType}: ${e.sourceTitle}${e.sourceUrl ? ` - ${e.sourceUrl}` : ""})\n${e.content}`;
+              })
               .join("\n\n")
           : "No evidence found for this sub-question.";
       return `### ${sq.id}: ${sq.question}\n\n${evidenceSection}`;
@@ -77,7 +83,7 @@ ${subQuestionSection}
 
 Requirements:
 - Write in clear, well-organized prose with headers for each major section
-- Cite sources inline using [N] notation matching the evidence numbers per sub-question
+- Cite sources inline using [N] notation matching the **global** evidence numbers above (single sequence across all sub-questions, starting at [1])
 - If evidence is weak or missing for a sub-question, acknowledge it explicitly
 - Do NOT fabricate information — only use the provided evidence
 - Start with a brief summary, then address each sub-question in detail

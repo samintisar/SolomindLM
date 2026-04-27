@@ -65,6 +65,7 @@ export interface ResearchContext {
 export type ResearchStreamChunk =
   | { type: "research_plan"; data: { planId: string; subQuestions: SubQuestion[]; sourcePolicy: SourcePolicy } }
   | { type: "research_progress"; data: { phase: ResearchPhase; subQuestionId?: string; iteration: number; sourcesFound: number } }
+  | /** Raw evidence for persisting to `researchEvidence` (streamed before tokens) */ { type: "evidence"; data: EvidenceEntry[] }
   | { type: "token"; data: string }
   | { type: "references"; data: unknown[] }
   | { type: "status"; status: string; message?: string }

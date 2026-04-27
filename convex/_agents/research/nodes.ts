@@ -172,15 +172,6 @@ export async function writerNode(
   const response = await llm.invoke([{ role: "user", content: prompt }]);
   const finalResponse = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
 
-  // Build references from evidence for citation support
-  const _references = evidence.map((e, i) => ({
-    id: String(i + 1),
-    sourceTitle: e.sourceTitle,
-    sourceUrl: e.sourceUrl,
-    sourceType: e.sourceType,
-    subQuestionId: e.subQuestionId,
-  }));
-
   return {
     finalResponse,
     shouldStop: true,

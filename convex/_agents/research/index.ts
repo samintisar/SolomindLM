@@ -34,6 +34,11 @@ export class ResearchAgent {
   ): AsyncGenerator<ResearchStreamChunk> {
     const result = await runExecuteGraph(query, subQuestions, sourcePolicy, context, this.deps);
 
+    // Persisted by Convex action before token streaming
+    if (result.evidence.length > 0) {
+      yield { type: "evidence", data: result.evidence };
+    }
+
     // Stream the final response token-by-token
     if (result.finalResponse) {
       // Split into chunks for smooth streaming

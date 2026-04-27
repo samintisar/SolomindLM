@@ -14,6 +14,7 @@ import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { env } from "../_lib/env";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { mapAgentEvidenceForSave } from "../research/mapEvidenceForDb";
 
 import type { ChunkMetadata } from "../storage/ChatHistoryService";
 
@@ -1141,11 +1142,18 @@ export const runResearchExecute = internalAction({
         },
       });
 
-      // Save evidence to DB
+      const conversationTurns = await ctx.runQuery(
+        internal.chat.index.getRecentConversationTurnsForResearchInternal,
+        {
+          conversationId: plan.conversationId,
+          maxMessages: 24,
+        }
+      );
+
       const context = {
         userId: args.userId,
         notebookId: String(notebookIdTyped),
-        conversationHistory: [],
+        conversationHistory: conversationTurns,
       };
 
       let fullResponse = "";
@@ -1157,7 +1165,15 @@ export const runResearchExecute = internalAction({
       );
 
       for await (const chunk of gen) {
-        if (chunk.type === "token") {
+        if (chunk.type === "evidence") {
+          const mapped = mapAgentEvidenceForSave(chunk.data);
+          if (mapped.length > 0) {
+            await ctx.runMutation(internal.research.index.saveEvidence, {
+              runId,
+              evidence: mapped,
+            });
+          }
+        } else if (chunk.type === "token") {
           fullResponse += chunk.data ?? "";
           await chunkAppender(chunk.data ?? "");
         } else if (chunk.type === "references") {
@@ -1166,9 +1182,6 @@ export const runResearchExecute = internalAction({
           await chunkAppender(`\n__DONE\n`);
         }
       }
-
-      // Save evidence to researchEvidence table
-      // (The evidence is accumulated in the graph execution and returned in the generator)
 
       // Persist assistant message
       const contentFinal = fullResponse.trim() || "Research completed but produced no output.";

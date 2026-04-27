@@ -511,6 +511,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_plan", ["planId"])
+    /** Latest run per plan: eq(planId) then order by createdAt */
+    .index("by_planId_and_createdAt", ["planId", "createdAt"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 

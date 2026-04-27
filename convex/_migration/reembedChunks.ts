@@ -4,21 +4,32 @@
  * This script migrates from OpenAI text-embedding-3-small (1536 dimensions)
  * to Together AI intfloat/multilingual-e5-large-instruct (1024 dimensions)
  *
- * Run via: npx convex run _migration/reembedChunks
+ * Run batched migration: npx convex run _migration/reembedChunks:reembedAllChunks
+ *
+ * Production: uses scheduled batches to avoid action timeouts and large .collect() reads.
  */
 
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 
 /**
- * Query to get all document chunks
+ * Query to get all document chunks (small dev datasets only)
  */
 export const listAllChunks = internalQuery({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("documentChunks").collect();
+  },
+});
+
+/** Paginate `documentChunks` for batched re-embedding (ascending _id order). */
+export const listDocumentChunksPage = internalQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("documentChunks").order("asc").paginate(args.paginationOpts);
   },
 });
 
@@ -64,72 +75,17 @@ export const updateChunkEmbedding = internalMutation({
 });
 
 /**
- * Migration action to re-embed all existing document chunks
- *
- * This will:
- * 1. Fetch all existing document chunks
- * 2. Re-generate embeddings using Together AI
- * 3. Update chunks with new 1024-dimension embeddings
+ * Start batched re-embedding (schedules work; safe for large `documentChunks` tables).
  */
 export const reembedAllChunks = internalAction({
   args: {},
-  handler: async (ctx): Promise<{ total: number; processed: number; errors: number }> => {
-    "use node";
-
-    const togetherApiKey = process.env.TOGETHER_AI_API_KEY;
-    if (!togetherApiKey) {
-      throw new Error("TOGETHER_AI_API_KEY environment variable not set");
-    }
-
-    const embeddingService = new EmbeddingService(togetherApiKey);
-
-    // Get all document chunks using query
-    const allChunks = await ctx.runQuery(internal._migration.reembedChunks.listAllChunks);
-
-    console.log(`Found ${allChunks.length} chunks to re-embed`);
-
-    // Process in batches to avoid timeouts
-    const BATCH_SIZE = 50;
-    let processed = 0;
-    let errors = 0;
-
-    for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
-      const batch = allChunks.slice(i, Math.min(i + BATCH_SIZE, allChunks.length));
-
-      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allChunks.length / BATCH_SIZE)}`);
-
-      try {
-        // Generate new embeddings for the batch
-        const texts = batch.map((chunk: any) => chunk.content);
-        const newEmbeddings = await embeddingService.embedBatch(texts);
-
-        // Update each chunk with its new embedding
-        for (let j = 0; j < batch.length; j++) {
-          const chunk = batch[j];
-          const newEmbedding = newEmbeddings[j];
-
-          await ctx.runMutation(internal._migration.reembedChunks.updateChunkEmbedding, {
-            chunkId: chunk._id,
-            newEmbedding,
-          });
-
-          processed++;
-        }
-
-        console.log(`  Batch complete: ${batch.length} chunks updated`);
-      } catch (error) {
-        console.error(`  Error processing batch starting at index ${i}:`, error);
-        errors += batch.length;
-      }
-    }
-
-    console.log(`Migration complete: ${processed} chunks updated, ${errors} errors`);
-
-    return {
-      total: allChunks.length,
-      processed,
-      errors,
-    };
+  handler: async (ctx) => {
+    await ctx.scheduler.runAfter(0, internal._migration.reembedBatchesWorker.reembedBatchesWorker, {
+      cursor: null,
+      processed: 0,
+      errors: 0,
+    });
+    return { scheduled: true, message: "Re-embedding started; watch logs for reembedBatchesWorker progress." };
   },
 });
 
