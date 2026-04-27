@@ -1,16 +1,24 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+// Single React instance (Bun monorepo on Linux CI otherwise bundles two copies → useState null)
+const reactRoot = path.dirname(require.resolve("react/package.json"));
+const reactDomRoot = path.dirname(require.resolve("react-dom/package.json"));
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    // Monorepo / Linux CI: avoid a second React copy (useState on null in context tests)
     dedupe: ["react", "react-dom"],
     alias: {
+      react: reactRoot,
+      "react-dom": reactDomRoot,
+      "react/jsx-runtime": require.resolve("react/jsx-runtime"),
+      "react/jsx-dev-runtime": require.resolve("react/jsx-dev-runtime"),
       "@": path.resolve(__dirname, "./src"),
       // Runtime .ts so Vitest can resolve `export { api }` (d.ts has no JS exports)
       "@convex/_generated/api": path.resolve(__dirname, "./src/test/mocks/convexGeneratedApi.ts"),
