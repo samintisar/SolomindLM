@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "bun": {
+      "source": "bun.sh",
+      "sourceType": "well-known",
+      "computedHash": "e81aa6ae97fdbc21cbccdbee38e0f314171fe8d7a09c5fdda72b82095cf4b9fa"
+    },
     "convex": {
       "source": "get-convex/agent-skills",
       "sourceType": "github",
@@ -31,15 +36,115 @@
       "sourceType": "github",
       "computedHash": "e719d31d1ab0d19ca7b942d1154d3ff436b5c156900eea9866c2aaeb910a1388"
     },
+    "deep-agents-core": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "f82c2219a3e3b91f04165a395ced7ab75ec3b8e3d82c0f5684c53eec746c35c7"
+    },
+    "deep-agents-memory": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "c4fccc7409e8b80bb5f6dbf18b677ea55b7ab8515cb734f3141205ceccb8c2ee"
+    },
+    "deep-agents-orchestration": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "fb3a558ec0c485ae813e23140cd2ff7df7b8e00b6538eea760816fa78546180e"
+    },
+    "expo-tailwind-setup": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "16c53e80cacd65369acfd8a4f5cf06a60083cc6d980127b4b2e384b81ce0e547"
+    },
+    "framework-selection": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "70355c49d4ea25553a67306ce07ad2b808b85d917bb310fe12a76abf1d7b880b"
+    },
+    "langchain-dependencies": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "c0f6bdbf1d896c2d913984ec151d30c1d1ed53fdaa94495fc37495726bf946a1"
+    },
+    "langchain-fundamentals": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "7f23a1fb935bb09221a7fb4e50d484abbe3ba93767de832b1904cf9101ff1fe2"
+    },
+    "langchain-middleware": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "8649cb289562f93beef2caeb8fa10792e1af6be9c829c585c39e1a9328b22fab"
+    },
+    "langchain-rag": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "25f569409285938fcb078ed2d14893f7d620131a28107f7a5c16f48b40bee24a"
+    },
+    "langgraph-fundamentals": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "43a226ecc442ba6d6091eea39cf587a7583fa532e73db58259e35b1393c31418"
+    },
+    "langgraph-human-in-the-loop": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "084b2c75d68a0000e665005372b010651c444247dc7e5ed340c4bc022b85e680"
+    },
+    "langgraph-persistence": {
+      "source": "langchain-ai/langchain-skills",
+      "sourceType": "github",
+      "computedHash": "41777ec7edc4504e45564917459202021245f3cdf90157e4a65dd6641cd0c1d7"
+    },
+    "langsmith-dataset": {
+      "source": "langchain-ai/langsmith-skills",
+      "sourceType": "github",
+      "computedHash": "b18bc199f25a2519678ecdc8a7f6a6eb118c4332b6ad2e6f65f7e5a75bcec2bc"
+    },
+    "langsmith-evaluator": {
+      "source": "langchain-ai/langsmith-skills",
+      "sourceType": "github",
+      "computedHash": "69d3bb64f4300051c046929ae040272e26eceb995fe01b5ebdde01240fafcaaf"
+    },
+    "langsmith-trace": {
+      "source": "langchain-ai/langsmith-skills",
+      "sourceType": "github",
+      "computedHash": "3ef4abf90e1d7fab5faeefd27cbf4b44ed57e10f321e174afab294fd86bc7e1b"
+    },
+    "serena-usage": {
+      "source": "practicalswan/agent-skills",
+      "sourceType": "github",
+      "computedHash": "0ce80405bb895d1fa01a94cfb989d7d49ad2752617f0d52f614e9d2273473dbd"
+    },
+    "tailwind-design-system": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "f54f39ce967af3a4bba1f662c3600f0253467508d5fbbc7c545c67e102da2253"
+    },
     "together-audio": {
       "source": "togethercomputer/skills",
       "sourceType": "github",
       "computedHash": "f4d515b68ff0c03d4d26ccd330ea8636c985bfacbdad69912e239084b9cf4778"
     },
+    "together-batch-inference": {
+      "source": "togethercomputer/skills",
+      "sourceType": "github",
+      "computedHash": "eca0e121eff9ed09c7cd4cb03da4c485bf32951b3e7f5ee7b8da6f05a6688d8f"
+    },
     "together-chat-completions": {
       "source": "togethercomputer/skills",
       "sourceType": "github",
       "computedHash": "23b006ff3f361d86bd88dd4e6086e837b2143c1ee119a66d0a164fbed4078b40"
+    },
+    "together-dedicated-containers": {
+      "source": "togethercomputer/skills",
+      "sourceType": "github",
+      "computedHash": "88ae84cded9f8b9a85dc12a7d00e50ead0665b5996e8aa1f47588d1d50c57482"
+    },
+    "together-dedicated-endpoints": {
+      "source": "togethercomputer/skills",
+      "sourceType": "github",
+      "computedHash": "e53936f90d7f8f8d968e63245c67c4b97704ea2fe3d4b9b496c0c0e2a077a741"
     },
     "together-embeddings": {
       "source": "togethercomputer/skills",
@@ -51,15 +156,65 @@
       "sourceType": "github",
       "computedHash": "6c23a0c7a847a01d549b90a5ada3cdf1fc3e7ab6f774148a4ed8ab30e3a3a8c4"
     },
+    "together-fine-tuning": {
+      "source": "togethercomputer/skills",
+      "sourceType": "github",
+      "computedHash": "bdee126e3c2dba0ff7e868363fa116ea31f9e690c25889da5aac5a23bb49c65c"
+    },
+    "together-gpu-clusters": {
+      "source": "togethercomputer/skills",
+      "sourceType": "github",
+      "computedHash": "9b97f93565c659d470262d66ecdb8d85961a8515d9464325f264145b2ff8b9fc"
+    },
     "together-images": {
       "source": "togethercomputer/skills",
       "sourceType": "github",
       "computedHash": "bf83ae93846bc7ad85cdfd0828c584cc032c36ac5f6a3d2effad35fb343528d3"
     },
+    "together-sandboxes": {
+      "source": "togethercomputer/skills",
+      "sourceType": "github",
+      "computedHash": "16f6d24a53da97207f36c51e23d79fa2e81d2060d2fa1b817722954167c87979"
+    },
     "together-video": {
       "source": "togethercomputer/skills",
       "sourceType": "github",
       "computedHash": "f13b0384b037dffc56752060c5fd82318ff0031a509af198f3c6344b4ac7cb56"
+    },
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "ee8377c523a911be41c31037b477805773ca5ab5ade181e44ca7dd3cd8df6692"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "575757e3e25761c8c562d6e395d29f0b76c98b1273c0bd72d88e6ab1bc9c7d42"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
+    },
+    "vercel-react-native-skills": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "41d24eafa7c3d82e270439808f7cfbc4d51aeb2d14f2809a2267c16275784d06"
+    },
+    "vite": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "computedHash": "1cdc4bbecaa89544e6ef92566b015db989994bf90c4472683ac64f7a114dc3af"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "3f14af7f5690695209c22fbf8c8d133769a86d64892602c09bb13f135e14e857"
     }
   }
 }

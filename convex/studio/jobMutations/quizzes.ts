@@ -153,7 +153,7 @@ export const clearQuizMapData = internalMutation({
     const quiz = await ctx.db.get(args.quizId);
     if (!quiz) return null;
 
-    const { mapResults, ...restMetadata } = quiz.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = quiz.metadata || {};
     await ctx.db.patch(args.quizId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

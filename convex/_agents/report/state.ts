@@ -6,6 +6,7 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
+import { mapOutputsMergeReducer } from "../_shared/stateUpdateHelpers.js";
 
 // ============================================================
 // STATE DEFINITIONS
@@ -33,7 +34,7 @@ export const OverallState = Annotation.Root({
     default: () => undefined,
   }),
   mapOutputs: Annotation<string[]>({
-    reducer: (x: string[], y?: string[]) => (y ? x.concat(y) : x),
+    reducer: (x, y) => mapOutputsMergeReducer(x, y),
     default: () => [],
   }),
   collapsedOutputs: Annotation<string[]>({

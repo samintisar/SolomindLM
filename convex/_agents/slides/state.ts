@@ -6,6 +6,7 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
+import { mapOutputsMergeReducer } from "../_shared/stateUpdateHelpers.js";
 import type { ProgressInfo } from "../_shared/index.js";
 import type { Slide } from "./prompts.js";
 
@@ -47,7 +48,7 @@ export const OverallState = Annotation.Root({
     default: () => "Untitled Presentation",
   }),
   mapOutputs: Annotation<string[]>({
-    reducer: (x: string[], y?: string[]) => (y ? x.concat(y) : x),
+    reducer: (x, y) => mapOutputsMergeReducer(x, y),
     default: () => [],
   }),
   collapsedOutputs: Annotation<string[]>({

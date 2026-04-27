@@ -41,7 +41,6 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const folders = ctx.folders;
   const onRequireAuth = ctx.onRequireAuth;
-  const isAuthenticated = ctx.isAuthenticated;
 
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialViewMode);
 
@@ -283,11 +282,6 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
           onClose={notebookHandlers.closeCustomize}
           onSave={async (data) => {
             if (notebookHandlers.isCreatingNotebook) {
-              if (!isAuthenticated) {
-                onRequireAuth("Sign in to create a notebook.");
-                notebookHandlers.closeCustomize();
-                return;
-              }
               try {
                 // Create notebook using hook
                 await createNotebook({
@@ -301,7 +295,7 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
               } catch (error) {
                 console.error("Failed to create notebook:", error);
                 const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                if (errorMessage.includes("Unauthorized")) {
+                if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
                   notebookHandlers.closeCustomize();
                   if (onRequireAuth) onRequireAuth("You need to sign in to create a notebook.");
                 }

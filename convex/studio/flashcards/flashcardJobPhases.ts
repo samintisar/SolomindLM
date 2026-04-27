@@ -31,7 +31,7 @@ import {
   type Flashcard,
   type FlashcardResponse,
 } from "../../_agents/flashcard/prompts";
-import { countTokens, invokeWithTimeout, sanitizeUserInput } from "../../_agents/_shared/index";
+import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
@@ -495,7 +495,7 @@ export async function runFinalizeFlashcardPhase(
     const allFlashcards: Flashcard[] = [];
     const failedCount = { count: 0 };
 
-    for (const [idx, resultJson] of Object.entries(mapResults)) {
+    for (const [_idx, resultJson] of Object.entries(mapResults)) {
       try {
         const parsed = JSON.parse(resultJson);
         if (parsed._error) {
@@ -589,7 +589,7 @@ export async function runFinalizeFlashcardPhase(
       title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
         chunk: flashcardsText.substring(0, 2000),
       });
-    } catch (e) {
+    } catch (_e) {
       console.log("[FlashcardJob] Title generation failed, using default");
     }
 

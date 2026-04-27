@@ -3,17 +3,17 @@ import {
   PanelLeftOpen,
   PanelRightOpen,
   MessageCircle,
-  RefreshCw,
   FileText,
   MoreVertical,
   Download,
   History,
-  ChevronLeft,
+  Plus,
+  Pin,
 } from "lucide-react";
 import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { DropdownMenu } from "@/shared/ui/DropdownMenu";
 import { Virtuoso } from "react-virtuoso";
-import { Message, Note } from "@/shared/types/index";
+import { Message, Note, ReferenceChunk } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/ToastContext";
 import { useChatStreamingContext } from "../ChatStreamingContext";
 import { exportAsMarkdown } from "../utils/exportChat";
@@ -26,9 +26,12 @@ import { ChatInput } from "./ChatInput";
 import { ConversationList } from "./ConversationList";
 import { useSourcesContext } from "../../sources/SourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
+import { SourceSuggestionPrompt } from "./SourceSuggestionPrompt";
+import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -39,6 +42,8 @@ interface ChatPanelProps {
   notebookTitle?: string;
   notebookIcon?: string | null;
   notebookCoverColor?: string | null;
+  /** Open a notebook document in the sources panel (citation / reference tooltip) */
+  onOpenNotebookSource?: (documentId: string) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -50,13 +55,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   notebookTitle = "Chat",
   notebookIcon,
   notebookCoverColor,
+  onOpenNotebookSource,
 }) => {
   const {
     messages,
     isChatStreaming: isLoading,
     remoteGenerationBlocksSend,
     onSendMessage,
-    onClearHistory,
     onSetFeedback,
     onRetry,
     onSaveChatOptimistic,
@@ -70,6 +75,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onCreateConversation,
     onRenameConversation,
     onDeleteConversation,
+    consumeResearchExecuteStream,
+    externalSources,
+    clearExternalSources,
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
@@ -82,35 +90,99 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
   const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
-  const [showConversationList, setShowConversationList] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("chat-pinned-ids");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+  const historyContainerRef = useRef<HTMLDivElement>(null);
+
+  const { ConfirmDialogComponent } = useConfirmDialog();
   const { success, error: toastError } = useToast();
   const saveChat = useSaveChat();
 
   const authToken = useAuthToken();
 
+  useEffect(() => {
+    if (!historyOpen) return;
+    const handler = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent) {
+        if (e.key === "Escape") setHistoryOpen(false);
+        return;
+      }
+      const t = e.target as Node;
+      // Thread options menu is portaled to document.body; must not close history on those clicks
+      if ((e.target as Element | null)?.closest?.("[data-thread-submenu-root]")) {
+        return;
+      }
+      // Delete / rename useConfirmDialog is portaled to body; closing history would unmount the dialog
+      if ((e.target as Element | null)?.closest?.("[data-confirm-dialog-root]")) {
+        return;
+      }
+      if (historyContainerRef.current && !historyContainerRef.current.contains(t)) {
+        setHistoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", handler);
+    };
+  }, [historyOpen]);
+
+  const handleTogglePin = useCallback((convId: string) => {
+    const id = String(convId);
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem("chat-pinned-ids", JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const handlePinActiveChat = useCallback(() => {
+    if (!activeConversationId) return;
+    handleTogglePin(activeConversationId);
+  }, [activeConversationId, handleTogglePin]);
+
   const approvePlanMutation = useMutation(api.research.index.approveResearchPlan);
   const rejectPlanMutation = useMutation(api.research.index.rejectResearchPlan);
+  const addExternalSourcesMutation = useMutation(api.documents.index.addExternalSources);
 
   const handleApproveResearchPlan = useCallback(async (planId: string) => {
     try {
       await approvePlanMutation({ planId: planId as any });
-      const convexUrl = import.meta.env.VITE_CONVEX_URL;
-      if (!convexUrl) return;
-      await fetch(`${convexUrl}/research/execute`, {
+      const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({ planId }),
       });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error || `Research failed to start (${response.status})`);
+      }
+      await consumeResearchExecuteStream(response);
     } catch (err) {
       console.error("[ResearchPlan] Approve failed:", err);
-      toastError("Failed to start research execution");
+      toastError(
+        err instanceof Error ? err.message : "Failed to start research execution"
+      );
     }
-  }, [approvePlanMutation, authToken, toastError]);
+  }, [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]);
 
   const handleRejectResearchPlan = useCallback(async (planId: string) => {
     try {
@@ -128,15 +200,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const virtuosoRef = useRef<any>(null);
 
   // --- Chat action handlers ---
-
-  const handleDeleteHistory = async () => {
-    const confirmed = await confirm(
-      "Clear Chat History",
-      "Are you sure you want to delete all chat history? This action cannot be undone.",
-      { confirmText: "Clear History", cancelText: "Cancel", variant: "danger" }
-    );
-    if (confirmed) onClearHistory?.();
-  };
 
   const handleExportChat = () => {
     if (messages.length === 0) {
@@ -262,6 +325,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     [handleRefHover, handleRefLeave, handleRefClick]
   );
 
+  const handleNewConversation = useCallback(async () => {
+    if (!onCreateConversation) return;
+    setIsCreatingConversation(true);
+    try {
+      const id = await onCreateConversation();
+      if (id) {
+        onSelectConversation?.(id);
+        setHistoryOpen(false);
+      }
+    } catch {
+      toastError("Failed to create conversation");
+    } finally {
+      setIsCreatingConversation(false);
+    }
+  }, [onCreateConversation, onSelectConversation, toastError]);
+
   // --- Message handlers ---
 
   const copyMessageAsMarkdown = useCallback(async (message: Message) => {
@@ -284,8 +363,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const trimmed = inputMessage.trim();
     if (!trimmed || chatInputDisabled || !notebookId || !onSendMessage) return;
 
-    // Deep research only needs notebook sources selected for notebook channel
-    if (!deepResearchEnabled) {
+    // Require selected sources when notebook RAG is enabled
+    if (!deepResearchEnabled && sourceFilters.includes("notebook")) {
       const selectedSources = sources?.filter((s) => s.selected) ?? [];
       if (selectedSources.length === 0) {
         toastError("Please select at least one source before asking a question");
@@ -298,7 +377,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onSendMessage(
       trimmed,
       deepResearchEnabled || undefined,
-      deepResearchEnabled ? { channels: sourceFilters } : undefined
+      { channels: sourceFilters }
     );
     setIsSending(false);
   }, [inputMessage, chatInputDisabled, notebookId, onSendMessage, sources, toastError, deepResearchEnabled, sourceFilters]);
@@ -307,16 +386,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     (text: string) => {
       if (chatInputDisabled || !notebookId || !onSendMessage) return;
 
-      // Check if user has selected any sources
-      const selectedSources = sources?.filter((s) => s.selected) ?? [];
-      if (selectedSources.length === 0) {
-        toastError("Please select at least one source before asking a question");
-        return;
+      if (sourceFilters.includes("notebook")) {
+        const selectedSources = sources?.filter((s) => s.selected) ?? [];
+        if (selectedSources.length === 0) {
+          toastError("Please select at least one source before asking a question");
+          return;
+        }
       }
 
-      onSendMessage(text);
+      onSendMessage(text, undefined, { channels: sourceFilters });
     },
-    [chatInputDisabled, notebookId, onSendMessage, sources, toastError]
+    [chatInputDisabled, notebookId, onSendMessage, sources, toastError, sourceFilters]
   );
 
   // --- Scroll to bottom ---
@@ -340,7 +420,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       return null;
     const hoveredMessage = messages.find((msg) => msg.id === hoveredMessageId);
     const refsArray = Array.isArray(hoveredMessage?.references) ? hoveredMessage.references : [];
-    const ref = refsArray.find((r) => Number(r.id) === hoveredRefId);
+    // Citations [n] match the n-th source in the grounded prompt order, not retrieval chunk.id.
+    const ref =
+      hoveredRefId >= 1 && hoveredRefId <= refsArray.length
+        ? refsArray[hoveredRefId - 1]
+        : refsArray.find((r) => Number(r.id) === hoveredRefId);
     const containerRect = messagesContainerRef.current.getBoundingClientRect();
     if (!ref || !containerRect) return null;
 
@@ -358,6 +442,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     return { ref, x, y };
   }, [hoveredRefId, hoveredMessageId, messages, tooltipStyle, tooltipPosition]);
 
+  const handleOpenReferenceInSources = useCallback(
+    (reference: ReferenceChunk) => {
+      const docId = reference.documentId?.trim();
+      if (!docId || !onOpenNotebookSource) return;
+      if (!sources.some((s) => s.id === docId)) return;
+      onOpenNotebookSource(docId);
+      setHoveredRefId(null);
+      setHoveredMessageId(null);
+      setIsTooltipHovered(false);
+      if (hideTooltipTimeoutRef.current) {
+        clearTimeout(hideTooltipTimeoutRef.current);
+        hideTooltipTimeoutRef.current = null;
+      }
+    },
+    [onOpenNotebookSource, sources]
+  );
+
   const memoizedMessages = useMemo(() => messages, [messages]);
 
   return (
@@ -368,18 +469,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <div className="flex items-center gap-2 text-foreground">
             <MessageCircle className="w-4 h-4" />
             <span className="font-display font-bold text-sm tracking-wide uppercase">Chat</span>
-            <button
-              onClick={() => setShowConversationList(!showConversationList)}
-              className={`p-1.5 rounded transition-colors ${
-                showConversationList
-                  ? "bg-zinc-700 text-zinc-100"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-              }`}
-              title="Conversation history"
-            >
-              <History className="w-3.5 h-3.5" />
-            </button>
           </div>
+
           <div className="flex items-center gap-2">
             {!isLeftOpen && (
               <button
@@ -399,6 +490,54 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <PanelRightOpen className="w-4 h-4" />
               </button>
             )}
+            <div ref={historyContainerRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((o) => !o)}
+                className={`p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 ${
+                  historyOpen ? "ring-1 ring-border bg-accent" : ""
+                }`}
+                title="Thread history"
+                aria-label="Thread history"
+                aria-expanded={historyOpen}
+              >
+                <History className="w-4 h-4" />
+              </button>
+
+              {historyOpen && (
+                <div
+                  role="dialog"
+                  aria-label="Thread history"
+                  className="absolute top-full right-0 mt-1.5 z-50 w-80 max-w-[calc(100vw-2rem)] bg-card font-sans text-sm antialiased border border-border/80 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
+                  style={{ maxHeight: "min(480px, calc(100vh - 100px))" }}
+                >
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
+                    <ConversationList
+                      conversations={conversations}
+                      activeConversationId={activeConversationId}
+                      onSelect={(id) => {
+                        onSelectConversation?.(id);
+                        setHistoryOpen(false);
+                      }}
+                      onRename={onRenameConversation}
+                      onDelete={onDeleteConversation}
+                      pinnedIds={pinnedIds}
+                      onTogglePin={handleTogglePin}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleNewConversation}
+              disabled={isCreatingConversation}
+              className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 disabled:opacity-50 disabled:pointer-events-none"
+              title="New chat"
+              aria-label={isCreatingConversation ? "Creating…" : "New chat"}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
             <DropdownMenu
               align="right"
               trigger={
@@ -412,14 +551,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               }
             >
               <div className="py-1">
-                <button
-                  onClick={handleDeleteHistory}
-                  className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-                  role="menuitem"
-                >
-                  <RefreshCw className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span>Refresh chat</span>
-                </button>
                 <button
                   onClick={handleExportChat}
                   className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
@@ -436,6 +567,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span>Save to note</span>
                 </button>
+                <div className="my-1 border-t border-border" />
+                <button
+                  onClick={handlePinActiveChat}
+                  className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+                  role="menuitem"
+                >
+                  <Pin className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span>
+                    {activeConversationId && pinnedIds.has(activeConversationId)
+                      ? "Unpin chat"
+                      : "Pin chat"}
+                  </span>
+                </button>
               </div>
             </DropdownMenu>
           </div>
@@ -443,28 +587,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Messages Area */}
         <div className="flex flex-1 min-h-0">
-          {/* Conversation sidebar */}
-          {showConversationList && (
-            <div className="w-56 shrink-0 border-r border-border bg-background/60 overflow-y-auto">
-              <div className="flex items-center justify-between px-2 py-2 border-b border-border">
-                <span className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Threads</span>
-                <button
-                  onClick={() => setShowConversationList(false)}
-                  className="p-0.5 text-zinc-500 hover:text-zinc-300"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <ConversationList
-                conversations={conversations}
-                activeConversationId={activeConversationId}
-                onSelect={onSelectConversation}
-                onCreate={onCreateConversation}
-                onRename={onRenameConversation}
-                onDelete={onDeleteConversation}
-              />
-            </div>
-          )}
         <div
           ref={messagesContainerRef}
           className={`flex min-h-0 w-full min-w-0 flex-1 relative chat-panel-graph-grid ${
@@ -501,6 +623,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                       onReject={handleRejectResearchPlan}
                     />
                   ) : (
+                  <>
                   <MessageBubble
                     message={message}
                     isAssistantStreamActive={message.id === "__streaming__" ? isLoading : false}
@@ -511,6 +634,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     onSendFollowUp={handleSendChip}
                     onRetry={onRetry}
                   />
+                  {message.role === "assistant" && externalSources.length > 0 && !isLoading && (() => {
+                    const isLast = messages[messages.length - 1]?.id === message.id
+                      || (message.id === "__streaming__" && messages[messages.length - 1]?.id === "__streaming__");
+                    if (!isLast) return null;
+                    return (
+                      <div className="mt-3 max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
+                        <SourceSuggestionPrompt
+                          sources={externalSources}
+                          onAddSelected={async (selectedSources) => {
+                            if (!notebookId) return;
+                            try {
+                              await addExternalSourcesMutation({
+                                notebookId: notebookId as Id<"notebooks">,
+                                sources: selectedSources.map((s) => ({
+                                  title: s.title,
+                                  url: s.url,
+                                  snippet: s.snippet,
+                                  sourceType: s.sourceType,
+                                })),
+                              });
+                              clearExternalSources?.();
+                            } catch (e) {
+                              console.error("Failed to add external sources:", e);
+                            }
+                          }}
+                          onDismiss={() => clearExternalSources?.()}
+                        />
+                      </div>
+                    );
+                  })()}
+                  </>
                   )}
                 </div>
               )}
@@ -527,6 +681,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               tooltipRef={tooltipRef}
               reference={tooltipContent.ref}
               position={{ x: tooltipContent.x, y: tooltipContent.y }}
+              onOpenInSources={(() => {
+                const docId = tooltipContent.ref.documentId?.trim();
+                if (
+                  !docId ||
+                  !onOpenNotebookSource ||
+                  !sources.some((s) => s.id === docId)
+                ) {
+                  return undefined;
+                }
+                return () => handleOpenReferenceInSources(tooltipContent.ref);
+              })()}
               onMouseEnter={() => {
                 setIsTooltipHovered(true);
                 if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);

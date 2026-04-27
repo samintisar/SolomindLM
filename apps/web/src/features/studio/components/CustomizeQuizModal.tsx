@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, HelpCircle, Check } from "lucide-react";
+import { X, HelpCircle } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeQuizModalProps {
@@ -69,7 +69,7 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
                     key={opt}
                     onClick={() => setCount(opt)}
                     className={`
-                      flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all
+                      flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
                       ${
                         count === opt
                           ? "bg-primary text-primary-foreground shadow-sm"
@@ -77,7 +77,6 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
                       }
                     `}
                   >
-                    {count === opt && <Check className="w-3 h-3" />}
                     {opt.charAt(0).toUpperCase() + opt.slice(1)}
                   </button>
                 ))}
@@ -94,7 +93,7 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
                     key={opt}
                     onClick={() => setDifficulty(opt)}
                     className={`
-                      flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all
+                      flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
                       ${
                         difficulty === opt
                           ? "bg-primary text-primary-foreground shadow-sm"
@@ -102,7 +101,6 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
                       }
                     `}
                   >
-                    {difficulty === opt && <Check className="w-3 h-3" />}
                     {opt.charAt(0).toUpperCase() + opt.slice(1)}
                   </button>
                 ))}

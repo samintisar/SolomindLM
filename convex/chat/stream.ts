@@ -8,10 +8,12 @@ import { components } from "../_generated/api";
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
+import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { env } from "../_lib/env";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 
 import type { ChunkMetadata } from "../storage/ChatHistoryService";
 
@@ -36,7 +38,7 @@ type DocumentChunkDoc = Doc<"documentChunks">;
 type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
 
 // Initialize Persistent Text Streaming
-const streaming = new PersistentTextStreaming(components.persistentTextStreaming);
+const _streaming = new PersistentTextStreaming(components.persistentTextStreaming);
 
 /** Batched addChunk to stay under Convex mutation write throughput (e.g. 4 MiB/s on S16). */
 const CHAT_STREAM_FLUSH_MS = parseInt(process.env.CHAT_STREAM_FLUSH_MS ?? "85", 10);
@@ -65,7 +67,8 @@ async function runResearchPlanPhase(
   documentIds: string[] | undefined,
   sourcePolicy: { channels: string[] },
   chunkAppender: (text: string) => Promise<void>,
-  conversationId: Id<"conversations">
+  conversationId: Id<"conversations">,
+  userMessageId: Id<"messages"> | undefined
 ): Promise<void> {
   const { ResearchAgent } = await import("../_agents/research/index.js");
 
@@ -73,14 +76,23 @@ async function runResearchPlanPhase(
   const smartModel = process.env.SMART_MODEL ?? "openai/gpt-oss-120b";
 
   const notebookIdTyped = notebookId as Id<"notebooks">;
-  const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY ?? "");
+
+  let resolvedUserMessageId = userMessageId;
+  if (!resolvedUserMessageId) {
+    const lookedUp = await ctx.runQuery(internal.chat.index.getLatestUserMessageIdForPlanInternal, {
+      conversationId,
+      content: message,
+    });
+    if (!lookedUp) {
+      throw new Error("[ResearchPlan] No user message found for this conversation; cannot attach plan.");
+    }
+    resolvedUserMessageId = lookedUp;
+  }
+  const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY ?? "");
 
   // Build hybrid search runner (same pattern as streamChatResponse)
   const vectorSearchRunner = async (embedding: number[], limit: number, docIds?: string[]) => {
     const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
-    const results = await ctx.runQuery(internal.documents.index.listChunksByNotebook, {
-      notebookId: notebookIdTyped,
-    });
     const vectorResults = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
@@ -123,6 +135,7 @@ async function runResearchPlanPhase(
       query,
       limit,
       documentIds: docIds as any,
+      quietLogs: true,
     });
   };
 
@@ -156,6 +169,7 @@ async function runResearchPlanPhase(
       return hybridSearch.search(userId, notebookId, query, docIds, embedding, undefined, {
         skipRerank: true,
         allowEmpty: true,
+        quiet: true,
       });
     },
     onProgress: async (phase, subQuestionId, sourcesFound) => {
@@ -173,7 +187,7 @@ async function runResearchPlanPhase(
     userId,
     notebookId: notebookIdTyped,
     conversationId,
-    messageId: "" as any, // Will be linked after user message is persisted
+    messageId: resolvedUserMessageId,
     query: message,
     sourcePolicy,
     subQuestions: subQuestions.map((sq) => ({
@@ -223,6 +237,8 @@ export const runWithStreamId = internalAction({
         dedupeStrategy: v.optional(v.string()),
       })
     ),
+    /** Set by client after sendMessageOptimistic; server falls back to latest user message in conversation. */
+    userMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
     const streamId = args.streamId as any;
@@ -290,7 +306,8 @@ export const runWithStreamId = internalAction({
           args.documentIds,
           args.sourcePolicy ?? { channels: ["notebook"] },
           chunkAppender,
-          conversationId
+          conversationId,
+          args.userMessageId
         );
       } else {
         await streamChatResponse(
@@ -301,7 +318,8 @@ export const runWithStreamId = internalAction({
           args.message,
           args.documentIds,
           chunkAppender,
-          conversationId
+          conversationId,
+          args.sourcePolicy ?? { channels: ["notebook"] }
         );
       }
     } catch (e) {
@@ -353,7 +371,8 @@ export async function streamChatResponse(
   message: string,
   documentIds: string[] | undefined,
   chunkAppender: (text: string) => Promise<void>,
-  conversationId: Id<"conversations">
+  conversationId: Id<"conversations">,
+  sourcePolicy?: { channels: string[] }
 ): Promise<{ fullResponse: string; references: unknown[]; hasError: boolean }> {
   const notebookIdTyped = notebookId as Id<"notebooks">;
 
@@ -362,7 +381,11 @@ export async function streamChatResponse(
   });
   const keywordSearchChunkUserId = (notebookDoc?.userId ?? userId) as Id<"users">;
 
-  console.log("[ChatStream] Starting stream:", streamId);
+  const chatStreamLog = createServiceLogger("chatStream", "streamChatResponse", {
+    userId,
+    notebookId: notebookIdTyped,
+  });
+  chatStreamLog.info("stream_start", { streamId });
 
   // Get conversation history
   const { messages: messageList } = await ctx.runQuery(internal.chat.index.getMessagesInternal, {
@@ -389,11 +412,6 @@ export async function streamChatResponse(
     // This ensures we get enough relevant chunks from the selected documents
     const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
 
-    const allChunks = await ctx.runQuery(internal.documents.index.listChunksByNotebook, {
-      notebookId: notebookIdTyped,
-    });
-    console.log("[vectorSearchRunner] Total chunks in notebook:", allChunks.length);
-
     const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
@@ -401,7 +419,7 @@ export async function streamChatResponse(
         q.eq("notebookId", notebookIdTyped),
     });
 
-    console.log("[vectorSearchRunner] Vector search returned:", results.length, "results");
+    chatStreamLog.debug("vector_search_raw", { count: results.length });
 
     const chunkIds = (results as VectorSearchHit[]).map((r: VectorSearchHit) => r._id);
     const fullChunks =
@@ -493,12 +511,13 @@ export async function streamChatResponse(
 
       // Filter by selected documents FIRST, before applying threshold
       const selectedDocResults = rows.filter((r) => docIdSet.has(r.documentId));
-      console.log(
-        `[vectorSearchRunner] Selected docs: ${selectedDocResults.length} chunks from ${docIds.length} sources`
-      );
+      chatStreamLog.debug("vector_selected_docs", {
+        chunks: selectedDocResults.length,
+        sources: docIds.length,
+      });
 
       if (selectedDocResults.length === 0) {
-        console.warn("[vectorSearchRunner] No chunks found in selected documents at all");
+        chatStreamLog.warn("No chunks in selected documents", { sources: docIds.length });
         return [];
       }
 
@@ -506,46 +525,52 @@ export async function streamChatResponse(
       const SELECTED_DOC_THRESHOLD = VECTOR_MATCH_THRESHOLD * 0.7; // 30% lower
 
       let thresholded = selectedDocResults.filter((r) => r._score >= SELECTED_DOC_THRESHOLD);
-      console.log(
-        `[vectorSearchRunner] Selected docs after threshold (${SELECTED_DOC_THRESHOLD}): ${thresholded.length} results`
-      );
+      chatStreamLog.debug("vector_after_threshold", {
+        threshold: SELECTED_DOC_THRESHOLD,
+        count: thresholded.length,
+      });
 
       // If still no results at lower threshold, try even lower as last resort
       if (thresholded.length === 0) {
         const LAST_RESORT_THRESHOLD = VECTOR_MATCH_THRESHOLD * 0.5; // 50% lower
         thresholded = selectedDocResults.filter((r) => r._score >= LAST_RESORT_THRESHOLD);
-        console.warn(
-          `[vectorSearchRunner] No results at ${SELECTED_DOC_THRESHOLD}, trying ${LAST_RESORT_THRESHOLD}: ${thresholded.length} results`
-        );
+        chatStreamLog.warn("vector_threshold_fallback", {
+          tried: SELECTED_DOC_THRESHOLD,
+          lastResort: LAST_RESORT_THRESHOLD,
+          count: thresholded.length,
+        });
       }
 
       // Final fallback: return top results from selected docs regardless of score
       if (thresholded.length === 0) {
-        console.warn(
-          `[vectorSearchRunner] No results even at lowest threshold, returning top ${Math.min(limit, selectedDocResults.length)} from selected docs`
-        );
+        chatStreamLog.warn("vector_last_resort_top_k", {
+          take: Math.min(limit, selectedDocResults.length),
+        });
         thresholded = selectedDocResults.slice(0, Math.min(limit, selectedDocResults.length));
       }
 
       return thresholded.slice(0, limit);
     } else if (docIds && docIds.length === 0) {
       // User explicitly has no selected sources - return empty results
-      console.log("[vectorSearchRunner] No sources selected, returning empty results");
+      chatStreamLog.debug("vector_no_sources_selected", {});
       return [];
     } else {
       // docIds is undefined or not provided - apply normal threshold logic (should not happen after frontend fix)
-      console.log(`[vectorSearchRunner] Applying threshold filter: ${VECTOR_MATCH_THRESHOLD}`);
+      chatStreamLog.debug("vector_threshold_apply", { threshold: VECTOR_MATCH_THRESHOLD });
       let thresholded = rows.filter((r) => r._score >= VECTOR_MATCH_THRESHOLD);
-      console.log(
-        `[vectorSearchRunner] After threshold (${VECTOR_MATCH_THRESHOLD}): ${thresholded.length} results (from ${rows.length})`
-      );
+      chatStreamLog.debug("vector_after_threshold_global", {
+        threshold: VECTOR_MATCH_THRESHOLD,
+        count: thresholded.length,
+        from: rows.length,
+      });
 
-      // Log score distribution for debugging
       if (rows.length > 0) {
         const scores = rows.map((r) => r._score);
-        console.log(
-          `[vectorSearchRunner] Score distribution: min=${Math.min(...scores).toFixed(3)}, max=${Math.max(...scores).toFixed(3)}, avg=${(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3)}`
-        );
+        chatStreamLog.debug("vector_score_distribution", {
+          min: Math.min(...scores),
+          max: Math.max(...scores),
+          avg: scores.reduce((a, b) => a + b, 0) / scores.length,
+        });
       }
 
       // Fallback: If no results pass threshold, progressively lower it
@@ -554,17 +579,19 @@ export async function streamChatResponse(
         for (const fallbackThreshold of FALLBACK_THRESHOLDS) {
           thresholded = rows.filter((r) => r._score >= fallbackThreshold);
           if (thresholded.length > 0) {
-            console.warn(
-              `[vectorSearchRunner] No results at threshold ${VECTOR_MATCH_THRESHOLD}. Using fallback threshold ${fallbackThreshold}: ${thresholded.length} results`
-            );
+            chatStreamLog.warn("vector_fallback_threshold", {
+              original: VECTOR_MATCH_THRESHOLD,
+              fallbackThreshold,
+              count: thresholded.length,
+            });
             break;
           }
         }
         // Last resort: return top results regardless of score
         if (thresholded.length === 0) {
-          console.warn(
-            `[vectorSearchRunner] No results even at lowest threshold. Returning top ${Math.min(limit, rows.length)} results regardless of score.`
-          );
+          chatStreamLog.warn("vector_last_resort_unfiltered", {
+            take: Math.min(limit, rows.length),
+          });
           thresholded = rows.slice(0, Math.min(limit, rows.length));
         }
       }
@@ -579,7 +606,7 @@ export async function streamChatResponse(
     limit: number,
     docIds?: string[]
   ): Promise<any[]> => {
-    console.log("[keywordSearchRunner] executing with closure-captured context");
+    chatStreamLog.debug("keyword_search_runner", { phase: "start" });
 
     const results = await ctx.runQuery(internal.documents.index.keywordSearch, {
       notebookId: notebookIdTyped,
@@ -589,12 +616,12 @@ export async function streamChatResponse(
       documentIds: docIds as any,
     });
 
-    console.log("[keywordSearchRunner] returned", results.length, "results");
+    chatStreamLog.debug("keyword_search_runner", { returned: results.length });
     return results;
   };
 
   // Initialize HybridSearchHandler with both vector and keyword search
-  const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
+  const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY || "");
 
   // Create rerank function closure that matches RerankFunction signature
   // The closure captures `ctx` from the outer scope
@@ -629,6 +656,114 @@ export async function streamChatResponse(
     vectorSearchHandler: hybridSearch,
     globalRerankFn,
   });
+
+  // External search: discover sources from non-notebook channels (web, news, finance)
+  const externalChannels = (sourcePolicy?.channels ?? ["notebook"]).filter(
+    (ch) => ch !== "notebook"
+  );
+  let externalSources: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    sourceType: string;
+    score?: number;
+  }> = [];
+  let externalChunks: Array<import("../storage/ChatHistoryService").ReferenceChunk> = [];
+
+  if (externalChannels.length > 0) {
+    const maxPerChannel = Math.ceil(5 / externalChannels.length);
+
+    // Tavily channels: web→general, news, finance
+    const tavilyChannels = externalChannels.filter((ch) =>
+      ["web", "news", "finance"].includes(ch)
+    );
+    const tavilyResults: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      sourceType: string;
+      score?: number;
+      rawContent?: string;
+    }> = [];
+
+    if (tavilyChannels.length > 0) {
+      const channelToTopic = (ch: string) => (ch === "web" ? "general" : ch);
+      const searchPromises: Promise<Array<typeof tavilyResults[number]>>[] = [];
+
+      // Refine the user message into a search-optimized query to improve result relevance.
+      // Falls back to the raw message if refinement fails.
+      const refinedQuery = await refineWebSearchQuery(message);
+
+      for (const channel of tavilyChannels) {
+        const topic = channelToTopic(channel);
+        searchPromises.push(
+          ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+            query: refinedQuery,
+            maxResults: maxPerChannel,
+            topic,
+          }).then((results: any[]) =>
+            results.map((r: any) => ({
+              title: r.title ?? "Untitled",
+              url: r.url ?? "",
+              snippet: r.snippet ?? r.content ?? "",
+              sourceType: channel,
+              score: r.score,
+              rawContent: r.rawContent ?? undefined,
+            }))
+          ).catch((e: unknown) => {
+            chatStreamLog.warn("tavily_search_failed", { channel, topic, error: String(e) });
+            return [];
+          })
+        );
+      }
+
+      const settled = await Promise.allSettled(searchPromises);
+      for (const result of settled) {
+        if (result.status === "fulfilled") {
+          tavilyResults.push(...result.value.filter((s) => s.url));
+        }
+      }
+
+      // Sort by score descending, cap at 5
+      tavilyResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      const topResults = tavilyResults.slice(0, 5);
+
+      // Build metadata for frontend and ReferenceChunks for the LLM
+      externalSources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
+      externalChunks = topResults
+        .filter((r) => r.rawContent && r.rawContent.trim().length > 100)
+        .map((r, i) => {
+          // Chunk raw content into ~3000 char pieces to fit within token budget
+          const raw = r.rawContent!.trim();
+          const CHUNK_SIZE = 3000;
+          const pieces: string[] = [];
+          for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
+            pieces.push(raw.slice(start, start + CHUNK_SIZE));
+          }
+          // Take first chunk only to stay within budget
+          const content = pieces[0] ?? raw;
+          return {
+            id: `ext_${i}`,
+            sourceId: `ext_${i}`,
+            sourceTitle: r.title,
+            sourceUrl: r.url,
+            content,
+            chunkIndex: 0,
+            // Assign a moderate score so token budget selector includes them
+            similarity: 0.5,
+            metadata: {
+              sectionTitle: `Web source (${r.sourceType})`,
+            },
+          } as import("../storage/ChatHistoryService").ReferenceChunk;
+        });
+
+      chatStreamLog.info("external_search_complete", {
+        channels: externalChannels,
+        resultCount: externalSources.length,
+        chunksForLLM: externalChunks.length,
+      });
+    }
+  }
 
   let fullResponse = "";
   let references: unknown[] = [];
@@ -678,6 +813,8 @@ export async function streamChatResponse(
     agentTrace.phases.push({ status, message });
   };
 
+  const includeNotebook = (sourcePolicy?.channels ?? ["notebook"]).includes("notebook");
+
   try {
     // Stream response chunks using ChatAgent
     for await (const chunk of agent.streamResponse(
@@ -685,10 +822,13 @@ export async function streamChatResponse(
         userId,
         noteId: notebookId,
         conversationHistory,
-        documentIds,
+        documentIds: includeNotebook ? documentIds : [],
+        enableNotebookSearch: includeNotebook,
         groundingMode: notebookGrounding,
+        externalChunks: externalChunks.length > 0 ? externalChunks : undefined,
       },
-      message
+      message,
+      streamId
     )) {
       if (chunk.type === "token") {
         fullResponse += chunk.data ?? "";
@@ -752,6 +892,10 @@ export async function streamChatResponse(
         await chunkAppender(`\n__ERROR:${JSON.stringify(chunk.data)}\n`);
         break;
       } else if (chunk.type === "done") {
+        // Emit discovered external sources before done signal
+        if (externalSources.length > 0) {
+          await chunkAppender(`\n__EXTERNAL_SOURCES:${JSON.stringify(externalSources)}\n`);
+        }
         await chunkAppender(`\n__DONE\n`);
       }
     }
@@ -794,9 +938,9 @@ export async function streamChatResponse(
   };
 
   if (existingMessages.length === 0) {
-    console.warn(
-      "[ChatStream] Conversation was cleared during generation — skipping assistant message storage."
-    );
+    chatStreamLog.warn("conversation_cleared_during_generation", {
+      detail: "skip_assistant_persist",
+    });
   } else {
     const refsToStore = fullResponse.trim() ? references : undefined;
     const contentFinal =
@@ -818,7 +962,10 @@ export async function streamChatResponse(
           void res;
           break;
         } catch (e) {
-          console.warn(`[ChatStream] persistAssistantFromStream attempt ${attempt + 1} failed:`, e);
+          chatStreamLog.warn("persist_assistant_retry", {
+            attempt: attempt + 1,
+            error: e instanceof Error ? e.message : String(e),
+          });
           if (attempt < 3) await sleepMs(150 * (attempt + 1));
         }
       }
@@ -836,13 +983,13 @@ export async function streamChatResponse(
             },
           });
         } catch (e2) {
-          console.error("[ChatStream] Tombstone after persist exhaustion failed:", e2);
+          chatStreamLog.error("tombstone_persist_failed", e2);
         }
       }
     }
   }
 
-  console.log("[ChatStream] Stream complete:", streamId);
+  chatStreamLog.info("stream_complete", { streamId });
 
   return {
     fullResponse,
@@ -893,10 +1040,16 @@ export const runResearchExecute = internalAction({
       });
       if (!plan) throw new Error("Plan not found");
 
+      const researchLog = createServiceLogger("chatStream", "researchExecute", {
+        userId: args.userId,
+        notebookId: plan.notebookId,
+      });
+      researchLog.operationStart({ runId: String(runId), planId: String(run.planId) });
+
       const { ResearchAgent } = await import("../_agents/research/index.js");
       const apiKey = process.env.TOGETHER_API_KEY ?? "";
       const smartModel = process.env.SMART_MODEL ?? "openai/gpt-oss-120b";
-      const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY ?? "");
+      const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY ?? "");
       const notebookIdTyped = plan.notebookId;
 
       // Build hybrid search runner
@@ -944,6 +1097,7 @@ export const runResearchExecute = internalAction({
           query,
           limit,
           documentIds: docIds as any,
+          quietLogs: true,
         });
       };
 
@@ -977,6 +1131,7 @@ export const runResearchExecute = internalAction({
           return hybridSearch.search(args.userId, String(notebookIdTyped), query, docIds, embedding, undefined, {
             skipRerank: true,
             allowEmpty: true,
+            quiet: true,
           });
         },
         onProgress: async (phase, subQuestionId, sourcesFound) => {
@@ -1028,8 +1183,12 @@ export const runResearchExecute = internalAction({
         runId,
         status: "completed",
       });
+      researchLog.operationComplete({ runId: String(runId) });
     } catch (e) {
-      console.error("[ResearchExecute] failed:", e);
+      const failLog = createServiceLogger("chatStream", "researchExecute", {
+        userId: args.userId,
+      });
+      failLog.operationError(e, { runId: String(runId) });
       await ctx.runMutation(internal.research.index.updateRunProgress, {
         runId,
         status: "failed",
@@ -1043,7 +1202,10 @@ export const runResearchExecute = internalAction({
           final: true,
         });
       } catch (flushErr) {
-        console.error("[ResearchExecute] Final stream flush failed:", flushErr);
+        const flushLog = createServiceLogger("chatStream", "researchExecute", {
+          userId: args.userId,
+        });
+        flushLog.error("stream_flush_failed", flushErr);
       }
     }
   },

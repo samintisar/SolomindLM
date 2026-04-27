@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import React, { useCallback, useEffect, useImperativeHandle, useRef } from "react";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GOOGLE_BROWSER_API_KEY = import.meta.env.VITE_GOOGLE_BROWSER_API_KEY as string | undefined;
@@ -51,8 +51,10 @@ interface Props {
   onFilesSelected: (files: PickedFile[], accessToken: string) => void;
 }
 
-export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
-  ({ onFilesSelected }, ref) => {
+export function GoogleDrivePicker({
+  onFilesSelected,
+  ref,
+}: Props & { ref?: React.Ref<GoogleDrivePickerHandle> }) {
     const tokenClientRef = useRef<google.accounts.oauth2.TokenClient | null>(null);
     const accessTokenRef = useRef<string | null>(null);
     const scriptsLoadedRef = useRef(false);
@@ -197,7 +199,4 @@ export const GoogleDrivePicker = forwardRef<GoogleDrivePickerHandle, Props>(
     }, [maybeOpenPicker, openPicker]);
 
     return null;
-  }
-);
-
-GoogleDrivePicker.displayName = "GoogleDrivePicker";
+}

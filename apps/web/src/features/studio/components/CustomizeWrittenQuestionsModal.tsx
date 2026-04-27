@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, MessageSquareText, Check } from "lucide-react";
+import { X, MessageSquareText } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeWrittenQuestionsModalProps {
@@ -60,48 +60,45 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
           </div>
         </div>
 
-        <div className="p-6 md:p-10 space-y-10 bg-card/50">
-          <div className="space-y-4">
-            <label className="block font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Number of Questions
-            </label>
-            <div className="flex w-full min-w-0 bg-background border border-border rounded-xl p-1">
-              {(["fewer", "standard", "more"] as const).map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setCount(opt)}
-                  className={`
-                    flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition-all sm:px-3
-                    ${
-                      count === opt
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }
-                  `}
-                >
-                  {count === opt && <Check className="h-3 w-3 shrink-0" aria-hidden />}
-                  <span className="whitespace-nowrap">
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-x-8">
-            <div className="space-y-4">
-              <label className="block font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Question Type
+        <div className="p-6 md:p-10 space-y-8 bg-card/50">
+          <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:gap-x-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
+                Count
               </label>
-              <div className="flex w-full min-w-0 bg-background border border-border rounded-xl p-1">
+              <div className="flex w-full min-w-0 rounded-lg border border-border bg-background p-0.5">
+                {(["fewer", "standard", "more"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setCount(opt)}
+                    className={`
+                      flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-md px-0.5 py-1 text-[10px] font-semibold transition-all sm:min-h-8 sm:px-1 sm:text-xs
+                      ${
+                        count === opt
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }
+                    `}
+                  >
+                    <span className="truncate">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-1">
+              <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
+                Type
+              </label>
+              <div className="flex w-full min-w-0 rounded-lg border border-border bg-background p-0.5">
                 {(["short", "essay"] as const).map((opt) => (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => setQuestionType(opt)}
                     className={`
-                      flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all
+                      flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-md px-0.5 py-1 text-[10px] font-semibold transition-all sm:min-h-8 sm:px-1 sm:text-xs
                       ${
                         questionType === opt
                           ? "bg-primary text-primary-foreground shadow-sm"
@@ -109,25 +106,24 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
                       }
                     `}
                   >
-                    {questionType === opt && <Check className="h-3 w-3 shrink-0" aria-hidden />}
                     <span className="truncate">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="block font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Difficulty Level
+            <div className="flex min-w-0 flex-col gap-1">
+              <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
+                Difficulty
               </label>
-              <div className="flex w-full min-w-0 bg-background border border-border rounded-xl p-1">
+              <div className="flex w-full min-w-0 rounded-lg border border-border bg-background p-0.5">
                 {(["easy", "medium", "hard"] as const).map((opt) => (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => setDifficulty(opt)}
                     className={`
-                      flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition-all sm:px-2.5
+                      flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-md px-0.5 py-1 text-[10px] font-semibold transition-all sm:min-h-8 sm:px-1 sm:text-xs
                       ${
                         difficulty === opt
                           ? "bg-primary text-primary-foreground shadow-sm"
@@ -135,7 +131,6 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
                       }
                     `}
                   >
-                    {difficulty === opt && <Check className="h-3 w-3 shrink-0" aria-hidden />}
                     <span className="truncate">{opt.charAt(0).toUpperCase() + opt.slice(1)}</span>
                   </button>
                 ))}

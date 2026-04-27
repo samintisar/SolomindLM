@@ -38,7 +38,9 @@ async function reasoningFieldStreaming(): Promise<void> {
 
   const stream = await client.chat.completions.stream({
     model: "moonshotai/Kimi-K2.5",
-    messages: [{ role: "user", content: "Which number is bigger, 9.11 or 9.9?" }],
+    messages: [
+      { role: "user", content: "Which number is bigger, 9.11 or 9.9?" },
+    ],
   });
 
   let reasoningText = "";
@@ -61,7 +63,9 @@ async function deepseekR1ThinkTags(): Promise<void> {
 
   const stream = await client.chat.completions.create({
     model: "deepseek-ai/DeepSeek-R1",
-    messages: [{ role: "user", content: "Which number is bigger 9.9 or 9.11?" }],
+    messages: [
+      { role: "user", content: "Which number is bigger 9.9 or 9.11?" },
+    ],
     stream: true,
   });
 
@@ -112,7 +116,9 @@ async function toggleReasoning(): Promise<void> {
   console.log("  [reasoning=true]");
   const enabledParams: ReasoningParams = {
     model: "moonshotai/Kimi-K2.5",
-    messages: [{ role: "user", content: "What is the capital of France?" }],
+    messages: [
+      { role: "user", content: "What is the capital of France?" },
+    ],
     reasoning: { enabled: true },
     temperature: 1.0,
     stream: true,

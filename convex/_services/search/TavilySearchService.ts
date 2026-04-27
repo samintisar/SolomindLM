@@ -20,6 +20,8 @@ export interface DiscoveredSource {
   score: number;
   publishedDate?: string;
   domain?: string;
+  /** Full page content in markdown (when include_raw_content is enabled) */
+  rawContent?: string;
 }
 
 // ============================================================
@@ -82,7 +84,7 @@ export const searchInternal = internalAction({
             topic: topic || "general",
             time_range: timeRange,
             include_answer: false,
-            include_raw_content: false,
+            include_raw_content: "markdown",
             max_results: maxResults,
             exclude_domains:
               excludeDomains && excludeDomains.length > 0 ? excludeDomains : undefined,
@@ -116,6 +118,7 @@ export const searchInternal = internalAction({
         score: result.score || 0,
         publishedDate: result.published_date,
         domain: result.url ? new URL(result.url).hostname : undefined,
+        rawContent: result.raw_content || undefined,
       }));
 
       sources = sources.filter((source) => source.score >= scoreThreshold);

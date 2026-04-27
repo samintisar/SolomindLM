@@ -1,24 +1,21 @@
 import { v } from "convex/values";
-import { query, mutation, internalMutation, action } from "../_generated/server";
+import { query, internalMutation, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { assertCanReadNotebook } from "../_lib/notebookAccess";
 
 /**
- * Vector search for document chunks
- * Returns relevant chunks based on semantic similarity
+ * Returns the first N chunks for a notebook (by index order), not semantic search.
+ * Use chat/internal vector search for similarity retrieval.
  */
-export const vectorSearch = query({
+export const getRecentNotebookChunks = query({
   args: {
     notebookId: v.id("notebooks"),
-    query: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    void args.query;
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
@@ -52,25 +49,28 @@ export const getChunks = query({
 });
 
 /**
- * Search chunks using vector index with query embedding
+ * ANN search with a precomputed embedding (internal only; no public surface).
  */
-export const searchWithEmbedding = action({
+export const searchWithEmbeddingInternal = internalAction({
   args: {
-    notebookId: v.string(),
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
     queryEmbedding: v.array(v.float64()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Use the vector index to search
-    const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
+    const canRead = await ctx.runQuery(internal.notebooks.index.canReadNotebookInternal, {
+      notebookId: args.notebookId,
+      userId: args.userId,
+    });
+    if (!canRead) {
+      throw new Error("Notebook not found");
+    }
+    return await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: args.queryEmbedding,
       limit: args.limit || 5,
-      filter: (q) => q.eq("notebookId", args.notebookId as any),
-      // Note: We can't filter by userId in vector search directly
-      // The userId filter should be applied after the search
+      filter: (q) => q.eq("notebookId", args.notebookId),
     });
-
-    return results;
   },
 });
 

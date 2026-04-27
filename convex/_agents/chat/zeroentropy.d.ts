@@ -10,9 +10,12 @@ declare module "zeroentropy" {
     top_n?: number;
   }
 
+  /** API returns index into the `documents` array and an optional score. */
   export interface ZeroEntropyRerankResult {
     text?: string;
     document?: string;
+    index?: number;
+    relevance_score?: number;
   }
 
   export interface ZeroEntropyRerankResponse {

@@ -8,7 +8,6 @@ import {
   Telescope,
   BookOpen,
   Globe,
-  GraduationCap,
   Newspaper,
   TrendingUp,
 } from "lucide-react";
@@ -16,9 +15,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 
 const SOURCE_FILTERS = [
-  { id: "notebook", label: "Notebook only", icon: BookOpen },
+  { id: "notebook", label: "Notebook sources", icon: BookOpen },
   { id: "web", label: "Web", icon: Globe },
-  { id: "academic", label: "Academic", icon: GraduationCap },
   { id: "news", label: "News", icon: Newspaper },
   { id: "finance", label: "Finance", icon: TrendingUp },
 ] as const;
@@ -111,7 +109,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     <div className="w-full max-w-3xl xl:max-w-4xl 2xl:max-w-5xl bg-card border-2 border-border shadow-lg rounded-2xl py-1.5 px-2 flex flex-col gap-1 relative">
       <textarea
         ref={textareaRef}
-        placeholder={deepResearchEnabled ? "Ask a deep research question..." : "Ask a question about your sources..."}
+        placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
         className="w-full bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-lg"
         rows={1}
         value={value}

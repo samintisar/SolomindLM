@@ -23,7 +23,7 @@ function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
 /**
  * Map a raw database note (with _type discriminator) to the frontend Note interface
  */
-function mapDatabaseNoteToNote(dbNote: any): Note {
+export function mapDatabaseNoteToNote(dbNote: any): Note {
   const { _type } = dbNote;
 
   switch (_type) {

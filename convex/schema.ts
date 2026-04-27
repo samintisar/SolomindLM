@@ -1,6 +1,11 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import {
+  fulltextStatusValidator,
+  ingestionStatusValidator,
+  paperRecordValidator,
+} from "./documents/paperRecord";
 
 export default defineSchema({
   // Convex Auth tables (users, sessions, accounts, verificationTokens)
@@ -65,7 +70,7 @@ export default defineSchema({
     userId: v.id("users"),
     notebookId: v.id("notebooks"),
     fileName: v.string(),
-    fileType: v.string(), // 'file' | 'url' | 'youtube' | 'text'
+    fileType: v.string(), // 'file' | 'url' | 'youtube' | 'text' | 'paper_record'
     fileSize: v.optional(v.number()),
     fileUrl: v.optional(v.string()),
     storageId: v.optional(v.string()), // Convex Storage ID
@@ -89,12 +94,19 @@ export default defineSchema({
     maxHeadingLevel: v.optional(v.number()),
     /** Full extracted text for UI copy/view (not chunk-overlapped). RAG still uses documentChunks. */
     extractedMarkdown: v.optional(v.string()),
+    /** Discovery-added research paper metadata + OA resolver fields */
+    paperRecord: v.optional(paperRecordValidator),
+    /** Whether an OA/full-text ingest path exists vs metadata-only vs external publisher */
+    fulltextStatus: v.optional(fulltextStatusValidator),
+    /** Ingest pipeline outcome for paper_record (orthogonal to `status` processing flag) */
+    ingestionStatus: v.optional(ingestionStatusValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
+    .index("by_notebook_and_status", ["notebookId", "status"])
     // Documents with storageId set (file uploads)
     .index("by_storage", ["storageId"]),
 
@@ -129,7 +141,7 @@ export default defineSchema({
     .index("by_document", ["documentId"])
     .index("by_notebook", ["notebookId"])
     .vectorIndex("by_embedding", {
-      dimensions: 1536, // NOTE: dimensions (plural), not dimension
+      dimensions: 1024, // NOTE: dimensions (plural), not dimension - updated for Together AI intfloat/multilingual-e5-large-instruct
       vectorField: "embedding",
       filterFields: ["userId", "notebookId"],
     })
@@ -151,6 +163,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -168,6 +181,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -199,6 +213,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -214,6 +229,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -230,6 +246,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -245,6 +262,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -261,6 +279,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
@@ -291,7 +310,9 @@ export default defineSchema({
     socraticThreadId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user_notebook", ["userId", "notebookId"]),
+  })
+    .index("by_user_notebook", ["userId", "notebookId"])
+    .index("by_notebook", ["notebookId"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),
@@ -323,49 +344,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
     .index("by_type", ["type"]),
-
-  // Wikis - Knowledge base compilation from notebook sources
-  wikis: defineTable({
-    userId: v.id("users"),
-    notebookId: v.id("notebooks"),
-    title: v.string(), // "Knowledge Base"
-    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
-    autoUpdate: v.optional(v.boolean()),
-    generatedAt: v.number(),
-    lastRefreshedAt: v.optional(v.number()),
-    metadata: v.optional(v.any()), // article counts, stats
-    error: v.optional(v.string()), // Error message if failed
-    /** Incremented on each refresh/cancel so in-flight jobs can detect stale runs */
-    generationRunId: v.optional(v.number()),
-  })
-    .index("by_notebook", ["notebookId"])
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
-
-  // Wiki articles - Individual concept/connection/qa articles
-  wikiArticles: defineTable({
-    wikiId: v.id("wikis"),
-    path: v.string(), // "concepts/entities", "connections/relationships", "index", "log", etc.
-    type: v.union(
-      v.literal("concept"),
-      v.literal("connection"),
-      v.literal("qa"),
-      v.literal("index"),
-      v.literal("log")
-    ),
-    title: v.string(),
-    content: v.string(), // Markdown content
-    sources: v.array(v.id("documents")), // Which source documents this came from
-    frontmatter: v.optional(v.any()), // YAML frontmatter data (slug, summary, related concepts, etc.)
-    wordCount: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_wiki", ["wikiId"])
-    .index("by_path", ["wikiId", "path"])
-    .index("by_type", ["wikiId", "type"]),
 
   // Stripe
   stripeSubscriptions: defineTable({
@@ -487,6 +468,11 @@ export default defineSchema({
         question: v.string(),
         searchQueries: v.array(v.string()),
         sourceChannels: v.array(v.string()), // "notebook" | "web" | "academic" | "news"
+        status: v.union(
+          v.literal("pending"),
+          v.literal("researching"),
+          v.literal("completed")
+        ),
       })
     ),
     sourcePolicy: v.object({

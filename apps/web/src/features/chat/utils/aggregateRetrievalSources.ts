@@ -174,11 +174,13 @@ export function aggregateRetrievalSources(
 
   const rows: AggregatedRetrievalSource[] = [...map.entries()].map(
     ([sourceId, { title, count, sourceUrl }]) => {
-      const badgeLabel = inferSourceBadgeLabel(title);
+      const badgeFromTitle = inferSourceBadgeLabel(title);
+      const openFromStored = navigableUrlFromStoredSource(sourceUrl);
+      const openFromTitle = deriveWebOpenUrl(title);
       const openUrl =
-        badgeLabel === "WEB"
-          ? (navigableUrlFromStoredSource(sourceUrl) ?? deriveWebOpenUrl(title))
-          : null;
+        openFromStored ?? (badgeFromTitle === "WEB" ? openFromTitle : null);
+      const badgeLabel =
+        badgeFromTitle === "TEXT" && openFromStored ? "WEB" : badgeFromTitle;
       return {
         sourceId,
         title,

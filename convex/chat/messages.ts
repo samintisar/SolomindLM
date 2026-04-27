@@ -2,8 +2,14 @@ import { v } from "convex/values";
 import { query, mutation, internalAction, internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
-import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { assertCanReadNotebook, assertCanEditNotebook } from "../_lib/notebookAccess";
+import {
+  getConversationIfReadable,
+  assertCanEditConversation,
+} from "../_lib/conversationAccess";
+import * as ConvModel from "../_model/conversations";
 import type { Id } from "../_generated/dataModel";
+import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
 
 /**
  * Get all messages for a notebook
@@ -15,6 +21,11 @@ export const listByNotebook = query({
     notebookId: v.id("notebooks"),
     conversationId: v.optional(v.id("conversations")),
   },
+  returns: v.object({
+    messages: v.array(v.any()),
+    chatGenerating: v.boolean(),
+    chatGenerationStartedAt: v.union(v.null(), v.number()),
+  }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
@@ -27,20 +38,15 @@ export const listByNotebook = query({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    // Resolve conversation: use explicit ID when provided, otherwise fall back to first
     let conversation;
     if (args.conversationId) {
-      conversation = await ctx.db.get(args.conversationId);
-      if (!conversation || conversation.userId !== userId || conversation.notebookId !== args.notebookId) {
+      const c = await getConversationIfReadable(ctx, args.conversationId, userId);
+      if (!c || c.notebookId !== args.notebookId) {
         return { messages: [], chatGenerating: false, chatGenerationStartedAt: null };
       }
+      conversation = c;
     } else {
-      conversation = await ctx.db
-        .query("conversations")
-        .withIndex("by_user_notebook", (q) =>
-          q.eq("userId", userId).eq("notebookId", args.notebookId)
-        )
-        .first();
+      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
     }
 
     if (!conversation) {
@@ -51,12 +57,11 @@ export const listByNotebook = query({
       };
     }
 
-    // Get all messages for this conversation
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
       .order("asc")
-      .collect();
+      .take(MAX_MESSAGES_PER_CONVERSATION);
 
     const inFlight = conversation.chatGenerationInFlight ?? 0;
     return {
@@ -111,13 +116,7 @@ export const sendMessage = mutation({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    // Find or create conversation
-    let conversation = await ctx.db
-      .query("conversations")
-      .withIndex("by_user_notebook", (q) =>
-        q.eq("userId", userId).eq("notebookId", args.notebookId)
-      )
-      .first();
+    let conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
 
     if (!conversation) {
       const now = Date.now();
@@ -169,20 +168,15 @@ export const sendMessageOptimistic = mutation({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    // Resolve conversation: use explicit ID when provided, otherwise find or create
     let conversation: { _id: Id<"conversations">; chatGenerationInFlight?: number; title?: string; userId?: Id<"users">; notebookId?: Id<"notebooks"> } | null;
     if (args.conversationId) {
-      conversation = await ctx.db.get(args.conversationId);
-      if (!conversation || conversation.userId !== userId || conversation.notebookId !== args.notebookId) {
+      const c = await getConversationIfReadable(ctx, args.conversationId, userId);
+      if (!c || c.notebookId !== args.notebookId) {
         throw new Error("Conversation not found");
       }
+      conversation = c;
     } else {
-      conversation = await ctx.db
-        .query("conversations")
-        .withIndex("by_user_notebook", (q) =>
-          q.eq("userId", userId).eq("notebookId", args.notebookId)
-        )
-        .first();
+      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
 
       if (!conversation) {
         const now = Date.now();
@@ -225,7 +219,7 @@ export const sendMessageOptimistic = mutation({
         .withIndex("by_conversation", (q) => q.eq("conversationId", conversation!._id))
         .collect();
       if (existingMessages.length <= 1) {
-        ctx.scheduler.runAfter(0, internal.chat.messages.generateAndSetTitle, {
+        await ctx.scheduler.runAfter(0, internal.chat.messages.generateAndSetTitle, {
           conversationId: conversation._id,
           content: args.message,
         });
@@ -260,15 +254,11 @@ export const releaseChatGeneration = mutation({
 
     let conversation;
     if (args.conversationId) {
-      conversation = await ctx.db.get(args.conversationId);
-      if (!conversation || conversation.userId !== userId) return;
+      conversation = await getConversationIfReadable(ctx, args.conversationId, userId);
+      if (!conversation) return;
     } else {
-      conversation = await ctx.db
-        .query("conversations")
-        .withIndex("by_user_notebook", (q) =>
-          q.eq("userId", userId).eq("notebookId", args.notebookId)
-        )
-        .first();
+      await assertCanReadNotebook(ctx, args.notebookId, userId);
+      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
     }
 
     if (!conversation) {
@@ -317,10 +307,7 @@ export const setMessageFeedback = mutation({
     const message = await ctx.db.get(args.messageId);
     if (!message) throw new Error("Message not found");
 
-    const conversation = await ctx.db.get(message.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Unauthorized");
-    }
+    await assertCanEditConversation(ctx, message.conversationId, userId);
 
     await ctx.db.patch(args.messageId, {
       feedback: args.feedback ?? undefined,
@@ -344,11 +331,7 @@ export const deleteMessagesFrom = mutation({
     const target = await ctx.db.get(args.messageId);
     if (!target) throw new Error("Message not found");
 
-    // Verify ownership via conversation
-    const conversation = await ctx.db.get(target.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Unauthorized");
-    }
+    await assertCanEditConversation(ctx, target.conversationId, userId);
 
     // Get all messages in the conversation ordered by creation time
     const allMessages = await ctx.db
@@ -385,20 +368,16 @@ export const clearHistory = mutation({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    // Resolve conversation
     let conversation;
     if (args.conversationId) {
-      conversation = await ctx.db.get(args.conversationId);
-      if (!conversation || conversation.userId !== userId) {
+      try {
+        conversation = await assertCanEditConversation(ctx, args.conversationId, userId);
+      } catch {
         return { message: "Conversation not found" };
       }
     } else {
-      conversation = await ctx.db
-        .query("conversations")
-        .withIndex("by_user_notebook", (q) =>
-          q.eq("userId", userId).eq("notebookId", args.notebookId)
-        )
-        .first();
+      await assertCanEditNotebook(ctx, args.notebookId, userId);
+      conversation = await ConvModel.getPrimaryConversationForNotebook(ctx, args.notebookId);
     }
 
     if (!conversation) {
@@ -437,10 +416,7 @@ export const renameConversation = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const conversation = await ctx.db.get(args.conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      throw new Error("Conversation not found");
-    }
+    await assertCanEditConversation(ctx, args.conversationId, userId);
 
     await ctx.db.patch(args.conversationId, {
       title: args.title,

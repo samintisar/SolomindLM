@@ -88,6 +88,31 @@ export async function deleteNotebook(ctx: MutationCtx, notebookId: Id<"notebooks
   await ctx.db.delete("notebooks", notebookId);
 }
 
+/**
+ * Remove share links, collaborating members, then the notebook row (same as public `notebooks.remove`).
+ * Does not delete documents, conversations, or other per-notebook content (matches current product behavior).
+ */
+export async function removeNotebookWithRelated(
+  ctx: MutationCtx,
+  notebookId: Id<"notebooks">
+): Promise<void> {
+  const members = await ctx.db
+    .query("notebookMembers")
+    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+    .collect();
+  for (const m of members) {
+    await ctx.db.delete(m._id);
+  }
+  const shareLinks = await ctx.db
+    .query("notebookShareLinks")
+    .withIndex("by_notebook", (q) => q.eq("notebookId", notebookId))
+    .collect();
+  for (const l of shareLinks) {
+    await ctx.db.delete(l._id);
+  }
+  await deleteNotebook(ctx, notebookId);
+}
+
 export async function getReportsByNotebook(
   ctx: QueryCtx,
   notebookId: Id<"notebooks">

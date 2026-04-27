@@ -80,6 +80,37 @@ export const resolvePlaybackUrl = query({
 });
 
 /**
+ * Resolve a raw audioUrl string (storageId or legacy /audio/<id> path) to a signed
+ * playback URL. Used for legacy audio notes that don't have an audioOverviewId.
+ * Requires authentication but does not verify ownership — callers should ensure
+ * the audioUrl came from a resource the user already has access to.
+ */
+export const resolveRawAudioUrl = query({
+  args: { audioUrl: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const raw = args.audioUrl.trim();
+    if (!raw) return null;
+
+    // Already a full URL — return as-is
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+      return { url: raw };
+    }
+
+    // Strip /audio/ prefix from legacy storage paths
+    let storageId = raw;
+    if (storageId.startsWith("/audio/")) storageId = storageId.slice("/audio/".length);
+    else if (storageId.startsWith("audio/")) storageId = storageId.slice("audio/".length);
+    if (storageId.startsWith("/")) storageId = storageId.slice(1);
+
+    const url = await ctx.storage.getUrl(storageId as Id<"_storage">);
+    return url ? { url } : null;
+  },
+});
+
+/**
  * Internal: Get an audio overview by ID (for use by jobs)
  */
 export const getInternal = internalQuery({

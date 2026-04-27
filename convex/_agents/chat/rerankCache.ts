@@ -138,7 +138,7 @@ export async function cachedRerank(
 
   // Build cache key components (for logging/debugging)
   const docIds = sortedDocs.map((d) => d.id).join(",");
-  const contentHash = hashInput(sortedDocs.map((d) => d.content).join("|"));
+  const _contentHash = hashInput(sortedDocs.map((d) => d.content).join("|"));
   const queryHash = hashInput(normalizedQuery);
   console.log(
     `[RerankCache] key: model=${model}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`

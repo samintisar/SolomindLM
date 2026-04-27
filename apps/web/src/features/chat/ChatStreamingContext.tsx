@@ -10,10 +10,14 @@ export interface ChatStreamingContextType {
   /** When true, block starting a new message (last DB row is not assistant while server refcount > 0). */
   remoteGenerationBlocksSend: boolean;
   onSendMessage: (messageText: string, deepResearch?: boolean, sourcePolicy?: { channels: string[] }) => void;
+  /** Attach UI to the HTTP body from POST /research/execute (same markers as chat stream). */
+  consumeResearchExecuteStream: (response: Response) => Promise<void>;
   onClearHistory: () => void;
   onSetFeedback: (messageId: string, feedback: "up" | "down" | null) => void;
   onRetry: (assistantMessageId: string) => void;
   onSaveChatOptimistic: (payload: { notebookId: string; note: Note } | null) => void;
+  externalSources: Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }>;
+  clearExternalSources: () => void;
   sourceCount: number;
   sourceSummary: string | null;
   suggestions: string[] | null;

@@ -61,6 +61,8 @@ interface ReferenceTooltipProps {
   position: { x: number; y: number };
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  /** When set, the reference header opens this notebook source in the sources panel */
+  onOpenInSources?: () => void;
 }
 
 export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
@@ -70,8 +72,12 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
   position,
   onMouseEnter,
   onMouseLeave,
+  onOpenInSources,
 }) => {
   const sanitized = useMemo(() => sanitizeMarkdown(reference.content ?? ""), [reference.content]);
+
+  const headerTypography =
+    "text-xs uppercase tracking-widest font-mono text-muted-foreground mb-3 font-bold shrink-0";
 
   return (
     <div
@@ -82,9 +88,23 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
       onMouseLeave={onMouseLeave}
     >
       <div className="bg-popover border border-border rounded-2xl shadow-xl p-5 w-96 h-80 text-sm animate-in fade-in zoom-in-95 duration-200 relative flex flex-col">
-        <p className="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-3 font-bold shrink-0">
-          Reference {hoveredRefId} • {reference.sourceTitle}
-        </p>
+        {onOpenInSources ? (
+          <button
+            type="button"
+            className={`${headerTypography} cursor-pointer text-left w-full rounded-md -mx-1 px-1 py-0.5 hover:bg-accent/60 hover:text-accent-foreground transition-colors`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpenInSources();
+            }}
+          >
+            Reference {hoveredRefId} • {reference.sourceTitle}
+          </button>
+        ) : (
+          <p className={headerTypography}>
+            Reference {hoveredRefId} • {reference.sourceTitle}
+          </p>
+        )}
         <div className="prose font-serif text-sm leading-relaxed max-w-none text-popover-foreground wrap-break-word min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
             <MarkdownRenderer components={tooltipMarkdownComponents as any}>

@@ -1,6 +1,6 @@
 "use node";
 
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "../../auth";
 import { action } from "../../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
@@ -27,6 +27,11 @@ export interface UnifiedDiscoveryResult {
     hasFullText?: boolean;
     publicationYear?: number;
     type?: string;
+    doi?: string;
+    openAlexId?: string;
+    pdfUrl?: string;
+    landingPageUrl?: string;
+    license?: string;
 
     // Web/News-specific
     domain?: string;
@@ -59,7 +64,7 @@ export interface DiscoveryRequest {
  * Tavily scores: 0-1 (mostly 0.6-1.0)
  * OpenAlex scores: 0-1 (calculated from citations + recency)
  */
-function normalizeScore(score: number, sourceType: string): number {
+function normalizeScore(score: number, _sourceType: string): number {
   // Scores are already normalized to 0-1 range from both APIs
   return Math.min(Math.max(score, 0), 1);
 }
@@ -115,6 +120,11 @@ function transformOpenAlexResult(result: any): UnifiedDiscoveryResult {
       hasFullText: result.hasFullText,
       publicationYear: result.publicationYear,
       type: result.type,
+      doi: result.doi,
+      openAlexId: result.openAlexWorkId,
+      pdfUrl: result.pdfUrl,
+      landingPageUrl: result.landingPageUrl,
+      license: result.license,
     },
   };
 }
@@ -209,6 +219,9 @@ export const discover = action({
     } = args;
 
     const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const logger = createServiceLogger("discovery", "discover", {
       userId: userId ?? undefined,
     });
@@ -391,6 +404,10 @@ export const discoverSources = action({
   ): Promise<{
     sources: Array<{ title: string; url: string; snippet: string; score: number }>;
   }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
     const result = await (ctx.runAction as any)(
       internal._services.search.TavilySearchService.discoverSourcesInternal,
       {

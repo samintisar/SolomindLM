@@ -162,7 +162,7 @@ function AuthHeroMockup() {
             role="tabpanel"
             aria-labelledby="auth-hero-tab-chat"
             hidden={mode !== "chat"}
-            className="absolute inset-0 flex min-h-0 flex-col gap-3 overflow-hidden pt-[5rem] sm:pt-[5.25rem]"
+            className="absolute inset-0 flex min-h-0 flex-col gap-3 overflow-hidden pt-20 sm:pt-21"
           >
           <div className="flex min-h-0 flex-1 gap-3 px-4 pb-4 pt-1 sm:gap-4 sm:px-5 sm:pb-5">
             <aside className="flex w-[min(38%,13.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
@@ -339,7 +339,7 @@ function AuthHeroMockup() {
             role="tabpanel"
             aria-labelledby="auth-hero-tab-studio"
             hidden={mode !== "studio"}
-            className="absolute inset-0 flex min-h-0 flex-col overflow-hidden pt-[5rem] sm:pt-[5.25rem]"
+            className="absolute inset-0 flex min-h-0 flex-col overflow-hidden pt-20 sm:pt-21"
           >
             <div className="flex min-h-0 flex-1 px-4 pb-4 pt-1 sm:px-5 sm:pb-5">
               <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
@@ -502,7 +502,7 @@ export function AuthPage() {
           className={
             nativeShell
               ? "mx-auto grid w-full max-w-lg grid-cols-1 gap-8 py-4"
-              : "mx-auto grid w-full max-w-7xl -translate-y-4 grid-cols-1 gap-12 sm:-translate-y-6 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:items-stretch lg:gap-x-10 lg:gap-y-8 lg:-translate-y-10 xl:gap-x-14 2xl:max-w-[90rem]"
+              : "mx-auto grid w-full max-w-7xl -translate-y-4 grid-cols-1 gap-12 sm:-translate-y-6 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] lg:items-stretch lg:gap-x-10 lg:gap-y-8 lg:-translate-y-10 xl:gap-x-14 2xl:max-w-360"
           }
         >
           <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:justify-end">

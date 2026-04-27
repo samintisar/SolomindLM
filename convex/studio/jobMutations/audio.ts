@@ -148,7 +148,7 @@ export const clearAudioOverviewMapData = internalMutation({
     const audioOverview = await ctx.db.get(args.audioOverviewId);
     if (!audioOverview) return null;
 
-    const { mapResults, ...restMetadata } = audioOverview.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = audioOverview.metadata || {};
     await ctx.db.patch(args.audioOverviewId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

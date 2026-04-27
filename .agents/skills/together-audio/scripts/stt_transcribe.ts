@@ -52,7 +52,7 @@ function parseArgs(): ParsedArgs {
 
   if (!mode || !audioFile) {
     console.error(
-      "Usage: npx tsx stt_transcribe.ts <transcribe|translate|diarize|timestamps> <audio_file> [options]"
+      "Usage: npx tsx stt_transcribe.ts <transcribe|translate|diarize|timestamps> <audio_file> [options]",
     );
     process.exit(1);
   }
@@ -136,7 +136,7 @@ async function diarize(args: ParsedArgs): Promise<void> {
 
   for (const segment of response.speaker_segments) {
     console.log(
-      `[${segment.speaker_id}] ${segment.start.toFixed(1)}s-${segment.end.toFixed(1)}s: ${segment.text}`
+      `[${segment.speaker_id}] ${segment.start.toFixed(1)}s-${segment.end.toFixed(1)}s: ${segment.text}`,
     );
   }
 }

@@ -131,8 +131,12 @@ export const env = {
   CHAT_RERANK_THRESHOLD: process.env.CHAT_RERANK_THRESHOLD ?? "10",
   CHAT_RERANK_TOP_N: process.env.CHAT_RERANK_TOP_N ?? "7",
   CHAT_MAX_RESULTS: process.env.CHAT_MAX_RESULTS ?? "7",
-  /** Top merged chunks passed to the answer model (citation indices match references). */
-  CHAT_MAX_CONTEXT_CHUNKS: process.env.CHAT_MAX_CONTEXT_CHUNKS ?? "15",
+  /** Minimum relevance score for chunks to be considered for context (0.0-1.0). Chunks below this threshold are filtered out. */
+  CHAT_MIN_RELEVANCE_THRESHOLD: process.env.CHAT_MIN_RELEVANCE_THRESHOLD ?? "0.20",
+  /** Maximum tokens for retrieved context chunks (not counting conversation history or system prompt). */
+  CHAT_CONTEXT_TOKEN_BUDGET: process.env.CHAT_CONTEXT_TOKEN_BUDGET ?? "8000",
+  /** Hard maximum number of chunks to include as a safety cap (prevents pathologically many tiny chunks). */
+  CHAT_MAX_CHUNKS_HARD_LIMIT: process.env.CHAT_MAX_CHUNKS_HARD_LIMIT ?? "50",
   /** Estimated-token budget for prior conversation turns (not including the current user message). */
   CHAT_HISTORY_TOKEN_BUDGET: process.env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000",
   /** Grounding: async (stream-first + warn), sync (validate + strict retry before stream), off. */

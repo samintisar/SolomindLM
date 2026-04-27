@@ -20,17 +20,16 @@ export const QuizQuestionSchema = z.object({
   question: z.string().describe("The complete question text (scenario-based preferred)"),
   options: z
     .array(z.string())
-    .min(2)
-    .max(5)
-    .describe("List of options (usually 4, but 2 for True/False)"),
+    .length(4)
+    .describe(
+      "Exactly four answer choices. Option text only — no A./B. or A)/1) prefixes; the app renders choices without letter labels."
+    ),
   answer: z
     .number()
     .int()
     .min(0)
-    .max(4)
-    .describe(
-      "Zero-based index of the correct option (0 = First Option). MUST match the index in the options array."
-    ),
+    .max(3)
+    .describe("Zero-based index of the correct option (0–3). Must match the options array after normalization."),
   hint: z.string().describe("A helpful hint that guides logic without giving the answer"),
   explanation: z
     .string()
@@ -96,6 +95,11 @@ export const REDUCE_SELECT_SYSTEM_PROMPT =
 
 /** System prompt for expand phase distractor generation */
 export const EXPAND_QUESTION_SYSTEM_PROMPT = `You are a professional educator creating rigorous multiple-choice questions.
+
+**OPTIONS FORMAT (REQUIRED):**
+- Output exactly four options in the options array. Not two, not five—four.
+- Each option string must be the choice text only. Do not prefix with letters (A. B. C. D. or A) B) …) or numbers (1. 2. …) — the app shows choices in order without those labels.
+- Inline code and math in options are fine; use backticks and $…$ as needed.
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}`;
 
@@ -278,12 +282,13 @@ Correct Answer: "${candidate.correctAnswer}"
 INSTRUCTIONS:
 1. **SCENARIO-BASED:** ${settings.questionStyle} Create a hypothetical scenario that fits the ${candidate.difficulty} difficulty level.
 2. **DISTRACTORS:** Use the CONTEXT to find ${candidate.difficulty === "easy" ? "obviously incorrect" : candidate.difficulty === "medium" ? "plausible but wrong" : "subtle and nuanced"} options. ${settings.distractorQuality}
-3. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like
+3. **EXACTLY FOUR OPTIONS:** The options array must have length 4. Each option is plain text (or code in backticks) with no A./B./C./D. or 1) 2) prefixes.
+4. **VISUALS:** If the concept is visual (e.g., anatomy, charts, graphs, code structures), insert a tag like
 [Image of linear regression plot]
  or
 [Image of mitosis stages]
  in the explanation. Only do this if it aids understanding.
-4. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. BE CONCISE - 1-2 sentences maximum.
+5. **EXPLANATION:** ${settings.explanationLength} Explain *why* the answer is correct and *why* the distractors are wrong, citing the context. BE CONCISE - 1-2 sentences maximum.
 
 Output full JSON.`;
 };

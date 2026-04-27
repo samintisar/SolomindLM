@@ -16,12 +16,28 @@ import { parseMarkdownToTree } from "./parsing.js";
 import { REDUCE_PROMPT, REDUCE_SYSTEM_PROMPT } from "./prompts.js";
 import type { OverallStateType } from "./state.js";
 
+const MAX_PERMANENT_MAP_FAILURES = 5;
+
 export async function reduceNode(
   state: OverallStateType,
   smartLlm: ChatTogetherAI
 ): Promise<Partial<OverallStateType>> {
   const logger = createAgentGraphLogger("MindMapGraph", "mindmap");
   const extractions = state.extractedConcepts || [];
+  const failures = state.permanentMapFailures ?? 0;
+  if (failures >= MAX_PERMANENT_MAP_FAILURES && extractions.length === 0) {
+    const err = new Error(
+      `Map phase circuit breaker: ${failures} chunk(s) failed permanently with no successful extractions (limit ${MAX_PERMANENT_MAP_FAILURES})`
+    );
+    logger.phaseError("reduce", err, { agent: "MindMapGraph", permanentMapFailures: failures });
+    throw err;
+  }
+  if (failures >= MAX_PERMANENT_MAP_FAILURES && extractions.length > 0) {
+    logger.warn(
+      `High map failure count (${failures}) but continuing with ${extractions.length} successful extraction(s)`,
+      { agent: "MindMapGraph", phase: "reduce", permanentMapFailures: failures }
+    );
+  }
 
   logger.phaseStart("reduce", {
     agent: "MindMapGraph",
@@ -139,7 +155,7 @@ export async function reduceNode(
       },
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const _msg = e instanceof Error ? e.message : String(e);
 
     logger.phaseError("reduce", e instanceof Error ? e : new Error(String(e)), {
       agent: "MindMapGraph",

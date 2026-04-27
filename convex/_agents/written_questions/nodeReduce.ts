@@ -4,7 +4,12 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { Send } from "@langchain/langgraph";
 
-import { createLangSmithRunConfig, invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
+import {
+  createLangSmithRunConfig,
+  invokeWithRetry,
+  invokeWithTimeout,
+  withoutMapOutputs,
+} from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
@@ -57,7 +62,6 @@ export async function reduce(
     });
     await callStatusUpdate(state, "failed");
     return {
-      ...state,
       finalOutput: [],
       status: "failed",
     };
@@ -302,7 +306,7 @@ export async function reduce(
 
     if (retryCount < 1) {
       return new Send("reduce", {
-        ...state,
+        ...withoutMapOutputs(state),
         reduceRetryCount: retryCount + 1,
       } as any);
     }

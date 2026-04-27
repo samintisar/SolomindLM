@@ -6,7 +6,10 @@
  * Optimized for token efficiency and reliable structured output.
  */
 
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import {
+  ChatTogetherAI,
+  type ChatTogetherAICallOptions,
+} from "@langchain/community/chat_models/togetherai";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { createLangSmithRunConfig } from "../_shared/index.js";
@@ -82,7 +85,14 @@ export class ChatLLMWrapper {
       new HumanMessage(userMessage),
     ];
     try {
-      const response = await this.fastLlm.invoke(messages);
+      const traceConfig = createLangSmithRunConfig({
+        runName: "ChatAgentDirectResponse",
+        tags: ["agent", "chat", "direct"],
+      });
+      const response = await this.fastLlm.invoke(
+        messages,
+        traceConfig as ChatTogetherAICallOptions
+      );
       return typeof response.content === "string"
         ? response.content.trim()
         : String(response.content).trim();
@@ -96,6 +106,8 @@ export class ChatLLMWrapper {
    * Generates a hypothetical document paragraph for HyDE retrieval (uses the smart model).
    * The caller typically embeds this together with the declarative search query so
    * explicit keywords stay represented while HyDE improves semantic density.
+   *
+   * Note: uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
    */
   async generateHypotheticalDocument(query: string): Promise<string> {
     console.log("[ChatLLMWrapper] Generating hypothetical document for HyDE");
@@ -127,6 +139,7 @@ Question: ${query}`;
 
   /**
    * Generates 2-3 follow-up question suggestions for a study session.
+   * Uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
    */
   async generateFollowUpQuestions(userMessage: string, answer: string): Promise<string[]> {
     console.log("[ChatLLMWrapper] Generating follow-up questions");
@@ -150,7 +163,7 @@ Question: ${query}`;
       });
       const text = response.content.trim();
       // Strip Qwen-style <redacted_thinking>...</redacted_thinking> reasoning blocks before parsing
-      const stripped = text.replace(/<redacted_thinking>[\s\S]*?<\/think>/gi, "").trim();
+      const stripped = text.replace(/<redacted_thinking>[\s\S]*?<\/redacted_thinking>/gi, "").trim();
       const match = stripped.match(/\[[\s\S]*\]/);
       if (match) {
         const parsed = JSON.parse(match[0]);
@@ -168,6 +181,7 @@ Question: ${query}`;
   /**
    * One-shot decomposition for parallel retrieval. No clarification field — router owns clarify path.
    * On failure returns a single subquery = user message.
+   * Uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
    */
   async generateRetrievalSubqueries(
     userMessage: string,
@@ -252,7 +266,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
   }
 
   /**
-   * Generates a structured response with citations using tool calling.
+   * Generates a structured response with citations via `withStructuredOutput` (JSON schema).
    *
    * @param chunks - Reference chunks to use as context
    * @param userMessage - The user's question

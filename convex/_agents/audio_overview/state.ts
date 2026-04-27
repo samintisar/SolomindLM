@@ -7,7 +7,7 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
-import { createGraphState, type ProgressInfo } from "../_shared/state_factory.js";
+import { createGraphState } from "../_shared/state_factory.js";
 import type { AudioType, AudioLength } from "./prompts.js";
 
 // ============================================================

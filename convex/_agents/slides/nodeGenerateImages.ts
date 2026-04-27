@@ -1,6 +1,6 @@
 "use node";
 
-import { clearStateKeys } from "../_shared/index.js";
+import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { callStatusUpdate } from "./nodeSplit.js";
@@ -25,7 +25,6 @@ export async function generateImages(
     });
     await callStatusUpdate(state, "failed");
     return {
-      ...state,
       finalOutput: [],
       status: "failed",
     };
@@ -55,7 +54,7 @@ export async function generateImages(
   });
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     finalOutput: slidesWithImages,
     status: "completed",
     ...clearStateKeys<OverallStateType>(["slidesWithPrompts"]),

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "../auth";
 import { internal } from "../_generated/api";
 
 /**
@@ -29,6 +29,7 @@ export const getSourceSuggestions = action({
     return ctx.runAction(internal._agents.chat.sourceSuggestions.generateSuggestionsInternal, {
       notebookId: args.notebookId,
       documentSignature: args.documentSignature,
+      userId,
     });
   },
 });

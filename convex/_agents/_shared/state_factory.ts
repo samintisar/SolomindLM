@@ -10,6 +10,7 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
+import { mapOutputsMergeReducer } from "./stateUpdateHelpers.js";
 import type { ProgressInfo as ProgressInfoType } from "./progress.js";
 
 // Re-export ProgressInfo for backward compatibility
@@ -67,7 +68,7 @@ export function createGraphState<TOutput = any>(options?: {
 
     mapOutputs: Annotation<string[]>({
       // Reducer concatenates arrays - critical for aggregating parallel outputs
-      reducer: (x: string[], y?: string[]) => (y ? x.concat(y) : x),
+      reducer: (x, y) => mapOutputsMergeReducer(x, y),
       default: () => [],
     }),
 

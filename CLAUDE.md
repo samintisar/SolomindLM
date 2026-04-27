@@ -220,21 +220,37 @@ bun run convex:env:push:dry    # Dry run for env push
 
 | Skill                      | When                                                            |
 | -------------------------- | --------------------------------------------------------------- |
-| `ai-agent-design`          | Designing or implementing LangGraph + Convex agents             |
 | `convex-create-component`  | Creating new Convex components with isolated tables             |
 | `convex-migration-helper`  | Planning or executing schema/data migrations                    |
 | `convex-performance-audit` | Auditing or optimizing Convex performance                       |
 | `convex-quickstart`        | Initializing new Convex projects                                |
 | `convex-setup-auth`        | Setting up authentication with @convex-dev/auth                 |
-| `langgraph-langchain`      | Modifying agents in `convex/_agents/` or working with LangGraph |
-| `langsmith`                | Setting up tracing/observability for agents                     |
 
-### Frontend & AI Generation Skills
+### LangChain & LangGraph Skills
 
-| Skill                | When                                                       |
-| -------------------- | ---------------------------------------------------------- |
-| `add-studio-feature` | Adding or extending Studio generation tools                |
-| `bun-runtime`        | Working with Bun-specific features or debugging Bun issues |
+| Skill                    | When                                                   |
+| ------------------------ | ------------------------------------------------------ |
+| `langchain-fundamentals` | Learning or using LangChain primitives and chains      |
+| `langchain-rag`          | Implementing RAG (Retrieval-Augmented Generation)      |
+| `langgraph-fundamentals` | Designing or implementing LangGraph agents             |
+
+### Frontend & Development Skills
+
+| Skill                          | When                                                       |
+| ------------------------------ | ---------------------------------------------------------- |
+| `bun`                          | Working with Bun runtime, package manager, and test runner |
+| `typescript-advanced-types`    | Working with advanced TypeScript patterns and types        |
+| `vercel-composition-patterns`  | Designing React component composition patterns             |
+| `vercel-react-best-practices`  | Writing, reviewing, or refactoring React code for performance optimization |
+| `vercel-react-native-skills`   | Working with React Native development                      |
+| `web-design-guidelines`        | Building UI/UX following production-grade design principles |
+| `vite`                         | Working with Vite configuration, plugins, or build optimization |
+
+### Testing Skills
+
+| Skill              | When                                        |
+| ------------------ | ------------------------------------------- |
+| `webapp-testing`   | Writing or reviewing tests for web apps     |
 
 ### Together AI Skills
 
@@ -246,6 +262,32 @@ bun run convex:env:push:dry    # Dry run for env push
 | `together-evaluations`      | Using LLM-as-a-judge evaluation            |
 | `together-images`           | Text-to-image generation or editing        |
 | `together-video`            | Text-to-video or image-to-video generation |
+
+### MCP & Code Navigation Skills
+
+| Skill            | When                                                  |
+| ---------------- | ----------------------------------------------------- |
+| `serena-usage`   | Managing Serena memories, navigating symbols, performing intelligent refactors |
+
+## Verifying Skills Installation
+
+After cloning the repository, verify all skills are properly accessible:
+
+```bash
+# Run once to create symlink from .claude/skills to .agents/skills
+bun run link:claude-skills
+
+# Verify skills are available
+ls .claude/skills/
+```
+
+**Expected skills count:** 25+ skills should be listed.
+
+If skills are missing, ensure:
+1. You ran `bun run link:claude-skills` after cloning
+2. `.agents/skills/` directory exists and contains skill directories
+3. On Windows: junction was created successfully (check with `dir .claude\skills`)
+4. On macOS/Linux: symlink was created successfully (check with `ls -la .claude/skills`)
 
 ## MCP Servers
 
@@ -308,6 +350,16 @@ This project uses the **context7 MCP server** for live documentation lookup of l
 2. Use `find_symbol` to read only the symbols you need (`include_body=true`)
 3. Edit with `replace_symbol_body` or insert with `insert_before_symbol`/`insert_after_symbol`
 4. Verify references with `find_referencing_symbols` after changing public APIs
+
+**Advanced Serena workflows:**
+- Use the `serena-usage` skill for:
+  - Managing Serena project memories across sessions
+  - Performing intelligent, symbol-aware refactors
+  - Navigating complex codebases with symbol search
+- Invoke `serena-usage` when:
+  - You need to save project context for future sessions
+  - Performing cross-file refactors that require reference tracking
+  - Analyzing code relationships and dependencies
 
 ### Operational Preferences
 

@@ -27,7 +27,7 @@ export const listAllByNotebook = query({
       return [];
     }
 
-    const types = args.types ?? [
+    const _types = args.types ?? [
       "reports",
       "flashcards",
       "quizzes",

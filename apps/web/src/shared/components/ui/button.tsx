@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/shared/utils/cn";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "outline" | "ghost" | "destructive";
@@ -35,25 +36,28 @@ const sizeStyles = {
   icon: "h-10 w-10 shrink-0 rounded-xl p-0",
 };
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = "", variant = "default", size = "default", children, ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        className={`
-          inline-flex items-center justify-center whitespace-nowrap text-sm font-semibold tracking-wide
-          ring-offset-background transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2
-          focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50
-          ${variantStyles[variant]}
-          ${sizeStyles[size]}
-          ${className}
-        `}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  }
-);
-
-Button.displayName = "Button";
+export function Button({
+  className,
+  variant = "default",
+  size = "default",
+  children,
+  ref,
+  ...props
+}: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
+  return (
+    <button
+      ref={ref}
+      className={cn(
+        "inline-flex items-center justify-center whitespace-nowrap text-sm font-semibold tracking-wide",
+        "ring-offset-background transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2",
+        "focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        variantStyles[variant],
+        sizeStyles[size],
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}

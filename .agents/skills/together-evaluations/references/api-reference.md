@@ -1,5 +1,4 @@
 # AI Evaluations API Reference
-
 ## Contents
 
 - [Endpoints](#endpoints)
@@ -22,131 +21,132 @@
 - [Evaluation Status Flow](#evaluation-status-flow)
 - [CLI Commands](#cli-commands)
 
+
 ## Endpoints
 
-| Method                        | Path              | Description                             |
-| ----------------------------- | ----------------- | --------------------------------------- |
-| `POST /evaluation`            | Create evaluation | Start a new evaluation job              |
-| `GET /evaluation/{id}`        | Get evaluation    | Retrieve evaluation details and results |
-| `GET /evaluation/{id}/status` | Get status        | Quick status and results check          |
-| `GET /evaluation`             | List evaluations  | List all evaluation jobs                |
-| `GET /evaluation/model-list`  | List models       | Models available for evaluation         |
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST /evaluation` | Create evaluation | Start a new evaluation job |
+| `GET /evaluation/{id}` | Get evaluation | Retrieve evaluation details and results |
+| `GET /evaluation/{id}/status` | Get status | Quick status and results check |
+| `GET /evaluation` | List evaluations | List all evaluation jobs |
+| `GET /evaluation/model-list` | List models | Models available for evaluation |
 
 Base URL: `https://api.together.xyz/v1`
 Authentication: `Authorization: Bearer $TOGETHER_API_KEY`
 
 ## Create Evaluation Request
 
-| Field        | Type   | Required | Description                          |
-| ------------ | ------ | -------- | ------------------------------------ |
-| `type`       | string | Yes      | `classify`, `score`, or `compare`    |
-| `parameters` | object | Yes      | Type-specific parameters (see below) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | `classify`, `score`, or `compare` |
+| `parameters` | object | Yes | Type-specific parameters (see below) |
 
 ### Classify Parameters
 
-| Field                  | Type                  | Required | Description                                |
-| ---------------------- | --------------------- | -------- | ------------------------------------------ |
-| `judge`                | JudgeModelConfig      | Yes      | Judge model configuration                  |
-| `labels`               | string[]              | Yes      | Classification categories (min 2)          |
-| `pass_labels`          | string[]              | Yes      | Labels considered "passing" (min 1)        |
-| `input_data_file_path` | string                | Yes      | Uploaded dataset file ID                   |
-| `model_to_evaluate`    | ModelConfig or string | No       | Model config object or dataset column name |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `judge` | JudgeModelConfig | Yes | Judge model configuration |
+| `labels` | string[] | Yes | Classification categories (min 2) |
+| `pass_labels` | string[] | Yes | Labels considered "passing" (min 1) |
+| `input_data_file_path` | string | Yes | Uploaded dataset file ID |
+| `model_to_evaluate` | ModelConfig or string | No | Model config object or dataset column name |
 
 ### Score Parameters
 
-| Field                  | Type                  | Required | Description                                |
-| ---------------------- | --------------------- | -------- | ------------------------------------------ |
-| `judge`                | JudgeModelConfig      | Yes      | Judge model configuration                  |
-| `min_score`            | float                 | Yes      | Minimum score value                        |
-| `max_score`            | float                 | Yes      | Maximum score value                        |
-| `pass_threshold`       | float                 | Yes      | Score at/above which is "passing"          |
-| `input_data_file_path` | string                | Yes      | Uploaded dataset file ID                   |
-| `model_to_evaluate`    | ModelConfig or string | No       | Model config object or dataset column name |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `judge` | JudgeModelConfig | Yes | Judge model configuration |
+| `min_score` | float | Yes | Minimum score value |
+| `max_score` | float | Yes | Maximum score value |
+| `pass_threshold` | float | Yes | Score at/above which is "passing" |
+| `input_data_file_path` | string | Yes | Uploaded dataset file ID |
+| `model_to_evaluate` | ModelConfig or string | No | Model config object or dataset column name |
 
 ### Compare Parameters
 
-| Field                  | Type                  | Required | Description                           |
-| ---------------------- | --------------------- | -------- | ------------------------------------- |
-| `judge`                | JudgeModelConfig      | Yes      | Judge model configuration             |
-| `input_data_file_path` | string                | Yes      | Uploaded dataset file ID              |
-| `model_a`              | ModelConfig or string | No       | Model A config or dataset column name |
-| `model_b`              | ModelConfig or string | No       | Model B config or dataset column name |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `judge` | JudgeModelConfig | Yes | Judge model configuration |
+| `input_data_file_path` | string | Yes | Uploaded dataset file ID |
+| `model_a` | ModelConfig or string | No | Model A config or dataset column name |
+| `model_b` | ModelConfig or string | No | Model B config or dataset column name |
 
 ## Judge Model Configuration
 
-| Field                | Type   | Required | Description                                   |
-| -------------------- | ------ | -------- | --------------------------------------------- |
-| `model`              | string | Yes      | Model name, endpoint ID, or external shortcut |
-| `model_source`       | string | Yes      | `serverless`, `dedicated`, or `external`      |
-| `system_template`    | string | Yes      | Jinja2 system prompt for the judge            |
-| `external_api_token` | string | No       | API key for external providers                |
-| `external_base_url`  | string | No       | Custom OpenAI-compatible base URL             |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | Model name, endpoint ID, or external shortcut |
+| `model_source` | string | Yes | `serverless`, `dedicated`, or `external` |
+| `system_template` | string | Yes | Jinja2 system prompt for the judge |
+| `external_api_token` | string | No | API key for external providers |
+| `external_base_url` | string | No | Custom OpenAI-compatible base URL |
 
 ## Model Configuration (Evaluation Target)
 
-| Field                | Type    | Required | Description                                   |
-| -------------------- | ------- | -------- | --------------------------------------------- |
-| `model`              | string  | Yes      | Model name, endpoint ID, or external shortcut |
-| `model_source`       | string  | Yes      | `serverless`, `dedicated`, or `external`      |
-| `system_template`    | string  | Yes      | System prompt for generation                  |
-| `input_template`     | string  | Yes      | Jinja2 input template (e.g., `{{prompt}}`)    |
-| `max_tokens`         | integer | Yes      | Maximum generation tokens                     |
-| `temperature`        | float   | Yes      | Generation temperature (0 to 2)               |
-| `external_api_token` | string  | No       | API key for external providers                |
-| `external_base_url`  | string  | No       | Custom OpenAI-compatible base URL             |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | Model name, endpoint ID, or external shortcut |
+| `model_source` | string | Yes | `serverless`, `dedicated`, or `external` |
+| `system_template` | string | Yes | System prompt for generation |
+| `input_template` | string | Yes | Jinja2 input template (e.g., `{{prompt}}`) |
+| `max_tokens` | integer | Yes | Maximum generation tokens |
+| `temperature` | float | Yes | Generation temperature (0 to 2) |
+| `external_api_token` | string | No | API key for external providers |
+| `external_base_url` | string | No | Custom OpenAI-compatible base URL |
 
 Alternatively, pass a string (dataset column name) to evaluate pre-generated responses.
 
 ## Evaluation Job Response
 
-| Field            | Type     | Description                                                        |
-| ---------------- | -------- | ------------------------------------------------------------------ |
-| `workflow_id`    | string   | Unique evaluation job ID                                           |
-| `type`           | string   | `classify`, `score`, or `compare`                                  |
-| `owner_id`       | string   | Job owner ID                                                       |
-| `status`         | string   | `pending`, `queued`, `running`, `completed`, `error`, `user_error` |
-| `status_updates` | array    | Historical status changes with timestamps                          |
-| `parameters`     | object   | Evaluation configuration used                                      |
-| `results`        | object   | Type-specific results (see below)                                  |
-| `created_at`     | datetime | Creation timestamp                                                 |
-| `updated_at`     | datetime | Last update timestamp                                              |
+| Field | Type | Description |
+|-------|------|-------------|
+| `workflow_id` | string | Unique evaluation job ID |
+| `type` | string | `classify`, `score`, or `compare` |
+| `owner_id` | string | Job owner ID |
+| `status` | string | `pending`, `queued`, `running`, `completed`, `error`, `user_error` |
+| `status_updates` | array | Historical status changes with timestamps |
+| `parameters` | object | Evaluation configuration used |
+| `results` | object | Type-specific results (see below) |
+| `created_at` | datetime | Creation timestamp |
+| `updated_at` | datetime | Last update timestamp |
 
 ## Result Schemas
 
 ### Classify Results
 
-| Field                   | Type   | Description                                             |
-| ----------------------- | ------ | ------------------------------------------------------- |
-| `label_counts`          | object | Count per label (e.g., `{"Toxic": 5, "Non-toxic": 45}`) |
-| `pass_percentage`       | float  | Percentage with pass labels                             |
-| `generation_fail_count` | int    | Failed generations                                      |
-| `judge_fail_count`      | int    | Unevaluated samples                                     |
-| `invalid_label_count`   | int    | Unparseable judge responses                             |
-| `result_file_id`        | string | Per-row results file                                    |
+| Field | Type | Description |
+|-------|------|-------------|
+| `label_counts` | object | Count per label (e.g., `{"Toxic": 5, "Non-toxic": 45}`) |
+| `pass_percentage` | float | Percentage with pass labels |
+| `generation_fail_count` | int | Failed generations |
+| `judge_fail_count` | int | Unevaluated samples |
+| `invalid_label_count` | int | Unparseable judge responses |
+| `result_file_id` | string | Per-row results file |
 
 ### Score Results
 
-| Field                               | Type   | Description                        |
-| ----------------------------------- | ------ | ---------------------------------- |
-| `aggregated_scores.mean_score`      | float  | Mean of all scores                 |
-| `aggregated_scores.std_score`       | float  | Standard deviation                 |
-| `aggregated_scores.pass_percentage` | float  | Percentage meeting threshold       |
-| `generation_fail_count`             | int    | Failed generations                 |
-| `judge_fail_count`                  | int    | Unevaluated samples                |
-| `invalid_score_count`               | int    | Unparseable or out-of-range scores |
-| `failed_samples`                    | int    | Total failures                     |
-| `result_file_id`                    | string | Per-row results file               |
+| Field | Type | Description |
+|-------|------|-------------|
+| `aggregated_scores.mean_score` | float | Mean of all scores |
+| `aggregated_scores.std_score` | float | Standard deviation |
+| `aggregated_scores.pass_percentage` | float | Percentage meeting threshold |
+| `generation_fail_count` | int | Failed generations |
+| `judge_fail_count` | int | Unevaluated samples |
+| `invalid_score_count` | int | Unparseable or out-of-range scores |
+| `failed_samples` | int | Total failures |
+| `result_file_id` | string | Per-row results file |
 
 ### Compare Results
 
-| Field                   | Type   | Description                                     |
-| ----------------------- | ------ | ----------------------------------------------- |
-| `A_wins`                | int    | Model A preference count (Python SDK: `a_wins`) |
-| `B_wins`                | int    | Model B preference count (Python SDK: `b_wins`) |
-| `Ties`                  | int    | No clear winner count (Python SDK: `ties`)      |
-| `generation_fail_count` | int    | Failed generations                              |
-| `judge_fail_count`      | int    | Unevaluated samples                             |
-| `result_file_id`        | string | Pairwise decision details                       |
+| Field | Type | Description |
+|-------|------|-------------|
+| `A_wins` | int | Model A preference count (Python SDK: `a_wins`) |
+| `B_wins` | int | Model B preference count (Python SDK: `b_wins`) |
+| `Ties` | int | No clear winner count (Python SDK: `ties`) |
+| `generation_fail_count` | int | Failed generations |
+| `judge_fail_count` | int | Unevaluated samples |
+| `result_file_id` | string | Pairwise decision details |
 
 > **Note:** The REST API returns `A_wins`, `B_wins`, and `Ties` but the Python SDK
 > Pydantic models convert these to snake_case (`a_wins`, `b_wins`, `ties`). The TypeScript
@@ -359,7 +359,8 @@ const evaluation = await client.evals.create({
     judge: {
       model: "deepseek-ai/DeepSeek-V3.1",
       model_source: "serverless",
-      system_template: "Assess which model has smarter and more helpful responses.",
+      system_template:
+        "Assess which model has smarter and more helpful responses.",
     },
     model_a: {
       model: "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
@@ -572,7 +573,7 @@ Example response:
   "workflow_id": "eval-7df2-1751287840",
   "type": "compare",
   "status": "completed",
-  "parameters": { "...": "..." },
+  "parameters": { "..." : "..." },
   "results": {
     "A_wins": 1,
     "B_wins": 13,
@@ -661,19 +662,19 @@ curl -X GET "https://api.together.xyz/v1/files/<RESULT_FILE_ID>/content" \
 
 ## Model Sources
 
-| Source       | Description                                                  | Model field                                    |
-| ------------ | ------------------------------------------------------------ | ---------------------------------------------- |
+| Source | Description | Model field |
+|--------|-------------|-------------|
 | `serverless` | Together AI serverless models with structured output support | Model name (e.g., `deepseek-ai/DeepSeek-V3.1`) |
-| `dedicated`  | Your deployed dedicated endpoint                             | Endpoint ID                                    |
-| `external`   | Third-party providers via shortcuts or custom URL            | Provider shortcut (e.g., `openai/gpt-5`)       |
+| `dedicated` | Your deployed dedicated endpoint | Endpoint ID |
+| `external` | Third-party providers via shortcuts or custom URL | Provider shortcut (e.g., `openai/gpt-5`) |
 
 ### External Provider Shortcuts
 
-| Provider  | Models                                                                                                                                                                            |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OpenAI    | `openai/gpt-5`, `openai/gpt-5-mini`, `openai/gpt-5-nano`, `openai/gpt-5.2`, `openai/gpt-5.2-pro`, `openai/gpt-4.1`, `openai/gpt-4o`, `openai/gpt-4o-mini`                         |
+| Provider | Models |
+|----------|--------|
+| OpenAI | `openai/gpt-5`, `openai/gpt-5-mini`, `openai/gpt-5-nano`, `openai/gpt-5.2`, `openai/gpt-5.2-pro`, `openai/gpt-4.1`, `openai/gpt-4o`, `openai/gpt-4o-mini` |
 | Anthropic | `anthropic/claude-opus-4-5`, `anthropic/claude-sonnet-4-5`, `anthropic/claude-haiku-4-5`, `anthropic/claude-opus-4-1`, `anthropic/claude-opus-4-0`, `anthropic/claude-sonnet-4-0` |
-| Google    | `google/gemini-2.5-pro`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/gemini-3-pro-preview`                                                                 |
+| Google | `google/gemini-2.5-pro`, `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `google/gemini-3-pro-preview` |
 
 For other providers, use `external_base_url` with any OpenAI-compatible chat/completions API.
 
@@ -699,31 +700,31 @@ Sub-1000 sample jobs typically complete within 1 hour.
 together evals create [OPTIONS]
 ```
 
-| Option                                                         | Description                                         |
-| -------------------------------------------------------------- | --------------------------------------------------- |
-| `--type [classify\|score\|compare]`                            | Type of evaluation (required)                       |
-| `--judge-model TEXT`                                           | Judge model name or URL (required)                  |
-| `--judge-model-source [serverless\|dedicated\|external]`       | Source of the judge model (required)                |
-| `--judge-system-template TEXT`                                 | System template for the judge (required)            |
-| `--judge-external-api-token TEXT`                              | API token for external judge                        |
-| `--judge-external-base-url TEXT`                               | Custom base URL for external judge                  |
-| `--input-data-file-path TEXT`                                  | Path to the input data file (required)              |
-| `--model-field TEXT`                                           | Field in input file containing model-generated text |
-| `--model-to-evaluate TEXT`                                     | Model name for detailed config                      |
-| `--model-to-evaluate-source [serverless\|dedicated\|external]` | Source of model to evaluate                         |
-| `--model-to-evaluate-max-tokens INTEGER`                       | Max tokens for model to evaluate                    |
-| `--model-to-evaluate-temperature FLOAT`                        | Temperature for model to evaluate                   |
-| `--model-to-evaluate-system-template TEXT`                     | System template for model to evaluate               |
-| `--model-to-evaluate-input-template TEXT`                      | Input template for model to evaluate                |
-| `--labels TEXT`                                                | Classify: comma-separated labels                    |
-| `--pass-labels TEXT`                                           | Classify: labels considered passing                 |
-| `--min-score FLOAT`                                            | Score: minimum score value                          |
-| `--max-score FLOAT`                                            | Score: maximum score value                          |
-| `--pass-threshold FLOAT`                                       | Score: threshold for passing                        |
-| `--model-a TEXT`                                               | Compare: model A name                               |
-| `--model-a-source [serverless\|dedicated\|external]`           | Compare: source of model A                          |
-| `--model-b TEXT`                                               | Compare: model B name                               |
-| `--model-b-source [serverless\|dedicated\|external]`           | Compare: source of model B                          |
+| Option | Description |
+|--------|-------------|
+| `--type [classify\|score\|compare]` | Type of evaluation (required) |
+| `--judge-model TEXT` | Judge model name or URL (required) |
+| `--judge-model-source [serverless\|dedicated\|external]` | Source of the judge model (required) |
+| `--judge-system-template TEXT` | System template for the judge (required) |
+| `--judge-external-api-token TEXT` | API token for external judge |
+| `--judge-external-base-url TEXT` | Custom base URL for external judge |
+| `--input-data-file-path TEXT` | Path to the input data file (required) |
+| `--model-field TEXT` | Field in input file containing model-generated text |
+| `--model-to-evaluate TEXT` | Model name for detailed config |
+| `--model-to-evaluate-source [serverless\|dedicated\|external]` | Source of model to evaluate |
+| `--model-to-evaluate-max-tokens INTEGER` | Max tokens for model to evaluate |
+| `--model-to-evaluate-temperature FLOAT` | Temperature for model to evaluate |
+| `--model-to-evaluate-system-template TEXT` | System template for model to evaluate |
+| `--model-to-evaluate-input-template TEXT` | Input template for model to evaluate |
+| `--labels TEXT` | Classify: comma-separated labels |
+| `--pass-labels TEXT` | Classify: labels considered passing |
+| `--min-score FLOAT` | Score: minimum score value |
+| `--max-score FLOAT` | Score: maximum score value |
+| `--pass-threshold FLOAT` | Score: threshold for passing |
+| `--model-a TEXT` | Compare: model A name |
+| `--model-a-source [serverless\|dedicated\|external]` | Compare: source of model A |
+| `--model-b TEXT` | Compare: model B name |
+| `--model-b-source [serverless\|dedicated\|external]` | Compare: source of model B |
 
 ### List
 
@@ -731,10 +732,10 @@ together evals create [OPTIONS]
 together evals list [OPTIONS]
 ```
 
-| Option     | Description                                                                |
-| ---------- | -------------------------------------------------------------------------- |
+| Option | Description |
+|--------|-------------|
 | `--status` | Filter: `pending`, `queued`, `running`, `completed`, `error`, `user_error` |
-| `--limit`  | Number of results (max 100)                                                |
+| `--limit` | Number of results (max 100) |
 
 ### Retrieve
 

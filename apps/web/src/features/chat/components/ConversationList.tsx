@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
-import { Plus, MessageSquare, MoreHorizontal, Pencil, Trash2, X, Check } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { MoreVertical, Pencil, Trash2, X, Check, Pin } from "lucide-react";
 import type { Doc } from "@convex/_generated/dataModel";
 import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { useToast } from "@/shared/contexts/ToastContext";
@@ -8,37 +9,42 @@ interface ConversationListProps {
   conversations: Doc<"conversations">[] | undefined;
   activeConversationId: string | null;
   onSelect: (id: string) => void;
-  onCreate: () => Promise<string | null>;
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  pinnedIds?: Set<string>;
+  onTogglePin?: (id: string) => void;
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
+const sortByUpdated = (a: Doc<"conversations">, b: Doc<"conversations">) =>
+  ((b.updatedAt as number | undefined) ?? 0) - ((a.updatedAt as number | undefined) ?? 0);
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <div className="px-2.5 pt-2.5 pb-1 font-sans text-xs font-medium text-muted-foreground select-none">
+      {children}
+    </div>
+  );
 }
 
 export function ConversationList({
   conversations,
   activeConversationId,
   onSelect,
-  onCreate,
   onRename,
   onDelete,
+  pinnedIds,
+  onTogglePin,
 }: ConversationListProps) {
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  /** Submenu is portaled to body; position stored so it is not clipped by parent overflow. */
+  const [threadMenu, setThreadMenu] = useState<{
+    convId: string;
+    top: number;
+    right: number;
+  } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const threadMenuBoxRef = useRef<HTMLDivElement>(null);
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const toast = useToast();
 
@@ -49,22 +55,53 @@ export function ConversationList({
     }
   }, [editingId]);
 
-  const handleCreate = async () => {
-    setIsCreating(true);
-    try {
-      const id = await onCreate();
-      if (id) onSelect(id);
-    } catch {
-      toast.error("Failed to create conversation");
-    } finally {
-      setIsCreating(false);
+  const { pinned, recents } = useMemo(() => {
+    if (!conversations) {
+      return { pinned: [] as Doc<"conversations">[], recents: [] as Doc<"conversations">[] };
     }
-  };
+    const pin: Doc<"conversations">[] = [];
+    const rest: Doc<"conversations">[] = [];
+    for (const c of conversations) {
+      if (pinnedIds?.has(c._id)) pin.push(c);
+      else rest.push(c);
+    }
+    pin.sort(sortByUpdated);
+    rest.sort(sortByUpdated);
+    return { pinned: pin, recents: rest };
+  }, [conversations, pinnedIds]);
+
+  const threadMenuDoc = useMemo(() => {
+    if (!conversations || !threadMenu) return null;
+    return conversations.find((c) => c._id === threadMenu.convId) ?? null;
+  }, [conversations, threadMenu]);
+
+  useEffect(() => {
+    if (!threadMenu) return;
+    const onScroll = () => setThreadMenu(null);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [threadMenu]);
+
+  useEffect(() => {
+    if (!threadMenu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (threadMenuBoxRef.current?.contains(t)) return;
+      if ((e.target as Element | null)?.closest?.("[data-thread-menu-trigger]")) return;
+      setThreadMenu(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [threadMenu]);
 
   const handleStartRename = (conv: Doc<"conversations">) => {
     setEditingId(conv._id);
     setEditTitle((conv.title as string | undefined) ?? "New Chat");
-    setMenuOpenId(null);
+    setThreadMenu(null);
   };
 
   const handleFinishRename = async () => {
@@ -75,146 +112,202 @@ export function ConversationList({
     try {
       await onRename(editingId, editTitle.trim());
     } catch {
-      toast.error("Failed to rename conversation");
+      toast.error("Failed to rename thread");
     }
     setEditingId(null);
   };
 
   const handleDelete = async (conv: Doc<"conversations">) => {
-    setMenuOpenId(null);
+    setThreadMenu(null);
     const ok = await confirm(
-      "Delete conversation?",
-      "This will permanently delete this conversation and all its messages.",
+      "Delete thread?",
+      "This will permanently delete this thread and all its messages.",
       { confirmText: "Delete", variant: "danger" }
     );
     if (!ok) return;
     try {
       await onDelete(conv._id);
     } catch {
-      toast.error("Failed to delete conversation");
+      toast.error("Failed to delete thread");
     }
   };
 
-  return (
-    <div className="flex flex-col gap-0.5 p-1">
-      <button
-        onClick={handleCreate}
-        disabled={isCreating}
-        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors disabled:opacity-50"
-      >
-        <Plus className="w-3.5 h-3.5 shrink-0" />
-        <span>{isCreating ? "Creating..." : "New Chat"}</span>
-      </button>
+  const renderRow = (conv: Doc<"conversations">) => {
+    const isActive = conv._id === activeConversationId;
+    const isEditing = conv._id === editingId;
+    const isPinned = pinnedIds?.has(conv._id) ?? false;
 
-      {!conversations && (
-        <div className="px-2 py-3 text-xs text-zinc-500">Loading...</div>
-      )}
-
-      {conversations?.length === 0 && (
-        <div className="px-2 py-3 text-xs text-zinc-500">No conversations yet</div>
-      )}
-
-      {conversations?.map((conv) => {
-        const isActive = conv._id === activeConversationId;
-        const isEditing = conv._id === editingId;
-
-        return (
-          <div
-            key={conv._id}
-            className={`group relative flex items-center rounded transition-colors ${
-              isActive
-                ? "bg-zinc-700/60 text-zinc-100"
-                : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
-            }`}
-          >
-            {isEditing ? (
-              <div className="flex items-center gap-1 w-full px-2 py-1">
-                <input
-                  ref={editInputRef}
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleFinishRename();
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  className="flex-1 bg-zinc-900 border border-zinc-600 rounded px-1.5 py-0.5 text-xs text-zinc-100 outline-none focus:border-zinc-400"
-                />
-                <button
-                  onClick={handleFinishRename}
-                  className="p-0.5 text-zinc-400 hover:text-zinc-200"
-                >
-                  <Check className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => setEditingId(null)}
-                  className="p-0.5 text-zinc-400 hover:text-zinc-200"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => onSelect(conv._id)}
-                  className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1.5 text-left"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                  <span className="truncate text-xs">
-                    {(conv.title as string | undefined) ?? "New Chat"}
-                  </span>
-                </button>
-                <span className="text-[10px] text-zinc-500 mr-1 shrink-0 hidden group-hover:hidden">
-                  {formatRelativeTime((conv.updatedAt as number | undefined) ?? 0)}
-                </span>
-                <div className="relative shrink-0 mr-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpenId(menuOpenId === conv._id ? null : conv._id);
-                    }}
-                    className={`p-0.5 rounded hover:bg-zinc-600 transition-colors ${
-                      menuOpenId === conv._id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    }`}
-                  >
-                    <MoreHorizontal className="w-3 h-3" />
-                  </button>
-                  {menuOpenId === conv._id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setMenuOpenId(null)}
-                      />
-                      <div className="absolute right-0 top-6 z-50 w-36 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg py-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartRename(conv);
-                          }}
-                          className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          Rename
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(conv);
-                          }}
-                          className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-400 hover:bg-zinc-700"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
+    if (isEditing) {
+      return (
+        <div key={conv._id} className="px-1.5 py-0.5">
+          <div className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5">
+            <input
+              ref={editInputRef}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleFinishRename();
+                if (e.key === "Escape") setEditingId(null);
+              }}
+              className="min-w-0 flex-1 border-0 bg-transparent font-sans text-xs text-foreground outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleFinishRename}
+              className="p-0.5 text-muted-foreground hover:text-foreground"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingId(null)}
+              className="p-0.5 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
-        );
-      })}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={conv._id}
+        className={`group flex min-h-[38px] w-full max-w-full items-stretch overflow-hidden rounded-lg transition-colors duration-150 ${
+          isActive
+            ? "bg-muted/50 text-foreground"
+            : "text-foreground/90 hover:bg-muted/45"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onSelect(conv._id)}
+          className={`flex min-w-0 flex-1 items-center gap-2.5 pl-2.5 pr-1.5 text-left font-sans text-xs font-normal antialiased leading-snug transition-colors ${
+            isActive ? "text-foreground/92" : "text-foreground/78"
+          }`}
+        >
+          {isPinned ? (
+            <Pin
+              className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-muted-foreground" : "text-muted-foreground/80"}`}
+              strokeWidth={1.75}
+            />
+          ) : null}
+          <span className="min-w-0 flex-1 truncate">
+            {(conv.title as string | undefined) ?? "New chat"}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center pr-0.5">
+          <button
+            type="button"
+            data-thread-menu-trigger
+            onClick={(e) => {
+              e.stopPropagation();
+              if (threadMenu?.convId === conv._id) {
+                setThreadMenu(null);
+                return;
+              }
+              const r = e.currentTarget.getBoundingClientRect();
+              setThreadMenu({
+                convId: conv._id,
+                top: r.bottom + 4,
+                right: document.documentElement.clientWidth - r.right,
+              });
+            }}
+            className={`rounded-md p-1.5 text-muted-foreground transition-[opacity,background-color,color] hover:bg-foreground/5 hover:text-foreground ${
+              isActive || threadMenu?.convId === conv._id
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100"
+            }`}
+            aria-label="Thread options"
+            aria-expanded={threadMenu?.convId === conv._id}
+          >
+            <MoreVertical className="h-4 w-4" strokeWidth={1.75} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (!conversations) {
+    return (
+      <div className="px-3 py-6 text-center font-sans text-sm text-muted-foreground">Loading…</div>
+    );
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <div className="px-3 py-6 text-center font-sans text-sm text-muted-foreground">
+        No other threads
+      </div>
+    );
+  }
+
+  const threadMenuPinned = threadMenuDoc
+    ? (pinnedIds?.has(threadMenuDoc._id) ?? false)
+    : false;
+
+  return (
+    <>
+      <div className="flex flex-col gap-1 pb-2 pt-1 font-sans antialiased">
+        {pinned.length > 0 && (
+          <>
+            <SectionLabel>Pinned</SectionLabel>
+            {pinned.map(renderRow)}
+          </>
+        )}
+        {recents.length > 0 && (
+          <>
+            <SectionLabel>Recents</SectionLabel>
+            {recents.map(renderRow)}
+          </>
+        )}
+      </div>
       <ConfirmDialogComponent />
-    </div>
+      {threadMenu &&
+        threadMenuDoc &&
+        createPortal(
+            <div
+              ref={threadMenuBoxRef}
+              role="menu"
+              data-thread-submenu-root
+              className="fixed z-200 min-w-36 overflow-hidden rounded-lg border border-border bg-card py-1 font-sans text-sm antialiased shadow-lg"
+              style={{ top: threadMenu.top, right: threadMenu.right }}
+            >
+              {onTogglePin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTogglePin(threadMenuDoc._id);
+                    setThreadMenu(null);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
+                  role="menuitem"
+                >
+                  <Pin className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  {threadMenuPinned ? "Unpin" : "Pin"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleStartRename(threadMenuDoc)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
+                role="menuitem"
+              >
+                <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete(threadMenuDoc)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans text-destructive hover:bg-muted/80"
+                role="menuitem"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Delete
+              </button>
+            </div>,
+          document.body
+        )}
+    </>
   );
 }

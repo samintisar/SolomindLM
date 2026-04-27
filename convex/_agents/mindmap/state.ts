@@ -6,17 +6,10 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
-import { z } from "zod";
 
 // ============================================================
-// SCHEMAS
+// TYPES
 // ============================================================
-
-const ConceptExtractionSchema = z.object({
-  main_theme: z.string(),
-  summary: z.string(),
-  key_concepts: z.array(z.string()),
-});
 
 export interface ConceptExtraction {
   main_theme: string;
@@ -46,8 +39,14 @@ export const ChunkState = Annotation.Root({
 
 export const OverallState = Annotation.Root({
   allChunks: Annotation<string[]>({ reducer: (x, y) => y ?? x, default: () => [] }),
+  /** Count of chunks that failed permanently after retries (summed across parallel map workers). */
+  permanentMapFailures: Annotation<number>({
+    reducer: (a, b) => a + (b ?? 0),
+    default: () => 0,
+  }),
   extractedConcepts: Annotation<ConceptExtraction[]>({
     reducer: (existing, incoming) => {
+      if (incoming === null) return [];
       const combined = [...existing, ...(incoming ?? [])];
 
       const seen = new Set<string>();

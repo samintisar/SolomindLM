@@ -10,6 +10,7 @@ import {
   allWithConcurrency,
   clearStateKeys,
   createLangSmithRunConfig,
+  withoutMapOutputs,
 } from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
@@ -160,7 +161,6 @@ export async function collapse(
   if (!state.mapOutputs || state.mapOutputs.length === 0) {
     console.error("[SpreadsheetGraph] Collapse: ERROR - No mapOutputs received!");
     return {
-      ...state,
       collapsedOutputs: [],
       status: "reducing",
     };
@@ -178,7 +178,7 @@ export async function collapse(
       `[SpreadsheetGraph] Collapse: skipping (${totalTokens} tokens <= ${TARGET_TOKENS} target), passing through to reduce`
     );
     return {
-      ...state,
+      ...withoutMapOutputs(state),
       collapsedOutputs: state.mapOutputs,
       status: "reducing",
       progress: {
@@ -195,7 +195,7 @@ export async function collapse(
       "[SpreadsheetGraph] Collapse: skipping (only 2 outputs), passing through to reduce"
     );
     return {
-      ...state,
+      ...withoutMapOutputs(state),
       collapsedOutputs: state.mapOutputs,
       status: "reducing",
       progress: {
@@ -221,7 +221,7 @@ export async function collapse(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     collapsedOutputs: collapsed,
     status: "reducing",
     ...clearStateKeys<OverallStateType>(["mapOutputs"]),

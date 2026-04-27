@@ -1,5 +1,4 @@
 # Embeddings & Rerank API Reference
-
 ## Contents
 
 - [Endpoints](#endpoints)
@@ -7,14 +6,15 @@
 - [Rerank Documents](#rerank-documents)
 - [HTTP Status Codes](#http-status-codes)
 
+
 Base URL: `https://api.together.xyz/v1`
 
 ## Endpoints
 
-| Method             | Path                | Description                                                             |
-| ------------------ | ------------------- | ----------------------------------------------------------------------- |
-| `POST /embeddings` | Generate embeddings | Convert text to vector representations                                  |
-| `POST /rerank`     | Rerank documents    | Reorder documents by relevance to a query (dedicated endpoint required) |
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST /embeddings` | Generate embeddings | Convert text to vector representations |
+| `POST /rerank` | Rerank documents | Reorder documents by relevance to a query (dedicated endpoint required) |
 
 ## Create Embeddings
 
@@ -92,10 +92,10 @@ for start in range(0, len(texts), batch_size):
 
 ### Request Parameters
 
-| Parameter | Type               | Required | Description                |
-| --------- | ------------------ | -------- | -------------------------- |
-| `model`   | string             | Yes      | Embedding model identifier |
-| `input`   | string or string[] | Yes      | Text(s) to embed           |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Embedding model identifier |
+| `input` | string or string[] | Yes | Text(s) to embed |
 
 ### Supported Models
 
@@ -125,14 +125,14 @@ setup instructions.
 
 ### Request Parameters
 
-| Parameter          | Type                 | Required | Description                        |
-| ------------------ | -------------------- | -------- | ---------------------------------- |
-| `model`            | string               | Yes      | Rerank model identifier            |
-| `query`            | string               | Yes      | Search query                       |
-| `documents`        | string[] or object[] | Yes      | Documents to rerank                |
-| `top_n`            | integer              | No       | Return only top N results          |
-| `return_documents` | boolean              | No       | Include document text in response  |
-| `rank_fields`      | string[]             | No       | Fields to rank by for JSON objects |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Rerank model identifier |
+| `query` | string | Yes | Search query |
+| `documents` | string[] or object[] | Yes | Documents to rerank |
+| `top_n` | integer | No | Return only top N results |
+| `return_documents` | boolean | No | Include document text in response |
+| `rank_fields` | string[] | No | Fields to rank by for JSON objects |
 
 ### Response Schema
 
@@ -145,7 +145,7 @@ setup instructions.
     {
       "index": 0,
       "relevance_score": 0.9823,
-      "document": { "text": "..." }
+      "document": {"text": "..."}
     },
     {
       "index": 2,
@@ -163,12 +163,12 @@ The `document` field is only present when `return_documents=true`.
 
 ## HTTP Status Codes
 
-| Code | Description                      |
-| ---- | -------------------------------- |
-| 200  | Success                          |
-| 400  | Bad request (invalid parameters) |
-| 401  | Unauthorized (invalid API key)   |
-| 404  | Not found (invalid model)        |
-| 429  | Rate limit exceeded              |
-| 503  | Service overloaded               |
-| 504  | Request timeout                  |
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 400 | Bad request (invalid parameters) |
+| 401 | Unauthorized (invalid API key) |
+| 404 | Not found (invalid model) |
+| 429 | Rate limit exceeded |
+| 503 | Service overloaded |
+| 504 | Request timeout |

@@ -1,5 +1,6 @@
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Id, Doc } from "../_generated/dataModel";
+import { MAX_DOCS_TO_COUNT } from "../_lib/queryCaps";
 
 /**
  * Database operations for folders.
@@ -21,7 +22,7 @@ export async function getUserFolders(
     .query("folders")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .order("desc")
-    .collect();
+    .take(2000);
 }
 
 export async function getNotebookCountByFolder(
@@ -31,8 +32,8 @@ export async function getNotebookCountByFolder(
   const notebooks = await ctx.db
     .query("notebooks")
     .withIndex("by_folder", (q) => q.eq("folderId", folderId))
-    .collect();
-  return notebooks.length;
+    .take(MAX_DOCS_TO_COUNT + 1);
+  return Math.min(notebooks.length, MAX_DOCS_TO_COUNT);
 }
 
 export async function getNotebooksInFolder(
@@ -42,7 +43,7 @@ export async function getNotebooksInFolder(
   return await ctx.db
     .query("notebooks")
     .withIndex("by_folder", (q) => q.eq("folderId", folderId))
-    .collect();
+    .take(2000);
 }
 
 export type FolderCreate = {

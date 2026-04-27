@@ -8,6 +8,7 @@ import {
   invokeWithRetry,
   clearStateKeys,
   createLangSmithRunConfig,
+  withoutMapOutputs,
 } from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
@@ -194,7 +195,7 @@ export async function reduce(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     finalOutput,
     status: "completed",
     ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),

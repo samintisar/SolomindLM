@@ -1,6 +1,6 @@
 "use node";
 
-import { countTokens } from "../_shared/index.js";
+import { countTokens, withoutMapOutputs } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
@@ -87,7 +87,7 @@ export async function collapse(state: OverallStateType): Promise<Partial<Overall
   });
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     collapsedOutputs: collapsed,
     status: "reducing",
     progress: {

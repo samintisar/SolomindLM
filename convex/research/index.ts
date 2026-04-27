@@ -1,7 +1,8 @@
-import { v } from "convex/values";
-import { query, mutation, internalMutation, internalQuery, internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { v, ConvexError } from "convex/values";
+import { query, mutation, internalMutation, internalQuery } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { getAuthUserId } from "../auth";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 
 // ============================================================
 // QUERIES
@@ -9,25 +10,75 @@ import type { Id } from "../_generated/dataModel";
 
 export const getPlan = query({
   args: { planId: v.id("researchPlans") },
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
     const plan = await ctx.db.get(args.planId);
     if (!plan) return null;
+    try {
+      await assertCanReadNotebook(ctx, plan.notebookId, userId);
+    } catch {
+      return null;
+    }
     return plan;
+  },
+});
+
+/** Latest run for a plan (for UI: in progress vs complete after approval). */
+export const getLatestRunForPlan = query({
+  args: { planId: v.id("researchPlans") },
+  returns: v.union(v.null(), v.any()),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const plan = await ctx.db.get(args.planId);
+    if (!plan) return null;
+    try {
+      await assertCanReadNotebook(ctx, plan.notebookId, userId);
+    } catch {
+      return null;
+    }
+    const runs = await ctx.db
+      .query("researchRuns")
+      .withIndex("by_plan", (q) => q.eq("planId", args.planId))
+      .collect();
+    if (runs.length === 0) return null;
+    runs.sort((a, b) => b.createdAt - a.createdAt);
+    return runs[0] ?? null;
   },
 });
 
 export const getRunStatus = query({
   args: { runId: v.id("researchRuns") },
+  returns: v.union(v.null(), v.any()),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
     const run = await ctx.db.get(args.runId);
     if (!run) return null;
+    try {
+      await assertCanReadNotebook(ctx, run.notebookId, userId);
+    } catch {
+      return null;
+    }
     return run;
   },
 });
 
 export const getRunEvidence = query({
   args: { runId: v.id("researchRuns") },
+  returns: v.array(v.any()),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const run = await ctx.db.get(args.runId);
+    if (!run) return [];
+    try {
+      await assertCanReadNotebook(ctx, run.notebookId, userId);
+    } catch {
+      return [];
+    }
     return await ctx.db
       .query("researchEvidence")
       .withIndex("by_run", (q) => q.eq("runId", args.runId))
@@ -117,9 +168,17 @@ export const approveResearchPlan = mutation({
       )
     ),
   },
+  returns: v.id("researchPlans"),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new ConvexError({ code: "UNAUTHENTICATED", message: "Sign in required" });
+    }
     const plan = await ctx.db.get(args.planId);
-    if (!plan) throw new Error("Plan not found");
+    if (!plan) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Plan not found" });
+    }
+    await assertCanEditNotebook(ctx, plan.notebookId, userId);
 
     const subQuestions = args.modifiedSubQuestions
       ? args.modifiedSubQuestions.map((sq) => ({ ...sq, status: "pending" as const }))
@@ -137,11 +196,22 @@ export const approveResearchPlan = mutation({
 
 export const rejectResearchPlan = mutation({
   args: { planId: v.id("researchPlans") },
+  returns: v.null(),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new ConvexError({ code: "UNAUTHENTICATED", message: "Sign in required" });
+    }
+    const plan = await ctx.db.get(args.planId);
+    if (!plan) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Plan not found" });
+    }
+    await assertCanEditNotebook(ctx, plan.notebookId, userId);
     await ctx.db.patch(args.planId, {
       status: "rejected",
       updatedAt: Date.now(),
     });
+    return null;
   },
 });
 

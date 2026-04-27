@@ -7,18 +7,14 @@ export const recordCacheHit = internalMutation({
     agentType: v.optional(v.string()),
   },
   handler: async (ctx, { cacheType, agentType }) => {
-    // Use a full table scan to find matching records
-    const existing = await ctx.db
+    const candidates = await ctx.db
       .query("cacheMetrics")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("cacheType"), cacheType),
-          agentType === undefined
-            ? q.eq(q.field("agentType"), null)
-            : q.eq(q.field("agentType"), agentType)
-        )
-      )
-      .first();
+      .withIndex("by_type", (q) => q.eq("cacheType", cacheType))
+      .collect();
+    const existing = candidates.find(
+      (m) =>
+        (agentType === undefined && m.agentType === undefined) || m.agentType === agentType
+    );
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -46,18 +42,14 @@ export const recordCacheMiss = internalMutation({
     agentType: v.optional(v.string()),
   },
   handler: async (ctx, { cacheType, agentType }) => {
-    // Use a full table scan to find matching records
-    const existing = await ctx.db
+    const candidates = await ctx.db
       .query("cacheMetrics")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("cacheType"), cacheType),
-          agentType === undefined
-            ? q.eq(q.field("agentType"), null)
-            : q.eq(q.field("agentType"), agentType)
-        )
-      )
-      .first();
+      .withIndex("by_type", (q) => q.eq("cacheType", cacheType))
+      .collect();
+    const existing = candidates.find(
+      (m) =>
+        (agentType === undefined && m.agentType === undefined) || m.agentType === agentType
+    );
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -84,14 +76,20 @@ export const getCacheStats = internalQuery({
     cacheType: v.optional(v.string()),
     agentType: v.optional(v.string()),
   },
-  handler: async (ctx, { cacheType }) => {
-    let query = ctx.db.query("cacheMetrics");
-
+  handler: async (ctx, { cacheType, agentType }) => {
+    let metrics;
     if (cacheType) {
-      query = query.filter((q) => q.eq(q.field("cacheType"), cacheType));
+      const rows = await ctx.db
+        .query("cacheMetrics")
+        .withIndex("by_type", (q) => q.eq("cacheType", cacheType))
+        .collect();
+      metrics =
+        agentType === undefined
+          ? rows
+          : rows.filter((m) => m.agentType === agentType);
+    } else {
+      metrics = await ctx.db.query("cacheMetrics").collect();
     }
-
-    const metrics = await query.collect();
 
     return metrics.map((m) => ({
       ...m,

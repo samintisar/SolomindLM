@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, AudioLines, Check } from "lucide-react";
+import { X, AudioLines } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface AudioFormat {
@@ -114,11 +114,6 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
                     >
                       {format.title}
                     </span>
-                    {selectedFormat === format.id && (
-                      <div className="p-1 rounded-xl bg-primary text-primary-foreground">
-                        <Check className="w-2.5 h-2.5" />
-                      </div>
-                    )}
                   </div>
                   <p className="text-[13px] text-muted-foreground leading-relaxed font-serif">
                     {format.description}
@@ -138,7 +133,7 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
                   key={opt}
                   onClick={() => setLength(opt)}
                   className={`
-                    flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-bold transition-all
+                    flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
                     ${
                       length === opt
                         ? "bg-primary text-primary-foreground shadow-sm"
@@ -146,7 +141,6 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
                     }
                   `}
                 >
-                  {length === opt && <Check className="w-3 h-3" />}
                   {opt.charAt(0).toUpperCase() + opt.slice(1)}
                 </button>
               ))}

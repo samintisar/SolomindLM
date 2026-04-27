@@ -173,7 +173,7 @@ export async function writerNode(
   const finalResponse = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
 
   // Build references from evidence for citation support
-  const references = evidence.map((e, i) => ({
+  const _references = evidence.map((e, i) => ({
     id: String(i + 1),
     sourceTitle: e.sourceTitle,
     sourceUrl: e.sourceUrl,

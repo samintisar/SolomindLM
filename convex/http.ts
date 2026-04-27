@@ -2,7 +2,6 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { components, internal } from "./_generated/api";
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
-import { corsRouter } from "convex-helpers/server/cors";
 import { auth } from "./auth";
 
 const http = httpRouter();
@@ -124,23 +123,24 @@ http.route({
 // Audio Streaming Endpoint with Range Request Support
 // ============================================================
 
-// Test endpoint to verify routing works
+// Authenticated audio playback by Convex storage ID.
+// Requires a valid JWT via Authorization header (same as /chat/stream).
+// Frontend resolves audio URLs to signed storage.getUrl links where possible;
+// this endpoint serves as an authenticated fallback for legacy storage IDs.
+
+// Handle OPTIONS preflight (Authorization header triggers CORS preflight)
 http.route({
-  path: "/audio/test",
-  method: "GET",
+  path: "/audio/" + ":storageId",
+  method: "OPTIONS",
   handler: httpAction(async (ctx, request) => {
-    console.log("[Audio HTTP] Test endpoint called");
-    return new Response(JSON.stringify({ message: "Audio HTTP routing works!" }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const origin = request.headers.get("origin");
+    return new Response(null, {
+      status: 204,
+      headers: getCorsHeaders(origin),
     });
   }),
 });
 
-// Playback by Convex storage ID. IDs are unguessable; treat URLs as capability links.
-// For stricter control, prefer signed `storage.getUrl` links or validate document ownership in an authenticated path.
 http.route({
   path: "/audio/" + ":storageId",
   method: "GET",
@@ -149,33 +149,37 @@ http.route({
     const corsHeaders = getCorsHeaders(origin);
     const withCors = (extra: Record<string, string>) => ({ ...corsHeaders, ...extra });
 
+    const errorResponse = (message: string, status: number) =>
+      new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: withCors({ "Content-Type": "application/json" }),
+      });
+
+    // Auth check — same pattern as /chat/stream and /research/execute
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity?.subject) {
+        return errorResponse("Authentication required", 401);
+      }
+    } catch (e) {
+      console.warn("[Audio HTTP] getUserIdentity / OIDC verification failed:", e);
+      return errorResponse("Session invalid or expired", 401);
+    }
+
     // Extract storageId from URL path
     const url = new URL(request.url);
     const pathParts = url.pathname.split("/");
     const storageId = pathParts[pathParts.length - 1] as any;
 
-    console.log("[Audio HTTP] Request received:", {
-      pathname: url.pathname,
-      storageId,
-      searchParams: url.search,
-      headers: Object.fromEntries(request.headers.entries()),
-    });
-
     try {
       const blob = await ctx.storage.get(storageId);
 
       if (blob === null) {
-        console.error("[Audio HTTP] Storage ID not found:", storageId);
         return new Response("Audio file not found", {
           status: 404,
           headers: withCors({ "Content-Type": "text/plain" }),
         });
       }
-
-      console.log("[Audio HTTP] Blob found:", {
-        size: blob.size,
-        type: blob.type,
-      });
 
       // Handle Range Requests for seeking
       const rangeHeader = request.headers.get("range");
@@ -192,13 +196,7 @@ http.route({
           // Validate range
           if (start >= 0 && start < fileSize && end >= start && end < fileSize) {
             const chunkSize = end - start + 1;
-
-            // Slice the blob to get the requested range
             const chunk = blob.slice(start, end + 1);
-
-            console.log(
-              `[Audio streaming] Range request: ${start}-${end}/${fileSize} (${chunkSize} bytes)`
-            );
 
             return new Response(chunk, {
               status: 206, // Partial Content
@@ -207,7 +205,7 @@ http.route({
                 "Content-Length": chunkSize.toString(),
                 "Content-Range": `bytes ${start}-${end}/${fileSize}`,
                 "Accept-Ranges": "bytes",
-                "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+                "Cache-Control": "private, max-age=3600",
               }),
             });
           }
@@ -215,15 +213,13 @@ http.route({
       }
 
       // No Range header or invalid range - return entire file
-      console.log(`[Audio streaming] Full file request: ${fileSize} bytes`);
-
       return new Response(blob, {
         status: 200,
         headers: withCors({
           "Content-Type": blob.type || "audio/mpeg",
           "Content-Length": fileSize.toString(),
           "Accept-Ranges": "bytes",
-          "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+          "Cache-Control": "private, max-age=3600",
         }),
       });
     } catch (error) {
@@ -274,10 +270,18 @@ http.route({
       });
     };
 
-    // Simplified auth check with Convex Auth
-    const identity = await ctx.auth.getUserIdentity();
-    // Subject is "userId|sessionId", extract just the userId
-    const userId = identity?.subject?.split("|")[0];
+    // Simplified auth check with Convex Auth.
+    // getUserIdentity() throws if the JWT is malformed, expired, or fails OIDC verification
+    // (e.g. wrong issuer vs auth.config) — return 401 instead of a 5xx to the client.
+    let userId: string | undefined;
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      // Subject is "userId|sessionId", extract just the userId
+      userId = identity?.subject?.split("|")[0];
+    } catch (e) {
+      console.warn("[Chat stream] getUserIdentity / OIDC verification failed:", e);
+      return errorResponse("Session invalid or expired. Please log in again.", 401);
+    }
 
     if (!userId) {
       return errorResponse("Please log in to use chat", 401);
@@ -292,12 +296,33 @@ http.route({
           message: string;
           documentIds?: string[];
           conversationId?: string;
+          /** Id of the user row from sendMessageOptimistic (required for research plan linkage). */
+          userMessageId?: string;
+          deepResearch?: boolean;
+          sourcePolicy?: {
+            channels: string[];
+            domainAllowlist?: string[];
+            dateRange?: { start: number; end: number };
+            maxResultsPerChannel?: number;
+            credibilityTier?: string;
+            requirePrimarySources?: boolean;
+            recencyDays?: number;
+            dedupeStrategy?: string;
+          };
         };
-      } catch (error) {
+      } catch (_error) {
         return errorResponse("Invalid JSON body", 400);
       }
 
-      const { notebookId, message, documentIds, conversationId: bodyConversationId } = body;
+      const {
+        notebookId,
+        message,
+        documentIds,
+        conversationId: bodyConversationId,
+        userMessageId: bodyUserMessageId,
+        deepResearch,
+        sourcePolicy,
+      } = body;
 
       // Validate request
       if (!notebookId || typeof notebookId !== "string") {
@@ -327,7 +352,7 @@ http.route({
       console.log("[Chat] Created stream:", streamId);
 
       // Conversation and user message already added by client via sendMessageOptimistic
-      const conversationId = await ctx.runMutation(internal.chat.index.ensureConversation, {
+      const _conversationId = await ctx.runMutation(internal.chat.index.ensureConversation, {
         notebookId: notebookId as any,
         userId: userId as any,
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
@@ -346,6 +371,13 @@ http.route({
         message,
         documentIds: documentIds ?? undefined,
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
+        ...(sourcePolicy != null ? { sourcePolicy: sourcePolicy as any } : {}),
+        ...(deepResearch === true
+          ? {
+              deepResearch: true,
+              ...(bodyUserMessageId ? { userMessageId: bodyUserMessageId as any } : {}),
+            }
+          : {}),
       });
 
       const { readable, writable } = new TransformStream();
@@ -422,8 +454,14 @@ http.route({
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    const identity = await ctx.auth.getUserIdentity();
-    const userId = identity?.subject?.split("|")[0];
+    let userId: string | undefined;
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      userId = identity?.subject?.split("|")[0];
+    } catch (e) {
+      console.warn("[Research execute] getUserIdentity / OIDC verification failed:", e);
+      return errorResponse("Session invalid or expired. Please log in again.", 401);
+    }
     if (!userId) return errorResponse("Please log in", 401);
 
     try {

@@ -1,6 +1,14 @@
 import { Streamdown, type StreamdownProps } from "streamdown";
-import { code } from "@streamdown/code";
+import { createCodePlugin } from "@streamdown/code";
 import { createMathPlugin } from "@streamdown/math";
+
+/**
+ * Shiki themes for fenced blocks must match the code panel background from `index.css`.
+ * We use light panels everywhere so `github-light` tokens (dark, saturated hues) stay readable.
+ */
+const codePlugin = createCodePlugin({
+  themes: ["github-light", "github-light"],
+});
 
 /** Shared plugins for all app markdown (Shiki + KaTeX). Inline $...$ enabled to match previous app behavior. */
 const mathPlugin = createMathPlugin({
@@ -9,7 +17,7 @@ const mathPlugin = createMathPlugin({
 });
 
 export const streamdownPlugins: NonNullable<StreamdownProps["plugins"]> = {
-  code,
+  code: codePlugin,
   math: mathPlugin,
 };
 
@@ -43,7 +51,7 @@ export default function MarkdownRenderer({
   animated = mode === "streaming" ? isAnimating : false,
   controls = false,
   lineNumbers = false,
-  shikiTheme = ["github-light", "github-dark"],
+  shikiTheme = ["github-light", "github-light"],
   ...rest
 }: MarkdownRendererProps) {
   return (

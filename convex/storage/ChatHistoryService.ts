@@ -2,6 +2,8 @@ import { internalMutation, internalQuery, internalAction } from "../_generated/s
 import type { Id, Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import { getNotebookAccess } from "../_lib/notebookAccess";
+import * as ConvModel from "../_model/conversations";
 
 // ============================================================
 // Types
@@ -63,18 +65,18 @@ export const getOrCreateConversation = internalMutation({
   handler: async (ctx, args) => {
     const { userId, notebookId } = args;
 
-    // Try to get existing conversation
-    const existing = await ctx.db
-      .query("conversations")
-      .withIndex("by_user_notebook", (q) => q.eq("userId", userId).eq("notebookId", notebookId))
-      .first();
+    const access = await getNotebookAccess(ctx, notebookId, userId);
+    if (!access) {
+      throw new Error("Notebook access denied");
+    }
+
+    const existing = await ConvModel.getPrimaryConversationForNotebook(ctx, notebookId);
 
     if (existing) {
       console.log(`[ChatHistoryService] Found existing conversation: ${existing._id}`);
       return existing._id;
     }
 
-    // Create new conversation
     const conversationId = await ctx.db.insert("conversations", {
       userId,
       notebookId,
@@ -245,9 +247,12 @@ export const clearConversation = internalMutation({
   handler: async (ctx, args) => {
     const { conversationId, userId } = args;
 
-    // Verify ownership
     const conversation = await ctx.db.get(conversationId);
-    if (!conversation || conversation.userId !== userId) {
+    if (!conversation) {
+      throw new Error("Conversation not found or access denied");
+    }
+    const access = await getNotebookAccess(ctx, conversation.notebookId, userId as Id<"users">);
+    if (!access) {
       throw new Error("Conversation not found or access denied");
     }
 
@@ -277,9 +282,12 @@ export const deleteConversation = internalMutation({
   handler: async (ctx, args) => {
     const { conversationId, userId } = args;
 
-    // Verify ownership
     const conversation = await ctx.db.get(conversationId);
-    if (!conversation || conversation.userId !== userId) {
+    if (!conversation) {
+      throw new Error("Conversation not found or access denied");
+    }
+    const access = await getNotebookAccess(ctx, conversation.notebookId, userId as Id<"users">);
+    if (!access) {
       throw new Error("Conversation not found or access denied");
     }
 
@@ -302,9 +310,12 @@ export const renameConversation = internalMutation({
   handler: async (ctx, args) => {
     const { conversationId, userId, title } = args;
 
-    // Verify ownership
     const conversation = await ctx.db.get(conversationId);
-    if (!conversation || conversation.userId !== userId) {
+    if (!conversation) {
+      throw new Error("Conversation not found or access denied");
+    }
+    const access = await getNotebookAccess(ctx, conversation.notebookId, userId as Id<"users">);
+    if (!access) {
       throw new Error("Conversation not found or access denied");
     }
 
@@ -324,12 +335,6 @@ export const getUserConversations = internalQuery({
   handler: async (ctx, args) => {
     const { userId } = args;
 
-    const conversations = await ctx.db
-      .query("conversations")
-      .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
-      .order("desc")
-      .collect();
-
-    return conversations;
+    return await ConvModel.getUserConversations(ctx, userId);
   },
 });

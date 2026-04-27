@@ -1,6 +1,6 @@
 "use node";
 
-import { clearStateKeys } from "../_shared/index.js";
+import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 
 import { FLASHCARD_CONFIG } from "./config.js";
 import { formatFlashcardsAsText } from "./formatFlashcards.js";
@@ -45,7 +45,6 @@ export async function collapse(
     console.error("[FlashcardGraph] Collapse: ERROR - No mapOutputs received!");
     await callStatusUpdate(state, "collapsing");
     return {
-      ...state,
       collapsedOutputs: [],
       status: "reducing",
       progress: {
@@ -86,7 +85,7 @@ export async function collapse(
     );
 
     return {
-      ...state,
+      ...withoutMapOutputs(state),
       collapsedOutputs: state.mapOutputs,
       status: "reducing",
       ...clearStateKeys<OverallStateType>(["mapOutputs"]),
@@ -110,7 +109,7 @@ export async function collapse(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     collapsedOutputs: collapsed,
     status: "reducing",
     ...clearStateKeys<OverallStateType>(["mapOutputs"]),

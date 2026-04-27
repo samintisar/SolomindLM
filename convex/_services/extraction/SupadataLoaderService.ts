@@ -89,6 +89,19 @@ export class SupadataLoaderService {
   }
 
   /**
+   * Remove cookie / CMP boilerplate that often dominates scraped publisher and repository HTML
+   * (OneTrust-style "Authentication, Preferences, Acknowledgement and Statistics", etc.).
+   * Bounded window avoids eating real article body text.
+   */
+  private stripCookieConsentNoise(text: string): string {
+    const t = text.replace(
+      /\s*We collect and process your personal information[\s\S]{0,4500}?(?:That['']s ok|Accept all(?: cookies)?|Decline\s*That['']s ok)\s*/gi,
+      "\n"
+    );
+    return t.replace(/\n\s*\n\s*\n+/g, "\n\n").trim();
+  }
+
+  /**
    * Get transcript from any supported social media platform
    * Supports: YouTube, TikTok, Instagram, X (Twitter)
    *
@@ -248,7 +261,8 @@ export class SupadataLoaderService {
   }
 
   /**
-   * Scrape a web page and extract text content plus page title when available
+   * Scrape a web page and extract text content plus page title when available.
+   * Retries on Supadata rate limits (same as transcript) — e.g. "Limit Exceeded" when many URL sources process at once.
    */
   async loadWebPageWithMeta(url: string): Promise<{ title: string; content: string }> {
     const validation = validateUrl(url);
@@ -256,6 +270,27 @@ export class SupadataLoaderService {
       throw new Error(`Invalid URL: ${validation.error}`);
     }
 
+    const logger = createServiceLogger("supadata", "scrapeWebPage");
+    return invokeWithRetry(
+      () => this.loadWebPageWithMetaInternal(url),
+      {
+        maxAttempts: 5,
+        baseDelayMs: 2000,
+        jitter: true,
+        retryableErrors: (err) =>
+          /limit exceeded|rate limit|too many requests|429/i.test(err.message),
+        onRetry: (attempt, error, delayMs) =>
+          logger.warn("Rate limited, retrying web scrape", {
+            attempt,
+            delayMs,
+            message: error.message,
+          }),
+      },
+      "loadWebPageWithMeta"
+    );
+  }
+
+  private async loadWebPageWithMetaInternal(url: string): Promise<{ title: string; content: string }> {
     const logger = createServiceLogger("supadata", "scrapeWebPage");
     logger.operationStart({});
 
@@ -266,7 +301,7 @@ export class SupadataLoaderService {
       };
       const text = scrapeResult.content || "";
       const title = scrapeResult.title ?? "";
-      const cleanedText = this.stripMedia(text);
+      const cleanedText = this.stripCookieConsentNoise(this.stripMedia(text));
       logger.operationComplete({
         rawChars: text.length,
         cleanedChars: cleanedText.length,

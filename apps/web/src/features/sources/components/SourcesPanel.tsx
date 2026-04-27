@@ -10,7 +10,6 @@ import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
 import { SourceList } from "./SourceList";
 import { SourceViewer } from "./SourceViewer";
 import { SourcesPanelHeader } from "./SourcesPanelHeader";
-import { WikiCard } from "./WikiCard";
 import { useSourceUpload } from "../hooks/useSourceUpload";
 import { useSourceContent } from "../hooks/useSourceContent";
 import { useSourceSearch } from "../hooks/useSourceSearch";
@@ -21,17 +20,11 @@ import {
   useRefreshNotebookRemoteSources,
   useRefreshRemoteSource,
 } from "../services/documentsApi";
-import {
-  useWiki,
-  useWikiArticle,
-  useCreateWiki,
-  useRefreshWiki,
-  useCancelWikiGeneration,
-} from "../services/wikiApi";
-import type { Source } from "@/shared/types";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { useToast } from "@/shared/contexts/ToastContext";
+
+export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
 interface SourcesPanelProps {
   isOpen: boolean;
@@ -41,6 +34,9 @@ interface SourcesPanelProps {
   userId?: string | null;
   noteId?: string | null;
   onDocumentUploaded?: (documentId: string) => void;
+  /** Open this notebook document in the viewer (e.g. citation click). `seq` bumps so the same id can reopen. */
+  focusSourceRequest?: SourcesPanelFocusRequest | null;
+  onFocusSourceHandled?: () => void;
 }
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({
@@ -50,6 +46,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   userId,
   noteId,
   onDocumentUploaded,
+  focusSourceRequest,
+  onFocusSourceHandled,
 }) => {
   const {
     sources,
@@ -64,8 +62,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // View state
   const [viewingSourceId, setViewingSourceId] = useState<string | null>(null);
-  /** Wiki article path from API (e.g. concepts/foo); opens full article in the panel viewer. */
-  const [viewingWikiPath, setViewingWikiPath] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -83,14 +79,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const refreshNotebookRemote = useRefreshNotebookRemoteSources();
   const refreshRemoteSource = useRefreshRemoteSource();
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
-  const [isWikiPending, setIsWikiPending] = useState(false);
-
-  // Wiki integration
-  const wiki = useWiki(noteId);
-  const wikiArticle = useWikiArticle(noteId, viewingWikiPath);
-  const createWikiMutation = useCreateWiki();
-  const refreshWikiMutation = useRefreshWiki();
-  const cancelWikiMutation = useCancelWikiGeneration();
 
   const handleGoogleDriveFiles = useCallback(
     async (files: PickedFile[], accessToken: string) => {
@@ -135,34 +123,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     [sources, viewingSourceId]
   );
 
-  const wikiSyntheticSource: Source | null = useMemo(() => {
-    if (!viewingWikiPath) return null;
-    if (wikiArticle) {
-      const date =
-        wikiArticle.frontmatter?.lastUpdated?.split("T")[0] ??
-        new Date(wikiArticle.updatedAt).toLocaleDateString();
-      return {
-        id: `__wiki__:${viewingWikiPath}`,
-        title: wikiArticle.title,
-        type: "MD",
-        date,
-        selected: false,
-        status: "completed",
-      };
-    }
-    const slug = viewingWikiPath.split("/").filter(Boolean).pop() ?? viewingWikiPath;
-    const fallbackTitle = slug.replace(/-/g, " ");
-    return {
-      id: `__wiki__:${viewingWikiPath}`,
-      title: fallbackTitle,
-      type: "MD",
-      date: "",
-      selected: false,
-      status: "completed",
-    };
-  }, [viewingWikiPath, wikiArticle]);
-
-  const panelViewingSource = viewingWikiPath ? wikiSyntheticSource : viewingSource;
   const documentContent = useDocumentContent(
     viewingSource && viewingSource.status === "completed" ? viewingSourceId : null
   );
@@ -199,15 +159,25 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  useEffect(() => {
+    if (!focusSourceRequest) return;
+    if (sources.length === 0) return;
+    const { documentId } = focusSourceRequest;
+    const exists = sources.some((s) => s.id === documentId);
+    if (exists) {
+      setViewingSourceId(documentId);
+    }
+    onFocusSourceHandled?.();
+  }, [focusSourceRequest, sources, onFocusSourceHandled]);
+
   // Computed values
   const allSelected = filteredSources.length > 0 && filteredSources.every((s) => s.selected);
   const selectedCount = sources.filter((s) => s.selected).length;
 
   const markdownContent = viewingSourceId ? sourceContent.getContent(viewingSourceId) : undefined;
-  const wikiMarkdown = viewingWikiPath ? wikiArticle?.content : undefined;
-  const canCopyOrDownload = viewingWikiPath
-    ? Boolean(wikiArticle?.content?.trim())
-    : Boolean(markdownContent && !sourceContent.hasError(viewingSourceId ?? ""));
+  const canCopyOrDownload = Boolean(
+    markdownContent && !sourceContent.hasError(viewingSourceId ?? "")
+  );
 
   // Handlers
   const handleDeleteSource = async (sourceId: string, sourceTitle: string) => {
@@ -314,62 +284,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   const handleViewSource = (sourceId: string) => {
-    setViewingWikiPath(null);
     setViewingSourceId(sourceId);
   };
-
-  const handleOpenWikiArticle = useCallback((path: string) => {
-    setViewingSourceId(null);
-    setViewingWikiPath(path);
-  }, []);
-
-  // Wiki handlers
-  const handleCreateWiki = useCallback(async () => {
-    if (!noteId) return;
-
-    try {
-      setIsWikiPending(true);
-      const { wikiId } = await createWikiMutation(noteId);
-      await refreshWikiMutation(wikiId);
-      success("Knowledge wiki generation started!");
-    } catch (err) {
-      console.error("Failed to create wiki:", err);
-      showError(err instanceof Error ? err.message : "Failed to create wiki");
-    } finally {
-      setIsWikiPending(false);
-    }
-  }, [noteId, createWikiMutation, refreshWikiMutation, success, showError]);
-
-  const handleRegenerateWiki = useCallback(async () => {
-    if (!wiki?._id) return;
-
-    try {
-      setIsWikiPending(true);
-      await refreshWikiMutation(wiki._id);
-      success("Knowledge wiki regeneration started!");
-    } catch (err) {
-      console.error("Failed to regenerate wiki:", err);
-      showError(err instanceof Error ? err.message : "Failed to regenerate wiki");
-    } finally {
-      setIsWikiPending(false);
-    }
-  }, [wiki?._id, refreshWikiMutation, success, showError]);
-
-  const handleCancelWikiGeneration = useCallback(async () => {
-    if (!wiki?._id) return;
-
-    try {
-      const result = await cancelWikiMutation(wiki._id);
-      if (result.cancelled) {
-        showInfo("Wiki generation stopped.");
-      }
-    } catch (err) {
-      console.error("Failed to cancel wiki generation:", err);
-      showError(err instanceof Error ? err.message : "Failed to stop wiki generation");
-    } finally {
-      setIsWikiPending(false);
-    }
-  }, [wiki?._id, cancelWikiMutation, showInfo, showError]);
 
   const handleRenameSource = (id: string, newTitle: string) => {
     onRenameSource(id, newTitle);
@@ -398,7 +314,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const handleBackToList = () => {
     setViewingSourceId(null);
-    setViewingWikiPath(null);
     setRenamingId(null);
   };
 
@@ -414,36 +329,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   const handleCopy = async () => {
-    if (viewingWikiPath && wikiArticle?.content) {
-      try {
-        await navigator.clipboard.writeText(wikiArticle.content);
-        success("Copied wiki article to clipboard");
-      } catch {
-        showError("Could not copy to clipboard");
-      }
-      return;
-    }
     if (viewingSource) {
       await sourceContent.handleCopySourceMarkdown(viewingSource.id, viewingSource.title);
     }
   };
 
   const handleDownload = () => {
-    if (viewingWikiPath && wikiArticle?.content) {
-      const safeName =
-        (wikiArticle.title || "wiki-article")
-          .replace(/[^\w\s-]/g, "")
-          .trim()
-          .slice(0, 80) || "wiki-article";
-      const blob = new Blob([wikiArticle.content], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${safeName}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
     if (viewingSource) {
       sourceContent.handleDownloadSourceMarkdown(viewingSource.id, viewingSource.title);
     }
@@ -502,7 +393,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         `}
       >
         <SourcesPanelHeader
-          viewingSource={panelViewingSource}
+          viewingSource={viewingSource}
           onBackToList={handleBackToList}
           onEnterRename={handleEnterRename}
           onExitRename={handleExitRename}
@@ -516,35 +407,19 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           onRenameChange={setRenameValue}
           onRenameSubmit={handleRenameSource}
           onResizeStart={handleResizeStart}
-          allowRename={!viewingWikiPath}
         />
 
         <div className="flex-1 overflow-y-auto w-full">
-          {panelViewingSource ? (
+          {viewingSource ? (
             <SourceViewer
-              source={panelViewingSource}
+              source={viewingSource}
               onToggle={handleToggleSource}
-              content={viewingWikiPath ? wikiMarkdown : markdownContent}
-              pdfStorageId={
-                !viewingWikiPath && viewingSource?.type === "PDF"
-                  ? viewingDocument?.storageId
-                  : undefined
-              }
-              isLoading={
-                viewingWikiPath
-                  ? wikiArticle === undefined
-                  : sourceContent.isLoading(viewingSourceId ?? "")
-              }
+              content={markdownContent}
+              pdfStorageId={viewingSource?.type === "PDF" ? viewingDocument?.storageId : undefined}
+              isLoading={sourceContent.isLoading(viewingSourceId ?? "")}
               error={
-                viewingWikiPath
-                  ? wikiArticle === null
-                    ? "Wiki article not found"
-                    : undefined
-                  : sourceContent.hasError(viewingSourceId ?? "")
-                    ? "Failed to load content"
-                    : undefined
+                sourceContent.hasError(viewingSourceId ?? "") ? "Failed to load content" : undefined
               }
-              hideInclusionToggle={Boolean(viewingWikiPath)}
             />
           ) : (
             <SourceList
@@ -573,18 +448,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               onRefreshAll={handleRefreshAll}
               canRefreshAll={canRefreshAll}
               isRefreshing={isRefreshingAll}
-              beforeSearch={
-                <div className="p-3 pb-2">
-                  <WikiCard
-                    wiki={wiki}
-                    isPending={isWikiPending}
-                    onCreateWiki={handleCreateWiki}
-                    onRegenerateWiki={handleRegenerateWiki}
-                    onCancelGeneration={handleCancelWikiGeneration}
-                    onOpenArticle={handleOpenWikiArticle}
-                  />
-                </div>
-              }
             />
           )}
         </div>
@@ -653,6 +516,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         isOpen={isDiscoverOpen}
         onClose={() => setIsDiscoverOpen(false)}
         onAddSource={onAddSource}
+        notebookSources={sources}
         isAtLimit={sources.length >= 100}
         userId={userId}
         noteId={noteId}

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "../_generated/server";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Doc } from "../_generated/dataModel";
 import { getAuthUserId } from "../auth";
 import { checkNotebookLimit } from "../_lib/limits";
 import { getNotebookAccess } from "../_lib/notebookAccess";
@@ -231,23 +231,7 @@ export const remove = mutation({
       throw new Error("Notebook not found");
     }
 
-    const members = await ctx.db
-      .query("notebookMembers")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.id))
-      .collect();
-    for (const m of members) {
-      await ctx.db.delete(m._id);
-    }
-
-    const shareLinks = await ctx.db
-      .query("notebookShareLinks")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.id))
-      .collect();
-    for (const l of shareLinks) {
-      await ctx.db.delete(l._id);
-    }
-
-    await Notebooks.deleteNotebook(ctx, args.id);
+    await Notebooks.removeNotebookWithRelated(ctx, args.id);
     return { message: "Notebook deleted successfully" };
   },
 });

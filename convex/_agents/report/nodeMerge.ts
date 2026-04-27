@@ -20,7 +20,6 @@ export function mergeResults(state: OverallStateType): Partial<OverallStateType>
   );
 
   return {
-    ...state,
     status: "completed",
     progress: {
       phase: "complete",

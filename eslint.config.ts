@@ -18,7 +18,7 @@ export default defineConfig(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       // React 19 + react-hooks v7: these flag many valid patterns (URL sync, ref mirrors,
       // latest-props-in-callback). Keep as warnings so `eslint .` stays clean; tighten over time.
       "react-hooks/set-state-in-effect": "warn",
@@ -33,10 +33,37 @@ export default defineConfig(
     ignores: [
       "convex/_generated/**",
       "apps/web/node_modules/.vite/**",
+      "apps/web/dist/**",
       "dist/**",
       ".claude/**",
+      ".worktrees/**",
       "node_modules/**",
       "archive/**",
+      "apps/mobile/.expo/**",
+      "apps/mobile/components/__tests__/**",
+      "apps/mobile/metro.config.js",
     ],
+  },
+  {
+    files: ["scripts/**", "convex/scripts/**"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        require: "readonly",
+        module: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        setInterval: "readonly",
+        clearTimeout: "readonly",
+        clearInterval: "readonly",
+        fetch: "readonly",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
   }
 );

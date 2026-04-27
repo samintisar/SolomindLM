@@ -36,7 +36,6 @@ export { packChunks, validateChunks } from "./chunkHelpers.js";
 export class MindMapGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
-  private failureCount = 0;
   private readonly MAX_TOTAL_FAILURES = 5;
 
   constructor(apiKey: string, mapModel: string, reduceModel: string) {
@@ -67,13 +66,6 @@ export class MindMapGraph {
   async mapProcess(state: ChunkStateType): Promise<Partial<OverallStateType> | Send> {
     const deps: MindMapMapProcessDeps = {
       extractConcepts: (c) => runConceptExtraction(this.fastLlm, c),
-      onMapSuccess: () => {
-        this.failureCount = 0;
-      },
-      onPermanentChunkFailure: () => {
-        this.failureCount++;
-        return this.failureCount;
-      },
       maxTotalFailures: this.MAX_TOTAL_FAILURES,
     };
     return mapProcess(state, deps);
@@ -111,8 +103,6 @@ export class MindMapGraph {
       inputChunks: chunks.length,
       validChunks: validated.length,
     });
-
-    this.failureCount = 0;
 
     const graph = this.buildGraph();
 

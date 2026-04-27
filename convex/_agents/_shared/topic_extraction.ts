@@ -286,7 +286,7 @@ export function selectBalancedByTopic(
   config?: TopicExtractionConfig
 ): number[] {
   const extractor = new TopicExtractor(config);
-  const { topics, allTopics } = extractor.analyzeDistribution(outputs);
+  const { topics: _topics, allTopics: _allTopics } = extractor.analyzeDistribution(outputs);
 
   // If we have fewer outputs than max selection, return all
   if (outputs.length <= maxSelection) {

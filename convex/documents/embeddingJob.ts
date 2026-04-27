@@ -8,13 +8,18 @@ import { SupadataLoaderService } from "../_services/extraction/SupadataLoaderSer
 import {
   extractDocumentMetadata,
   getFileExtension,
-  type DocumentMetadata,
 } from "../_services/processing/DocumentMetadataExtractor";
 import {
   StructuralChunker,
-  type ChunkWithMetadata,
 } from "../_services/processing/StructuralChunker";
+import {
+  E5_RAG_CHUNK_OVERLAP_TOKENS,
+  E5_RAG_CHUNK_SIZE_TOKENS,
+  E5_TOGETHER_EMBED_BATCH_SIZE,
+} from "../_lib/e5Embedding";
 import { createJobLogger, createErrorMetadata } from "../_agents/_shared/logging";
+import { resolveOpenAlexSourceUrlToArticleUrl } from "../_lib/resolveOpenAlexSourceUrl";
+import { buildPaperMetadataMarkdown } from "./paperRecord";
 
 // File extensions that require OCR processing
 const OCR_FILE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".avif", ".pdf", ".pptx", ".docx"];
@@ -32,6 +37,34 @@ function needsOCR(fileName: string): boolean {
 function needsAudioTranscription(fileName: string): boolean {
   const ext = fileName.toLowerCase().substring(fileName.lastIndexOf("."));
   return AUDIO_FILE_EXTENSIONS.includes(ext);
+}
+
+/**
+ * True when `fileName` is still the raw URL string (or empty), not a human title from discovery or rename.
+ */
+function isLikelyRawUrlFileName(value: string | undefined): boolean {
+  const t = (value ?? "").trim();
+  if (!t) return true;
+  if (/^https?:\/\//i.test(t)) return true;
+  if (/^www\./i.test(t)) return true;
+  return false;
+}
+
+function titleForUrlDocument(
+  fileName: string | undefined,
+  fileUrl: string | undefined,
+  extractedTitle: string | undefined
+): string {
+  if (!isLikelyRawUrlFileName(fileName)) {
+    return (fileName ?? "").trim();
+  }
+  const fromPage = extractedTitle?.trim();
+  if (fromPage) return fromPage;
+  try {
+    return new URL(fileUrl || "").hostname;
+  } catch {
+    return fileUrl?.trim() || "Web Page";
+  }
 }
 
 /**
@@ -60,6 +93,7 @@ export const docEmbedding = internalAction({
     logger.jobStart();
 
     let currentPhase = "initializing";
+    let fileTypeForError = "";
 
     try {
       // Phase: Initializing
@@ -88,6 +122,11 @@ export const docEmbedding = internalAction({
         fileType: docDetails.fileType,
         fileName: docDetails.fileName,
       });
+
+      fileTypeForError = docDetails.fileType;
+
+      /** For URL docs, updated when OpenAlex metadata URL is resolved to DOI / publisher. */
+      let effectiveFileUrl: string | undefined = docDetails.fileUrl;
 
       let extractedText = "";
       let extractedTitle: string | undefined;
@@ -188,12 +227,111 @@ export const docEmbedding = internalAction({
         }
       } else if (docDetails.fileType === "url") {
         logger.info("Extracting web page content");
-        const meta = await supadataLoader.loadWebPageWithMeta(docDetails.fileUrl || "");
+        const rawUrl = docDetails.fileUrl || "";
+        const scrapeUrl = await resolveOpenAlexSourceUrlToArticleUrl(rawUrl);
+        if (scrapeUrl !== rawUrl) {
+          logger.info("Resolved OpenAlex work URL to article URL for scraping", {
+            from: rawUrl,
+            to: scrapeUrl,
+          });
+          await ctx.runMutation(internal.documents.index.setDocumentFileUrl, {
+            documentId,
+            fileUrl: scrapeUrl,
+          });
+        }
+        effectiveFileUrl = scrapeUrl;
+        const meta = await supadataLoader.loadWebPageWithMeta(scrapeUrl);
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
         logger.phaseComplete("extraction", {
           contentLength: extractedText.length,
           title: extractedTitle,
+        });
+      } else if (docDetails.fileType === "paper_record") {
+        logger.info("Processing paper_record (OA PDF → Supadata PDF → repository/landing URLs → metadata stub)");
+        const pr = docDetails.paperRecord;
+        if (!pr) {
+          throw new Error("paper_record document missing paperRecord");
+        }
+        const pdfUrl = pr.pdfUrl?.trim();
+        const landing = pr.landingPageUrl?.trim();
+        const primaryDocUrl = docDetails.fileUrl?.trim();
+        let paperIngestion: "ingested" | "metadata_only" = "metadata_only";
+
+        if (pdfUrl) {
+          try {
+            extractedText = await mistralOCR.processDocument(pdfUrl);
+            if (extractedText?.trim()) {
+              paperIngestion = "ingested";
+              logger.phaseComplete("extraction", {
+                contentLength: extractedText.length,
+                method: "oa_pdf_ocr",
+              });
+            }
+          } catch (e) {
+            logger.warn("OA PDF extraction failed", { message: e instanceof Error ? e.message : String(e) });
+          }
+        }
+
+        // Mistral often fails on institutional PDFs; Supadata may still extract text from the same URL.
+        if (!extractedText?.trim() && pdfUrl) {
+          try {
+            const meta = await supadataLoader.loadWebPageWithMeta(pdfUrl);
+            extractedText = meta.content;
+            if (meta.title?.trim()) extractedTitle = meta.title.trim();
+            if (extractedText?.trim()) {
+              paperIngestion = "ingested";
+              logger.phaseComplete("extraction", {
+                contentLength: extractedText.length,
+                title: extractedTitle,
+                method: "oa_pdf_scrape",
+              });
+            }
+          } catch (e) {
+            logger.warn("Supadata PDF URL failed", {
+              message: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
+        // Landing from OpenAlex is sometimes missing even when `fileUrl` (DOI, handle, publisher) is set.
+        const scrapeUrls = [...new Set([landing, primaryDocUrl].filter(Boolean) as string[])];
+        for (const url of scrapeUrls) {
+          if (extractedText?.trim()) break;
+          if (url === pdfUrl) continue;
+          try {
+            const meta = await supadataLoader.loadWebPageWithMeta(url);
+            extractedText = meta.content;
+            if (meta.title?.trim()) extractedTitle = meta.title.trim();
+            if (extractedText?.trim()) {
+              paperIngestion = "ingested";
+              logger.phaseComplete("extraction", {
+                contentLength: extractedText.length,
+                title: extractedTitle,
+                method: "repository_or_landing_scrape",
+              });
+              break;
+            }
+          } catch (e) {
+            logger.warn("Scrape failed for paper URL", {
+              url: url.slice(0, 80),
+              message: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
+        if (!extractedText?.trim()) {
+          extractedText = buildPaperMetadataMarkdown(pr, docDetails.fileName || "Research paper");
+          paperIngestion = "metadata_only";
+          logger.phaseComplete("extraction", {
+            contentLength: extractedText.length,
+            method: "metadata_stub",
+          });
+        }
+
+        await ctx.runMutation(internal.documents.index.patch, {
+          documentId,
+          patch: { ingestionStatus: paperIngestion },
         });
       }
 
@@ -239,9 +377,13 @@ export const docEmbedding = internalAction({
         language: docMetadata.language,
       });
 
-      // Use structural chunker for enhanced metadata
+      // E5 (Together) max ~512 real tokens; chunk below that so RAG index matches embed input (see e5Embedding)
       const chunker = new StructuralChunker();
-      const chunksWithMetadata = await chunker.chunk(extractedText, 1000, 200);
+      const chunksWithMetadata = await chunker.chunk(
+        extractedText,
+        E5_RAG_CHUNK_SIZE_TOKENS,
+        E5_RAG_CHUNK_OVERLAP_TOKENS
+      );
 
       logger.phaseComplete("chunking", { chunkCount: chunksWithMetadata.length });
 
@@ -255,15 +397,7 @@ export const docEmbedding = internalAction({
         // Keep full file name (with extension) so the UI can show correct type (PDF, DOCX, etc.)
         title = docDetails.fileName || "";
       } else if (docDetails.fileType === "url") {
-        title =
-          extractedTitle ||
-          (() => {
-            try {
-              return new URL(docDetails.fileUrl || "").hostname;
-            } catch {
-              return docDetails.fileUrl || "Web Page";
-            }
-          })();
+        title = titleForUrlDocument(docDetails.fileName, effectiveFileUrl, extractedTitle);
       } else if (docDetails.fileType === "youtube") {
         title =
           extractedTitle ||
@@ -273,6 +407,8 @@ export const docEmbedding = internalAction({
             );
             return match ? `YouTube: ${match[1]}` : "YouTube Video";
           })();
+      } else if (docDetails.fileType === "paper_record") {
+        title = (docDetails.fileName || "").trim() || extractedTitle || "Research paper";
       } else {
         // For text input
         title = "Pasted Text";
@@ -311,14 +447,17 @@ export const docEmbedding = internalAction({
 
       const embeddingTimer = logger.createTimer();
 
-      // Generate embeddings via shared lib (uses OpenAI; cacheable per chunk)
-      const embeddingVectors = await Promise.all(
-        chunksWithMetadata.map((chunk) =>
-          ctx.runAction(internal._services.ai.embeddings.generateEmbeddingInternal, {
-            text: chunk.content,
-          })
-        )
-      );
+      // Together E5: batched `input: string[]` (fewer HTTP calls than one-per-chunk) + sequential batches to avoid 429s
+      const chunkTexts = chunksWithMetadata.map((c) => c.content);
+      const embeddingVectors: number[][] = [];
+      for (let off = 0; off < chunkTexts.length; off += E5_TOGETHER_EMBED_BATCH_SIZE) {
+        const batch = chunkTexts.slice(off, off + E5_TOGETHER_EMBED_BATCH_SIZE);
+        const part = await ctx.runAction(
+          internal._services.ai.embeddings.generateEmbeddingsBatchInternal,
+          { texts: batch, inputType: "passage" }
+        );
+        embeddingVectors.push(...part);
+      }
 
       const embeddingDuration = embeddingTimer.end();
       logger.phaseComplete("embedding", {
@@ -388,6 +527,13 @@ export const docEmbedding = internalAction({
         documentId,
         status: "failed",
       });
+
+      if (fileTypeForError === "paper_record") {
+        await ctx.runMutation(internal.documents.index.patch, {
+          documentId,
+          patch: { ingestionStatus: "failed" },
+        });
+      }
 
       // Store error in metadata
       await ctx.runMutation(internal.documents.index.patch, {

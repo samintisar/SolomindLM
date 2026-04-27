@@ -4,6 +4,7 @@ import type Together from "together-ai";
 
 import { synthesizeSpeechToBuffer } from "../../_services/ai/togetherTts.js";
 import { env } from "../../_lib/env.js";
+import { withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 import type { OverallStateType, DialogueLine } from "./state.js";
 import { GRAPH_CONFIG } from "./config.js";
@@ -121,7 +122,7 @@ export async function synthesizeAudio(
   });
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     audioBuffer,
     status: "completed",
     progress: {

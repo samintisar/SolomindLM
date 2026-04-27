@@ -170,7 +170,8 @@ export function clearStateKeys<TState extends Record<string, unknown>>(
   const result: Partial<TState> = {};
 
   for (const key of keysToClear) {
-    (result as Record<string, unknown>)[key] = [];
+    // mapOutputs uses mapOutputsMergeReducer: only `null` clears; [] would concat to no-op
+    (result as Record<string, unknown>)[key] = key === "mapOutputs" ? null : [];
   }
 
   return result;

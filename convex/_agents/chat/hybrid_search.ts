@@ -7,6 +7,7 @@
 
 import type { ReferenceChunk, ChunkMetadata } from "../../storage/ChatHistoryService";
 import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import {
   VectorSearchHandler,
   VectorSearchRunner,
@@ -162,7 +163,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
     documentIds?: string[],
     preComputedEmbedding?: number[],
     retrievalAugmentForRerank?: string,
-    options?: { skipRerank?: boolean; allowEmpty?: boolean }
+    options?: { skipRerank?: boolean; allowEmpty?: boolean; quiet?: boolean }
   ): Promise<HybridReferenceChunk[]> {
     if (!this.hybridConfig.enableHybrid || !this.keywordSearchRunner) {
       // Vector-only: cast to base type for compatibility
@@ -177,8 +178,16 @@ export class HybridSearchHandler extends VectorSearchHandler {
       )) as HybridReferenceChunk[];
     }
 
+    const quiet = options?.quiet === true;
+    const log = createServiceLogger("hybridSearch", "search", {
+      userId,
+      notebookId: noteId,
+    });
     const startTime = Date.now();
-    console.log(`[HybridSearch] query="${query.slice(0, 80)}..."`);
+
+    if (!quiet) {
+      log.debug("query", { preview: query.slice(0, 120), length: query.length });
+    }
 
     // Parallel retrieval
     const [vectorResults, keywordResults] = await Promise.all([
@@ -186,8 +195,12 @@ export class HybridSearchHandler extends VectorSearchHandler {
       this.executeKeywordSearch(query, documentIds),
     ]);
 
-    const overlap = vectorResults.length + keywordResults.length;
-    console.log(`[HybridSearch] vector=${vectorResults.length}, keyword=${keywordResults.length}`);
+    if (!quiet) {
+      log.debug("retrieval_counts", {
+        vector: vectorResults.length,
+        keyword: keywordResults.length,
+      });
+    }
 
     // No fallback: respect the user's document selection strictly
 
@@ -235,7 +248,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
       const rerankQuery = augment
         ? `${query.trim()}\n\n${augment.length > 2000 ? augment.slice(0, 2000) : augment}`
         : query;
-      const reranked = await this.rerankResults(rerankQuery, filtered);
+      const reranked = await this.rerankResults(rerankQuery, filtered, quiet);
       rankedForMap = reranked.slice(0, this.hybridConfig.maxResults) as (RRFResult & {
         _score?: number;
         similarity?: number;
@@ -271,29 +284,17 @@ export class HybridSearchHandler extends VectorSearchHandler {
       };
     });
 
-    // Telemetry
-    console.log("[HybridSearch] metrics", {
-      query_length: query.length,
-      vector_count: vectorResults.length,
-      keyword_count: keywordResults.length,
-      fused_count: fused.length,
-      overlap_count: overlapCount,
-      top_rrf_score: fused[0]?.rrfScore.toFixed(4),
-      final_count: finalResults.length,
-      latency_ms: Date.now() - startTime,
-    });
-
     // KEYWORD FALLBACK: If no results from hybrid search in selected docs, try keyword-only search
     if (finalResults.length === 0 && documentIds && documentIds.length > 0) {
-      console.log(
-        "[HybridSearch] No results from hybrid search in selected docs, trying keyword fallback"
-      );
+      log.warn("No hybrid results for selected docs; trying keyword fallback", {
+        documentIdCount: documentIds.length,
+      });
 
       // Use keyword search with the exact query terms
       const keywordOnlyResults = await this.executeKeywordSearch(query, documentIds);
 
       if (keywordOnlyResults.length > 0) {
-        console.log(`[HybridSearch] Keyword fallback found ${keywordOnlyResults.length} results`);
+        log.info("keyword_fallback_hit", { count: keywordOnlyResults.length });
 
         // Convert to final format without reranking (already keyword-relevant)
         const limited = keywordOnlyResults.slice(0, this.config.maxResults);
@@ -315,6 +316,18 @@ export class HybridSearchHandler extends VectorSearchHandler {
         }));
       }
     }
+
+    const latencyMs = Date.now() - startTime;
+    log.performance("hybrid_search", latencyMs, "ms", {
+      quiet,
+      query_length: query.length,
+      vector_count: vectorResults.length,
+      keyword_count: keywordResults.length,
+      fused_count: fused.length,
+      overlap_count: overlapCount,
+      top_rrf_score: fused[0]?.rrfScore != null ? Number(fused[0].rrfScore.toFixed(4)) : null,
+      final_count: finalResults.length,
+    });
 
     return finalResults;
   }

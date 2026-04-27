@@ -14,7 +14,8 @@ export interface Source {
     | "XLS"
     | "MD"
     | "JSON"
-    | "CSV";
+    | "CSV"
+    | "PAPER";
   date: string;
   selected: boolean;
   content?: string;
@@ -23,6 +24,13 @@ export interface Source {
   url?: string;
   /** Kebab Refresh: web page (`url` type, not YouTube) or Google Drive–backed file */
   remoteRefreshKind?: "url" | "drive";
+  /** Set for `paper_record` documents (discovery / OpenAlex) */
+  paper?: {
+    doi?: string;
+    openAlexId?: string;
+    fulltextStatus?: "available" | "unavailable" | "external_only";
+    ingestionStatus?: "pending" | "ingested" | "metadata_only" | "failed";
+  };
 }
 
 export interface ReferenceChunk {
@@ -93,6 +101,14 @@ export interface Message {
   agentTrace?: ChatAgentTrace;
   /** Deep research plan metadata for plan-approval messages */
   researchPlan?: { planId: string; subQuestions: unknown[]; sourcePolicy: unknown };
+  /** External sources discovered during chat (web, academic, news, finance) */
+  externalSources?: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    sourceType: string;
+    score?: number;
+  }>;
 }
 
 export interface StudioTool {
@@ -167,7 +183,7 @@ export interface Slide {
   title: string;
   talking_points: string[];
   prompt?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /** Convex studio jobs persist these on artifact `metadata` while status is `generating`. */
@@ -314,20 +330,6 @@ export interface SpreadsheetNote extends BaseNote {
   } & StudioGenerationMetadata;
 }
 
-// Wiki note - LLM-generated knowledge base with interconnected pages
-export interface WikiNote extends BaseNote {
-  type: "wiki";
-  content: string; // Main content (index page)
-  metadata: {
-    totalPages: number;
-    lastUpdated: number;
-    documentIds: string[];
-    wikiType: "knowledge_base" | "research_summary" | "course_companion";
-    error?: string;
-    customPrompt?: string;
-  } & StudioGenerationMetadata;
-}
-
 // User note - saved chat conversations or manual notes
 export interface UserNote extends BaseNote {
   type: "note";
@@ -338,7 +340,7 @@ export interface UserNote extends BaseNote {
     messageCount?: number; // For saved chats
     conversationId?: string; // For saved chats - link to original conversation
     savedAt: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -354,7 +356,6 @@ export type Note =
   | WrittenQuestionsNote
   | SlideDeckNote
   | SpreadsheetNote
-  | WikiNote
   | UserNote;
 
 // Type guard functions for checking note types at runtime
@@ -396,10 +397,6 @@ export function isSlideDeckNote(note: Note): note is SlideDeckNote {
 
 export function isSpreadsheetNote(note: Note): note is SpreadsheetNote {
   return note.type === "spreadsheet";
-}
-
-export function isWikiNote(note: Note): note is WikiNote {
-  return note.type === "wiki";
 }
 
 export function isUserNote(note: Note): note is UserNote {
@@ -450,7 +447,7 @@ export interface Document {
   file_type: "file" | "url" | "youtube";
   file_url?: string;
   status: "pending" | "processing" | "completed" | "failed";
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -459,6 +456,21 @@ export interface UploadResponse {
   message: string;
   documentId: string;
   status: string;
+}
+
+/** Payload for `documents.upload` with `type: "paper_record"` */
+export interface PaperRecordInput {
+  abstract: string;
+  authors: string[];
+  doi?: string;
+  venue?: string;
+  publicationYear?: number;
+  openAlexId?: string;
+  semanticScholarId?: string;
+  isOa: boolean;
+  pdfUrl?: string;
+  landingPageUrl?: string;
+  license?: string;
 }
 
 /**
@@ -481,6 +493,11 @@ export interface UnifiedDiscoveryResult {
     hasFullText?: boolean;
     publicationYear?: number;
     type?: string;
+    doi?: string;
+    openAlexId?: string;
+    pdfUrl?: string;
+    landingPageUrl?: string;
+    license?: string;
 
     // Web/News-specific
     domain?: string;

@@ -1,0 +1,617 @@
+"use node";
+/**
+ * Chat Agent Service
+ *
+ * Deterministic router → parallel sub-query retrieval (HyDE + hybrid, rerank once) → structured answer.
+ */
+
+import { env } from "../../_lib/env";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import type { ServiceLogger } from "../../_lib/logging/serviceLogger";
+
+import { VectorSearchHandler } from "./vector_search.js";
+import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
+import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
+import { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import type { ReferenceChunk } from "../../storage/ChatHistoryService";
+import { budgetConversationHistory } from "./chatHistoryBudget.js";
+import { routeChatMessage } from "./chatRouter.js";
+
+import type { ChatAgentContext, ChatAgentOptions, GlobalRerankFn, StreamChunk } from "./types.js";
+import {
+  FOLLOWUP_GENERATION_TIMEOUT_MS,
+  RESPONSE_GENERATION_TIMEOUT_MS,
+  SEARCH_PIPELINE_TIMEOUT_MS,
+  STREAM_TOKEN_DELAY_MS,
+} from "./chatConfig.js";
+import { withTimeout } from "./withTimeout.js";
+import {
+  chunkDedupKey,
+  chunkRankingScore,
+  mergeChunkScores,
+  selectChunksByTokenBudget,
+} from "./chunkContext.js";
+import { expandQueryWithKeywords } from "./queryExpansion.js";
+import { sliceParagraphForStream } from "./streamSlice.js";
+
+export class ChatAgent {
+  private llmWrapper: ChatLLMWrapper;
+  private vectorSearch: VectorSearchHandler;
+  private embeddingService: EmbeddingService;
+  private globalRerankFn?: GlobalRerankFn;
+
+  constructor(options?: ChatAgentOptions) {
+    this.llmWrapper = new ChatLLMWrapper({
+      apiKey: env.TOGETHER_AI_API_KEY,
+      model: env.SMART_LLM || "openai/gpt-oss-120b",
+      temperature: parseFloat(env.CHAT_LLM_TEMPERATURE ?? "0.1"),
+      fastModel: env.FAST_LLM,
+      fastApiKey: env.TOGETHER_AI_API_KEY,
+    });
+
+    this.vectorSearch =
+      options?.vectorSearchHandler ??
+      new VectorSearchHandler({
+        vectorMatchThreshold: parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD ?? "0.3"),
+        vectorMatchCount: parseInt(env.CHAT_VECTOR_MATCH_COUNT ?? "25", 10),
+        rerankThreshold: parseInt(env.CHAT_RERANK_THRESHOLD ?? "5", 10),
+        rerankTopN: parseInt(env.CHAT_RERANK_TOP_N ?? "15", 10),
+        maxResults: parseInt(env.CHAT_MAX_RESULTS ?? "7", 10),
+      });
+
+    this.embeddingService = new EmbeddingService(env.TOGETHER_AI_API_KEY);
+    this.globalRerankFn = options?.globalRerankFn;
+  }
+
+  private createLogger(context: ChatAgentContext & { requestId?: string }): ServiceLogger {
+    return createServiceLogger("ChatAgent", "streamChatResponse", {
+      userId: context.userId,
+      notebookId: context.noteId,
+      requestId: context.requestId,
+    });
+  }
+
+  private resolveGroundingMode(context: ChatAgentContext): "async" | "sync" | "off" {
+    if (context.groundingMode) return context.groundingMode;
+    const m = env.CHAT_GROUNDING_MODE;
+    if (m === "sync" || m === "off") return m;
+    return "async";
+  }
+
+  /**
+   * HyDE + hybrid search for one sub-query; rerank skipped (merged + global rerank later).
+   */
+  private async runSubqueryRetrieval(
+    query: string,
+    context: ChatAgentContext,
+    logger: ServiceLogger
+  ): Promise<ReferenceChunk[]> {
+    const pipelineDeadline = Date.now() + SEARCH_PIPELINE_TIMEOUT_MS;
+    const remainingMs = () => {
+      const ms = pipelineDeadline - Date.now();
+      if (ms <= 0) {
+        throw new Error(`search_pipeline timed out after ${SEARCH_PIPELINE_TIMEOUT_MS}ms`);
+      }
+      return ms;
+    };
+
+    const searchOpts = { skipRerank: true, allowEmpty: true } as const;
+
+    logger.apiCall("ChatLLMWrapper", "generateHypotheticalDocument", { query });
+    const hydeText = await withTimeout(
+      this.llmWrapper.generateHypotheticalDocument(query),
+      remainingMs(),
+      "hyde_generation"
+    );
+
+    const textForVectorEmbedding = [query.trim(), hydeText.trim()].filter(Boolean).join("\n\n");
+    const hydeEmbedding = await withTimeout(
+      this.embeddingService.embedText(textForVectorEmbedding),
+      remainingMs(),
+      "hyde_embedding"
+    );
+
+    if (context.documentIds?.length) {
+      const expandedQueries = expandQueryWithKeywords(query);
+      const allResults: ReferenceChunk[] = [];
+      const seenChunkKeys = new Set<string>();
+
+      for (const queryVariation of expandedQueries) {
+        const variationResults = await withTimeout(
+          this.vectorSearch.search(
+            context.userId,
+            context.noteId,
+            queryVariation,
+            context.documentIds,
+            hydeEmbedding,
+            hydeText,
+            searchOpts
+          ),
+          remainingMs(),
+          "vector_hybrid_search"
+        );
+        for (const chunk of variationResults) {
+          const key = chunkDedupKey(chunk);
+          if (!seenChunkKeys.has(key)) {
+            allResults.push(chunk);
+            seenChunkKeys.add(key);
+          }
+        }
+      }
+      logger.apiSuccess(
+        "VectorSearch",
+        "hybrid",
+        Date.now() - (pipelineDeadline - SEARCH_PIPELINE_TIMEOUT_MS),
+        {
+          query,
+          expandedCount: expandedQueries.length,
+          resultCount: allResults.length,
+        }
+      );
+      return allResults;
+    }
+
+    const results = await withTimeout(
+      this.vectorSearch.search(
+        context.userId,
+        context.noteId,
+        query,
+        context.documentIds,
+        hydeEmbedding,
+        hydeText,
+        searchOpts
+      ),
+      remainingMs(),
+      "vector_hybrid_search"
+    );
+    logger.apiSuccess(
+      "VectorSearch",
+      "hybrid",
+      Date.now() - (pipelineDeadline - SEARCH_PIPELINE_TIMEOUT_MS),
+      {
+        query,
+        resultCount: results.length,
+      }
+    );
+    return results;
+  }
+
+  private async applyGlobalRerank(
+    merged: ReferenceChunk[],
+    rerankQueryFromDecomposer: string | undefined,
+    userMessage: string,
+    logger: ServiceLogger
+  ): Promise<ReferenceChunk[]> {
+    if (!this.globalRerankFn || merged.length === 0) {
+      return merged;
+    }
+    const rerankQueryForCache =
+      (rerankQueryFromDecomposer?.trim() && rerankQueryFromDecomposer.trim()) || userMessage;
+
+    const docs = merged.map((c) => ({
+      id: `${c.sourceId}:${c.chunkIndex}`,
+      content: c.content,
+    }));
+
+    const rerankStart = Date.now();
+    try {
+      const reranked = await this.globalRerankFn(rerankQueryForCache, docs);
+      const order = new Map(reranked.map((d, i) => [d.id, i]));
+      const scoreMap = new Map(reranked.map((d) => [d.id, d.score]));
+
+      logger.apiSuccess("Rerank", "global", Date.now() - rerankStart, {
+        inputCount: merged.length,
+        outputCount: reranked.length,
+      });
+
+      const sorted = [...merged].sort((a, b) => {
+        const ida = `${a.sourceId}:${a.chunkIndex}`;
+        const idb = `${b.sourceId}:${b.chunkIndex}`;
+        const ia = order.has(ida) ? (order.get(ida) as number) : 9999;
+        const ib = order.has(idb) ? (order.get(idb) as number) : 9999;
+        if (ia !== ib) return ia - ib;
+        return chunkRankingScore(b) - chunkRankingScore(a);
+      });
+
+      return sorted.map((c) => {
+        const id = `${c.sourceId}:${c.chunkIndex}`;
+        const sc = scoreMap.get(id);
+        if (sc != null && !Number.isNaN(sc)) {
+          return { ...c, similarity: sc };
+        }
+        return c;
+      });
+    } catch (error) {
+      logger.apiError("Rerank", "global", error, { inputCount: merged.length });
+      throw error;
+    }
+  }
+
+  async *streamResponse(
+    context: ChatAgentContext,
+    userMessage: string,
+    requestId?: string
+  ): AsyncGenerator<StreamChunk> {
+    const logger = this.createLogger({ ...context, requestId });
+
+    logger.operationStart({ userMessage, documentIds: context.documentIds });
+
+    try {
+      const historyBudget = parseInt(env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000", 10);
+      const recentTurns = budgetConversationHistory(context.conversationHistory, historyBudget);
+
+      yield* this.streamRoutedResponse(context, userMessage, recentTurns, logger);
+
+      logger.operationComplete();
+    } catch (error) {
+      logger.operationError(error, { userMessage });
+
+      let errorMessage = "Unknown error occurred";
+      let errorType = "unknown";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (
+          error.message.includes("No results found") ||
+          error.message.includes("No relevant documents")
+        ) {
+          errorType = "no_documents";
+        } else if (
+          error.message.includes("Vector search failed") ||
+          error.message.includes("Hybrid search failed")
+        ) {
+          errorType = "search_failed";
+        } else if (error.message.includes("API key")) {
+          errorType = "api_error";
+        } else if (error.message.includes("Invalid document ID")) {
+          errorType = "validation_error";
+        } else if (error.message.includes("timed out")) {
+          errorType = "timeout";
+        }
+      }
+
+      yield { type: "error", data: { message: errorMessage, type: errorType } };
+    }
+  }
+
+  private async *streamRoutedResponse(
+    context: ChatAgentContext,
+    userMessage: string,
+    recentTurns: Array<{ role: string; content: string }>,
+    logger: ServiceLogger
+  ): AsyncGenerator<StreamChunk> {
+    const route = routeChatMessage(userMessage, recentTurns);
+
+    if (route.type === "clarify") {
+      logger.info("Router decision: clarify", { question: route.question });
+      yield { type: "clarification", data: { question: route.question } };
+      yield { type: "done" };
+      return;
+    }
+
+    if (route.type === "direct") {
+      logger.info("Router decision: direct response");
+      yield { type: "status", status: "thinking", message: "Generating response..." };
+      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, recentTurns);
+      for (const para of directAnswer.split(/\n\n+/)) {
+        if (para.trim().length > 0) {
+          for await (const piece of sliceParagraphForStream(para)) {
+            yield { type: "token", data: piece };
+            await new Promise((resolve) => setTimeout(resolve, STREAM_TOKEN_DELAY_MS));
+          }
+        }
+      }
+      yield { type: "done" };
+      return;
+    }
+
+    logger.info("Router decision: retrieve (parallel sub-queries)");
+    const enableNotebookSearch = context.enableNotebookSearch !== false;
+    const allChunks: ReferenceChunk[] = [];
+    let rerankQueryOpt: string | undefined;
+
+    if (enableNotebookSearch) {
+      yield { type: "status", status: "planning", message: "Planning searches…" };
+
+      const subqueryStart = Date.now();
+      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, recentTurns);
+      rerankQueryOpt = plan.rerankQuery;
+      const { subqueries } = plan;
+      logger.apiSuccess(
+        "ChatLLMWrapper",
+        "generateRetrievalSubqueries",
+        Date.now() - subqueryStart,
+        {
+          subqueryCount: subqueries.length,
+        }
+      );
+
+      yield { type: "status", status: "retrieving", message: "Searching your materials…" };
+
+      const settled = await Promise.allSettled(
+        subqueries.map((sq) => this.runSubqueryRetrieval(sq, context, logger))
+      );
+
+      for (let i = 0; i < settled.length; i++) {
+        const sq = subqueries[i];
+        const r = settled[i];
+        yield {
+          type: "tool_call",
+          data: { tool: "search_documents", query: sq, status: "searching" },
+        };
+        if (r.status === "fulfilled") {
+          for (const chunk of r.value) {
+            const key = chunkDedupKey(chunk);
+            const idx = allChunks.findIndex((c) => chunkDedupKey(c) === key);
+            if (idx < 0) {
+              allChunks.push(chunk);
+            } else {
+              allChunks[idx] = mergeChunkScores(allChunks[idx], chunk);
+            }
+          }
+          yield {
+            type: "tool_call",
+            data: {
+              tool: "search_documents",
+              query: sq,
+              status: "done",
+              resultCount: r.value.length,
+            },
+          };
+        } else {
+          logger.warn("Subquery search failed", { query: sq, error: String(r.reason) });
+          yield {
+            type: "tool_call",
+            data: { tool: "search_documents", query: sq, status: "done", resultCount: 0 },
+          };
+        }
+      }
+    } else {
+      logger.info("Notebook source search disabled — skipping hybrid retrieval");
+    }
+
+    let merged = allChunks;
+    try {
+      merged = await this.applyGlobalRerank(allChunks, rerankQueryOpt, userMessage, logger);
+    } catch (e) {
+      logger.warn("Global rerank failed, using merged hybrid scores", { error: String(e) });
+    }
+
+    if (context.externalChunks && context.externalChunks.length > 0) {
+      merged = [...merged, ...context.externalChunks];
+      logger.info("Merged external chunks into context", {
+        notebookChunks: allChunks.length,
+        externalChunks: context.externalChunks.length,
+        totalAfterMerge: merged.length,
+      });
+    }
+
+    const rankedChunks = selectChunksByTokenBudget(merged, logger);
+
+    if (rankedChunks.length === 0) {
+      logger.info("No chunks found — streaming direct response");
+      yield { type: "status", status: "thinking", message: "Generating response..." };
+      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, recentTurns);
+      for (const para of directAnswer.split(/\n\n+/)) {
+        if (para.trim().length > 0) {
+          for await (const piece of sliceParagraphForStream(para)) {
+            yield { type: "token", data: piece };
+            await new Promise((resolve) => setTimeout(resolve, STREAM_TOKEN_DELAY_MS));
+          }
+        }
+      }
+      yield { type: "done" };
+      return;
+    }
+
+    yield* this.streamRagAnswerFromChunks(context, userMessage, recentTurns, rankedChunks, logger);
+  }
+
+  private async *streamRagAnswerFromChunks(
+    context: ChatAgentContext,
+    userMessage: string,
+    recentTurns: Array<{ role: string; content: string }>,
+    allChunks: ReferenceChunk[],
+    logger: ServiceLogger
+  ): AsyncGenerator<StreamChunk> {
+    const mode = this.resolveGroundingMode(context);
+
+    const citationChunks: ReferenceChunk[] = allChunks.map((c, i) => ({
+      ...c,
+      id: String(i + 1),
+    }));
+
+    yield { type: "status", status: "reading", message: `Reading ${citationChunks.length} passages...` };
+    yield { type: "references", data: citationChunks };
+
+    logger.info("Generating grounded response", {
+      chunkCount: citationChunks.length,
+      groundingMode: mode,
+    });
+    yield { type: "status", status: "thinking", message: "Formulating answer..." };
+
+    const responseStart = Date.now();
+    let structuredResponse: ChatResponse = await withTimeout(
+      this.llmWrapper.generateStructuredResponse(citationChunks, userMessage, recentTurns),
+      RESPONSE_GENERATION_TIMEOUT_MS,
+      "response_generation"
+    );
+    logger.apiSuccess("ChatLLMWrapper", "generateStructuredResponse", Date.now() - responseStart, {
+      responseLength: structuredResponse.answer_markdown.length,
+      confidence: structuredResponse.confidence,
+    });
+
+    let isGrounded = true;
+    let semanticOnlyFailure = false;
+    let semanticValidation: {
+      isGrounded: boolean;
+      issues: string[];
+      missingCitations: boolean;
+    } = {
+      isGrounded: true,
+      issues: [],
+      missingCitations: false,
+    };
+
+    if (mode === "sync") {
+      logger.info("Validating grounding (sync)");
+      const syntacticValidation = validateGrounding(
+        structuredResponse.answer_markdown,
+        citationChunks
+      );
+      semanticValidation = syntacticValidation.isGrounded
+        ? await validateSemanticGrounding(
+            structuredResponse.answer_markdown,
+            citationChunks,
+            this.embeddingService
+          )
+        : { isGrounded: false, issues: [], missingCitations: false };
+
+      isGrounded = syntacticValidation.isGrounded && semanticValidation.isGrounded;
+
+      if (!isGrounded) {
+        if (syntacticValidation.isGrounded && !semanticValidation.isGrounded) {
+          semanticOnlyFailure = true;
+          logger.warn("Semantic grounding below threshold — keeping first response", {
+            issues: semanticValidation.issues,
+          });
+        } else {
+          logger.warn("Grounding failed — retrying with strict grounding");
+          structuredResponse = await withTimeout(
+            this.llmWrapper.generateWithStrictGrounding(citationChunks, userMessage, recentTurns),
+            RESPONSE_GENERATION_TIMEOUT_MS,
+            "strict_grounding_retry"
+          );
+
+          const retrySyntactic = validateGrounding(
+            structuredResponse.answer_markdown,
+            citationChunks
+          );
+          const retrySemantic = retrySyntactic.isGrounded
+            ? await validateSemanticGrounding(
+                structuredResponse.answer_markdown,
+                citationChunks,
+                this.embeddingService
+              )
+            : { isGrounded: false, issues: [], missingCitations: false };
+          isGrounded = retrySyntactic.isGrounded && retrySemantic.isGrounded;
+          semanticValidation = retrySemantic;
+          semanticOnlyFailure = retrySyntactic.isGrounded && !retrySemantic.isGrounded;
+        }
+      }
+    }
+
+    yield { type: "status", status: "generating", message: "Generating response..." };
+    const finalText = structuredResponse.answer_markdown;
+
+    if (mode === "async") {
+      const groundingPromise = (async () => {
+        const syn = validateGrounding(structuredResponse.answer_markdown, citationChunks);
+        const sem = syn.isGrounded
+          ? await validateSemanticGrounding(
+              structuredResponse.answer_markdown,
+              citationChunks,
+              this.embeddingService
+            )
+          : { isGrounded: false, issues: [] as string[], missingCitations: false };
+        const g = syn.isGrounded && sem.isGrounded;
+        const semOnly = syn.isGrounded && !sem.isGrounded;
+        return { sem, isGrounded: g, semanticOnlyFailure: semOnly };
+      })();
+
+      for (const para of finalText.split(/\n\n+/)) {
+        if (para.trim().length > 0) {
+          for await (const piece of sliceParagraphForStream(para)) {
+            yield { type: "token", data: piece };
+            await new Promise((resolve) => setTimeout(resolve, STREAM_TOKEN_DELAY_MS));
+          }
+        }
+      }
+
+      const g = await groundingPromise;
+      isGrounded = g.isGrounded;
+      semanticOnlyFailure = g.semanticOnlyFailure;
+
+      if (!isGrounded) {
+        const syntacticIssues = validateGrounding(
+          structuredResponse.answer_markdown,
+          citationChunks
+        ).issues;
+        const allIssues = semanticOnlyFailure
+          ? [...g.sem.issues, ...syntacticIssues]
+          : syntacticIssues;
+        logger.warn("Async grounding check failed", {
+          semanticOnlyFailure,
+          issueCount: allIssues.length,
+        });
+        yield {
+          type: "grounding_warn",
+          data: {
+            passed: false,
+            issues: allIssues,
+            message: semanticOnlyFailure
+              ? "Note: Automated check suggests the answer may be only loosely aligned with cited passages"
+              : "Note: This response may not be fully grounded in your documents",
+          },
+        };
+      }
+    } else {
+      for (const para of finalText.split(/\n\n+/)) {
+        if (para.trim().length > 0) {
+          for await (const piece of sliceParagraphForStream(para)) {
+            yield { type: "token", data: piece };
+            await new Promise((resolve) => setTimeout(resolve, STREAM_TOKEN_DELAY_MS));
+          }
+        }
+      }
+
+      if (mode === "sync" && !isGrounded) {
+        const syntacticIssues = validateGrounding(
+          structuredResponse.answer_markdown,
+          citationChunks
+        ).issues;
+        const allIssues = semanticOnlyFailure
+          ? [...semanticValidation.issues, ...syntacticIssues]
+          : syntacticIssues;
+        yield {
+          type: "grounding_check",
+          data: {
+            passed: false,
+            issues: allIssues,
+            message: semanticOnlyFailure
+              ? "Note: Automated check suggests the answer may be only loosely aligned with cited passages"
+              : "Note: This response may not be fully grounded in your documents",
+          },
+        };
+      }
+    }
+
+    if (structuredResponse.confidence !== "high") {
+      yield {
+        type: "grounding_check",
+        data: {
+          passed: structuredResponse.confidence !== "low",
+          issues:
+            structuredResponse.confidence === "low" ? ["Low confidence in source coverage"] : [],
+          message: `Response confidence: ${structuredResponse.confidence}`,
+        },
+      };
+    }
+
+    let followUps: string[] = [];
+    try {
+      followUps = await withTimeout(
+        this.llmWrapper.generateFollowUpQuestions(userMessage, finalText),
+        FOLLOWUP_GENERATION_TIMEOUT_MS,
+        "follow_up_questions"
+      );
+    } catch (e) {
+      logger.warn("Follow-up generation timed out or failed", { error: String(e) });
+    }
+    if (followUps.length > 0) {
+      yield { type: "followups", data: followUps };
+    }
+
+    yield { type: "done" };
+  }
+}

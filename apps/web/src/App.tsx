@@ -262,6 +262,7 @@ const AppContent: React.FC = () => {
       remoteChatGenerating: chatStream.remoteChatGenerating,
       remoteGenerationBlocksSend: chatStream.remoteGenerationBlocksSend,
       onSendMessage: chatStream.handleSendMessage,
+      consumeResearchExecuteStream: chatStream.consumeResearchExecuteStream,
       onClearHistory: chatStream.handleClearChatHistory,
       onSetFeedback: chatStream.setMessageFeedback,
       onRetry: chatStream.handleRetryMessage,
@@ -276,11 +277,21 @@ const AppContent: React.FC = () => {
       onCreateConversation: conversationCRUD.handleCreate,
       onRenameConversation: conversationCRUD.handleRename,
       onDeleteConversation: async (id: string) => {
+        const list = conversationCRUD.conversations;
+        const wasOnlyThread =
+          list != null && list.length === 1 && list[0]._id === id;
         await conversationCRUD.handleDelete(id);
+        if (wasOnlyThread) {
+          const newId = await conversationCRUD.handleCreate();
+          setActiveConversationId(newId ?? null);
+          return;
+        }
         if (activeConversationId === id) {
           setActiveConversationId(null);
         }
       },
+      externalSources: chatStream.externalSources,
+      clearExternalSources: chatStream.clearExternalSources,
     }),
     [chatStream, activeConversationId, conversationCRUD]
   );

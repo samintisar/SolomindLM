@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   X,
   Search,
@@ -18,6 +18,7 @@ import {
   FileStack,
 } from "lucide-react";
 import { Source, UnifiedDiscoveryResult } from "@/shared/types/index";
+import { normalizeSourceUrlForNotebookMatch } from "@/shared/utils/sourceUrlMatch";
 import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi";
 import { useToast } from "@/shared/contexts/ToastContext";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
@@ -26,6 +27,8 @@ interface DiscoverSourcesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddSource: (source: Source) => void;
+  /** Current notebook sources — used to show "Added" in sync (removal updates UI). */
+  notebookSources: Source[];
   isAtLimit: boolean;
   userId?: string | null;
   noteId?: string | null;
@@ -56,17 +59,63 @@ const DEFAULT_FILTERS: FilterState = {
 /** Tavily Search caps `max_results` at 20; discovery total budget matches that ceiling. */
 const MAX_DISCOVERY_TOTAL_RESULTS = 20;
 
-/** Subtle active state — avoids bright per-type pastels; uses theme tokens only */
-const SOURCE_TYPE_ACTIVE = "bg-secondary text-foreground border-border/80 shadow-sm ring-1 ring-border/50";
+/** One pastel system per type: filters, list border, icons, and grid labels stay aligned */
+const SOURCE_TYPE_STYLES: Record<
+  "web" | "news" | "academic" | "finance",
+  { filterActive: string; filterInactive: string; listAccent: string; icon: string; typeChip: string }
+> = {
+  web: {
+    filterActive:
+      "bg-sky-100/90 text-sky-950 border-sky-300/80 shadow-sm ring-1 ring-sky-200/50",
+    filterInactive:
+      "border-transparent bg-sky-50/50 text-sky-800/80 hover:bg-sky-100/80 hover:border-sky-200/50",
+    listAccent: "border-l-sky-400/85",
+    icon: "text-sky-800/80",
+    typeChip: "border border-sky-200/60 bg-sky-100/80 text-sky-950",
+  },
+  news: {
+    filterActive:
+      "bg-amber-100/90 text-amber-950 border-amber-300/80 shadow-sm ring-1 ring-amber-200/50",
+    filterInactive:
+      "border-transparent bg-amber-50/50 text-amber-900/80 hover:bg-amber-100/80 hover:border-amber-200/50",
+    listAccent: "border-l-amber-400/85",
+    icon: "text-amber-800/90",
+    typeChip: "border border-amber-200/60 bg-amber-100/80 text-amber-950",
+  },
+  academic: {
+    filterActive:
+      "bg-violet-100/90 text-violet-950 border-violet-300/80 shadow-sm ring-1 ring-violet-200/50",
+    filterInactive:
+      "border-transparent bg-violet-50/50 text-violet-900/80 hover:bg-violet-100/80 hover:border-violet-200/50",
+    listAccent: "border-l-violet-400/85",
+    icon: "text-violet-800/90",
+    typeChip: "border border-violet-200/60 bg-violet-100/80 text-violet-950",
+  },
+  finance: {
+    filterActive:
+      "bg-emerald-100/90 text-emerald-950 border-emerald-300/80 shadow-sm ring-1 ring-emerald-200/50",
+    filterInactive:
+      "border-transparent bg-emerald-50/50 text-emerald-900/80 hover:bg-emerald-100/80 hover:border-emerald-200/50",
+    listAccent: "border-l-emerald-400/85",
+    icon: "text-emerald-800/90",
+    typeChip: "border border-emerald-200/60 bg-emerald-100/80 text-emerald-950",
+  },
+};
 
 const SOURCE_TYPE_CONFIG = {
-  web: { label: "Web", icon: Globe, activeClass: SOURCE_TYPE_ACTIVE },
-  news: { label: "News", icon: Newspaper, activeClass: SOURCE_TYPE_ACTIVE },
-  academic: { label: "Academic", icon: GraduationCap, activeClass: SOURCE_TYPE_ACTIVE },
-  finance: { label: "Finance", icon: TrendingUp, activeClass: SOURCE_TYPE_ACTIVE },
+  web: { label: "Web", icon: Globe },
+  news: { label: "News", icon: Newspaper },
+  academic: { label: "Academic", icon: GraduationCap },
+  finance: { label: "Finance", icon: TrendingUp },
 } as const;
 
 type SourceType = keyof typeof SOURCE_TYPE_CONFIG;
+
+const META_CHIP =
+  "inline-flex items-center gap-0.5 rounded-md border border-border/60 bg-background/60 px-1.5 py-0.5 text-[11px] text-muted-foreground leading-none";
+
+const ADD_BTN_BASE =
+  "flex-shrink-0 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 px-3 py-1.5";
 
 function getHostname(url: string): string {
   try {
@@ -76,16 +125,100 @@ function getHostname(url: string): string {
   }
 }
 
+/** Hide snippets that duplicate the title or are an obvious title-prefix repeat from APIs */
+function isSnippetMeaningful(title: string, snippet: string): boolean {
+  const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, " ");
+  const t = norm(title);
+  const s = norm(snippet);
+  if (!s) return false;
+  if (s === t) return false;
+  if (t.length > 0 && t.startsWith(s)) return false;
+  return true;
+}
+
+function formatAcademicByline(r: UnifiedDiscoveryResult): string | null {
+  if (r.sourceType !== "academic") return null;
+  const parts: string[] = [];
+  if (r.metadata.publicationYear) parts.push(String(r.metadata.publicationYear));
+  else if (r.publishedDate) {
+    const d = new Date(r.publishedDate);
+    if (!Number.isNaN(d.getTime())) parts.push(String(d.getFullYear()));
+  }
+  if (r.metadata.venue) parts.push(r.metadata.venue);
+  if (r.metadata.authors?.length) {
+    const a = r.metadata.authors;
+    parts.push(a.length > 1 ? `${a[0]} et al.` : a[0]!);
+  }
+  return parts.length ? parts.join(" · ") : null;
+}
+
+function normalizeOpenAlexKey(id: string): string {
+  return id.replace(/^https:\/\/openalex\.org\//i, "").toLowerCase();
+}
+
+function normalizeDoiKey(doi: string | undefined): string | null {
+  if (!doi?.trim()) return null;
+  const d = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim().toLowerCase();
+  return d || null;
+}
+
+/** Discovery-row hint aligned with notebook `fulltextStatus` / product copy */
+function academicAccessChip(
+  r: UnifiedDiscoveryResult
+): { label: string; className: string; title?: string } | null {
+  if (r.sourceType !== "academic") return null;
+  const pdf = Boolean(r.metadata.pdfUrl?.trim());
+  if (pdf) {
+    return {
+      label: "OA PDF",
+      title:
+        "OpenAlex lists an open-access PDF. We try to ingest it; some repositories block automated downloads.",
+      className: `${META_CHIP} border-emerald-200/70 bg-emerald-50/80 text-emerald-950`,
+    };
+  }
+  if (r.metadata.openAccess) {
+    return {
+      label: "Open access",
+      className: `${META_CHIP} border-violet-200/70 bg-violet-50/80 text-violet-950`,
+    };
+  }
+  if (r.metadata.landingPageUrl?.trim() || r.metadata.doi?.trim()) {
+    return {
+      label: "External access",
+      className: `${META_CHIP} border-amber-200/70 bg-amber-50/80 text-amber-950`,
+    };
+  }
+  return {
+    label: "Metadata only",
+    className: `${META_CHIP} border-border/80 bg-muted/40 text-muted-foreground`,
+  };
+}
+
 function getScoreBadge(score: number) {
-  if (score >= 0.8) return { label: "high relevance", className: "bg-secondary text-muted-foreground" };
-  if (score >= 0.6) return { label: "medium relevance", className: "bg-muted/80 text-muted-foreground" };
-  return null;
+  const base = "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-none";
+  if (score >= 0.8) {
+    return {
+      label: "high relevance",
+      className: `${base} border border-green-300/80 bg-green-100/90 text-green-950`,
+    };
+  }
+  if (score >= 0.6) {
+    return {
+      label: "medium relevance",
+      className: `${base} border border-amber-300/80 bg-amber-100/90 text-amber-950`,
+    };
+  }
+  return {
+    label: "low relevance",
+    className: `${base} border border-rose-300/80 bg-rose-100/90 text-rose-950`,
+  };
 }
 
 export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   isOpen,
   onClose,
   onAddSource,
+  notebookSources,
   isAtLimit,
   userId,
   noteId,
@@ -96,12 +229,37 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   const [results, setResults] = useState<UnifiedDiscoveryResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
-  const [addedUrls, setAddedUrls] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [filters, setFilters] = useSessionStorage<FilterState>("discovery-filters", DEFAULT_FILTERS);
+
+  const notebookDiscoveryKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const source of notebookSources) {
+      const u = source.url?.trim();
+      if (u) s.add(normalizeSourceUrlForNotebookMatch(u));
+      const oa = source.paper?.openAlexId?.trim();
+      if (oa) s.add(`oa:${normalizeOpenAlexKey(oa)}`);
+      const dk = normalizeDoiKey(source.paper?.doi);
+      if (dk) s.add(`doi:${dk}`);
+    }
+    return s;
+  }, [notebookSources]);
+
+  const isDiscoveryResultInNotebook = useCallback(
+    (r: UnifiedDiscoveryResult) => {
+      if (notebookDiscoveryKeys.has(normalizeSourceUrlForNotebookMatch(r.url))) return true;
+      if (r.sourceType !== "academic") return false;
+      const oa = r.metadata.openAlexId?.trim();
+      if (oa && notebookDiscoveryKeys.has(`oa:${normalizeOpenAlexKey(oa)}`)) return true;
+      const dk = normalizeDoiKey(r.metadata.doi);
+      if (dk && notebookDiscoveryKeys.has(`doi:${dk}`)) return true;
+      return false;
+    },
+    [notebookDiscoveryKeys]
+  );
 
   useEffect(() => {
     setFilters((prev) =>
@@ -179,13 +337,12 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   };
 
   const handleAddSingle = async (result: UnifiedDiscoveryResult) => {
-    if (isAtLimit || !userId || !noteId || addedUrls.has(result.url)) return;
+    if (isAtLimit || !userId || !noteId || isDiscoveryResultInNotebook(result)) return;
 
     setAddingIds((prev) => new Set(prev).add(result.id));
 
     try {
       await addResult(result);
-      setAddedUrls((prev) => new Set(prev).add(result.url));
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(result.id);
@@ -206,7 +363,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
     if (isAtLimit || !userId || !noteId) return;
 
     const toAdd = results.filter(
-      (r) => selectedIds.has(r.id) && !addedUrls.has(r.url) && !addingIds.has(r.id)
+      (r) => selectedIds.has(r.id) && !isDiscoveryResultInNotebook(r) && !addingIds.has(r.id)
     );
     if (toAdd.length === 0) return;
 
@@ -216,12 +373,11 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       return next;
     });
 
-    let succeeded = 0;
+    let _succeeded = 0;
     for (const result of toAdd) {
       try {
         await addResult(result);
-        setAddedUrls((prev) => new Set(prev).add(result.url));
-        succeeded++;
+        _succeeded++;
       } catch (err) {
         showError(err instanceof Error ? err.message : "Failed to add source");
       }
@@ -236,6 +392,44 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   };
 
   const addResult = async (result: UnifiedDiscoveryResult) => {
+    if (result.sourceType === "academic") {
+      const response = await createDocument({
+        notebookId: noteId!,
+        type: "paper_record",
+        fileName: result.title || "Paper",
+        paperRecord: {
+          abstract: result.snippet || "",
+          authors: result.metadata.authors ?? [],
+          doi: result.metadata.doi,
+          venue: result.metadata.venue,
+          publicationYear: result.metadata.publicationYear,
+          openAlexId: result.metadata.openAlexId,
+          isOa: result.metadata.openAccess ?? false,
+          pdfUrl: result.metadata.pdfUrl,
+          landingPageUrl: result.metadata.landingPageUrl,
+          license: result.metadata.license,
+        },
+      });
+
+      const newSource: Source = {
+        id: response.documentId,
+        title: result.title,
+        type: "PAPER",
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        selected: true,
+        status: "pending",
+        url: result.metadata.landingPageUrl || result.url,
+        paper: {
+          doi: result.metadata.doi,
+          openAlexId: result.metadata.openAlexId,
+        },
+      };
+
+      onAddSource(newSource);
+      onDocumentUploaded?.(response.documentId);
+      return;
+    }
+
     const response = await createDocument({
       notebookId: noteId!,
       type: "url",
@@ -351,15 +545,14 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                 ([key, config]) => {
                   const Icon = config.icon;
                   const isActive = filters.sourceTypes.includes(key);
+                  const pastel = SOURCE_TYPE_STYLES[key];
                   return (
                     <button
                       key={key}
                       type="button"
                       onClick={() => toggleSourceType(key)}
                       className={`inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg border text-sm font-medium transition-all ${
-                        isActive
-                          ? config.activeClass
-                          : "border-transparent bg-secondary/30 text-muted-foreground hover:bg-secondary/50 hover:border-border"
+                        isActive ? pastel.filterActive : pastel.filterInactive
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -553,14 +746,14 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             </div>
           ) : results.length > 0 ? (
             viewMode === "list" ? (
-              <div className="divide-y divide-border/30">
+              <div className="space-y-2 py-1">
                 {results.map((result) => (
                   <ResultRow
                     key={result.id}
                     result={result}
                     isSelected={selectedIds.has(result.id)}
                     isAdding={addingIds.has(result.id)}
-                    isAdded={addedUrls.has(result.url)}
+                    isAdded={isDiscoveryResultInNotebook(result)}
                     isAtLimit={isAtLimit}
                     onToggleSelect={() => toggleSelect(result.id)}
                     onAdd={() => handleAddSingle(result)}
@@ -574,7 +767,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                     key={result.id}
                     result={result}
                     isAdding={addingIds.has(result.id)}
-                    isAdded={addedUrls.has(result.url)}
+                    isAdded={isDiscoveryResultInNotebook(result)}
                     isAtLimit={isAtLimit}
                     onAdd={() => handleAddSingle(result)}
                   />
@@ -641,15 +834,22 @@ const ResultRow: React.FC<ResultRowProps> = ({
   onAdd,
 }) => {
   const badge = getScoreBadge(result.score);
+  const typeConfig = SOURCE_TYPE_CONFIG[result.sourceType];
+  const typeStyle = SOURCE_TYPE_STYLES[result.sourceType];
+  const TypeIcon = typeConfig.icon;
+  const byline = formatAcademicByline(result);
+  const showSnippet = isSnippetMeaningful(result.title, result.snippet);
+  const accessChip = academicAccessChip(result);
 
   return (
     <div
       onClick={onToggleSelect}
-      className={`flex items-start gap-3 py-2.5 cursor-pointer transition-colors ${
-        isSelected ? "bg-primary/5" : "hover:bg-secondary/40"
+      className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-all border-l-[3px] ${typeStyle.listAccent} ${
+        isSelected
+          ? "bg-primary/5 border-primary/25 ring-1 ring-primary/10 shadow-sm"
+          : "bg-card/50 border-border/60 hover:border-border hover:bg-secondary/30"
       }`}
     >
-      {/* Checkbox */}
       <div
         className={`w-4 h-4 mt-0.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
           isSelected ? "bg-primary border-primary" : "border-border"
@@ -658,33 +858,47 @@ const ResultRow: React.FC<ResultRowProps> = ({
         {isSelected && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground leading-snug truncate">
-          {result.title}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-          {result.snippet}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[11px] text-muted-foreground">
-            {result.metadata.domain || getHostname(result.url)}
+        <div className="flex items-start gap-2 min-w-0">
+          <TypeIcon
+            className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${typeStyle.icon}`}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">{result.title}</p>
+            {byline && (
+              <p className="text-[11px] text-muted-foreground/90 mt-0.5 line-clamp-1">{byline}</p>
+            )}
+            {showSnippet && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                {result.snippet}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <span
+            className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-none ${typeStyle.typeChip}`}
+          >
+            {typeConfig.label}
           </span>
-          {badge && (
-            <span className={`text-[11px] px-1.5 py-px rounded-full ${badge.className}`}>
-              {badge.label}
-            </span>
-          )}
-          {result.sourceType === "academic" && result.metadata.openAccess && (
-            <span className="text-[11px] px-1.5 py-px rounded-full bg-secondary text-muted-foreground inline-flex items-center gap-0.5">
-              <BookOpen className="w-2.5 h-2.5" />
-              open access
+          <span className={META_CHIP}>{result.metadata.domain || getHostname(result.url)}</span>
+          {badge && <span className={badge.className}>{badge.label}</span>}
+          {accessChip && (
+            <span
+              className={`${accessChip.className} inline-flex items-center gap-0.5`}
+              title={accessChip.title}
+            >
+              {result.sourceType === "academic" && (
+                <BookOpen className="w-2.5 h-2.5 shrink-0" aria-hidden />
+              )}
+              {accessChip.label}
             </span>
           )}
           {result.sourceType === "academic" && result.metadata.citationCount !== undefined && (
-            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-0.5">
-              <Quote className="w-2.5 h-2.5" />
-              {result.metadata.citationCount}
+            <span className={META_CHIP}>
+              <Quote className="w-2.5 h-2.5 shrink-0" />
+              {result.metadata.citationCount.toLocaleString()} cites
             </span>
           )}
           <a
@@ -692,27 +906,28 @@ const ResultRow: React.FC<ResultRowProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-muted-foreground hover:text-primary transition-colors"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+            aria-label="Open source in new tab"
           >
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       </div>
 
-      {/* Add button */}
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           if (isAdded) return;
           onAdd();
         }}
         disabled={isAdded || isAdding || isAtLimit}
-        className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-md border transition-all mt-0.5 ${
-          isAdded
-            ? "border-border text-muted-foreground cursor-default"
+        className={`${ADD_BTN_BASE} ${
+          isAdded || isAtLimit
+            ? "bg-secondary text-muted-foreground cursor-default"
             : isAdding
-              ? "border-primary/30 text-primary cursor-wait"
-              : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+              ? "bg-primary/50 text-primary-foreground cursor-wait"
+              : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
         }`}
         title={isAtLimit ? "Source limit reached" : undefined}
       >
@@ -723,7 +938,10 @@ const ResultRow: React.FC<ResultRowProps> = ({
         ) : isAtLimit ? (
           "Limit"
         ) : (
-          "+ Add"
+          <>
+            <Plus className="w-3 h-3" />
+            Add
+          </>
         )}
       </button>
     </div>
@@ -743,14 +961,22 @@ interface ResultCardProps {
 const ResultCard: React.FC<ResultCardProps> = ({ result, isAdding, isAdded, isAtLimit, onAdd }) => {
   const badge = getScoreBadge(result.score);
   const config = SOURCE_TYPE_CONFIG[result.sourceType];
+  const typeStyle = SOURCE_TYPE_STYLES[result.sourceType];
   const Icon = config.icon;
+  const byline = formatAcademicByline(result);
+  const showSnippet = isSnippetMeaningful(result.title, result.snippet);
+  const accessChip = academicAccessChip(result);
 
   return (
-    <div className="group border border-border/50 rounded-xl p-5 bg-card shadow-sm hover:shadow-md hover:border-primary/20 transition-all flex flex-col justify-between">
+    <div
+      className={`group rounded-xl border border-border/50 border-l-[3px] ${typeStyle.listAccent} bg-card p-5 shadow-sm transition-all flex flex-col justify-between hover:border-primary/20 hover:shadow-md`}
+    >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <Icon className="w-3 h-3" />
+          <div
+            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${typeStyle.typeChip}`}
+          >
+            <Icon className={`h-3 w-3 ${typeStyle.icon}`} />
             {config.label}
           </div>
           <a
@@ -766,24 +992,30 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, isAdding, isAdded, isAt
         <h3 className="font-medium text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
           {result.title}
         </h3>
+        {byline && <p className="text-[11px] text-muted-foreground/90 line-clamp-1">{byline}</p>}
 
-        <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
-          {result.snippet}
-        </p>
+        {showSnippet && (
+          <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{result.snippet}</p>
+        )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] text-muted-foreground">
-            {result.metadata.domain || getHostname(result.url)}
-          </span>
-          {badge && (
-            <span className={`text-[11px] px-1.5 py-px rounded-full ${badge.className}`}>
-              {badge.label}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={META_CHIP}>{result.metadata.domain || getHostname(result.url)}</span>
+          {badge && <span className={badge.className}>{badge.label}</span>}
+          {accessChip && (
+            <span
+              className={`${accessChip.className} inline-flex items-center gap-0.5`}
+              title={accessChip.title}
+            >
+              {result.sourceType === "academic" && (
+                <BookOpen className="w-2.5 h-2.5 shrink-0" aria-hidden />
+              )}
+              {accessChip.label}
             </span>
           )}
           {result.sourceType === "academic" && result.metadata.citationCount !== undefined && (
-            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-0.5">
-              <Quote className="w-2.5 h-2.5" />
-              {result.metadata.citationCount}
+            <span className={META_CHIP}>
+              <Quote className="w-2.5 h-2.5 shrink-0" />
+              {result.metadata.citationCount.toLocaleString()} cites
             </span>
           )}
         </div>

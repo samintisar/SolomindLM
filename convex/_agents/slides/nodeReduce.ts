@@ -9,6 +9,7 @@ import {
   createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
+  withoutMapOutputs,
 } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
@@ -134,7 +135,7 @@ async function refineSelectedSlides(
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     slidesWithPrompts: refinedSlidesWithPrompts,
     status: "generating_images",
     ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),
@@ -181,7 +182,6 @@ export async function reduce(
       agent: "SlideDeckGraph",
     });
     return {
-      ...state,
       slidesWithPrompts: [],
       finalOutput: [],
       status: "failed",

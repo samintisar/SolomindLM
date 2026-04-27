@@ -3,7 +3,7 @@
 import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { clearStateKeys, createLangSmithRunConfig } from "../_shared/index.js";
+import { clearStateKeys, createLangSmithRunConfig, withoutMapOutputs } from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
@@ -321,7 +321,7 @@ Do NOT combine topics or focus primarily on one.
   );
 
   return {
-    ...state,
+    ...withoutMapOutputs(state),
     finalOutput,
     status: "completed",
     ...clearStateKeys<OverallStateType>(["collapsedOutputs", "chunks"]),

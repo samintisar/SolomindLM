@@ -11,7 +11,37 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { checkSourceLimit } from "../_lib/limits";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
+import { MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
+import {
+  assertCanEditNotebook,
+  assertCanReadNotebook,
+  getNotebookAccess,
+} from "../_lib/notebookAccess";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import {
+  deriveFulltextStatus,
+  paperRecordValidator,
+  primaryLinkUrlForPaper,
+} from "./paperRecord";
+
+/**
+ * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
+ */
+export const userCanAccessStorage = internalQuery({
+  args: {
+    userId: v.id("users"),
+    storageId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db
+      .query("documents")
+      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
+      .first();
+    if (!doc) return false;
+    const access = await getNotebookAccess(ctx, doc.notebookId, args.userId);
+    return access !== null;
+  },
+});
 
 async function deleteAllChunksForDocument(
   ctx: MutationCtx,
@@ -54,6 +84,7 @@ export const upload = mutation({
     contentType: v.optional(v.string()), // e.g. application/pdf — used when fileName has no extension
     googleDriveFileId: v.optional(v.string()),
     googleDriveMimeType: v.optional(v.string()),
+    paperRecord: v.optional(paperRecordValidator),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -65,7 +96,7 @@ export const upload = mutation({
     await checkSourceLimit(ctx, args.notebookId);
 
     // Validate type
-    const validTypes = ["file", "url", "youtube", "text"];
+    const validTypes = ["file", "url", "youtube", "text", "paper_record"];
     if (!validTypes.includes(args.type)) {
       throw new Error(`Invalid type. Must be one of: ${validTypes.join(", ")}`);
     }
@@ -77,6 +108,11 @@ export const upload = mutation({
     if ((args.type === "url" || args.type === "youtube" || args.type === "text") && !args.source) {
       throw new Error("source is required for url/youtube/text type");
     }
+    if (args.type === "paper_record") {
+      if (!args.paperRecord) {
+        throw new Error("paperRecord is required for paper_record type");
+      }
+    }
 
     if (args.type === "file" && (args.googleDriveFileId || args.googleDriveMimeType)) {
       if (!args.googleDriveFileId || !args.googleDriveMimeType) {
@@ -87,6 +123,23 @@ export const upload = mutation({
     }
 
     const now = Date.now();
+
+    let paperFields: {
+      paperRecord: NonNullable<(typeof args)["paperRecord"]>;
+      fulltextStatus: "available" | "unavailable" | "external_only";
+      ingestionStatus: "pending";
+      fileUrl: string | undefined;
+    } | null = null;
+    if (args.type === "paper_record" && args.paperRecord) {
+      const pr = args.paperRecord;
+      const link = primaryLinkUrlForPaper(pr);
+      paperFields = {
+        paperRecord: pr,
+        fulltextStatus: deriveFulltextStatus(pr),
+        ingestionStatus: "pending",
+        fileUrl: link || undefined,
+      };
+    }
 
     const documentId = await ctx.db.insert("documents", {
       userId,
@@ -101,8 +154,11 @@ export const upload = mutation({
       fileUrl:
         args.type === "url" || args.type === "youtube" || args.type === "text"
           ? args.source
-          : undefined,
+          : paperFields?.fileUrl,
       status: "pending",
+      paperRecord: paperFields?.paperRecord,
+      fulltextStatus: paperFields?.fulltextStatus,
+      ingestionStatus: paperFields?.ingestionStatus,
       createdAt: now,
       updatedAt: now,
     });
@@ -153,6 +209,7 @@ export const get = query({
  */
 export const list = query({
   args: { notebookId: v.optional(v.id("notebooks")) },
+  returns: v.array(v.any()),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
@@ -167,12 +224,12 @@ export const list = query({
         .collect();
     }
 
-    // Get all documents for user
+    // User-wide list: cap to keep reads bounded (use notebook-scoped list for full set per notebook)
     return await ctx.db
       .query("documents")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .collect();
+      .take(MAX_USER_WIDE_DOCUMENTS);
   },
 });
 
@@ -181,6 +238,14 @@ export const list = query({
  */
 export const getContent = query({
   args: { id: v.id("documents") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      documentId: v.id("documents"),
+      content: v.string(),
+      chunkCount: v.number(),
+    })
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -414,6 +479,7 @@ export const prepareDocumentReembed = internalMutation({
 
     await deleteAllChunksForDocument(ctx, args.documentId);
 
+    const before = await ctx.db.get(args.documentId);
     await ctx.db.patch(args.documentId, {
       status: "pending",
       error: undefined,
@@ -429,6 +495,8 @@ export const prepareDocumentReembed = internalMutation({
       documentStructure: undefined,
       maxHeadingLevel: undefined,
       metadata: undefined,
+      extractedMarkdown: undefined,
+      ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
       updatedAt: Date.now(),
     });
 
@@ -440,6 +508,24 @@ export const prepareDocumentReembed = internalMutation({
       userId: after.userId,
       notebookId: after.notebookId,
     });
+  },
+});
+
+/**
+ * Internal: List documents in a notebook when the user can read the notebook (for internal actions).
+ */
+export const listDocumentsForNotebookReadInternal = internalQuery({
+  args: {
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    await assertCanReadNotebook(ctx, args.notebookId, args.userId);
+    return await ctx.db
+      .query("documents")
+      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+      .order("desc")
+      .collect();
   },
 });
 
@@ -505,6 +591,24 @@ export const updateTitle = internalMutation({
       fileName: args.title,
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Internal: replace source URL (e.g. OpenAlex work page → DOI) before scrape / re-embed.
+ */
+export const setDocumentFileUrl = internalMutation({
+  args: {
+    documentId: v.id("documents"),
+    fileUrl: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.documentId, {
+      fileUrl: args.fileUrl,
+      updatedAt: Date.now(),
+    });
+    return null;
   },
 });
 
@@ -657,11 +761,11 @@ export const keywordSearch = internalQuery({
     query: v.string(),
     limit: v.optional(v.number()),
     documentIds: v.optional(v.array(v.id("documents"))),
+    /** When true, skip structured logs (deep research issues many keyword calls). */
+    quietLogs: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
-
-    console.log(`[keywordSearch] query="${args.query.slice(0, 80)}..."`);
 
     const results = await ctx.db
       .query("documentChunks")
@@ -670,7 +774,10 @@ export const keywordSearch = internalQuery({
       )
       .take(limit);
 
-    console.log(`[keywordSearch] raw=${results.length}`);
+    // User explicitly has no selected sources - return empty results
+    if (args.documentIds && args.documentIds.length === 0) {
+      return [];
+    }
 
     // FIXED: Explicit length > 0 check
     let filtered = results;
@@ -679,7 +786,19 @@ export const keywordSearch = internalQuery({
       filtered = results.filter(
         (r) => r.documentId !== undefined && docIdSet.has(r.documentId.toString())
       );
-      console.log(`[keywordSearch] after filter=${filtered.length}`);
+    }
+
+    if (!args.quietLogs) {
+      const log = createServiceLogger("documents", "keywordSearch", {
+        userId: args.userId,
+        notebookId: args.notebookId,
+      });
+      log.debug("query", {
+        preview: args.query.slice(0, 120),
+        raw: results.length,
+        afterFilter: filtered.length,
+        filteredByDocs: !!(args.documentIds && args.documentIds.length > 0),
+      });
     }
 
     const uniqueDocIds = [...new Set(filtered.map((r) => r.documentId))];
@@ -690,7 +809,12 @@ export const keywordSearch = internalQuery({
       const fileName = doc?.fileName ?? "Document";
       const u = doc?.fileUrl?.trim();
       const sourceUrl =
-        u && (doc?.fileType === "url" || doc?.fileType === "youtube") ? u : undefined;
+        u &&
+        (doc?.fileType === "url" ||
+          doc?.fileType === "youtube" ||
+          doc?.fileType === "paper_record")
+          ? u
+          : undefined;
       docMetaMap.set(id, { fileName, sourceUrl });
     }
 
@@ -746,6 +870,9 @@ export const getDocumentDetails = internalQuery({
       fileName: doc.fileName,
       fileType: doc.fileType,
       fileUrl: doc.fileUrl,
+      paperRecord: doc.paperRecord,
+      fulltextStatus: doc.fulltextStatus,
+      ingestionStatus: doc.ingestionStatus,
     };
   },
 });
@@ -837,5 +964,77 @@ export const storeChunk = internalMutation({
     }
 
     await ctx.db.insert("documentChunks", chunkData);
+  },
+});
+
+/**
+ * Add discovered external sources (from web/academic/news/finance search) to a notebook.
+ * Creates document records and triggers embedding pipeline for each source.
+ */
+export const addExternalSources = mutation({
+  args: {
+    notebookId: v.id("notebooks"),
+    sources: v.array(
+      v.object({
+        title: v.string(),
+        url: v.string(),
+        snippet: v.optional(v.string()),
+        sourceType: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    await assertCanEditNotebook(ctx, args.notebookId, userId);
+
+    const logger = createServiceLogger("documents", "addExternalSources", {
+      userId,
+      notebookId: args.notebookId,
+    });
+
+    logger.operationStart({ sourceCount: args.sources.length });
+
+    const now = Date.now();
+    const createdIds: Id<"documents">[] = [];
+
+    for (const source of args.sources) {
+      // Deduplicate: skip if URL already exists in this notebook
+      const existing = await ctx.db
+        .query("documents")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .filter((q) => q.eq(q.field("fileUrl"), source.url))
+        .first();
+
+      if (existing) {
+        logger.info("skipped_duplicate_source", { url: source.url });
+        continue;
+      }
+
+      const documentId = await ctx.db.insert("documents", {
+        userId,
+        notebookId: args.notebookId,
+        fileName: source.title,
+        fileType: source.sourceType === "academic" ? "paper_record" : "url",
+        fileUrl: source.url,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      createdIds.push(documentId);
+
+      // Schedule embedding job for each document
+      await ctx.scheduler.runAfter(0, internal.documents.embeddingJob.docEmbedding, {
+        documentId,
+        notebookId: args.notebookId,
+        userId,
+      });
+    }
+
+    logger.operationComplete({ createdCount: createdIds.length, skippedCount: args.sources.length - createdIds.length });
+
+    return createdIds;
   },
 });
