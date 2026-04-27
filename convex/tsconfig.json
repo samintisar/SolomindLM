@@ -28,5 +28,9 @@
     "incremental": true
   },
   "include": ["./**/*"],
-  "exclude": ["./_generated", "./**/*.test.ts"]
+  "exclude": [
+    "./_generated",
+    "./**/*.test.ts",
+    "./vitest.config.ts"
+  ]
 }
