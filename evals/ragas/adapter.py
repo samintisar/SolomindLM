@@ -12,15 +12,35 @@ class RagasSample:
     ground_truth: str  # expected items joined
 
 
-def load_artifacts(json_path: str) -> list[RagasSample]:
-    """Load eval artifacts from a JSON file produced by the TypeScript runner."""
+def load_artifacts(path: str) -> list[RagasSample]:
+    """Load eval artifacts produced by the TypeScript runner.
+
+    Supports both formats:
+      - JSONL (default for `--export-artifacts`): one artifact per line.
+      - JSON: a single object or an array of objects.
+
+    Format is auto-detected from the file extension and content shape so the
+    same path works regardless of how the runner emitted it.
+    """
     import json
 
-    with open(json_path) as f:
-        data = json.load(f)
+    with open(path) as f:
+        text = f.read().strip()
+    if not text:
+        return []
+
+    # JSONL detection: extension hint OR multiple non-empty lines that each
+    # parse as an object. We avoid the naive "split by newline" pre-check
+    # because pretty-printed JSON also contains newlines.
+    artifacts: list[dict[str, Any]]
+    is_jsonl = path.endswith(".jsonl")
+    if is_jsonl:
+        artifacts = [json.loads(line) for line in text.splitlines() if line.strip()]
+    else:
+        data = json.loads(text)
+        artifacts = data if isinstance(data, list) else [data]
 
     samples = []
-    artifacts = data if isinstance(data, list) else [data]
     for art in artifacts:
         samples.append(
             RagasSample(

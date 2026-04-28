@@ -126,15 +126,34 @@ export const FIXTURES: Record<string, EvalFixture> = {
 
 ## Running Evaluations
 
+Non-dry runs invoke the gated Convex eval action against a **dev** deployment only.
+
+Template (copy variables into repo-root `.env`; Bun loads it for `bun run eval:rag`): see [`evals/rag/env.eval.example`](../env.eval.example).
+
+**Local `.env`** (CLI):
+
+- `RAG_EVAL_CONVEX_URL` — your dev deployment `https://….convex.cloud`
+- `RAG_EVAL_SECRET` — long random string (≥16 chars), same value as Convex
+
+**Convex dev deployment** (Dashboard → Environment Variables **or** `bun run convex:env:push` after merging the same secrets into `.env`):
+
+- `RAG_EVALS_ENABLED=true`
+- `RAG_EVAL_SECRET` — same as local
+
+`scripts/push-convex-env.js` skips `RAG_EVAL_CONVEX_URL` so only the Convex backend vars are uploaded.
+
 ```bash
-# Run all fixtures
+# Preview what would be pushed (optional)
+bun run convex:env:push:dry
+
+# Dry run (validate fixtures only; no Convex calls)
+bun run eval:rag:dry
+
+# Run all fixtures (real agent)
 bun run eval:rag
 
-# Run specific fixture
-bun run eval:rag --fixture agentic-patterns-20
-
-# Dry run (validate fixtures only)
-bun run eval:rag --dry-run
+# Run one fixture
+bun run eval:rag -- --case agentic-patterns-20
 ```
 
 ## Suggested Fixtures for Machine Learning Notebook

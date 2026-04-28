@@ -41,6 +41,8 @@ bun run convex:env:push:prod   # Push to production convex
 bun run convex:env:push:dry    # Dry run for env push
 ```
 
+**RAG eval (`bun run eval:rag`):** One-shot: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Manual template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). The push script does not upload `RAG_EVAL_CONVEX_URL` (CLI-only).
+
 ## Project Architecture
 
 **Monorepo structure using Bun workspaces:**

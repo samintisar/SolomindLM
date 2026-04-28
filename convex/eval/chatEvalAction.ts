@@ -5,6 +5,11 @@
  * globalRerankFn to capture pre/post-rerank intermediate state.
  * Consumes the full async generator to collect answer, references,
  * subqueries, and timing data.
+ *
+ * SECURITY: Intended for dev tooling only. Gated by RAG_EVALS_ENABLED +
+ * RAG_EVAL_SECRET in Convex env. Identity is derived from the target
+ * notebook's owner — the action does NOT trust a caller-supplied userId,
+ * so a leaked secret cannot be used to impersonate arbitrary users.
  */
 "use node";
 
@@ -23,10 +28,10 @@ import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
 // ─── Types ───────────────────────────────────────────────────
 
 export const chatEvalActionArgs = {
+  evalSecret: v.string(),
   question: v.string(),
-  notebookId: v.string(),
-  documentIds: v.optional(v.array(v.string())),
-  userId: v.string(),
+  notebookId: v.id("notebooks"),
+  documentIds: v.optional(v.array(v.id("documents"))),
 };
 
 export interface ChatEvalResult {
@@ -45,19 +50,52 @@ interface VectorSearchHit {
   _score: number;
 }
 
+function assertRagEvalGate(evalSecret: string): void {
+  if (process.env.RAG_EVALS_ENABLED !== "true") {
+    throw new Error("RAG evals are disabled (set RAG_EVALS_ENABLED=true on this deployment to enable).");
+  }
+  const expected = process.env.RAG_EVAL_SECRET ?? "";
+  if (!expected || expected.length < 16) {
+    throw new Error("RAG_EVAL_SECRET must be set to a strong value (min 16 chars) on this deployment.");
+  }
+  if (evalSecret.length !== expected.length) {
+    throw new Error("Invalid eval credentials.");
+  }
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= evalSecret.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  if (diff !== 0) {
+    throw new Error("Invalid eval credentials.");
+  }
+}
+
 // ─── Action ──────────────────────────────────────────────────
 
 export const runChatEval = action({
   args: chatEvalActionArgs,
   handler: async (ctx, args): Promise<ChatEvalResult> => {
-    const startTime = Date.now();
-    const notebookIdTyped = args.notebookId as Id<"notebooks">;
+    assertRagEvalGate(args.evalSecret);
 
-    // Get notebook for keyword search user ID
+    const startTime = Date.now();
+    const notebookIdTyped = args.notebookId;
+
+    // Identity is the notebook owner — secret-holder cannot impersonate
+    // arbitrary users by passing a userId.
     const notebook = await ctx.runQuery(internal.notebooks.index.getNotebookInternal, {
       notebookId: notebookIdTyped,
     });
-    const keywordSearchChunkUserId = (notebook?.userId ?? args.userId) as Id<"users">;
+    if (!notebook) {
+      throw new Error(
+        `Notebook ${notebookIdTyped} not found on this Convex deployment. ` +
+          `Verify RAG_EVAL_CONVEX_URL points at the deployment that owns this notebook ` +
+          `(IDs do not transfer across deployments).`
+      );
+    }
+    const evalUserId = notebook.userId as Id<"users">;
+    const keywordSearchChunkUserId = evalUserId;
+
+    const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
 
     // ── Vector search runner (matches convex/chat/stream.ts) ──
 
@@ -71,7 +109,7 @@ export const runChatEval = action({
       const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
         vector: embedding,
         limit: limitToFetch,
-        filter: (q: any) => q.eq("notebookId", notebookIdTyped),
+        filter: (q) => q.eq("notebookId", notebookIdTyped),
       });
 
       const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
@@ -80,11 +118,14 @@ export const runChatEval = action({
       const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
 
       const chunkMap = new Map(
-        (fullChunks as any[]).map((c: any) => [c._id, c] as [Id<"documentChunks">, any])
+        (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map((c) => [
+          c._id,
+          c,
+        ]) as [Id<"documentChunks">, Record<string, unknown>][]
       );
 
       const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
-      const docIdSet = docIds ? new Set(docIds) : null;
+      const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
 
       const rows: VectorSearchRawResult[] = [];
       for (const r of results as VectorSearchHit[]) {
@@ -92,7 +133,7 @@ export const runChatEval = action({
         if (!chunk) continue;
 
         // Filter by document IDs if specified
-        if (docIdSet && !docIdSet.has(chunk.documentId)) continue;
+        if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
         // Apply threshold
         const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
         if (r._score < threshold) continue;
@@ -100,9 +141,9 @@ export const runChatEval = action({
         rows.push({
           _id: r._id,
           _score: r._score,
-          content: chunk.content,
-          chunkIndex: chunk.chunkIndex,
-          documentId: chunk.documentId,
+          content: chunk.content as string,
+          chunkIndex: chunk.chunkIndex as number,
+          documentId: chunk.documentId as Id<"documents">,
           sourceTitle: "",
           sourceUrl: "",
         });
@@ -112,17 +153,13 @@ export const runChatEval = action({
 
     // ── Keyword search runner ──
 
-    const keywordSearchRunner = async (
-      query: string,
-      limit: number,
-      docIds?: string[]
-    ) => {
+    const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
       return ctx.runQuery(internal.documents.index.keywordSearch, {
         notebookId: notebookIdTyped,
         userId: keywordSearchChunkUserId,
         query,
         limit,
-        documentIds: docIds as any,
+        documentIds: docIds as Id<"documents">[] | undefined,
       });
     };
 
@@ -180,12 +217,15 @@ export const runChatEval = action({
     let references: ReferenceChunk[] = [];
     const subQueries: string[] = [];
 
+    const userIdStr = evalUserId as string;
+    const notebookIdStr = args.notebookId as string;
+
     for await (const chunk of agent.streamResponse(
       {
-        userId: args.userId,
-        noteId: args.notebookId,
+        userId: userIdStr,
+        noteId: notebookIdStr,
         conversationHistory: [],
-        documentIds: args.documentIds as Id<"documents">[] | undefined,
+        documentIds: documentIdStrings,
         enableNotebookSearch: true,
       },
       args.question,
@@ -205,6 +245,24 @@ export const runChatEval = action({
           }
           break;
         }
+        case "error": {
+          // Surface as a thrown error so eval scoring never runs against a
+          // truncated answer. Without this, the loop would complete normally
+          // and return partial output with a computed latency.
+          const msg =
+            (chunk as { message?: string }).message ??
+            (typeof chunk.data === "string" ? chunk.data : "Agent stream emitted error chunk");
+          throw new Error(`Agent stream error: ${msg}`);
+        }
+        case "done":
+        case "warning":
+        case "grounding_check":
+        case "grounding_warn":
+        case "status":
+        case "followups":
+        case "clarification":
+          // Non-terminal informational chunks; not needed for eval artifacts.
+          break;
       }
     }
 

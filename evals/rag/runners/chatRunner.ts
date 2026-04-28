@@ -111,8 +111,14 @@ export async function runChatEval(
     );
   }
 
+  // userId is a sentinel placeholder. The Convex invoker
+  // (`evals/rag/runners/convexChatInvoker.ts`) does NOT forward it, and the
+  // Convex eval action derives identity from the notebook owner server-side.
+  // Field exists only to satisfy the shared `ChatAgentContext` shape; if a
+  // future invoker starts using it, that invoker must derive a real userId
+  // rather than relying on this string.
   const agentContext: ChatAgentContext = {
-    userId: "eval-runner",
+    userId: "__eval_unused__",
     noteId: fixture.notebookId ?? "",
     conversationHistory: [{ role: "user", content: fixture.question }],
     documentIds: fixture.documentIds,

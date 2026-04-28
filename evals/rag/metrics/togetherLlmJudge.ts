@@ -110,7 +110,7 @@ export function createTogetherJudgeInvoker(
       return content;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      throw new Error(`Together AI judge failed: ${message}`);
+      throw new Error(`Together AI judge failed: ${message}`, { cause: err });
     }
   };
 }

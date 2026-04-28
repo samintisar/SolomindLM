@@ -3,7 +3,7 @@
  *
  * Usage:
  *   bun run eval:rag -- --dry-run                  # Validate fixtures
- *   bun run eval:rag -- --case agentic-patterns-20 # Single fixture (needs invokers)
+ *   bun run eval:rag -- --case agentic-patterns-20 # Needs RAG_EVAL_CONVEX_URL + RAG_EVAL_SECRET
  *   bun run eval:rag -- --prefix ml-               # ML NotebookLM fixture suite only
  *   bun run eval:rag -- --full                     # All fixtures, verbose
  *   bun run eval:rag -- --export-artifacts         # Export Ragas-compatible artifacts
@@ -96,6 +96,11 @@ Options:
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
   --help, -h               Show this help
 
+Real runs (non --dry-run) require env:
+  RAG_EVAL_CONVEX_URL       Dev Convex https://….convex.cloud (avoid prod)
+  RAG_EVAL_SECRET           Matches Convex dashboard env RAG_EVAL_SECRET (min 16 chars)
+Also set on that Convex deployment: RAG_EVALS_ENABLED=true
+
 Available fixtures:
   ${listFixtureIds().join("\n  ")}
 `);
@@ -179,23 +184,33 @@ async function main(): Promise<void> {
   }
   console.log(`Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}\n`);
 
-  // Auto-detect Convex URL and create invoker for real mode
+  // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
   let chatInvoker: ChatAgentInvoker | undefined;
   if (!opts.dryRun) {
-    const convexUrl = process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL;
-    if (convexUrl) {
-      console.log(`Using Convex at ${convexUrl}`);
-      chatInvoker = createConvexChatInvoker(convexUrl);
-    } else {
-      console.error("FATAL: No Convex URL found. Set VITE_CONVEX_URL or CONVEX_URL.");
+    const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
+    const evalSecret = process.env.RAG_EVAL_SECRET?.trim();
+    if (!convexUrl) {
+      console.error("FATAL: Set RAG_EVAL_CONVEX_URL to your dev Convex URL (https://….convex.cloud).");
+      console.error("  Do not point this at prod. Use --dry-run to validate fixtures offline.");
+      process.exit(2);
+    }
+    if (!evalSecret) {
+      console.error("FATAL: Set RAG_EVAL_SECRET to match the RAG_EVAL_SECRET env var on that deployment.");
+      console.error("  Convex must also set RAG_EVALS_ENABLED=true on that deployment for eval actions.");
       console.error("  Use --dry-run to validate fixtures without Convex.");
       process.exit(2);
     }
+    console.log(`Using Convex at ${convexUrl} (eval mode)`);
+    chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
   }
 
   const allMetrics: MetricResult[] = [];
   const allArtifacts: EvalRunArtifact[] = [];
   const fixtureMeta = new Map<string, { question: string; expectedItems: string[] }>();
+  // Tracks per-fixture invocation errors so an auth/gate regression (e.g. a
+  // bad RAG_EVAL_SECRET) fails the run loudly instead of being absorbed into
+  // a stub artifact with score 0.
+  let runtimeErrorCount = 0;
 
   for (const id of fixtureIds) {
     const fixture = getFixture(id);
@@ -219,6 +234,7 @@ async function main(): Promise<void> {
     for (const { artifact, errors } of results) {
       if (errors.length > 0) {
         console.log(`  Errors: ${errors.join("; ")}`);
+        runtimeErrorCount += errors.length;
       }
 
       allArtifacts.push(artifact);
@@ -267,6 +283,14 @@ async function main(): Promise<void> {
     const outPath = exportRagasArtifacts(fixtureMeta, allArtifacts, opts.artifactsDir);
     console.log(`\nRagas artifacts exported to ${outPath}`);
     console.log(`  Run: python evals/ragas/run_ragas.py --dataset ${outPath}`);
+  }
+
+  if (runtimeErrorCount > 0) {
+    console.error(
+      `\n${runtimeErrorCount} fixture(s) failed at the invocation layer (auth, gate, or stream errors). ` +
+        `These are NOT scored as metric failures and would otherwise be hidden.`
+    );
+    process.exit(2);
   }
 
   if (report.summary.fail > 0) {
