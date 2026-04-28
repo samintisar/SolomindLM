@@ -209,12 +209,11 @@ bun run convex:env:push:dry    # Dry run for env push
 
 **Always invoke these skills at the specified triggers.**
 
-### Core Skills (Session Workflow)
+### Serena MCP (Code Navigation & Editing)
 
-| Skill              | When                                       |
-| ------------------ | ------------------------------------------ |
-| `serena-first`     | Session start — before any code work       |
-| `coding-standards` | Writing or reviewing TypeScript/React code |
+| Skill          | When                                                        |
+| -------------- | ----------------------------------------------------------- |
+| `serena-usage` | Managing Serena memories, navigating symbols, intelligent refactors |
 
 ### Convex Skills
 
@@ -263,12 +262,6 @@ bun run convex:env:push:dry    # Dry run for env push
 | `together-images`           | Text-to-image generation or editing        |
 | `together-video`            | Text-to-video or image-to-video generation |
 
-### MCP & Code Navigation Skills
-
-| Skill            | When                                                  |
-| ---------------- | ----------------------------------------------------- |
-| `serena-usage`   | Managing Serena memories, navigating symbols, performing intelligent refactors |
-
 ## Verifying Skills Installation
 
 After cloning the repository, verify all skills are properly accessible:
@@ -281,7 +274,7 @@ bun run link:claude-skills
 ls .claude/skills/
 ```
 
-**Expected skills count:** 25+ skills should be listed.
+**Expected skills count:** 40+ skills should be listed.
 
 If skills are missing, ensure:
 1. You ran `bun run link:claude-skills` after cloning
@@ -316,13 +309,14 @@ This project uses the **context7 MCP server** for live documentation lookup of l
 
 ## Code Navigation & Editing (Serena MCP)
 
-**ALWAYS invoke the `serena-first` skill at the start of every session before doing any code work.** This project uses the Serena MCP server for LSP-powered semantic code operations.
+**At session start**, call the `initial_instructions` tool to load Serena's operational guidance. This project uses the Serena MCP server for LSP-powered semantic code operations.
 
 ### Session Startup
 
-1. Call `initial_instructions` to load Serena's operational guidance for this project
-2. Check `list_memories` for any relevant project context from prior sessions
-3. Proceed with code work using Serena's tools as the primary method
+1. **Activate project**: Use `activate_project` if not already active
+2. **Read instructions**: Call `initial_instructions` tool
+3. **Check memories**: Use `list_memories` for relevant project context
+4. **Proceed** with code work using Serena's tools as the primary method
 
 ### General Rules
 

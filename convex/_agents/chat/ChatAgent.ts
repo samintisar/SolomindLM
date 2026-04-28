@@ -20,7 +20,8 @@ import { routeChatMessage } from "./chatRouter.js";
 import type { ChatAgentContext, ChatAgentOptions, GlobalRerankFn, StreamChunk } from "./types.js";
 import {
   FOLLOWUP_GENERATION_TIMEOUT_MS,
-  RESPONSE_GENERATION_TIMEOUT_MS,
+  LIST_QUERY_CONTEXT_TOKEN_BUDGET,
+  LIST_QUERY_MAX_SELECTED_CHUNKS,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
@@ -31,6 +32,18 @@ import {
   mergeChunkScores,
   selectChunksByTokenBudget,
 } from "./chunkContext.js";
+import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
+import {
+  SUBQUERY_POOL_MULTIPLIER,
+} from "./chatConfig.js";
+import { countTokens } from "../_shared/tokenizer.js";
+
+/**
+ * Threshold for when to use full-document mode.
+ * If retrieved chunks represent more than this fraction of a document's total chunks,
+ * fetch the full document instead.
+ */
+const FULL_DOCUMENT_CHUNK_RATIO_THRESHOLD = 0.4;
 import { expandQueryWithKeywords } from "./queryExpansion.js";
 import { sliceParagraphForStream } from "./streamSlice.js";
 
@@ -39,11 +52,13 @@ export class ChatAgent {
   private vectorSearch: VectorSearchHandler;
   private embeddingService: EmbeddingService;
   private globalRerankFn?: GlobalRerankFn;
+  private fetchDocumentFn?: (documentId: string) => Promise<{ content: string } | null>;
 
   constructor(options?: ChatAgentOptions) {
+    const smartModel = options?.smartModel || env.SMART_LLM || "openai/gpt-oss-120b";
     this.llmWrapper = new ChatLLMWrapper({
       apiKey: env.TOGETHER_AI_API_KEY,
-      model: env.SMART_LLM || "openai/gpt-oss-120b",
+      model: smartModel,
       temperature: parseFloat(env.CHAT_LLM_TEMPERATURE ?? "0.1"),
       fastModel: env.FAST_LLM,
       fastApiKey: env.TOGETHER_AI_API_KEY,
@@ -61,6 +76,124 @@ export class ChatAgent {
 
     this.embeddingService = new EmbeddingService(env.TOGETHER_AI_API_KEY);
     this.globalRerankFn = options?.globalRerankFn;
+    this.fetchDocumentFn = options?.fetchDocumentFn;
+  }
+
+  /**
+   * Fetch full document content
+   */
+  private async fetchFullDocumentContent(
+    documentId: string
+  ): Promise<string | null> {
+    if (!this.fetchDocumentFn) return null;
+    try {
+      const result = await this.fetchDocumentFn(documentId);
+      return result?.content ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * GENERAL MULTI-SECTION DOCUMENT RETRIEVAL:
+   * When retrieval finds multiple relevant sections from the same document,
+   * replace those chunks with the full document content.
+   *
+   * This ensures comprehensive coverage when the query relates to many parts
+   * of a single source, regardless of query type.
+   *
+   * @param chunks - All retrieved chunks after reranking
+   * @param logger - Service logger
+   * @returns Chunks with multi-section documents replaced by full content
+   */
+  private async expandMultiSectionDocuments(
+    chunks: ReferenceChunk[],
+    logger: ServiceLogger
+  ): Promise<ReferenceChunk[]> {
+    if (!this.fetchDocumentFn || chunks.length === 0) return chunks;
+
+    // Group chunks by document
+    const chunksByDocument = new Map<string, ReferenceChunk[]>();
+    for (const chunk of chunks) {
+      const docId = chunk.documentId;
+      if (!docId) continue;
+
+      if (!chunksByDocument.has(docId)) {
+        chunksByDocument.set(docId, []);
+      }
+      chunksByDocument.get(docId)!.push(chunk);
+    }
+
+    // Find documents with many chunks retrieved
+    const documentsToExpand: string[] = [];
+    for (const [docId, docChunks] of chunksByDocument) {
+      const totalChunks = docChunks[0]?.metadata?.totalChunks ?? 1;
+      const retrievedCount = docChunks.length;
+      const ratio = retrievedCount / totalChunks;
+
+      // Expand if we have a significant portion of the document
+      // OR if we have many chunks regardless of document size
+      const shouldExpand =
+        ratio >= FULL_DOCUMENT_CHUNK_RATIO_THRESHOLD ||
+        retrievedCount >= 10; // Absolute threshold for larger documents
+
+      if (shouldExpand && totalChunks > 1) {
+        documentsToExpand.push(docId);
+        logger.info("Expanding multi-section document to full content", {
+          documentId: docId,
+          retrievedCount,
+          totalChunks,
+          ratio: ratio.toFixed(2),
+        });
+      }
+    }
+
+    if (documentsToExpand.length === 0) return chunks;
+
+    // Fetch full content for documents to expand
+    const expandedChunks: ReferenceChunk[] = [];
+    const expandedDocIds = new Set<string>(documentsToExpand);
+
+    for (const chunk of chunks) {
+      const docId = chunk.documentId;
+
+      if (docId && expandedDocIds.has(docId)) {
+        // Only add full document once per document
+        if (!expandedChunks.some((c) => c.documentId === docId && c.chunkIndex === -1)) {
+          const fullContent = await this.fetchFullDocumentContent(docId);
+          if (fullContent) {
+            expandedChunks.push({
+              id: `full-${docId}`,
+              sourceId: String(docId),
+              documentId: docId,
+              sourceTitle: chunk.sourceTitle,
+              sourceUrl: chunk.sourceUrl,
+              content: fullContent,
+              chunkIndex: -1, // Special index to indicate full document
+              similarity: 1.0,
+              metadata: {
+                totalChunks: chunksByDocument.get(docId)!.length,
+                relativePosition: 0.5,
+                chunkLengthChars: fullContent.length,
+                wordCount: fullContent.split(/\s+/).length,
+                sentenceCount: fullContent.split(/[.!?]+/).length,
+              },
+            });
+          }
+        }
+      } else {
+        // Keep chunks from documents not being expanded
+        expandedChunks.push(chunk);
+      }
+    }
+
+    logger.info("Multi-section document expansion complete", {
+      originalChunks: chunks.length,
+      expandedChunks: expandedChunks.length,
+      documentsExpanded: documentsToExpand.length,
+    });
+
+    return expandedChunks;
   }
 
   private createLogger(context: ChatAgentContext & { requestId?: string }): ServiceLogger {
@@ -84,7 +217,8 @@ export class ChatAgent {
   private async runSubqueryRetrieval(
     query: string,
     context: ChatAgentContext,
-    logger: ServiceLogger
+    logger: ServiceLogger,
+    isListQuery: boolean = false
   ): Promise<ReferenceChunk[]> {
     const pipelineDeadline = Date.now() + SEARCH_PIPELINE_TIMEOUT_MS;
     const remainingMs = () => {
@@ -95,7 +229,7 @@ export class ChatAgent {
       return ms;
     };
 
-    const searchOpts = { skipRerank: true, allowEmpty: true } as const;
+    const searchOpts = { skipRerank: true, allowEmpty: true, isListQuery } as const;
 
     logger.apiCall("ChatLLMWrapper", "generateHypotheticalDocument", { query });
     const hydeText = await withTimeout(
@@ -280,7 +414,12 @@ export class ChatAgent {
     recentTurns: Array<{ role: string; content: string }>,
     logger: ServiceLogger
   ): AsyncGenerator<StreamChunk> {
-    const route = routeChatMessage(userMessage, recentTurns);
+    // Default mode: treat every query as standalone — no conversation memory.
+    // Learning guide mode keeps full history for Socratic back-and-forth.
+    const effectiveTurns =
+      context.chatSettings?.instructionMode === "learningGuide" ? recentTurns : [];
+
+    const route = routeChatMessage(userMessage, effectiveTurns, context.chatSettings);
 
     if (route.type === "clarify") {
       logger.info("Router decision: clarify", { question: route.question });
@@ -292,7 +431,7 @@ export class ChatAgent {
     if (route.type === "direct") {
       logger.info("Router decision: direct response");
       yield { type: "status", status: "thinking", message: "Generating response..." };
-      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, recentTurns);
+      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, effectiveTurns, context.chatSettings);
       for (const para of directAnswer.split(/\n\n+/)) {
         if (para.trim().length > 0) {
           for await (const piece of sliceParagraphForStream(para)) {
@@ -307,6 +446,7 @@ export class ChatAgent {
 
     logger.info("Router decision: retrieve (parallel sub-queries)");
     const enableNotebookSearch = context.enableNotebookSearch !== false;
+    const isListQuery = isListEnumerationQuery(userMessage);
     const allChunks: ReferenceChunk[] = [];
     let rerankQueryOpt: string | undefined;
 
@@ -314,7 +454,7 @@ export class ChatAgent {
       yield { type: "status", status: "planning", message: "Planning searches…" };
 
       const subqueryStart = Date.now();
-      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, recentTurns);
+      const plan = await this.llmWrapper.generateRetrievalSubqueries(userMessage, effectiveTurns);
       rerankQueryOpt = plan.rerankQuery;
       const { subqueries } = plan;
       logger.apiSuccess(
@@ -329,7 +469,7 @@ export class ChatAgent {
       yield { type: "status", status: "retrieving", message: "Searching your materials…" };
 
       const settled = await Promise.allSettled(
-        subqueries.map((sq) => this.runSubqueryRetrieval(sq, context, logger))
+        subqueries.map((sq) => this.runSubqueryRetrieval(sq, context, logger, isListQuery))
       );
 
       for (let i = 0; i < settled.length; i++) {
@@ -386,12 +526,28 @@ export class ChatAgent {
       });
     }
 
-    const rankedChunks = selectChunksByTokenBudget(merged, logger);
+    // GENERAL MULTI-SECTION DOCUMENT RETRIEVAL:
+    // If many chunks come from a single document, replace them with the full document.
+    // This applies whenever retrieval finds multiple relevant sections, regardless of query type.
+    merged = await this.expandMultiSectionDocuments(merged, logger);
+
+    const rankedChunks = selectChunksByTokenBudget(
+      merged,
+      logger,
+      undefined,
+      isListQuery
+        ? {
+            maxSelectedChunks: LIST_QUERY_MAX_SELECTED_CHUNKS,
+            maxContextTokens: LIST_QUERY_CONTEXT_TOKEN_BUDGET,
+            lexicalQuery: userMessage,
+          }
+        : undefined
+    );
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");
       yield { type: "status", status: "thinking", message: "Generating response..." };
-      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, recentTurns);
+      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, effectiveTurns, context.chatSettings);
       for (const para of directAnswer.split(/\n\n+/)) {
         if (para.trim().length > 0) {
           for await (const piece of sliceParagraphForStream(para)) {
@@ -404,7 +560,7 @@ export class ChatAgent {
       return;
     }
 
-    yield* this.streamRagAnswerFromChunks(context, userMessage, recentTurns, rankedChunks, logger);
+    yield* this.streamRagAnswerFromChunks(context, userMessage, effectiveTurns, rankedChunks, logger);
   }
 
   private async *streamRagAnswerFromChunks(
@@ -431,10 +587,15 @@ export class ChatAgent {
     yield { type: "status", status: "thinking", message: "Formulating answer..." };
 
     const responseStart = Date.now();
-    let structuredResponse: ChatResponse = await withTimeout(
-      this.llmWrapper.generateStructuredResponse(citationChunks, userMessage, recentTurns),
-      RESPONSE_GENERATION_TIMEOUT_MS,
-      "response_generation"
+    // Note: Removed timeout wrapper for streaming response generation.
+    // The Together AI SDK handles streaming internally, and complex queries
+    // (like "list 20 items") genuinely require more time. Let the request
+    // complete naturally or fail with a real API error rather than timing out.
+    let structuredResponse: ChatResponse = await this.llmWrapper.generateStructuredResponse(
+      citationChunks,
+      userMessage,
+      recentTurns,
+      context.chatSettings
     );
     logger.apiSuccess("ChatLLMWrapper", "generateStructuredResponse", Date.now() - responseStart, {
       responseLength: structuredResponse.answer_markdown.length,
@@ -477,10 +638,12 @@ export class ChatAgent {
           });
         } else {
           logger.warn("Grounding failed — retrying with strict grounding");
-          structuredResponse = await withTimeout(
-            this.llmWrapper.generateWithStrictGrounding(citationChunks, userMessage, recentTurns),
-            RESPONSE_GENERATION_TIMEOUT_MS,
-            "strict_grounding_retry"
+          // Note: No timeout on retry - let the model take the time it needs
+          structuredResponse = await this.llmWrapper.generateWithStrictGrounding(
+            citationChunks,
+            userMessage,
+            recentTurns,
+            context.chatSettings
           );
 
           const retrySyntactic = validateGrounding(

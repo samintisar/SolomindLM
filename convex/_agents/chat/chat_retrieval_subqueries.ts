@@ -1,13 +1,26 @@
 import { z } from "zod";
 
 export const RetrievalSubqueriesSchema = z.object({
-  subqueries: z.array(z.string()).min(1).max(4),
+  subqueries: z.array(z.string()).min(1).max(6),
   rerankQuery: z.string().optional(),
 });
+
+/** Digits or common English count words (lecture notes often say "four tasks" not "4 tasks"). */
+const COUNT_QUANT =
+  "(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+
+/** "N [optional-adjectives] <counted noun>" — list-style questions in natural language. */
+const COUNTED_LIST_TAIL = new RegExp(
+  `\\b${COUNT_QUANT}\\s+(?:\\w+\\s+){0,6}?(items?|patterns?|types?|categories?|methods?|techniques?|strategies?|principles?|rules?|steps?|stages?|phases?|elements?|factors?|components?|ways?|kinds?|forms?|approaches?|practices?|examples?|topics?|tasks?|points?|criteria|architectures?|embeddings?|linkages?|concepts?|ideas?|reasons?|benefits?|features?|characteristics?|properties?|aspects?|dimensions?|domains?|areas?|fields?|themes?|subjects?|questions?|problems?|challenges?|solutions?|answers?)\\b`,
+  "i",
+);
 
 /**
  * Many user turns are a single retrieval intent; skipping the JSON decomposition call avoids
  * extra latency and flaky fast-model 503s when status pages still show "Up".
+ *
+ * Queries that ask for lists, enumerations, or counts of multiple items are NOT trivial —
+ * they need sub-query decomposition to retrieve enough chunks covering all requested items.
  */
 export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
   if (trimmed.includes("\n")) return false;
@@ -16,6 +29,16 @@ export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
     /\b(compare|comparing|versus|vs\.?|differences?\s+between|similarit|contrasts?\b|respectively)\b/i.test(
       trimmed
     )
+  ) {
+    return false;
+  }
+  // List/enumeration queries need decomposition to cover multiple items spread across chunks.
+  // Matches: "list all X", "name the X", "the 20 X", "20 agentic patterns", etc.
+  if (
+    /\b(list|enumerate|name|every|each\s+of|how\s+many|count\s+(of|all)|complete\s+(list|set)|full\s+list)\b/i.test(
+      trimmed
+    ) ||
+    COUNTED_LIST_TAIL.test(trimmed)
   ) {
     return false;
   }
@@ -47,10 +70,85 @@ export function parseRetrievalSubqueriesFromLlmContent(
     if (subs.length === 0) return null;
     const rq = parsed.data.rerankQuery?.trim();
     return {
-      subqueries: subs.slice(0, 4),
+      subqueries: subs.slice(0, 6),
       rerankQuery: rq || undefined,
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Detects list/enumeration queries that need diverse subqueries for broad retrieval coverage.
+ */
+export function isListEnumerationQuery(trimmed: string): boolean {
+  if (
+    /\b(list|enumerate|name|every|each\s+of|how\s+many|count\s+(of|all)|complete\s+(list|set)|full\s+list)\b/i.test(
+      trimmed
+    )
+  ) {
+    return true;
+  }
+  if (COUNTED_LIST_TAIL.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Extracts the core topic phrase from a list query.
+ * E.g. "What are the 20 agentic patterns?" → "agentic patterns"
+ */
+function extractListTopic(trimmed: string): string {
+  // Try to extract "N <topic>" pattern
+  const numMatch = trimmed.match(/\b\d+\s+(.+?)[\s?!.]*$/i);
+  if (numMatch) return numMatch[1].trim();
+  // Try to extract after list/name/enumerate
+  const listMatch = trimmed.match(
+    /\b(?:list|name|enumerate|show)\s+(?:all\s+|the\s+)?(.+?)[\s?!.]*$/i
+  );
+  if (listMatch) return listMatch[1].trim();
+  // Fallback: last meaningful phrase
+  const words = trimmed.replace(/[?!.]+$/, "").split(/\s+/);
+  return words.slice(-3).join(" ");
+}
+
+/**
+ * Generates diverse subqueries for list/enumeration queries to maximize retrieval coverage.
+ * Each subquery targets a different angle to retrieve chunks covering different items.
+ * Designed to retrieve chunks from different sections of the source material.
+ */
+export function expandListSubqueries(
+  originalQuery: string,
+  existingSubqueries: string[]
+): string[] {
+  const maxSubqueries = 6;
+  const result = [...existingSubqueries];
+  const topic = extractListTopic(originalQuery);
+
+  // More targeted variations that aim to retrieve chunks from different document sections
+  // These are designed to capture items that might be mentioned in different contexts
+  const variations = [
+    `${topic} complete list all items overview`,
+    `${topic} definitions terminology and concepts`,
+    `${topic} categories types classifications and kinds`,
+    `${topic} examples specific instances and use cases`,
+    `${topic} advanced methods techniques and strategies`,
+    `${topic} implementation details and practical applications`,
+    `${topic} collaboration patterns multi-agent systems`,
+    `${topic} safety guardrails validation and monitoring`,
+    `${topic} evaluation metrics testing and quality assurance`,
+    `${topic} configuration setup parameters and options`,
+  ];
+
+  for (const v of variations) {
+    if (result.length >= maxSubqueries) break;
+    // Avoid duplicates (case-insensitive)
+    const normalized = v.toLowerCase();
+    if (!result.some((r) => r.toLowerCase() === normalized)) {
+      result.push(v);
+    }
+  }
+
+  return result;
 }

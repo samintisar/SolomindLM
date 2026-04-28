@@ -10,6 +10,7 @@ import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
+import { AVAILABLE_SMART_MODEL_IDS, type SmartModelId } from "../_agents/chat/chatConfig.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { env } from "../_lib/env";
@@ -396,10 +397,50 @@ export async function streamChatResponse(
 
   const fullHistory = messageList
     .filter((m: any) => m.role !== "system")
-    .map((m: any) => ({ role: m.role, content: m.content }));
+    .map((m: any) => ({ role: m.role, content: m.content, metadata: m.metadata }));
 
   const historyBudget = parseInt(env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000", 10);
   const conversationHistory = budgetConversationHistory(fullHistory, historyBudget);
+
+  const notebookChatSettings = notebookDoc?.chatSettings as {
+    instructionMode: "default" | "learningGuide" | "custom";
+    customInstructions?: string;
+    responseLength: "default" | "longer" | "shorter";
+    smartModel?: string;
+  } | undefined;
+
+  // Validate model ID against whitelist, fall back to env default
+  const validModelIds = new Set(AVAILABLE_SMART_MODEL_IDS);
+  const resolvedSmartModel =
+    notebookChatSettings?.smartModel && validModelIds.has(notebookChatSettings.smartModel as SmartModelId)
+      ? notebookChatSettings.smartModel as SmartModelId
+      : (env.SMART_LLM ?? "openai/gpt-oss-120b") as SmartModelId;
+
+  // Merge chat settings: default/learningGuide follow the notebook (Configure chat).
+  // Conversations only lock instruction mode for custom instructions once created as custom.
+  // Otherwise stale snapshots from createConversation could ignore a later switch to Default.
+  const conversationDoc = await ctx.runQuery(internal.chat.conversations.getInternal, {
+    conversationId,
+  });
+  const notebookInstructionMode = (notebookChatSettings?.instructionMode ??
+    "default") as "default" | "learningGuide" | "custom";
+  const conversationInstructionMode = conversationDoc?.instructionMode as
+    | "default"
+    | "learningGuide"
+    | "custom"
+    | undefined;
+
+  const mergedInstructionMode: "default" | "learningGuide" | "custom" =
+    conversationInstructionMode === "custom" ? "custom" : notebookInstructionMode;
+
+  const mergedChatSettings = {
+    instructionMode: mergedInstructionMode,
+    customInstructions:
+      conversationInstructionMode === "custom"
+        ? (conversationDoc?.customInstructions ?? notebookChatSettings?.customInstructions)
+        : notebookChatSettings?.customInstructions,
+    responseLength: notebookChatSettings?.responseLength ?? "default",
+  };
 
   const notebookGrounding = notebookDoc?.chatGroundingMode as "async" | "sync" | "off" | undefined;
 
@@ -656,6 +697,24 @@ export async function streamChatResponse(
   const agent = new ChatAgent({
     vectorSearchHandler: hybridSearch,
     globalRerankFn,
+    smartModel: resolvedSmartModel,
+    fetchDocumentFn: async (documentId: string) => {
+      // Fetch all chunks for the document and stitch them together
+      const chunks = await ctx.runQuery(internal.documents.index.listChunksByDocument, {
+        documentId: documentId as any,
+      });
+      if (!chunks || chunks.length === 0) return null;
+
+      // Sort by chunk index and join content
+      const sortedChunks = chunks.sort((a: any, b: any) => a.chunkIndex - b.chunkIndex);
+      const content = sortedChunks.map((c: any) => c.content).join("\n\n");
+
+      return {
+        documentId: documentId as any,
+        content,
+        chunkCount: chunks.length,
+      };
+    },
   });
 
   // External search: discover sources from non-notebook channels (web, news, finance)
@@ -827,6 +886,7 @@ export async function streamChatResponse(
         enableNotebookSearch: includeNotebook,
         groundingMode: notebookGrounding,
         externalChunks: externalChunks.length > 0 ? externalChunks : undefined,
+        chatSettings: mergedChatSettings,
       },
       message,
       streamId
@@ -930,6 +990,13 @@ export async function streamChatResponse(
   }
 
   const metadataPayload = {
+    guidedLearning: {
+      awaitingUserResponse:
+        mergedChatSettings.instructionMode === "learningGuide" &&
+        Boolean(contentToPersist) &&
+        !hasError &&
+        !agentTrace.clarification,
+    },
     agentTrace: {
       toolCalls: agentTrace.toolCalls,
       grounding: agentTrace.grounding,

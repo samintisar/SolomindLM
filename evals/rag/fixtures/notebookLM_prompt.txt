@@ -1,0 +1,111 @@
+# NotebookLM Prompt: Focused RAG Q&A Generation (Single Category)
+
+Use this prompt to generate Q&A pairs for **one scenario category at a time**.
+Run multiple times with different categories to build your full test suite.
+
+---
+
+## Category to Generate
+
+**[INSERT CATEGORY HERE]** - Choose one:
+- `factoid` - Single-fact retrieval
+- `list-enumeration` - Complete set of items
+- `comparison` - Compare concepts A vs B
+- `causality` - Why/how reasoning chains
+- `temporal` - Chronology/sequence
+- `ambiguous` - Disambiguation
+- `technical` - Domain-specific details
+- `explanation` - How something works
+- `summarization` - Key takeaways
+
+## Role
+
+You are generating test cases for a RAG evaluation system. Create **2-4 high-quality Q&A pairs** for the category above based on the notebook sources.
+
+## Output Format
+
+```
+### Question: [your question]
+
+### Expected Answer: [comprehensive answer from sources]
+
+### Expected Items: [comma-separated items if this is a list question; otherwise "N/A"]
+
+### Expected Behavior: [what a complete answer must include, key points to watch for]
+```
+
+## Category-Specific Guidelines
+
+### For `factoid`:
+- Ask about specific facts, definitions, or properties
+- Expected Answer: 1-2 precise sentences
+- Example: "What is the universal approximation theorem?"
+
+### For `list-enumeration`:
+- Ask for complete lists (types, components, steps, etc.)
+- Expected Items: ALL items that must appear
+- Example: "What are the main types of regularization in deep learning?"
+- **Critical:** List must be complete; test if retrieval finds every item
+
+### For `comparison`:
+- Compare two or more concepts from the sources
+- Expected Answer: Cover similarities AND differences
+- Example: "Compare L1 and L2 regularization."
+- Must explain what each is and how they differ
+
+### For `causality`:
+- Ask why something happens or cause-effect relationships
+- Expected Answer: Explain the mechanism/reasoning
+- Example: "Why does batch normalization stabilize training?"
+- Requires connecting concepts across chunks
+
+### For `temporal`:
+- Ask about order, progression, or history
+- Expected Answer: Chronological with clear sequence
+- Example: "What was the progression of optimizer improvements from SGD to Adam?"
+
+### For `ambiguous`:
+- Questions with multiple interpretations requiring context
+- Example: "What is attention?" (could be self, cross, multi-head)
+- Tests if retrieval provides correct context
+
+### For `technical`:
+- Precise terminology, formulas, or implementation
+- Expected Answer: Use exact notation/terminology from sources
+- Example: "Write the gradient descent update rule with weight decay."
+
+### For `explanation`:
+- How does something work in detail
+- Expected Answer: 3-5 sentences explaining mechanism
+- Example: "How does self-attention compute token relationships?"
+
+### For `summarization`:
+- Key takeaways from multiple sources
+- Expected Answer: Synthesize main points
+- Example: "Summarize the advantages of transformers over RNNs."
+
+## Quality Checklist
+
+Each Q&A pair must:
+- [ ] Be answerable from the notebook sources
+- [ ] Require actual retrieval (not general knowledge)
+- [ ] Use the exact terminology from the sources
+- [ ] Have specific details in Expected Answer (not vague)
+- [ ] Include concrete evaluation criteria in Expected Behavior
+- [ ] Test the specific category's pattern (e.g., for lists: ensure all items are enumerable)
+
+## Example Output (list-enumeration category)
+
+### Question: What are the key components of the transformer architecture?
+
+### Expected Answer: The transformer architecture consists of an encoder-decoder structure. The encoder uses self-attention and feed-forward layers to create contextualized representations. The decoder generates outputs using cross-attention to encoder representations, combined with masked self-attention for autoregressive generation. Positional encodings are added to both since there's no recurrence.
+
+### Expected Items: encoder, decoder, self-attention, cross-attention, feed-forward layers, positional encodings
+
+### Expected Behavior: Must list all 6 components. Explain encoder vs decoder roles. Mention why positional encodings are needed. Common failure: missing components or confusing self vs cross-attention.
+
+---
+
+**Generate 2-4 Q&A pairs for the category: [YOUR CHOSEN CATEGORY]**
+
+Focus on quality over quantity. Each question should thoroughly test the specific retrieval pattern for its category.

@@ -81,6 +81,8 @@ export type ConversationCreate = {
   userId: Id<"users">;
   notebookId: Id<"notebooks">;
   title?: string;
+  instructionMode?: "default" | "learningGuide" | "custom";
+  customInstructions?: string;
 };
 
 export async function createConversation(
@@ -92,6 +94,8 @@ export async function createConversation(
     userId: data.userId,
     notebookId: data.notebookId,
     title: data.title,
+    instructionMode: data.instructionMode,
+    customInstructions: data.customInstructions,
     createdAt: now,
     updatedAt: now,
   });

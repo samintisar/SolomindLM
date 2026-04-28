@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, Pencil, Table2, ChevronLeft } from "lucide-react";
+import { X, Pencil, Table2, ChevronLeft, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface CustomizeSpreadsheetsModalProps {
   isOpen: boolean;
@@ -134,6 +135,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
 }) => {
   const [configuringFormat, setConfiguringFormat] = useState<SpreadsheetFormat | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -192,7 +194,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
             <h2 className="text-xl font-bold font-sans">Create spreadsheet</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="spreadsheet" onApplyPrompt={setCustomPrompt} />
             <button
               type="button"
               onClick={onClose}
@@ -222,6 +224,15 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
                 placeholder="Tell SolomindLM how to structure and organize your spreadsheet..."
                 className="w-full h-56 bg-background border border-border rounded-lg p-6 text-base font-serif leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/40"
               />
+              <button
+                type="button"
+                onClick={() => setSaveAsPromptModalOpen(true)}
+                disabled={!customPrompt.trim()}
+                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                Save as reusable prompt
+              </button>
             </div>
 
             <div className="flex justify-end pt-4">
@@ -252,6 +263,14 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
             </div>
           </div>
         )}
+
+        {/* Save as Prompt Modal */}
+        <SaveAsPromptModal
+          isOpen={saveAsPromptModalOpen}
+          onClose={() => setSaveAsPromptModalOpen(false)}
+          studioTool="spreadsheet"
+          initialPromptText={customPrompt}
+        />
       </div>
     </div>
   );

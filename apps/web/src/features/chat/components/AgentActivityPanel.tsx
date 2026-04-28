@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { ChevronDown, CircleCheck, FileBox, AlertTriangle } from "lucide-react";
+import { ChevronRight, CircleCheck, FileBox, AlertTriangle } from "lucide-react";
 import type {
   MessageToolCall,
   AgentGroundingCheck,
@@ -201,8 +201,8 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                 {headerMeta}
               </span>
             ) : null}
-            <ChevronDown
-              className={`ml-0.5 inline-block h-3.5 w-3.5 align-middle text-muted-foreground/55 transition-[color,transform] duration-200 ease-out group-hover/trigger:text-muted-foreground/80 ${expanded ? "rotate-180" : ""}`}
+            <ChevronRight
+              className={`ml-0.5 inline-block h-3.5 w-3.5 align-middle text-muted-foreground/55 transition-[color,transform] duration-200 ease-out group-hover/trigger:text-muted-foreground/80 ${expanded ? "rotate-90" : ""}`}
               strokeWidth={2}
               aria-hidden
             />
@@ -254,8 +254,9 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                               {src.title}
                             </span>
                             <span className="shrink-0 whitespace-nowrap text-right text-[11px] text-muted-foreground">
-                              {src.sectionCount} relevant section
-                              {src.sectionCount === 1 ? "" : "s"}
+                              {src.isFullDocument
+                                ? null
+                                : `${src.sectionCount} relevant section${src.sectionCount === 1 ? "" : "s"}`}
                             </span>
                             {src.openUrl ? (
                               <a

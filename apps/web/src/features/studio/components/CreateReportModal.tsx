@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { X, Pencil, FilePlus2, ChevronLeft } from "lucide-react";
+import { X, Pencil, FilePlus2, ChevronLeft, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface ReportFormat {
   id: string;
@@ -182,6 +183,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
 }) => {
   const [configuringFormat, setConfiguringFormat] = useState<ReportFormat | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -240,7 +242,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
             <h2 className="text-xl font-bold font-sans">Create report</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="report" onApplyPrompt={setCustomPrompt} />
             <button
               type="button"
               onClick={onClose}
@@ -270,6 +272,15 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
                 placeholder="Tell SolomindLM how to structure and write your report..."
                 className="w-full h-56 bg-background border border-border rounded-lg p-6 text-base font-serif leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/40"
               />
+              <button
+                type="button"
+                onClick={() => setSaveAsPromptModalOpen(true)}
+                disabled={!customPrompt.trim()}
+                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                Save as reusable prompt
+              </button>
             </div>
 
             <div className="flex justify-end pt-4">
@@ -300,6 +311,14 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Save as Prompt Modal */}
+        <SaveAsPromptModal
+          isOpen={saveAsPromptModalOpen}
+          onClose={() => setSaveAsPromptModalOpen(false)}
+          studioTool="report"
+          initialPromptText={customPrompt}
+        />
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   type ChatTogetherAICallOptions,
 } from "@langchain/community/chat_models/togetherai";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import Together from "together-ai";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { createLangSmithRunConfig } from "../_shared/index.js";
 import { uncachedLlmCall } from "../_shared/cachedLlm.js";
@@ -21,11 +22,19 @@ import {
   CORE_SYSTEM_PROMPT,
   MINIMAL_FEW_SHOT,
   STRICT_GROUNDING_PREFIX,
+  buildNotebookChatInstructionBlock,
 } from "./chat_llm_prompts.js";
-import { ChatResponseSchema, type ChatResponse, type LLMWrapperConfig } from "./chat_llm_types.js";
+import {
+  ChatResponseSchema,
+  stripLeakedConfidenceFromMarkdown,
+  type ChatResponse,
+  type LLMWrapperConfig,
+} from "./chat_llm_types.js";
 import {
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
+  isListEnumerationQuery,
+  expandListSubqueries,
 } from "./chat_retrieval_subqueries.js";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
@@ -42,6 +51,8 @@ export class ChatLLMWrapper {
   /** Primary generation model — used as fallback when fast model returns repeated 503s, etc. */
   private readonly smartLlmModelId: string;
   private tokenBudget: number = 7000; // Reserve tokens for generation
+  /** Together AI SDK client for streaming with structured output */
+  private togetherClient: Together;
 
   constructor(config: LLMWrapperConfig) {
     // Smart vs fast: `mergeModelKwargs` — GPT-OSS uses reasoning_effort; Qwen-style uses chat_template thinking.
@@ -61,6 +72,10 @@ export class ChatLLMWrapper {
       : this.llm;
     this.fastLlmModelId = config.fastModel ?? config.model;
     this.smartLlmModelId = config.model;
+    // Initialize Together AI SDK client for streaming with structured output
+    this.togetherClient = new Together({
+      apiKey: config.apiKey,
+    });
   }
 
   /**
@@ -70,13 +85,21 @@ export class ChatLLMWrapper {
    */
   async generateDirectResponse(
     userMessage: string,
-    conversationHistory: Array<{ role: string; content: string }>
+    conversationHistory: Array<{ role: string; content: string }>,
+    chatSettings?: {
+      instructionMode: "default" | "learningGuide" | "custom";
+      customInstructions?: string;
+      responseLength: "default" | "longer" | "shorter";
+    }
   ): Promise<string> {
     console.log("[ChatLLMWrapper] Generating direct response (no RAG)");
-    const systemPrompt =
+    let systemPrompt =
       "You are a helpful study assistant. Answer the user conversationally and concisely. " +
       "If they are asking about specific content from their documents, let them know you can search " +
       "for it if they rephrase their question.";
+    if (chatSettings) {
+      systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
+    }
     const messages = [
       new SystemMessage(systemPrompt),
       ...conversationHistory
@@ -201,7 +224,22 @@ Question: ${query}`;
       .map((t) => `${t.role}: ${t.content.slice(0, 400)}`)
       .join("\n");
 
-    const prompt = `Break the student's question into 1–4 short declarative search strings for document retrieval (not questions). Each string should be self-contained for hybrid search. If the question compares multiple topics, include one string per topic. Also optionally set "rerankQuery": a single English line that captures the full user intent for reranking (defaults to the user message if omitted).
+    const isListQuery = /\b\d+\s+(\w+\s+)?(items?|patterns?|types?|categories?|methods?|techniques?|strategies?|principles?|rules?|steps?|stages?|phases?|elements?|factors?|components?|ways?|kinds?|forms?|approaches?|practices?|examples?|topics?|concepts?|ideas?|reasons?|benefits?|features?|characteristics?|properties?|aspects?|dimensions?|domains?|areas?|fields?|themes?|subjects?|questions?|problems?|challenges?|solutions?|answers?)\b/i.test(trimmed) ||
+      /\b(list|enumerate|name|every|each\s+of|how\s+many|count\s+(of|all)|complete\s+(list|set)|full\s+list)\b/i.test(trimmed);
+
+    const listInstruction = isListQuery ? `
+
+CRITICAL FOR LIST/ENUMERATION QUERIES: The user is asking for a COMPLETE list. Generate subqueries that will retrieve chunks from DIFFERENT PARTS of the document. Each subquery should target:
+- Different sections or chapters (e.g., "introduction", "advanced topics")
+- Different item categories (e.g., "basic patterns", "advanced patterns", "safety patterns")
+- Different aspects (e.g., "definitions", "examples", "implementation")
+- DO NOT just rephrase the same query 6 times — use DISTINCT search terms` : "";
+
+    const prompt = `Break the student's question into 1–6 short declarative search strings for document retrieval (not questions). Each string should be self-contained for hybrid search. If the question compares multiple topics, include one string per topic.
+
+IMPORTANT: For list/enumeration questions (e.g. "list all X", "what are the N Y"), generate diverse subqueries that target different aspects, subcategories, or sections of the requested items. Do NOT just rephrase the same concept — each subquery should aim to surface a different subset of items.${listInstruction}
+
+Also optionally set "rerankQuery": a single English line that captures the full user intent for reranking (defaults to the user message if omitted).
 
 User question: ${trimmed}
 
@@ -233,7 +271,17 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
 
     try {
       const fromFast = await callModel(this.fastLlmModelId);
-      if (fromFast) return fromFast;
+      if (fromFast) {
+        // Expand subqueries for list queries when the LLM returned too few
+        if (isListEnumerationQuery(trimmed) && fromFast.subqueries.length < 4) {
+          fromFast.subqueries = expandListSubqueries(trimmed, fromFast.subqueries);
+          console.log(
+            `[ChatLLMWrapper] Expanded list subqueries: ${fromFast.subqueries.length} total`,
+            fromFast.subqueries
+          );
+        }
+        return fromFast;
+      }
       return fallback;
     } catch (e) {
       console.warn("[ChatLLMWrapper] Retrieval subquery decomposition failed (fast model):", e);
@@ -259,10 +307,15 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
   async generateWithStrictGrounding(
     chunks: ReferenceChunk[],
     userMessage: string,
-    conversationHistory: Array<{ role: string; content: string }> = []
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    chatSettings?: {
+      instructionMode: "default" | "learningGuide" | "custom";
+      customInstructions?: string;
+      responseLength: "default" | "longer" | "shorter";
+    }
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Retrying with strict grounding");
-    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, true);
+    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, true, chatSettings);
   }
 
   /**
@@ -276,18 +329,28 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
   async generateStructuredResponse(
     chunks: ReferenceChunk[],
     userMessage: string,
-    conversationHistory: Array<{ role: string; content: string }> = []
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    chatSettings?: {
+      instructionMode: "default" | "learningGuide" | "custom";
+      customInstructions?: string;
+      responseLength: "default" | "longer" | "shorter";
+    }
   ): Promise<ChatResponse> {
-    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, false);
+    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, false, chatSettings);
   }
 
   private async _generateStructuredResponse(
     chunks: ReferenceChunk[],
     userMessage: string,
     conversationHistory: Array<{ role: string; content: string }>,
-    strictGrounding: boolean
+    strictGrounding: boolean,
+    chatSettings?: {
+      instructionMode: "default" | "learningGuide" | "custom";
+      customInstructions?: string;
+      responseLength: "default" | "longer" | "shorter";
+    }
   ): Promise<ChatResponse> {
-    console.log("[ChatLLMWrapper] Generating structured response with citations");
+    console.log("[ChatLLMWrapper] Generating structured response with citations (streaming)");
 
     const needsExamples = conversationHistory.length === 0 || isComplexQuery(userMessage);
 
@@ -297,11 +360,12 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     const basePrompt = needsExamples
       ? `${MINIMAL_FEW_SHOT}\n\n${CORE_SYSTEM_PROMPT}${dateContext}`
       : `${CORE_SYSTEM_PROMPT}${dateContext}`;
-    const systemPrompt = strictGrounding ? `${STRICT_GROUNDING_PREFIX}${basePrompt}` : basePrompt;
+    let systemPrompt = strictGrounding ? `${STRICT_GROUNDING_PREFIX}${basePrompt}` : basePrompt;
 
-    const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
-      name: "chat_response",
-    });
+    // Append notebook chat instructions (lower priority than grounding/citations)
+    if (chatSettings) {
+      systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
+    }
 
     const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
 
@@ -324,6 +388,148 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       );
     }
 
+    // Use Together AI SDK with streaming for structured output
+    // This avoids the hard timeout issue by streaming tokens incrementally
+    try {
+      const { z } = await import("zod");
+      const jsonSchema = z.toJSONSchema(ChatResponseSchema);
+
+      // Build messages in the format expected by Together AI
+      const messages = [
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: groundedPrompt },
+      ];
+
+      console.log("[ChatLLMWrapper] Starting streaming request to Together AI...");
+
+      // Create streaming request
+      const stream = await this.togetherClient.chat.completions.create({
+        model: this.smartLlmModelId,
+        messages,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "chat_response",
+            schema: jsonSchema,
+          },
+        },
+        temperature: 0.1,
+        stream: true,
+        max_tokens: 8192,
+      });
+
+      // Accumulate streaming chunks
+      const chunks: string[] = [];
+      for await (const chunk of stream) {
+        const token = chunk.choices[0]?.delta?.content || "";
+        if (token) {
+          chunks.push(token);
+        }
+      }
+
+      const fullResponse = chunks.join("");
+      console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
+
+      // Parse the accumulated JSON
+      let parsedResponse: any;
+      try {
+        parsedResponse = JSON.parse(fullResponse);
+      } catch (parseError) {
+        console.warn("[ChatLLMWrapper] Failed to parse streaming JSON:", parseError);
+        // Try to salvage partial JSON or raw text
+        const salvaged = this.salvageResponse(fullResponse);
+        if (salvaged) {
+          return salvaged;
+        }
+        return {
+          answer_markdown: "I encountered an error processing the response. Please try again.",
+          confidence: "low",
+        };
+      }
+
+      // Validate against schema
+      const validated = ChatResponseSchema.safeParse(parsedResponse);
+
+      if (!validated.success) {
+        console.warn(
+          "[ChatLLMWrapper] Structured output validation failed:",
+          validated.error.issues
+        );
+
+        const salvaged = this.salvageResponse(parsedResponse);
+        if (salvaged) {
+          console.log("[ChatLLMWrapper] Successfully salvaged response after validation failure");
+          return salvaged;
+        }
+
+        return {
+          answer_markdown: "I encountered an error. Please rephrase your question or try again.",
+          confidence: "low",
+        };
+      }
+
+      console.log("[ChatLLMWrapper] Structured response generated successfully (via streaming)");
+      const cleanedMarkdown = stripLeakedConfidenceFromMarkdown(
+        validated.data.answer_markdown ?? ""
+      );
+      console.log(`[ChatLLMWrapper] Full response markdown: "${cleanedMarkdown}"`);
+
+      const extractedCitations = this.extractCitationsFromMarkdown(cleanedMarkdown);
+      console.log(
+        `[ChatLLMWrapper] Citations: [${extractedCitations.join(", ")}], Confidence: ${validated.data.confidence}`
+      );
+
+      return {
+        answer_markdown: cleanedMarkdown,
+        confidence: validated.data.confidence ?? "low",
+      } as ChatResponse;
+    } catch (error) {
+      console.error("[ChatLLMWrapper] Streaming structured output generation failed:", error);
+
+      // Fallback to LangChain approach if streaming fails
+      console.log("[ChatLLMWrapper] Falling back to LangChain non-streaming approach...");
+      return this._generateStructuredResponseLangChain(
+        chunks,
+        userMessage,
+        conversationHistory,
+        strictGrounding,
+        chatSettings
+      );
+    }
+  }
+
+  /** Fallback: Original LangChain-based non-streaming implementation */
+  private async _generateStructuredResponseLangChain(
+    chunks: ReferenceChunk[],
+    userMessage: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+    strictGrounding: boolean,
+    chatSettings?: {
+      instructionMode: "default" | "learningGuide" | "custom";
+      customInstructions?: string;
+      responseLength: "default" | "longer" | "shorter";
+    }
+  ): Promise<ChatResponse> {
+    console.log("[ChatLLMWrapper] Using LangChain fallback (non-streaming)");
+
+    const needsExamples = conversationHistory.length === 0 || isComplexQuery(userMessage);
+    const today = new Date().toISOString().split("T")[0];
+    const dateContext = `\nCurrent Date: ${today}`;
+
+    const basePrompt = needsExamples
+      ? `${MINIMAL_FEW_SHOT}\n\n${CORE_SYSTEM_PROMPT}${dateContext}`
+      : `${CORE_SYSTEM_PROMPT}${dateContext}`;
+    let systemPrompt = strictGrounding ? `${STRICT_GROUNDING_PREFIX}${basePrompt}` : basePrompt;
+
+    if (chatSettings) {
+      systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
+    }
+
+    const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
+      name: "chat_response",
+    });
+
+    const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(groundedPrompt)];
     const traceConfig = createLangSmithRunConfig({
       runName: "ChatAgentStructuredResponse",
@@ -339,37 +545,20 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       const validated = ChatResponseSchema.safeParse(response);
 
       if (!validated.success) {
-        console.warn(
-          "[ChatLLMWrapper] Structured output validation failed:",
-          validated.error.issues
-        );
-
         const salvaged = this.salvageResponse(response);
-        if (salvaged) {
-          console.log("[ChatLLMWrapper] Successfully salvaged response after validation failure");
-          return salvaged;
-        }
-
+        if (salvaged) return salvaged;
         return {
           answer_markdown: "I encountered an error. Please rephrase your question or try again.",
           confidence: "low",
         };
       }
 
-      console.log("[ChatLLMWrapper] Structured response generated successfully");
-      console.log(`[ChatLLMWrapper] Full response markdown: "${validated.data.answer_markdown}"`);
-
-      const extractedCitations = this.extractCitationsFromMarkdown(validated.data.answer_markdown);
-      console.log(
-        `[ChatLLMWrapper] Citations: [${extractedCitations.join(", ")}], Confidence: ${validated.data.confidence}`
-      );
-
       return {
-        answer_markdown: validated.data.answer_markdown ?? "",
+        answer_markdown: stripLeakedConfidenceFromMarkdown(validated.data.answer_markdown ?? ""),
         confidence: validated.data.confidence ?? "low",
       } as ChatResponse;
     } catch (error) {
-      console.error("[ChatLLMWrapper] Structured output generation failed:", error);
+      console.error("[ChatLLMWrapper] LangChain fallback failed:", error);
       return {
         answer_markdown:
           "I apologize, but I encountered an error generating a response. Please try again.",
@@ -411,7 +600,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
             : "low";
 
       return {
-        answer_markdown: answerText,
+        answer_markdown: stripLeakedConfidenceFromMarkdown(answerText),
         confidence,
       };
     } catch (error) {

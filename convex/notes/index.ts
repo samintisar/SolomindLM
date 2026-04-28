@@ -193,6 +193,7 @@ export const getById = query({
     }
 
     try {
+      if (!note.notebookId) return null;
       await assertCanReadNotebook(ctx, note.notebookId, userId);
     } catch {
       return null;

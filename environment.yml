@@ -1,0 +1,10 @@
+name: solomindlm-rag-evals
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - ragas>=0.2
+      - langchain-openai
+      - langchain-community

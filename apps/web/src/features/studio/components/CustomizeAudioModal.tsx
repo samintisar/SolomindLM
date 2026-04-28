@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, AudioLines } from "lucide-react";
+import { X, AudioLines, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface AudioFormat {
   id: string;
@@ -56,6 +57,7 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
   const [selectedFormat, setSelectedFormat] = useState("deep_dive");
   const [length, setLength] = useState<AudioConfig["length"]>("default");
   const [focus, setFocus] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -77,7 +79,7 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Audio Overview</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="audio" onApplyPrompt={setFocus} />
             <button
               type="button"
               onClick={onClose}
@@ -158,6 +160,15 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
               placeholder='Things to try&#10;• Focus on a specific source ("only cover the article about Italy")&#10;• Focus on a specific topic ("just discuss the novel&apos;s main character")&#10;• Target a specific audience ("explain to someone new to biology")'
               className="w-full h-44 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
             />
+            <button
+              type="button"
+              onClick={() => setSaveAsPromptModalOpen(true)}
+              disabled={!focus.trim()}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Save as reusable prompt
+            </button>
           </div>
 
           {/* Footer Button */}
@@ -171,6 +182,14 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Save as Prompt Modal */}
+      <SaveAsPromptModal
+        isOpen={saveAsPromptModalOpen}
+        onClose={() => setSaveAsPromptModalOpen(false)}
+        studioTool="audio"
+        initialPromptText={focus}
+      />
     </div>
   );
 };

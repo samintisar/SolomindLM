@@ -14,6 +14,31 @@ export interface ChatResponse {
   confidence: "high" | "medium" | "low";
 }
 
+/** Remove accidental "Confidence: high|medium|low" leaked into visible markdown. */
+export function stripLeakedConfidenceFromMarkdown(markdown: string): string {
+  let s = markdown.trimEnd();
+  const onlyConfidence = /^\s*\*{0,2}Confidence\*{0,2}\s*:\s*(?:high|medium|low)\s*$/i;
+  if (onlyConfidence.test(s)) {
+    return "";
+  }
+  const patterns = [
+    /\n+\s*\*{0,2}Confidence\*{0,2}\s*:\s*(?:high|medium|low)\s*$/i,
+    /\s+\*{0,2}Confidence\*{0,2}\s*:\s*(?:high|medium|low)\s*$/i,
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const before = s;
+    for (const p of patterns) {
+      s = s.replace(p, "").trimEnd();
+    }
+    if (s !== before) {
+      changed = true;
+    }
+  }
+  return s;
+}
+
 /**
  * Configuration for the LLM wrapper.
  */
@@ -41,6 +66,7 @@ export const ChatResponseSchema = z.object({
       "The answer in markdown format. " +
         "CRITICAL: Use INLINE citations ONLY - place plain ASCII [1], [2] after each factual claim (never \\[1\\] — backslashes break detection). " +
         'DO NOT add a "Sources:" footer or list at the end. ' +
+        "NEVER include confidence level text in this field (no lines like Confidence: high/medium/low); confidence belongs ONLY in the separate confidence enum field. " +
         "Start with a direct answer, then provide supporting details with inline citations. " +
         "Math: wrap all formulas in $...$ or $$...$$; never use $ inside $$; do not nest dollar math."
     ),

@@ -4,6 +4,11 @@ export type AggregatedRetrievalSource = {
   sourceId: string;
   title: string;
   sectionCount: number;
+  /**
+   * True when the model received the full document (chunkIndex -1 from retrieval expansion),
+   * not a counted set of RAG sections — avoid "1 relevant section" in the activity panel.
+   */
+  isFullDocument: boolean;
   badgeLabel: string;
   /** When set, WEB badge opens this URL in a new tab */
   openUrl: string | null;
@@ -155,25 +160,35 @@ export function aggregateRetrievalSources(
 ): AggregatedRetrievalSource[] {
   if (!references?.length) return [];
 
-  const map = new Map<string, { title: string; count: number; sourceUrl?: string }>();
+  const map = new Map<
+    string,
+    { title: string; count: number; sourceUrl?: string; isFullDocument: boolean }
+  >();
 
   for (const ref of references) {
     const title = (ref.sourceTitle ?? "").trim() || "Document";
     const key = aggregationKey(ref);
     const url = ref.sourceUrl?.trim();
+    const fullDoc = ref.chunkIndex === -1;
 
     const cur = map.get(key);
     if (cur) {
       cur.count += 1;
+      cur.isFullDocument = cur.isFullDocument || fullDoc;
       if (!cur.title && title) cur.title = title;
       if (!cur.sourceUrl && url) cur.sourceUrl = url;
     } else {
-      map.set(key, { title, count: 1, ...(url ? { sourceUrl: url } : {}) });
+      map.set(key, {
+        title,
+        count: 1,
+        isFullDocument: fullDoc,
+        ...(url ? { sourceUrl: url } : {}),
+      });
     }
   }
 
   const rows: AggregatedRetrievalSource[] = [...map.entries()].map(
-    ([sourceId, { title, count, sourceUrl }]) => {
+    ([sourceId, { title, count, sourceUrl, isFullDocument }]) => {
       const badgeFromTitle = inferSourceBadgeLabel(title);
       const openFromStored = navigableUrlFromStoredSource(sourceUrl);
       const openFromTitle = deriveWebOpenUrl(title);
@@ -185,6 +200,7 @@ export function aggregateRetrievalSources(
         sourceId,
         title,
         sectionCount: count,
+        isFullDocument,
         badgeLabel,
         openUrl,
       };

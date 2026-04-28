@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, HelpCircle } from "lucide-react";
+import { X, HelpCircle, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface CustomizeQuizModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
   const [count, setCount] = useState<QuizConfig["count"]>("standard");
   const [difficulty, setDifficulty] = useState<QuizConfig["difficulty"]>("medium");
   const [focus, setFocus] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -46,7 +48,7 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Quiz</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="quiz" onApplyPrompt={setFocus} />
             <button
               type="button"
               onClick={onClose}
@@ -118,6 +120,15 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
               placeholder="e.g. Create a 'Final Exam' style review or focus on 'Boyce-Codd Normal Form'..."
               className="w-full h-44 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
             />
+            <button
+              type="button"
+              onClick={() => setSaveAsPromptModalOpen(true)}
+              disabled={!focus.trim()}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Save as reusable prompt
+            </button>
           </div>
 
           <div className="flex justify-end pt-2">
@@ -130,6 +141,14 @@ export const CustomizeQuizModal: React.FC<CustomizeQuizModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Save as Prompt Modal */}
+      <SaveAsPromptModal
+        isOpen={saveAsPromptModalOpen}
+        onClose={() => setSaveAsPromptModalOpen(false)}
+        studioTool="quiz"
+        initialPromptText={focus}
+      />
     </div>
   );
 };

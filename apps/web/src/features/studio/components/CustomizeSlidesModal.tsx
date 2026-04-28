@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, Presentation } from "lucide-react";
+import { X, Presentation, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface CustomizeSlidesModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
   const [slideType, setSlideType] = useState<SlideDeckConfig["slideType"]>("detailed_deck");
   const [deckLength, setDeckLength] = useState<SlideDeckConfig["deckLength"]>("default");
   const [customPrompt, setCustomPrompt] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -45,7 +47,7 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Slide Deck</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="slides" onApplyPrompt={setCustomPrompt} />
             <button
               type="button"
               onClick={onClose}
@@ -146,6 +148,15 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
               placeholder="Add a high-level outline, or guide the audience, style, and focus: 'Create a deck for beginners using a bold and playful style with a focus on step-by-step instructions.'"
               className="w-full h-44 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
             />
+            <button
+              type="button"
+              onClick={() => setSaveAsPromptModalOpen(true)}
+              disabled={!customPrompt.trim()}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Save as reusable prompt
+            </button>
           </div>
 
           <div className="flex justify-end pt-2">
@@ -158,6 +169,14 @@ export const CustomizeSlidesModal: React.FC<CustomizeSlidesModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Save as Prompt Modal */}
+      <SaveAsPromptModal
+        isOpen={saveAsPromptModalOpen}
+        onClose={() => setSaveAsPromptModalOpen(false)}
+        studioTool="slides"
+        initialPromptText={customPrompt}
+      />
     </div>
   );
 };
