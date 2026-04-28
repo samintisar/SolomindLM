@@ -1003,6 +1003,10 @@ export async function streamChatResponse(
       phases: agentTrace.phases.slice(-30),
       clarification: agentTrace.clarification,
     },
+    // Surfaces stream-error state on the persisted message so the UI can render
+    // a "this response ended early" indicator after page reload, not just to
+    // clients that observed the in-flight `__ERROR:` marker.
+    hadStreamError: hasError || undefined,
   };
 
   if (existingMessages.length === 0) {
@@ -1011,9 +1015,15 @@ export async function streamChatResponse(
     });
   } else {
     const refsToStore = fullResponse.trim() ? references : undefined;
-    const contentFinal =
-      contentToPersist ||
-      (hasError ? "Something went wrong while generating a response. Please try again." : "");
+    // When an error chunk arrives mid-stream after tokens, the in-flight
+    // `__ERROR:` marker is lost on reload. Append a trailing notice so the
+    // persisted message records that the response was cut short.
+    const errorSuffix = "\n\n_⚠️ This response ended early due to an error. Please try again._";
+    const contentFinal = hasError
+      ? contentToPersist
+        ? `${contentToPersist}${errorSuffix}`
+        : "Something went wrong while generating a response. Please try again."
+      : contentToPersist;
 
     if (contentFinal) {
       let persisted = false;
@@ -1094,6 +1104,12 @@ export const runResearchExecute = internalAction({
       await rawAddChunk(text);
     };
 
+    // Hoisted so the catch block can read the partial output and write a
+    // tombstone assistant message that preserves whatever streamed before
+    // the failure, instead of leaving zero record on reload.
+    let fullResponse = "";
+    let conversationIdForPersist: Id<"conversations"> | undefined;
+
     try {
       await ctx.runMutation(internal.research.index.updateRunProgress, {
         runId,
@@ -1107,6 +1123,7 @@ export const runResearchExecute = internalAction({
         planId: run.planId,
       });
       if (!plan) throw new Error("Plan not found");
+      conversationIdForPersist = plan.conversationId;
 
       const researchLog = createServiceLogger("chatStream", "researchExecute", {
         userId: args.userId,
@@ -1223,7 +1240,6 @@ export const runResearchExecute = internalAction({
         conversationHistory: conversationTurns,
       };
 
-      let fullResponse = "";
       const gen = agent.executeResearch(
         plan.query,
         plan.subQuestions.map((sq: any) => ({ ...sq, status: "pending" as const })),
@@ -1269,11 +1285,43 @@ export const runResearchExecute = internalAction({
         userId: args.userId,
       });
       failLog.operationError(e, { runId: String(runId) });
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
       await ctx.runMutation(internal.research.index.updateRunProgress, {
         runId,
         status: "failed",
-        error: e instanceof Error ? e.message : "Unknown error",
+        error: errorMessage,
       });
+      // Surface the failure on the open stream and as a persisted assistant
+      // message; without this, the client only sees `final: true` (no error
+      // marker) and reload shows no record of why the run stopped.
+      try {
+        await chunkAppender(
+          `\n__ERROR:${JSON.stringify({ message: errorMessage })}\n`
+        );
+      } catch (streamErr) {
+        failLog.warn("research_error_stream_failed", { error: String(streamErr) });
+      }
+      if (conversationIdForPersist) {
+        try {
+          const trimmed = fullResponse.trim();
+          await ctx.runMutation(internal.chat.index.persistAssistantFromStream, {
+            conversationId: conversationIdForPersist,
+            streamId: args.streamId,
+            content:
+              trimmed.length > 0
+                ? `${fullResponse}\n\n_⚠️ Research run failed before completing. Please try again._`
+                : "Research run failed before producing a response. Please try again.",
+            metadata: {
+              researchRunId: runId,
+              isResearchResult: true,
+              hadStreamError: true,
+              researchError: errorMessage.slice(0, 500),
+            },
+          });
+        } catch (persistErr) {
+          failLog.error("research_tombstone_persist_failed", persistErr);
+        }
+      }
     } finally {
       try {
         await ctx.runMutation(components.persistentTextStreaming.lib.addChunk, {

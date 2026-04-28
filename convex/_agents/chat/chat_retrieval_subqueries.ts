@@ -53,27 +53,61 @@ export function trivialRetrievalSubqueryMessage(trimmed: string): boolean {
   return wc <= 10;
 }
 
+/**
+ * Parses retrieval-subquery JSON from an LLM response. Returns `null` on any
+ * failure so the caller can degrade to the original query as a single subquery.
+ *
+ * Failure paths are logged at WARN level so the silent-fallback behavior is
+ * observable: a sustained spike in "no_json_match" or "schema_invalid" means
+ * the prompt or upstream model output drifted and decomposition is effectively
+ * disabled.
+ */
 export function parseRetrievalSubqueriesFromLlmContent(
   rawContent: string
 ): { subqueries: string[]; rerankQuery?: string } | null {
+  let text = rawContent;
   try {
-    const text = rawContent
+    // Strip both <think>…</think> (Qwen-style) and <redacted_thinking>…</redacted_thinking>
+    // (Anthropic-style placeholders). The previous regex paired
+    // <redacted_thinking> with </think>, so it never matched anything and
+    // thinking content leaked into the JSON-extraction step.
+    text = rawContent
       .trim()
-      .replace(/<redacted_thinking>[\s\S]*?<\/think>/gi, "")
+      .replace(/<redacted_thinking>[\s\S]*?<\/redacted_thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .trim();
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
+    if (!match) {
+      console.warn(
+        "[chat_retrieval_subqueries] parse fallback: no_json_match",
+        { previewLen: text.length, preview: text.slice(0, 200) }
+      );
+      return null;
+    }
     const raw = JSON.parse(match[0]);
     const parsed = RetrievalSubqueriesSchema.safeParse(raw);
-    if (!parsed.success) return null;
+    if (!parsed.success) {
+      console.warn(
+        "[chat_retrieval_subqueries] parse fallback: schema_invalid",
+        { issues: parsed.error.issues.slice(0, 3) }
+      );
+      return null;
+    }
     const subs = parsed.data.subqueries.map((s) => s.trim()).filter(Boolean);
-    if (subs.length === 0) return null;
+    if (subs.length === 0) {
+      console.warn("[chat_retrieval_subqueries] parse fallback: empty_subqueries");
+      return null;
+    }
     const rq = parsed.data.rerankQuery?.trim();
     return {
       subqueries: subs.slice(0, 6),
       rerankQuery: rq || undefined,
     };
-  } catch {
+  } catch (err) {
+    console.warn(
+      "[chat_retrieval_subqueries] parse fallback: exception",
+      { error: err instanceof Error ? err.message : String(err), previewLen: text.length }
+    );
     return null;
   }
 }
