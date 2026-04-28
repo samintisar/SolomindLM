@@ -605,6 +605,7 @@ export default defineSchema({
     // Ownership & scoping
     .index("by_user", ["userId"])
     .index("by_user_and_studioTool", ["userId", "studioTool"])
+    .index("by_user_and_sourcePrompt", ["userId", "sourcePromptId"])
     .index("by_notebook", ["notebookId"])
     // Public listing sorted by saves
     .index("by_visibility_and_status_and_studioTool_and_saveCount", [

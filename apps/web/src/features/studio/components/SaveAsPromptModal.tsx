@@ -106,6 +106,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
 
   return (
     <div
+      data-testid="save-as-prompt-modal"
       className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
       onClick={handleCancel}
     >
@@ -120,7 +121,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
               <Bookmark className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">
+              <p data-testid="save-as-prompt-tool-label" className="text-xs text-muted-foreground">
                 {TOOL_LABELS[studioTool]}
               </p>
               <h2 className="text-lg font-bold leading-snug tracking-tight">
@@ -129,7 +130,9 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
             </div>
           </div>
           <button
+            data-testid="save-as-prompt-close"
             onClick={handleCancel}
+            aria-label="Close"
             className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
           >
             <X className="w-5 h-5" />
@@ -212,6 +215,10 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
             </div>
             <button
               type="button"
+              data-testid="save-as-prompt-visibility-toggle"
+              role="switch"
+              aria-checked={makePublic}
+              aria-label={makePublic ? "Set visibility to private" : "Set visibility to public"}
               onClick={() => setMakePublic(!makePublic)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 makePublic ? "bg-primary" : "bg-muted"

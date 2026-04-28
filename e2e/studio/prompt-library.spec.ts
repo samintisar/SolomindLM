@@ -33,7 +33,7 @@ test.describe("Prompt Library", () => {
       // Save as Prompt modal should open
       await expect(page.getByRole("heading", { name: /save as prompt/i })).toBeVisible();
       // Should show the tool label in the header
-      await expect(page.locator("p.text-muted-foreground").filter({ hasText: "Flashcards" })).toBeVisible();
+      await expect(page.getByTestId("save-as-prompt-tool-label")).toHaveText("Flashcards");
 
       // The prompt text should be pre-filled with the topic text
       const promptTextarea = page.getByPlaceholder(/Enter your custom prompt/);
@@ -113,9 +113,11 @@ test.describe("Prompt Library", () => {
       await expect(page.getByText("Private")).toBeVisible();
       await expect(page.getByText(/Only you can see and use this prompt/)).toBeVisible();
 
-      // Click the toggle button (the one with relative positioning)
-      const toggleButton = page.locator(".relative.inline-flex");
+      // Click the visibility toggle (testid + role=switch)
+      const toggleButton = page.getByTestId("save-as-prompt-visibility-toggle");
+      await expect(toggleButton).toHaveAttribute("aria-checked", "false");
       await toggleButton.click();
+      await expect(toggleButton).toHaveAttribute("aria-checked", "true");
 
       // Should now show public state
       await expect(page.getByText("Public")).toBeVisible();
@@ -167,10 +169,8 @@ test.describe("Prompt Library", () => {
 
       await expect(page.getByRole("heading", { name: /save as prompt/i })).toBeVisible();
 
-      // Click the X button in the Save as Prompt modal (z-[130])
-      const saveAsPromptModal = page.locator(".z-\\[130\\]");
-      const closeButton = saveAsPromptModal.locator("button").first();
-      await closeButton.click();
+      // Click the X (close) button in the Save as Prompt modal
+      await page.getByTestId("save-as-prompt-close").click();
 
       // Modal should close
       await expect(page.getByRole("heading", { name: /save as prompt/i })).not.toBeVisible();
@@ -228,10 +228,15 @@ test.describe("Prompt Library", () => {
       await expect(page.getByRole("heading", { name: /prompt library/i })).toBeVisible();
 
       // Click My Prompts tab
-      await page.getByRole("button", { name: /my prompts/i }).click();
+      const myPromptsTab = page.getByTestId("discover-prompts-tab-my");
+      await myPromptsTab.click();
 
-      // My Prompts should be active
-      await expect(page.getByRole("button", { name: /my prompts/i })).toHaveClass(/border-primary/);
+      // My Prompts should be active (assert via aria-selected, not Tailwind classes)
+      await expect(myPromptsTab).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByTestId("discover-prompts-tab-public")).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
 
       // Search/sort should not be visible in My Prompts
       await expect(page.getByPlaceholder(/search prompts/i)).not.toBeVisible();

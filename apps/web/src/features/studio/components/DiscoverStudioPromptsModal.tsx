@@ -28,6 +28,7 @@ import {
   type PublicPrompt,
 } from "../services/promptsApi";
 import { useToast } from "@/shared/contexts/ToastContext";
+import type { Id } from "@convex/_generated/dataModel";
 
 // ── Props ──────────────────────────────────────────────────────────────
 
@@ -83,10 +84,10 @@ export const DiscoverStudioPromptsModal: React.FC<DiscoverStudioPromptsModalProp
   const [sortOpen, setSortOpen] = useState(false);
 
   // Reporting state
-  const [reportingId, setReportingId] = useState<string | null>(null);
+  const [reportingId, setReportingId] = useState<Id<"studioPrompts"> | null>(null);
 
   // Rating follow-up state
-  const [ratingPromptId, setRatingPromptId] = useState<string | null>(null);
+  const [ratingPromptId, setRatingPromptId] = useState<Id<"studioPrompts"> | null>(null);
 
   if (!isOpen) return null;
 
@@ -121,8 +122,11 @@ export const DiscoverStudioPromptsModal: React.FC<DiscoverStudioPromptsModalProp
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-border/50 px-5">
+        <div role="tablist" className="flex border-b border-border/50 px-5">
           <button
+            role="tab"
+            aria-selected={activeTab === "public"}
+            data-testid="discover-prompts-tab-public"
             onClick={() => setActiveTab("public")}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "public"
@@ -134,6 +138,9 @@ export const DiscoverStudioPromptsModal: React.FC<DiscoverStudioPromptsModalProp
             Public
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === "my"}
+            data-testid="discover-prompts-tab-my"
             onClick={() => setActiveTab("my")}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "my"
@@ -227,10 +234,10 @@ interface PublicPromptsListProps {
   sortBy: PromptSortBy;
   searchQuery: string;
   onApplyPrompt: (text: string) => void;
-  reportingId: string | null;
-  setReportingId: (id: string | null) => void;
-  ratingPromptId: string | null;
-  setRatingPromptId: (id: string | null) => void;
+  reportingId: Id<"studioPrompts"> | null;
+  setReportingId: (id: Id<"studioPrompts"> | null) => void;
+  ratingPromptId: Id<"studioPrompts"> | null;
+  setRatingPromptId: (id: Id<"studioPrompts"> | null) => void;
 }
 
 const PublicPromptsList: React.FC<PublicPromptsListProps> = ({
@@ -262,7 +269,7 @@ const PublicPromptsList: React.FC<PublicPromptsListProps> = ({
     }
   };
 
-  const handleRate = async (promptId: string, rating: number) => {
+  const handleRate = async (promptId: Id<"studioPrompts">, rating: number) => {
     try {
       await ratePrompt(promptId, rating);
       setRatingPromptId(null);
@@ -272,7 +279,7 @@ const PublicPromptsList: React.FC<PublicPromptsListProps> = ({
     }
   };
 
-  const handleReport = async (promptId: string) => {
+  const handleReport = async (promptId: Id<"studioPrompts">) => {
     try {
       await reportPrompt(promptId);
       setReportingId(null);
@@ -499,7 +506,7 @@ const MyPromptsList: React.FC<MyPromptsListProps> = ({ studioTool, onApplyPrompt
     );
   }
 
-  const handlePublish = async (id: string) => {
+  const handlePublish = async (id: Id<"studioPrompts">) => {
     try {
       await publishPrompt(id);
       success("Prompt published");
@@ -508,7 +515,7 @@ const MyPromptsList: React.FC<MyPromptsListProps> = ({ studioTool, onApplyPrompt
     }
   };
 
-  const handleUnpublish = async (id: string) => {
+  const handleUnpublish = async (id: Id<"studioPrompts">) => {
     try {
       await unpublishPrompt(id);
       success("Prompt unpublished");
@@ -517,7 +524,7 @@ const MyPromptsList: React.FC<MyPromptsListProps> = ({ studioTool, onApplyPrompt
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: Id<"studioPrompts">) => {
     try {
       await deletePrompt(id);
       success("Prompt deleted");

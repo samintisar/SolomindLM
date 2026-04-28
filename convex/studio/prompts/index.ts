@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../../_generated/server";
 import { getAuthUserId } from "../../auth";
+import { assertCanEditNotebook } from "../../_lib/notebookAccess";
 import { paginationOptsValidator } from "convex/server";
 import {
   PROMPT_TEXT_MAX_LENGTH,
@@ -9,10 +10,9 @@ import {
   PROMPT_REPORT_AUTO_HIDE_THRESHOLD,
   RATING_PRIOR_MEAN,
   RATING_PRIOR_COUNT,
+  PROMPT_REPORT_REASON_MAX_LENGTH,
   studioToolValidator,
 } from "./config";
-import type { StudioTool } from "./config";
-import type { Id } from "../../_generated/dataModel";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -178,6 +178,10 @@ export const createPrompt = mutation({
     if (args.description && args.description.length > PROMPT_DESCRIPTION_MAX_LENGTH)
       throw new Error(`Description must be ≤${PROMPT_DESCRIPTION_MAX_LENGTH} characters`);
 
+    if (args.notebookId) {
+      await assertCanEditNotebook(ctx, args.notebookId, userId);
+    }
+
     const now = Date.now();
     return await ctx.db.insert("studioPrompts", {
       userId,
@@ -259,19 +263,17 @@ export const savePublicPrompt = mutation({
       .unique();
 
     if (existingSave) {
-      // Already saved — return the existing private copy
       const existingCopy = await ctx.db
         .query("studioPrompts")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .order("desc")
+        .withIndex("by_user_and_sourcePrompt", (q) =>
+          q.eq("userId", userId).eq("sourcePromptId", args.publicPromptId)
+        )
         .first();
-      // Find the copy with matching sourcePromptId
-      const copies = await ctx.db
-        .query("studioPrompts")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
-      const copy = copies.find((p) => p.sourcePromptId === args.publicPromptId);
-      return copy?._id ?? null;
+      return existingCopy?._id ?? null;
+    }
+
+    if (args.notebookId) {
+      await assertCanEditNotebook(ctx, args.notebookId, userId);
     }
 
     // Create the save record
@@ -431,6 +433,10 @@ export const reportPrompt = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
+
+    if (args.reason !== undefined && args.reason.length > PROMPT_REPORT_REASON_MAX_LENGTH) {
+      throw new Error(`Reason must be ≤${PROMPT_REPORT_REASON_MAX_LENGTH} characters`);
+    }
 
     const prompt = await ctx.db.get(args.promptId);
     if (!prompt || prompt.visibility !== "public" || prompt.status !== "active")

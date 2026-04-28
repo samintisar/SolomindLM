@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
@@ -148,9 +148,8 @@ describe("SaveAsPromptModal", () => {
 
     // Toggle to public - click on the visibility toggle button (bg-muted when private)
     const toggleButton = document.querySelector("button[class*='bg-muted']");
-    if (toggleButton) {
-      await user.click(toggleButton);
-    }
+    expect(toggleButton).not.toBeNull();
+    await user.click(toggleButton!);
 
     expect(screen.getByText("Public")).toBeInTheDocument();
     expect(screen.getByText(/Anyone can discover/)).toBeInTheDocument();
@@ -175,7 +174,8 @@ describe("SaveAsPromptModal", () => {
     expect(saveButton).toBeDisabled();
   });
 
-  it("disables Save button when prompt text is empty", () => {
+  it("disables Save button when prompt text is empty", async () => {
+    const user = userEvent.setup();
     render(
       <SaveAsPromptModal
         isOpen={true}
@@ -188,13 +188,10 @@ describe("SaveAsPromptModal", () => {
     const titleInput = screen.getByPlaceholderText(/e.g., Focus on key concepts/);
     const saveButton = screen.getByRole("button", { name: /Save Prompt/i });
 
-    // Even with title filled, if prompt text is empty, save should be disabled
-    // But since initialPromptText is empty, the textarea is empty
-    // Let's type a title
-    const user = userEvent.setup();
-    user.type(titleInput, "My Title");
+    // Fill title only — textarea is still empty, so save must remain disabled.
+    await user.type(titleInput, "My Title");
 
-    // The textarea is empty, so save should still be disabled
+    expect(titleInput).toHaveValue("My Title");
     expect(saveButton).toBeDisabled();
   });
 
@@ -252,10 +249,9 @@ describe("SaveAsPromptModal", () => {
 
     // Click on the overlay (the outer backdrop div)
     const overlay = document.querySelector(".bg-black\\/60");
-    if (overlay) {
-      await user.click(overlay);
-      expect(mockOnClose).toHaveBeenCalledOnce();
-    }
+    expect(overlay).not.toBeNull();
+    await user.click(overlay!);
+    expect(mockOnClose).toHaveBeenCalledOnce();
   });
 
   it("closes modal when X button is clicked", async () => {
@@ -271,10 +267,10 @@ describe("SaveAsPromptModal", () => {
 
     // Find the X button by its SVG icon
     const closeButton = document.querySelector("button svg.lucide-x");
-    if (closeButton) {
-      await user.click(closeButton.parentElement!);
-      expect(mockOnClose).toHaveBeenCalledOnce();
-    }
+    expect(closeButton).not.toBeNull();
+    expect(closeButton!.parentElement).not.toBeNull();
+    await user.click(closeButton!.parentElement!);
+    expect(mockOnClose).toHaveBeenCalledOnce();
   });
 
   it("respects max length for title", async () => {
@@ -322,8 +318,7 @@ describe("SaveAsPromptModal", () => {
     expect(screen.getByText("300/300")).toBeInTheDocument();
   });
 
-  it("respects max length for prompt text", async () => {
-    const user = userEvent.setup();
+  it("respects max length for prompt text", () => {
     render(
       <SaveAsPromptModal
         isOpen={true}
@@ -334,7 +329,6 @@ describe("SaveAsPromptModal", () => {
     );
 
     const textarea = screen.getByPlaceholderText(/Enter your custom prompt/);
-    // Just test that it has maxLength attribute
     expect(textarea).toHaveAttribute("maxlength", "2000");
   });
 

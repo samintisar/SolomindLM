@@ -7,6 +7,7 @@ import {
   PROMPT_TEXT_MAX_LENGTH,
   PROMPT_TITLE_MAX_LENGTH,
   PROMPT_REPORT_AUTO_HIDE_THRESHOLD,
+  PROMPT_REPORT_REASON_MAX_LENGTH,
   RATING_PRIOR_MEAN,
   RATING_PRIOR_COUNT,
 } from "./config.js";
@@ -29,6 +30,18 @@ async function seedUser(t: ReturnType<typeof convexTest>) {
       email: "test@example.com",
       emailVerificationTime: Date.now(),
       isAnonymous: false,
+    });
+  });
+}
+
+async function seedNotebook(t: ReturnType<typeof convexTest>, ownerUserId: string) {
+  const now = Date.now();
+  return await t.run(async (ctx) => {
+    return await ctx.db.insert("notebooks", {
+      userId: ownerUserId as any,
+      title: "Test notebook",
+      createdAt: now,
+      updatedAt: now,
     });
   });
 }
@@ -88,6 +101,22 @@ describe("Prompt Library — createPrompt", () => {
         studioTool: "report",
       }),
     ).rejects.toThrow("Title is required");
+  });
+
+  it("rejects notebookId for a notebook the caller cannot edit", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const other = await seedUser(t);
+    const notebookId = await seedNotebook(t, owner);
+
+    await expect(
+      asUser(t, other).mutation(api.studio.prompts.index.createPrompt, {
+        title: "T",
+        promptText: "Body",
+        studioTool: "report",
+        notebookId: notebookId as any,
+      }),
+    ).rejects.toThrow("Notebook not found");
   });
 
   it("rejects empty prompt text", async () => {
@@ -269,18 +298,45 @@ describe("Prompt Library — savePublicPrompt", () => {
       promptId: promptId as any,
     });
 
-    await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+    const copyId1 = await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
       publicPromptId: promptId as any,
     });
 
-    await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+    const copyId2 = await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
       publicPromptId: promptId as any,
     });
+
+    expect(copyId2).toEqual(copyId1);
 
     const original = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
       promptId: promptId as any,
     });
     expect(original!.saveCount).toBe(1);
+  });
+
+  it("rejects save with notebookId for a notebook the saver cannot edit", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+    const saver = await seedUser(t);
+    const ownerOther = await seedUser(t);
+    const foreignNotebook = await seedNotebook(t, ownerOther);
+
+    const promptId = await asUser(t, author).mutation(api.studio.prompts.index.createPrompt, {
+      title: "X",
+      promptText: "Y",
+      studioTool: "report",
+    });
+
+    await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+
+    await expect(
+      asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+        publicPromptId: promptId as any,
+        notebookId: foreignNotebook as any,
+      }),
+    ).rejects.toThrow("Notebook not found");
   });
 });
 
@@ -416,6 +472,29 @@ describe("Prompt Library — reportPrompt", () => {
 
     expect(prompt!.reportCount).toBe(1);
     expect(prompt!.status).toBe("active");
+  });
+
+  it("rejects report reason over max length", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+    const reporter = await seedUser(t);
+
+    const promptId = await asUser(t, author).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Report Long",
+      promptText: "Text",
+      studioTool: "report",
+    });
+
+    await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+
+    await expect(
+      asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
+        promptId: promptId as any,
+        reason: "x".repeat(PROMPT_REPORT_REASON_MAX_LENGTH + 1),
+      }),
+    ).rejects.toThrow("Reason must be");
   });
 
   it("auto-hides when threshold is reached", async () => {
@@ -564,6 +643,312 @@ describe("Prompt Library — updatePrompt", () => {
         title: "Hacked Title",
       }),
     ).rejects.toThrow("Not found or not owner");
+  });
+});
+
+describe("Prompt Library — listPublicPrompts", () => {
+  async function publishOne(
+    t: ReturnType<typeof convexTest>,
+    userId: string,
+    overrides: { title?: string; studioTool?: "report" | "quiz" } = {},
+  ) {
+    const promptId = await asUser(t, userId).mutation(api.studio.prompts.index.createPrompt, {
+      title: overrides.title ?? "Pub",
+      promptText: "Body",
+      studioTool: overrides.studioTool ?? "report",
+    });
+    await asUser(t, userId).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+    return promptId;
+  }
+
+  it("excludes private prompts", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+
+    await asUser(t, author).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Stays Private",
+      promptText: "Text",
+      studioTool: "report",
+    });
+
+    const result = await t.query(api.studio.prompts.index.listPublicPrompts, {
+      studioTool: "report",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+
+    expect(result.page).toHaveLength(0);
+  });
+
+  it("excludes hidden and removed prompts", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+
+    const publicId = await publishOne(t, author, { title: "Visible" });
+    const hiddenId = await publishOne(t, author, { title: "Will Hide" });
+    const removedId = await publishOne(t, author, { title: "Will Remove" });
+
+    // Force hidden + removed by directly mutating the db (auto-hide threshold
+    // is exercised separately; this exercises the listing filter only).
+    await t.run(async (ctx) => {
+      await ctx.db.patch(hiddenId as any, { status: "hidden" });
+      await ctx.db.patch(removedId as any, { status: "removed" });
+    });
+
+    const result = await t.query(api.studio.prompts.index.listPublicPrompts, {
+      studioTool: "report",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+
+    expect(result.page).toHaveLength(1);
+    expect(result.page[0]._id).toEqual(publicId);
+  });
+
+  it("filters by studioTool", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+
+    await publishOne(t, author, { title: "Report", studioTool: "report" });
+    await publishOne(t, author, { title: "Quiz", studioTool: "quiz" });
+
+    const reports = await t.query(api.studio.prompts.index.listPublicPrompts, {
+      studioTool: "report",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(reports.page).toHaveLength(1);
+    expect(reports.page[0].studioTool).toBe("report");
+  });
+
+  it("sorts by saves desc when sortBy='saves'", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+    const a = await publishOne(t, author, { title: "A" });
+    const b = await publishOne(t, author, { title: "B" });
+
+    // Give B more saves than A
+    const saver1 = await seedUser(t);
+    const saver2 = await seedUser(t);
+    await asUser(t, saver1).mutation(api.studio.prompts.index.savePublicPrompt, {
+      publicPromptId: b as any,
+    });
+    await asUser(t, saver2).mutation(api.studio.prompts.index.savePublicPrompt, {
+      publicPromptId: b as any,
+    });
+    await asUser(t, saver1).mutation(api.studio.prompts.index.savePublicPrompt, {
+      publicPromptId: a as any,
+    });
+
+    const result = await t.query(api.studio.prompts.index.listPublicPrompts, {
+      studioTool: "report",
+      sortBy: "saves",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+
+    expect(result.page.map((p: any) => p._id)).toEqual([b, a]);
+  });
+
+  it("sorts by newest desc when sortBy='newest'", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+    const first = await publishOne(t, author, { title: "First" });
+    // Force a visible time gap (createdAt is ms-precision)
+    await new Promise((r) => setTimeout(r, 5));
+    const second = await publishOne(t, author, { title: "Second" });
+
+    const result = await t.query(api.studio.prompts.index.listPublicPrompts, {
+      studioTool: "report",
+      sortBy: "newest",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+
+    expect(result.page.map((p: any) => p._id)).toEqual([second, first]);
+  });
+});
+
+describe("Prompt Library — getPrompt access matrix", () => {
+  it("returns null for a private prompt to a non-owner", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const other = await seedUser(t);
+
+    const promptId = await asUser(t, owner).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Private",
+      promptText: "Body",
+      studioTool: "report",
+    });
+
+    const seen = await asUser(t, other).query(api.studio.prompts.index.getPrompt, {
+      promptId: promptId as any,
+    });
+    expect(seen).toBeNull();
+  });
+
+  it("returns null for an unauthenticated reader on a private prompt", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+
+    const promptId = await asUser(t, owner).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Private",
+      promptText: "Body",
+      studioTool: "report",
+    });
+
+    const seen = await t.query(api.studio.prompts.index.getPrompt, {
+      promptId: promptId as any,
+    });
+    expect(seen).toBeNull();
+  });
+
+  it("returns the prompt to anyone once published & active", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const other = await seedUser(t);
+
+    const promptId = await asUser(t, owner).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Public",
+      promptText: "Body",
+      studioTool: "report",
+    });
+    await asUser(t, owner).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+
+    const seen = await asUser(t, other).query(api.studio.prompts.index.getPrompt, {
+      promptId: promptId as any,
+    });
+    expect(seen!._id).toEqual(promptId);
+  });
+
+  it("hides a hidden public prompt from non-owners", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedUser(t);
+    const other = await seedUser(t);
+
+    const promptId = await asUser(t, owner).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Was Public",
+      promptText: "Body",
+      studioTool: "report",
+    });
+    await asUser(t, owner).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(promptId as any, { status: "hidden" });
+    });
+
+    const otherSees = await asUser(t, other).query(api.studio.prompts.index.getPrompt, {
+      promptId: promptId as any,
+    });
+    expect(otherSees).toBeNull();
+
+    const ownerSees = await asUser(t, owner).query(api.studio.prompts.index.getPrompt, {
+      promptId: promptId as any,
+    });
+    expect(ownerSees!._id).toEqual(promptId);
+  });
+});
+
+describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
+  it("hasSavedPrompt: false initially, true after save, scoped per-user", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+    const saver = await seedUser(t);
+    const stranger = await seedUser(t);
+
+    const promptId = await asUser(t, author).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Savable",
+      promptText: "Body",
+      studioTool: "report",
+    });
+    await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+
+    expect(
+      await asUser(t, saver).query(api.studio.prompts.index.hasSavedPrompt, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBe(false);
+
+    await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+      publicPromptId: promptId as any,
+    });
+
+    expect(
+      await asUser(t, saver).query(api.studio.prompts.index.hasSavedPrompt, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBe(true);
+
+    expect(
+      await asUser(t, stranger).query(api.studio.prompts.index.hasSavedPrompt, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBe(false);
+  });
+
+  it("hasSavedPrompt: false for unauthenticated callers", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+
+    const promptId = await asUser(t, author).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Anon Test",
+      promptText: "Body",
+      studioTool: "report",
+    });
+    await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+
+    expect(
+      await t.query(api.studio.prompts.index.hasSavedPrompt, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBe(false);
+  });
+
+  it("getMyRating: null initially, returns the rating after rating, updates on re-rate", async () => {
+    const t = convexTest(schema, modules);
+    const author = await seedUser(t);
+    const rater = await seedUser(t);
+
+    const promptId = await asUser(t, author).mutation(api.studio.prompts.index.createPrompt, {
+      title: "Ratable",
+      promptText: "Body",
+      studioTool: "report",
+    });
+    await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      promptId: promptId as any,
+    });
+
+    expect(
+      await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBeNull();
+
+    await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      publicPromptId: promptId as any,
+      rating: 4,
+    });
+
+    expect(
+      await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBe(4);
+
+    await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      publicPromptId: promptId as any,
+      rating: 2,
+    });
+
+    expect(
+      await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
+        publicPromptId: promptId as any,
+      }),
+    ).toBe(2);
   });
 });
 

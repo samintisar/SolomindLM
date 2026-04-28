@@ -91,14 +91,14 @@ export function useCreatePrompt() {
     description?: string;
     promptText: string;
     studioTool: StudioTool;
-    notebookId?: string;
+    notebookId?: Id<"notebooks">;
   }) => {
     return await create({
       title: args.title,
       description: args.description,
       promptText: args.promptText,
       studioTool: args.studioTool,
-      notebookId: args.notebookId as Id<"notebooks"> | undefined,
+      notebookId: args.notebookId,
     });
   };
 }
@@ -106,35 +106,32 @@ export function useCreatePrompt() {
 /** Publish a private prompt to the public library. */
 export function usePublishPrompt() {
   const publish = useMutation(api.studio.prompts.index.publishPrompt);
-  return async (promptId: string) => {
-    await publish({ promptId: promptId as Id<"studioPrompts"> });
+  return async (promptId: Id<"studioPrompts">) => {
+    await publish({ promptId });
   };
 }
 
 /** Retract a public prompt back to private. */
 export function useUnpublishPrompt() {
   const unpublish = useMutation(api.studio.prompts.index.unpublishPrompt);
-  return async (promptId: string) => {
-    await unpublish({ promptId: promptId as Id<"studioPrompts"> });
+  return async (promptId: Id<"studioPrompts">) => {
+    await unpublish({ promptId });
   };
 }
 
 /** Save a public prompt into the user's private library. */
 export function useSavePublicPrompt() {
   const save = useMutation(api.studio.prompts.index.savePublicPrompt);
-  return async (publicPromptId: string, notebookId?: string) => {
-    return await save({
-      publicPromptId: publicPromptId as Id<"studioPrompts">,
-      notebookId: notebookId as Id<"notebooks"> | undefined,
-    });
+  return async (publicPromptId: Id<"studioPrompts">, notebookId?: Id<"notebooks">) => {
+    return await save({ publicPromptId, notebookId });
   };
 }
 
 /** Rate a public prompt (1-5). */
 export function useRatePrompt() {
   const rate = useMutation(api.studio.prompts.index.ratePrompt);
-  return async (publicPromptId: string, rating: number) => {
-    await rate({ publicPromptId: publicPromptId as Id<"studioPrompts">, rating });
+  return async (publicPromptId: Id<"studioPrompts">, rating: number) => {
+    await rate({ publicPromptId, rating });
   };
 }
 
@@ -142,25 +139,25 @@ export function useRatePrompt() {
 export function useUpdatePrompt() {
   const update = useMutation(api.studio.prompts.index.updatePrompt);
   return async (
-    promptId: string,
+    promptId: Id<"studioPrompts">,
     updates: { title?: string; description?: string; promptText?: string },
   ) => {
-    await update({ promptId: promptId as Id<"studioPrompts">, ...updates });
+    await update({ promptId, ...updates });
   };
 }
 
 /** Delete a prompt. */
 export function useDeletePrompt() {
   const del = useMutation(api.studio.prompts.index.deletePrompt);
-  return async (promptId: string) => {
-    await del({ promptId: promptId as Id<"studioPrompts"> });
+  return async (promptId: Id<"studioPrompts">) => {
+    await del({ promptId });
   };
 }
 
 /** Report a public prompt. */
 export function useReportPrompt() {
   const report = useMutation(api.studio.prompts.index.reportPrompt);
-  return async (promptId: string, reason?: string) => {
-    await report({ promptId: promptId as Id<"studioPrompts">, reason });
+  return async (promptId: Id<"studioPrompts">, reason?: string) => {
+    await report({ promptId, reason });
   };
 }

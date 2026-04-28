@@ -8,6 +8,8 @@ export const PROMPT_DESCRIPTION_MAX_LENGTH = 300;
 // ── Moderation ────────────────────────────────────────────────────────
 /** Auto-hide a public prompt once it accumulates this many reports. */
 export const PROMPT_REPORT_AUTO_HIDE_THRESHOLD = 5;
+/** Max length for report reason (abuse hardening). */
+export const PROMPT_REPORT_REASON_MAX_LENGTH = 500;
 
 // ── Bayesian rating ───────────────────────────────────────────────────
 export const RATING_PRIOR_MEAN = 4.0;
