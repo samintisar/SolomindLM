@@ -106,26 +106,20 @@ export const getChecklistProgress = query({
     };
     if (!userId) return empty;
 
-    const [hasNotebook, hasDocument, hasConversation] = await Promise.all([
-      userHasAny(ctx, "notebooks", userId),
-      userHasAny(ctx, "documents", userId),
-      userHasAnyConversation(ctx, userId),
-    ]);
-
-    let hasArtifact = false;
-    for (const table of ARTIFACT_TABLES) {
-      if (await userHasAny(ctx, table, userId)) {
-        hasArtifact = true;
-        break;
-      }
-    }
+    const [hasNotebook, hasDocument, hasConversation, ...artifactFlags] =
+      await Promise.all([
+        userHasAny(ctx, "notebooks", userId),
+        userHasAny(ctx, "documents", userId),
+        userHasAnyConversation(ctx, userId),
+        ...ARTIFACT_TABLES.map((tbl) => userHasAny(ctx, tbl, userId)),
+      ]);
 
     return {
       createNotebook: hasNotebook,
       addSource: hasDocument,
       askQuestion: hasConversation,
       openStudio: false,
-      generateArtifact: hasArtifact,
+      generateArtifact: artifactFlags.some(Boolean),
     };
   },
 });
