@@ -127,3 +127,13 @@ export const restartTour = mutation({
     return null;
   },
 });
+
+export const showChecklist = mutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const row = await loadRow(ctx);
+    await ctx.db.patch(row._id, { checklistDismissed: false });
+    return null;
+  },
+});

@@ -331,6 +331,22 @@ describe("restartTour", () => {
   });
 });
 
+describe("showChecklist", () => {
+  test("sets checklistDismissed back to false", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedRow(t, {
+      tourStatus: "active",
+      checklistDismissed: true,
+    });
+    await withAuth(t, userId).mutation(
+      api.onboarding.mutations.showChecklist,
+      {},
+    );
+    const row = await readRow(t, userId);
+    expect(row?.checklistDismissed).toBe(false);
+  });
+});
+
 describe("auth requirement", () => {
   test.each([
     ["startTour"],
@@ -338,6 +354,7 @@ describe("auth requirement", () => {
     ["completeTour"],
     ["dismissChecklist"],
     ["restartTour"],
+    ["showChecklist"],
   ] as const)("%s throws when unauthenticated", async (name) => {
     const t = convexTest(schema, modules);
     await expect(
@@ -349,6 +366,7 @@ describe("auth requirement", () => {
             | "completeTour"
             | "dismissChecklist"
             | "restartTour"
+            | "showChecklist"
         ],
         {},
       ),
