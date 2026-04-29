@@ -188,6 +188,23 @@ describe("advanceTourStep", () => {
       ),
     ).rejects.toThrow();
   });
+
+  test("silent no-op when tour is not active (stale currentStepId)", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedRow(t, {
+      tourStatus: "skipped",
+      currentStepId: "addSource",
+    });
+    await expect(
+      withAuth(t, userId).mutation(
+        api.onboarding.mutations.advanceTourStep,
+        { expectedCurrentStepId: "addSource" },
+      ),
+    ).resolves.toBeNull();
+    const row = await readRow(t, userId);
+    expect(row?.tourStatus).toBe("skipped");
+    expect(row?.currentStepId).toBe("addSource");
+  });
 });
 
 describe("skipTour", () => {
@@ -206,6 +223,20 @@ describe("skipTour", () => {
     expect(row?.tourStatus).toBe("skipped");
     expect(row?.checklistDismissed).toBe(false);
   });
+
+  test("clears currentStepId after skip", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedRow(t, {
+      tourStatus: "active",
+      currentStepId: "addSource",
+    });
+    await withAuth(t, userId).mutation(
+      api.onboarding.mutations.skipTour,
+      {},
+    );
+    const row = await readRow(t, userId);
+    expect(row?.currentStepId).toBeUndefined();
+  });
 });
 
 describe("completeTour", () => {
@@ -222,6 +253,20 @@ describe("completeTour", () => {
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("completed");
     expect(row?.completedAt).toBeTypeOf("number");
+  });
+
+  test("clears currentStepId after complete", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedRow(t, {
+      tourStatus: "active",
+      currentStepId: "openStudio",
+    });
+    await withAuth(t, userId).mutation(
+      api.onboarding.mutations.completeTour,
+      {},
+    );
+    const row = await readRow(t, userId);
+    expect(row?.currentStepId).toBeUndefined();
   });
 });
 
@@ -269,6 +314,20 @@ describe("restartTour", () => {
     expect(row?.tourNotebookId).toBeUndefined();
     expect(row?.completedAt).toBeUndefined();
     expect(row?.startedAt).toBeTypeOf("number");
+  });
+
+  test("resets checklistDismissed to false", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedRow(t, {
+      tourStatus: "completed",
+      checklistDismissed: true,
+    });
+    await withAuth(t, userId).mutation(
+      api.onboarding.mutations.restartTour,
+      {},
+    );
+    const row = await readRow(t, userId);
+    expect(row?.checklistDismissed).toBe(false);
   });
 });
 

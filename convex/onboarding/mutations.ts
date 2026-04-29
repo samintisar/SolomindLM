@@ -51,6 +51,7 @@ export const advanceTourStep = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await loadRow(ctx);
+    if (row.tourStatus !== "active") return null;
     if (row.currentStepId !== args.expectedCurrentStepId) {
       throw new Error(
         `Step mismatch: expected ${args.expectedCurrentStepId}, got ${row.currentStepId ?? "undefined"}`,
@@ -78,7 +79,10 @@ export const skipTour = mutation({
   returns: v.null(),
   handler: async (ctx) => {
     const row = await loadRow(ctx);
-    await ctx.db.patch(row._id, { tourStatus: "skipped" });
+    await ctx.db.patch(row._id, {
+      tourStatus: "skipped",
+      currentStepId: undefined,
+    });
     return null;
   },
 });
@@ -90,6 +94,7 @@ export const completeTour = mutation({
     const row = await loadRow(ctx);
     await ctx.db.patch(row._id, {
       tourStatus: "completed",
+      currentStepId: undefined,
       completedAt: Date.now(),
     });
     return null;
@@ -117,6 +122,7 @@ export const restartTour = mutation({
       startedAt: Date.now(),
       tourNotebookId: undefined,
       completedAt: undefined,
+      checklistDismissed: false,
     });
     return null;
   },
