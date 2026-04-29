@@ -80,6 +80,7 @@ export const SourceList: React.FC<SourceListProps> = ({
         <div className="flex gap-2">
           <button
             type="button"
+            data-onboarding="add-source-button"
             onClick={onAddSource}
             className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? "px-3" : ""}`}
             title={actionIconsOnly || actionAbbrevLabels ? "Add Source" : ""}

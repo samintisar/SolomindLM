@@ -36,7 +36,7 @@ const IconMap: Record<string, React.FC<any>> = {
  */
 export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, width, activeToolId }) => {
   return (
-    <div className="space-y-3" data-testid="studio-tool-grid">
+    <div className="space-y-3" data-onboarding="studio-tool-grid" data-testid="studio-tool-grid">
       <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 font-display">
         Create
       </h3>
