@@ -3,6 +3,11 @@ import type { ComponentType, ReactNode } from "react";
 declare module "react-router-dom" {
   export const Navigate: ComponentType<{ to: string; replace?: boolean }>;
   export const BrowserRouter: ComponentType<{ children?: ReactNode }>;
+  export const MemoryRouter: ComponentType<{
+    children?: ReactNode;
+    initialEntries?: string[];
+    initialIndex?: number;
+  }>;
   export const Routes: ComponentType<{ children?: ReactNode }>;
   export const Route: ComponentType<{
     path?: string;
