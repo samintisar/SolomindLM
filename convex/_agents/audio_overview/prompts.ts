@@ -61,38 +61,48 @@ export const DIALOGUE_CHUNK_SIZE = 30;
 
 /** Map prompts for each audio type */
 export const MAP_PROMPTS: Record<AudioType, string> = {
-  deep_dive: `Analyze this text and extract "dialogue beats" for an engaging podcast conversation.
+  deep_dive: `Read this chunk and extract material that's ready to become a real
+two-host conversation. Each "beat" is ONE conversational move, not one fact.
+Stay specific — pull verbatim numbers, proper nouns, and contrasts the chunk
+gives you. Do NOT paraphrase into generic statements; the reducer can't recover
+specificity once you smooth it out.
 
-For EACH major point, extract:
-- The core fact/concept (what it is)
-- Why it matters (significance)
-- A concrete example or analogy
-- A potential debate angle or counterpoint
-- Follow-up questions a curious listener would ask
+Tag each beat by the kind of move it is, so the reducer can stitch them into
+uneven, lifelike dialogue:
 
-Extract at least 8-12 dialogue beats from this chunk to ensure rich conversation material.
+- CLAIM:       A specific assertion the expert host can make. Include the evidence
+               inline (number, citation, name).
+- PUSHBACK:    A real objection or "wait, but —" the curious host would raise.
+               Should poke at hand-waviness, missing definitions, or weak evidence
+               in the source — not just ask for elaboration.
+- FOLLOWUP:    A question that takes the discussion one layer deeper. Prefer
+               "what happens when X breaks?" or "how is this different from Y?"
+               over "can you tell me more about X?"
+- HESITATION:  A spot where one host backs up, qualifies, or admits the source is
+               fuzzy. ("Honestly, the source doesn't pin a number on this — they
+               give a 5–20% range, so treat it as a range.")
+- AHA:         A connection between two ideas the source doesn't draw explicitly.
+- RECAP:       A short summary the hosts can use to round out a stretch.
+- NAMED_ITEM:  Use ONLY when the chunk introduces a discrete named-list item
+               (e.g. "Pattern: prompt chaining — break a task into ordered
+               steps."). Use the exact name verbatim. The reducer relies on
+               these to guarantee complete coverage of the source's named list.
+               Emit ONE NAMED_ITEM per named item appearing in this chunk; do
+               not collapse them.
 
-NAMED-LIST COVERAGE:
-If the chunk enumerates a discrete, named list of items (e.g. "the 20 patterns",
-"the 7 principles", "frameworks: X, Y, Z"), produce one dedicated beat per named
-item that appears in this chunk. Use the exact name verbatim in the beat. Do not
-collapse named items into a single beat or skip any named item that the chunk
-introduces — the downstream reducer needs the names preserved to build a complete
-script.
+Produce 8–12 beats from this chunk with a mix of types. CLAIM-only stretches
+read robotic — intersperse PUSHBACK / HESITATION / FOLLOWUP. NAMED_ITEM beats
+are mandatory whenever the chunk introduces a named list item, and they do NOT
+count against the 8–12 target — emit them in addition.
 
-Focus on:
-- Surprising facts or data points that would make listeners say "Wow!"
-- Controversial statements or counterintuitive ideas that could spark debate
-- Complex concepts that need simple analogies to understand
-- Personal stories or vivid examples that bring content to life
-- Discussion points that would make great conversation starters
+Format: each beat on its own line, prefixed with the type and a colon.
 
-Format as a bulleted list with clear categories:
-• Surprising Facts: [bulleted list with details]
-• Controversial Points: [bulleted list with debate angles]
-• Complex Concepts: [with brief explanations and analogies]
-• Discussion Starters: [conversation topics with follow-up questions]
-• Examples & Stories: [concrete illustrations]
+Illustrative example (do not copy the wording):
+CLAIM: The author benchmarks routing at 85% F1 across a 5k-intent test set.
+PUSHBACK: 85% F1 looks fine on paper, but he doesn't break it out by category — the long-tail intents could be much worse.
+FOLLOWUP: What does the system do when the router's softmax sits right at the threshold?
+HESITATION: He's loose on what "threshold" means here — at one point it's 0.7, later he writes 0.65 without flagging the change.
+NAMED_ITEM: Pattern: routing — a small classifier dispatches incoming work to a downstream agent or tool.
 
 TEXT TO ANALYZE:
 {chunk}`,
@@ -170,73 +180,98 @@ Output ONLY a valid JSON array of dialogue lines with this exact format:
   {"speaker": "host_b", "text": "..."}
 ]
 
-CRITICAL LENGTH REQUIREMENTS:
-- Generate EXACTLY {targetLines} speaker turns (JSON objects with "speaker" and "text")
-- Each turn should usually be 2-5 sentences (roughly 25-55 words). Prefer fuller turns over choppy one-liners—listeners should hear real paragraphs, not ping-pong quips
-- Occasionally let one host speak twice in a row when they are explaining a concept, telling a mini-story, or answering a multi-part question (then the other host responds)
-- Total target: approximately {estimatedWords} words
-- DO NOT summarize - explore topics in depth with examples, elaboration, and follow-up questions
-- Include natural tangents and deeper dives into interesting points
-- Add "thinking out loud" moments where hosts process information
+LENGTH (CEILING, not a quota):
+- The natural shape of the conversation decides where it ends. {targetLines} turns
+  / ~{estimatedWords} words is a CEILING — never a target to reach. If the dialogue
+  reaches a satisfying recap + sign-off in 30 turns, stop at 30. Do NOT generate
+  filler turns or restart the conversation to inflate the count.
+- A reaction can be five words; an explanation can be eight sentences. Same speaker
+  can take two or three turns in a row when telling a mini-story, working out an
+  argument, or recovering from a misspoken phrase.
+- DO NOT summarize. Stay specific. If a beat hands you a number, an example, or
+  a counterpoint, use it verbatim instead of paraphrasing into something generic.
 
-ANTI-REPETITION RULES:
-- Build on previous discussion rather than repeating it
-- If a concept was explained before, refer to it briefly and move to NEW aspects
-- You MAY discuss different concepts, rules, or aspects of the same topic
-  - Example: If "A*" was covered, you can still discuss "admissibility", "consistency", or "complexity"
-  - Example: If "BFS" was covered, you can still discuss "DFS comparison" or "optimality proofs"
-- Use DIFFERENT examples and analogies - don't reuse them from earlier parts
-- Each chunk should feel like a progression forward, not a restatement
-
-NAMED-LIST COVERAGE (overrides depth-vs-breadth tradeoff):
-If the dialogue beats reference a discrete, named list of items from the source
-(e.g. "20 patterns", "7 principles", "frameworks: X, Y, Z"), the script MUST
-mention every named item by its exact name at least once before ending. Use
-quick consecutive turns to name-check items the script has not yet covered if
-the deeper beats only landed on a subset. A natural way to do this is a brief
-"so what's the full list?" style turn near the end where one host names the
-remaining items. Do not omit a named item to preserve narrative flow.
+ANTI-REPETITION:
+- Build on what was already said; don't restate it.
+- If a concept was already explained, jump to a new angle on it (consequences, edge cases,
+  comparison to a sibling concept) rather than re-explaining.
+- Don't reuse examples or analogies from earlier turns.
 
 {coveredTopicsPrompt}
 
-HOST PERSONALITIES:
-- host_a (Asteria - Expert): Knowledgeable, explains concepts clearly, provides specific details, cites evidence, sounds authoritative but accessible. Vary acknowledgments—do not open most replies with "Right," or "Exactly," (use sparingly across the whole script). Mix in "So," "One thing that stands out," "The short version is," "What the data actually shows," and direct answers without a verbal tic
-- host_b (Orion - Interviewer): Genuinely curious and intellectually engaged. Asks thoughtful follow-up questions, makes connections, reacts with varied language—rotate "That's fascinating," "I hadn't considered that," "So what you're saying is," "Walk me through," "How does that square with..." Avoid repeating the same reaction phrase in consecutive turns
+HOST VOICES (speak the way the samples below speak — do not just role-play the labels):
 
-NATURALNESS REQUIREMENTS FOR PODCAST DIALOGUE:
-- host_b should sound intellectually curious and engaged - excited about ideas, not just shocked
-- Include thoughtful reactions: "That's really interesting," "That's a great way to put it," "I see what you mean," "That connects to something you said earlier"
-- Add hesitation markers naturally: "Hmm," "let me think about this," "so in other words" (but not excessive)
-- Use emphasis words thoughtfully: "really," "actually," "essentially," "fundamentally" - for clarity, not drama
-- host_b should respond with genuine engagement: "That's a great point," "That helps me understand," "I hadn't thought of it that way"
-- Add breathing room with "..." for thoughtful pauses when processing complex ideas
-- Both hosts should show authentic intellectual engagement - excited about learning, not performing
+host_a is the one who's been thinking about this stuff for years. Direct, slightly
+dry, no hedging. Drops in specific numbers and proper nouns without ceremony.
+Sample:
+  "Okay so prompt chaining. You take a big task, break it into ordered steps, and you
+   feed each step's output into the next. That's it. The reason it works is every step
+   gets to fail loudly, in isolation. You're not asking one model call to do five things
+   at once and then wondering which of the five went wrong."
+  "Right, but routing isn't that. Routing is — you've got incoming work, and a small
+   classifier decides which downstream agent or tool actually handles it. Cheap, fast,
+   wrong half the time if you don't tune it. Different problem."
 
-GUIDELINES FOR NATURAL CONVERSATION:
-1. Alternate speakers in a human rhythm: default is back-and-forth, but break strict A-B-A-B when it helps—two turns from the same host in a row is fine for explanations, stories, or a quick follow-up
-2. Keep most turns substantive (2-5 sentences; avoid a script of single-sentence ping-pong)
-3. host_a provides explanations and depth, host_b reacts and asks follow-ups
-4. OPENING: Start from the actual material—a striking number, a tension, a question, or a plain-spoken summary of why this matters. NEVER use a canned podcast opener; do not begin with "So, here's something wild" or any fixed stock phrase. The first line should sound specific to this topic
-5. End with a summary reflection or takeaway
-6. Make it sound like two real people talking, not reading a script
-7. When something is surprising or insightful, host_b responds with varied wording—not the same praise every time
-8. Use "..." sparingly for thoughtful pauses when processing complex ideas
-9. host_b should ask clarifying questions that help listeners understand; vary how those questions start
+host_b is the one hearing it for the first time but not pretending to be amazed.
+Asks the real follow-up. Pushes back when something's hand-wavy.
+Sample:
+  "Hold on — you said it fails loudly. In practice, doesn't it just fail at step three
+   and the user sees a wall of JSON?"
+  "Hmm. So routing assumes you already know the categories. What happens when the request
+   doesn't fit any of them — does it default, or just sit there?"
 
-ANTI-ROBOTIC RULES (critical):
-- Do not begin more than one host_a turn in the entire script with "Right," — same for "Exactly," as a sentence starter
-- Do not mirror the same sentence structure every turn (e.g. every line starting with the same filler)
-- Vary energy: some turns are short reactions, others are longer explanations—avoid uniform length every time
+DO NOT include the host names "Asteria" or "Orion" in the dialogue text. Just write
+their lines. The speaker labels are JSON metadata, not character names the listener hears.
 
-EXAMPLES OF ENGAGING DIALOGUE (structure and rhythm—do not copy wording literally):
-host_b: "That's a really interesting point... so you're saying that [concept] works like [analogy]?"
-host_a: "You've got it. What's particularly noteworthy is how [detail] connects to [broader principle]."
-host_b: "That helps me understand it better. But what about [edge case]?"
-host_a: "Great question—that's where [nuance] comes in. [One or two more sentences unpacking it.]"
-host_b: "Okay, so it's not just [simple view], it's actually [more sophisticated view]."
+DO NOT use "..." as a stylistic pause. If a thought is unfinished, write it that way —
+"Hold on, that doesn't —" — but don't sprinkle ellipses to fake naturalness.
+
+OPENING:
+Start mid-thought, with something specific to this material — a number, a contradiction,
+a half-finished question. Never a stock podcast opener. Never "So, today we're talking
+about..." or "Welcome back, listeners."
+
+NAMED-LIST RECAP (only when applicable):
+If the source enumerates a discrete named list (e.g. "the 20 patterns") and the deeper
+discussion only landed on a subset, near the end give host_a or host_b ONE substantive
+recap turn that names every remaining item in plain prose — like a person actually
+recalling a list, not a checklist robot. Example shape (do NOT copy wording literally):
+  host_a: "We hit the big ones, but to round it out — the rest of the list is reflection,
+   tool use, planning, multi-agent collaboration, memory management, learning and
+   adaptation, goal setting and monitoring, and a handful more. Each one's a separate
+   conversation, but at least you know the lay of the land."
+This is ONE turn, not a sprinkled checklist across multiple turns. Do not break it
+into ping-pong "And what about X?" / "Right, X is —" exchanges.
+
+ENDING ANCHOR (hard rule, overrides length target):
+After the recap turn (or, if no recap is applicable, after host_a's final
+explanation), produce at most ONE short closing turn from host_b — a brief
+take-away or sign-off, 1–2 sentences max — and then STOP. Close the JSON array.
+
+Things that are NOT permitted after the closing turn:
+- Restarting the conversation with a new opening hook (e.g. "The Google
+  engineer's 400-page book..." or "The author claims..." again).
+- Re-introducing the topic or re-naming items already covered or recapped.
+- Generating additional turns to "fill" the {targetLines} target — that
+  number is a ceiling, never a quota. Stopping early is correct; looping is
+  a generation defect.
+
+If you are tempted to keep going because you "haven't reached the target line
+count", you have already finished. Output the closing turn and emit "]".
+
+EXAMPLES OF GOOD RHYTHM (for cadence reference, not wording):
+host_a: "There are twenty of these patterns in the book. Most of them you can group
+ into three or four families, but the author keeps them separate because the failure
+ modes are different."
+host_b: "Twenty feels like a lot. Is the author padding, or are they actually all
+ doing different work?"
+host_a: "Mostly different work. A few overlap — routing and prioritization are
+ cousins. But things like reflection and exception-handling are doing genuinely
+ different jobs even if they sound similar in a paragraph."
+host_b: "Okay. Start with the one you think people misuse the most."
 
 AUDIO TYPE: {audioType}
-TARGET LENGTH: {targetLines} dialogue turns (~{estimatedWords} words)
+ROUGH LENGTH: ~{targetLines} turns / ~{estimatedWords} words (approximate, not enforced)
 FOCUS AREA: {focus}
 
 SOURCE MATERIAL (dialogue beats):
