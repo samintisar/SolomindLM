@@ -43,6 +43,7 @@ build/Release
 
 # Dependency directories
 .bun/
+.conda/
 node_modules/
 jspm_packages/
 
@@ -162,3 +163,6 @@ playwright-report/
 test-results/
 .auth/
 .env.e2e
+
+# RAG eval exported artifacts (local)
+evals/rag/generated/

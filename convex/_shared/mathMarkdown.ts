@@ -12,6 +12,26 @@ function decodeMathEntities(value: string): string {
   return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
+/**
+ * LLMs and JSON often emit "\\\\(" instead of "\\(" for LaTeX delimiters. The first pass of
+ * {@link normalizeMathDelimiters} only matches "\\(", leaving a stray "\\" before "$...$". Markdown
+ * then treats "\\$" as an escaped dollar, so users see raw "$\\gamma$" instead of KaTeX.
+ * Repeat until stable so "\\\\\\\\(" collapses to "\\(".
+ */
+function collapseDoubledTexDelimiterBackslashes(value: string): string {
+  let prev = "";
+  let out = value;
+  while (out !== prev) {
+    prev = out;
+    out = out
+      .replace(/\\\\\(/g, "\\(")
+      .replace(/\\\\\)/g, "\\)")
+      .replace(/\\\\\[/g, "\\[")
+      .replace(/\\\\\]/g, "\\]");
+  }
+  return out;
+}
+
 function trimMathContent(value: string): string {
   return decodeMathEntities(value)
     .trim()
@@ -265,7 +285,8 @@ function fixArraysInAllMathSpans(segment: string): string {
 }
 
 function normalizeTextOutsideMathOnly(segment: string): string {
-  const arrayFixed = fixArraysInAllMathSpans(segment);
+  const delimiterFixed = collapseDoubledTexDelimiterBackslashes(segment);
+  const arrayFixed = fixArraysInAllMathSpans(delimiterFixed);
   const stripped = stripInnerInlineDollarsInDisplayMath(arrayFixed);
   return splitByMathDelimiters(stripped)
     .map((part) => (part.kind === "text" ? normalizeTextSegment(part.s) : part.s))

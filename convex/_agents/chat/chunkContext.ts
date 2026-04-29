@@ -8,6 +8,8 @@ import {
   MIN_RELEVANCE_THRESHOLD,
 } from "./chatConfig.js";
 
+export { LIST_QUERY_RELEVANCE_THRESHOLD } from "./chatConfig.js";
+
 export function chunkDedupKey(c: ReferenceChunk): string {
   return `${c.sourceId}:${c.chunkIndex}`;
 }
@@ -39,6 +41,33 @@ type ContextLogger = {
   performance: (metric: string, value: number, unit: string, meta?: Record<string, unknown>) => void;
 };
 
+export type SelectChunksOptions = {
+  maxSelectedChunks?: number;
+  /** Secondary sort: prefer chunks whose text overlaps question terms (list / enumeration RAG). */
+  lexicalQuery?: string;
+  /** Override CONTEXT_TOKEN_BUDGET (e.g. list queries: keep prompt focused on top reranked hits). */
+  maxContextTokens?: number;
+};
+
+/** Count significant query tokens appearing in chunk text (cheap lexical grounding signal). */
+function lexicalOverlapScore(chunk: ReferenceChunk, query: string): number {
+  const normalized = query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = normalized
+    .split(" ")
+    .filter((w) => w.length > 2);
+  if (tokens.length === 0) return 0;
+  const text = chunk.content.toLowerCase();
+  let hit = 0;
+  for (const t of tokens) {
+    if (text.includes(t)) hit++;
+  }
+  return hit;
+}
+
 /**
  * Selects chunks using token-based budgeting with relevance threshold.
  *
@@ -47,48 +76,94 @@ type ContextLogger = {
  * 2. Sort remaining chunks by relevance score (descending)
  * 3. Add chunks one-by-one until token budget is exhausted
  * 4. Enforce hard maximum chunk limit as safety cap
+ *
+ * @param chunks - All retrieved chunks to select from
+ * @param logger - Optional context logger
+ * @param relevanceThreshold - Optional custom threshold (default: MIN_RELEVANCE_THRESHOLD)
+ * @param options - Optional cap on chunk count and lexical re-ranking for list queries
  */
 export function selectChunksByTokenBudget(
   chunks: ReferenceChunk[],
-  logger?: ContextLogger
+  logger?: ContextLogger,
+  relevanceThreshold?: number,
+  options?: SelectChunksOptions
 ): ReferenceChunk[] {
-  const relevantChunks = chunks.filter(
-    (chunk) => chunkRankingScore(chunk) >= MIN_RELEVANCE_THRESHOLD
+  const threshold = relevanceThreshold ?? MIN_RELEVANCE_THRESHOLD;
+  let relevantChunks = chunks.filter(
+    (chunk) => chunkRankingScore(chunk) >= threshold
   );
 
+  // If retrieval returned candidates but the relevance floor filtered everything,
+  // relax monotonically then fall back to top-by-score (production RAG pattern:
+  // grounded answer with imperfect ranking beats empty context + ungrounded model guess).
+  if (relevantChunks.length === 0 && chunks.length > 0) {
+    const MIN_FALLBACK_FLOOR = 0.06;
+    let relaxed = threshold;
+    while (relevantChunks.length === 0 && relaxed > MIN_FALLBACK_FLOOR) {
+      relaxed *= 0.72;
+      relevantChunks = chunks.filter(
+        (chunk) => chunkRankingScore(chunk) >= relaxed
+      );
+    }
+    if (relevantChunks.length === 0) {
+      const topN = Math.min(5, chunks.length);
+      relevantChunks = [...chunks]
+        .sort((a, b) => chunkRankingScore(b) - chunkRankingScore(a))
+        .slice(0, topN);
+      logger?.warn(
+        `No chunks met relevance threshold ${threshold}; using top-${topN} by score as fallback`,
+        { scores: relevantChunks.map((c) => chunkRankingScore(c)) }
+      );
+    } else {
+      logger?.warn(
+        `Relaxed relevance floor from ${threshold} to ${relaxed.toFixed(4)} (${relevantChunks.length} chunk(s))`
+      );
+    }
+  }
+
   if (relevantChunks.length === 0) {
-    logger?.warn(
-      `No chunks met relevance threshold ${MIN_RELEVANCE_THRESHOLD}, returning empty context`
-    );
+    logger?.warn("No chunks to select from");
     return [];
   }
 
-  const sortedChunks = [...relevantChunks].sort(
-    (a, b) => chunkRankingScore(b) - chunkRankingScore(a)
-  );
+  const lexQ = options?.lexicalQuery?.trim();
+  const sortedChunks = [...relevantChunks].sort((a, b) => {
+    if (!lexQ) {
+      return chunkRankingScore(b) - chunkRankingScore(a);
+    }
+    const overlapWeight = 0.04;
+    const ca =
+      chunkRankingScore(a) + overlapWeight * lexicalOverlapScore(a, lexQ);
+    const cb =
+      chunkRankingScore(b) + overlapWeight * lexicalOverlapScore(b, lexQ);
+    return cb - ca;
+  });
 
   const selectedChunks: ReferenceChunk[] = [];
   let usedTokens = 0;
+  const chunkCap = Math.min(
+    options?.maxSelectedChunks ?? MAX_CHUNKS_HARD_LIMIT,
+    MAX_CHUNKS_HARD_LIMIT
+  );
+  const tokenBudget = options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET;
 
   for (const chunk of sortedChunks) {
-    if (selectedChunks.length >= MAX_CHUNKS_HARD_LIMIT) {
-      logger?.info(
-        `Reached hard chunk limit (${MAX_CHUNKS_HARD_LIMIT}), stopping selection`
-      );
+    if (selectedChunks.length >= chunkCap) {
+      logger?.info(`Reached selection cap (${chunkCap}), stopping selection`);
       break;
     }
 
     const chunkTokens = countTokens(chunk.content);
 
-    if (usedTokens + chunkTokens > CONTEXT_TOKEN_BUDGET) {
+    if (usedTokens + chunkTokens > tokenBudget) {
       if (selectedChunks.length > 0) {
         logger?.info(
-          `Token budget exhausted (${usedTokens}/${CONTEXT_TOKEN_BUDGET} tokens), selected ${selectedChunks.length} chunks`
+          `Token budget exhausted (${usedTokens}/${tokenBudget} tokens), selected ${selectedChunks.length} chunks`
         );
         break;
       }
       logger?.warn(
-        `Single chunk exceeds token budget (${chunkTokens} > ${CONTEXT_TOKEN_BUDGET}), including anyway`
+        `Single chunk exceeds token budget (${chunkTokens} > ${tokenBudget}), including anyway`
       );
     }
 
@@ -103,9 +178,9 @@ export function selectChunksByTokenBudget(
   logger?.performance("contextSelection", selectedCount, "chunks", {
     originalCount,
     filteredCount,
-    threshold: MIN_RELEVANCE_THRESHOLD,
+    threshold,
     usedTokens,
-    tokenBudget: CONTEXT_TOKEN_BUDGET,
+    tokenBudget,
   });
 
   return selectedChunks;

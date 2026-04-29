@@ -10,7 +10,7 @@ import * as Notebooks from "../_model/notebooks";
 function toNotebookDTO(
   notebook: Pick<
     Doc<"notebooks">,
-    "_id" | "title" | "updatedAt" | "coverColor" | "icon" | "isFeatured" | "folderId" | "createdAt"
+    "_id" | "title" | "updatedAt" | "coverColor" | "icon" | "isFeatured" | "folderId" | "createdAt" | "chatSettings"
   >,
   sourceCount: number,
   options?: { isSharedNotebook?: boolean }
@@ -31,6 +31,7 @@ function toNotebookDTO(
     created_at: notebook.createdAt,
     updated_at: notebook.updatedAt,
     isSharedNotebook: options?.isSharedNotebook ?? false,
+    chatSettings: notebook.chatSettings ?? undefined,
   };
 }
 
@@ -195,6 +196,22 @@ export const update = mutation({
     icon: v.optional(v.string()),
     isFeatured: v.optional(v.boolean()),
     folderId: v.optional(v.id("folders")),
+    chatSettings: v.optional(
+      v.object({
+        instructionMode: v.union(
+          v.literal("default"),
+          v.literal("learningGuide"),
+          v.literal("custom"),
+        ),
+        customInstructions: v.optional(v.string()),
+        responseLength: v.union(
+          v.literal("default"),
+          v.literal("longer"),
+          v.literal("shorter"),
+        ),
+        smartModel: v.optional(v.string()),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);

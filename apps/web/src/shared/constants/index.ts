@@ -1,5 +1,7 @@
 import { Source, Message, StudioTool, Note, NotebookItem } from "@/shared/types/index";
 
+export * from "./models";
+
 export const MOCK_SOURCES: Source[] = [
   {
     id: "1",

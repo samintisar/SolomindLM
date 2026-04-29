@@ -10,6 +10,8 @@ export interface ChatStreamingContextType {
   /** When true, block starting a new message (last DB row is not assistant while server refcount > 0). */
   remoteGenerationBlocksSend: boolean;
   onSendMessage: (messageText: string, deepResearch?: boolean, sourcePolicy?: { channels: string[] }) => void;
+  /** Stop the current streaming response */
+  onStopChat: () => void;
   /** Attach UI to the HTTP body from POST /research/execute (same markers as chat stream). */
   consumeResearchExecuteStream: (response: Response) => Promise<void>;
   onClearHistory: () => void;

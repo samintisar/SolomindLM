@@ -243,6 +243,7 @@ import type * as documents_paperRecord from "../documents/paperRecord.js";
 import type * as documents_refreshRemote from "../documents/refreshRemote.js";
 import type * as e2e_cleanupFolders from "../e2e/cleanupFolders.js";
 import type * as e2e_cleanupNotebooks from "../e2e/cleanupNotebooks.js";
+import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
 import type * as folders_index from "../folders/index.js";
 import type * as googleDrive from "../googleDrive.js";
 import type * as http from "../http.js";
@@ -282,6 +283,8 @@ import type * as studio_jobMutations_writtenQuestions from "../studio/jobMutatio
 import type * as studio_mindmaps_index from "../studio/mindmaps/index.js";
 import type * as studio_mindmaps_job from "../studio/mindmaps/job.js";
 import type * as studio_mindmaps_mindmapJobPhases from "../studio/mindmaps/mindmapJobPhases.js";
+import type * as studio_prompts_config from "../studio/prompts/config.js";
+import type * as studio_prompts_index from "../studio/prompts/index.js";
 import type * as studio_quizzes_index from "../studio/quizzes/index.js";
 import type * as studio_quizzes_job from "../studio/quizzes/job.js";
 import type * as studio_quizzes_quizJobPhases from "../studio/quizzes/quizJobPhases.js";
@@ -546,6 +549,7 @@ declare const fullApi: ApiFromModules<{
   "documents/refreshRemote": typeof documents_refreshRemote;
   "e2e/cleanupFolders": typeof e2e_cleanupFolders;
   "e2e/cleanupNotebooks": typeof e2e_cleanupNotebooks;
+  "eval/chatEvalAction": typeof eval_chatEvalAction;
   "folders/index": typeof folders_index;
   googleDrive: typeof googleDrive;
   http: typeof http;
@@ -585,6 +589,8 @@ declare const fullApi: ApiFromModules<{
   "studio/mindmaps/index": typeof studio_mindmaps_index;
   "studio/mindmaps/job": typeof studio_mindmaps_job;
   "studio/mindmaps/mindmapJobPhases": typeof studio_mindmaps_mindmapJobPhases;
+  "studio/prompts/config": typeof studio_prompts_config;
+  "studio/prompts/index": typeof studio_prompts_index;
   "studio/quizzes/index": typeof studio_quizzes_index;
   "studio/quizzes/job": typeof studio_quizzes_job;
   "studio/quizzes/quizJobPhases": typeof studio_quizzes_quizJobPhases;

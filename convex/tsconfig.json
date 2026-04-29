@@ -30,7 +30,6 @@
   "include": ["./**/*"],
   "exclude": [
     "./_generated",
-    "./**/*.test.ts",
-    "./vitest.config.ts"
+    "./**/*.test.ts"
   ]
 }

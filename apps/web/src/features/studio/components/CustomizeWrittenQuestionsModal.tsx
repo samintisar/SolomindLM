@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, MessageSquareText } from "lucide-react";
+import { X, MessageSquareText, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface CustomizeWrittenQuestionsModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
   const [difficulty, setDifficulty] = useState<WrittenQuestionsConfig["difficulty"]>("medium");
   const [questionType, setQuestionType] = useState<WrittenQuestionsConfig["questionType"]>("short");
   const [focus, setFocus] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -49,7 +51,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="writtenQuestions" onApplyPrompt={setFocus} />
             <button
               type="button"
               onClick={onClose}
@@ -148,6 +150,15 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
               placeholder="e.g. Focus on 'Database Normalization' concepts or create a comprehensive review..."
               className="w-full h-32 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
             />
+            <button
+              type="button"
+              onClick={() => setSaveAsPromptModalOpen(true)}
+              disabled={!focus.trim()}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Save as reusable prompt
+            </button>
           </div>
 
           <div className="flex justify-end pt-2">
@@ -160,6 +171,14 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
           </div>
         </div>
       </div>
+
+      {/* Save as Prompt Modal */}
+      <SaveAsPromptModal
+        isOpen={saveAsPromptModalOpen}
+        onClose={() => setSaveAsPromptModalOpen(false)}
+        studioTool="writtenQuestions"
+        initialPromptText={focus}
+      />
     </div>
   );
 };

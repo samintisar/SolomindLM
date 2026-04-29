@@ -86,12 +86,21 @@ export const createConversation = mutation({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
+    // Snapshot the notebook's instruction mode onto the conversation (locked at creation)
+    const notebook = await ctx.db.get(args.notebookId);
+    const chatSettings = notebook?.chatSettings as {
+      instructionMode?: "default" | "learningGuide" | "custom";
+      customInstructions?: string;
+    } | undefined;
+
     const now = Date.now();
 
     const conversationId = await ctx.db.insert("conversations", {
       userId,
       notebookId: args.notebookId,
       title: args.title,
+      instructionMode: chatSettings?.instructionMode,
+      customInstructions: chatSettings?.customInstructions,
       createdAt: now,
       updatedAt: now,
     });

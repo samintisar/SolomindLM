@@ -75,7 +75,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
   const clearChatHistoryMutation = useMutation(api.chat.messages.clearHistory);
   const deleteMessagesFromMutation = useMutation(api.chat.messages.deleteMessagesFrom);
   const releaseChatGenerationMutation = useMutation(api.chat.messages.releaseChatGeneration);
-  const sendChatMessage = useSendMessage();
+  const { sendMessage, stopChat: stopSendMessage } = useSendMessage();
   const setMessageFeedback = useSetMessageFeedback();
 
   const [isChatStreaming, setIsChatStreaming] = useState(false);
@@ -103,6 +103,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const streamStartedAtRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [optimisticSaveNote, setOptimisticSaveNote] = useState<{
     notebookId: string;
@@ -128,6 +129,52 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
     setExternalSources([]);
     streamStartedAtRef.current = null;
   }, []);
+
+  // Reset streaming state when switching to a different conversation
+  useEffect(() => {
+    resetStreamingState();
+  }, [activeConversationId, resetStreamingState]);
+
+  // Auto-release stale chat generations (when generation is stuck for >5 minutes)
+  // This prevents the "Generating in another tab" message from showing forever
+  // when a stream crashes or is interrupted.
+  const STALE_GENERATION_MS = 5 * 60 * 1000; // 5 minutes
+  useEffect(() => {
+    if (
+      !isChatStreaming &&
+      chatRemoteGenerating &&
+      chatBundle?.chatGenerationStartedAt
+    ) {
+      const startedAt = chatBundle.chatGenerationStartedAt;
+      const now = Date.now();
+      const age = now - startedAt;
+
+      // Only auto-release if:
+      // 1. Generation is old (>5 min)
+      // 2. We're not actively streaming locally
+      // 3. There's no assistant message waiting for this generation
+      const last = messages[messages.length - 1];
+      const isWaitingForAssistant = last?.role !== "assistant";
+
+      if (age > STALE_GENERATION_MS && !isWaitingForAssistant && activeNotebookId) {
+        // Silently release the stuck generation
+        releaseChatGenerationMutation({
+          notebookId: activeNotebookId as Id<"notebooks">,
+        }).catch(() => {
+          // Best-effort: if it fails, user can manually retry
+        });
+      }
+    }
+  },
+    [
+      isChatStreaming,
+      chatRemoteGenerating,
+      chatBundle?.chatGenerationStartedAt,
+      messages,
+      activeNotebookId,
+      releaseChatGenerationMutation,
+    ]
+  );
 
   const handleSendMessage = useCallback(
     async (
@@ -179,7 +226,10 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       };
 
       try {
-        await sendChatMessage(
+        // Set up abort controller for this stream
+        abortControllerRef.current = new AbortController();
+
+        await sendMessage(
           activeNotebookId,
           messageText,
           {
@@ -241,7 +291,16 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
             onFollowUps: (qs) => setLastAssistantFollowUps(qs),
             onExternalSources: (sources) => setExternalSources(sources),
             onComplete: onStreamComplete,
-            onError: resetStreamingState,
+            onStopped: () => {
+              setIsChatStreaming(false);
+              setStreamingJustFinished(true);
+              streamStartedAtRef.current = null;
+              abortControllerRef.current = null;
+            },
+            onError: () => {
+              resetStreamingState();
+              abortControllerRef.current = null;
+            },
           },
           selectedDocumentIds.length > 0 ? selectedDocumentIds : [],
           deepResearch,
@@ -258,7 +317,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       isChatStreaming,
       chatRemoteGenerating,
       releaseChatGenerationMutation,
-      sendChatMessage,
+      sendMessage,
       resetStreamingState,
     ]
   );
@@ -491,6 +550,17 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
     ]
   );
 
+  // Central stop function that aborts both regular chat and research streams
+  const stopChat = useCallback(() => {
+    // Abort the shared abort controller (used by research stream)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Also stop the regular send message stream
+    stopSendMessage();
+  }, [stopSendMessage]);
+
   const sourceSuggestions = useSourceSuggestions(
     activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null,
     documents
@@ -510,6 +580,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
         const len = messagesRef.current.length;
         messagesLengthWhenStreamCompleteRef.current = len > 0 ? len : -1;
         streamStartedAtRef.current = null;
+        abortControllerRef.current = null;
       };
 
       const pushStatus = (status: string, message?: string) => {
@@ -549,6 +620,9 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       setStreamingTracePhases([{ status: "planning", message: "Running approved research…" }]);
       streamStartedAtRef.current = Date.now();
 
+      // Set up abort controller for this stream
+      abortControllerRef.current = new AbortController();
+
       try {
         await consumePersistentTextStream(response, {
           onToken: (token) => setStreamingContent((prev) => prev + token),
@@ -561,12 +635,20 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
           onToolCalls: (tcs) => setStreamingToolCalls(tcs),
           onGroundingChecks: (checks) => setStreamingGrounding(checks),
           onComplete: onResearchStreamComplete,
+          onStopped: () => {
+            setIsChatStreaming(false);
+            setStreamingJustFinished(true);
+            streamStartedAtRef.current = null;
+            abortControllerRef.current = null;
+          },
           onError: () => {
             resetStreamingState();
+            abortControllerRef.current = null;
           },
-        });
+        }, abortControllerRef.current.signal);
       } catch {
         resetStreamingState();
+        abortControllerRef.current = null;
         throw new Error("Research stream failed");
       }
     },
@@ -585,6 +667,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
     handleRetryMessage,
     setOptimisticSaveNote,
     consumeResearchExecuteStream,
+    stopChat,
     sourceCount,
     sourceSummary: sourceSuggestions.summary,
     suggestions: sourceSuggestions.suggestions,

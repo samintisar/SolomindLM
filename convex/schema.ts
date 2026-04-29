@@ -21,6 +21,22 @@ export default defineSchema({
     folderId: v.optional(v.id("folders")),
     /** Overrides env CHAT_GROUNDING_MODE when set: async | sync | off */
     chatGroundingMode: v.optional(v.union(v.literal("async"), v.literal("sync"), v.literal("off"))),
+    chatSettings: v.optional(
+      v.object({
+        instructionMode: v.union(
+          v.literal("default"),
+          v.literal("learningGuide"),
+          v.literal("custom"),
+        ),
+        customInstructions: v.optional(v.string()),
+        responseLength: v.union(
+          v.literal("default"),
+          v.literal("longer"),
+          v.literal("shorter"),
+        ),
+        smartModel: v.optional(v.string()),
+      })
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -308,6 +324,12 @@ export default defineSchema({
       })
     ),
     socraticThreadId: v.optional(v.string()),
+    /** Instruction mode locked at conversation creation. */
+    instructionMode: v.optional(
+      v.union(v.literal("default"), v.literal("learningGuide"), v.literal("custom"))
+    ),
+    /** Custom instructions locked at conversation creation (only used when instructionMode is "custom"). */
+    customInstructions: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -543,4 +565,103 @@ export default defineSchema({
 
   // Note: Direct scheduling used instead of jobs table
   // Jobs are scheduled directly via ctx.scheduler.runAfter() from mutations
+
+  // ── Prompt Library ──────────────────────────────────────────────────
+
+  // Core prompt records (both private and public)
+  studioPrompts: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    promptText: v.string(),
+    studioTool: v.union(
+      v.literal("report"),
+      v.literal("spreadsheet"),
+      v.literal("slides"),
+      v.literal("flashcards"),
+      v.literal("quiz"),
+      v.literal("audio"),
+      v.literal("writtenQuestions"),
+      v.literal("mindmap"),
+    ),
+    visibility: v.union(v.literal("private"), v.literal("public")),
+    notebookId: v.optional(v.id("notebooks")),
+    /** Points to the public original when this is a copied save. */
+    sourcePromptId: v.optional(v.id("studioPrompts")),
+    status: v.union(v.literal("active"), v.literal("hidden"), v.literal("removed")),
+    // Cached leaderboard stats (only meaningful on public originals)
+    saveCount: v.optional(v.number()),
+    ratingCount: v.optional(v.number()),
+    ratingSum: v.optional(v.number()),
+    ratingAverage: v.optional(v.number()),
+    bayesianRating: v.optional(v.number()),
+    // Moderation
+    reportCount: v.optional(v.number()),
+    lastReportedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    publishedAt: v.optional(v.number()),
+  })
+    // Ownership & scoping
+    .index("by_user", ["userId"])
+    .index("by_user_and_studioTool", ["userId", "studioTool"])
+    .index("by_user_and_sourcePrompt", ["userId", "sourcePromptId"])
+    .index("by_notebook", ["notebookId"])
+    // Public listing sorted by saves
+    .index("by_visibility_and_status_and_studioTool_and_saveCount", [
+      "visibility",
+      "status",
+      "studioTool",
+      "saveCount",
+    ])
+    // Public listing sorted by rating
+    .index("by_visibility_and_status_and_studioTool_and_bayesianRating", [
+      "visibility",
+      "status",
+      "studioTool",
+      "bayesianRating",
+    ])
+    // Public listing sorted by newest
+    .index("by_visibility_and_status_and_studioTool_and_createdAt", [
+      "visibility",
+      "status",
+      "studioTool",
+      "createdAt",
+    ])
+    // Search over title with filter fields
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["studioTool", "visibility", "status"],
+    }),
+
+  // One counted save per user per public prompt
+  studioPromptSaves: defineTable({
+    userId: v.id("users"),
+    publicPromptId: v.id("studioPrompts"),
+    savedAt: v.number(),
+  })
+    .index("by_user_and_public_prompt", ["userId", "publicPromptId"])
+    .index("by_user", ["userId"])
+    .index("by_public_prompt", ["publicPromptId"]),
+
+  // One rating per user per public prompt (1-5)
+  studioPromptRatings: defineTable({
+    userId: v.id("users"),
+    publicPromptId: v.id("studioPrompts"),
+    rating: v.number(), // 1-5
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_and_public_prompt", ["userId", "publicPromptId"])
+    .index("by_public_prompt", ["publicPromptId"]),
+
+  // Moderation reports
+  studioPromptReports: defineTable({
+    promptId: v.id("studioPrompts"),
+    reporterUserId: v.id("users"),
+    reason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_prompt", ["promptId"])
+    .index("by_prompt_and_reporter", ["promptId", "reporterUserId"]),
 });

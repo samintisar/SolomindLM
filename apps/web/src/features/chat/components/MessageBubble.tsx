@@ -56,15 +56,16 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
       icon: React.ElementType;
       onClick: () => void;
       className?: string;
-    }> = [
-      {
-        id: "copy",
-        label: isCopied ? "Copied" : "Copy",
-        icon: isCopied ? Check : Copy,
-        onClick: () => onCopyMessage(message),
-        className: isCopied ? "text-primary" : "",
-      },
-    ];
+    }> = [];
+
+    // Copy button (always present)
+    messageActions.push({
+      id: "copy",
+      label: isCopied ? "Copied" : "Copy",
+      icon: isCopied ? Check : Copy,
+      onClick: () => onCopyMessage(message),
+      className: isCopied ? "text-primary" : "",
+    });
 
     const canRetryAssistant =
       !isUser &&
@@ -107,7 +108,7 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     }
 
     const actionBtnBase =
-      "rounded-md p-1.5 min-w-8 min-h-8 inline-flex items-center justify-center touch-manipulation " +
+      "rounded-md p-2 min-h-10 min-w-10 md:min-h-8 md:min-w-8 md:p-1.5 inline-flex items-center justify-center touch-manipulation " +
       "text-foreground/50 hover:text-foreground hover:bg-primary/10 dark:hover:bg-primary/14 " +
       "transition-[transform,color,background-color] duration-200 ease-out motion-reduce:transition-none " +
       "active:scale-[0.96] motion-reduce:active:scale-100 " +

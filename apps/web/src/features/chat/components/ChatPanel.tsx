@@ -9,11 +9,12 @@ import {
   History,
   Plus,
   Pin,
+  Settings2,
 } from "lucide-react";
 import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { DropdownMenu } from "@/shared/ui/DropdownMenu";
 import { Virtuoso } from "react-virtuoso";
-import { Message, Note, ReferenceChunk } from "@/shared/types/index";
+import { Message, Note, ReferenceChunk, ChatSettings } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/ToastContext";
 import { useChatStreamingContext } from "../ChatStreamingContext";
 import { exportAsMarkdown } from "../utils/exportChat";
@@ -24,6 +25,8 @@ import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput } from "./ChatInput";
 import { ConversationList } from "./ConversationList";
+import { ConfigureChatModal } from "./ConfigureChatModal";
+import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useSourcesContext } from "../../sources/SourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
 import { SourceSuggestionPrompt } from "./SourceSuggestionPrompt";
@@ -42,6 +45,7 @@ interface ChatPanelProps {
   notebookTitle?: string;
   notebookIcon?: string | null;
   notebookCoverColor?: string | null;
+  chatSettings?: ChatSettings;
   /** Open a notebook document in the sources panel (citation / reference tooltip) */
   onOpenNotebookSource?: (documentId: string) => void;
 }
@@ -55,6 +59,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   notebookTitle = "Chat",
   notebookIcon,
   notebookCoverColor,
+  chatSettings,
   onOpenNotebookSource,
 }) => {
   const {
@@ -62,6 +67,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     isChatStreaming: isLoading,
     remoteGenerationBlocksSend,
     onSendMessage,
+    onStopChat,
     onSetFeedback,
     onRetry,
     onSaveChatOptimistic,
@@ -92,6 +98,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const updateNotebook = useUpdateNotebook();
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem("chat-pinned-ids");
@@ -246,6 +255,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       onSaveChatOptimistic?.(null);
     }
   };
+
+  const handleSaveChatConfig = useCallback(
+    async (settings: ChatSettings, opts?: { silentSuccess?: boolean }) => {
+      if (!notebookId) return;
+      setIsSavingConfig(true);
+      try {
+        await updateNotebook(notebookId, { chatSettings: settings });
+        if (!opts?.silentSuccess) {
+          success("Chat settings saved");
+        }
+        setIsConfigModalOpen(false);
+      } catch (e) {
+        toastError("Failed to save chat settings");
+      } finally {
+        setIsSavingConfig(false);
+      }
+    },
+    [notebookId, updateNotebook, success, toastError]
+  );
 
   // --- Tooltip / citation handlers ---
 
@@ -463,128 +491,143 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const memoizedMessages = useMemo(() => messages, [messages]);
 
+  const chatHeaderToolbar = (
+    <div className="flex items-center gap-2 shrink-0">
+      <div className="hidden md:flex items-center gap-2">
+        {!isLeftOpen && (
+          <button
+            onClick={toggleLeft}
+            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
+            title="Open Sources"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+        )}
+        {!isRightOpen && (
+          <button
+            onClick={toggleRight}
+            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
+            title="Open Studio"
+          >
+            <PanelRightOpen className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <div ref={historyContainerRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((o) => !o)}
+          className={`p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 ${
+            historyOpen ? "ring-1 ring-border bg-accent" : ""
+          }`}
+          title="Thread history"
+          aria-label="Thread history"
+          aria-expanded={historyOpen}
+        >
+          <History className="w-4 h-4" />
+        </button>
+
+        {historyOpen && (
+          <div
+            role="dialog"
+            aria-label="Thread history"
+            className="absolute top-full right-0 mt-1.5 z-50 w-80 max-w-[calc(100vw-2rem)] bg-card font-sans text-sm antialiased border border-border/80 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
+            style={{ maxHeight: "min(480px, calc(100vh - 100px))" }}
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
+              <ConversationList
+                conversations={conversations}
+                activeConversationId={activeConversationId}
+                onSelect={(id) => {
+                  onSelectConversation?.(id);
+                  setHistoryOpen(false);
+                }}
+                onRename={onRenameConversation}
+                onDelete={onDeleteConversation}
+                pinnedIds={pinnedIds}
+                onTogglePin={handleTogglePin}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleNewConversation}
+        disabled={isCreatingConversation}
+        className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 disabled:opacity-50 disabled:pointer-events-none"
+        title="New chat"
+        aria-label={isCreatingConversation ? "Creating…" : "New chat"}
+      >
+        <Plus className="w-4 h-4" />
+      </button>
+      <DropdownMenu
+        align="right"
+        trigger={
+          <button
+            className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
+            title="Chat options"
+            type="button"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+        }
+      >
+        <div className="py-1">
+          <button
+            onClick={() => setIsConfigModalOpen(true)}
+            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+            role="menuitem"
+          >
+            <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>Configure chat</span>
+          </button>
+          <button
+            onClick={handleExportChat}
+            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+            role="menuitem"
+          >
+            <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>Export chat</span>
+          </button>
+          <button
+            onClick={handleSaveToNote}
+            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+            role="menuitem"
+          >
+            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>Save to note</span>
+          </button>
+          <div className="my-1 border-t border-border" />
+          <button
+            onClick={handlePinActiveChat}
+            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+            role="menuitem"
+          >
+            <Pin className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>
+              {activeConversationId && pinnedIds.has(activeConversationId)
+                ? "Unpin chat"
+                : "Pin chat"}
+            </span>
+          </button>
+        </div>
+      </DropdownMenu>
+    </div>
+  );
+
   return (
     <>
       <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
-        {/* Header */}
-        <div className="hidden md:flex items-center justify-between p-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10 h-14">
-          <div className="flex items-center gap-2 text-foreground">
-            <MessageCircle className="w-4 h-4" />
-            <span className="font-display font-bold text-sm tracking-wide uppercase">Chat</span>
+        {/* Panel header: visible on mobile (z-20) like Sources/Studio; desktop uses md:z-10 */}
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0 md:z-10">
+          <div className="flex min-w-0 items-center gap-2 text-foreground">
+            <MessageCircle className="h-4 w-4 shrink-0" />
+            <span className="truncate font-display text-sm font-bold uppercase tracking-wide">
+              Chat
+            </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            {!isLeftOpen && (
-              <button
-                onClick={toggleLeft}
-                className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-                title="Open Sources"
-              >
-                <PanelLeftOpen className="w-4 h-4" />
-              </button>
-            )}
-            {!isRightOpen && (
-              <button
-                onClick={toggleRight}
-                className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-                title="Open Studio"
-              >
-                <PanelRightOpen className="w-4 h-4" />
-              </button>
-            )}
-            <div ref={historyContainerRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setHistoryOpen((o) => !o)}
-                className={`p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 ${
-                  historyOpen ? "ring-1 ring-border bg-accent" : ""
-                }`}
-                title="Thread history"
-                aria-label="Thread history"
-                aria-expanded={historyOpen}
-              >
-                <History className="w-4 h-4" />
-              </button>
-
-              {historyOpen && (
-                <div
-                  role="dialog"
-                  aria-label="Thread history"
-                  className="absolute top-full right-0 mt-1.5 z-50 w-80 max-w-[calc(100vw-2rem)] bg-card font-sans text-sm antialiased border border-border/80 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"
-                  style={{ maxHeight: "min(480px, calc(100vh - 100px))" }}
-                >
-                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
-                    <ConversationList
-                      conversations={conversations}
-                      activeConversationId={activeConversationId}
-                      onSelect={(id) => {
-                        onSelectConversation?.(id);
-                        setHistoryOpen(false);
-                      }}
-                      onRename={onRenameConversation}
-                      onDelete={onDeleteConversation}
-                      pinnedIds={pinnedIds}
-                      onTogglePin={handleTogglePin}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleNewConversation}
-              disabled={isCreatingConversation}
-              className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 disabled:opacity-50 disabled:pointer-events-none"
-              title="New chat"
-              aria-label={isCreatingConversation ? "Creating…" : "New chat"}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <DropdownMenu
-              align="right"
-              trigger={
-                <button
-                  className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
-                  title="Chat options"
-                  type="button"
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              }
-            >
-              <div className="py-1">
-                <button
-                  onClick={handleExportChat}
-                  className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-                  role="menuitem"
-                >
-                  <Download className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span>Export chat</span>
-                </button>
-                <button
-                  onClick={handleSaveToNote}
-                  className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-                  role="menuitem"
-                >
-                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span>Save to note</span>
-                </button>
-                <div className="my-1 border-t border-border" />
-                <button
-                  onClick={handlePinActiveChat}
-                  className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-                  role="menuitem"
-                >
-                  <Pin className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span>
-                    {activeConversationId && pinnedIds.has(activeConversationId)
-                      ? "Unpin chat"
-                      : "Pin chat"}
-                  </span>
-                </button>
-              </div>
-            </DropdownMenu>
-          </div>
+          {chatHeaderToolbar}
         </div>
 
         {/* Messages Area */}
@@ -670,7 +713,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   )}
                 </div>
               )}
-              components={{ Footer: () => <div className="h-56" /> }}
+              components={{
+                Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
+              }}
               defaultItemHeight={150}
               increaseViewportBy={{ top: 200, bottom: 400 }}
             />
@@ -712,18 +757,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
         </div>
 
-        {/* Input Area */}
-        <div className="absolute bottom-8 left-0 right-0 px-4 flex justify-center z-20">
+        {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
+        <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex justify-center px-4">
           <ChatInput
             value={inputMessage}
             onChange={setInputMessage}
             onSend={handleSendMessage}
             disabled={chatInputDisabled}
+            isStreaming={isLoading}
+            onStop={onStopChat}
             notebookId={notebookId}
             deepResearchEnabled={deepResearchEnabled}
             onToggleDeepResearch={() => setDeepResearchEnabled((prev) => !prev)}
             sourceFilters={sourceFilters}
             onSourceFilterChange={setSourceFilters}
+            chatSettings={chatSettings}
+            onModelChange={(modelId) =>
+              handleSaveChatConfig(
+                {
+                  instructionMode: chatSettings?.instructionMode ?? "default",
+                  responseLength: chatSettings?.responseLength ?? "default",
+                  customInstructions: chatSettings?.customInstructions,
+                  smartModel: modelId,
+                },
+                { silentSuccess: true }
+              )
+            }
             onAppendTranscription={(text) => {
               setInputMessage((prev) => {
                 const t = text.trim();
@@ -741,6 +800,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       </div>
       <ConfirmDialogComponent />
+      <ConfigureChatModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        onSave={handleSaveChatConfig}
+        chatSettings={chatSettings}
+        saving={isSavingConfig}
+        instructionModeLocked={messages.length > 0}
+      />
     </>
   );
 };

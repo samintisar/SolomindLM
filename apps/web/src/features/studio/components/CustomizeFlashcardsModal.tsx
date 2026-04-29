@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { X, Layers } from "lucide-react";
+import { X, Layers, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface CustomizeFlashcardsModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
   const [count, setCount] = useState<FlashcardConfig["count"]>("standard");
   const [difficulty, setDifficulty] = useState<FlashcardConfig["difficulty"]>("medium");
   const [topic, setTopic] = useState("");
+  const [saveAsPromptModalOpen, setSaveAsPromptModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -45,7 +47,7 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Flashcards</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton />
+            <StudioModalDiscoverPromptsButton studioTool="flashcards" onApplyPrompt={setTopic} />
             <button
               type="button"
               onClick={onClose}
@@ -117,6 +119,15 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
               placeholder="e.g. Focus on 'Relational Algebra' or 'Keep card fronts under 3 words'..."
               className="w-full h-44 bg-background border border-border rounded-xl p-6 text-base leading-relaxed font-serif focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none placeholder:text-muted-foreground/30"
             />
+            <button
+              type="button"
+              onClick={() => setSaveAsPromptModalOpen(true)}
+              disabled={!topic.trim()}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Save as reusable prompt
+            </button>
           </div>
 
           <div className="flex justify-end pt-2">
@@ -129,6 +140,14 @@ export const CustomizeFlashcardsModal: React.FC<CustomizeFlashcardsModalProps> =
           </div>
         </div>
       </div>
+
+      {/* Save as Prompt Modal */}
+      <SaveAsPromptModal
+        isOpen={saveAsPromptModalOpen}
+        onClose={() => setSaveAsPromptModalOpen(false)}
+        studioTool="flashcards"
+        initialPromptText={topic}
+      />
     </div>
   );
 };

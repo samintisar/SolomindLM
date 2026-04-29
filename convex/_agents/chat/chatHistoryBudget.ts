@@ -2,7 +2,7 @@
 
 import { countTokens } from "../_shared/tokenizer.js";
 
-export type HistoryTurn = { role: string; content: string };
+export type HistoryTurn = { role: string; content: string; metadata?: unknown };
 
 /**
  * Keep the most recent turns whose total estimated tokens stay within maxTokens.

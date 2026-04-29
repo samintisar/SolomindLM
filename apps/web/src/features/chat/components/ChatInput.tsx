@@ -10,9 +10,15 @@ import {
   Globe,
   Newspaper,
   TrendingUp,
+  ChevronDown,
+  Check,
+  Square,
 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
+import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
+import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
+import type { ChatSettings } from "@/shared/types";
 
 const SOURCE_FILTERS = [
   { id: "notebook", label: "Notebook sources", icon: BookOpen },
@@ -26,6 +32,8 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   disabled?: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
   notebookId?: string | null;
   onAppendTranscription?: (text: string) => void;
   onVoiceError?: (message: string) => void;
@@ -33,6 +41,8 @@ interface ChatInputProps {
   onToggleDeepResearch?: () => void;
   sourceFilters?: string[];
   onSourceFilterChange?: (filters: string[]) => void;
+  chatSettings?: ChatSettings;
+  onModelChange?: (modelId: string) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -40,6 +50,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onChange,
   onSend,
   disabled,
+  isStreaming = false,
+  onStop,
   notebookId,
   onAppendTranscription,
   onVoiceError,
@@ -47,10 +59,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onToggleDeepResearch,
   sourceFilters,
   onSourceFilterChange,
+  chatSettings,
+  onModelChange,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  const currentModel = findSmartModelById(chatSettings?.smartModel);
 
   const activeFilters = sourceFilters ?? ["notebook"];
 
@@ -84,6 +102,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
+  // Close model dropdown on outside click
+  useEffect(() => {
+    if (!modelDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [modelDropdownOpen]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -106,7 +136,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="w-full max-w-3xl xl:max-w-4xl 2xl:max-w-5xl bg-card border-2 border-border shadow-lg rounded-2xl py-1.5 px-2 flex flex-col gap-1 relative">
+    <div className="flex w-full max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
+      <div className="pointer-events-auto relative flex w-full flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg">
       <textarea
         ref={textareaRef}
         placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
@@ -117,7 +148,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         onKeyDown={handleKeyDown}
         disabled={disabled}
       />
-      <div className="flex justify-between items-center gap-2 px-1.5 pb-0.5 w-full">
+        <div className="flex justify-between items-center gap-2 px-1.5 pb-0.5 w-full">
         <div className="flex items-center gap-1.5 min-h-10">
           {/* "+" button with dropup menu */}
           <div className="relative" ref={menuRef}>
@@ -199,44 +230,123 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           )}
         </div>
         <div className="flex items-center gap-1.5 min-h-10">
+          {/* Model selector */}
+          {onModelChange && (
+            <div className="relative" ref={modelDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setModelDropdownOpen((prev) => !prev)}
+                disabled={Boolean(disabled)}
+                aria-expanded={modelDropdownOpen}
+                aria-haspopup="listbox"
+                className={[
+                  "group h-8 shrink-0 inline-flex items-center gap-1.5 rounded-md border border-transparent bg-transparent px-1.5 font-sans text-sm font-medium tabular-nums text-muted-foreground",
+                  "transition-[color,background-color,transform] duration-150",
+                  "hover:bg-muted/45 hover:text-foreground",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  modelDropdownOpen && "bg-muted/40 text-foreground",
+                ].join(" ")}
+                title="Model"
+              >
+                <ModelBrandIcon brand={currentModel?.brand ?? "openai"} />
+                <span className="max-w-[6.5rem] truncate sm:max-w-[10rem]">
+                  {currentModel?.name ?? "GPT-OSS 120B"}
+                </span>
+                <ChevronDown
+                  className={[
+                    "size-3.5 shrink-0 opacity-50 transition-transform duration-200",
+                    "group-hover:opacity-70",
+                    modelDropdownOpen && "-rotate-180 opacity-70",
+                  ].join(" ")}
+                  strokeWidth={2.25}
+                  aria-hidden
+                />
+              </button>
+
+              {modelDropdownOpen && (
+                <div
+                  className="absolute bottom-full right-0 z-50 mb-2 min-w-[13.5rem] max-w-[min(18rem,calc(100vw-2rem))] max-h-[min(70vh,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
+                  role="listbox"
+                  aria-label="Choose model"
+                >
+                  <div className="border-b border-border/50 px-3 py-2">
+                    <p className="text-[11px] font-medium leading-none text-muted-foreground">Model</p>
+                  </div>
+                  <div className="p-1">
+                    {AVAILABLE_SMART_MODELS.map((model) => {
+                      const isActive = chatSettings?.smartModel === model.id;
+                      return (
+                        <button
+                          key={model.id}
+                          type="button"
+                          role="option"
+                          aria-selected={isActive}
+                          onClick={() => {
+                            onModelChange(model.id);
+                            setModelDropdownOpen(false);
+                          }}
+                          className={[
+                            "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+                            isActive
+                              ? "bg-primary/12 font-medium text-primary"
+                              : "text-foreground/90 hover:bg-muted/80",
+                          ].join(" ")}
+                        >
+                          <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+                            <ModelBrandIcon brand={model.brand} />
+                            <span className="min-w-0 flex-1 truncate">{model.name}</span>
+                          </span>
+                          {isActive && (
+                            <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.75} aria-hidden />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {onAppendTranscription && (
             <div
               className={
                 voice.voiceState === "recording"
-                  ? "flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.07] pl-2.5 pr-1.5 py-0.5 shadow-sm ring-1 ring-inset ring-primary/10"
+                  ? "flex items-center gap-2"
                   : "contents"
               }
             >
               {voice.voiceState === "recording" && (
-                <span
-                  className="text-xs tabular-nums font-medium text-primary min-w-[2.75rem]"
-                  aria-live="polite"
-                >
-                  {voice.formatElapsed}
-                </span>
+                <>
+                  <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive/45 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive shadow-sm" />
+                  </span>
+                  <span
+                    className="text-xs tabular-nums font-medium text-muted-foreground min-w-11"
+                    aria-live="polite"
+                  >
+                    {voice.formatElapsed}
+                  </span>
+                </>
               )}
               <button
                 type="button"
                 onClick={() => void voice.toggleRecording()}
                 disabled={Boolean(disabled) || !notebookId || voice.voiceState === "transcribing"}
                 className={[
-                  "group relative shrink-0 size-8 rounded-full flex items-center justify-center",
+                  "group relative shrink-0 inline-flex items-center justify-center rounded-md",
                   "transition-all duration-200 ease-out",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
                   "disabled:opacity-50 disabled:cursor-not-allowed",
                   voice.voiceState === "transcribing" &&
-                    "bg-primary/12 ring-1 ring-inset ring-primary/25 text-primary shadow-sm",
+                    "size-8 bg-primary/12 ring-1 ring-inset ring-primary/25 text-primary shadow-sm",
                   voice.voiceState === "recording" &&
-                    "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:translate-y-px",
+                    "size-8 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:translate-y-px",
                   voice.voiceState !== "recording" &&
                     voice.voiceState !== "transcribing" &&
-                    "border border-border/80 bg-gradient-to-b from-background to-muted/30 text-muted-foreground shadow-sm",
-                  voice.voiceState !== "recording" &&
-                    voice.voiceState !== "transcribing" &&
-                    "hover:border-primary/35 hover:from-primary/[0.06] hover:to-primary/[0.03] hover:text-primary",
-                  voice.voiceState !== "recording" &&
-                    voice.voiceState !== "transcribing" &&
-                    "active:scale-[0.98]",
+                    "p-1.5 min-h-9 min-w-9 text-muted-foreground hover:text-primary active:scale-[0.98]",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -265,17 +375,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           )}
         <button
-          onClick={onSend}
-          disabled={!value.trim() || disabled || !notebookId}
+          onClick={isStreaming ? onStop : onSend}
+          disabled={(!isStreaming && (!value.trim() || disabled || !notebookId))}
           className={`inline-flex size-8 shrink-0 items-center justify-center rounded-lg p-0 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
-            deepResearchEnabled
-              ? "bg-primary text-primary-foreground hover:bg-primary/90"
-              : "bg-primary text-primary-foreground hover:bg-primary/90"
+            isStreaming
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              : deepResearchEnabled
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
           }`}
-          title={value.trim() ? (deepResearchEnabled ? "Start deep research (Enter)" : "Send message (Enter)") : "Type a message to send"}
+          title={
+            isStreaming
+              ? "Stop generating"
+              : value.trim()
+                ? deepResearchEnabled
+                  ? "Start deep research (Enter)"
+                  : "Send message (Enter)"
+                : "Type a message to send"
+          }
         >
           {disabled ? (
             <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isStreaming ? (
+            <Square className="w-4 h-4 fill-current" />
           ) : deepResearchEnabled ? (
             <Search className="w-5 h-5" />
           ) : (
@@ -283,7 +405,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           )}
         </button>
         </div>
+        </div>
       </div>
+      <p className="pointer-events-none text-center text-[11px] leading-snug text-muted-foreground px-1">
+        SolomindLM can be inaccurate; please double check its responses.
+      </p>
     </div>
   );
 };

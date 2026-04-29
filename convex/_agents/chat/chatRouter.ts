@@ -7,23 +7,56 @@ export type ChatRoute =
   | { type: "clarify"; question: string }
   | { type: "retrieve" };
 
+type ChatHistoryTurn = {
+  role: string;
+  content: string;
+  metadata?: unknown;
+};
+
 const GREETING_RE =
   /^\s*(hi|hello|hey|good\s+(morning|afternoon|evening)|thanks|thank\s+you|thx|bye|goodbye|ok|okay|cool|nice)\b[!?.\s]*$/i;
 
 const META_APP_RE =
   /\b(how\s+do\s+i\s+use|how\s+does\s+this\s+app|what\s+is\s+solomind|solomind\s+lm|upload\s+a\s+file|how\s+to\s+upload)\b/i;
 
+function getAwaitingGuidedResponse(metadata: unknown): boolean | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const guidedLearning = (metadata as { guidedLearning?: unknown }).guidedLearning;
+  if (!guidedLearning || typeof guidedLearning !== "object") return undefined;
+  const awaitingUserResponse = (guidedLearning as { awaitingUserResponse?: unknown })
+    .awaitingUserResponse;
+  return typeof awaitingUserResponse === "boolean" ? awaitingUserResponse : undefined;
+}
+
 /**
- * Short questions like "What is ARMA?" are valid retrieval targets; don't treat them as vague.
+ * Check whether the last assistant turn is explicitly waiting for a guided answer.
+ * Falls back to the legacy punctuation heuristic for older messages without metadata.
  */
-function looksLikeTargetedQuestion(trimmed: string): boolean {
-  return (
-    /^(what|who|where|when|why|how)\s+(is|are|was|were|do|does|did|can|could|should|would)\s+\S+/i.test(
-      trimmed
-    ) ||
-    /^define\s+\S+/i.test(trimmed) ||
-    /^explain\s+(the\s+)?\S+/i.test(trimmed)
-  );
+function lastAssistantAwaitingGuidedResponse(history: ChatHistoryTurn[]): boolean {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "assistant") {
+      const explicitState = getAwaitingGuidedResponse(history[i].metadata);
+      if (explicitState !== undefined) {
+        return explicitState;
+      }
+      const text = history[i].content.trimEnd();
+      return text.endsWith("?");
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if the user message looks like a conversational follow-up (answering a question)
+ * rather than a new substantive query.
+ */
+function isConversationalFollowUp(trimmed: string): boolean {
+  // Short, non-question messages are likely follow-up answers to Socratic questions
+  if (trimmed.length > 150) return false;
+  // If it starts with a question word, it's a new query
+  if (/^(what|who|where|when|why|how|which|define|explain|compare|describe|list)\b/i.test(trimmed))
+    return false;
+  return true;
 }
 
 /**
@@ -31,7 +64,10 @@ function looksLikeTargetedQuestion(trimmed: string): boolean {
  */
 export function routeChatMessage(
   userMessage: string,
-  _historyBudgeted: Array<{ role: string; content: string }>
+  historyBudgeted: ChatHistoryTurn[],
+  chatSettings?: {
+    instructionMode?: "default" | "learningGuide" | "custom";
+  }
 ): ChatRoute {
   const trimmed = userMessage.trim();
   if (trimmed.length === 0) {
@@ -56,19 +92,14 @@ export function routeChatMessage(
     return { type: "direct" };
   }
 
-  // Very short vague question — ask for scope (skip "What is X?" / "Define Y?" style)
-  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  // In learning guide mode, if the assistant last asked a Socratic question and the user
+  // is answering it conversationally, skip RAG retrieval — the context is already in history.
   if (
-    wordCount <= 3 &&
-    trimmed.length < 40 &&
-    trimmed.includes("?") &&
-    !looksLikeTargetedQuestion(trimmed)
+    chatSettings?.instructionMode === "learningGuide" &&
+    lastAssistantAwaitingGuidedResponse(historyBudgeted) &&
+    isConversationalFollowUp(trimmed)
   ) {
-    return {
-      type: "clarify",
-      question:
-        "Your question is quite short. Which topic, document, or concept should I focus on in your notebook?",
-    };
+    return { type: "direct" };
   }
 
   return { type: "retrieve" };

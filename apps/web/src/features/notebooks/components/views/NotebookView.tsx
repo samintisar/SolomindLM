@@ -177,6 +177,7 @@ export function NotebookView() {
             notebookTitle={notebookTitle}
             notebookIcon={activeNotebook?.icon}
             notebookCoverColor={activeNotebook?.coverColor}
+            chatSettings={activeNotebook?.chatSettings}
             onOpenNotebookSource={handleOpenNotebookSourceFromChat}
           />
 
@@ -231,6 +232,7 @@ export function NotebookView() {
                 notebookTitle={notebookTitle}
                 notebookIcon={activeNotebook?.icon}
                 notebookCoverColor={activeNotebook?.coverColor}
+                chatSettings={activeNotebook?.chatSettings}
                 onOpenNotebookSource={handleOpenNotebookSourceFromChat}
               />
             </div>

@@ -46,6 +46,8 @@ export interface HybridSearchConfig extends VectorSearchConfig {
   rrfK?: number;
   enableHybrid?: boolean;
   hybridThreshold?: number;
+  /** Larger pool multiplier for list/enumeration queries to ensure comprehensive coverage */
+  listQueryPoolMultiplier?: number;
 }
 
 /**
@@ -64,17 +66,19 @@ interface RRFResult extends VectorSearchRawResult {
 }
 
 const DEFAULT_HYBRID_CONFIG: Required<HybridSearchConfig> = {
-  vectorMatchThreshold: 0.3,
-  vectorMatchCount: 25,
+  vectorMatchThreshold: 0.35, // Increased from 0.30 for better initial quality
+  vectorMatchCount: 20, // Reduced from 25 for more focused retrieval
   rerankThreshold: 5,
-  rerankTopN: 15,
+  rerankTopN: 12, // Reduced from 15 for more aggressive filtering
   maxResults: 7,
-  keywordMatchCount: 25,
+  keywordMatchCount: 20, // Reduced from 25 to match vector
   rrfK: 60,
   enableHybrid: true,
   // RRF scores are bounded by 1/(k+1) ≈ 0.016 (single list) to 2/(k+1) ≈ 0.033 (both lists).
-  // A threshold of 0.012 keeps chunks that appear in at least one list near the top.
+  // A threshold of 0.015 (increased from 0.012) keeps only higher-quality chunks.
   hybridThreshold: 0.012,
+  // Pool multiplier for list queries — wider pool before global rerank for exhaustive list answers
+  listQueryPoolMultiplier: 5,
 };
 
 // ============================================================
@@ -163,7 +167,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
     documentIds?: string[],
     preComputedEmbedding?: number[],
     retrievalAugmentForRerank?: string,
-    options?: { skipRerank?: boolean; allowEmpty?: boolean; quiet?: boolean }
+    options?: { skipRerank?: boolean; allowEmpty?: boolean; quiet?: boolean; isListQuery?: boolean }
   ): Promise<HybridReferenceChunk[]> {
     if (!this.hybridConfig.enableHybrid || !this.keywordSearchRunner) {
       // Vector-only: cast to base type for compatibility
@@ -235,7 +239,19 @@ export class HybridSearchHandler extends VectorSearchHandler {
       });
     }
 
-    const poolSize = Math.max(this.hybridConfig.maxResults, this.hybridConfig.rerankTopN);
+    // When skipRerank is true (subquery retrieval), global rerank handles final selection,
+    // so per-subquery pool should be much larger to maximise coverage across subqueries.
+    // For list queries, use even larger pool to ensure comprehensive item coverage.
+    const poolMultiplier = options?.isListQuery
+      ? (this.hybridConfig.listQueryPoolMultiplier ?? 6)
+      : 3;
+    const poolSize = options?.skipRerank
+      ? Math.max(
+          this.hybridConfig.maxResults * poolMultiplier,
+          this.hybridConfig.vectorMatchCount,
+          this.hybridConfig.rerankTopN
+        )
+      : this.hybridConfig.maxResults;
     let rankedForMap: (RRFResult & { _score?: number; similarity?: number })[];
 
     if (options?.skipRerank) {

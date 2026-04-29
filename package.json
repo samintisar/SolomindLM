@@ -39,9 +39,14 @@
     "test:web": "bun run --cwd apps/web test",
     "test:web:watch": "bun run --cwd apps/web test:watch",
     "test:web:coverage": "bun run --cwd apps/web test:coverage",
-    "test:convex": "bun run --cwd convex test",
+    "test:convex": "vitest run --config vitest.convex.config.ts",
+    "test:convex:watch": "vitest --config vitest.convex.config.ts",
     "test:e2e": "bunx playwright test",
     "test:e2e:ui": "bunx playwright test --ui",
+    "eval:rag": "bun run evals/rag/cli.ts",
+    "eval:rag:dry": "bun run evals/rag/cli.ts --dry-run",
+    "eval:rag:bootstrap-env": "node scripts/bootstrap-rag-eval-env.js",
+    "eval:ragas": "conda run -n solomindlm-rag-evals python evals/ragas/run_ragas.py",
     "e2e:convex:cleanup": "node scripts/cleanup-e2e.mjs",
     "e2e:convex:cleanup-folders": "node scripts/cleanup-e2e-folders.mjs",
     "e2e:convex:cleanup-notebooks": "node scripts/cleanup-e2e-notebooks.mjs"
@@ -53,13 +58,15 @@
     "@types/node": "^25.6.0",
     "@typescript/native-preview": "^7.0.0-dev.20260425.1",
     "convex": "1.36.0",
+    "convex-test": "^0.0.50",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "prettier": "^3.8.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.0"
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.5"
   },
   "dependencies": {
     "@auth/core": "0.37.2",

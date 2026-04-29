@@ -155,8 +155,10 @@ describe("aggregateRetrievalSources", () => {
 
   function makeRef(overrides: Partial<ReferenceChunk> & { documentId: string }): ReferenceChunk {
     return {
-      text: "chunk text",
-      score: 0.9,
+      id: 1,
+      sourceId: overrides.documentId,
+      chunkIndex: 0,
+      content: "chunk text",
       sourceTitle: "Document",
       ...overrides,
     } as ReferenceChunk;
@@ -172,8 +174,10 @@ describe("aggregateRetrievalSources", () => {
     expect(result).toHaveLength(2);
     const doc1 = result.find((r) => r.sourceId === "doc:doc1");
     expect(doc1?.sectionCount).toBe(2);
+    expect(doc1?.isFullDocument).toBe(false);
     const doc2 = result.find((r) => r.sourceId === "doc:doc2");
     expect(doc2?.sectionCount).toBe(1);
+    expect(doc2?.isFullDocument).toBe(false);
   });
 
   it("sorts by sectionCount descending then title ascending", () => {
@@ -216,5 +220,20 @@ describe("aggregateRetrievalSources", () => {
     ];
     const result = aggregateRetrievalSources(refs);
     expect(result[0].openUrl).toBe("https://example.com/article");
+  });
+
+  it("marks full-document expansion (chunkIndex -1) for activity panel labeling", () => {
+    const refs = [
+      makeRef({
+        documentId: "d1",
+        sourceTitle: "Paper",
+        chunkIndex: -1,
+        id: 99,
+      }),
+    ];
+    const result = aggregateRetrievalSources(refs);
+    expect(result).toHaveLength(1);
+    expect(result[0].sectionCount).toBe(1);
+    expect(result[0].isFullDocument).toBe(true);
   });
 });

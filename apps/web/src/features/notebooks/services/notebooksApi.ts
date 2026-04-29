@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { ChatSettings } from "@/shared/types";
 
 // ============================================================
 // Hooks (for use in React components)
@@ -77,7 +78,7 @@ export function useCreateNotebook() {
 export function useUpdateNotebook() {
   const update = useMutation(api.notebooks.index.update).withOptimisticUpdate(
     (localStore, args) => {
-      const { id, title, coverColor, icon, isFeatured, folderId } = args;
+      const { id, title, coverColor, icon, isFeatured, folderId, chatSettings } = args;
       const now = Date.now();
 
       // Update list view
@@ -95,6 +96,7 @@ export function useUpdateNotebook() {
                   ...(icon !== undefined && { icon }),
                   ...(isFeatured !== undefined && { isFeatured }),
                   ...(folderId !== undefined && { folderId }),
+                  ...(chatSettings !== undefined && { chatSettings }),
                   updated_at: now,
                   date: new Date(now).toLocaleDateString("en-US", {
                     month: "short",
@@ -120,6 +122,7 @@ export function useUpdateNotebook() {
             ...(icon !== undefined && { icon }),
             ...(isFeatured !== undefined && { isFeatured }),
             ...(folderId !== undefined && { folderId }),
+            ...(chatSettings !== undefined && { chatSettings }),
             updated_at: now,
             date: new Date(now).toLocaleDateString("en-US", {
               month: "short",
@@ -140,6 +143,7 @@ export function useUpdateNotebook() {
       icon?: string;
       isFeatured?: boolean;
       folderId?: string | null;
+      chatSettings?: ChatSettings;
     }
   ) => {
     // Convert folderId to proper type if provided

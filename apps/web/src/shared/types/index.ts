@@ -403,6 +403,13 @@ export function isUserNote(note: Note): note is UserNote {
   return note.type === "note";
 }
 
+export type ChatSettings = {
+  instructionMode: "default" | "learningGuide" | "custom";
+  customInstructions?: string;
+  responseLength: "default" | "longer" | "shorter";
+  smartModel?: string;
+};
+
 export interface NotebookItem {
   id: string;
   title: string;
@@ -417,6 +424,7 @@ export interface NotebookItem {
   folderId?: string;
   created_at?: string | number;
   updated_at?: string | number;
+  chatSettings?: ChatSettings;
 }
 
 export interface FolderItem {

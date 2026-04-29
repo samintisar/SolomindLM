@@ -95,6 +95,8 @@ export interface SendMessageCallbacks {
   onExternalSources?: (sources: Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }>) => void;
   onComplete: () => void;
   onError: (error: string | ChatError) => void;
+  /** Called when stream is stopped by user */
+  onStopped?: () => void;
 }
 
 function mergeToolCallsFromLines(lines: string[]): MessageToolCall[] {
@@ -259,7 +261,8 @@ export function parseStreamBody(body: string): ParsedStreamData {
  */
 export async function consumePersistentTextStream(
   response: Response,
-  callbacks: SendMessageCallbacks
+  callbacks: SendMessageCallbacks,
+  signal?: AbortSignal
 ): Promise<void> {
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
@@ -279,8 +282,29 @@ export async function consumePersistentTextStream(
   let lastClarificationJson: string | null = null;
   let lastResearchProgressJson: string | null = null;
 
+  // Handle abort signal
+  if (signal) {
+    const handleAbort = () => {
+      try {
+        reader.cancel();
+      } catch {
+        /* stream may already be closed */
+      }
+    };
+    if (signal.aborted) {
+      handleAbort();
+      return;
+    }
+    signal.addEventListener("abort", handleAbort);
+  }
+
   try {
     while (true) {
+      // Check if aborted before reading
+      if (signal?.aborted) {
+        break;
+      }
+
       const { done, value } = await reader.read();
 
       if (value) {
@@ -455,6 +479,8 @@ export function useSendMessage() {
   const { isAuthenticated } = useConvexAuth();
   const authToken = useAuthToken();
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const sendMessage = useCallback(
     async (
       notebookId: string,
@@ -472,6 +498,15 @@ export function useSendMessage() {
         callbacks.onError("Authentication required. Please log in.");
         return;
       }
+
+      // Cancel any ongoing stream
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new abort controller for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       let streamJobMayHaveStarted = false;
 
@@ -511,6 +546,7 @@ export function useSendMessage() {
           method: "POST",
           credentials: "include",
           headers,
+          signal: abortController.signal,
           body: JSON.stringify({
             notebookId,
             message,
@@ -535,18 +571,32 @@ export function useSendMessage() {
 
         streamJobMayHaveStarted = true;
 
-        await consumePersistentTextStream(response, callbacks);
+        await consumePersistentTextStream(response, callbacks, abortController.signal);
       } catch (error) {
         if (!streamJobMayHaveStarted) {
           await releaseGenerationIfSafe();
         }
-        callbacks.onError(error instanceof Error ? error.message : "Failed to send message");
+        // If aborted, call onStopped instead of onError
+        if (error instanceof Error && error.name === 'AbortError') {
+          callbacks.onStopped?.();
+        } else {
+          callbacks.onError(error instanceof Error ? error.message : "Failed to send message");
+        }
+      } finally {
+        abortControllerRef.current = null;
       }
     },
     [sendMessageMutation, releaseChatGeneration, isAuthenticated, authToken]
   );
 
-  return sendMessage;
+  const stopChat = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
+  return { sendMessage, stopChat };
 }
 
 /**

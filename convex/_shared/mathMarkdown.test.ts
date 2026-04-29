@@ -82,6 +82,20 @@ describe("normalizeMathMarkdown", () => {
     expect(result).not.toContain("\\(x^2\\)");
   });
 
+  it("collapses LLM double-escaped \\(...\\) so $ is not escaped as \\\\$", () => {
+    const input = "| x | \\\\(" + "\\gamma" + "\\\\), \\\\(" + "C" + "\\\\) |";
+    const result = normalizeMathMarkdown(input);
+    expect(result).toContain("$\\gamma$");
+    expect(result).toContain("$C$");
+    expect(result).not.toContain("\\$");
+  });
+
+  it("collapses repeated double-escapes in \\(...\\)", () => {
+    const input = "\\\\(" + "\\gamma" + "\\\\)";
+    const result = normalizeMathMarkdown(input);
+    expect(result).toBe("$\\gamma$");
+  });
+
   it("preserves code blocks", () => {
     const input = "```python\nx = [1, 2]\n```";
     expect(normalizeMathMarkdown(input)).toBe(input);

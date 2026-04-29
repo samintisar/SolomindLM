@@ -262,11 +262,14 @@ const AppContent: React.FC = () => {
       remoteChatGenerating: chatStream.remoteChatGenerating,
       remoteGenerationBlocksSend: chatStream.remoteGenerationBlocksSend,
       onSendMessage: chatStream.handleSendMessage,
+      onStopChat: chatStream.stopChat,
       consumeResearchExecuteStream: chatStream.consumeResearchExecuteStream,
       onClearHistory: chatStream.handleClearChatHistory,
       onSetFeedback: chatStream.setMessageFeedback,
       onRetry: chatStream.handleRetryMessage,
       onSaveChatOptimistic: chatStream.setOptimisticSaveNote,
+      externalSources: chatStream.externalSources,
+      clearExternalSources: chatStream.clearExternalSources,
       sourceCount: chatStream.sourceCount,
       sourceSummary: chatStream.sourceSummary,
       suggestions: chatStream.suggestions,
@@ -290,8 +293,6 @@ const AppContent: React.FC = () => {
           setActiveConversationId(null);
         }
       },
-      externalSources: chatStream.externalSources,
-      clearExternalSources: chatStream.clearExternalSources,
     }),
     [chatStream, activeConversationId, conversationCRUD]
   );

@@ -61,13 +61,59 @@ export async function createNotebook(
   });
 }
 
+export type ChatSettings = {
+  instructionMode: "default" | "learningGuide" | "custom";
+  customInstructions?: string;
+  responseLength: "default" | "longer" | "shorter";
+  smartModel?: string;
+};
+
+/** Max character count for custom instructions */
+export const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 10000;
+
 export type NotebookUpdate = {
   title?: string;
   coverColor?: string;
   icon?: string;
   isFeatured?: boolean;
   folderId?: Id<"folders">;
+  chatSettings?: ChatSettings;
 };
+
+/**
+ * Normalize chatSettings: if instructionMode is "custom" but customInstructions
+ * is empty/whitespace-only, fall back to "default" mode.
+ * Trims customInstructions and caps at CUSTOM_INSTRUCTIONS_MAX_LENGTH.
+ */
+export function normalizeChatSettings(
+  settings: ChatSettings | undefined
+): ChatSettings | undefined {
+  if (!settings) return undefined;
+  const { instructionMode, customInstructions, responseLength, smartModel } = settings;
+
+  // Normalize: custom with empty text → default
+  if (instructionMode === "custom") {
+    const trimmed = customInstructions?.trim();
+    if (!trimmed) {
+      return responseLength === "default" && !smartModel
+        ? undefined
+        : { instructionMode: "default", responseLength, ...(smartModel && { smartModel }) };
+    }
+    return {
+      instructionMode: "custom",
+      customInstructions: trimmed.slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH),
+      responseLength,
+      ...(smartModel && { smartModel }),
+    };
+  }
+
+  // default or learningGuide with default responseLength → whole setting unnecessary
+  if (instructionMode === "default" && responseLength === "default" && !smartModel) {
+    return undefined;
+  }
+
+  return { instructionMode, responseLength, ...(smartModel && { smartModel }) };
+}
 
 export async function updateNotebook(
   ctx: MutationCtx,
@@ -80,6 +126,9 @@ export async function updateNotebook(
   };
   if (updates.title !== undefined) {
     updateData.title = updates.title.trim();
+  }
+  if (updates.chatSettings !== undefined) {
+    updateData.chatSettings = normalizeChatSettings(updates.chatSettings);
   }
   await ctx.db.patch("notebooks", notebookId, updateData);
 }
