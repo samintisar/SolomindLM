@@ -62,7 +62,7 @@ pending ──startTour──▶ active ──advanceTourStep×5──▶ comple
    └────(none)
 ```
 
-`completed` is also reached automatically when all five checklist booleans become `true`, even if the user skipped the tour.
+`completed` is also reached when the client (in `OnboardingProvider`) detects all five checklist booleans are `true` and calls `completeTour`. This is client-driven — Convex doesn't run code on row inserts to other tables.
 
 ### Action gating
 
@@ -100,8 +100,6 @@ userOnboarding: defineTable({
   )),
   /** Notebook the tour is bound to. Set when `createNotebook` step advances. */
   tourNotebookId: v.optional(v.id("notebooks")),
-  /** True for users created before this feature shipped (legacy backfill). */
-  isLegacyUser: v.boolean(),
   checklistDismissed: v.boolean(),
   startedAt: v.optional(v.number()),
   completedAt: v.optional(v.number()),
@@ -112,9 +110,16 @@ userOnboarding: defineTable({
 
 The "no row" ambiguity is resolved by **eagerly creating a row at user creation time**, not lazily.
 
-- **New signups:** `convex/auth.ts` is configured with `convex/auth/callbacks.ts` (or equivalent post-creation hook from `@convex-dev/auth`) that inserts a `userOnboarding` row with `{ tourStatus: "pending", isLegacyUser: false, checklistDismissed: false }` immediately after the auth library creates the user. If `@convex-dev/auth` does not expose a post-create hook in our version, the alternative is a `getOrCreateOnboardingRow` mutation called once from `OnboardingProvider`'s mount effect; in that case the row is created with `tourStatus: "pending"` only when `users._creationTime > (now - 5 minutes)`, otherwise with `tourStatus: "completed"` and `isLegacyUser: true`. The implementation plan picks one of these two strategies after reading the installed auth library version.
+**Preferred path: signup hook.** `convex/auth.ts` is configured with the post-user-creation hook exposed by `@convex-dev/auth` (e.g. `createOrUpdateUser` callback or equivalent in the installed version) that inserts a `userOnboarding` row with `{ tourStatus: "pending", checklistDismissed: false }` immediately after the auth library creates the user. This is preferred over the client-side fallback because client-created bootstrap rows are race-prone and add a mount-time branch.
 
-- **Legacy users (created before this feature):** a one-time backfill migration (using `@convex-dev/migrations`) iterates existing `users` and inserts rows with `{ tourStatus: "completed", isLegacyUser: true, checklistDismissed: true }`. After backfill, every user has a row; "no row" stops being a meaningful state.
+**Fallback path: client-side mount.** If the installed `@convex-dev/auth` version doesn't expose a usable post-create hook, the alternative is a `getOrCreateOnboardingRow` mutation called once from `OnboardingProvider`'s mount effect. In that case:
+
+- The row is created with `tourStatus: "pending"` only when `users._creationTime > (now - FRESH_USER_WINDOW_MS)`, otherwise with `tourStatus: "completed"`.
+- `FRESH_USER_WINDOW_MS` is a named constant (default: `5 * 60_000`) defined in `convex/onboarding/constants.ts`, with a code comment documenting the failure mode: a user who signs up but doesn't reach `/home` for >5 minutes (rare — would require closing the tab during signup) gets bucketed as "completed" and won't see the tour. The "Restart tour" menu item is the recovery path.
+
+The implementation plan picks one of these two strategies after reading the installed auth library version.
+
+**Legacy users (created before this feature):** a one-time backfill migration (using `@convex-dev/migrations`) iterates existing `users` and inserts rows with `{ tourStatus: "completed", checklistDismissed: true }`. After backfill, every user has a row; "no row" stops being a meaningful state for legacy users.
 
 - **`getOnboardingState` query:** still returns a safe default for the brief window where a row might not yet exist (e.g. backfill running, or new user mid-signup), but the default is now contextual:
   - If `users._creationTime > (now - 5 minutes)` → return `{ tourStatus: "pending", checklistDismissed: false }` (treat as fresh signup; provider will create the row on next mutation).
@@ -133,7 +138,7 @@ Booleans like `hasCreatedNotebook` are inferable from existing tables (`notebook
 | `getOnboardingState` | query | Returns the user's row or the contextual default (see Bootstrap) |
 | `getChecklistProgress` | query | Returns five booleans derived from app-wide row counts for the calling user (any notebook) |
 | `getTourProgress` | query | Returns `{ tourNotebookId, createNotebook, addSource, askQuestion, openStudio, generateArtifact }` where steps 2/3/5 are scoped to `tourNotebookId` only. `openStudio` is always `false` server-side; the provider overlays its in-memory open state. |
-| `startTour` | mutation | Upserts row to `tourStatus: "active"`, `currentStepId: "createNotebook"`, `startedAt: Date.now()`. Idempotent: no-op if existing status is `completed` or `skipped` |
+| `startTour` | mutation | Upserts row to `tourStatus: "active"`, `currentStepId: "createNotebook"`, `startedAt: Date.now()` only when current status is `pending`. No-op if existing status is `active`, `completed`, or `skipped`. Reopening a `completed`/`skipped` flow is exclusively the responsibility of `restartTour`. |
 | `advanceTourStep` | mutation | Args: `expectedCurrentStepId`, optional `tourNotebookId` (passed when advancing from `createNotebook`). Rejects if `expectedCurrentStepId` mismatch. Advances to next step or sets `completed` if last |
 | `skipTour` | mutation | Sets `tourStatus: "skipped"`, leaves `checklistDismissed` and `tourNotebookId` alone |
 | `completeTour` | mutation | Sets `tourStatus: "completed"`, `completedAt`. Called by the client when all checklist items true (see Edge cases for why client-driven) |
@@ -191,13 +196,13 @@ Soft skip: tooltip unmounts, dim overlay clears, but `<ChecklistCard />` remains
 ### Visibility
 
 Show iff:
+
 - `tourStatus !== "completed"`
 - `checklistDismissed === false`
 - not all five progress booleans are `true`
 - current route is `/home` or `/notebook/:id`
-- not running in native shell (`isNativeShell()` false)
 
-When all five flip to true, `completeTour` mutation runs server-side and the card animates out.
+When all five flip to true, the client calls `completeTour` and the card animates out.
 
 ### Behavior
 
@@ -209,7 +214,7 @@ When all five flip to true, `completeTour` mutation runs server-side and the car
 
 ### Mobile / native shell
 
-Tour disabled when `isNativeShell()` is true (tooltip positioning is fragile). Checklist still renders.
+Tour disabled when `isNativeShell()` is true (tooltip positioning is fragile). Checklist still renders — it's just a fixed-position card with no DOM-targeting requirements, so it works on every viewport. (This is the canonical statement; the visibility list above intentionally omits a native-shell exclusion.)
 
 ## Edge cases
 
@@ -229,7 +234,8 @@ Tour disabled when `isNativeShell()` is true (tooltip positioning is fragile). C
 
 ### New
 
-- `convex/onboarding/index.ts` — 3 queries (`getOnboardingState`, `getChecklistProgress`, `getTourProgress`) + 7 mutations (`startTour`, `advanceTourStep`, `skipTour`, `completeTour`, `dismissChecklist`, `restartTour`, `getOrCreateOnboardingRow` if used)
+- `convex/onboarding/index.ts` — 3 queries (`getOnboardingState`, `getChecklistProgress`, `getTourProgress`) + 7 mutations (`startTour`, `advanceTourStep`, `skipTour`, `completeTour`, `dismissChecklist`, `restartTour`, `getOrCreateOnboardingRow` if fallback path used)
+- `convex/onboarding/constants.ts` — `FRESH_USER_WINDOW_MS` and related constants (only if fallback path used)
 - `convex/onboarding/index.test.ts` — backend tests (see Testing)
 - `convex/migrations.ts` (or extend if exists) — one-time backfill marking pre-existing users as `isLegacyUser: true`, `tourStatus: "completed"`
 - `apps/web/src/features/onboarding/OnboardingProvider.tsx`
@@ -264,9 +270,10 @@ Repo has no formal test runner configured yet, but `apps/web/src/features/studio
 
 | Test | Asserts |
 |---|---|
-| `getOnboardingState` default | Returns `{ tourStatus: "completed", checklistDismissed: true }` for user without row |
-| `startTour` happy path | Creates row with `pending → active`, sets `currentStepId: "createNotebook"`, sets `startedAt` |
-| `startTour` idempotent | No-op when user has `tourStatus: "completed"` or `"skipped"` |
+| `getOnboardingState` contextual default — fresh user | No row + `users._creationTime > now - FRESH_USER_WINDOW_MS` → returns `{ tourStatus: "pending", checklistDismissed: false }` |
+| `getOnboardingState` contextual default — legacy user | No row + old `_creationTime` → returns `{ tourStatus: "completed", checklistDismissed: true }` |
+| `startTour` happy path | Sets `pending → active`, `currentStepId: "createNotebook"`, sets `startedAt` |
+| `startTour` only acts on `pending` | No-op when status is `active`, `completed`, or `skipped` (reopening flows is `restartTour`'s job) |
 | `advanceTourStep` linear walk | Walks all five steps; final advance sets `completed` and `completedAt` |
 | `advanceTourStep` stale-client rejection | Throws when `expectedCurrentStepId` doesn't match server state |
 | `skipTour` | Sets `tourStatus: "skipped"`, leaves `checklistDismissed` unchanged |
@@ -276,9 +283,7 @@ Repo has no formal test runner configured yet, but `apps/web/src/features/studio
 | `getTourProgress` is notebook-scoped | Document inserted into a notebook other than `tourNotebookId` does not flip `addSource`. Same for messages and Studio artifacts. |
 | `getTourProgress` returns `tourNotebookId` | Provider can navigate without a separate query |
 | `restartTour` is deterministic | Sets `active` directly with `currentStepId: "createNotebook"`; no `pending` round-trip; clears `tourNotebookId` |
-| Bootstrap default for fresh user (no row, recent `_creationTime`) | Returns `tourStatus: "pending"` |
-| Bootstrap default for legacy user (no row, old `_creationTime`) | Returns `tourStatus: "completed"` |
-| Backfill migration | After running, all existing users have a row with `isLegacyUser: true`, `tourStatus: "completed"` |
+| Backfill migration | After running, all existing users have a row with `tourStatus: "completed"`, `checklistDismissed: true` |
 | All mutations require auth | Unauthenticated calls throw |
 
 ### Frontend unit (Vitest + RTL)
@@ -311,8 +316,8 @@ Resolved by implementation plan, not blocking design:
 - 2026-04-28 — Tour engine + steps approved
 - 2026-04-28 — Checklist + edge cases + file list approved
 - 2026-04-28 — Testing approach approved
-- 2026-04-28 — Revised after review feedback:
-  - Added `tourNotebookId` and `isLegacyUser` to `userOnboarding`
+- 2026-04-28 — Revised after first review:
+  - Added `tourNotebookId` (and initially `isLegacyUser`) to `userOnboarding`
   - Split progress into `getChecklistProgress` (global) and `getTourProgress` (notebook-scoped)
   - Replaced "no row = completed" default with bootstrap-at-signup + contextual default + legacy backfill migration
   - Made `restartTour` deterministic (sets `active` directly, no `pending`)
@@ -320,3 +325,11 @@ Resolved by implementation plan, not blocking design:
   - Added scroll-aware tooltip remeasurement and rAF backstop
   - Added dev-only invariant for missing/duplicate `data-onboarding` selectors
   - Documented that `completeTour` is client-driven and noted the trade-off
+- 2026-04-28 — Final tweaks after second review:
+  - Removed `isLegacyUser` field (redundant with backfill + eager creation)
+  - Marked signup hook as the preferred bootstrap path; client fallback only if hook unavailable
+  - Extracted `FRESH_USER_WINDOW_MS` to a named constant in `convex/onboarding/constants.ts`
+  - Constrained `startTour` to act only when status is `pending`; reopening completed/skipped flows is exclusively `restartTour`'s job
+  - Resolved the visibility-rule conflict on native shell (tour disabled, checklist still renders)
+  - Made client-driven wording for `completeTour` consistent throughout
+  - Updated `getOnboardingState` tests to cover both contextual defaults instead of the old single default
