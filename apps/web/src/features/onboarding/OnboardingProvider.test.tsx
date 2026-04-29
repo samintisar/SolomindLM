@@ -1,5 +1,5 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { render, act, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { OnboardingProvider } from "./OnboardingProvider";
 import { useOnboarding } from "./OnboardingContext";
@@ -162,6 +162,36 @@ describe("OnboardingProvider", () => {
     expect(mockMutations.advanceTourStep).toHaveBeenCalledWith({
       expectedCurrentStepId: "createNotebook",
       tourNotebookId: "nb1",
+    });
+  });
+
+  test("calls advanceTourStep with openStudio when notifyStudioOpen is invoked", async () => {
+    mockState = {
+      tourStatus: "active",
+      currentStepId: "openStudio",
+      _id: "row1",
+    };
+    function ProbeWithStudioToggle() {
+      const { notifyStudioOpen } = useOnboarding();
+      return (
+        <button data-testid="open-studio-btn" onClick={notifyStudioOpen}>
+          open
+        </button>
+      );
+    }
+    const { getByTestId } = render(
+      <MemoryRouter initialEntries={["/home"]}>
+        <OnboardingProvider isAuthenticated={true}>
+          <ProbeWithStudioToggle />
+        </OnboardingProvider>
+      </MemoryRouter>,
+    );
+    await act(() => Promise.resolve());
+    await act(async () => {
+      fireEvent.click(getByTestId("open-studio-btn"));
+    });
+    expect(mockMutations.advanceTourStep).toHaveBeenCalledWith({
+      expectedCurrentStepId: "openStudio",
     });
   });
 });

@@ -9,17 +9,23 @@ import React, {
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   OnboardingContext,
   type OnboardingContextValue,
   type TourStatus,
 } from "./OnboardingContext";
+import type { TourProgress } from "./hooks/useTourProgress";
 import type { StepId } from "./steps";
 
 interface Props {
   isAuthenticated: boolean;
   children: ReactNode;
 }
+
+type AdvanceTourStepArgs =
+  | { expectedCurrentStepId: StepId }
+  | { expectedCurrentStepId: StepId; tourNotebookId: Id<"notebooks"> };
 
 export const OnboardingProvider: React.FC<Props> = ({
   isAuthenticated,
@@ -35,7 +41,7 @@ export const OnboardingProvider: React.FC<Props> = ({
   const tourProgress = useQuery(
     api.onboarding.progress.getTourProgress,
     isAuthenticated ? {} : "skip",
-  );
+  ) as TourProgress | undefined;
   const checklist = useQuery(
     api.onboarding.progress.getChecklistProgress,
     isAuthenticated ? {} : "skip",
@@ -53,7 +59,7 @@ export const OnboardingProvider: React.FC<Props> = ({
   const ensuredRowRef = useRef(false);
   const startedRef = useRef(false);
   const advancingRef = useRef(false);
-  const navigatedAfterCreateRef = useRef(false);
+  const pendingNavigationRef = useRef<string | null>(null);
   const completedAllRef = useRef(false);
 
   const tourStatus: TourStatus =
@@ -97,17 +103,19 @@ export const OnboardingProvider: React.FC<Props> = ({
     if (!gate) return;
 
     advancingRef.current = true;
-    const args: { expectedCurrentStepId: StepId; tourNotebookId?: string } = {
-      expectedCurrentStepId: currentStepId,
-    };
-    if (
-      currentStepId === "createNotebook" &&
-      (tourProgress as { tourNotebookId?: string }).tourNotebookId
-    ) {
-      args.tourNotebookId = (tourProgress as { tourNotebookId?: string })
-        .tourNotebookId as string;
-    }
-    void (advanceTourStep as (a: typeof args) => Promise<void>)(args)
+    const args: AdvanceTourStepArgs =
+      currentStepId === "createNotebook" && tourProgress.tourNotebookId
+        ? {
+            expectedCurrentStepId: currentStepId,
+            tourNotebookId: tourProgress.tourNotebookId,
+          }
+        : { expectedCurrentStepId: currentStepId };
+    void advanceTourStep(args)
+      .then(() => {
+        if (currentStepId === "createNotebook" && tourProgress.tourNotebookId) {
+          pendingNavigationRef.current = String(tourProgress.tourNotebookId);
+        }
+      })
       .catch(() => {
         /* stale step — server will re-sync via the next reactive query update */
       })
@@ -116,22 +124,14 @@ export const OnboardingProvider: React.FC<Props> = ({
       });
   }, [tourStatus, currentStepId, tourProgress, studioOpen, advanceTourStep]);
 
-  // 4. Cross-route navigation after createNotebook completes.
+  // 4. Cross-route navigation only on the transition out of createNotebook.
   useEffect(() => {
-    if (navigatedAfterCreateRef.current) return;
-    if (!currentStepId) return;
-    if (currentStepId === "createNotebook") return;
-    const tourNotebookId = (tourProgress as { tourNotebookId?: string } | null)
-      ?.tourNotebookId;
-    if (!tourNotebookId) return;
-    if (location.pathname.startsWith(`/notebook/${tourNotebookId}`)) {
-      navigatedAfterCreateRef.current = true;
-      return;
-    }
-    if (tourStatus !== "active") return;
-    navigatedAfterCreateRef.current = true;
-    navigate(`/notebook/${tourNotebookId}`);
-  }, [tourStatus, currentStepId, tourProgress, location.pathname, navigate]);
+    const target = pendingNavigationRef.current;
+    if (!target) return;
+    pendingNavigationRef.current = null;
+    if (location.pathname.startsWith(`/notebook/${target}`)) return;
+    navigate(`/notebook/${target}`);
+  }, [currentStepId, navigate, location.pathname]);
 
   // 5. Auto-complete when all five checklist items are done.
   useEffect(() => {
