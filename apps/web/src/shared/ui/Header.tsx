@@ -44,8 +44,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   const showChecklistDismissed =
     !!onboardingState &&
-    "checklistDismissed" in onboardingState &&
-    onboardingState.checklistDismissed === true;
+    "_id" in onboardingState &&
+    onboardingState.checklistDismissed === true &&
+    onboardingState.tourStatus !== "completed";
 
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(title);

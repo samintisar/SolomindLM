@@ -326,7 +326,7 @@ const AppContent: React.FC = () => {
   );
 
   return (
-    <OnboardingProvider isAuthenticated={isAuthenticated}>
+    <OnboardingProvider key={user?.id ?? "anon"} isAuthenticated={isAuthenticated}>
       {shareModalOpen && urlNotebookId && activeNotebook && !activeNotebook.isSharedNotebook && (
         <ShareNotebookModal notebookId={urlNotebookId} onClose={() => setShareModalOpen(false)} />
       )}
