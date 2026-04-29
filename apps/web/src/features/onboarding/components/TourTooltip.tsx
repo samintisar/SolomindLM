@@ -11,11 +11,13 @@ interface Rect {
 }
 
 function readRect(selector: string): Rect | null {
-  const el = document.querySelector(selector);
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (r.width === 0 && r.height === 0) return null;
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
+  const elements = document.querySelectorAll(selector);
+  for (const el of elements) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue;
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+  }
+  return null;
 }
 
 function tooltipPosition(rect: Rect, side: StepDefinition["side"]) {
@@ -52,10 +54,18 @@ function logSelectorInvariants(step: StepDefinition) {
     console.error(
       `[onboarding] step "${step.id}" has no element matching ${step.targetSelector}`,
     );
-  } else if (matches.length > 1) {
+    return;
+  }
+  // Only warn when more than one match is currently visible (rules out
+  // responsive duplicates where Tailwind hides one variant via display:none).
+  const visibleMatches = Array.from(matches).filter((el) => {
+    const r = el.getBoundingClientRect();
+    return !(r.width === 0 && r.height === 0);
+  });
+  if (visibleMatches.length > 1) {
     console.error(
-      `[onboarding] step "${step.id}" matches ${matches.length} elements:`,
-      Array.from(matches),
+      `[onboarding] step "${step.id}" has ${visibleMatches.length} visible elements:`,
+      visibleMatches,
     );
   }
 }
