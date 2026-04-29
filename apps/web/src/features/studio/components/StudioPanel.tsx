@@ -220,7 +220,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   return (
     <>
       <div
-        data-onboarding="studio-panel-toggle"
         style={{
           width: isMobile ? "100%" : width,
         }}

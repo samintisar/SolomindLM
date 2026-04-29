@@ -505,6 +505,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
         {!isRightOpen && (
           <button
+            data-onboarding="studio-panel-toggle"
             onClick={toggleRight}
             className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0"
             title="Open Studio"

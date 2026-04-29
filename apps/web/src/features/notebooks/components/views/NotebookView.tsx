@@ -136,6 +136,7 @@ export function NotebookView() {
           </button>
           <div className="w-px h-6 bg-border"></div>
           <button
+            data-onboarding="studio-panel-toggle"
             onClick={() => setMobileActiveTab("studio")}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
               mobileActiveTab === "studio"
