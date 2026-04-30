@@ -26,6 +26,13 @@ export {
   convertNotebookLM,
 } from "./notebookLM_converter";
 
+export {
+  withSourceMatrix,
+  withAcademicWebMatrix,
+  withNewsMatrix,
+  DEFAULT_SOURCE_MATRIX,
+} from "./sourceFilterVariants";
+
 /** Registry of all golden eval fixtures */
 export const FIXTURES: Record<string, EvalFixture> = {
   [agenticPatterns20.id]: agenticPatterns20,
