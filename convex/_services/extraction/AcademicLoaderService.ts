@@ -28,7 +28,7 @@ export class AcademicLoaderService {
 
   async loadPaper(
     paper: AcademicPaper
-  ): Promise<{ title: string; content: string; source: string }> {
+  ): Promise<{ title: string; content: string; source: AcademicPaper["source"] }> {
     const logger = createServiceLogger("academic_loader", "loadPaper");
     logger.operationStart({ title: paper.title, source: paper.source });
 
@@ -85,7 +85,7 @@ export class AcademicLoaderService {
     parts.push(`# ${paper.title}`);
     parts.push("");
 
-    if (paper.authors.length > 0) {
+    if (paper.authors?.length) {
       parts.push(`**Authors:** ${paper.authors.join(", ")}`);
       parts.push("");
     }
