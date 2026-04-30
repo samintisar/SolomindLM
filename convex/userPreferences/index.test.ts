@@ -65,6 +65,15 @@ describe("setOutputLanguage", () => {
       }),
     ).rejects.toThrow();
   });
+
+  test("rejects when unauthenticated", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.userPreferences.index.setOutputLanguage, {
+        outputLanguage: "en",
+      }),
+    ).rejects.toThrow();
+  });
 });
 
 describe("getMyPreferences", () => {

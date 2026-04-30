@@ -73,6 +73,10 @@ const mockMutations = {
   }),
 };
 
+vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
+  useServiceErrorToast: () => ({ showError: vi.fn() }),
+}));
+
 vi.mock("convex/react", () => ({
   useQuery: (fn: { name?: string } | string) => {
     const name = typeof fn === "string" ? fn : String(fn.name ?? fn);

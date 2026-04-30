@@ -228,10 +228,15 @@ export async function runProcessReportMapChunkPhase(
       return;
     }
 
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as any },
-    );
+    let userPrefs: { outputLanguage?: string } | null = null;
+    try {
+      userPrefs = await ctx.runQuery(
+        internal.userPreferences.index.getPreferencesByUserId,
+        { userId: userId as any },
+      );
+    } catch (e) {
+      console.warn("[report] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    }
     const language = userPrefs?.outputLanguage;
 
     const llm = createMapLLM();
@@ -403,10 +408,15 @@ export async function runFinalizeReportPhase(
       return;
     }
 
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as any },
-    );
+    let userPrefs: { outputLanguage?: string } | null = null;
+    try {
+      userPrefs = await ctx.runQuery(
+        internal.userPreferences.index.getPreferencesByUserId,
+        { userId: userId as any },
+      );
+    } catch (e) {
+      console.warn("[report] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    }
     const language = userPrefs?.outputLanguage;
 
     const mapResults = (report.metadata?.mapResults as Record<string, string>) || {};

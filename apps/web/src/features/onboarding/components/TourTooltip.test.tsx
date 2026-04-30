@@ -5,10 +5,15 @@ import { TourTooltip } from "./TourTooltip";
 import { OnboardingContext } from "../OnboardingContext";
 import type { OnboardingContextValue } from "../OnboardingContext";
 
+vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
+  useServiceErrorToast: () => ({ showError: vi.fn() }),
+}));
+
 function withCtx(value: Partial<OnboardingContextValue>) {
   const full: OnboardingContextValue = {
     tourStatus: "active",
     currentStepId: "createNotebook",
+    initFailed: false,
     skip: vi.fn(async () => {}),
     ...value,
   };

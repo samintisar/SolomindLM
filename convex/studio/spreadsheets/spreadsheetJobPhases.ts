@@ -359,10 +359,15 @@ export async function runProcessSpreadsheetMapChunkPhase(
       return;
     }
 
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as any },
-    );
+    let userPrefs: { outputLanguage?: string } | null = null;
+    try {
+      userPrefs = await ctx.runQuery(
+        internal.userPreferences.index.getPreferencesByUserId,
+        { userId: userId as any },
+      );
+    } catch (e) {
+      console.warn("[spreadsheet] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    }
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM (plain text output)
@@ -553,10 +558,15 @@ export async function runFinalizeSpreadsheetPhase(
       return;
     }
 
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as any },
-    );
+    let userPrefs: { outputLanguage?: string } | null = null;
+    try {
+      userPrefs = await ctx.runQuery(
+        internal.userPreferences.index.getPreferencesByUserId,
+        { userId: userId as any },
+      );
+    } catch (e) {
+      console.warn("[spreadsheet] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    }
     const language = userPrefs?.outputLanguage;
 
     const mapResults = (spreadsheet.metadata?.mapResults as Record<string, string>) || {};

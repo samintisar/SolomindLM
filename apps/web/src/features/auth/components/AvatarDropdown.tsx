@@ -1,5 +1,5 @@
 import React from "react";
-import { LogIn, LogOut, Sun, Moon, RotateCcw, ListChecks } from "lucide-react";
+import { LogIn, LogOut, Sun, Moon, ListChecks } from "lucide-react";
 import type { User } from "../AuthContext";
 import { LanguageSelector } from "./LanguageSelector";
 
@@ -10,7 +10,6 @@ interface AvatarDropdownProps {
   onLogout: () => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
-  onRestartTour?: () => void;
   onShowChecklist?: () => void;
   showChecklistDismissed?: boolean;
 }
@@ -22,7 +21,6 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   onLogout,
   theme,
   toggleTheme,
-  onRestartTour,
   onShowChecklist,
   showChecklistDismissed,
 }) => {
@@ -62,16 +60,6 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
         {/* Language Selector */}
         <LanguageSelector isAuthenticated={isAuthenticated} />
 
-        {isAuthenticated && onRestartTour && (
-          <button
-            onClick={onRestartTour}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <RotateCcw className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Restart tour</span>
-          </button>
-        )}
         {isAuthenticated && showChecklistDismissed && onShowChecklist && (
           <button
             onClick={onShowChecklist}

@@ -6,6 +6,8 @@ export type TourStatus = "pending" | "active" | "skipped" | "completed";
 export interface OnboardingContextValue {
   tourStatus: TourStatus;
   currentStepId: StepId | null;
+  /** True after all retries on initialization mutations have been exhausted. */
+  initFailed: boolean;
   /** Caller-provided: skip the tour. */
   skip: () => Promise<void>;
 }

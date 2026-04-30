@@ -73,6 +73,7 @@ export const OnboardingProvider: React.FC<Props> = ({
   const advanceTourRetryAttemptsRef = useRef(0);
   const completeTourRetryAttemptsRef = useRef(0);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [initFailed, setInitFailed] = useState(false);
 
   const tourStatus: TourStatus =
     onboardingState && "tourStatus" in onboardingState
@@ -104,6 +105,8 @@ export const OnboardingProvider: React.FC<Props> = ({
         if (createRowRetryAttemptsRef.current < 3) {
           createRowRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
+        } else {
+          setInitFailed(true);
         }
       });
   }, [isAuthenticated, onboardingState, getOrCreateOnboardingRow, hasOnboardingRow, retryNonce]);
@@ -124,6 +127,8 @@ export const OnboardingProvider: React.FC<Props> = ({
         if (startTourRetryAttemptsRef.current < 3) {
           startTourRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
+        } else {
+          setInitFailed(true);
         }
       });
   }, [isAuthenticated, hasOnboardingRow, tourStatus, startTour, retryNonce]);
@@ -168,6 +173,8 @@ export const OnboardingProvider: React.FC<Props> = ({
         if (advanceTourRetryAttemptsRef.current < 3) {
           advanceTourRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
+        } else {
+          setInitFailed(true);
         }
       })
       .finally(() => {
@@ -184,7 +191,7 @@ export const OnboardingProvider: React.FC<Props> = ({
     navigate(`/notebook/${target}`);
   }, [currentStepId, navigate, location.pathname]);
 
-  // 5. Auto-complete when all five checklist items are done.
+  // 5. Auto-complete when all four checklist items are done.
   useEffect(() => {
     if (!checklist) return;
     if (tourStatus === "completed") return;
@@ -206,6 +213,8 @@ export const OnboardingProvider: React.FC<Props> = ({
         if (completeTourRetryAttemptsRef.current < 3) {
           completeTourRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
+        } else {
+          setInitFailed(true);
         }
       });
   }, [checklist, tourStatus, completeTour, retryNonce]);
@@ -215,8 +224,8 @@ export const OnboardingProvider: React.FC<Props> = ({
   }, [skipTourMutation]);
 
   const value = useMemo<OnboardingContextValue>(
-    () => ({ tourStatus, currentStepId, skip }),
-    [tourStatus, currentStepId, skip],
+    () => ({ tourStatus, currentStepId, initFailed, skip }),
+    [tourStatus, currentStepId, initFailed, skip],
   );
 
   return (

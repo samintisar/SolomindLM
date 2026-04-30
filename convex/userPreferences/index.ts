@@ -5,6 +5,7 @@ import { VALID_LANGUAGE_CODES } from "../_agents/_shared/languageInstruction";
 
 export const getMyPreferences = query({
   args: {},
+  returns: v.union(v.object({ outputLanguage: v.optional(v.string()) }), v.null()),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -18,6 +19,7 @@ export const getMyPreferences = query({
 
 export const getPreferencesByUserId = internalQuery({
   args: { userId: v.id("users") },
+  returns: v.union(v.object({ outputLanguage: v.optional(v.string()) }), v.null()),
   handler: async (ctx, args) => {
     const prefs = await ctx.db
       .query("userPreferences")
@@ -29,6 +31,7 @@ export const getPreferencesByUserId = internalQuery({
 
 export const setOutputLanguage = mutation({
   args: { outputLanguage: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError("Unauthenticated");
@@ -51,5 +54,6 @@ export const setOutputLanguage = mutation({
         updatedAt: Date.now(),
       });
     }
+    return null;
   },
 });

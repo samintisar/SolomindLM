@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOnboarding } from "../OnboardingContext";
 import { findStep, STEP_IDS, TOTAL_STEPS, type StepDefinition } from "../steps";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 
 interface Rect {
   top: number;
@@ -109,6 +110,7 @@ function logOnboardingError(action: string, error: unknown) {
 
 export const TourTooltip: React.FC = () => {
   const { tourStatus, currentStepId, skip } = useOnboarding();
+  const { showError } = useServiceErrorToast();
   const [rect, setRect] = useState<Rect | null>(null);
   const rafRef = useRef<number | null>(null);
   const spotlightMaskId = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -181,6 +183,7 @@ export const TourTooltip: React.FC = () => {
   const handleSkip = () => {
     void skip().catch((error) => {
       logOnboardingError("failed to skip tour", error);
+      showError(error);
     });
   };
 

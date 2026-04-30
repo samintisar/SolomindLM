@@ -133,6 +133,59 @@ describe("getChecklistProgress", () => {
     expect(result.askQuestion).toBe(true);
   });
 
+  test("generateArtifact=true after inserting a report (global path)", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await makeUserAndOnboarding(t);
+    const nbId = await insertNotebook(t, userId);
+    await t.run(async (ctx) =>
+      ctx.db.insert("reports", {
+        userId: userId as never,
+        notebookId: nbId as never,
+        title: "Test Report",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    const result = await withAuth(t, userId).query(
+      api.onboarding.progress.getChecklistProgress,
+      {},
+    );
+    expect(result.generateArtifact).toBe(true);
+  });
+
+  test("generateArtifact=true when report is in tourNotebookId (active tour path)", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { name: "U" }),
+    );
+    const nbId = await insertNotebook(t, userId, "Tour");
+    await t.run(async (ctx) =>
+      ctx.db.insert("userOnboarding", {
+        userId,
+        tourStatus: "active",
+        currentStepId: "generateArtifact",
+        tourNotebookId: nbId,
+        checklistDismissed: false,
+      }),
+    );
+    await t.run(async (ctx) =>
+      ctx.db.insert("reports", {
+        userId: userId as never,
+        notebookId: nbId as never,
+        title: "Tour Report",
+        status: "completed",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    const result = await withAuth(t, userId).query(
+      api.onboarding.progress.getChecklistProgress,
+      {},
+    );
+    expect(result.generateArtifact).toBe(true);
+  });
+
   test("auth-scoped: another user's notebooks do not tick this user's checklist", async () => {
     const t = convexTest(schema, modules);
     const userA = await makeUserAndOnboarding(t);
@@ -172,7 +225,7 @@ describe("getChecklistProgress", () => {
     const userId = await t.run(async (ctx) => {
       const uid = await ctx.db.insert("users", { name: "U" });
       await ctx.db.insert("notebooks", {
-        userId: uid,
+        userId: uid as never,
         title: "Before restart",
         createdAt: Date.now() - 86_400_000,
         updatedAt: Date.now(),

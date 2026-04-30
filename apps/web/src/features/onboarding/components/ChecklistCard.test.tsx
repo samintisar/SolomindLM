@@ -36,6 +36,10 @@ vi.mock("@convex/_generated/api", () => ({
   },
 }));
 
+vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
+  useServiceErrorToast: () => ({ showError: vi.fn() }),
+}));
+
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>

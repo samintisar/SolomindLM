@@ -572,10 +572,15 @@ export async function runProcessSlideDeckMapChunkPhase(
       return;
     }
 
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as any },
-    );
+    let userPrefs: { outputLanguage?: string } | null = null;
+    try {
+      userPrefs = await ctx.runQuery(
+        internal.userPreferences.index.getPreferencesByUserId,
+        { userId: userId as any },
+      );
+    } catch (e) {
+      console.warn("[slides] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    }
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM using structured output
@@ -771,10 +776,15 @@ export async function runFinalizeSlideDeckPhase(
       return;
     }
 
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as any },
-    );
+    let userPrefs: { outputLanguage?: string } | null = null;
+    try {
+      userPrefs = await ctx.runQuery(
+        internal.userPreferences.index.getPreferencesByUserId,
+        { userId: userId as any },
+      );
+    } catch (e) {
+      console.warn("[slides] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    }
     const language = userPrefs?.outputLanguage;
 
     const mapResults = (slideDeck.metadata?.mapResults as Record<string, string>) || {};

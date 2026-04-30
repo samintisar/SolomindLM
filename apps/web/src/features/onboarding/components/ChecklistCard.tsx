@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { api } from "@convex/_generated/api";
 import { ChecklistItem } from "./ChecklistItem";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 
 const COLLAPSED_KEY = "onboardingChecklistCollapsed";
 
@@ -30,6 +31,7 @@ export const ChecklistCard: React.FC = () => {
   const state = useQuery(api.onboarding.state.getOnboardingState, {});
   const progress = useQuery(api.onboarding.progress.getChecklistProgress, {});
   const dismiss = useMutation(api.onboarding.mutations.dismissChecklist);
+  const { showError } = useServiceErrorToast();
 
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -63,11 +65,12 @@ export const ChecklistCard: React.FC = () => {
   const handleDismiss = () => {
     void dismiss({}).catch((error) => {
       logOnboardingError("failed to dismiss checklist", error);
+      showError(error);
     });
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-45 w-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
+    <div className="fixed bottom-4 right-4 z-[45] w-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
       <div className="flex items-center justify-between p-3 border-b border-border">
         <span className="text-sm font-semibold">
           Get started — {completed} of {ORDER.length}

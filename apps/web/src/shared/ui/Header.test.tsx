@@ -4,11 +4,9 @@ import type { ReactNode } from "react";
 import { Header } from "./Header";
 
 const mockUseQuery = vi.fn();
-const mockRestartTour = vi.fn(async () => {});
 const mockShowChecklist = vi.fn(async () => {});
 let capturedAvatarProps:
   | {
-      onRestartTour?: () => void;
       onShowChecklist?: () => void;
       showChecklistDismissed?: boolean;
     }
@@ -23,7 +21,6 @@ vi.mock("convex/react", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
   useMutation: (fn: { name?: string } | string) => {
     const name = typeof fn === "string" ? fn : String(fn.name ?? fn);
-    if (name.includes("restartTour")) return mockRestartTour;
     if (name.includes("showChecklist")) return mockShowChecklist;
     return vi.fn();
   },
@@ -34,7 +31,6 @@ vi.mock("@convex/_generated/api", () => ({
     onboarding: {
       state: { getOnboardingState: { name: "getOnboardingState" } },
       mutations: {
-        restartTour: { name: "restartTour" },
         showChecklist: { name: "showChecklist" },
       },
     },
@@ -61,7 +57,6 @@ vi.mock("./DropdownMenu", () => ({
 
 vi.mock("../../features/auth/components/AvatarDropdown", () => ({
   AvatarDropdown: (props: {
-    onRestartTour?: () => void;
     onShowChecklist?: () => void;
     showChecklistDismissed?: boolean;
   }) => {
@@ -70,11 +65,14 @@ vi.mock("../../features/auth/components/AvatarDropdown", () => ({
   },
 }));
 
+vi.mock("../hooks/useServiceErrorToast", () => ({
+  useServiceErrorToast: () => ({ showError: vi.fn() }),
+}));
+
 describe("Header onboarding action wiring", () => {
   beforeEach(() => {
     capturedAvatarProps = null;
     mockUseQuery.mockReset();
-    mockRestartTour.mockClear();
     mockShowChecklist.mockClear();
   });
 
@@ -112,7 +110,7 @@ describe("Header onboarding action wiring", () => {
     expect(capturedAvatarProps?.showChecklistDismissed).toBe(false);
   });
 
-  test("forwards restart/show handlers to mutations", async () => {
+  test("forwards show handler to mutation", async () => {
     mockUseQuery.mockReturnValue({
       _id: "row1",
       checklistDismissed: true,
@@ -127,10 +125,8 @@ describe("Header onboarding action wiring", () => {
       />,
     );
 
-    await capturedAvatarProps?.onRestartTour?.();
     await capturedAvatarProps?.onShowChecklist?.();
 
-    expect(mockRestartTour).toHaveBeenCalledTimes(1);
     expect(mockShowChecklist).toHaveBeenCalledTimes(1);
   });
 });

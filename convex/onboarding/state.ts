@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
 
@@ -53,7 +53,7 @@ export const getOrCreateOnboardingRow = mutation({
   returns: v.id("userOnboarding"),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    if (!userId) throw new ConvexError("Not authenticated");
 
     const existing = await ctx.db
       .query("userOnboarding")
@@ -62,7 +62,7 @@ export const getOrCreateOnboardingRow = mutation({
     if (existing) return existing._id;
 
     const user = await ctx.db.get(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new ConvexError("User not found");
 
     return await ctx.db.insert("userOnboarding", {
       userId,

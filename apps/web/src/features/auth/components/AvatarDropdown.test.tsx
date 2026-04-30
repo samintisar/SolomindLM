@@ -18,7 +18,6 @@ function renderMenu(
     onLogout: vi.fn(async () => {}),
     theme: "light",
     toggleTheme: vi.fn(),
-    onRestartTour: vi.fn(),
     onShowChecklist: vi.fn(),
     showChecklistDismissed: false,
     ...overrides,
@@ -27,14 +26,6 @@ function renderMenu(
 }
 
 describe("AvatarDropdown onboarding actions", () => {
-  test("shows restart tour for authenticated users and triggers handler", async () => {
-    const user = userEvent.setup();
-    const { props } = renderMenu();
-    const restart = screen.getByRole("menuitem", { name: /restart tour/i });
-    await user.click(restart);
-    expect(props.onRestartTour).toHaveBeenCalledTimes(1);
-  });
-
   test("shows checklist action only when dismissed and triggers handler", async () => {
     const user = userEvent.setup();
     const { props } = renderMenu({ showChecklistDismissed: true });
@@ -49,16 +40,9 @@ describe("AvatarDropdown onboarding actions", () => {
     renderMenu({
       user: null,
       isAuthenticated: false,
-      onRestartTour: vi.fn(),
       onShowChecklist: vi.fn(),
       showChecklistDismissed: true,
     });
-    expect(
-      screen.queryByRole("button", { name: /restart tour/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: /restart tour/i }),
-    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", {
         name: /show getting-started checklist/i,

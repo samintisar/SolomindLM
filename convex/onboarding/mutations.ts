@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { getAuthUserId } from "../auth";
 import { nextStepId } from "./constants";
@@ -18,12 +18,12 @@ const stepIdValidator = v.union(
  */
 async function loadRow(ctx: MutationCtx) {
   const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
+  if (!userId) throw new ConvexError("Not authenticated");
   const row = await ctx.db
     .query("userOnboarding")
     .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
-  if (!row) throw new Error("Onboarding row not found");
+  if (!row) throw new ConvexError("Onboarding row not found");
   return row;
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { User as UserIcon, Share2 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
@@ -37,7 +38,6 @@ export const Header: React.FC<HeaderProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   const onboardingState = useQuery(api.onboarding.state.getOnboardingState, {});
-  const restartTour = useMutation(api.onboarding.mutations.restartTour);
   const showChecklistMutation = useMutation(
     api.onboarding.mutations.showChecklist,
   );
@@ -54,6 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
   const spanRef = useRef<HTMLSpanElement>(null);
   const [inputWidth, setInputWidth] = useState(0);
 
+  const { showError } = useServiceErrorToast();
   const logOnboardingError = (action: string, error: unknown) => {
     console.error(`[onboarding] ${action}`, error);
   };
@@ -102,15 +103,10 @@ export const Header: React.FC<HeaderProps> = ({
     setIsEditing(false);
   };
 
-  const handleRestartTour = () => {
-    void restartTour({}).catch((error) => {
-      logOnboardingError("failed to restart tour", error);
-    });
-  };
-
   const handleShowChecklist = () => {
     void showChecklistMutation({}).catch((error) => {
       logOnboardingError("failed to show checklist", error);
+      showError(error);
     });
   };
 
@@ -241,7 +237,6 @@ export const Header: React.FC<HeaderProps> = ({
             onLogout={signOut}
             theme={theme}
             toggleTheme={toggleTheme}
-            onRestartTour={handleRestartTour}
             onShowChecklist={handleShowChecklist}
             showChecklistDismissed={showChecklistDismissed}
           />
