@@ -768,7 +768,7 @@ export async function streamChatResponse(
       for (const channel of tavilyChannels) {
         const topic = channelToTopic(channel);
         searchPromises.push(
-          ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+          ctx.runAction(internal._services.search.FirecrawlSearchService.discoverSourcesInternal, {
             query: refinedQuery,
             maxResults: maxPerChannel,
             topic,
@@ -782,7 +782,7 @@ export async function streamChatResponse(
               rawContent: r.rawContent ?? undefined,
             }))
           ).catch((e: unknown) => {
-            chatStreamLog.warn("tavily_search_failed", { channel, topic, error: String(e) });
+            chatStreamLog.warn("web_search_failed", { channel, topic, error: String(e) });
             return [];
           })
         );
