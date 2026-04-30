@@ -563,7 +563,7 @@ async function searchPubMed(
 // Result Processing (deduplication, filtering, sorting)
 // ============================================================
 
-function deduplicatePapers(papers: AcademicPaper[]): AcademicPaper[] {
+export function deduplicatePapers(papers: AcademicPaper[]): AcademicPaper[] {
   const seen = new Set<string>();
   return papers.filter((paper) => {
     const key = paper.doi ? paper.doi.toLowerCase() : normalizeTitle(paper.title);
@@ -573,7 +573,7 @@ function deduplicatePapers(papers: AcademicPaper[]): AcademicPaper[] {
   });
 }
 
-function filterPapers(
+export function filterPapers(
   papers: AcademicPaper[],
   filters: {
     publicationYearFrom?: number;
@@ -599,7 +599,7 @@ function filterPapers(
   });
 }
 
-function sortPapers(papers: AcademicPaper[], sortBy: string): AcademicPaper[] {
+export function sortPapers(papers: AcademicPaper[], sortBy: string): AcademicPaper[] {
   const sorted = [...papers];
   if (sortBy === "citations") {
     sorted.sort((a, b) => (b.citationCount ?? 0) - (a.citationCount ?? 0));

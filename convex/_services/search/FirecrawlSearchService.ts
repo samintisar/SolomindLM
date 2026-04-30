@@ -118,26 +118,9 @@ export const searchInternal = internalAction({
         };
       }, "firecrawl_search");
 
-      let sourcesList: DiscoveredSource[] = (data.data?.web || []).map(
-        (result: FirecrawlWebResult) => ({
-          title: result.title || "Untitled",
-          url: result.url || "",
-          snippet: result.snippet || "",
-          score: result.score || 0,
-          publishedDate: result.publishedDate,
-          domain: result.domain || (() => {
-            try {
-              return result.url ? new URL(result.url).hostname : undefined;
-            } catch {
-              return undefined;
-            }
-          })(),
-          rawContent: result.rawContent || undefined,
-        })
-      );
+      let sourcesList: DiscoveredSource[] = (data.data?.web || []).map(mapFirecrawlResult);
 
-      sourcesList = sourcesList.filter((source) => source.score >= scoreThreshold);
-      sourcesList.sort((a, b) => b.score - a.score);
+      sourcesList = filterAndSortSources(sourcesList, scoreThreshold);
 
       logger.operationComplete({ count: sourcesList.length, durationMs: Date.now() - startTime });
       return sourcesList;
@@ -160,8 +143,35 @@ const searchCache = createCachedAction(
   { ttl: withJitter(CACHE_TTL.search, 0.15), name: "firecrawl-search" }
 );
 
-function normalizeQuery(query: string): string {
+export function normalizeQuery(query: string): string {
   return query.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+export function mapFirecrawlResult(result: FirecrawlWebResult): DiscoveredSource {
+  return {
+    title: result.title || "Untitled",
+    url: result.url || "",
+    snippet: result.snippet || "",
+    score: result.score || 0,
+    publishedDate: result.publishedDate,
+    domain: result.domain || (() => {
+      try {
+        return result.url ? new URL(result.url).hostname : undefined;
+      } catch {
+        return undefined;
+      }
+    })(),
+    rawContent: result.rawContent || undefined,
+  };
+}
+
+export function filterAndSortSources(
+  sources: DiscoveredSource[],
+  scoreThreshold: number
+): DiscoveredSource[] {
+  const filtered = sources.filter((source) => source.score >= scoreThreshold);
+  filtered.sort((a, b) => b.score - a.score);
+  return filtered;
 }
 
 // ============================================================

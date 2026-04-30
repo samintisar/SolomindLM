@@ -121,6 +121,23 @@ export async function runResearchEval(
   try {
     const result = await invoker.invoke(researchContext);
 
+    // Build source evidence summary for eval metrics
+    const sourceEvidenceMap = new Map<string, { sourceCount: number; topDomains: string[] }>();
+    for (const ev of result.evidence) {
+      const channel = ev.sourceType;
+      const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
+      existing.sourceCount++;
+      if (ev.metadata?.domain && !existing.topDomains.includes(ev.metadata.domain)) {
+        existing.topDomains.push(ev.metadata.domain);
+      }
+      sourceEvidenceMap.set(channel, existing);
+    }
+    const sourceEvidence = Array.from(sourceEvidenceMap.entries()).map(([channel, data]) => ({
+      channel,
+      sourceCount: data.sourceCount,
+      topDomains: data.topDomains.slice(0, 5),
+    }));
+
     const artifact: EvalRunArtifact = {
       caseId: fixture.id,
       runner: "research",
@@ -133,6 +150,8 @@ export async function runResearchEval(
       subQueries: result.subQueries,
       researchPlan: result.plan,
       evidence: result.evidence,
+      sourcePolicy: fixture.sourcePolicy,
+      sourceEvidence,
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
       timestamp: new Date().toISOString(),

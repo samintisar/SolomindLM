@@ -38,6 +38,8 @@ export interface EvidenceEntry {
     chunkIndex?: number;
     domain?: string;
     publishedAt?: number;
+    doi?: string;
+    citationCount?: number;
   };
 }
 

@@ -37,7 +37,7 @@ export async function runPlanGraph(
 
 // ============================================================
 // EXECUTE GRAPH — retrieves evidence and writes response
-// V1: single pass, no iteration loop
+// V2: iterative loop with gap analysis
 // ============================================================
 
 interface ExecuteResult {
@@ -69,16 +69,53 @@ export async function runExecuteGraph(
     finalResponse: "",
   };
 
-  // Linear: retrieve → write
-  const retrievalResult = await retrieverNode(state, deps);
-  const newEvidence = retrievalResult.evidence ?? [];
-  const updatedSubQuestions = retrievalResult.subQuestions ?? state.subQuestions;
-  state = {
-    ...state,
-    subQuestions: updatedSubQuestions,
-    evidence: [...state.evidence, ...newEvidence],
-  };
+  // Iterative retrieve loop
+  while (state.iteration < state.maxIterations) {
+    // Reset sub-question statuses for re-retrieval on subsequent iterations
+    if (state.iteration > 0) {
+      state = {
+        ...state,
+        subQuestions: state.subQuestions.map((sq) =>
+          sq.status === "completed" ? { ...sq, status: "pending" as const } : sq
+        ),
+      };
+    }
 
+    // Retrieve evidence
+    const retrievalResult = await retrieverNode(state, deps);
+    const newEvidence = retrievalResult.evidence ?? [];
+    const updatedSubQuestions = retrievalResult.subQuestions ?? state.subQuestions;
+    state = {
+      ...state,
+      subQuestions: updatedSubQuestions,
+      evidence: [...state.evidence, ...newEvidence],
+      iteration: state.iteration + 1,
+    };
+
+    // Gap analysis: check if any sub-questions have insufficient evidence
+    const evidenceBySubQuestion: Record<string, EvidenceEntry[]> = {};
+    for (const e of state.evidence) {
+      if (!evidenceBySubQuestion[e.subQuestionId]) evidenceBySubQuestion[e.subQuestionId] = [];
+      evidenceBySubQuestion[e.subQuestionId]!.push(e);
+    }
+
+    const gaps = subQuestions
+      .map((sq) => ({
+        subQuestionId: sq.id,
+        evidenceCount: evidenceBySubQuestion[sq.id]?.length ?? 0,
+      }))
+      .filter((g) => g.evidenceCount < 2); // Threshold: at least 2 evidence pieces per SQ
+
+    // Stop if we have enough evidence or reached max iterations
+    if (gaps.length === 0 || state.iteration >= state.maxIterations) {
+      break;
+    }
+
+    // Log gap analysis for debugging
+    console.log(`[ResearchGraph] Iteration ${state.iteration}: ${gaps.length} sub-questions need more evidence`);
+  }
+
+  // Write final response
   const writerResult = await writerNode(state, deps);
   state = { ...state, ...writerResult };
 

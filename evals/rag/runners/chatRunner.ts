@@ -1,4 +1,5 @@
 import type { EvalFixture, EvalRunArtifact, ChunkSnapshot } from "../types";
+import { inferSourceChannel } from "../metrics/sourceAware";
 import { computeConfigHash } from "../configHash";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
@@ -131,6 +132,30 @@ export async function runChatEval(
   try {
     const result = await invoker.invoke(agentContext);
 
+    // Build source evidence summary from selected chunks
+    const sourceEvidenceMap = new Map<string, { sourceCount: number; topDomains: string[] }>();
+    for (const chunk of result.selectedChunks) {
+      const channel = inferSourceChannel(chunk.sourceUrl);
+      const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
+      existing.sourceCount++;
+      if (chunk.sourceUrl) {
+        try {
+          const domain = new URL(chunk.sourceUrl).hostname;
+          if (!existing.topDomains.includes(domain)) {
+            existing.topDomains.push(domain);
+          }
+        } catch {
+          // Invalid URL, skip
+        }
+      }
+      sourceEvidenceMap.set(channel, existing);
+    }
+    const sourceEvidence = Array.from(sourceEvidenceMap.entries()).map(([channel, data]) => ({
+      channel,
+      sourceCount: data.sourceCount,
+      topDomains: data.topDomains.slice(0, 5),
+    }));
+
     const artifact: EvalRunArtifact = {
       caseId: fixture.id,
       runner: "chat",
@@ -144,6 +169,7 @@ export async function runChatEval(
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
       sourcePolicy: result.sourcePolicy,
+      sourceEvidence,
       timestamp: new Date().toISOString(),
     };
 

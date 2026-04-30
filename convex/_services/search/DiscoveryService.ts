@@ -64,7 +64,7 @@ export interface DiscoveryRequest {
  * Firecrawl scores: 0-1 (mostly 0.6-1.0)
  * Academic API scores: 0-1 (calculated from citations + recency)
  */
-function normalizeScore(score: number, _sourceType: string): number {
+export function normalizeScore(score: number, _sourceType: string): number {
   // Scores are already normalized to 0-1 range from both APIs
   return Math.min(Math.max(score, 0), 1);
 }
@@ -72,7 +72,7 @@ function normalizeScore(score: number, _sourceType: string): number {
 /**
  * Convert relevance score to label
  */
-function getRelevanceLabel(score: number): "high" | "medium" | "low" {
+export function getRelevanceLabel(score: number): "high" | "medium" | "low" {
   if (score >= 0.8) return "high";
   if (score >= 0.6) return "medium";
   return "low";
@@ -81,7 +81,7 @@ function getRelevanceLabel(score: number): "high" | "medium" | "low" {
 /**
  * Transform Tavily result to unified format
  */
-function transformWebResult(
+export function transformWebResult(
   result: any,
   sourceType: "web" | "news" | "finance"
 ): UnifiedDiscoveryResult {
@@ -103,7 +103,7 @@ function transformWebResult(
 /**
  * Transform OpenAlex result to unified format
  */
-function transformAcademicResult(result: any): UnifiedDiscoveryResult {
+export function transformAcademicResult(result: any): UnifiedDiscoveryResult {
   return {
     id: `academic-${result.metadata?.sourceApi || "unknown"}-${result.url}`,
     title: result.title,
@@ -129,34 +129,35 @@ function transformAcademicResult(result: any): UnifiedDiscoveryResult {
 /**
  * Sort results based on sort option
  */
-function sortResults(
+export function sortResults(
   results: UnifiedDiscoveryResult[],
   sortBy: "relevance" | "date" | "citations"
 ): UnifiedDiscoveryResult[] {
+  const sorted = [...results];
   switch (sortBy) {
     case "date":
-      return results.sort((a, b) => {
+      return sorted.sort((a, b) => {
         if (!a.publishedDate && !b.publishedDate) return b.score - a.score;
         if (!a.publishedDate) return 1;
         if (!b.publishedDate) return -1;
         return new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime();
       });
     case "citations":
-      return results.sort((a, b) => {
-        const aCitations = a.metadata.citationCount || 0;
-        const bCitations = b.metadata.citationCount || 0;
+      return sorted.sort((a, b) => {
+        const aCitations = a.metadata?.citationCount || 0;
+        const bCitations = b.metadata?.citationCount || 0;
         return bCitations - aCitations;
       });
     case "relevance":
     default:
-      return results.sort((a, b) => b.score - a.score);
+      return sorted.sort((a, b) => b.score - a.score);
   }
 }
 
 /**
  * Distribute results evenly across source types when multiple are selected
  */
-function distributeResults(
+export function distributeResults(
   resultsBySource: { sourceType: string; results: UnifiedDiscoveryResult[] }[],
   maxResults: number
 ): UnifiedDiscoveryResult[] {

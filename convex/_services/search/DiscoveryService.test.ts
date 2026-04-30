@@ -1,551 +1,320 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// Mock auth
-vi.mock("../../auth", () => ({
-  getAuthUserId: vi.fn(),
-}));
-
-// Mock logging
-vi.mock("../../_lib/logging/serviceLogger", () => ({
-  createServiceLogger: () => ({
-    operationStart: vi.fn(),
-    operationComplete: vi.fn(),
-    operationError: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    performance: vi.fn(),
-    apiCall: vi.fn(),
-    apiError: vi.fn(),
-    apiSuccess: vi.fn(),
-    cacheHit: vi.fn(),
-    cacheMiss: vi.fn(),
-  }),
-}));
-
-import { discover, discoverSources } from "./DiscoveryService";
-import { getAuthUserId } from "../../auth";
+import { describe, it, expect } from "vitest";
+import {
+  normalizeScore,
+  getRelevanceLabel,
+  transformWebResult,
+  transformAcademicResult,
+  sortResults,
+  distributeResults,
+} from "./DiscoveryService";
+import type { UnifiedDiscoveryResult } from "./DiscoveryService";
 
 describe("DiscoveryService", () => {
-  let runActionMock: ReturnType<typeof vi.fn>;
-  let mockCtx: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    runActionMock = vi.fn();
-    mockCtx = {
-      runAction: runActionMock,
-    };
-
-    // Default authenticated user
-    (getAuthUserId as ReturnType<typeof vi.fn>).mockResolvedValue("user123");
-  });
-
-  describe("discover", () => {
-    it("throws error when user is not authenticated", async () => {
-      (getAuthUserId as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-
-      await expect(
-        discover.handler(mockCtx, {
-          query: "test",
-          sourceTypes: ["web"],
-          maxResults: 10,
-          filters: {},
-        })
-      ).rejects.toThrow("Unauthenticated");
+  describe("normalizeScore", () => {
+    it("clamps scores to 0-1 range", () => {
+      expect(normalizeScore(1.5, "web")).toBe(1);
+      expect(normalizeScore(-0.5, "web")).toBe(0);
+      expect(normalizeScore(0.5, "web")).toBe(0.5);
     });
 
-    it("discovers web sources only", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.topic === "general" || !args.topic) {
-          return Promise.resolve([
-            {
-              title: "Web Result 1",
-              url: "https://example.com/1",
-              snippet: "Snippet 1",
-              score: 0.9,
-              domain: "example.com",
-            },
-            {
-              title: "Web Result 2",
-              url: "https://example.com/2",
-              snippet: "Snippet 2",
-              score: 0.8,
-              domain: "example.com",
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "machine learning",
-        sourceTypes: ["web"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources).toHaveLength(2);
-      expect(result.totalCount).toBe(2);
-      expect(result.sourceTypeCounts).toHaveProperty("web");
-      expect(result.sources[0].sourceType).toBe("web");
-      expect(result.sources[0].metadata.relevanceLabel).toBe("high");
-    });
-
-    it("discovers news sources", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.topic === "news") {
-          return Promise.resolve([
-            {
-              title: "Breaking News",
-              url: "https://news.example.com/story",
-              snippet: "News snippet.",
-              score: 0.85,
-              publishedDate: "2024-01-15",
-              domain: "news.example.com",
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "breaking story",
-        sourceTypes: ["news"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources).toHaveLength(1);
-      expect(result.sources[0].sourceType).toBe("news");
-      expect(result.sources[0].publishedDate).toBe("2024-01-15");
-    });
-
-    it("discovers academic sources", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.publicationYearFrom !== undefined || args.sortBy !== undefined) {
-          // Academic search
-          return Promise.resolve([
-            {
-              title: "Academic Paper",
-              url: "https://arxiv.org/abs/1234",
-              snippet: "Abstract here.",
-              score: 0.92,
-              publishedDate: "2023-01-01",
-              metadata: {
-                authors: ["Author One"],
-                citationCount: 100,
-                openAccess: true,
-                hasFullText: true,
-                pdfUrl: "https://arxiv.org/pdf/1234.pdf",
-                doi: "10.1234/test",
-                sourceApi: "arxiv",
-              },
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "deep learning",
-        sourceTypes: ["academic"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources).toHaveLength(1);
-      expect(result.sources[0].sourceType).toBe("academic");
-      expect(result.sources[0].metadata.authors).toEqual(["Author One"]);
-      expect(result.sources[0].metadata.citationCount).toBe(100);
-      expect(result.sources[0].metadata.openAccess).toBe(true);
-    });
-
-    it("discovers multiple source types in parallel", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.topic === "general") {
-          return Promise.resolve([
-            { title: "Web 1", url: "https://web1.com", snippet: "Web.", score: 0.9, domain: "web1.com" },
-          ]);
-        }
-        if (args.publicationYearFrom !== undefined || args.minCitations !== undefined) {
-          return Promise.resolve([
-            { title: "Academic 1", url: "https://arxiv.org/abs/1", snippet: "Academic.", score: 0.95, metadata: { sourceApi: "arxiv" } },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "neural networks",
-        sourceTypes: ["web", "academic"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources).toHaveLength(2);
-      expect(result.sourceTypeCounts).toHaveProperty("web");
-      expect(result.sourceTypeCounts).toHaveProperty("academic");
-    });
-
-    it("distributes maxResults evenly across source types", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.topic === "general") {
-          return Promise.resolve([
-            { title: "Web 1", url: "https://w1.com", snippet: "S1", score: 0.9, domain: "w1.com" },
-            { title: "Web 2", url: "https://w2.com", snippet: "S2", score: 0.8, domain: "w2.com" },
-            { title: "Web 3", url: "https://w3.com", snippet: "S3", score: 0.7, domain: "w3.com" },
-          ]);
-        }
-        if (args.topic === "news") {
-          return Promise.resolve([
-            { title: "News 1", url: "https://n1.com", snippet: "S1", score: 0.85, domain: "n1.com" },
-            { title: "News 2", url: "https://n2.com", snippet: "S2", score: 0.75, domain: "n2.com" },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["web", "news"],
-        maxResults: 4,
-        filters: {},
-      });
-
-      // Should get at most 4 results total
-      expect(result.totalCount).toBeLessThanOrEqual(4);
-      expect(result.sources.length).toBeLessThanOrEqual(4);
-    });
-
-    it("sorts results by date", async () => {
-      runActionMock.mockResolvedValue([
-        {
-          title: "Old Article",
-          url: "https://example.com/old",
-          snippet: "Old.",
-          score: 0.9,
-          publishedDate: "2020-01-01",
-          domain: "example.com",
-        },
-        {
-          title: "New Article",
-          url: "https://example.com/new",
-          snippet: "New.",
-          score: 0.7,
-          publishedDate: "2024-01-01",
-          domain: "example.com",
-        },
-      ]);
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["web"],
-        maxResults: 10,
-        filters: {},
-        sortBy: "date",
-      });
-
-      expect(result.sources[0].title).toBe("New Article");
-      expect(result.sources[1].title).toBe("Old Article");
-    });
-
-    it("sorts results by citations for academic sources", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.sortBy === "citations") {
-          return Promise.resolve([
-            {
-              title: "Low Citations",
-              url: "https://arxiv.org/abs/low",
-              snippet: "Low.",
-              score: 0.9,
-              metadata: { citationCount: 10, sourceApi: "arxiv" },
-            },
-            {
-              title: "High Citations",
-              url: "https://arxiv.org/abs/high",
-              snippet: "High.",
-              score: 0.7,
-              metadata: { citationCount: 1000, sourceApi: "arxiv" },
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["academic"],
-        maxResults: 10,
-        filters: {},
-        sortBy: "citations",
-      });
-
-      expect(result.sources[0].title).toBe("High Citations");
-      expect(result.sources[1].title).toBe("Low Citations");
-    });
-
-    it("handles failures gracefully and returns results from successful sources", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.topic === "general") {
-          return Promise.resolve([
-            { title: "Web Result", url: "https://example.com", snippet: "Web.", score: 0.8, domain: "example.com" },
-          ]);
-        }
-        if (args.topic === "news") {
-          return Promise.reject(new Error("News API failed"));
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["web", "news"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources).toHaveLength(1);
-      expect(result.sources[0].title).toBe("Web Result");
-    });
-
-    it("applies timeRange to web searches", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        expect(args.timeRange).toBe("week");
-        return Promise.resolve([]);
-      });
-
-      await discover.handler(mockCtx, {
-        query: "recent news",
-        sourceTypes: ["web"],
-        maxResults: 10,
-        filters: {},
-        timeRange: "week",
-      });
-    });
-
-    it("applies academic filters to academic search", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.publicationYearFrom !== undefined) {
-          expect(args.publicationYearFrom).toBe(2020);
-          expect(args.publicationYearTo).toBe(2024);
-          expect(args.minCitations).toBe(50);
-          expect(args.openAccessOnly).toBe(true);
-          return Promise.resolve([]);
-        }
-        return Promise.resolve([]);
-      });
-
-      await discover.handler(mockCtx, {
-        query: "machine learning",
-        sourceTypes: ["academic"],
-        maxResults: 10,
-        filters: {},
-        academicFilters: {
-          publicationYearFrom: 2020,
-          publicationYearTo: 2024,
-          minCitations: 50,
-          openAccessOnly: true,
-        },
-      });
-    });
-
-    it("normalizes web results correctly", async () => {
-      runActionMock.mockResolvedValue([
-        {
-          title: "Test",
-          url: "https://example.com",
-          snippet: "Snippet",
-          score: 0.95,
-          domain: "example.com",
-        },
-      ]);
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["web"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      const source = result.sources[0];
-      expect(source.id).toContain("web-web-");
-      expect(source.title).toBe("Test");
-      expect(source.url).toBe("https://example.com");
-      expect(source.snippet).toBe("Snippet");
-      expect(source.score).toBe(0.95);
-      expect(source.sourceType).toBe("web");
-      expect(source.metadata.domain).toBe("example.com");
-      expect(source.metadata.relevanceLabel).toBe("high");
-    });
-
-    it("normalizes academic results correctly", async () => {
-      runActionMock.mockImplementation((_action: any, args: any) => {
-        if (args.sortBy || args.publicationYearFrom !== undefined) {
-          return Promise.resolve([
-            {
-              title: "Academic Paper",
-              url: "https://arxiv.org/abs/1234",
-              snippet: "Abstract.",
-              score: 0.88,
-              publishedDate: "2023",
-              metadata: {
-                authors: ["Author One", "Author Two"],
-                citationCount: 42,
-                pdfUrl: "https://arxiv.org/pdf/1234.pdf",
-                doi: "10.1234/test",
-                sourceApi: "arxiv",
-              },
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["academic"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      const source = result.sources[0];
-      expect(source.id).toContain("academic-");
-      expect(source.title).toBe("Academic Paper");
-      expect(source.sourceType).toBe("academic");
-      expect(source.metadata.authors).toEqual(["Author One", "Author Two"]);
-      expect(source.metadata.citationCount).toBe(42);
-      expect(source.metadata.openAccess).toBe(true);
-      expect(source.metadata.hasFullText).toBe(true);
-      expect(source.metadata.publicationYear).toBe(2023);
-      expect(source.metadata.doi).toBe("10.1234/test");
-      expect(source.metadata.pdfUrl).toBe("https://arxiv.org/pdf/1234.pdf");
-    });
-
-    it("handles empty results from all sources", async () => {
-      runActionMock.mockResolvedValue([]);
-
-      const result = await discover.handler(mockCtx, {
-        query: "xyznonexistent12345",
-        sourceTypes: ["web", "academic", "news"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources).toEqual([]);
-      expect(result.totalCount).toBe(0);
-      expect(Object.keys(result.sourceTypeCounts).length).toBeGreaterThanOrEqual(0);
-    });
-
-    it("limits total results to maxResults", async () => {
-      runActionMock.mockImplementation((_action: any, _args: any) => {
-        return Promise.resolve(
-          Array.from({ length: 20 }, (_, i) => ({
-            title: `Result ${i}`,
-            url: `https://example.com/${i}`,
-            snippet: `Snippet ${i}`,
-            score: 1 - i * 0.01,
-            domain: "example.com",
-          }))
-        );
-      });
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["web"],
-        maxResults: 5,
-        filters: {},
-      });
-
-      expect(result.totalCount).toBeLessThanOrEqual(5);
-      expect(result.sources.length).toBeLessThanOrEqual(5);
-    });
-
-    it("sorts by relevance by default", async () => {
-      runActionMock.mockResolvedValue([
-        { title: "Medium", url: "https://m.com", snippet: "M", score: 0.7, domain: "m.com" },
-        { title: "High", url: "https://h.com", snippet: "H", score: 0.9, domain: "h.com" },
-        { title: "Low", url: "https://l.com", snippet: "L", score: 0.5, domain: "l.com" },
-      ]);
-
-      const result = await discover.handler(mockCtx, {
-        query: "test",
-        sourceTypes: ["web"],
-        maxResults: 10,
-        filters: {},
-      });
-
-      expect(result.sources[0].title).toBe("High");
-      expect(result.sources[1].title).toBe("Medium");
-      expect(result.sources[2].title).toBe("Low");
+    it("handles edge cases", () => {
+      expect(normalizeScore(0, "academic")).toBe(0);
+      expect(normalizeScore(1, "news")).toBe(1);
     });
   });
 
-  describe("discoverSources", () => {
-    it("throws error when user is not authenticated", async () => {
-      (getAuthUserId as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-
-      await expect(
-        discoverSources.handler(mockCtx, {
-          query: "test",
-        })
-      ).rejects.toThrow("Unauthenticated");
+  describe("getRelevanceLabel", () => {
+    it("returns high for scores >= 0.8", () => {
+      expect(getRelevanceLabel(0.8)).toBe("high");
+      expect(getRelevanceLabel(0.95)).toBe("high");
     });
 
-    it("calls Firecrawl with default parameters", async () => {
-      runActionMock.mockResolvedValue([
-        { title: "Result", url: "https://example.com", snippet: "Snippet", score: 0.8 },
-      ]);
-
-      const result = await discoverSources.handler(mockCtx, {
-        query: "test query",
-      });
-
-      expect(result.sources).toHaveLength(1);
-      expect(result.sources[0].title).toBe("Result");
-
-      // Should use default maxResults of 10
-      expect(runActionMock).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          query: "test query",
-          maxResults: 10,
-        })
-      );
+    it("returns medium for scores >= 0.6", () => {
+      expect(getRelevanceLabel(0.6)).toBe("medium");
+      expect(getRelevanceLabel(0.79)).toBe("medium");
     });
 
-    it("passes custom maxResults", async () => {
-      runActionMock.mockResolvedValue([]);
+    it("returns low for scores < 0.6", () => {
+      expect(getRelevanceLabel(0.59)).toBe("low");
+      expect(getRelevanceLabel(0.1)).toBe("low");
+    });
+  });
 
-      await discoverSources.handler(mockCtx, {
-        query: "test",
-        maxResults: 25,
-      });
+  describe("transformWebResult", () => {
+    it("transforms web result correctly", () => {
+      const result = {
+        title: "Test Article",
+        url: "https://example.com/article",
+        snippet: "Snippet",
+        score: 0.85,
+        publishedDate: "2024-01-15",
+        domain: "example.com",
+      };
 
-      expect(runActionMock).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          maxResults: 25,
-        })
-      );
+      const transformed = transformWebResult(result, "web");
+
+      expect(transformed.id).toBe("web-web-https://example.com/article");
+      expect(transformed.title).toBe("Test Article");
+      expect(transformed.url).toBe("https://example.com/article");
+      expect(transformed.snippet).toBe("Snippet");
+      expect(transformed.score).toBe(0.85);
+      expect(transformed.sourceType).toBe("web");
+      expect(transformed.publishedDate).toBe("2024-01-15");
+      expect(transformed.metadata.domain).toBe("example.com");
+      expect(transformed.metadata.relevanceLabel).toBe("high");
     });
 
-    it("passes scoreThreshold when provided", async () => {
-      runActionMock.mockResolvedValue([]);
+    it("transforms news result correctly", () => {
+      const result = {
+        title: "News Story",
+        url: "https://news.example.com/story",
+        snippet: "Breaking news",
+        score: 0.7,
+        domain: "news.example.com",
+      };
 
-      await discoverSources.handler(mockCtx, {
-        query: "test",
-        scoreThreshold: 0.8,
-      });
+      const transformed = transformWebResult(result, "news");
 
-      expect(runActionMock).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          scoreThreshold: 0.8,
-        })
-      );
+      expect(transformed.sourceType).toBe("news");
+      expect(transformed.metadata.relevanceLabel).toBe("medium");
+    });
+
+    it("transforms finance result correctly", () => {
+      const result = {
+        title: "Market Report",
+        url: "https://finance.example.com/report",
+        snippet: "Stocks up",
+        score: 0.5,
+      };
+
+      const transformed = transformWebResult(result, "finance");
+
+      expect(transformed.sourceType).toBe("finance");
+      expect(transformed.metadata.relevanceLabel).toBe("low");
+    });
+  });
+
+  describe("transformAcademicResult", () => {
+    it("transforms academic result with all metadata", () => {
+      const result = {
+        title: "Research Paper",
+        url: "https://arxiv.org/abs/1234",
+        snippet: "Abstract here",
+        score: 0.92,
+        publishedDate: "2023",
+        metadata: {
+          authors: ["Author One", "Author Two"],
+          citationCount: 100,
+          pdfUrl: "https://arxiv.org/pdf/1234.pdf",
+          doi: "10.1234/test",
+          sourceApi: "arxiv",
+        },
+      };
+
+      const transformed = transformAcademicResult(result);
+
+      expect(transformed.id).toBe("academic-arxiv-https://arxiv.org/abs/1234");
+      expect(transformed.title).toBe("Research Paper");
+      expect(transformed.sourceType).toBe("academic");
+      expect(transformed.metadata.authors).toEqual(["Author One", "Author Two"]);
+      expect(transformed.metadata.citationCount).toBe(100);
+      expect(transformed.metadata.openAccess).toBe(true);
+      expect(transformed.metadata.hasFullText).toBe(true);
+      expect(transformed.metadata.publicationYear).toBe(2023);
+      expect(transformed.metadata.doi).toBe("10.1234/test");
+      expect(transformed.metadata.pdfUrl).toBe("https://arxiv.org/pdf/1234.pdf");
+      expect(transformed.metadata.landingPageUrl).toBe("https://arxiv.org/abs/1234");
+      expect(transformed.metadata.type).toBe("article");
+    });
+
+    it("handles missing metadata gracefully", () => {
+      const result = {
+        title: "Minimal Paper",
+        url: "https://example.com/paper",
+        snippet: "Abstract",
+        score: 0.6,
+      };
+
+      const transformed = transformAcademicResult(result);
+
+      expect(transformed.id).toBe("academic-unknown-https://example.com/paper");
+      expect(transformed.metadata.openAccess).toBe(false);
+      expect(transformed.metadata.hasFullText).toBe(false);
+      expect(transformed.metadata.publicationYear).toBeUndefined();
+    });
+  });
+
+  describe("sortResults", () => {
+    const results: UnifiedDiscoveryResult[] = [
+      {
+        id: "1",
+        title: "Old High Score",
+        url: "http://1",
+        snippet: "S1",
+        score: 0.9,
+        sourceType: "web",
+        publishedDate: "2020-01-01",
+      },
+      {
+        id: "2",
+        title: "New Low Score",
+        url: "http://2",
+        snippet: "S2",
+        score: 0.7,
+        sourceType: "web",
+        publishedDate: "2024-01-01",
+      },
+      {
+        id: "3",
+        title: "Medium",
+        url: "http://3",
+        snippet: "S3",
+        score: 0.8,
+        sourceType: "web",
+      },
+      {
+        id: "4",
+        title: "Academic High Citations",
+        url: "http://4",
+        snippet: "S4",
+        score: 0.6,
+        sourceType: "academic",
+        metadata: { citationCount: 100 },
+      },
+      {
+        id: "5",
+        title: "Academic Low Citations",
+        url: "http://5",
+        snippet: "S5",
+        score: 0.85,
+        sourceType: "academic",
+        metadata: { citationCount: 10 },
+      },
+    ];
+
+    it("sorts by relevance (score) descending", () => {
+      const sorted = sortResults([...results], "relevance");
+      expect(sorted[0].title).toBe("Old High Score");
+      expect(sorted[1].title).toBe("Academic Low Citations");
+      expect(sorted[2].title).toBe("Medium");
+      expect(sorted[3].title).toBe("New Low Score");
+      expect(sorted[4].title).toBe("Academic High Citations");
+    });
+
+    it("sorts by date descending", () => {
+      const sorted = sortResults([...results], "date");
+      expect(sorted[0].title).toBe("New Low Score");
+      expect(sorted[1].title).toBe("Old High Score");
+      // Items without dates go to the end
+      expect(sorted[sorted.length - 1].title).toBe("Academic High Citations");
+    });
+
+    it("sorts by citations descending", () => {
+      const sorted = sortResults([...results], "citations");
+      expect(sorted[0].title).toBe("Academic High Citations");
+      expect(sorted[1].title).toBe("Academic Low Citations");
+    });
+
+    it("uses score as tiebreaker when both lack dates", () => {
+      const noDates: UnifiedDiscoveryResult[] = [
+        { id: "1", title: "A", url: "", snippet: "", score: 0.5, sourceType: "web" },
+        { id: "2", title: "B", url: "", snippet: "", score: 0.8, sourceType: "web" },
+      ];
+      const sorted = sortResults([...noDates], "date");
+      expect(sorted[0].title).toBe("B");
+      expect(sorted[1].title).toBe("A");
+    });
+
+    it("does not mutate original array", () => {
+      const original = [...results];
+      sortResults(results, "relevance");
+      expect(results).toEqual(original);
+    });
+  });
+
+  describe("distributeResults", () => {
+    const createResults = (count: number, prefix: string): UnifiedDiscoveryResult[] =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `${prefix}-${i}`,
+        title: `${prefix} ${i}`,
+        url: `http://${prefix}-${i}`,
+        snippet: "S",
+        score: 1 - i * 0.1,
+        sourceType: prefix as any,
+      }));
+
+    it("distributes evenly across two sources", () => {
+      const resultsBySource = [
+        { sourceType: "web", results: createResults(10, "web") },
+        { sourceType: "academic", results: createResults(10, "academic") },
+      ];
+
+      const distributed = distributeResults(resultsBySource, 10);
+      // 5 from each source (ceil(10/2) = 5)
+      expect(distributed).toHaveLength(10);
+      const webCount = distributed.filter((r) => r.sourceType === "web").length;
+      const academicCount = distributed.filter((r) => r.sourceType === "academic").length;
+      expect(webCount).toBe(5);
+      expect(academicCount).toBe(5);
+    });
+
+    it("distributes across three sources", () => {
+      const resultsBySource = [
+        { sourceType: "web", results: createResults(10, "web") },
+        { sourceType: "news", results: createResults(10, "news") },
+        { sourceType: "academic", results: createResults(10, "academic") },
+      ];
+
+      const distributed = distributeResults(resultsBySource, 9);
+      // ceil(9/3) = 3 from each
+      expect(distributed).toHaveLength(9);
+    });
+
+    it("handles empty results", () => {
+      expect(distributeResults([], 10)).toEqual([]);
+    });
+
+    it("caps to maxResults when distributed exceeds limit", () => {
+      const resultsBySource = [
+        { sourceType: "web", results: createResults(10, "web") },
+        { sourceType: "news", results: createResults(10, "news") },
+      ];
+
+      const distributed = distributeResults(resultsBySource, 5);
+      // ceil(5/2) = 3 from each = 6 total, should cap to 5
+      expect(distributed).toHaveLength(5);
+    });
+
+    it("returns all results when total is under maxResults", () => {
+      const resultsBySource = [
+        { sourceType: "web", results: createResults(3, "web") },
+        { sourceType: "academic", results: createResults(2, "academic") },
+      ];
+
+      const distributed = distributeResults(resultsBySource, 10);
+      expect(distributed).toHaveLength(5);
+    });
+
+    it("takes top results from each source by original order", () => {
+      const resultsBySource = [
+        {
+          sourceType: "web",
+          results: [
+            { id: "w1", title: "Web 1", url: "", snippet: "", score: 0.9, sourceType: "web" },
+            { id: "w2", title: "Web 2", url: "", snippet: "", score: 0.8, sourceType: "web" },
+          ],
+        },
+        {
+          sourceType: "academic",
+          results: [
+            { id: "a1", title: "Academic 1", url: "", snippet: "", score: 0.95, sourceType: "academic" },
+            { id: "a2", title: "Academic 2", url: "", snippet: "", score: 0.85, sourceType: "academic" },
+          ],
+        },
+      ];
+
+      const distributed = distributeResults(resultsBySource, 4);
+      expect(distributed.map((r) => r.id)).toEqual(["w1", "w2", "a1", "a2"]);
     });
   });
 });

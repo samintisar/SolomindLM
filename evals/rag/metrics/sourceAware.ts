@@ -132,7 +132,7 @@ export function sourceRecallByChannel(
 /**
  * Infer source channel from a URL or chunk metadata.
  */
-function inferSourceChannel(sourceUrl?: string): string {
+export function inferSourceChannel(sourceUrl?: string): string {
   if (!sourceUrl) return "notebook";
   const url = sourceUrl.toLowerCase();
   if (url.includes("arxiv.org")) return "academic";

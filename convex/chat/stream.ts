@@ -73,6 +73,10 @@ async function runResearchPlanPhase(
   userMessageId: Id<"messages"> | undefined
 ): Promise<void> {
   const { ResearchAgent } = await import("../_agents/research/index.js");
+  const researchLog = createServiceLogger("researchStream", "runResearchPlanPhase", {
+    userId,
+    notebookId: notebookId as Id<"notebooks">,
+  });
 
   const apiKey = process.env.TOGETHER_API_KEY ?? "";
   const smartModel = process.env.SMART_MODEL ?? "openai/gpt-oss-120b";
@@ -173,6 +177,64 @@ async function runResearchPlanPhase(
         allowEmpty: true,
         quiet: true,
       });
+    },
+    discoverSources: async (query, channels, maxResults) => {
+      const promises: Promise<any[]>[] = [];
+      const webChannels = channels.filter((ch) => ch === "web" || ch === "news");
+      const academicChannels = channels.filter((ch) => ch === "academic");
+
+      if (webChannels.length > 0) {
+        for (const channel of webChannels) {
+          promises.push(
+            ctx.runAction(internal._services.search.FirecrawlSearchService.discoverSourcesInternal, {
+              query,
+              maxResults: maxResults ?? 5,
+              topic: channel === "web" ? "general" : channel,
+            }).catch((e: unknown) => {
+              researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
+              return [];
+            })
+          );
+        }
+      }
+
+      if (academicChannels.length > 0) {
+        promises.push(
+          ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
+            query,
+            maxResults: maxResults ?? 5,
+          }).catch((e: unknown) => {
+            researchLog.warn("research_academic_discovery_failed", { error: String(e) });
+            return [];
+          })
+        );
+      }
+
+      const results = await Promise.all(promises);
+      return results.flat().map((r: any) => ({
+        title: r.title ?? "Untitled",
+        url: r.url ?? "",
+        snippet: r.snippet ?? r.abstract ?? "",
+        sourceType: r.sourceType ?? r.metadata?.sourceApi ?? "web",
+        score: r.score,
+        rawContent: r.rawContent,
+        metadata: {
+          pdfUrl: r.metadata?.pdfUrl,
+          doi: r.metadata?.doi,
+          citationCount: r.metadata?.citationCount,
+          sourceApi: r.metadata?.sourceApi,
+        },
+      }));
+    },
+    loadWebPage: async (url: string) => {
+      const { WebLoaderService } = await import("../_services/extraction/WebLoaderService.js");
+      const loader = new WebLoaderService();
+      return loader.loadWebPageWithMeta(url);
+    },
+    loadPaper: async (paper) => {
+      const { AcademicLoaderService } = await import("../_services/extraction/AcademicLoaderService.js");
+      const loader = new AcademicLoaderService();
+      return loader.loadPaper(paper);
     },
     onProgress: async (phase, subQuestionId, sourcesFound) => {
       await chunkAppender(
@@ -744,11 +806,14 @@ export async function streamChatResponse(
   if (externalChannels.length > 0) {
     const maxPerChannel = Math.ceil(5 / externalChannels.length);
 
-    // Tavily channels: web→general, news, finance
-    const tavilyChannels = externalChannels.filter((ch) =>
+    // Web/News channels via Firecrawl
+    const webChannels = externalChannels.filter((ch) =>
       ["web", "news", "finance"].includes(ch)
     );
-    const tavilyResults: Array<{
+    // Academic channel via AcademicSearchService
+    const academicChannels = externalChannels.filter((ch) => ch === "academic");
+
+    const allResults: Array<{
       title: string;
       url: string;
       snippet: string;
@@ -757,15 +822,14 @@ export async function streamChatResponse(
       rawContent?: string;
     }> = [];
 
-    if (tavilyChannels.length > 0) {
+    if (webChannels.length > 0) {
       const channelToTopic = (ch: string) => (ch === "web" ? "general" : ch);
-      const searchPromises: Promise<Array<typeof tavilyResults[number]>>[] = [];
+      const searchPromises: Promise<Array<typeof allResults[number]>>[] = [];
 
       // Refine the user message into a search-optimized query to improve result relevance.
-      // Falls back to the raw message if refinement fails.
       const refinedQuery = await refineWebSearchQuery(message);
 
-      for (const channel of tavilyChannels) {
+      for (const channel of webChannels) {
         const topic = channelToTopic(channel);
         searchPromises.push(
           ctx.runAction(internal._services.search.FirecrawlSearchService.discoverSourcesInternal, {
@@ -791,49 +855,74 @@ export async function streamChatResponse(
       const settled = await Promise.allSettled(searchPromises);
       for (const result of settled) {
         if (result.status === "fulfilled") {
-          tavilyResults.push(...result.value.filter((s) => s.url));
+          allResults.push(...result.value.filter((s) => s.url));
         }
       }
-
-      // Sort by score descending, cap at 5
-      tavilyResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-      const topResults = tavilyResults.slice(0, 5);
-
-      // Build metadata for frontend and ReferenceChunks for the LLM
-      externalSources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
-      externalChunks = topResults
-        .filter((r) => r.rawContent && r.rawContent.trim().length > 100)
-        .map((r, i) => {
-          // Chunk raw content into ~3000 char pieces to fit within token budget
-          const raw = r.rawContent!.trim();
-          const CHUNK_SIZE = 3000;
-          const pieces: string[] = [];
-          for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
-            pieces.push(raw.slice(start, start + CHUNK_SIZE));
-          }
-          // Take first chunk only to stay within budget
-          const content = pieces[0] ?? raw;
-          return {
-            id: `ext_${i}`,
-            sourceId: `ext_${i}`,
-            sourceTitle: r.title,
-            sourceUrl: r.url,
-            content,
-            chunkIndex: 0,
-            // Assign a moderate score so token budget selector includes them
-            similarity: 0.5,
-            metadata: {
-              sectionTitle: `Web source (${r.sourceType})`,
-            },
-          } as import("../storage/ChatHistoryService").ReferenceChunk;
-        });
-
-      chatStreamLog.info("external_search_complete", {
-        channels: externalChannels,
-        resultCount: externalSources.length,
-        chunksForLLM: externalChunks.length,
-      });
     }
+
+    if (academicChannels.length > 0) {
+      const academicQuery = await refineWebSearchQuery(message);
+      try {
+        const academicResults = await ctx.runAction(
+          internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+          {
+            query: academicQuery,
+            maxResults: maxPerChannel,
+          }
+        );
+        allResults.push(
+          ...academicResults.map((r: any) => ({
+            title: r.title ?? "Untitled",
+            url: r.url ?? "",
+            snippet: r.snippet ?? r.abstract ?? "",
+            sourceType: "academic",
+            score: r.score,
+            rawContent: r.rawContent ?? undefined,
+          }))
+        );
+      } catch (e: unknown) {
+        chatStreamLog.warn("academic_search_failed", { error: String(e) });
+      }
+    }
+
+    // Sort by score descending, cap at 5
+    allResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    const topResults = allResults.slice(0, 5);
+
+    // Build metadata for frontend and ReferenceChunks for the LLM
+    externalSources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
+    externalChunks = topResults
+      .filter((r) => r.rawContent && r.rawContent.trim().length > 100)
+      .map((r, i) => {
+        // Chunk raw content into ~3000 char pieces to fit within token budget
+        const raw = r.rawContent!.trim();
+        const CHUNK_SIZE = 3000;
+        const pieces: string[] = [];
+        for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
+          pieces.push(raw.slice(start, start + CHUNK_SIZE));
+        }
+        // Take first 2 chunks for more depth (6000 chars total)
+        const content = pieces.slice(0, 2).join("\n\n---\n\n") || raw;
+        return {
+          id: `ext_${i}`,
+          sourceId: `ext_${i}`,
+          sourceTitle: r.title,
+          sourceUrl: r.url,
+          content,
+          chunkIndex: 0,
+          // Assign a moderate score so token budget selector includes them
+          similarity: 0.5,
+          metadata: {
+            sectionTitle: `${r.sourceType === "academic" ? "Academic" : "Web"} source (${r.sourceType})`,
+          },
+        } as import("../storage/ChatHistoryService").ReferenceChunk;
+      });
+
+    chatStreamLog.info("external_search_complete", {
+      channels: externalChannels,
+      resultCount: externalSources.length,
+      chunksForLLM: externalChunks.length,
+    });
   }
 
   let fullResponse = "";
