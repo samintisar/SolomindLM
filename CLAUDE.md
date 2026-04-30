@@ -1,372 +1,165 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository. Keep concise; this file is loaded into every session.
 
-## Common Commands
-
-**Development:**
+## Quick Start
 
 ```bash
-bun install                    # Install all dependencies
-bun run dev                    # Run all dev servers (workspace)
-bun run dev:web                # Run only web dev server on :5173
-bun x convex dev               # Run Convex dev backend (separate terminal)
+bun install                    # Install dependencies
+bun run dev                    # All dev servers (workspace)
+bun run dev:web                # Web dev server on :5173 (auto-kills stale port)
+bun x convex dev               # Convex dev backend (separate terminal)
 ```
 
-**Building & Type Checking:**
+**Build & typecheck** (typechecks must run separately — cannot parallelize):
 
 ```bash
-bun run build                  # Build all workspace packages
-bun run build:prod             # Build production web app
-bun run typecheck:convex       # Type check convex only
-bun run typecheck:web          # Type check web only
+bun run build                  # Build all workspaces
+bun run build:prod             # Production web build
+bun run typecheck:convex       # Convex typecheck
+bun run typecheck:web          # Web typecheck
 ```
 
-Type checks must be run individually per workspace (cannot run simultaneously).
-
-**Linting & Formatting:**
+**Lint & format:**
 
 ```bash
-bun run lint                  # Run ESLint on entire codebase
-bun run lint:fix              # Auto-fix ESLint issues
-bun run format                # Format all files with Prettier
-bun run format:check          # Check formatting without writing
+bun run lint                   # ESLint (flat config)
+bun run lint:fix               # Auto-fix
+bun run format                 # Prettier write
+bun run format:check           # Prettier check
 ```
 
-**Convex Environment:**
+**Convex env push:**
 
 ```bash
-bun run convex:env:push        # Push .env vars to convex dev
-bun run convex:env:push:prod   # Push to production convex
-bun run convex:env:push:dry    # Dry run for env push
+bun run convex:env:push        # Push .env to convex dev
+bun run convex:env:push:prod   # Push to prod
+bun run convex:env:push:dry    # Dry run
 ```
 
-**RAG eval (`bun run eval:rag`):** One-shot: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Manual template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). The push script does not upload `RAG_EVAL_CONVEX_URL` (CLI-only).
+**RAG eval (`bun run eval:rag`):** One-shot bootstrap: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). Push script does NOT upload `RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case` / `--runner` for scoped runs; `eval:studio` is for cross-cutting work.
 
-## Project Architecture
+## Architecture
 
-**Monorepo structure using Bun workspaces:**
+Bun workspaces monorepo:
 
-- `apps/web/` - React 19.2 + Vite frontend
-- `convex/` - Convex backend (auth, database, functions, agents)
+- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4 + Radix; React Router 7, Mind Elixir 5, react-flip-toolkit, react-markdown + KaTeX, DOMPurify, Stripe SDK
+- `convex/` — Convex backend (auth, schema, functions, agents)
 
-### Frontend (`apps/web/`)
+**Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/`, `billing/`, `chat/`, `landing/`, `legal/`, `notebooks/`, `sources/`, `studio/` (with `studio/components/views/` per content type — ReportView, FlashcardView, QuizView, etc.).
 
-**Stack:** React 19.2, Vite 7.x, TypeScript, TailwindCSS 4.x, Radix UI (lucide-react icons)
+**Path aliases** (`tsconfig.json`): `@/*` → `./src/*`, `@convex/*` → `../../convex/*`.
 
-**Key libraries:**
+**Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workpool`.
 
-- React Router DOM 7.x for routing
-- Mind Elixir 5.x for mind maps
-- React Flip Toolkit for flashcards
-- React Markdown + KaTeX for math rendering
-- DOMPurify for sanitizing HTML
-- Stripe SDK for payments
+**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors), `reports`, `audioOverviews`, `flashcards`, `quizzes`, `slides`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `stripeSubscriptions`, `stripePaymentHistory`, `cacheVersions`, `cacheMetrics`.
 
-**Feature organization:**
+**Convex directory layout** (`_` prefix = excluded from generated API):
 
-- `features/audio/` - Audio overview generation
-- `features/auth/` - Authentication with @convex-dev/auth
-- `features/billing/` - Stripe subscription management
-- `features/chat/` - RAG chat with citations & streaming
-- `features/landing/` - Landing page
-- `features/legal/` - Legal pages (terms, privacy)
-- `features/notebooks/` - Notebook management
-- `features/sources/` - Source discovery and management
-- `features/studio/` - AI generation tools (reports, flashcards, quizzes, mind maps, audio, slides, spreadsheets)
-- `features/studio/components/views/` - View components for each content type (ReportView, FlashcardView, QuizView, etc.)
+- `_agents/` — LangGraph agents per type (`chat/`, `report/`, `flashcard/`, …); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization
+- `_lib/` — errors, limits, env helpers
+- `_model/` — data models
+- `_services/` — `ai/`, `search/`, `extraction/`, `processing/`, `grading/`, `cache/`
+- `auth/`, `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/` — domain functions
+- `studio/` — content generation per type
+- `storage/` — vector store, chat history
+- root `*.ts` — schema, auth config, http actions
 
-**Path aliases (tsconfig.json):**
+**AI services:** LLMs `openai/gpt-oss-120b` (smart) / `openai/gpt-oss-20b` (fast). Embeddings via LangChain (Together AI compatible). Reranking: ZeroEntropy. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
 
-- `@/*` → `./src/*`
-- `@convex/*` → `../../convex/*`
+**Pipelines:**
 
-### Backend (`convex/`)
+- *Content:* ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
+- *Generation:* user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
 
-**Convex modules enabled:**
+## Observability
 
-- `@convex-dev/auth` - Authentication (OTT handler)
-- `@convex-dev/stripe` - Stripe integration
-- `@convex-dev/persistent-text-streaming` - Streaming responses
-- `@convex-dev/action-cache` - Action caching
-- `@convex-dev/rate-limiter` - Rate limiting
-- `@convex-dev/workpool` - Background job scheduling
-
-**Schema key tables:**
-
-- `notebooks` - Research notebook containers
-- `folders` - Organization within notebooks
-- `documents` - Source files/URLs with status tracking
-- `documentChunks` - Vector search chunks (1536 dimensions) for RAG
-- `reports`, `audioOverviews`, `flashcards`, `quizzes` - Generated content
-- `slides`, `spreadsheets`, `writtenQuestions` - Additional generated content
-- `conversations`, `messages` - Chat history with RAG citations
-- `notes` - Saved chat conversations and manual user notes
-- `stripeSubscriptions`, `stripePaymentHistory` - Billing state
-- `cacheVersions`, `cacheMetrics` - Agent cache invalidation tracking
-
-**Directory structure:**
-
-- `_agents/` - LangGraph-based agents (underscore = excluded from API). Subdirs per type: `chat/`, `report/`, `flashcard/`, etc.
-- `_agents/_shared/` - Shared utilities: LLM factory, retry, timeout, validation, sanitization
-- `_lib/` - Core utilities (errors, limits, env helpers)
-- `_model/` - Data models (underscore = excluded from API)
-- `_services/` - External service integrations: `ai/`, `search/`, `extraction/`, `processing/`, `grading/`, `cache/`
-- `auth/`, `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/` - Domain function directories
-- `studio/` - Content generation: `reports/`, `flashcards/`, `quizzes/`, `mindmaps/`, `audio/`, `slides/`, `spreadsheets/`, `writtenQuestions/`
-- `storage/` - Vector store, chat history
-- `*.ts` - Functions, schema, mutations, auth config (root level)
-
-### AI Services Integration
-
-**LLMs:** openai/gpt-oss-120b (smart model), openai/gpt-oss-20b (fast model)
-**Embeddings:** LangChain integration (can use Together AI models)
-**Reranking:** ZeroEntropy
-**OCR:** Mistral for images
-**Web Search:** Tavily API
-**Content Extraction:** Supadata (YouTube, TikTok, Instagram, X, web scraping)
-**Together AI:** Audio overviews (TTS), embeddings, chat completions, images, video, evaluations
-**Audio voices:** Configured via `AUDIO_VOICE_HOST_*` environment variables
-
-### Processing Pipelines
-
-**Content Processing:**
-
-1. Ingestion → Convex storage
-2. Extraction (OCR via Mistral, transcripts via Supadata)
-3. Splitting with smart strategies per content type
-4. Embedding and vector storage (1536 dimensions)
-5. Reranking with ZeroEntropy
-
-**Generation Pipeline:**
-
-1. User request → Convex job queue
-2. LangChain agent processes with RAG
-3. Streaming via persistent text streaming
-4. Content delivery when complete
-
-**Note:** Jobs are scheduled directly via `ctx.scheduler.runAfter()` from mutations, not via a jobs table.
-
-### Observability (logging and errors)
-
-- **Service logs:** [`convex/_lib/logging/serviceLogger.ts`](convex/_lib/logging/serviceLogger.ts) emits one JSON object per line (dashboard + optional Log Streams). Pass `requestId` in context when you have it so exports can correlate with Convex `function.request_id`.
-- **Production logs:** Prefer a [Convex Log Stream](https://stack.convex.dev/log-streams-common-uses) (e.g. Axiom, Datadog); dashboard log history is limited.
-- **Structured errors:** [`convex/_lib/errors.ts`](convex/_lib/errors.ts) (`ExternalServiceError`, `StorageError`, `InputValidationError`); map to `ConvexError` for clients via [`convex/_lib/serviceErrors.ts`](convex/_lib/serviceErrors.ts) `toConvexError`. Web parsing: [`apps/web/src/shared/utils/errorParser.ts`](apps/web/src/shared/utils/errorParser.ts) (`parseServiceError`, `parseAppError`) and optional [`useServiceErrorToast`](apps/web/src/shared/hooks/useServiceErrorToast.ts).
+- **Logs:** [`convex/_lib/logging/serviceLogger.ts`](convex/_lib/logging/serviceLogger.ts) emits one-JSON-per-line. Pass `requestId` so exports correlate with Convex `function.request_id`. Prefer a [Convex Log Stream](https://stack.convex.dev/log-streams-common-uses) (Axiom/Datadog) in prod — dashboard history is limited.
+- **Errors:** [`convex/_lib/errors.ts`](convex/_lib/errors.ts) (`ExternalServiceError`, `StorageError`, `InputValidationError`); map to `ConvexError` via [`convex/_lib/serviceErrors.ts`](convex/_lib/serviceErrors.ts) `toConvexError`. Web parsing: [`apps/web/src/shared/utils/errorParser.ts`](apps/web/src/shared/utils/errorParser.ts) (`parseServiceError`, `parseAppError`); optional [`useServiceErrorToast`](apps/web/src/shared/hooks/useServiceErrorToast.ts).
 - **HTTP retry:** [`convex/_agents/_shared/retry.ts`](convex/_agents/_shared/retry.ts) — `RetryPolicies.http`, `invokeWithHttpRetry`, `isHttpAwareRetryableError`.
 
-## Environment Setup
+## Environment
 
-**Required:** Bun 1.2+ runtime
+Bun 1.2+ required. Required env vars: `CONVEX_DEPLOYMENT` plus AI service keys (Together AI, OpenAI, Mistral, Tavily, Supadata, ZeroEntropy, …).
 
-**Convex URLs:** Dev and prod deployments have different URLs. Use dev URLs in `apps/web/.env.local` when running locally; set prod URLs in production hosting env vars (e.g., Vercel).
-
-**Required env variables:**
-
-- `CONVEX_DEPLOYMENT` - Convex deployment URL
-- AI service keys (Together AI, OpenAI for embeddings/slides, Mistral, Tavily, Supadata, ZeroEntropy, etc.)
+**Dev vs prod Convex URLs differ.** Local `apps/web/.env.local` uses dev URL; production hosting (Vercel) uses prod URL.
 
 ## Git Workflow
 
-**Branching:** GitHub Flow - feature branches → PR to main
+GitHub Flow: feature branches → PR to `main` (protected, requires PR + CI). Branch prefixes: `feature/`, `fix/`, `refactor/`, `docs/`, `chore/`. Conventional commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`). Squash merge.
 
-- Main branch is protected (requires PR + CI checks)
-- Branch prefixes: `feature/`, `fix/`, `refactor/`, `docs/`, `chore/`
-- Commit format: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
-- Use squash merge for clean history
-
-**CI:** Runs on push to `main` and PRs — Convex typecheck; web build (main uses repo variable `VITE_CONVEX_URL`, not a second `convex deploy` — avoids racing Vercel).
+CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `VITE_CONVEX_URL`, no second `convex deploy` — avoids racing Vercel).
 
 ## Claude Code Hooks
 
-**Automatic typechecking is enabled:**
+Auto-typecheck runs after edits in `apps/web/` (web typecheck) and `convex/` (convex typecheck). Config: `.claude/settings.json`.
 
-- **Web files**: Typecheck runs automatically after editing any file in `apps/web/`
-- **Convex files**: Typecheck runs automatically after editing any file in `convex/`
-
-**Hook configuration:** `.claude/settings.json`
-
-**If hooks fail to run:**
-
-1. Check that `Bash(bun run typecheck:*)` is in permissions.allow
-2. Ensure hooks are in `settings.json` (not `settings.local.json`)
-3. Remove `shell: "powershell"` parameter (use default shell)
-4. Restart Claude Code to reload configuration
+Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; hooks belong in `settings.json` (not `settings.local.json`); no `shell: "powershell"` (use default); restart Claude Code to reload.
 
 ## Gotchas
 
-- **Convex directory structure** - Directories with `_` prefix are excluded from API generation. Functions in `convex/domain/index.ts` become `api.domain.index.*`
-- **Auth file location** - `@convex-dev/auth` requires `convex/auth.ts` at root level, not in a subdirectory
-- **Vite cache** - After changing API paths, clear Vite cache: `rm -rf apps/web/node_modules/.vite` and hard refresh browser (Ctrl+Shift+R)
-- **Linting/formatting:** ESLint (flat config) + Prettier. Run `bun run lint` before committing. Convex generated files (`convex/_generated/`) are excluded. `@typescript-eslint/no-explicit-any` is a warning (not error) to match `strict: false` in web tsconfig — tighten this as null safety improves. No tests configured yet — typecheck is the primary validation.
-- **Port management:** `bun run dev:web` automatically kills existing processes on port 5173 via kill-port script
-- **Convex URLs:** Dev and prod use different deployment URLs - ensure `.env.local` uses dev URLs locally, while production hosting (Vercel) uses prod URLs
-- **TypeScript strict mode disabled** - `strict: false` in web tsconfig; rely on typecheck rather than strict null checks
-- **Agent caching** - Agent results are cached; increment version in `cacheVersions` table when prompts change to invalidate cache
+- **`_` prefix excludes from API.** Functions in `convex/domain/index.ts` become `api.domain.index.*`.
+- **Auth file location.** `@convex-dev/auth` requires `convex/auth.ts` at root, not in a subdirectory.
+- **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
+- **Validation gates** (in order):
+  1. `bun run typecheck:web` + `typecheck:convex` — always
+  2. `bun run test:convex` — vitest + `convex-test`, ~277 tests, <1s. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
+  3. `bun run test:web` — vitest for web utilities
+  4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
+  5. `bun run eval:rag --case=… / --runner=…` — agent or prompt changes (do NOT unit-test prompt outputs)
+- **TS strictness:** `@typescript-eslint/no-explicit-any` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves.
+- **Generated files excluded from lint:** `convex/_generated/`.
+- **Port management:** `bun run dev:web` kills stale :5173 via `kill-port`.
+- **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
+- **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.
 
-## Required Skills
+## Process Skills (superpowers)
 
-**Canonical location:** `.agents/skills/<skill-name>/SKILL.md` (single copy in git). Add or edit skills only there. Cursor and other agents should use that path.
+Plugin `superpowers@claude-plugins-official` is installed. Invoke via `Skill` tool. Project-specific triggers and overrides:
 
-**Claude Code** expects skills under `.claude/skills/`, but `.claude/` is gitignored. After cloning, run `bun run link:claude-skills` once to create a junction (Windows) or symlink (macOS/Linux) from `.claude/skills` to `.agents/skills`.
+| Skill | When | Project notes |
+|---|---|---|
+| `superpowers:brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
+| `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
+| `superpowers:executing-plans` | Executing a written plan in a separate session | — |
+| `superpowers:subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
+| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Prefer `Explore` subagent for >3-query codebase searches |
+| `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
+| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
+| `superpowers:requesting-code-review` | Before merging significant work | — |
+| `superpowers:receiving-code-review` | When handling review feedback | — |
+| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
+| `superpowers:using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
+| `superpowers:writing-skills` | Creating or editing a skill | Edit canonical copy under `.agents/skills/<name>/SKILL.md` |
+| `superpowers:test-driven-development` | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
 
-**Always invoke these skills at the specified triggers.**
+## Project-Specific Skill Triggers
 
-### Serena MCP (Code Navigation & Editing)
+Skill descriptions are loaded automatically; below are *project* triggers, not generic descriptions.
 
-| Skill          | When                                                        |
-| -------------- | ----------------------------------------------------------- |
-| `serena-usage` | Managing Serena memories, navigating symbols, intelligent refactors |
+**Convex** (`convex-create-component`, `convex-migration-helper`, `convex-performance-audit`, `convex-quickstart`, `convex-setup-auth`):
 
-### Convex Skills
+- Schema or table change → `convex-migration-helper` (widen-migrate-narrow)
+- Read amplification, OCC conflicts, `npx convex insights` warnings → `convex-performance-audit`
+- New isolated table-owning module → `convex-create-component`
 
-| Skill                      | When                                                            |
-| -------------------------- | --------------------------------------------------------------- |
-| `convex-create-component`  | Creating new Convex components with isolated tables             |
-| `convex-migration-helper`  | Planning or executing schema/data migrations                    |
-| `convex-performance-audit` | Auditing or optimizing Convex performance                       |
-| `convex-quickstart`        | Initializing new Convex projects                                |
-| `convex-setup-auth`        | Setting up authentication with @convex-dev/auth                 |
+**LangChain / LangGraph** (`langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`): touching anything under `convex/_agents/`, especially RAG retrieval, graph state, or new agent types.
 
-### LangChain & LangGraph Skills
+**Together AI** (`together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`): when modifying `convex/_services/ai/` or `convex/studio/audio/`.
 
-| Skill                    | When                                                   |
-| ------------------------ | ------------------------------------------------------ |
-| `langchain-fundamentals` | Learning or using LangChain primitives and chains      |
-| `langchain-rag`          | Implementing RAG (Retrieval-Augmented Generation)      |
-| `langgraph-fundamentals` | Designing or implementing LangGraph agents             |
+**Frontend** (`vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `bun`): use as triggers describe; `web-design-guidelines` for any new UI surface.
 
-### Frontend & Development Skills
-
-| Skill                          | When                                                       |
-| ------------------------------ | ---------------------------------------------------------- |
-| `bun`                          | Working with Bun runtime, package manager, and test runner |
-| `typescript-advanced-types`    | Working with advanced TypeScript patterns and types        |
-| `vercel-composition-patterns`  | Designing React component composition patterns             |
-| `vercel-react-best-practices`  | Writing, reviewing, or refactoring React code for performance optimization |
-| `vercel-react-native-skills`   | Working with React Native development                      |
-| `web-design-guidelines`        | Building UI/UX following production-grade design principles |
-| `vite`                         | Working with Vite configuration, plugins, or build optimization |
-
-### Testing Skills
-
-| Skill              | When                                        |
-| ------------------ | ------------------------------------------- |
-| `webapp-testing`   | Writing or reviewing tests for web apps     |
-
-### Together AI Skills
-
-| Skill                       | When                                       |
-| --------------------------- | ------------------------------------------ |
-| `together-audio`            | Working with TTS/STT or audio overviews    |
-| `together-chat-completions` | Using Together AI's chat/completions API   |
-| `together-embeddings`       | Working with embeddings or vector search   |
-| `together-evaluations`      | Using LLM-as-a-judge evaluation            |
-| `together-images`           | Text-to-image generation or editing        |
-| `together-video`            | Text-to-video or image-to-video generation |
-
-## Verifying Skills Installation
-
-After cloning the repository, verify all skills are properly accessible:
-
-```bash
-# Run once to create symlink from .claude/skills to .agents/skills
-bun run link:claude-skills
-
-# Verify skills are available
-ls .claude/skills/
-```
-
-**Expected skills count:** 40+ skills should be listed.
-
-If skills are missing, ensure:
-1. You ran `bun run link:claude-skills` after cloning
-2. `.agents/skills/` directory exists and contains skill directories
-3. On Windows: junction was created successfully (check with `dir .claude\skills`)
-4. On macOS/Linux: symlink was created successfully (check with `ls -la .claude/skills`)
+**Serena**: see MCP section below.
 
 ## MCP Servers
 
-### context7 - Documentation Lookup
+- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. Prefer `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file` over `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
 
-This project uses the **context7 MCP server** for live documentation lookup of libraries and frameworks.
+## Skills Installation
 
-**When to use context7:**
+Canonical skill source: `.agents/skills/<name>/SKILL.md` (in git). Claude Code reads from `.claude/skills/` (gitignored). After cloning, run **once**:
 
-- Looking up API documentation for any library (React, LangChain, Convex, Stripe, etc.)
-- Finding code examples for specific library features
-- Checking current best practices and patterns
-- Understanding library-specific APIs that may have changed
-
-**How to use:**
-
+```bash
+bun run link:claude-skills     # Junction (Windows) / symlink (Unix)
+ls .claude/skills              # Should list 40+ skills
 ```
-"Show me React 19.2 documentation for useTransition"
-"What's the current LangChain API for creating agents?"
-"How do I use Convex's v.scalar() for schema definitions?"
-```
-
-**Available via:** `mcp__plugin_context7_context7__query-docs` tool
-
-**Install:** Already configured in `.mcp.json`
-
-## Code Navigation & Editing (Serena MCP)
-
-**At session start**, call the `initial_instructions` tool to load Serena's operational guidance. This project uses the Serena MCP server for LSP-powered semantic code operations.
-
-### Session Startup
-
-1. **Activate project**: Use `activate_project` if not already active
-2. **Read instructions**: Call `initial_instructions` tool
-3. **Check memories**: Use `list_memories` for relevant project context
-4. **Proceed** with code work using Serena's tools as the primary method
-
-### General Rules
-
-- Prefer Serena's code-aware tools over naive file reads and regex/grep:
-  - Use `find_symbol` and `find_referencing_symbols` to locate definitions/usages instead of scanning whole files.
-  - Use `insert_before_symbol`, `insert_after_symbol`, and `replace_symbol_body` for edits instead of rewriting entire files.
-- For non-trivial refactors: ask Serena to find all references before changing any public API. Apply edits via Serena's editing tools so changes are localized and consistent.
-
-### When to Use Serena vs Built-in Tools
-
-**Use Serena for (`.ts`/`.tsx` files):**
-
-- **Reading code:** `find_symbol` (with `include_body=true`) or `get_symbols_overview` to understand structure, then `find_symbol` to read specific symbols — avoids loading entire files
-- **Searching:** `find_symbol` or `search_for_pattern` instead of `Grep` for code searches
-- **Editing:** `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol` instead of `Edit` — more token-efficient and localized
-- **Renaming:** `rename_symbol` for project-wide renames
-- **Finding usages:** `find_referencing_symbols` before changing any signature
-- **New code files:** `create_text_file` instead of `Write`
-
-**Built-in tools are fine for:** non-code files (`.md`, `.json`, `.yaml`, `.css`, `.html`), images, and binary files.
-
-### Workflow
-
-1. Start with `get_symbols_overview` to understand a file's structure
-2. Use `find_symbol` to read only the symbols you need (`include_body=true`)
-3. Edit with `replace_symbol_body` or insert with `insert_before_symbol`/`insert_after_symbol`
-4. Verify references with `find_referencing_symbols` after changing public APIs
-
-**Advanced Serena workflows:**
-- Use the `serena-usage` skill for:
-  - Managing Serena project memories across sessions
-  - Performing intelligent, symbol-aware refactors
-  - Navigating complex codebases with symbol search
-- Invoke `serena-usage` when:
-  - You need to save project context for future sessions
-  - Performing cross-file refactors that require reference tracking
-  - Analyzing code relationships and dependencies
-
-### Operational Preferences
-
-- Assume Serena is already configured for this project; don't try to reconfigure the MCP server.
-- If Serena tools fail or are unavailable, fall back to Claude Code's built-in file operations, but prefer Serena when possible.
-- **LSP staleness:** If Serena seems unaware of recent changes, call `restart_language_server` to resync. This can happen after using built-in tools for edits.
-
-<!-- convex-ai-start -->
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
-<!-- convex-ai-end -->

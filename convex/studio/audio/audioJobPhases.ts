@@ -20,9 +20,7 @@ import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import {
   getMapPrompt,
   getReducePrompt,
-  buildCoveredTopicsPrompt,
   TARGET_LINE_COUNTS,
-  DIALOGUE_CHUNK_SIZE,
   MAP_SYSTEM_PROMPT,
   REDUCE_SYSTEM_PROMPT,
   type AudioType,
@@ -520,117 +518,89 @@ export async function runFinalizeAudioOverviewPhase(
     const targetLines = TARGET_LINE_COUNTS[length];
 
     let fullDialogueScript: DialogueLine[] = [];
-    const numChunks = Math.ceil(targetLines / DIALOGUE_CHUNK_SIZE);
-    const coveredExamples = new Set<string>();
 
     console.log(
       `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`
     );
 
-    for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
-      const linesThisChunk = Math.min(
-        DIALOGUE_CHUNK_SIZE,
-        targetLines - chunkIdx * DIALOGUE_CHUNK_SIZE
-      );
+    const reducePrompt = getReducePrompt({
+      content: combined,
+      audioType,
+      length,
+      focus: sanitizedFocus || "general overview",
+      targetLines,
+    });
 
-      let coveredTopicsPrompt = "";
-      if (chunkIdx > 0 && coveredExamples.size > 0) {
-        coveredTopicsPrompt = buildCoveredTopicsPrompt(Array.from(coveredExamples));
-      }
+    console.log(
+      `[AudioJob] Writing script single-pass (promptChars=${reducePrompt.length}, promptTokens=${countTokens(reducePrompt)}, targetLines=${targetLines})`
+    );
 
-      const previousDialogue =
-        chunkIdx > 0
-          ? `\n\nRECENT DIALOGUE (for continuity):\n${fullDialogueScript
-              .slice(-4)
-              .map((l) => `${l.speaker}: ${l.text}`)
-              .join("\n")}\n`
-          : "";
+    const response = await invokeStudioLlm({
+      invoke: () =>
+        (llm as any).invoke(
+          [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(reducePrompt)],
+          createLangSmithRunConfig({
+            runName: "AudioJob.WriteScript",
+            tags: ["agent", "audio-overview", "reduce"],
+            metadata: {
+              audioType,
+              length,
+              targetLines,
+              focus: sanitizedFocus || "general overview",
+            },
+          })
+        ),
+      timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+      phaseLabel: "AudioReduce",
+      retry: { maxAttempts: 2, baseDelayMs: 1000 },
+    });
 
-      const chunkPrompt = getReducePrompt({
-        content: combined + previousDialogue,
-        audioType,
-        length,
-        focus: sanitizedFocus || "general overview",
-        targetLines: linesThisChunk,
-        coveredTopicsPrompt,
-      });
-
-      console.log(
-        `[AudioJob] Writing script chunk ${chunkIdx + 1}/${numChunks} (promptChars=${chunkPrompt.length}, promptTokens=${countTokens(chunkPrompt)}, lines=${linesThisChunk}, previousDialogueChars=${previousDialogue.length}, coveredExamples=${coveredExamples.size})`
-      );
-
-      const response = await invokeStudioLlm({
-        invoke: () =>
-          (llm as any).invoke(
-            [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(chunkPrompt)],
-            createLangSmithRunConfig({
-              runName: "AudioJob.WriteScript",
-              tags: ["agent", "audio-overview", "reduce"],
-              metadata: {
-                chunkIndex: chunkIdx + 1,
-                totalChunks: numChunks,
-                audioType,
-                length,
-                focus: sanitizedFocus || "general overview",
-              },
-            })
-          ),
-        timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-        phaseLabel: "AudioReduce",
-        retry: { maxAttempts: 2, baseDelayMs: 1000 },
-      });
-
-      const responseAny = response as any;
-      const responseContent = responseAny?.content;
-      const responseText =
-        typeof responseContent === "string"
+    const responseAny = response as any;
+    const responseContent = responseAny?.content;
+    const responseText =
+      typeof responseContent === "string"
+        ? responseContent
+        : Array.isArray(responseContent)
           ? responseContent
-          : Array.isArray(responseContent)
-            ? responseContent
-                .map((part: any) => {
-                  if (typeof part === "string") return part;
-                  if (part && typeof part === "object" && typeof part.text === "string")
-                    return part.text;
-                  return "";
-                })
-                .join("")
-            : String(responseContent ?? "");
-      const finishReason =
-        responseAny?.response_metadata?.finish_reason ??
-        responseAny?.response_metadata?.finishReason ??
-        null;
-      const jsonStart = responseText.indexOf("[");
-      const jsonEnd = responseText.lastIndexOf("]");
+              .map((part: any) => {
+                if (typeof part === "string") return part;
+                if (part && typeof part === "object" && typeof part.text === "string")
+                  return part.text;
+                return "";
+              })
+              .join("")
+          : String(responseContent ?? "");
+    const finishReason =
+      responseAny?.response_metadata?.finish_reason ??
+      responseAny?.response_metadata?.finishReason ??
+      null;
+    const jsonStart = responseText.indexOf("[");
+    const jsonEnd = responseText.lastIndexOf("]");
 
-      console.log(
-        `[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}, finishReason=${finishReason ?? "unknown"}`
-      );
+    console.log(
+      `[AudioJob] Script response responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}, finishReason=${finishReason ?? "unknown"}`
+    );
 
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        try {
-          const chunkDialogue = JSON.parse(
-            responseText.substring(jsonStart, jsonEnd + 1)
-          ) as DialogueLine[];
-          if (Array.isArray(chunkDialogue) && chunkDialogue.length > 0) {
-            fullDialogueScript = fullDialogueScript.concat(chunkDialogue);
-          } else {
-            console.log(
-              `[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} parsed empty or invalid array`
-            );
-          }
-        } catch (error) {
-          console.log(
-            `[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} parse failed: ${error instanceof Error ? error.message : String(error)}`
-          );
-          console.log(
-            `[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} response preview: ${responseText.slice(0, 500)}`
-          );
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      try {
+        const parsed = JSON.parse(
+          responseText.substring(jsonStart, jsonEnd + 1)
+        ) as DialogueLine[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          fullDialogueScript = parsed;
+        } else {
+          console.log(`[AudioJob] Script parsed empty or invalid array`);
         }
-      } else {
+      } catch (error) {
         console.log(
-          `[AudioJob] Script chunk ${chunkIdx + 1}/${numChunks} missing JSON array; response preview: ${responseText.slice(0, 500)}`
+          `[AudioJob] Script parse failed: ${error instanceof Error ? error.message : String(error)}`
         );
+        console.log(`[AudioJob] Script response preview: ${responseText.slice(0, 500)}`);
       }
+    } else {
+      console.log(
+        `[AudioJob] Script missing JSON array; response preview: ${responseText.slice(0, 500)}`
+      );
     }
 
     if (fullDialogueScript.length === 0) {
