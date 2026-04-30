@@ -1,5 +1,5 @@
 "use node";
-import { Supadata, SupadataError } from "@supadata/js";
+import { Supadata } from "@supadata/js";
 import FirecrawlApp from "@mendable/firecrawl-js";
 import { env } from "../../_lib/env";
 import { validateUrl } from "../../_lib/utils/urlValidation.js";
@@ -389,6 +389,13 @@ export class WebLoaderService {
       "twitter.com",
       "x.com",
     ];
-    return supportedDomains.some((domain) => url.includes(domain));
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      return supportedDomains.some((domain) =>
+        hostname === domain || hostname.endsWith(`.${domain}`)
+      );
+    } catch {
+      return false;
+    }
   }
 }
