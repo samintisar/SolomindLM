@@ -33,6 +33,14 @@ export const chatEvalActionArgs = {
   question: v.string(),
   notebookId: v.id("notebooks"),
   documentIds: v.optional(v.array(v.id("documents"))),
+  sourcePolicy: v.optional(
+    v.object({
+      channels: v.array(v.string()),
+      maxResultsPerChannel: v.optional(v.number()),
+      domainAllowlist: v.optional(v.array(v.string())),
+      recencyDays: v.optional(v.number()),
+    })
+  ),
 };
 
 export interface ChatEvalResult {
@@ -44,6 +52,10 @@ export interface ChatEvalResult {
   selectedChunks: ReferenceChunk[];
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
+  sourcePolicy?: {
+    channels: string[];
+    maxResultsPerChannel?: number;
+  };
 }
 
 interface VectorSearchHit {
@@ -201,13 +213,23 @@ export const runChatEval = action({
     const userIdStr = evalUserId as string;
     const notebookIdStr = args.notebookId as string;
 
+    const sourcePolicyChannels = args.sourcePolicy?.channels ?? ["notebook"];
+    const isNotebookOnly = sourcePolicyChannels.length === 1 && sourcePolicyChannels[0] === "notebook";
+
     for await (const chunk of agent.streamResponse(
       {
         userId: userIdStr,
         noteId: notebookIdStr,
         conversationHistory: [],
         documentIds: documentIdStrings,
-        enableNotebookSearch: true,
+        enableNotebookSearch: sourcePolicyChannels.includes("notebook"),
+        sourcePolicy: {
+          channels: sourcePolicyChannels,
+          maxResultsPerChannel: args.sourcePolicy?.maxResultsPerChannel ?? 5,
+          ...(args.sourcePolicy?.domainAllowlist ? { domainAllowlist: args.sourcePolicy.domainAllowlist } : {}),
+          ...(args.sourcePolicy?.recencyDays ? { recencyDays: args.sourcePolicy.recencyDays } : {}),
+        },
+        externalChunks: undefined,
       },
       args.question,
       `eval-${Date.now()}`
@@ -292,6 +314,7 @@ export const runChatEval = action({
       postRerankChunks,
       selectedChunks,
       latencyMs: Date.now() - startTime,
+      sourcePolicy: args.sourcePolicy,
     };
   },
 });

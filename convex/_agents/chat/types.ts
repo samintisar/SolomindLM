@@ -20,6 +20,13 @@ export interface ChatAgentContext {
     customInstructions?: string;
     responseLength: "default" | "longer" | "shorter";
   };
+  /** Source filter configuration for retrieval across different channels */
+  sourcePolicy?: {
+    channels: string[];
+    maxResultsPerChannel?: number;
+    domainAllowlist?: string[];
+    recencyDays?: number;
+  };
 }
 
 export interface StreamChunk {
