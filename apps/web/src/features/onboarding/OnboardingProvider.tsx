@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -25,6 +26,10 @@ interface Props {
 type AdvanceTourStepArgs =
   | { expectedCurrentStepId: StepId }
   | { expectedCurrentStepId: StepId; tourNotebookId: Id<"notebooks"> };
+
+function isStepMismatchError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Step mismatch:");
+}
 
 export const OnboardingProvider: React.FC<Props> = ({
   isAuthenticated,
@@ -59,6 +64,8 @@ export const OnboardingProvider: React.FC<Props> = ({
   const advancingRef = useRef(false);
   const pendingNavigationRef = useRef<string | null>(null);
   const completedAllRef = useRef(false);
+  const retryAttemptsRef = useRef(0);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const tourStatus: TourStatus =
     onboardingState && "tourStatus" in onboardingState
@@ -78,16 +85,39 @@ export const OnboardingProvider: React.FC<Props> = ({
       return;
     }
     ensuredRowRef.current = true;
-    void getOrCreateOnboardingRow({});
-  }, [isAuthenticated, onboardingState, getOrCreateOnboardingRow]);
+    void getOrCreateOnboardingRow({})
+      .then(() => {
+        ensuredRowRef.current = true;
+        retryAttemptsRef.current = 0;
+      })
+      .catch((error) => {
+        ensuredRowRef.current = false;
+        console.error("[onboarding] failed to create onboarding row", error);
+        if (retryAttemptsRef.current < 3) {
+          retryAttemptsRef.current += 1;
+          setRetryNonce((n) => n + 1);
+        }
+      });
+  }, [isAuthenticated, onboardingState, getOrCreateOnboardingRow, retryNonce]);
 
   // 2. Auto-launch the tour for pending users.
   useEffect(() => {
     if (!isAuthenticated || startedRef.current) return;
     if (tourStatus !== "pending") return;
     startedRef.current = true;
-    void startTour({});
-  }, [isAuthenticated, tourStatus, startTour]);
+    void startTour({})
+      .then(() => {
+        retryAttemptsRef.current = 0;
+      })
+      .catch((error) => {
+        startedRef.current = false;
+        console.error("[onboarding] failed to start tour", error);
+        if (retryAttemptsRef.current < 3) {
+          retryAttemptsRef.current += 1;
+          setRetryNonce((n) => n + 1);
+        }
+      });
+  }, [isAuthenticated, tourStatus, startTour, retryNonce]);
 
   // 2b. Navigate to /home when step 1 is active so the create-notebook tooltip is visible.
   useEffect(() => {
@@ -119,8 +149,12 @@ export const OnboardingProvider: React.FC<Props> = ({
           pendingNavigationRef.current = String(tourProgress.tourNotebookId);
         }
       })
-      .catch(() => {
-        /* stale step — server will re-sync via the next reactive query update */
+      .catch((error) => {
+        if (isStepMismatchError(error)) {
+          // stale step — server will re-sync via the next reactive query update
+          return;
+        }
+        console.error("[onboarding] failed to advance tour step", error);
       })
       .finally(() => {
         advancingRef.current = false;
@@ -148,8 +182,19 @@ export const OnboardingProvider: React.FC<Props> = ({
       checklist.generateArtifact;
     if (!all) return;
     completedAllRef.current = true;
-    void completeTour({});
-  }, [checklist, tourStatus, completeTour]);
+    void completeTour({})
+      .then(() => {
+        retryAttemptsRef.current = 0;
+      })
+      .catch((error) => {
+        completedAllRef.current = false;
+        console.error("[onboarding] failed to complete tour", error);
+        if (retryAttemptsRef.current < 3) {
+          retryAttemptsRef.current += 1;
+          setRetryNonce((n) => n + 1);
+        }
+      });
+  }, [checklist, tourStatus, completeTour, retryNonce]);
 
   const skip = useCallback(async () => {
     await skipTourMutation({});

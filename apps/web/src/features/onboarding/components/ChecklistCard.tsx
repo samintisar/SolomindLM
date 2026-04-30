@@ -56,6 +56,12 @@ export const ChecklistCard: React.FC = () => {
   const completed = ORDER.filter((k) => progress[k]).length;
   if (completed === ORDER.length) return null;
 
+  const handleDismiss = () => {
+    void dismiss({}).catch((error) => {
+      console.error("[onboarding] failed to dismiss checklist", error);
+    });
+  };
+
   return (
     <div className="fixed bottom-4 right-4 z-45 w-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg">
       <div className="flex items-center justify-between p-3 border-b border-border">
@@ -74,7 +80,7 @@ export const ChecklistCard: React.FC = () => {
           <button
             type="button"
             aria-label="Dismiss"
-            onClick={() => void dismiss({})}
+            onClick={handleDismiss}
             className="p-1 hover:bg-accent rounded"
           >
             <X className="w-4 h-4" />

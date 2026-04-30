@@ -98,6 +98,18 @@ export const Header: React.FC<HeaderProps> = ({
     setIsEditing(false);
   };
 
+  const handleRestartTour = () => {
+    void restartTour({}).catch((error) => {
+      console.error("[onboarding] failed to restart tour", error);
+    });
+  };
+
+  const handleShowChecklist = () => {
+    void showChecklistMutation({}).catch((error) => {
+      console.error("[onboarding] failed to show checklist", error);
+    });
+  };
+
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b-2 border-border bg-background relative z-[70] transition-all duration-300">
       {/* Hidden span for measuring text width */}
@@ -225,8 +237,8 @@ export const Header: React.FC<HeaderProps> = ({
             onLogout={signOut}
             theme={theme}
             toggleTheme={toggleTheme}
-            onRestartTour={() => void restartTour({})}
-            onShowChecklist={() => void showChecklistMutation({})}
+            onRestartTour={handleRestartTour}
+            onShowChecklist={handleShowChecklist}
             showChecklistDismissed={showChecklistDismissed}
           />
         </DropdownMenu>
