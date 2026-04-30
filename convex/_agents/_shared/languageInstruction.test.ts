@@ -21,8 +21,8 @@ describe("withLanguageInstruction", () => {
     expect(withLanguageInstruction("System prompt.", "xx")).toBe("System prompt.");
   });
 
-  it("exports all 15 languages", () => {
-    expect(SUPPORTED_LANGUAGES).toHaveLength(15);
+  it("exports all 16 languages", () => {
+    expect(SUPPORTED_LANGUAGES).toHaveLength(16);
   });
 
   it("every language code is unique", () => {

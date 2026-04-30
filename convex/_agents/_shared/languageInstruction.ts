@@ -1,6 +1,7 @@
 export const SUPPORTED_LANGUAGES = [
   { code: "en",    label: "English" },
   { code: "ar",    label: "Arabic" },
+  { code: "bn",    label: "Bengali" },
   { code: "zh-CN", label: "Chinese (Simplified)" },
   { code: "fr",    label: "French" },
   { code: "de",    label: "German" },
