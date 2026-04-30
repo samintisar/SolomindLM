@@ -22,6 +22,7 @@ import {
 import type { ConceptExtraction, MindMapNode, FinalMindMap } from "../../_agents/mindmap/state";
 import { validateWithPreset } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
 // ============================================================
@@ -361,6 +362,12 @@ export async function runProcessMindMapMapChunkPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     // Process with LLM using structured output
     const llm = createMapLLM();
     const structuredLLM = createConceptExtractionLLM(llm);
@@ -373,7 +380,7 @@ export async function runProcessMindMapMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         (structuredLLM as any).invoke(
-          [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
             runName: "MindMapJob.MapProcess",
             tags: ["agent", "mindmap", "map"],
@@ -534,6 +541,12 @@ export async function runFinalizeMindMapPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     const mapResults = (mindmap.metadata?.mapResults as Record<string, string>) || {};
 
     // Separate successful and failed results
@@ -596,7 +609,7 @@ export async function runFinalizeMindMapPhase(
         invoke: () =>
           (llm as any).invoke(
             [
-              new SystemMessage(REDUCE_SYSTEM_PROMPT),
+              new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
               new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
             ],
             createLangSmithRunConfig({

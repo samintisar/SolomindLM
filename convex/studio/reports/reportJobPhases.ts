@@ -22,6 +22,7 @@ import { MapOutputSchema, type MapOutput } from "../../_agents/report/nodes";
 import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
 interface MapOutputInvoker {
@@ -227,6 +228,12 @@ export async function runProcessReportMapChunkPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     const llm = createMapLLM();
     const structuredLLM = createStructuredLLM(llm, MapOutputSchema);
 
@@ -247,7 +254,7 @@ IMPORTANT: Respond with a JSON object containing:
     const mapOutput = (await invokeStudioLlm({
       invoke: () =>
         (structuredLLM as any).invoke(
-          [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(structuredPrompt)],
+          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(structuredPrompt)],
           createLangSmithRunConfig({
             runName: "ReportJob.MapProcess",
             tags: ["agent", "report", "map"],
@@ -396,6 +403,12 @@ export async function runFinalizeReportPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     const mapResults = (report.metadata?.mapResults as Record<string, string>) || {};
 
     const successfulResults: string[] = [];
@@ -458,7 +471,7 @@ export async function runFinalizeReportPhase(
     const response = (await invokeStudioLlm({
       invoke: () =>
         (llm as any).invoke(
-          [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
             runName: "ReportJob.Reduce",
             tags: ["agent", "report", "reduce"],

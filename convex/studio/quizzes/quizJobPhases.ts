@@ -32,6 +32,7 @@ import {
 } from "../../_agents/quiz/prompts";
 import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
 // Interface for the structured LLM to avoid deep type instantiation
@@ -354,6 +355,12 @@ export async function runProcessQuizMapChunkPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     // Process with LLM using structured output
     const llm = createMapLLM();
     const structuredLLM = createCandidateLLM(llm);
@@ -408,7 +415,7 @@ export async function runProcessQuizMapChunkPhase(
         response = await invokeStudioLlm({
           invoke: () =>
             (structuredLLM as any).invoke(
-              [new SystemMessage(MAP_CANDIDATES_SYSTEM_PROMPT), new HumanMessage(prompt)],
+              [new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
               createLangSmithRunConfig({
                 runName: `QuizJob.MapCandidates.r${round}`,
                 tags: ["agent", "quiz", "map"],
@@ -608,6 +615,12 @@ export async function runFinalizeQuizPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     const mapResults = (quiz.metadata?.mapResults as Record<string, string>) || {};
 
     // Separate successful and failed results
@@ -673,7 +686,7 @@ export async function runFinalizeQuizPhase(
     const selectionResponse = await invokeStudioLlm({
       invoke: () =>
         (structuredSelectLLM as any).invoke(
-          [new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT), new HumanMessage(selectionPrompt)],
+          [new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)), new HumanMessage(selectionPrompt)],
           createLangSmithRunConfig({
             runName: "QuizJob.Select",
             tags: ["agent", "quiz", "reduce"],
@@ -746,7 +759,7 @@ export async function runFinalizeQuizPhase(
             return await invokeStudioLlm({
               invoke: () =>
                 (structuredExpandLLM as any).invoke(
-                  [new SystemMessage(EXPAND_QUESTION_SYSTEM_PROMPT), new HumanMessage(prompt)],
+                  [new SystemMessage(withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
                   createLangSmithRunConfig({
                     runName: "QuizJob.Expand",
                     tags: ["agent", "quiz", "expand"],

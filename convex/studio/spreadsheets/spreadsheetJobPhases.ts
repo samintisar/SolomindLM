@@ -22,6 +22,7 @@ import {
 } from "../../_agents/spreadsheet/prompts";
 import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
 // ============================================================
@@ -358,6 +359,12 @@ export async function runProcessSpreadsheetMapChunkPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     // Process with LLM (plain text output)
     const llm = createMapLLM();
 
@@ -377,7 +384,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         (llm as any).invoke(
-          [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
             runName: "SpreadsheetJob.MapProcess",
             tags: ["agent", "spreadsheet", "map"],
@@ -546,6 +553,12 @@ export async function runFinalizeSpreadsheetPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     const mapResults = (spreadsheet.metadata?.mapResults as Record<string, string>) || {};
 
     // Separate successful and failed results
@@ -600,7 +613,7 @@ export async function runFinalizeSpreadsheetPhase(
       console.log(
         `[SpreadsheetJob] Collapsing ${allOutputs.length} outputs (${totalTokens} tokens)`
       );
-      collapsedOutputs = await recursiveCollapse(allOutputs, spreadsheetType, customPrompt);
+      collapsedOutputs = await recursiveCollapse(allOutputs, spreadsheetType, customPrompt, language);
     }
 
     // Update status for reduce
@@ -634,7 +647,7 @@ export async function runFinalizeSpreadsheetPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         (reduceLLM as any).invoke(
-          [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
             runName: "SpreadsheetJob.Reduce",
             tags: ["agent", "spreadsheet", "reduce"],
@@ -749,7 +762,8 @@ export async function runFinalizeSpreadsheetPhase(
 async function recursiveCollapse(
   textOutputs: string[],
   spreadsheetType: string,
-  customPrompt: string
+  customPrompt: string,
+  language?: string
 ): Promise<string[]> {
   const TARGET_TOKENS = CONFIG.REDUCE_CHUNK_SIZE_TOKENS;
 
@@ -800,7 +814,7 @@ async function recursiveCollapse(
           const response = await invokeStudioLlm({
             invoke: () =>
               (reduceLLM as any).invoke(
-                [new SystemMessage(COLLAPSE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+                [new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
                 createLangSmithRunConfig({
                   runName: "SpreadsheetJob.CollapseGroup",
                   tags: ["agent", "spreadsheet", "collapse"],
@@ -823,5 +837,5 @@ async function recursiveCollapse(
     CONFIG.COLLAPSE_CONCURRENCY
   );
 
-  return recursiveCollapse(collapsed, spreadsheetType, customPrompt);
+  return recursiveCollapse(collapsed, spreadsheetType, customPrompt, language);
 }

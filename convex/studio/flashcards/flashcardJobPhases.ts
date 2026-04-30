@@ -33,6 +33,7 @@ import {
 } from "../../_agents/flashcard/prompts";
 import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
 
 // ============================================================
@@ -293,6 +294,12 @@ export async function runProcessFlashcardMapChunkPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     // Process with LLM using structured output
     const llm = createMapLLM();
     const structuredLLM = createStructuredLLM(llm, FlashcardArraySchema);
@@ -312,7 +319,7 @@ export async function runProcessFlashcardMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         (structuredLLM as any).invoke(
-          [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
+          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
             runName: "FlashcardJob.MapProcess",
             tags: ["agent", "flashcard", "map"],
@@ -488,6 +495,12 @@ export async function runFinalizeFlashcardPhase(
       return;
     }
 
+    const userPrefs = await ctx.runQuery(
+      internal.userPreferences.index.getPreferencesByUserId,
+      { userId: userId as any },
+    );
+    const language = userPrefs?.outputLanguage;
+
     const mapResults = (flashcard.metadata?.mapResults as Record<string, string>) || {};
 
     // Separate successful and failed results
@@ -541,7 +554,8 @@ export async function runFinalizeFlashcardPhase(
     const collapsedOutputs = await recursiveCollapse(
       mapFlashcardGroups,
       collapseReduceDeps,
-      sanitizedTopic
+      sanitizedTopic,
+      language
     );
 
     const collapsedFlashcards = collapsedOutputs
@@ -570,7 +584,8 @@ export async function runFinalizeFlashcardPhase(
         cardCount,
         difficulty,
         collapseReduceDeps,
-        sanitizedTopic
+        sanitizedTopic,
+        language
       );
     }
 

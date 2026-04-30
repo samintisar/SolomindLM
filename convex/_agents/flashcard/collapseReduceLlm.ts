@@ -5,6 +5,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { createLangSmithRunConfig, invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
+import { withLanguageInstruction } from "../_shared/languageInstruction";
 
 import { FLASHCARD_CONFIG } from "./config.js";
 import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
@@ -27,7 +28,8 @@ export interface CollapseReduceDeps {
 export async function recursiveCollapse(
   outputs: Flashcard[][],
   deps: CollapseReduceDeps,
-  topic?: string
+  topic?: string,
+  language?: string
 ): Promise<Flashcard[][]> {
   const totalTokens = outputs.reduce(
     (sum, flashcards) => sum + deps.estimateTokens(formatFlashcardsAsText(flashcards)),
@@ -46,7 +48,7 @@ export async function recursiveCollapse(
   for (const flashcards of outputs) {
     const tokens = deps.estimateTokens(formatFlashcardsAsText(flashcards));
     if (currentTokens + tokens > targetGroupTokens && currentGroup.length > 0) {
-      collapsed.push(await collapseGroup(currentGroup, deps, topic));
+      collapsed.push(await collapseGroup(currentGroup, deps, topic, language));
       currentGroup = [flashcards];
       currentTokens = tokens;
     } else {
@@ -56,16 +58,17 @@ export async function recursiveCollapse(
   }
 
   if (currentGroup.length > 0) {
-    collapsed.push(await collapseGroup(currentGroup, deps, topic));
+    collapsed.push(await collapseGroup(currentGroup, deps, topic, language));
   }
 
-  return recursiveCollapse(collapsed, deps, topic);
+  return recursiveCollapse(collapsed, deps, topic, language);
 }
 
 export async function collapseGroup(
   group: Flashcard[][],
   deps: CollapseReduceDeps,
-  topic?: string
+  topic?: string,
+  language?: string
 ): Promise<Flashcard[]> {
   const allCards: Flashcard[] = [];
   for (const flashcards of group) {
@@ -105,7 +108,7 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
       invokeWithTimeout(
         () =>
           structuredLlm.invoke(
-            [new SystemMessage(COLLAPSE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+            [new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
             createLangSmithRunConfig({
               runName: "FlashcardGraph.CollapseGroup",
               tags: ["agent", "flashcard", "collapse"],
@@ -133,7 +136,8 @@ export async function refineFlashcardSelection(
   targetCount: number,
   difficulty: string,
   deps: CollapseReduceDeps,
-  topic?: string
+  topic?: string,
+  language?: string
 ): Promise<Flashcard[]> {
   deps.logger.info(`Selecting ${targetCount} best cards from ${flashcards.length}`, {
     agent: "FlashcardGraph",
@@ -204,7 +208,7 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       invokeWithTimeout(
         () =>
           structuredLlm.invoke(
-            [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
+            [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
             createLangSmithRunConfig({
               runName: "FlashcardGraph.RefineSelection",
               tags: ["agent", "flashcard", "reduce"],
