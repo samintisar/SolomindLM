@@ -21,6 +21,16 @@ export interface DiscoveredSource {
   rawContent?: string;
 }
 
+interface FirecrawlWebResult {
+  title?: string;
+  url?: string;
+  snippet?: string;
+  score?: number;
+  publishedDate?: string;
+  domain?: string;
+  rawContent?: string;
+}
+
 // ============================================================
 // Internal Action (makes actual API call)
 // ============================================================
@@ -109,7 +119,7 @@ export const searchInternal = internalAction({
       }, "firecrawl_search");
 
       let sourcesList: DiscoveredSource[] = (data.data?.web || []).map(
-        (result: any) => ({
+        (result: FirecrawlWebResult) => ({
           title: result.title || "Untitled",
           url: result.url || "",
           snippet: result.snippet || "",
