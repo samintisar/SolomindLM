@@ -119,7 +119,7 @@ function toDiscoveredSource(paper: AcademicPaper): DiscoveredSource {
   return {
     title: paper.title,
     url: paper.url,
-    snippet: paper.abstract,
+    snippet: paper.abstract.substring(0, 500),
     score: paper.score,
     publishedDate: yearToDateString(paper.year),
     domain: extractDomain(paper.url),
@@ -363,7 +363,7 @@ async function searchPubMed(
   const email = env.PUBMED_EMAIL || "support@solomindlm.com";
 
   // Step 1: esearch to get PMC IDs
-  const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${encodeURIComponent(query)}&retmode=json&retmax=${maxResults}&email=${encodeURIComponent(email)}`;
+  const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${encodeURIComponent(query)}&retmax=${maxResults}&sort=relevance&email=${encodeURIComponent(email)}`;
 
   const idList = await invokeWithHttpRetry(
     async () => {
@@ -525,6 +525,9 @@ async function searchPubMed(
         const url = pmcId
           ? `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcId}/`
           : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(query)}`;
+        const pdfUrl = pmcId
+          ? `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcId}/pdf/`
+          : undefined;
 
         const basePaper: Omit<AcademicPaper, "score"> = {
           title,
@@ -532,6 +535,7 @@ async function searchPubMed(
           year,
           abstract: abstractText,
           url,
+          pdfUrl,
           source: "pubmed",
           citationCount: undefined,
           doi,
@@ -623,7 +627,7 @@ export const searchInternal = internalAction({
       sortBy,
     }
   ) => {
-    const logger = createServiceLogger("academic", "searchInternal");
+    const logger = createServiceLogger("academic_search", "searchInternal");
     const startTime = Date.now();
 
     const filters = {
@@ -735,7 +739,7 @@ export const discoverAcademicPapersInternal = internalAction({
     sortBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const logger = createServiceLogger("academic", "discoverAcademicPapersInternal");
+    const logger = createServiceLogger("academic_search", "discoverAcademicPapersInternal");
     const startTime = Date.now();
     const normalizedQuery = normalizeQuery(args.query);
 
