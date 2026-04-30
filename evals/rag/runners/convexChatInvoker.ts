@@ -47,6 +47,7 @@ export function createConvexChatInvoker(
         question: lastMessage.content,
         notebookId: context.noteId as Id<"notebooks">,
         documentIds: context.documentIds as Id<"documents">[] | undefined,
+        sourcePolicy: context.sourcePolicy,
       });
 
       return {
@@ -58,6 +59,7 @@ export function createConvexChatInvoker(
         selectedChunks: result.selectedChunks as ReferenceChunk[],
         latencyMs: result.latencyMs,
         tokenUsage: result.tokenUsage,
+        sourcePolicy: result.sourcePolicy,
       };
     },
   };

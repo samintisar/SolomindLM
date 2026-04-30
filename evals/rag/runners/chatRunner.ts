@@ -11,7 +11,7 @@ import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 // call and returns a structured result.
 
 export interface ChatAgentInvoker {
-  invoke(context: ChatAgentContext): Promise<{
+  invoke(context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -20,6 +20,7 @@ export interface ChatAgentInvoker {
     selectedChunks: ReferenceChunk[];
     latencyMs: number;
     tokenUsage?: { prompt: number; completion: number; total: number };
+    sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
 }
 
@@ -122,6 +123,7 @@ export async function runChatEval(
     noteId: fixture.notebookId ?? "",
     conversationHistory: [{ role: "user", content: fixture.question }],
     documentIds: fixture.documentIds,
+    sourcePolicy: fixture.sourcePolicy,
   };
 
   const errors: string[] = [];
@@ -141,6 +143,7 @@ export async function runChatEval(
       subQueries: result.subQueries,
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
+      sourcePolicy: result.sourcePolicy,
       timestamp: new Date().toISOString(),
     };
 
