@@ -1,59 +1,64 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calculateNextReview, initializeProficiency } from "./srsScheduling";
 
 describe("calculateNextReview", () => {
-  it('resets interval to 1 and schedules ~10 min ahead for "again"', () => {
-    const result = calculateNextReview({ interval: 6, easeFactor: 2.5 }, "again");
-    expect(result.interval).toBe(1);
-    const tenMinutes = 10 * 60 * 1000;
-    const diff = result.nextReviewDate - Date.now();
-    expect(diff).toBeGreaterThanOrEqual(tenMinutes - 100);
-    expect(diff).toBeLessThanOrEqual(tenMinutes + 100);
+  const now = new Date("2026-04-29T12:00:00Z");
+  const minute = 60 * 1000;
+  const day = 24 * 60 * minute;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
   });
 
-  it('increases interval with 1.2x multiplier for "hard"', () => {
-    const result = calculateNextReview({ interval: 6, easeFactor: 2.5 }, "hard");
-    // quality=3 → easeFactor = 2.5 + (0.1 - 2*(0.08+0.04)) = 2.36; interval = round(6*2.36) = 14
-    expect(result.interval).toBe(14);
-    const oneDay = 24 * 60 * 60 * 1000;
-    const expectedDelay = Math.round(14 * 1.2 * oneDay);
-    const diff = result.nextReviewDate - Date.now();
-    expect(Math.abs(diff - expectedDelay)).toBeLessThan(100);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('uses interval * 1 day for "good"', () => {
-    const result = calculateNextReview({ interval: 6, easeFactor: 2.5 }, "good");
-    // quality=4 → easeFactor = 2.5 + (0.1 - 1*0.1) = 2.5; interval = round(6*2.5) = 15
-    expect(result.interval).toBe(15);
-    const oneDay = 24 * 60 * 60 * 1000;
-    const expectedDelay = 15 * oneDay;
-    const diff = result.nextReviewDate - Date.now();
-    expect(Math.abs(diff - expectedDelay)).toBeLessThan(100);
+  it("uses Anki-style learning steps for a new card", () => {
+    const current = { interval: 0, easeFactor: 2.5 };
+
+    const again = calculateNextReview(current, "again");
+    const hard = calculateNextReview(current, "hard");
+    const good = calculateNextReview(current, "good");
+    const easy = calculateNextReview(current, "easy");
+
+    expect(again.nextReviewDate - now.getTime()).toBe(1 * minute);
+    expect(hard.nextReviewDate - now.getTime()).toBe(6 * minute);
+    expect(good.nextReviewDate - now.getTime()).toBe(10 * minute);
+    expect(easy.nextReviewDate - now.getTime()).toBe(4 * day);
+    expect(again.interval).toBe(0);
+    expect(hard.interval).toBe(0);
+    expect(good.interval).toBe(0);
+    expect(easy.interval).toBe(4);
   });
 
-  it('uses interval * 1.3x for "easy"', () => {
-    const result = calculateNextReview({ interval: 6, easeFactor: 2.5 }, "easy");
-    // quality=5 → easeFactor = 2.5 + 0.1 = 2.6; interval = round(6*2.6) = 16
-    expect(result.interval).toBe(16);
-    const oneDay = 24 * 60 * 60 * 1000;
-    const expectedDelay = Math.round(16 * 1.3 * oneDay);
-    const diff = result.nextReviewDate - Date.now();
-    expect(Math.abs(diff - expectedDelay)).toBeLessThan(100);
+  it("keeps review delays ordered as hard < good < easy", () => {
+    const current = { interval: 10, easeFactor: 2.5 };
+
+    const hard = calculateNextReview(current, "hard");
+    const good = calculateNextReview(current, "good");
+    const easy = calculateNextReview(current, "easy");
+
+    expect(hard.interval).toBe(12);
+    expect(good.interval).toBe(25);
+    expect(easy.interval).toBe(33);
+    expect(hard.nextReviewDate).toBeLessThan(good.nextReviewDate);
+    expect(good.nextReviewDate).toBeLessThan(easy.nextReviewDate);
+  });
+
+  it('puts a lapsed review card into relearning for "again"', () => {
+    const result = calculateNextReview({ interval: 10, easeFactor: 2.5 }, "again");
+
+    expect(result.interval).toBe(0);
+    expect(result.nextReviewDate - now.getTime()).toBe(10 * minute);
+    expect(result.easeFactor).toBe(2.3);
   });
 
   it("clamps ease factor to 1.3 minimum", () => {
-    const result = calculateNextReview({ interval: 1, easeFactor: 1.3 }, "again");
-    expect(result.easeFactor).toBeGreaterThanOrEqual(1.3);
-  });
+    const result = calculateNextReview({ interval: 10, easeFactor: 1.3 }, "again");
 
-  it("sets interval to 1 from zero for quality >= 3", () => {
-    const result = calculateNextReview({ interval: 0, easeFactor: 2.5 }, "good");
-    expect(result.interval).toBe(1);
-  });
-
-  it("sets interval to 6 when current interval is 1", () => {
-    const result = calculateNextReview({ interval: 1, easeFactor: 2.5 }, "good");
-    expect(result.interval).toBe(6);
+    expect(result.easeFactor).toBe(1.3);
   });
 });
 
@@ -67,6 +72,8 @@ describe("initializeProficiency", () => {
       totalReviews: 0,
       correctCount: 0,
       incorrectCount: 0,
+      phase: "learning",
+      learningStep: 0,
     });
   });
 });

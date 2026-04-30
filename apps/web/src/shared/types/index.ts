@@ -162,6 +162,8 @@ export interface Flashcard {
     correctCount: number;
     incorrectCount: number;
     lastReviewedAt?: number;
+    phase?: "learning" | "review" | "relearning";
+    learningStep?: number;
   };
 }
 

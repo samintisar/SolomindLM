@@ -18,10 +18,11 @@ import {
   useDeleteCard,
   useUpdateFlashcardPreferences,
   useDueCards,
+  useCardReview,
 } from "@/features/studio/services/flashcardsApi";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { ProficiencyBadge } from "./ProficiencyBadge";
-import { StudyMode } from "./StudyMode";
+import { StudyMode, type DueFlashcard } from "./StudyMode";
 import { EditCardModal } from "./EditCardModal";
 
 const MarkdownRenderer = lazy(() =>
@@ -44,45 +45,55 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Flashcard | undefined>(undefined);
   const [editingCardIndex, setEditingCardIndex] = useState<number | undefined>(undefined);
+  const [studySessionCards, setStudySessionCards] = useState<DueFlashcard[]>([]);
 
   // Hooks
   const latestNote = useFlashcard(note.id);
+  const displayNote = latestNote ?? note;
+  const allCards = displayNote.flashcards;
   const updateCard = useUpdateCard();
   const addCard = useAddCard();
   const deleteCard = useDeleteCard();
   const updatePreferences = useUpdateFlashcardPreferences();
+  const submitCardReview = useCardReview();
 
   // Due cards for study mode
   const dueCardsData = useDueCards(note.id);
-  const dueCards = useMemo(() => {
+  const dueCards: DueFlashcard[] = useMemo(() => {
     if (!dueCardsData) return [];
-    return dueCardsData.map((d: { index: number; card: Flashcard }) => d.card);
+    return dueCardsData.map((d: { index: number; card: Flashcard }) => d);
   }, [dueCardsData]);
 
   // Filter cards based on showMastered preference
   const filteredCards = useMemo(() => {
     if (!showMastered) {
-      return note.flashcards.filter((card) => {
+      return allCards.filter((card) => {
         const interval = card.proficiency?.interval || 0;
         return interval < 21;
       });
     }
-    return note.flashcards;
-  }, [note.flashcards, showMastered]);
+    return allCards;
+  }, [allCards, showMastered]);
 
   // Initialize currentIndex from note.metadata.lastViewedIndex
   const hasInitializedIndex = useRef(false);
 
   useEffect(() => {
-    if (!hasInitializedIndex.current && latestNote) {
-      const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
+    if (!hasInitializedIndex.current && displayNote) {
+      const savedIndex = (displayNote.metadata as any)?.lastViewedIndex ?? 0;
       const boundedIndex = Math.min(savedIndex, Math.max(0, filteredCards.length - 1));
       if (savedIndex > 0) {
         setCurrentIndex(boundedIndex);
       }
       hasInitializedIndex.current = true;
     }
-  }, [latestNote, filteredCards.length]);
+  }, [displayNote, filteredCards.length]);
+
+  useEffect(() => {
+    setCurrentIndex((prev) =>
+      filteredCards.length === 0 ? 0 : Math.min(prev, filteredCards.length - 1)
+    );
+  }, [filteredCards.length]);
 
   // Persist progress
   const stableCurrentIndex = useMemo(() => currentIndex, [currentIndex]);
@@ -111,6 +122,11 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   };
 
   const handleModeChange = (newMode: ViewMode) => {
+    if (newMode === "study") {
+      setStudySessionCards(dueCards);
+    } else {
+      setStudySessionCards([]);
+    }
     setMode(newMode);
     setIsFlipped(false);
   };
@@ -122,8 +138,8 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   };
 
   const handleEditCard = (index: number) => {
-    const cardIndex = note.flashcards.findIndex((card) => card === filteredCards[index]);
-    setEditingCard(note.flashcards[cardIndex]);
+    const cardIndex = allCards.findIndex((card) => card === filteredCards[index]);
+    setEditingCard(allCards[cardIndex]);
     setEditingCardIndex(cardIndex);
     setEditModalOpen(true);
   };
@@ -167,6 +183,13 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
     longestStreak: number;
   }) => {
     console.log("Study complete:", stats);
+  };
+
+  const handleRateStudyCard = async (
+    cardIndex: number,
+    rating: "again" | "hard" | "good" | "easy"
+  ) => {
+    await submitCardReview(note.id, cardIndex, rating);
   };
 
   // Render different card types
@@ -222,6 +245,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   const boundedBrowseIndex =
     filteredCards.length === 0 ? 0 : Math.min(Math.max(0, currentIndex), filteredCards.length - 1);
   const currentCard = filteredCards.length > 0 ? filteredCards[boundedBrowseIndex] : undefined;
+  const activeStudyCards = mode === "study" ? studySessionCards : dueCards;
 
   return (
     <div
@@ -256,6 +280,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
               title="Browse Mode"
+              aria-label="Browse Mode"
             >
               <BookOpen className="w-4.5 h-4.5" />
             </button>
@@ -269,6 +294,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
               }`}
               disabled={dueCards.length === 0}
               title="Study Mode"
+              aria-label="Study Mode"
             >
               <Brain className="w-4.5 h-4.5" />
             </button>
@@ -281,6 +307,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               }`}
               title="Edit Mode"
+              aria-label="Edit Mode"
             >
               <Edit3 className="w-4.5 h-4.5" />
             </button>
@@ -321,9 +348,9 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
             </div>
           )}
 
-          {mode === "study" && dueCards.length > 0 && (
+          {mode === "study" && activeStudyCards.length > 0 && (
             <span className="tabular-nums text-sm font-medium leading-none text-foreground/90">
-              {dueCards.length}
+              {activeStudyCards.length}
               <span className="ml-1 font-normal text-muted-foreground">due</span>
             </span>
           )}
@@ -342,17 +369,18 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {mode === "study" && dueCards.length > 0 && (
+        {mode === "study" && activeStudyCards.length > 0 && (
           <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center pb-1">
             <StudyMode
-              cards={dueCards}
+              cards={activeStudyCards}
               onComplete={handleStudyComplete}
+              onRateCard={handleRateStudyCard}
               onExit={() => handleModeChange("browse")}
             />
           </div>
         )}
 
-        {mode === "study" && dueCards.length === 0 && (
+        {mode === "study" && activeStudyCards.length === 0 && (
           <div className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/20">
               <Brain className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />

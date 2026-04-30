@@ -116,13 +116,25 @@ export function updateProficiencyAfterReview(
 
   // Calculate next review
   const sm2State = calculateNextReview(
-    { interval: current.interval, easeFactor: current.easeFactor },
+    {
+      interval: current.interval,
+      easeFactor: current.easeFactor,
+      phase: current.phase,
+      learningStep: current.learningStep,
+      totalReviews: current.totalReviews,
+    },
     rating
   );
 
   updated.interval = sm2State.interval;
   updated.easeFactor = sm2State.easeFactor;
   updated.nextReviewDate = sm2State.nextReviewDate;
+  updated.phase = sm2State.phase;
+  if (sm2State.learningStep === undefined) {
+    delete updated.learningStep;
+  } else {
+    updated.learningStep = sm2State.learningStep;
+  }
 
   return updated;
 }
@@ -148,7 +160,10 @@ export function isCardDue(
  * @param cardsData - Array of cards with proficiency data
  * @returns Array of indices for due cards
  */
-export function getDueCardIndices(cardsData: any[], nowMs: number): number[] {
+export function getDueCardIndices(
+  cardsData: Array<{ proficiency?: CardProficiency }>,
+  nowMs: number
+): number[] {
   return cardsData
     .map((card, index) => ({ card, index }))
     .filter(({ card }) => {
