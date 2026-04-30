@@ -8,6 +8,7 @@ import { internal } from "../../_generated/api";
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
+import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
 import FirecrawlApp from "@mendable/firecrawl-js";
 
 export interface DiscoveredSource {
@@ -60,7 +61,7 @@ export const searchInternal = internalAction({
     const firecrawl = new FirecrawlApp({ apiKey });
 
     // Map topic to Firecrawl sources filter
-    const sources = topic === "news" ? (["news"] as ("news")[]) : undefined;
+    const sources: ("news")[] | undefined = topic === "news" ? ["news"] : undefined;
 
     // Map timeRange to Google tbs parameter
     const tbsMap: Record<string, string> = {
@@ -114,7 +115,13 @@ export const searchInternal = internalAction({
           snippet: result.snippet || "",
           score: result.score || 0,
           publishedDate: result.publishedDate,
-          domain: result.domain || (result.url ? new URL(result.url).hostname : undefined),
+          domain: result.domain || (() => {
+            try {
+              return result.url ? new URL(result.url).hostname : undefined;
+            } catch {
+              return undefined;
+            }
+          })(),
           rawContent: result.rawContent || undefined,
         })
       );
@@ -126,6 +133,9 @@ export const searchInternal = internalAction({
       return sourcesList;
     } catch (error) {
       logger.operationError(error);
+      if (error instanceof Error) {
+        throw createExternalServiceErrorFromResponse("firecrawl", 0, "/search", error.message);
+      }
       throw error;
     }
   },
@@ -148,6 +158,10 @@ function normalizeQuery(query: string): string {
 // Public Cached Action
 // ============================================================
 
+/**
+ * Discover web sources using Firecrawl Search API with caching (internal version)
+ * This action is cached to reduce API costs and improve latency
+ */
 export const discoverSourcesInternal = internalAction({
   args: {
     query: v.string(),
