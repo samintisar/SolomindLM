@@ -4,7 +4,8 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { MistralOCRService } from "../_services/extraction/MistralOCRService";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
-import { SupadataLoaderService } from "../_services/extraction/SupadataLoaderService";
+import { WebLoaderService } from "../_services/extraction/WebLoaderService";
+import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
 import {
   extractDocumentMetadata,
   getFileExtension,
@@ -18,7 +19,6 @@ import {
   E5_TOGETHER_EMBED_BATCH_SIZE,
 } from "../_lib/e5Embedding";
 import { createJobLogger, createErrorMetadata } from "../_agents/_shared/logging";
-import { resolveOpenAlexSourceUrlToArticleUrl } from "../_lib/resolveOpenAlexSourceUrl";
 import { buildPaperMetadataMarkdown } from "./paperRecord";
 
 // File extensions that require OCR processing
@@ -136,11 +136,12 @@ export const docEmbedding = internalAction({
       currentPhase = "extraction";
 
       const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
-      const supadataLoader = new SupadataLoaderService();
+      const webLoader = new WebLoaderService();
+      const academicLoader = new AcademicLoaderService();
 
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
-        const meta = await supadataLoader.loadTranscriptWithMeta(docDetails.fileUrl || "");
+        const meta = await webLoader.loadSocialTranscriptWithMeta(docDetails.fileUrl || "");
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
         logger.phaseComplete("extraction", {
@@ -228,19 +229,8 @@ export const docEmbedding = internalAction({
       } else if (docDetails.fileType === "url") {
         logger.info("Extracting web page content");
         const rawUrl = docDetails.fileUrl || "";
-        const scrapeUrl = await resolveOpenAlexSourceUrlToArticleUrl(rawUrl);
-        if (scrapeUrl !== rawUrl) {
-          logger.info("Resolved OpenAlex work URL to article URL for scraping", {
-            from: rawUrl,
-            to: scrapeUrl,
-          });
-          await ctx.runMutation(internal.documents.index.setDocumentFileUrl, {
-            documentId,
-            fileUrl: scrapeUrl,
-          });
-        }
-        effectiveFileUrl = scrapeUrl;
-        const meta = await supadataLoader.loadWebPageWithMeta(scrapeUrl);
+        effectiveFileUrl = rawUrl;
+        const meta = await webLoader.loadWebPageWithMeta(rawUrl);
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
         logger.phaseComplete("extraction", {
@@ -248,76 +238,38 @@ export const docEmbedding = internalAction({
           title: extractedTitle,
         });
       } else if (docDetails.fileType === "paper_record") {
-        logger.info("Processing paper_record (OA PDF → Supadata PDF → repository/landing URLs → metadata stub)");
+        logger.info("Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)");
         const pr = docDetails.paperRecord;
         if (!pr) {
           throw new Error("paper_record document missing paperRecord");
         }
-        const pdfUrl = pr.pdfUrl?.trim();
-        const landing = pr.landingPageUrl?.trim();
-        const primaryDocUrl = docDetails.fileUrl?.trim();
         let paperIngestion: "ingested" | "metadata_only" = "metadata_only";
 
-        if (pdfUrl) {
-          try {
-            extractedText = await mistralOCR.processDocument(pdfUrl);
-            if (extractedText?.trim()) {
-              paperIngestion = "ingested";
-              logger.phaseComplete("extraction", {
-                contentLength: extractedText.length,
-                method: "oa_pdf_ocr",
-              });
-            }
-          } catch (e) {
-            logger.warn("OA PDF extraction failed", { message: e instanceof Error ? e.message : String(e) });
-          }
-        }
+        const paper = {
+          title: docDetails.fileName || "Research paper",
+          authors: pr.authors || [],
+          year: pr.publicationYear,
+          abstract: pr.abstract || "",
+          url: docDetails.fileUrl || pr.landingPageUrl || "",
+          pdfUrl: pr.pdfUrl,
+          source: "semantic_scholar" as const,
+          doi: pr.doi,
+        };
 
-        // Mistral often fails on institutional PDFs; Supadata may still extract text from the same URL.
-        if (!extractedText?.trim() && pdfUrl) {
-          try {
-            const meta = await supadataLoader.loadWebPageWithMeta(pdfUrl);
-            extractedText = meta.content;
-            if (meta.title?.trim()) extractedTitle = meta.title.trim();
-            if (extractedText?.trim()) {
-              paperIngestion = "ingested";
-              logger.phaseComplete("extraction", {
-                contentLength: extractedText.length,
-                title: extractedTitle,
-                method: "oa_pdf_scrape",
-              });
-            }
-          } catch (e) {
-            logger.warn("Supadata PDF URL failed", {
-              message: e instanceof Error ? e.message : String(e),
+        try {
+          const result = await academicLoader.loadPaper(paper);
+          extractedText = result.content;
+          if (result.title?.trim()) extractedTitle = result.title.trim();
+          if (extractedText?.trim()) {
+            paperIngestion = "ingested";
+            logger.phaseComplete("extraction", {
+              contentLength: extractedText.length,
+              title: extractedTitle,
+              method: "academic_loader",
             });
           }
-        }
-
-        // Landing from OpenAlex is sometimes missing even when `fileUrl` (DOI, handle, publisher) is set.
-        const scrapeUrls = [...new Set([landing, primaryDocUrl].filter(Boolean) as string[])];
-        for (const url of scrapeUrls) {
-          if (extractedText?.trim()) break;
-          if (url === pdfUrl) continue;
-          try {
-            const meta = await supadataLoader.loadWebPageWithMeta(url);
-            extractedText = meta.content;
-            if (meta.title?.trim()) extractedTitle = meta.title.trim();
-            if (extractedText?.trim()) {
-              paperIngestion = "ingested";
-              logger.phaseComplete("extraction", {
-                contentLength: extractedText.length,
-                title: extractedTitle,
-                method: "repository_or_landing_scrape",
-              });
-              break;
-            }
-          } catch (e) {
-            logger.warn("Scrape failed for paper URL", {
-              url: url.slice(0, 80),
-              message: e instanceof Error ? e.message : String(e),
-            });
-          }
+        } catch (e) {
+          logger.warn("AcademicLoaderService failed", { message: e instanceof Error ? e.message : String(e) });
         }
 
         if (!extractedText?.trim()) {
