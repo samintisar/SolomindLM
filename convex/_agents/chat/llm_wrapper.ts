@@ -16,6 +16,7 @@ import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { createLangSmithRunConfig } from "../_shared/index.js";
 import { uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
+import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
 import { buildGroundingPrompt, estimateTokens, isComplexQuery } from "./chat_llm_grounding.js";
 import {
@@ -53,6 +54,7 @@ export class ChatLLMWrapper {
   private tokenBudget: number = 7000; // Reserve tokens for generation
   /** Together AI SDK client for streaming with structured output */
   private togetherClient: Together;
+  private readonly outputLanguage?: string;
 
   constructor(config: LLMWrapperConfig) {
     // Smart vs fast: `mergeModelKwargs` — GPT-OSS uses reasoning_effort; Qwen-style uses chat_template thinking.
@@ -76,6 +78,7 @@ export class ChatLLMWrapper {
     this.togetherClient = new Together({
       apiKey: config.apiKey,
     });
+    this.outputLanguage = config.outputLanguage;
   }
 
   /**
@@ -100,6 +103,7 @@ export class ChatLLMWrapper {
     if (chatSettings) {
       systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
     }
+    systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
     const messages = [
       new SystemMessage(systemPrompt),
       ...conversationHistory
@@ -366,6 +370,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     if (chatSettings) {
       systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
     }
+    systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
     const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
 
@@ -524,6 +529,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     if (chatSettings) {
       systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
     }
+    systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
     const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
       name: "chat_response",

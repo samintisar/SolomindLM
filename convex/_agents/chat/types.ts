@@ -53,4 +53,6 @@ export interface ChatAgentOptions {
   smartModel?: string;
   /** Fetch full document content for single-document list queries */
   fetchDocumentFn?: (documentId: string) => Promise<{ content: string } | null>;
+  /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
+  outputLanguage?: string;
 }

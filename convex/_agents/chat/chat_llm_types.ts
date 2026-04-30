@@ -53,6 +53,8 @@ export interface LLMWrapperConfig {
   fastModel?: string;
   /** API key for fast model (defaults to apiKey) */
   fastApiKey?: string;
+  /** BCP-47 language code for output language instruction. undefined = English (no prompt overhead). */
+  outputLanguage?: string;
 }
 
 /**

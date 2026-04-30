@@ -694,10 +694,16 @@ export async function streamChatResponse(
     rerankFn
   );
 
+  const userPrefs = await ctx.runQuery(
+    internal.userPreferences.index.getPreferencesByUserId,
+    { userId: userId as any },
+  );
+
   const agent = new ChatAgent({
     vectorSearchHandler: hybridSearch,
     globalRerankFn,
     smartModel: resolvedSmartModel,
+    outputLanguage: userPrefs?.outputLanguage,
     fetchDocumentFn: async (documentId: string) => {
       // Fetch all chunks for the document and stitch them together
       const chunks = await ctx.runQuery(internal.documents.index.listChunksByDocument, {

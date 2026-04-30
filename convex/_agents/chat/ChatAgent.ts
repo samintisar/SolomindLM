@@ -62,6 +62,7 @@ export class ChatAgent {
       temperature: parseFloat(env.CHAT_LLM_TEMPERATURE ?? "0.1"),
       fastModel: env.FAST_LLM,
       fastApiKey: env.TOGETHER_AI_API_KEY,
+      outputLanguage: options?.outputLanguage,
     });
 
     this.vectorSearch =
