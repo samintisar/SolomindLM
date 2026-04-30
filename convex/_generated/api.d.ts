@@ -256,7 +256,6 @@ import type * as notebooks_index from "../notebooks/index.js";
 import type * as notebooks_sharing from "../notebooks/sharing.js";
 import type * as notes_index from "../notes/index.js";
 import type * as notes_userNotes from "../notes/userNotes.js";
-import type * as onboarding_backfill from "../onboarding/backfill.js";
 import type * as onboarding_constants from "../onboarding/constants.js";
 import type * as onboarding_mutations from "../onboarding/mutations.js";
 import type * as onboarding_progress from "../onboarding/progress.js";
@@ -571,7 +570,6 @@ declare const fullApi: ApiFromModules<{
   "notebooks/sharing": typeof notebooks_sharing;
   "notes/index": typeof notes_index;
   "notes/userNotes": typeof notes_userNotes;
-  "onboarding/backfill": typeof onboarding_backfill;
   "onboarding/constants": typeof onboarding_constants;
   "onboarding/mutations": typeof onboarding_mutations;
   "onboarding/progress": typeof onboarding_progress;

@@ -4,7 +4,6 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -55,7 +54,6 @@ export const OnboardingProvider: React.FC<Props> = ({
   const skipTourMutation = useMutation(api.onboarding.mutations.skipTour);
   const completeTour = useMutation(api.onboarding.mutations.completeTour);
 
-  const [studioOpen, setStudioOpen] = useState(false);
   const ensuredRowRef = useRef(false);
   const startedRef = useRef(false);
   const advancingRef = useRef(false);
@@ -91,15 +89,20 @@ export const OnboardingProvider: React.FC<Props> = ({
     void startTour({});
   }, [isAuthenticated, tourStatus, startTour]);
 
+  // 2b. Navigate to /home when step 1 is active so the create-notebook tooltip is visible.
+  useEffect(() => {
+    if (tourStatus !== "active") return;
+    if (currentStepId !== "createNotebook") return;
+    if (location.pathname === "/home") return;
+    navigate("/home");
+  }, [tourStatus, currentStepId, navigate, location.pathname]);
+
   // 3. Step advancement when the gating boolean for the current step flips.
   useEffect(() => {
     if (advancingRef.current) return;
     if (tourStatus !== "active") return;
     if (!currentStepId || !tourProgress) return;
-    const gate =
-      currentStepId === "openStudio"
-        ? studioOpen
-        : (tourProgress as Record<string, unknown>)[currentStepId];
+    const gate = (tourProgress as Record<string, unknown>)[currentStepId];
     if (!gate) return;
 
     advancingRef.current = true;
@@ -122,7 +125,7 @@ export const OnboardingProvider: React.FC<Props> = ({
       .finally(() => {
         advancingRef.current = false;
       });
-  }, [tourStatus, currentStepId, tourProgress, studioOpen, advanceTourStep]);
+  }, [tourStatus, currentStepId, tourProgress, advanceTourStep]);
 
   // 4. Cross-route navigation only on the transition out of createNotebook.
   useEffect(() => {
@@ -142,21 +145,19 @@ export const OnboardingProvider: React.FC<Props> = ({
       checklist.createNotebook &&
       checklist.addSource &&
       checklist.askQuestion &&
-      checklist.openStudio &&
       checklist.generateArtifact;
     if (!all) return;
     completedAllRef.current = true;
     void completeTour({});
   }, [checklist, tourStatus, completeTour]);
 
-  const notifyStudioOpen = useCallback(() => setStudioOpen(true), []);
   const skip = useCallback(async () => {
     await skipTourMutation({});
   }, [skipTourMutation]);
 
   const value = useMemo<OnboardingContextValue>(
-    () => ({ tourStatus, currentStepId, notifyStudioOpen, skip }),
-    [tourStatus, currentStepId, notifyStudioOpen, skip],
+    () => ({ tourStatus, currentStepId, skip }),
+    [tourStatus, currentStepId, skip],
   );
 
   return (

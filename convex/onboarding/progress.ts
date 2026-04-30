@@ -8,7 +8,6 @@ const checklistShape = {
   createNotebook: v.boolean(),
   addSource: v.boolean(),
   askQuestion: v.boolean(),
-  openStudio: v.boolean(),
   generateArtifact: v.boolean(),
 };
 
@@ -70,6 +69,56 @@ async function userHasAnyConversation(
   return first !== null;
 }
 
+const EMPTY_CHECKLIST_PROGRESS = {
+  createNotebook: false,
+  addSource: false,
+  askQuestion: false,
+  generateArtifact: false,
+};
+
+/** Resolve the notebook used for an in-progress tour (stored id or first notebook created since `startedAt`). */
+async function resolveTourNotebookId(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  row: { tourNotebookId?: Id<"notebooks">; startedAt?: number },
+): Promise<Id<"notebooks"> | undefined> {
+  let tourNotebookId = row.tourNotebookId;
+  if (!tourNotebookId && row.startedAt !== undefined) {
+    const notebooks = await ctx.db
+      .query("notebooks")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const candidate = notebooks
+      .filter((n) => n.createdAt >= row.startedAt!)
+      .sort((a, b) => a.createdAt - b.createdAt)[0];
+    if (candidate) {
+      tourNotebookId = candidate._id;
+    }
+  }
+  return tourNotebookId;
+}
+
+/** Progress flags for steps after step 1, scoped to `tourNotebookId`. Step 1 is satisfied whenever that notebook exists. */
+async function checklistProgressForTourNotebook(
+  ctx: QueryCtx,
+  tourNotebookId: Id<"notebooks">,
+) {
+  const [addSource, askQuestion, ...artifactFlags] = await Promise.all([
+    notebookHasAny(ctx, "documents", tourNotebookId),
+    notebookHasAny(ctx, "conversations", tourNotebookId),
+    ...ARTIFACT_TABLES.map((tbl) =>
+      notebookHasAny(ctx, tbl, tourNotebookId),
+    ),
+  ]);
+
+  return {
+    createNotebook: true,
+    addSource,
+    askQuestion,
+    generateArtifact: artifactFlags.some(Boolean),
+  };
+}
+
 async function notebookHasAny(
   ctx: QueryCtx,
   table:
@@ -97,14 +146,22 @@ export const getChecklistProgress = query({
   returns: v.object(checklistShape),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    const empty = {
-      createNotebook: false,
-      addSource: false,
-      askQuestion: false,
-      openStudio: false,
-      generateArtifact: false,
-    };
-    if (!userId) return empty;
+    if (!userId) return EMPTY_CHECKLIST_PROGRESS;
+
+    const row = await ctx.db
+      .query("userOnboarding")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    // While the guided tour is active, mirror tour-scoped progress so restartTour
+    // (new startedAt, cleared tourNotebookId) resets the checklist with the tour.
+    if (row?.tourStatus === "active") {
+      const tourNotebookId = await resolveTourNotebookId(ctx, userId, row);
+      if (!tourNotebookId) {
+        return EMPTY_CHECKLIST_PROGRESS;
+      }
+      return await checklistProgressForTourNotebook(ctx, tourNotebookId);
+    }
 
     const [hasNotebook, hasDocument, hasConversation, ...artifactFlags] =
       await Promise.all([
@@ -118,7 +175,6 @@ export const getChecklistProgress = query({
       createNotebook: hasNotebook,
       addSource: hasDocument,
       askQuestion: hasConversation,
-      openStudio: false,
       generateArtifact: artifactFlags.some(Boolean),
     };
   },
@@ -130,11 +186,7 @@ export const getTourProgress = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     const empty = {
-      createNotebook: false,
-      addSource: false,
-      askQuestion: false,
-      openStudio: false,
-      generateArtifact: false,
+      ...EMPTY_CHECKLIST_PROGRESS,
       tourNotebookId: undefined,
     };
     if (!userId) return empty;
@@ -144,28 +196,18 @@ export const getTourProgress = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
-    const createNotebook = await userHasAny(ctx, "notebooks", userId);
-    const tourNotebookId = row?.tourNotebookId;
+    // tourNotebookId comes from the row once step 1 has been advanced. Before
+    // that (fresh tour or after restart), find the first notebook the user
+    // created since startedAt so advanceTourStep can bind it on the next call.
+    const tourNotebookId = row
+      ? await resolveTourNotebookId(ctx, userId, row)
+      : undefined;
 
     if (!tourNotebookId) {
-      return { ...empty, createNotebook };
+      return empty;
     }
 
-    const [addSource, askQuestion, ...artifactFlags] = await Promise.all([
-      notebookHasAny(ctx, "documents", tourNotebookId),
-      notebookHasAny(ctx, "conversations", tourNotebookId),
-      ...ARTIFACT_TABLES.map((tbl) =>
-        notebookHasAny(ctx, tbl, tourNotebookId),
-      ),
-    ]);
-
-    return {
-      createNotebook,
-      addSource,
-      askQuestion,
-      openStudio: false,
-      generateArtifact: artifactFlags.some(Boolean),
-      tourNotebookId,
-    };
+    const progress = await checklistProgressForTourNotebook(ctx, tourNotebookId);
+    return { ...progress, tourNotebookId };
   },
 });

@@ -5,8 +5,6 @@ import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
-// convex-test resolves function references via module keys relative to the
-// convex/ root. Use a root-absolute glob so keys are stable from any subdir.
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
   string,
   () => Promise<unknown>
@@ -28,7 +26,6 @@ type OnboardingPatch = {
     | "createNotebook"
     | "addSource"
     | "askQuestion"
-    | "openStudio"
     | "generateArtifact";
   tourNotebookId?: Id<"notebooks">;
   checklistDismissed?: boolean;
@@ -82,7 +79,7 @@ async function insertNotebookFor(
 }
 
 describe("startTour", () => {
-  test("happy path: pending → active with createNotebook", async () => {
+  test("happy path: pending -> active with createNotebook", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, { tourStatus: "pending" });
     await withAuth(t, userId).mutation(
@@ -159,11 +156,6 @@ describe("advanceTourStep", () => {
 
     await auth.mutation(api.onboarding.mutations.advanceTourStep, {
       expectedCurrentStepId: "askQuestion",
-    });
-    expect((await readRow(t, userId))?.currentStepId).toBe("openStudio");
-
-    await auth.mutation(api.onboarding.mutations.advanceTourStep, {
-      expectedCurrentStepId: "openStudio",
     });
     expect((await readRow(t, userId))?.currentStepId).toBe("generateArtifact");
 
@@ -244,7 +236,7 @@ describe("completeTour", () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, {
       tourStatus: "active",
-      currentStepId: "openStudio",
+      currentStepId: "generateArtifact",
     });
     await withAuth(t, userId).mutation(
       api.onboarding.mutations.completeTour,
@@ -259,7 +251,7 @@ describe("completeTour", () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, {
       tourStatus: "active",
-      currentStepId: "openStudio",
+      currentStepId: "generateArtifact",
     });
     await withAuth(t, userId).mutation(
       api.onboarding.mutations.completeTour,

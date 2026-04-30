@@ -2,7 +2,6 @@ export const STEP_IDS = [
   "createNotebook",
   "addSource",
   "askQuestion",
-  "openStudio",
   "generateArtifact",
 ] as const;
 
@@ -41,14 +40,6 @@ export const STEP_DEFINITIONS: readonly StepDefinition[] = [
     targetSelector: '[data-onboarding="chat-input"]',
     copy: "Ask anything about your sources. Answers come with citations.",
     side: "top",
-  },
-  {
-    id: "openStudio",
-    route: "notebook",
-    targetSelector: '[data-onboarding="studio-panel-toggle"]',
-    copy:
-      "Studio turns your sources into reports, flashcards, quizzes, mind maps, audio, and more.",
-    side: "left",
   },
   {
     id: "generateArtifact",

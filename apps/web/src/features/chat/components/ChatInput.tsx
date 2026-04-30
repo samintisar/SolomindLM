@@ -141,17 +141,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         data-onboarding="chat-input"
         className="pointer-events-auto relative flex w-full flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
       >
-      <textarea
-        ref={textareaRef}
-        data-onboarding="chat-input"
-        placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
-        className="w-full bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-lg"
-        rows={1}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-      />
+        <textarea
+          ref={textareaRef}
+          placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
+          className="w-full bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-lg"
+          rows={1}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+        />
         <div className="flex justify-between items-center gap-2 px-1.5 pb-0.5 w-full">
         <div className="flex items-center gap-1.5 min-h-10">
           {/* "+" button with dropup menu */}

@@ -6,8 +6,6 @@ export type TourStatus = "pending" | "active" | "skipped" | "completed";
 export interface OnboardingContextValue {
   tourStatus: TourStatus;
   currentStepId: StepId | null;
-  /** Caller-provided: notify the provider that the Studio panel just opened. */
-  notifyStudioOpen: () => void;
   /** Caller-provided: skip the tour. */
   skip: () => Promise<void>;
 }

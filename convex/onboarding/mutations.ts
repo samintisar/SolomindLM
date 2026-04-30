@@ -8,7 +8,6 @@ const stepIdValidator = v.union(
   v.literal("createNotebook"),
   v.literal("addSource"),
   v.literal("askQuestion"),
-  v.literal("openStudio"),
   v.literal("generateArtifact"),
 );
 

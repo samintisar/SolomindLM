@@ -8,14 +8,48 @@ interface Rect {
   left: number;
   width: number;
   height: number;
+  /** Spotlight hole radius from the target's computed border-radius. */
+  rx: number;
 }
+
+/** Breathing room around the target so the cutout keeps rounded corners smooth. */
+const SPOTLIGHT_PADDING_PX = 4;
 
 function readRect(selector: string): Rect | null {
   const elements = document.querySelectorAll(selector);
+  const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 0;
   for (const el of elements) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
-    return { top: r.top, left: r.left, width: r.width, height: r.height };
+    const style = getComputedStyle(el);
+    const raw = parseFloat(style.borderTopLeftRadius);
+    const cornerBase = Number.isFinite(raw) ? raw : 0;
+    const innerRx = Math.min(cornerBase, r.width / 2, r.height / 2);
+
+    let left = r.left - SPOTLIGHT_PADDING_PX;
+    let top = r.top - SPOTLIGHT_PADDING_PX;
+    let width = r.width + 2 * SPOTLIGHT_PADDING_PX;
+    let height = r.height + 2 * SPOTLIGHT_PADDING_PX;
+
+    if (left < 0) {
+      width += left;
+      left = 0;
+    }
+    if (top < 0) {
+      height += top;
+      top = 0;
+    }
+    if (vw > 0 && left + width > vw) width = Math.max(0, vw - left);
+    if (vh > 0 && top + height > vh) height = Math.max(0, vh - top);
+
+    const rx = Math.min(
+      innerRx + SPOTLIGHT_PADDING_PX,
+      width / 2,
+      height / 2,
+    );
+
+    return { top, left, width, height, rx };
   }
   return null;
 }
@@ -56,8 +90,7 @@ function logSelectorInvariants(step: StepDefinition) {
     );
     return;
   }
-  // Only warn when more than one match is currently visible (rules out
-  // responsive duplicates where Tailwind hides one variant via display:none).
+  // Only warn when more than one match is currently visible.
   const visibleMatches = Array.from(matches).filter((el) => {
     const r = el.getBoundingClientRect();
     return !(r.width === 0 && r.height === 0);
@@ -74,6 +107,7 @@ export const TourTooltip: React.FC = () => {
   const { tourStatus, currentStepId, skip } = useOnboarding();
   const [rect, setRect] = useState<Rect | null>(null);
   const rafRef = useRef<number | null>(null);
+  const spotlightMaskId = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
   const step = currentStepId ? findStep(currentStepId) : null;
 
@@ -96,7 +130,8 @@ export const TourTooltip: React.FC = () => {
           next.top === prev.top &&
           next.left === prev.left &&
           next.width === prev.width &&
-          next.height === prev.height
+          next.height === prev.height &&
+          next.rx === prev.rx
         ) {
           return prev;
         }
@@ -136,23 +171,45 @@ export const TourTooltip: React.FC = () => {
 
   const pos = tooltipPosition(rect, step.side);
   const stepNumber = STEP_IDS.indexOf(step.id) + 1;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
 
   return createPortal(
     <>
-      <div
-        className="fixed inset-0 bg-black/40 z-40 pointer-events-none"
-        style={{
-          clipPath: `polygon(
-            0% 0%, 0% 100%, ${rect.left}px 100%,
-            ${rect.left}px ${rect.top}px,
-            ${rect.left + rect.width}px ${rect.top}px,
-            ${rect.left + rect.width}px ${rect.top + rect.height}px,
-            ${rect.left}px ${rect.top + rect.height}px,
-            ${rect.left}px 100%, 100% 100%, 100% 0%
-          )`,
-        }}
+      <svg
+        className="fixed inset-0 z-40 pointer-events-none"
+        width={vw}
+        height={vh}
         aria-hidden
-      />
+      >
+        <defs>
+          <mask
+            id={spotlightMaskId}
+            maskUnits="userSpaceOnUse"
+            x="0"
+            y="0"
+            width={vw}
+            height={vh}
+          >
+            <rect width={vw} height={vh} fill="white" />
+            <rect
+              x={rect.left}
+              y={rect.top}
+              width={rect.width}
+              height={rect.height}
+              rx={rect.rx}
+              ry={rect.rx}
+              fill="black"
+            />
+          </mask>
+        </defs>
+        <rect
+          width={vw}
+          height={vh}
+          fill="rgba(0, 0, 0, 0.42)"
+          mask={`url(#${spotlightMaskId})`}
+        />
+      </svg>
       <div
         role="dialog"
         className="fixed z-50 max-w-xs rounded-lg border border-border bg-popover text-popover-foreground p-4 shadow-lg"

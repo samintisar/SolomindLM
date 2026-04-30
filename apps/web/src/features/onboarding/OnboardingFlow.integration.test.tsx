@@ -4,13 +4,11 @@ import { MemoryRouter } from "react-router-dom";
 import { OnboardingProvider } from "./OnboardingProvider";
 import { TourTooltip } from "./components/TourTooltip";
 import { ChecklistCard } from "./components/ChecklistCard";
-import { useOnboarding } from "./OnboardingContext";
 
 const STEPS = [
   "createNotebook",
   "addSource",
   "askQuestion",
-  "openStudio",
   "generateArtifact",
 ] as const;
 
@@ -28,14 +26,12 @@ let tour: {
   createNotebook: boolean;
   addSource: boolean;
   askQuestion: boolean;
-  openStudio: boolean;
   generateArtifact: boolean;
   tourNotebookId: string | undefined;
 } = {
   createNotebook: false,
   addSource: false,
   askQuestion: false,
-  openStudio: false,
   generateArtifact: false,
   tourNotebookId: undefined,
 };
@@ -43,7 +39,6 @@ let checklist = {
   createNotebook: false,
   addSource: false,
   askQuestion: false,
-  openStudio: false,
   generateArtifact: false,
 };
 
@@ -136,22 +131,12 @@ function setupTarget(attr: string) {
   return el;
 }
 
-function StudioOpener() {
-  const { notifyStudioOpen } = useOnboarding();
-  return (
-    <button data-testid="open-studio" onClick={notifyStudioOpen}>
-      open
-    </button>
-  );
-}
-
 function App() {
   return (
     <MemoryRouter initialEntries={["/home"]}>
       <OnboardingProvider isAuthenticated>
         <TourTooltip />
         <ChecklistCard />
-        <StudioOpener />
       </OnboardingProvider>
     </MemoryRouter>
   );
@@ -169,7 +154,6 @@ beforeEach(() => {
     createNotebook: false,
     addSource: false,
     askQuestion: false,
-    openStudio: false,
     generateArtifact: false,
     tourNotebookId: undefined,
   };
@@ -177,18 +161,15 @@ beforeEach(() => {
     createNotebook: false,
     addSource: false,
     askQuestion: false,
-    openStudio: false,
     generateArtifact: false,
   };
 });
 
-describe("Onboarding integration — happy path", () => {
-  test("tour advances through all 5 steps and completes", async () => {
+describe("Onboarding integration - happy path", () => {
+  test("tour advances through all 4 steps and completes", async () => {
     setupTarget("create-notebook-button");
     const { rerender } = render(<App />);
 
-    // Auto-launch fired startTour which mutated external mock state. Re-render
-    // so the provider picks up the new tourStatus/currentStepId from useQuery.
     await waitFor(() => expect(mockMutations.startTour).toHaveBeenCalled());
     rerender(<App />);
 
@@ -196,12 +177,10 @@ describe("Onboarding integration — happy path", () => {
       expect(screen.getByText(/Create your first one/)).toBeInTheDocument(),
     );
 
-    // Step 1 → 2: user creates a notebook
     setupTarget("add-source-button");
     tour = { ...tour, createNotebook: true, tourNotebookId: "nb1" };
     checklist = { ...checklist, createNotebook: true };
     rerender(<App />);
-    // advanceTourStep mock flips state.currentStepId; rerender to pick it up.
     await waitFor(() =>
       expect(mockMutations.advanceTourStep).toHaveBeenLastCalledWith({
         expectedCurrentStepId: "createNotebook",
@@ -213,7 +192,6 @@ describe("Onboarding integration — happy path", () => {
       expect(screen.getByText(/Add a PDF/)).toBeInTheDocument(),
     );
 
-    // Step 2 → 3: user adds a source
     setupTarget("chat-input");
     tour = { ...tour, addSource: true };
     checklist = { ...checklist, addSource: true };
@@ -230,8 +208,7 @@ describe("Onboarding integration — happy path", () => {
       ).toBeInTheDocument(),
     );
 
-    // Step 3 → 4: user asks a question
-    setupTarget("studio-panel-toggle");
+    setupTarget("studio-tool-grid");
     tour = { ...tour, askQuestion: true };
     checklist = { ...checklist, askQuestion: true };
     rerender(<App />);
@@ -242,25 +219,9 @@ describe("Onboarding integration — happy path", () => {
     );
     rerender(<App />);
     await waitFor(() =>
-      expect(screen.getByText(/Studio turns your sources/)).toBeInTheDocument(),
-    );
-
-    // Step 4 → 5: user opens Studio (via local state notify)
-    setupTarget("studio-tool-grid");
-    const userEvent = (await import("@testing-library/user-event")).default;
-    await userEvent.click(screen.getByTestId("open-studio"));
-    checklist = { ...checklist, openStudio: true };
-    await waitFor(() =>
-      expect(mockMutations.advanceTourStep).toHaveBeenLastCalledWith({
-        expectedCurrentStepId: "openStudio",
-      }),
-    );
-    rerender(<App />);
-    await waitFor(() =>
       expect(screen.getByText(/Pick any tool/)).toBeInTheDocument(),
     );
 
-    // Step 5 → completed: user generates an artifact
     tour = { ...tour, generateArtifact: true };
     checklist = { ...checklist, generateArtifact: true };
     rerender(<App />);

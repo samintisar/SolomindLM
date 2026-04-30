@@ -17,7 +17,6 @@ import { useStudioContext } from "../StudioContext";
 import { useAudioPlayerContext } from "@/features/audio/AudioPlayerContext";
 import { useStudioHandlers } from "../hooks/useStudioHandlers";
 import { useNoteActions } from "../hooks/useNoteActions";
-import { useOnboarding } from "@/features/onboarding/OnboardingContext";
 
 interface StudioPanelProps {
   isOpen: boolean;
@@ -49,11 +48,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   const { miniPlayerVisible, miniPlayerData, onPlayAudio, onCloseMiniPlayer, onExpandAudioPlayer } =
     useAudioPlayerContext();
-
-  const { notifyStudioOpen } = useOnboarding();
-  useEffect(() => {
-    if (isOpen) notifyStudioOpen();
-  }, [isOpen, notifyStudioOpen]);
 
   // State
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);

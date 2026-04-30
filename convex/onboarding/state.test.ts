@@ -3,7 +3,6 @@ import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
 import schema from "../schema";
 import { api } from "../_generated/api";
-import { FRESH_USER_WINDOW_MS } from "./constants";
 
 // convex-test resolves function references via module keys relative to the
 // convex/ root. Use a root-absolute glob so keys are stable from any subdir.
@@ -22,17 +21,12 @@ function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
   return t.withIdentity({ subject: `${userId}|session1` });
 }
 
-/**
- * Insert a user whose `_creationTime` is older than `FRESH_USER_WINDOW_MS`.
- * convex-test stamps `_creationTime` from `Date.now()` at insert time, so we
- * temporarily rewind the system clock, insert, then restore.
- */
 async function insertLegacyUser(
   t: ReturnType<typeof convexTest>,
   name: string,
 ) {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date(Date.now() - FRESH_USER_WINDOW_MS - 60_000));
+  vi.setSystemTime(new Date(Date.now() - 10 * 60_000));
   try {
     return await t.run(async (ctx) => ctx.db.insert("users", { name }));
   } finally {
@@ -82,7 +76,7 @@ describe("getOnboardingState", () => {
     });
   });
 
-  test("contextual default: legacy user (old _creationTime) → completed", async () => {
+  test("contextual default: user without row is pending regardless of age", async () => {
     const t = convexTest(schema, modules);
     const userId = await insertLegacyUser(t, "Legacy");
     const result = await withAuth(t, userId).query(
@@ -90,8 +84,8 @@ describe("getOnboardingState", () => {
       {},
     );
     expect(result).toMatchObject({
-      tourStatus: "completed",
-      checklistDismissed: true,
+      tourStatus: "pending",
+      checklistDismissed: false,
     });
   });
 });
@@ -116,7 +110,7 @@ describe("getOrCreateOnboardingRow", () => {
     });
   });
 
-  test("creates completed row for legacy user", async () => {
+  test("creates pending row for user without row regardless of age", async () => {
     const t = convexTest(schema, modules);
     const userId = await insertLegacyUser(t, "Legacy");
     await withAuth(t, userId).mutation(
@@ -130,8 +124,8 @@ describe("getOrCreateOnboardingRow", () => {
         .unique(),
     );
     expect(row).toMatchObject({
-      tourStatus: "completed",
-      checklistDismissed: true,
+      tourStatus: "pending",
+      checklistDismissed: false,
     });
   });
 

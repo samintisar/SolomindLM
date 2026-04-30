@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
-import { FRESH_USER_WINDOW_MS } from "./constants";
 
 const onboardingRowValidator = v.object({
   _id: v.id("userOnboarding"),
@@ -18,7 +17,6 @@ const onboardingRowValidator = v.object({
       v.literal("createNotebook"),
       v.literal("addSource"),
       v.literal("askQuestion"),
-      v.literal("openStudio"),
       v.literal("generateArtifact"),
     ),
   ),
@@ -46,13 +44,7 @@ export const getOnboardingState = query({
       .unique();
     if (row) return row;
 
-    const user = await ctx.db.get(userId);
-    if (!user) return null;
-
-    const isFresh = Date.now() - user._creationTime < FRESH_USER_WINDOW_MS;
-    return isFresh
-      ? { tourStatus: "pending" as const, checklistDismissed: false }
-      : { tourStatus: "completed" as const, checklistDismissed: true };
+    return { tourStatus: "pending" as const, checklistDismissed: false };
   },
 });
 
@@ -72,11 +64,10 @@ export const getOrCreateOnboardingRow = mutation({
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("User not found");
 
-    const isFresh = Date.now() - user._creationTime < FRESH_USER_WINDOW_MS;
     return await ctx.db.insert("userOnboarding", {
       userId,
-      tourStatus: isFresh ? "pending" : "completed",
-      checklistDismissed: !isFresh,
+      tourStatus: "pending",
+      checklistDismissed: false,
     });
   },
 });
