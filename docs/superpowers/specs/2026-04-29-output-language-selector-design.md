@@ -35,11 +35,13 @@ userPreferences: defineTable({
 
 - **`getMyPreferences`** — authenticated public `query` (uses `ctx.auth`), reads row by the authed `userId`, returns `{ outputLanguage?: string } | null`. Used by the frontend hook.
 - **`getPreferencesByUserId`** — `internalQuery` that accepts `userId: v.id("users")` as an explicit arg. Used by jobs/actions (which are scheduled and do not carry user auth context).
-- **`setOutputLanguage`** — authenticated public `mutation`, upserts the row (`outputLanguage`, `updatedAt`)
+- **`setOutputLanguage`** — authenticated public `mutation`, upserts the row (`outputLanguage`, `updatedAt`). Server-side validates the code against the known list and throws `ConvexError("Unsupported language code")` for unknown values.
 
-## 2. Language Instruction Helper
+## 2. Language Constants
 
-**New file:** `convex/_agents/_shared/languageInstruction.ts`
+Language definitions live in **two separate files** due to the Convex/frontend boundary — `convex/_agents/` files are backend-only and cannot be imported by the web app.
+
+### Frontend (`apps/web/src/features/auth/constants/languages.ts`)
 
 ```typescript
 export const SUPPORTED_LANGUAGES = [
@@ -58,8 +60,16 @@ export const SUPPORTED_LANGUAGES = [
   { code: "tr",    label: "Turkish" },
   { code: "ur",    label: "Urdu" },
   { code: "vi",    label: "Vietnamese" },
-];
+] as const;
 
+export type LanguageCode = typeof SUPPORTED_LANGUAGES[number]["code"];
+```
+
+### Backend helper (`convex/_agents/_shared/languageInstruction.ts`)
+
+Contains its own copy of the language list (these are plain string constants — duplication is fine and avoids any cross-boundary coupling). Exports `withLanguageInstruction()`:
+
+```typescript
 export function withLanguageInstruction(systemPrompt: string, language?: string): string {
   if (!language || language === "en") return systemPrompt;
   const lang = SUPPORTED_LANGUAGES.find(l => l.code === language);
@@ -68,13 +78,15 @@ export function withLanguageInstruction(systemPrompt: string, language?: string)
 }
 ```
 
-`SUPPORTED_LANGUAGES` is also exported for use in the frontend selector.
+English is the default — no extra tokens added for most users. Unknown codes are silently treated as English (belt-and-suspenders; the mutation already validates at write time).
+
+The Convex `setOutputLanguage` mutation imports the backend list for server-side validation.
 
 ## 3. Backend Injection
 
 ### Studio jobs
 
-Each of the following job files already receives `userId` and `ctx`. They fetch the preference once at entry and pass `language` to wherever `withLanguageInstruction()` is called on their system prompt strings:
+Each of the following job files already receives `userId` and `ctx`. They fetch the preference once at job entry and pass `language` to wherever `withLanguageInstruction()` is called on their system prompt strings:
 
 - `convex/studio/flashcards/job.ts`
 - `convex/studio/reports/job.ts`
@@ -83,7 +95,7 @@ Each of the following job files already receives `userId` and `ctx`. They fetch 
 - `convex/studio/spreadsheets/job.ts`
 - `convex/studio/writtenQuestions/job.ts`
 - `convex/studio/mindmaps/job.ts`
-- `convex/studio/audio/job.ts` (transcript generation step only; TTS voice is unaffected)
+- `convex/studio/audio/job.ts` — applies to transcript generation step only. Note: TTS will speak in the target language since it reads the translated transcript; this is intentional and desirable behavior.
 
 Pattern per job:
 ```typescript
@@ -99,10 +111,11 @@ const language = prefs?.outputLanguage;
 outputLanguage?: string;
 ```
 
-The HTTP handler that builds `ChatAgentContext` fetches the preference and sets this field. Inside `llm_wrapper.ts`, `CORE_SYSTEM_PROMPT` is wrapped:
+The HTTP action handler (`convex/http.ts`) that builds `ChatAgentContext` fetches the preference via `getPreferencesByUserId` and sets this field. Inside `llm_wrapper.ts`, the language instruction is applied exactly once at system message construction:
 ```typescript
 withLanguageInstruction(CORE_SYSTEM_PROMPT, context.outputLanguage)
 ```
+`CORE_SYSTEM_PROMPT` is a module-level constant used in one place in `llm_wrapper.ts`. Confirm it is not re-constructed mid-request before applying the wrap — if any sub-call rebuilds the system prompt independently, it must also receive `context.outputLanguage`.
 
 ## 4. UI
 
@@ -114,52 +127,52 @@ export function useOutputLanguage() {
   const setLanguageMutation = useMutation(api.userPreferences.index.setOutputLanguage);
   return {
     language: prefs?.outputLanguage ?? "en",
+    isLoading: prefs === undefined,
     setLanguage: (code: string) => setLanguageMutation({ outputLanguage: code }),
   };
 }
 ```
 
+`isLoading` lets the selector render as disabled while the preference loads, avoiding a flash from English → selected language on mount.
+
 ### Component (`apps/web/src/features/auth/components/LanguageSelector.tsx`)
 
-A single row styled to match the existing `AvatarDropdown` button rows:
-- Globe icon (Lucide `Globe`) + current language label on the left
-- Native `<select>` populated from `SUPPORTED_LANGUAGES`, styled with Tailwind to match the dropdown aesthetic
-- Calls `setLanguage(code)` on change
-- Only rendered when `isAuthenticated`
+A self-contained row styled to match the existing `AvatarDropdown` button rows:
+- Owns `useOutputLanguage()` internally — no props needed from `AvatarDropdown`
+- Globe icon (Lucide `Globe`) + current language label as the trigger
+- Uses **Radix `Select`** (`@radix-ui/react-select`) for consistent cross-OS styling, matching the rest of the app's UI primitives
+- Renders disabled while `isLoading`
+- Only rendered when `isAuthenticated` (caller's responsibility via conditional render)
 
 ### `AvatarDropdown.tsx` changes
 
-Adds two props:
-```typescript
-outputLanguage: string;
-onLanguageChange: (code: string) => void;
-```
-
-Renders `<LanguageSelector>` between the theme toggle row and login/logout, guarded by `isAuthenticated`.
+No new props. Renders `<LanguageSelector />` (no props) between the theme toggle and login/logout, guarded by `isAuthenticated`.
 
 ### `Header.tsx` changes
 
-Pulls `const { language, setLanguage } = useOutputLanguage()` and passes as `outputLanguage` / `onLanguageChange` to `<AvatarDropdown>`.
+No new hook calls needed. `Header` passes `isAuthenticated` to `AvatarDropdown` as it already does; `LanguageSelector` is self-contained.
 
 ## 5. Files Changed
 
 | File | Change |
 |---|---|
 | `convex/schema.ts` | Add `userPreferences` table |
-| `convex/userPreferences/index.ts` | **New** — `getMyPreferences` query + `setOutputLanguage` mutation |
-| `convex/_agents/_shared/languageInstruction.ts` | **New** — helper + language list |
+| `convex/userPreferences/index.ts` | **New** — `getMyPreferences`, `getPreferencesByUserId`, `setOutputLanguage` |
+| `convex/_agents/_shared/languageInstruction.ts` | **New** — `withLanguageInstruction()` helper + backend language list |
 | `convex/_agents/chat/types.ts` | Add `outputLanguage?: string` to `ChatAgentContext` |
 | `convex/_agents/chat/llm_wrapper.ts` | Wrap `CORE_SYSTEM_PROMPT` with `withLanguageInstruction` |
-| `convex/chat/` (HTTP handler) | Fetch preference, set `context.outputLanguage` |
+| `convex/http.ts` | Fetch preference via `getPreferencesByUserId`, set `context.outputLanguage` |
 | `convex/studio/*/job.ts` (×8) | Fetch preference, pass to `withLanguageInstruction` at prompt sites |
-| `apps/web/src/features/auth/hooks/useOutputLanguage.ts` | **New** — React hook |
-| `apps/web/src/features/auth/components/LanguageSelector.tsx` | **New** — selector UI component |
-| `apps/web/src/features/auth/components/AvatarDropdown.tsx` | Add props + render `<LanguageSelector>` |
-| `apps/web/src/shared/ui/Header.tsx` | Wire `useOutputLanguage()` → `AvatarDropdown` |
+| `apps/web/src/features/auth/constants/languages.ts` | **New** — frontend language list + `LanguageCode` type |
+| `apps/web/src/features/auth/hooks/useOutputLanguage.ts` | **New** — React hook with `language`, `isLoading`, `setLanguage` |
+| `apps/web/src/features/auth/components/LanguageSelector.tsx` | **New** — self-contained Radix Select component |
+| `apps/web/src/features/auth/components/AvatarDropdown.tsx` | Render `<LanguageSelector />` guarded by `isAuthenticated` |
+
+`Header.tsx` requires no changes — `LanguageSelector` is self-contained.
 
 ## 6. Out of Scope
 
 - UI translation (no i18n library; app chrome remains in English)
 - Per-notebook language override (global preference only)
-- Audio TTS voice language (voice selection is a separate concern)
+- Audio TTS voice selection (voice is a separate concern; transcript language does follow the preference)
 - Language auto-detection from document content
