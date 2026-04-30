@@ -7,7 +7,6 @@ import { CACHE_TTL, withJitter } from "../cache/cache";
 import { internal } from "../../_generated/api";
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import FirecrawlApp from "@mendable/firecrawl-js";
 
@@ -19,12 +18,6 @@ export interface DiscoveredSource {
   publishedDate?: string;
   domain?: string;
   rawContent?: string;
-  metadata?: {
-    pdfUrl?: string;
-    doi?: string;
-    citationCount?: number;
-    sourceApi?: "arxiv" | "semantic_scholar" | "pubmed";
-  };
 }
 
 // ============================================================
@@ -36,11 +29,8 @@ export const searchInternal = internalAction({
     query: v.string(),
     maxResults: v.number(),
     scoreThreshold: v.number(),
-    excludeDomains: v.optional(v.array(v.string())),
-    includeDomains: v.optional(v.array(v.string())),
     topic: v.optional(v.string()),
     timeRange: v.optional(v.string()),
-    searchDepth: v.optional(v.string()),
   },
   handler: async (
     _,
@@ -48,11 +38,8 @@ export const searchInternal = internalAction({
       query,
       maxResults,
       scoreThreshold,
-      excludeDomains,
-      includeDomains,
       topic,
       timeRange,
-      searchDepth,
     }
   ) => {
     const logger = createServiceLogger("firecrawl", "searchInternal");
@@ -166,11 +153,8 @@ export const discoverSourcesInternal = internalAction({
     query: v.string(),
     maxResults: v.optional(v.number()),
     scoreThreshold: v.optional(v.number()),
-    excludeDomains: v.optional(v.array(v.string())),
-    includeDomains: v.optional(v.array(v.string())),
     topic: v.optional(v.string()),
     timeRange: v.optional(v.string()),
-    searchDepth: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const logger = createServiceLogger("firecrawl", "discoverSourcesInternal");
@@ -188,11 +172,8 @@ export const discoverSourcesInternal = internalAction({
         query: normalizedQuery,
         maxResults: args.maxResults ?? 10,
         scoreThreshold: args.scoreThreshold ?? 0.5,
-        excludeDomains: args.excludeDomains,
-        includeDomains: args.includeDomains,
         topic: args.topic,
         timeRange: args.timeRange,
-        searchDepth: args.searchDepth,
       });
 
       logger.operationComplete({
