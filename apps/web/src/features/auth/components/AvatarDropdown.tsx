@@ -1,6 +1,7 @@
 import React from "react";
 import { LogIn, LogOut, Sun, Moon, RotateCcw, ListChecks } from "lucide-react";
 import type { User } from "../AuthContext";
+import { LanguageSelector } from "./LanguageSelector";
 
 interface AvatarDropdownProps {
   user: User | null;
@@ -57,6 +58,9 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
           )}
           <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
         </button>
+
+        {/* Language Selector */}
+        <LanguageSelector isAuthenticated={isAuthenticated} />
 
         {isAuthenticated && onRestartTour && (
           <button
