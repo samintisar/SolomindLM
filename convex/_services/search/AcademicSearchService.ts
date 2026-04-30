@@ -185,9 +185,9 @@ async function searchArxiv(
         const title = stripXmlTags(extractTag(entry, "title") || "Untitled");
         const summary = stripXmlTags(extractTag(entry, "summary") || "");
         const published = extractTag(entry, "published");
-        const year = published ? parseInt(published.substring(0, 4), 10) : undefined;
+        let year = published ? parseInt(published.substring(0, 4), 10) : undefined;
         if (year !== undefined && isNaN(year)) {
-          // handle NaN
+          year = undefined;
         }
 
         // Extract authors from <author><name>...</name></author>
