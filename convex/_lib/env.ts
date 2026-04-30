@@ -12,11 +12,12 @@ export const env = {
   FAST_LLM: process.env.FAST_LLM || "openai/gpt-oss-120b",
   SMART_LLM: process.env.SMART_LLM || "openai/gpt-oss-120b",
 
-  // Tavily (web search)
-  TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",
+  // Firecrawl (web search + extraction)
+  FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || "",
 
-  // OpenAlex (academic papers)
-  OPENALEX_BASE_URL: process.env.OPENALEX_BASE_URL || "https://api.openalex.org",
+  // Academic APIs
+  SEMANTIC_SCHOLAR_API_KEY: process.env.SEMANTIC_SCHOLAR_API_KEY || "",
+  PUBMED_EMAIL: process.env.PUBMED_EMAIL || "",
 
   // Mistral (OCR)
   MISTRAL_API_KEY: process.env.MISTRAL_API_KEY || "",
