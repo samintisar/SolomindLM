@@ -119,19 +119,19 @@ Plugin `superpowers@claude-plugins-official` is installed. Invoke via `Skill` to
 
 | Skill | When | Project notes |
 |---|---|---|
-| `superpowers:brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
-| `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
-| `superpowers:executing-plans` | Executing a written plan in a separate session | — |
-| `superpowers:subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
-| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Prefer `Explore` subagent for >3-query codebase searches |
-| `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
-| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
-| `superpowers:requesting-code-review` | Before merging significant work | — |
-| `superpowers:receiving-code-review` | When handling review feedback | — |
-| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
-| `superpowers:using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
-| `superpowers:writing-skills` | Creating or editing a skill | Edit canonical copy under `.agents/skills/<name>/SKILL.md` |
-| `superpowers:test-driven-development` | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
+| `brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
+| `writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
+| `executing-plans` | Executing a written plan in a separate session | — |
+| `subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
+| `dispatching-parallel-agents` | 2+ independent tasks, no shared state | Prefer `Explore` subagent for >3-query codebase searches |
+| `systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
+| `verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
+| `requesting-code-review` | Before merging significant work | — |
+| `receiving-code-review` | When handling review feedback | — |
+| `finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
+| `using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
+| `writing-skills` | Creating or editing a skill | Edit canonical copy under `.agents/skills/<name>/SKILL.md` |
+| `test-driven-development` | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
 
 ## Project-Specific Skill Triggers
 
@@ -153,7 +153,16 @@ Skill descriptions are loaded automatically; below are *project* triggers, not g
 
 ## MCP Servers
 
-- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. Prefer `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file` over `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
+- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context.
+
+  **MANDATORY for all code files (`.ts` / `.tsx`):**
+  - **Discovery:** Use `get_symbols_overview` → `find_symbol`. `Read` and `Grep` are FORBIDDEN for exploration.
+  - **Reading:** Use `find_symbol` with `include_body=True`. Only use `Read` if you already have the file overview and need a few specific lines.
+  - **Editing:** Use `replace_symbol_body` for whole symbols, `insert_before_symbol` / `insert_after_symbol` for adding code, `replace_content` for small line changes within a symbol. `Edit` is FORBIDDEN on code files.
+  - **Refactoring:** Use `find_referencing_symbols` before any rename; use `rename_symbol` for renames; use `safe_delete_symbol` for deletions.
+  - **Non-code files only** (`.md`, `.json`, `.yaml`, `.css`, `.html`): built-in `Read` / `Edit` / `Write` are allowed.
+
+  If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
 
 ## Skills Installation
 
