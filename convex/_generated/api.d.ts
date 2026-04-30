@@ -243,6 +243,7 @@ import type * as documents_paperRecord from "../documents/paperRecord.js";
 import type * as documents_refreshRemote from "../documents/refreshRemote.js";
 import type * as e2e_cleanupFolders from "../e2e/cleanupFolders.js";
 import type * as e2e_cleanupNotebooks from "../e2e/cleanupNotebooks.js";
+import type * as e2e_seedFlashcards from "../e2e/seedFlashcards.js";
 import type * as eval__gate from "../eval/_gate.js";
 import type * as eval__studioRowCreators from "../eval/_studioRowCreators.js";
 import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
@@ -552,6 +553,7 @@ declare const fullApi: ApiFromModules<{
   "documents/refreshRemote": typeof documents_refreshRemote;
   "e2e/cleanupFolders": typeof e2e_cleanupFolders;
   "e2e/cleanupNotebooks": typeof e2e_cleanupNotebooks;
+  "e2e/seedFlashcards": typeof e2e_seedFlashcards;
   "eval/_gate": typeof eval__gate;
   "eval/_studioRowCreators": typeof eval__studioRowCreators;
   "eval/chatEvalAction": typeof eval_chatEvalAction;

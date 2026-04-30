@@ -137,7 +137,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="flex w-full max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
-      <div className="pointer-events-auto relative flex w-full flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg">
+      <div
+        data-onboarding="chat-input"
+        className="pointer-events-auto relative flex w-full flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
+      >
       <textarea
         ref={textareaRef}
         placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}

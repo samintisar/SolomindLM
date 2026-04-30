@@ -6,7 +6,11 @@ export interface SM2State {
   interval: number;
   easeFactor: number;
   nextReviewDate: number;
+  phase: SrsPhase;
+  learningStep?: number;
 }
+
+export type SrsPhase = "learning" | "review" | "relearning";
 
 export interface CardProficiency {
   nextReviewDate?: number;
@@ -17,48 +21,160 @@ export interface CardProficiency {
   correctCount: number;
   incorrectCount: number;
   lastReviewedAt?: number;
+  phase?: SrsPhase;
+  learningStep?: number;
+}
+
+const MINUTE = 60 * 1000;
+const ONE_DAY = 24 * 60 * MINUTE;
+const LEARNING_STEPS_MS = [1 * MINUTE, 10 * MINUTE] as const;
+const RELEARNING_STEPS_MS = [10 * MINUTE] as const;
+const GRADUATING_INTERVAL_DAYS = 1;
+const EASY_INTERVAL_DAYS = 4;
+const MIN_EASE_FACTOR = 1.3;
+const HARD_INTERVAL_MULTIPLIER = 1.2;
+const EASY_BONUS = 1.3;
+
+function clampEase(easeFactor: number): number {
+  return Math.max(MIN_EASE_FACTOR, Math.round(easeFactor * 100) / 100);
+}
+
+function addDays(now: number, days: number): number {
+  return now + days * ONE_DAY;
+}
+
+function inferPhase(currentState: {
+  interval: number;
+  phase?: SrsPhase;
+  totalReviews?: number;
+}): SrsPhase {
+  if (currentState.phase) return currentState.phase;
+  if (currentState.interval > 0 && (currentState.totalReviews ?? 1) > 0) return "review";
+  return "learning";
 }
 
 /**
- * Calculate next review date using SuperMemo 2 (SM-2) algorithm
+ * Calculate next review date using Anki-style learning steps plus legacy SM-2 review growth.
  */
 export function calculateNextReview(
-  currentState: { interval: number; easeFactor: number },
+  currentState: {
+    interval: number;
+    easeFactor: number;
+    phase?: SrsPhase;
+    learningStep?: number;
+    totalReviews?: number;
+  },
   rating: "again" | "hard" | "good" | "easy"
 ): SM2State {
   const now = Date.now();
-  const ONE_DAY = 24 * 60 * 60 * 1000;
-  const TEN_MINUTES = 10 * 60 * 1000;
+  const phase = inferPhase(currentState);
+  const learningStep = currentState.learningStep ?? 0;
+  const isLearning = phase === "learning" || phase === "relearning";
+  const steps = phase === "relearning" ? RELEARNING_STEPS_MS : LEARNING_STEPS_MS;
+  const firstStepDelay = steps[0];
+  const secondStepDelay = steps[1] ?? firstStepDelay;
+  const currentStepDelay = steps[learningStep] ?? firstStepDelay;
 
-  let { interval, easeFactor } = currentState;
+  if (isLearning) {
+    if (rating === "again") {
+      return {
+        interval: 0,
+        easeFactor: currentState.easeFactor,
+        nextReviewDate: now + firstStepDelay,
+        phase,
+        learningStep: 0,
+      };
+    }
 
-  const quality = { again: 0, hard: 3, good: 4, easy: 5 }[rating];
+    if (rating === "hard") {
+      const delay =
+        learningStep === 0 && steps.length > 1
+          ? Math.ceil((firstStepDelay + secondStepDelay) / 2 / MINUTE) * MINUTE
+          : Math.min(Math.round(currentStepDelay * 1.5), currentStepDelay + ONE_DAY);
 
-  easeFactor = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-  easeFactor = Math.max(1.3, easeFactor);
+      return {
+        interval: 0,
+        easeFactor: clampEase(currentState.easeFactor - 0.15),
+        nextReviewDate: now + delay,
+        phase,
+        learningStep,
+      };
+    }
 
-  if (quality < 3) {
-    interval = 1;
-  } else if (interval === 0) {
-    interval = 1;
-  } else if (interval === 1) {
-    interval = 6;
-  } else {
-    interval = Math.round(interval * easeFactor);
+    if (rating === "good" && learningStep < steps.length - 1) {
+      const nextStep = learningStep + 1;
+      return {
+        interval: 0,
+        easeFactor: currentState.easeFactor,
+        nextReviewDate: now + (steps[nextStep] ?? firstStepDelay),
+        phase,
+        learningStep: nextStep,
+      };
+    }
+
+    if (rating === "easy") {
+      return {
+        interval: EASY_INTERVAL_DAYS,
+        easeFactor: clampEase(currentState.easeFactor + 0.15),
+        nextReviewDate: addDays(now, EASY_INTERVAL_DAYS),
+        phase: "review",
+      };
+    }
+
+    return {
+      interval: GRADUATING_INTERVAL_DAYS,
+      easeFactor: currentState.easeFactor,
+      nextReviewDate: addDays(now, GRADUATING_INTERVAL_DAYS),
+      phase: "review",
+    };
   }
 
-  let nextReviewDate: number;
+  const currentInterval = Math.max(1, currentState.interval);
+
   if (rating === "again") {
-    nextReviewDate = now + TEN_MINUTES;
-  } else if (rating === "hard") {
-    nextReviewDate = now + Math.round(interval * 1.2 * ONE_DAY);
-  } else if (rating === "good") {
-    nextReviewDate = now + interval * ONE_DAY;
-  } else {
-    nextReviewDate = now + Math.round(interval * 1.3 * ONE_DAY);
+    return {
+      interval: 0,
+      easeFactor: clampEase(currentState.easeFactor - 0.2),
+      nextReviewDate: now + RELEARNING_STEPS_MS[0],
+      phase: "relearning",
+      learningStep: 0,
+    };
   }
 
-  return { interval, easeFactor, nextReviewDate };
+  const hardInterval = Math.max(
+    currentInterval + 1,
+    Math.round(currentInterval * HARD_INTERVAL_MULTIPLIER)
+  );
+  const goodInterval = Math.max(
+    hardInterval + 1,
+    Math.round(currentInterval * currentState.easeFactor)
+  );
+  const easyInterval = Math.max(goodInterval + 1, Math.round(goodInterval * EASY_BONUS));
+
+  if (rating === "hard") {
+    return {
+      interval: hardInterval,
+      easeFactor: clampEase(currentState.easeFactor - 0.15),
+      nextReviewDate: addDays(now, hardInterval),
+      phase: "review",
+    };
+  }
+
+  if (rating === "easy") {
+    return {
+      interval: easyInterval,
+      easeFactor: clampEase(currentState.easeFactor + 0.15),
+      nextReviewDate: addDays(now, easyInterval),
+      phase: "review",
+    };
+  }
+
+  return {
+    interval: goodInterval,
+    easeFactor: currentState.easeFactor,
+    nextReviewDate: addDays(now, goodInterval),
+    phase: "review",
+  };
 }
 
 export function initializeProficiency(): CardProficiency {
@@ -69,5 +185,7 @@ export function initializeProficiency(): CardProficiency {
     totalReviews: 0,
     correctCount: 0,
     incorrectCount: 0,
+    phase: "learning",
+    learningStep: 0,
   };
 }

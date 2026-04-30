@@ -8,14 +8,23 @@ const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
+export type DueFlashcard = {
+  index: number;
+  card: Flashcard;
+};
+
 interface StudyModeProps {
-  cards: Flashcard[];
+  cards: DueFlashcard[];
   onComplete: (stats: {
     reviewed: number;
     correct: number;
     incorrect: number;
     longestStreak: number;
   }) => void;
+  onRateCard: (
+    cardIndex: number,
+    rating: "again" | "hard" | "good" | "easy"
+  ) => Promise<void>;
   onExit: () => void;
 }
 
@@ -79,7 +88,7 @@ const answerMarkdownComponents = {
 /**
  * Study mode for spaced repetition — layout aligned with FlashcardView browse styling.
  */
-export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
+export function StudyMode({ cards, onComplete, onRateCard, onExit }: StudyModeProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [reviewedCards, setReviewedCards] = useState<number[]>([]);
@@ -87,8 +96,10 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
-  const currentCard = cards[currentIndex];
+  const currentCardEntry = cards[currentIndex];
+  const currentCard = currentCardEntry?.card;
   const remainingCards = cards.length - reviewedCards.length;
   const isComplete = reviewedCards.length === cards.length;
 
@@ -96,34 +107,46 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
   const deckPositionPercent = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
 
   const handleRating = async (rating: "again" | "hard" | "good" | "easy") => {
-    const isNewCorrect = rating !== "again";
-    const isNewIncorrect = rating === "again";
+    if (!currentCardEntry || isSubmittingRating) return;
 
-    if (isNewCorrect) {
-      const newStreak = currentStreak + 1;
-      setCurrentStreak(newStreak);
-      setLongestStreak((prev) => Math.max(prev, newStreak));
-      setCorrectCount((prev) => prev + 1);
-    } else {
-      setCurrentStreak(0);
-      setIncorrectCount((prev) => prev + 1);
-    }
+    setIsSubmittingRating(true);
+    try {
+      await onRateCard(currentCardEntry.index, rating);
 
-    setReviewedCards((prev) => [...prev, currentIndex]);
+      const isNewCorrect = rating !== "again";
+      const isNewIncorrect = rating === "again";
+      const nextReviewedCards = [...reviewedCards, currentIndex];
 
-    if (reviewedCards.length + 1 >= cards.length) {
-      onComplete({
-        reviewed: reviewedCards.length + 1,
-        correct: correctCount + (isNewCorrect ? 1 : 0),
-        incorrect: incorrectCount + (isNewIncorrect ? 1 : 0),
-        longestStreak: isNewCorrect ? Math.max(longestStreak, currentStreak + 1) : longestStreak,
-      });
-    } else {
-      const nextIndex = cards.findIndex((_, i) => !reviewedCards.includes(i) && i > currentIndex);
-      const nextUnreviewed =
-        nextIndex !== -1 ? nextIndex : cards.findIndex((_, i) => !reviewedCards.includes(i));
-      setCurrentIndex(nextUnreviewed);
-      setShowAnswer(false);
+      if (isNewCorrect) {
+        const newStreak = currentStreak + 1;
+        setCurrentStreak(newStreak);
+        setLongestStreak((prev) => Math.max(prev, newStreak));
+        setCorrectCount((prev) => prev + 1);
+      } else {
+        setCurrentStreak(0);
+        setIncorrectCount((prev) => prev + 1);
+      }
+
+      setReviewedCards(nextReviewedCards);
+
+      if (nextReviewedCards.length >= cards.length) {
+        onComplete({
+          reviewed: nextReviewedCards.length,
+          correct: correctCount + (isNewCorrect ? 1 : 0),
+          incorrect: incorrectCount + (isNewIncorrect ? 1 : 0),
+          longestStreak: isNewCorrect ? Math.max(longestStreak, currentStreak + 1) : longestStreak,
+        });
+      } else {
+        const nextIndex = cards.findIndex(
+          (_, i) => !nextReviewedCards.includes(i) && i > currentIndex
+        );
+        const nextUnreviewed =
+          nextIndex !== -1 ? nextIndex : cards.findIndex((_, i) => !nextReviewedCards.includes(i));
+        setCurrentIndex(nextUnreviewed);
+        setShowAnswer(false);
+      }
+    } finally {
+      setIsSubmittingRating(false);
     }
   };
 
@@ -358,7 +381,7 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
           <button
             type="button"
             onClick={handlePrevious}
-            disabled={currentIndex === 0}
+            disabled={currentIndex === 0 || isSubmittingRating}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
             aria-label="Previous card"
           >
@@ -380,7 +403,7 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
           <button
             type="button"
             onClick={handleNext}
-            disabled={currentIndex === cards.length - 1}
+            disabled={currentIndex === cards.length - 1 || isSubmittingRating}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-all hover:border-foreground/20 hover:text-foreground active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35 touch-manipulation"
             aria-label="Next card"
           >
@@ -417,7 +440,8 @@ export function StudyMode({ cards, onComplete, onExit }: StudyModeProps) {
                 <button
                   key={rating}
                   type="button"
-                  onClick={() => handleRating(rating)}
+                  onClick={() => void handleRating(rating)}
+                  disabled={isSubmittingRating}
                   className={`${RATING_BUTTON_BASE} ${stripeClass}`}
                 >
                   <div className="font-semibold tracking-tight">{label}</div>

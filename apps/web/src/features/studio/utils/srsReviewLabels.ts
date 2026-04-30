@@ -48,7 +48,13 @@ export function srsSubtextForRating(
 ): string {
   const base = proficiency ?? initializeProficiency();
   const { nextReviewDate } = calculateNextReview(
-    { interval: base.interval, easeFactor: base.easeFactor },
+    {
+      interval: base.interval,
+      easeFactor: base.easeFactor,
+      phase: base.phase,
+      learningStep: base.learningStep,
+      totalReviews: base.totalReviews,
+    },
     rating
   );
   return formatIntervalUntilNextReview(nextReviewDate - Date.now());
