@@ -157,10 +157,4 @@ export const env = {
 
   // Convex deployment info
   CONVEX_CLOUD_URL: process.env.CONVEX_CLOUD_URL || "",
-
-  // Tavily (web search) — DEPRECATED, will be removed when old services are deleted
-  TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",
-
-  // OpenAlex (academic papers) — DEPRECATED, will be removed when old services are deleted
-  OPENALEX_BASE_URL: process.env.OPENALEX_BASE_URL || "https://api.openalex.org",
 };
