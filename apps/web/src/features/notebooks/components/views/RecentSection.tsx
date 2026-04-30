@@ -77,6 +77,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
             </div>
           )}
           <div
+            data-onboarding="create-notebook-button"
             onClick={onCreateNotebook}
             className="group aspect-16/10 rounded-2xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300"
           >

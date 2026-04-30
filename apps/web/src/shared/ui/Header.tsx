@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { User as UserIcon, Share2 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { useAuth } from "../../features/auth/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { DropdownMenu } from "./DropdownMenu";
@@ -33,6 +35,18 @@ export const Header: React.FC<HeaderProps> = ({
   const authLocation = useLocation();
   const { user, isAuthenticated, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  const onboardingState = useQuery(api.onboarding.state.getOnboardingState, {});
+  const restartTour = useMutation(api.onboarding.mutations.restartTour);
+  const showChecklistMutation = useMutation(
+    api.onboarding.mutations.showChecklist,
+  );
+
+  const showChecklistDismissed =
+    !!onboardingState &&
+    "_id" in onboardingState &&
+    onboardingState.checklistDismissed === true &&
+    onboardingState.tourStatus !== "completed";
 
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(title);
@@ -211,6 +225,9 @@ export const Header: React.FC<HeaderProps> = ({
             onLogout={signOut}
             theme={theme}
             toggleTheme={toggleTheme}
+            onRestartTour={() => void restartTour({})}
+            onShowChecklist={() => void showChecklistMutation({})}
+            showChecklistDismissed={showChecklistDismissed}
           />
         </DropdownMenu>
       </div>

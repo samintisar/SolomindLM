@@ -39,6 +39,9 @@ import { useNotebookCRUD } from "./features/notebooks/hooks/useNotebookCRUD";
 import { useFolderCRUD } from "./features/notebooks/hooks/useFolderCRUD";
 import { useChatStream } from "./features/chat/hooks/useChatStream";
 import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
+import { OnboardingProvider } from "./features/onboarding/OnboardingProvider";
+import { TourTooltip } from "./features/onboarding/components/TourTooltip";
+import { ChecklistCard } from "./features/onboarding/components/ChecklistCard";
 import "mind-elixir/style.css";
 
 const AppContent: React.FC = () => {
@@ -323,7 +326,7 @@ const AppContent: React.FC = () => {
   );
 
   return (
-    <>
+    <OnboardingProvider key={user?.id ?? "anon"} isAuthenticated={isAuthenticated}>
       {shareModalOpen && urlNotebookId && activeNotebook && !activeNotebook.isSharedNotebook && (
         <ShareNotebookModal notebookId={urlNotebookId} onClose={() => setShareModalOpen(false)} />
       )}
@@ -419,7 +422,10 @@ const AppContent: React.FC = () => {
           </Routes>
         </NotebookProvider>
       </div>
-    </>
+
+      {!isNativeShell() && <TourTooltip />}
+      <ChecklistCard />
+    </OnboardingProvider>
   );
 };
 

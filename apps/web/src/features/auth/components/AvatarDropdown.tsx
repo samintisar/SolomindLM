@@ -1,5 +1,5 @@
 import React from "react";
-import { LogIn, LogOut, Sun, Moon } from "lucide-react";
+import { LogIn, LogOut, Sun, Moon, RotateCcw, ListChecks } from "lucide-react";
 import type { User } from "../AuthContext";
 
 interface AvatarDropdownProps {
@@ -9,6 +9,9 @@ interface AvatarDropdownProps {
   onLogout: () => void;
   theme: "light" | "dark";
   toggleTheme: () => void;
+  onRestartTour?: () => void;
+  onShowChecklist?: () => void;
+  showChecklistDismissed?: boolean;
 }
 
 export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
@@ -18,6 +21,9 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   onLogout,
   theme,
   toggleTheme,
+  onRestartTour,
+  onShowChecklist,
+  showChecklistDismissed,
 }) => {
   const handleLogout = async () => {
     await onLogout();
@@ -51,6 +57,27 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
           )}
           <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
         </button>
+
+        {isAuthenticated && onRestartTour && (
+          <button
+            onClick={onRestartTour}
+            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+            role="menuitem"
+          >
+            <RotateCcw className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>Restart tour</span>
+          </button>
+        )}
+        {isAuthenticated && showChecklistDismissed && onShowChecklist && (
+          <button
+            onClick={onShowChecklist}
+            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+            role="menuitem"
+          >
+            <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>Show getting-started checklist</span>
+          </button>
+        )}
 
         {/* Login/Logout */}
         <button

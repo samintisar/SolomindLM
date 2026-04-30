@@ -39,7 +39,15 @@ bun run convex:env:push:dry    # Dry run
 
 **RAG eval (`bun run eval:rag`):** One-shot bootstrap: `bun run eval:rag:bootstrap-env` (reads `VITE_CONVEX_URL` from `apps/web/.env.local`, appends secrets to repo-root `.env`, runs `npx convex env set …` against dev). Template: [`evals/rag/env.eval.example`](evals/rag/env.eval.example). Push script does NOT upload `RAG_EVAL_CONVEX_URL` (CLI-only). Prefer `--case` / `--runner` for scoped runs; `eval:studio` is for cross-cutting work.
 
-## Architecture
+**Onboarding backfill (one-time after first deploy of onboarding feature):**
+
+```bash
+bun x convex run --prod onboarding/backfill:backfillLegacyOnboarding
+```
+
+Marks all pre-existing users as `tourStatus: "completed"` so they don't see the new-user tour. Idempotent — second run is a no-op.
+
+## Project Architecture
 
 Bun workspaces monorepo:
 

@@ -143,6 +143,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       >
       <textarea
         ref={textareaRef}
+        data-onboarding="chat-input"
         placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
         className="w-full bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-lg"
         rows={1}
