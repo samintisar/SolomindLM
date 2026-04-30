@@ -39,6 +39,13 @@ export interface StudioParams {
   slideCount?: number;
 }
 
+export interface SourcePolicyConfig {
+  channels: string[];
+  maxResultsPerChannel?: number;
+  domainAllowlist?: string[];
+  recencyDays?: number;
+}
+
 /**
  * Optional structural expectations used by studio metric scorers.
  * `requiredSections`: heading text that must appear in a markdown report.
@@ -90,6 +97,8 @@ export interface EvalFixture {
   studioParams?: StudioParams;
   /** Studio-only: structural expectations used by studio metric scorers */
   expectedStructure?: ExpectedStructure;
+  /** Source filter configuration for testing retrieval across different channels */
+  sourcePolicy?: SourcePolicyConfig;
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -157,6 +166,14 @@ export interface EvalRunArtifact {
   }>;
   /** Studio-only: structured output payload */
   studioOutput?: StudioOutput;
+  /** Source policy used for this run */
+  sourcePolicy?: SourcePolicyConfig;
+  /** Per-source-type evidence found (research runner only) */
+  sourceEvidence?: Array<{
+    channel: string;
+    sourceCount: number;
+    topDomains?: string[];
+  }>;
   /** Latency in ms */
   latencyMs: number;
   /** Token usage if available */
