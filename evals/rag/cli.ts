@@ -10,14 +10,15 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname, join } from "path";
-import { getFixture, listFixtureIds } from "./fixtures";
+import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import type { SourcePolicyConfig } from "./types";
 import { runEval, createConvexChatInvoker, createConvexStudioInvokers } from "./runners";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { StudioRunnerKind, RunnerKind } from "./types";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { generateReport, formatReport } from "./reports";
-import type { EvalBaseline, EvalRunArtifact, MetricResult } from "./types";
+import type { EvalBaseline, EvalRunArtifact, MetricResult, EvalFixture } from "./types";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -35,6 +36,8 @@ interface CliOptions {
   exportArtifacts: boolean;
   /** Directory for exported artifacts (default: evals/rag/generated) */
   artifactsDir: string;
+  /** Comma-separated source channel combinations (e.g. "notebook,web+academic") */
+  sourceMatrix?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
@@ -105,6 +108,9 @@ function parseArgs(args: string[]): CliOptions {
       case "--artifacts-dir":
         opts.artifactsDir = args[++i];
         break;
+      case "--source-matrix":
+        opts.sourceMatrix = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -131,6 +137,7 @@ Options:
   --output, -o <path>      Write JSON report to file
   --export-artifacts       Export Ragas-compatible artifacts alongside report
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
+  --source-matrix <combos>  Test fixture against multiple channel combinations (e.g. "notebook,web+academic")
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -258,8 +265,22 @@ async function main(): Promise<void> {
   // a stub artifact with score 0.
   let runtimeErrorCount = 0;
 
+  // Expand fixtures for source matrix testing
+  let expandedFixtures: EvalFixture[] = [];
   for (const id of fixtureIds) {
     const fixture = getFixture(id);
+    if (opts.sourceMatrix) {
+      const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
+      const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
+        channels: combo.split("+"),
+      }));
+      expandedFixtures.push(...withSourceMatrix(fixture, matrix));
+    } else {
+      expandedFixtures.push(fixture);
+    }
+  }
+
+  for (const fixture of expandedFixtures) {
     fixtureMeta.set(fixture.id, {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
@@ -317,6 +338,7 @@ async function main(): Promise<void> {
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
+    groupBySourcePolicy: !!opts.sourceMatrix,
   });
 
   console.log(formatReport(report));
