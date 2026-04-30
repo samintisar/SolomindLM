@@ -41,6 +41,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_createdAt", ["userId", "createdAt"])
     .index("by_folder", ["folderId"])
     .searchIndex("search_title", {
       searchField: "title",
@@ -67,6 +68,12 @@ export default defineSchema({
     checklistDismissed: v.boolean(),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
+
+  userPreferences: defineTable({
+    userId: v.id("users"),
+    outputLanguage: v.optional(v.string()),
+    updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
   // Share links: opaque token (stored as hash) for collaborate or fork-only access
