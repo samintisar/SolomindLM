@@ -147,7 +147,7 @@ async function searchArxiv(
     openAccessOnly?: boolean;
   }
 ): Promise<AcademicPaper[]> {
-  const logger = createServiceLogger("academic", "searchArxiv");
+  const logger = createServiceLogger("academic_search", "searchArxiv");
   const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${maxResults}&sortBy=relevance&sortOrder=descending`;
 
   return invokeWithHttpRetry(
@@ -258,7 +258,7 @@ async function searchSemanticScholar(
     openAccessOnly?: boolean;
   }
 ): Promise<AcademicPaper[]> {
-  const logger = createServiceLogger("academic", "searchSemanticScholar");
+  const logger = createServiceLogger("academic_search", "searchSemanticScholar");
   const fields = "title,authors,year,abstract,openAccessPdf,citationCount,externalIds,url";
   const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&fields=${fields}&limit=${maxResults}`;
 
@@ -359,7 +359,7 @@ async function searchPubMed(
     openAccessOnly?: boolean;
   }
 ): Promise<AcademicPaper[]> {
-  const logger = createServiceLogger("academic", "searchPubMed");
+  const logger = createServiceLogger("academic_search", "searchPubMed");
   const email = env.PUBMED_EMAIL || "support@solomindlm.com";
 
   // Step 1: esearch to get PMC IDs
