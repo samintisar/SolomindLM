@@ -266,7 +266,7 @@ async function main(): Promise<void> {
   let runtimeErrorCount = 0;
 
   // Expand fixtures for source matrix testing
-  let expandedFixtures: EvalFixture[] = [];
+  const expandedFixtures: EvalFixture[] = [];
   for (const id of fixtureIds) {
     const fixture = getFixture(id);
     if (opts.sourceMatrix) {

@@ -214,7 +214,6 @@ export const runChatEval = action({
     const notebookIdStr = args.notebookId as string;
 
     const sourcePolicyChannels = args.sourcePolicy?.channels ?? ["notebook"];
-    const isNotebookOnly = sourcePolicyChannels.length === 1 && sourcePolicyChannels[0] === "notebook";
 
     for await (const chunk of agent.streamResponse(
       {

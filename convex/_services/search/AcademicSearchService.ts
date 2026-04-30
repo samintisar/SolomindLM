@@ -49,13 +49,13 @@ export interface DiscoveredSource {
 // XML Parsing Helpers (lightweight regex-based)
 // ============================================================
 
-function extractTag(xml: string, tag: string): string | undefined {
+export function extractTag(xml: string, tag: string): string | undefined {
   const regex = new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, "i");
   const match = xml.match(regex);
   return match?.[1]?.trim();
 }
 
-function extractAllTags(xml: string, tag: string): string[] {
+export function extractAllTags(xml: string, tag: string): string[] {
   const regex = new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, "gi");
   const matches: string[] = [];
   let match;
@@ -65,17 +65,17 @@ function extractAllTags(xml: string, tag: string): string[] {
   return matches;
 }
 
-function stripXmlTags(text: string): string {
+export function stripXmlTags(text: string): string {
   return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function extractAttribute(xmlFragment: string, attr: string): string | undefined {
+export function extractAttribute(xmlFragment: string, attr: string): string | undefined {
   const regex = new RegExp(`${attr}=["']([^"']+)["']`, "i");
   const match = xmlFragment.match(regex);
   return match?.[1];
 }
 
-function extractXmlBlocks(xml: string, tag: string): string[] {
+export function extractXmlBlocks(xml: string, tag: string): string[] {
   const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi");
   const blocks: string[] = [];
   let match;
@@ -93,18 +93,18 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 }
 
-function calculateScore(paper: Omit<AcademicPaper, "score">): number {
+export function calculateScore(paper: Omit<AcademicPaper, "score">): number {
   const citationScore = Math.min(paper.citationCount ?? 0, 1000) / 1000;
   const currentYear = new Date().getFullYear();
   const recencyScore = paper.year ? Math.min(paper.year, currentYear) / currentYear : 0.5;
   return citationScore * 0.7 + recencyScore * 0.3;
 }
 
-function extractDomain(url: string): string | undefined {
+export function extractDomain(url: string): string | undefined {
   try {
     return new URL(url).hostname;
   } catch {
@@ -112,11 +112,11 @@ function extractDomain(url: string): string | undefined {
   }
 }
 
-function yearToDateString(year: number | undefined): string | undefined {
+export function yearToDateString(year: number | undefined): string | undefined {
   return year ? `${year}-01-01` : undefined;
 }
 
-function toDiscoveredSource(paper: AcademicPaper): DiscoveredSource {
+export function toDiscoveredSource(paper: AcademicPaper): DiscoveredSource {
   return {
     title: paper.title,
     url: paper.url,
