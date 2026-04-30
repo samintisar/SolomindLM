@@ -222,7 +222,9 @@ import type * as _services_processing_DocumentMetadataExtractor from "../_servic
 import type * as _services_processing_EmbeddingServiceClient from "../_services/processing/EmbeddingServiceClient.js";
 import type * as _services_processing_StructuralChunker from "../_services/processing/StructuralChunker.js";
 import type * as _services_processing_TextSplitterService from "../_services/processing/TextSplitterService.js";
+import type * as _services_search_AcademicSearchService from "../_services/search/AcademicSearchService.js";
 import type * as _services_search_DiscoveryService from "../_services/search/DiscoveryService.js";
+import type * as _services_search_FirecrawlSearchService from "../_services/search/FirecrawlSearchService.js";
 import type * as _services_search_OpenAlexSearchService from "../_services/search/OpenAlexSearchService.js";
 import type * as _services_search_TavilySearchService from "../_services/search/TavilySearchService.js";
 import type * as _shared_mathMarkdown from "../_shared/mathMarkdown.js";
@@ -538,7 +540,9 @@ declare const fullApi: ApiFromModules<{
   "_services/processing/EmbeddingServiceClient": typeof _services_processing_EmbeddingServiceClient;
   "_services/processing/StructuralChunker": typeof _services_processing_StructuralChunker;
   "_services/processing/TextSplitterService": typeof _services_processing_TextSplitterService;
+  "_services/search/AcademicSearchService": typeof _services_search_AcademicSearchService;
   "_services/search/DiscoveryService": typeof _services_search_DiscoveryService;
+  "_services/search/FirecrawlSearchService": typeof _services_search_FirecrawlSearchService;
   "_services/search/OpenAlexSearchService": typeof _services_search_OpenAlexSearchService;
   "_services/search/TavilySearchService": typeof _services_search_TavilySearchService;
   "_shared/mathMarkdown": typeof _shared_mathMarkdown;
