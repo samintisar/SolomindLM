@@ -61,8 +61,8 @@ export interface DiscoveryRequest {
 
 /**
  * Normalize scores from different APIs to a common scale
- * Tavily scores: 0-1 (mostly 0.6-1.0)
- * OpenAlex scores: 0-1 (calculated from citations + recency)
+ * Firecrawl scores: 0-1 (mostly 0.6-1.0)
+ * Academic API scores: 0-1 (calculated from citations + recency)
  */
 function normalizeScore(score: number, _sourceType: string): number {
   // Scores are already normalized to 0-1 range from both APIs
@@ -185,7 +185,7 @@ function distributeResults(
 
 /**
  * Unified discovery service that searches across multiple source types
- * Routes to Tavily for web/news/finance and OpenAlex for academic papers
+ * Routes to Firecrawl for web/news/finance and Academic APIs for academic papers
  * Results are normalized, merged, and sorted according to preferences
  */
 export const discover = action({
@@ -230,12 +230,12 @@ export const discover = action({
     const searchFinance = sourceTypes.includes("finance");
     const searchAcademic = sourceTypes.includes("academic");
 
-    const tavilyTopics: Array<"web" | "news" | "finance"> = [];
-    if (searchWeb) tavilyTopics.push("web");
-    if (searchNews) tavilyTopics.push("news");
-    if (searchFinance) tavilyTopics.push("finance");
+    const webTopics: Array<"web" | "news" | "finance"> = [];
+    if (searchWeb) webTopics.push("web");
+    if (searchNews) webTopics.push("news");
+    if (searchFinance) webTopics.push("finance");
 
-    const numSearchChannels = tavilyTopics.length + (searchAcademic ? 1 : 0);
+    const numSearchChannels = webTopics.length + (searchAcademic ? 1 : 0);
     const maxPerChannel =
       numSearchChannels > 0 ? Math.ceil(maxResults / numSearchChannels) : maxResults;
 
@@ -255,7 +255,7 @@ export const discover = action({
     }>[] = [];
 
     // For each web topic, create a search promise with timing
-    for (const topic of tavilyTopics) {
+    for (const topic of webTopics) {
       const firecrawlTopic = topic === "web" ? "general" : topic;
       const topicStartTime = Date.now();
 
