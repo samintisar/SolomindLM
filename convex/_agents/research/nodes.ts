@@ -161,8 +161,8 @@ export async function retrieverNode(
             Math.ceil(maxResultsPerChannel / webQueries.length)
           );
           discoveredSources.push(...sources);
-        } catch (err) {
-          console.error(`[ResearchRetriever] Web discovery failed for "${searchQuery}":`, err);
+        } catch (_err) {
+          console.error(`[ResearchRetriever] Web discovery failed for "${searchQuery}":`, _err);
         }
       }
 
@@ -251,8 +251,8 @@ export async function retrieverNode(
             Math.ceil(maxResultsPerChannel / academicQueries.length)
           );
           discoveredPapers.push(...sources);
-        } catch (err) {
-          console.error(`[ResearchRetriever] Academic discovery failed for "${searchQuery}":`, err);
+        } catch (_err) {
+          console.error(`[ResearchRetriever] Academic discovery failed for "${searchQuery}":`, _err);
         }
       }
 
