@@ -54,6 +54,10 @@ export const Header: React.FC<HeaderProps> = ({
   const spanRef = useRef<HTMLSpanElement>(null);
   const [inputWidth, setInputWidth] = useState(0);
 
+  const logOnboardingError = (action: string, error: unknown) => {
+    console.error(`[onboarding] ${action}`, error);
+  };
+
   // Sync internal state if prop changes
   useEffect(() => {
     setInputValue(title);
@@ -100,13 +104,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleRestartTour = () => {
     void restartTour({}).catch((error) => {
-      console.error("[onboarding] failed to restart tour", error);
+      logOnboardingError("failed to restart tour", error);
     });
   };
 
   const handleShowChecklist = () => {
     void showChecklistMutation({}).catch((error) => {
-      console.error("[onboarding] failed to show checklist", error);
+      logOnboardingError("failed to show checklist", error);
     });
   };
 

@@ -278,4 +278,38 @@ describe("getTourProgress", () => {
     );
     expect(result.askQuestion).toBe(true);
   });
+
+  test("falls back to first notebook created since startedAt", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
+    await t.run(async (ctx) => {
+      await ctx.db.insert("notebooks", {
+        userId: userId as never,
+        title: "Before start",
+        createdAt: Date.now() - 300_000,
+        updatedAt: Date.now() - 300_000,
+      });
+      await ctx.db.insert("userOnboarding", {
+        userId,
+        tourStatus: "active",
+        currentStepId: "createNotebook",
+        checklistDismissed: false,
+        startedAt: Date.now() - 30_000,
+      });
+    });
+    const expectedNotebookId = await t.run(async (ctx) =>
+      ctx.db.insert("notebooks", {
+        userId: userId as never,
+        title: "After start",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+
+    const result = await withAuth(t, userId).query(
+      api.onboarding.progress.getTourProgress,
+      {},
+    );
+    expect(result.tourNotebookId).toBe(expectedNotebookId);
+  });
 });

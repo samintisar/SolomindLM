@@ -21,6 +21,10 @@ const ORDER = [
   "generateArtifact",
 ] as const;
 
+function logOnboardingError(action: string, error: unknown) {
+  console.error(`[onboarding] ${action}`, error);
+}
+
 export const ChecklistCard: React.FC = () => {
   const location = useLocation();
   const state = useQuery(api.onboarding.state.getOnboardingState, {});
@@ -58,7 +62,7 @@ export const ChecklistCard: React.FC = () => {
 
   const handleDismiss = () => {
     void dismiss({}).catch((error) => {
-      console.error("[onboarding] failed to dismiss checklist", error);
+      logOnboardingError("failed to dismiss checklist", error);
     });
   };
 

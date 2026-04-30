@@ -125,20 +125,38 @@ afterEach(() => {
 
 describe("OnboardingProvider", () => {
   test("calls startTour when state is pending", async () => {
-    mockState = { tourStatus: "pending" };
+    mockState = { tourStatus: "pending", _id: "row1" };
     renderWith();
     await flushEffects();
     expect(mockMutations.startTour).toHaveBeenCalledTimes(1);
   });
 
   test("retries startTour after a transient failure", async () => {
-    mockState = { tourStatus: "pending" };
+    mockState = { tourStatus: "pending", _id: "row1" };
     mockMutations.startTour
       .mockRejectedValueOnce(new Error("temporary"))
       .mockResolvedValueOnce(undefined);
     renderWith();
     await flushEffects();
     expect(mockMutations.startTour).toHaveBeenCalledTimes(2);
+  });
+
+  test("waits for onboarding row before calling startTour", async () => {
+    mockState = { tourStatus: "pending" };
+    const { rerender } = renderWith();
+    await flushEffects();
+    expect(mockMutations.startTour).not.toHaveBeenCalled();
+
+    mockState = { tourStatus: "pending", _id: "row1" };
+    rerender(
+      <MemoryRouter initialEntries={["/home"]}>
+        <OnboardingProvider isAuthenticated={true}>
+          <ProbeStep />
+        </OnboardingProvider>
+      </MemoryRouter>,
+    );
+    await flushEffects();
+    expect(mockMutations.startTour).toHaveBeenCalled();
   });
 
   test("does not call startTour when state is skipped", async () => {
@@ -226,6 +244,26 @@ describe("OnboardingProvider", () => {
       "[onboarding] failed to advance tour step",
       failure,
     );
+  });
+
+  test("retries advanceTourStep after a transient failure", async () => {
+    mockState = {
+      tourStatus: "active",
+      currentStepId: "createNotebook",
+      _id: "row1",
+    };
+    mockTour = {
+      ...mockTour,
+      createNotebook: true,
+      tourNotebookId: "nb1",
+    };
+    mockMutations.advanceTourStep
+      .mockRejectedValueOnce(new Error("temporary"))
+      .mockResolvedValueOnce(undefined);
+
+    renderWith();
+    await flushEffects();
+    expect(mockMutations.advanceTourStep).toHaveBeenCalledTimes(2);
   });
 
   test("retries completeTour after a transient failure", async () => {

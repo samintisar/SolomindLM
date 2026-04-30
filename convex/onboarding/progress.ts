@@ -84,16 +84,14 @@ async function resolveTourNotebookId(
 ): Promise<Id<"notebooks"> | undefined> {
   let tourNotebookId = row.tourNotebookId;
   if (!tourNotebookId && row.startedAt !== undefined) {
-    const notebooks = await ctx.db
+    const startedAt = row.startedAt;
+    const firstSinceStart = await ctx.db
       .query("notebooks")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    const candidate = notebooks
-      .filter((n) => n.createdAt >= row.startedAt!)
-      .sort((a, b) => a.createdAt - b.createdAt)[0];
-    if (candidate) {
-      tourNotebookId = candidate._id;
-    }
+      .withIndex("by_user_and_createdAt", (q) =>
+        q.eq("userId", userId).gte("createdAt", startedAt),
+      )
+      .first();
+    tourNotebookId = firstSinceStart?._id;
   }
   return tourNotebookId;
 }

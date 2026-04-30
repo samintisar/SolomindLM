@@ -31,6 +31,10 @@ function isStepMismatchError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("Step mismatch:");
 }
 
+function logOnboardingError(action: string, error: unknown) {
+  console.error(`[onboarding] ${action}`, error);
+}
+
 export const OnboardingProvider: React.FC<Props> = ({
   isAuthenticated,
   children,
@@ -64,7 +68,10 @@ export const OnboardingProvider: React.FC<Props> = ({
   const advancingRef = useRef(false);
   const pendingNavigationRef = useRef<string | null>(null);
   const completedAllRef = useRef(false);
-  const retryAttemptsRef = useRef(0);
+  const createRowRetryAttemptsRef = useRef(0);
+  const startTourRetryAttemptsRef = useRef(0);
+  const advanceTourRetryAttemptsRef = useRef(0);
+  const completeTourRetryAttemptsRef = useRef(0);
   const [retryNonce, setRetryNonce] = useState(0);
 
   const tourStatus: TourStatus =
@@ -75,12 +82,13 @@ export const OnboardingProvider: React.FC<Props> = ({
     onboardingState && "currentStepId" in onboardingState
       ? ((onboardingState.currentStepId as StepId | undefined) ?? null)
       : null;
+  const hasOnboardingRow = !!onboardingState && "_id" in onboardingState;
 
   // 1. Ensure a userOnboarding row exists (idempotent client-side via ref).
   useEffect(() => {
     if (!isAuthenticated || ensuredRowRef.current) return;
     if (onboardingState === undefined) return; // still loading
-    if (onboardingState && "_id" in onboardingState) {
+    if (hasOnboardingRow) {
       ensuredRowRef.current = true;
       return;
     }
@@ -88,36 +96,37 @@ export const OnboardingProvider: React.FC<Props> = ({
     void getOrCreateOnboardingRow({})
       .then(() => {
         ensuredRowRef.current = true;
-        retryAttemptsRef.current = 0;
+        createRowRetryAttemptsRef.current = 0;
       })
       .catch((error) => {
         ensuredRowRef.current = false;
-        console.error("[onboarding] failed to create onboarding row", error);
-        if (retryAttemptsRef.current < 3) {
-          retryAttemptsRef.current += 1;
+        logOnboardingError("failed to create onboarding row", error);
+        if (createRowRetryAttemptsRef.current < 3) {
+          createRowRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
         }
       });
-  }, [isAuthenticated, onboardingState, getOrCreateOnboardingRow, retryNonce]);
+  }, [isAuthenticated, onboardingState, getOrCreateOnboardingRow, hasOnboardingRow, retryNonce]);
 
   // 2. Auto-launch the tour for pending users.
   useEffect(() => {
     if (!isAuthenticated || startedRef.current) return;
+    if (!hasOnboardingRow) return;
     if (tourStatus !== "pending") return;
     startedRef.current = true;
     void startTour({})
       .then(() => {
-        retryAttemptsRef.current = 0;
+        startTourRetryAttemptsRef.current = 0;
       })
       .catch((error) => {
         startedRef.current = false;
-        console.error("[onboarding] failed to start tour", error);
-        if (retryAttemptsRef.current < 3) {
-          retryAttemptsRef.current += 1;
+        logOnboardingError("failed to start tour", error);
+        if (startTourRetryAttemptsRef.current < 3) {
+          startTourRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
         }
       });
-  }, [isAuthenticated, tourStatus, startTour, retryNonce]);
+  }, [isAuthenticated, hasOnboardingRow, tourStatus, startTour, retryNonce]);
 
   // 2b. Navigate to /home when step 1 is active so the create-notebook tooltip is visible.
   useEffect(() => {
@@ -145,6 +154,7 @@ export const OnboardingProvider: React.FC<Props> = ({
         : { expectedCurrentStepId: currentStepId };
     void advanceTourStep(args)
       .then(() => {
+        advanceTourRetryAttemptsRef.current = 0;
         if (currentStepId === "createNotebook" && tourProgress.tourNotebookId) {
           pendingNavigationRef.current = String(tourProgress.tourNotebookId);
         }
@@ -154,12 +164,16 @@ export const OnboardingProvider: React.FC<Props> = ({
           // stale step — server will re-sync via the next reactive query update
           return;
         }
-        console.error("[onboarding] failed to advance tour step", error);
+        logOnboardingError("failed to advance tour step", error);
+        if (advanceTourRetryAttemptsRef.current < 3) {
+          advanceTourRetryAttemptsRef.current += 1;
+          setRetryNonce((n) => n + 1);
+        }
       })
       .finally(() => {
         advancingRef.current = false;
       });
-  }, [tourStatus, currentStepId, tourProgress, advanceTourStep]);
+  }, [tourStatus, currentStepId, tourProgress, advanceTourStep, retryNonce]);
 
   // 4. Cross-route navigation only on the transition out of createNotebook.
   useEffect(() => {
@@ -184,13 +198,13 @@ export const OnboardingProvider: React.FC<Props> = ({
     completedAllRef.current = true;
     void completeTour({})
       .then(() => {
-        retryAttemptsRef.current = 0;
+        completeTourRetryAttemptsRef.current = 0;
       })
       .catch((error) => {
         completedAllRef.current = false;
-        console.error("[onboarding] failed to complete tour", error);
-        if (retryAttemptsRef.current < 3) {
-          retryAttemptsRef.current += 1;
+        logOnboardingError("failed to complete tour", error);
+        if (completeTourRetryAttemptsRef.current < 3) {
+          completeTourRetryAttemptsRef.current += 1;
           setRetryNonce((n) => n + 1);
         }
       });

@@ -103,6 +103,10 @@ function logSelectorInvariants(step: StepDefinition) {
   }
 }
 
+function logOnboardingError(action: string, error: unknown) {
+  console.error(`[onboarding] ${action}`, error);
+}
+
 export const TourTooltip: React.FC = () => {
   const { tourStatus, currentStepId, skip } = useOnboarding();
   const [rect, setRect] = useState<Rect | null>(null);
@@ -174,6 +178,12 @@ export const TourTooltip: React.FC = () => {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
+  const handleSkip = () => {
+    void skip().catch((error) => {
+      logOnboardingError("failed to skip tour", error);
+    });
+  };
+
   return createPortal(
     <>
       <svg
@@ -222,7 +232,7 @@ export const TourTooltip: React.FC = () => {
           </span>
           <button
             type="button"
-            onClick={() => void skip()}
+            onClick={handleSkip}
             className="underline hover:text-foreground transition-colors"
           >
             Skip tour
