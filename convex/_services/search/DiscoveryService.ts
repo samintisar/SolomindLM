@@ -8,7 +8,7 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 
 /**
  * Unified discovery result format
- * Normalizes results from different APIs (Tavily, OpenAlex)
+ * Normalizes results from different APIs (Firecrawl, Academic APIs)
  */
 export interface UnifiedDiscoveryResult {
   id: string;
@@ -81,12 +81,12 @@ function getRelevanceLabel(score: number): "high" | "medium" | "low" {
 /**
  * Transform Tavily result to unified format
  */
-function transformTavilyResult(
+function transformWebResult(
   result: any,
   sourceType: "web" | "news" | "finance"
 ): UnifiedDiscoveryResult {
   return {
-    id: `tavily-${sourceType}-${result.url}`,
+    id: `web-${sourceType}-${result.url}`,
     title: result.title,
     url: result.url,
     snippet: result.snippet,
@@ -103,9 +103,9 @@ function transformTavilyResult(
 /**
  * Transform OpenAlex result to unified format
  */
-function transformOpenAlexResult(result: any): UnifiedDiscoveryResult {
+function transformAcademicResult(result: any): UnifiedDiscoveryResult {
   return {
-    id: result.id,
+    id: `academic-${result.metadata?.sourceApi || "unknown"}-${result.url}`,
     title: result.title,
     url: result.url,
     snippet: result.snippet,
@@ -113,18 +113,15 @@ function transformOpenAlexResult(result: any): UnifiedDiscoveryResult {
     sourceType: "academic",
     publishedDate: result.publishedDate,
     metadata: {
-      authors: result.authors,
-      venue: result.venue,
-      citationCount: result.citationCount,
-      openAccess: result.openAccess,
-      hasFullText: result.hasFullText,
-      publicationYear: result.publicationYear,
-      type: result.type,
-      doi: result.doi,
-      openAlexId: result.openAlexWorkId,
-      pdfUrl: result.pdfUrl,
-      landingPageUrl: result.landingPageUrl,
-      license: result.license,
+      authors: result.metadata?.authors,
+      citationCount: result.metadata?.citationCount,
+      openAccess: !!result.metadata?.pdfUrl,
+      hasFullText: !!result.metadata?.pdfUrl,
+      publicationYear: result.publishedDate ? parseInt(result.publishedDate, 10) : undefined,
+      type: "article",
+      doi: result.metadata?.doi,
+      pdfUrl: result.metadata?.pdfUrl,
+      landingPageUrl: result.url,
     },
   };
 }
@@ -257,17 +254,17 @@ export const discover = action({
       duration: number;
     }>[] = [];
 
-    // For each Tavily topic, create a search promise with timing
+    // For each web topic, create a search promise with timing
     for (const topic of tavilyTopics) {
-      const tavilyTopic = topic === "web" ? "general" : topic;
+      const firecrawlTopic = topic === "web" ? "general" : topic;
       const topicStartTime = Date.now();
 
       const promise = (ctx.runAction as any)(
-        internal._services.search.TavilySearchService.discoverSourcesInternal,
+        internal._services.search.FirecrawlSearchService.discoverSourcesInternal,
         {
           query,
           maxResults: maxPerChannel,
-          topic: tavilyTopic,
+          topic: firecrawlTopic,
           timeRange: timeRange as any,
           searchDepth: "basic",
         }
@@ -280,7 +277,7 @@ export const discover = action({
           });
           return {
             sourceType: topic,
-            results: results.map((r: any) => transformTavilyResult(r, topic)),
+            results: results.map((r: any) => transformWebResult(r, topic)),
             duration,
           };
         })
@@ -305,7 +302,7 @@ export const discover = action({
       const academicStartTime = Date.now();
 
       const promise = (ctx.runAction as any)(
-        internal._services.search.OpenAlexSearchService.discoverAcademicPapersInternal,
+        internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
         {
           query,
           maxResults: maxPerChannel,
@@ -325,7 +322,7 @@ export const discover = action({
           });
           return {
             sourceType: "academic",
-            results: results.map((r: any) => transformOpenAlexResult(r)),
+            results: results.map((r: any) => transformAcademicResult(r)),
             duration,
           };
         })
@@ -409,7 +406,7 @@ export const discoverSources = action({
       throw new Error("Unauthenticated");
     }
     const result = await (ctx.runAction as any)(
-      internal._services.search.TavilySearchService.discoverSourcesInternal,
+      internal._services.search.FirecrawlSearchService.discoverSourcesInternal,
       {
         query: args.query,
         maxResults: args.maxResults ?? 10,
