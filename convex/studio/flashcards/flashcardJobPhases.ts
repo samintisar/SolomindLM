@@ -121,7 +121,7 @@ export async function runFlashcardGenerationPhase(
 ): Promise<void> {
   "use node";
 
-  const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic } = args;
+  const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic, smartLlm } = args;
 
   // Initialize structured logger
   const logger = createJobLogger({
@@ -219,6 +219,7 @@ export async function runFlashcardGenerationPhase(
         cardsPerChunk,
         difficulty,
         topic,
+        smartLlm,
       });
       console.log(`[FlashcardJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
     }
@@ -276,6 +277,7 @@ export async function runProcessFlashcardMapChunkPhase(
     cardsPerChunk,
     difficulty,
     topic,
+    smartLlm,
   } = args;
 
   const logger = createJobLogger({
@@ -398,6 +400,7 @@ export async function runProcessFlashcardMapChunkPhase(
         cardCount,
         difficulty,
         topic,
+        smartLlm,
       });
     }
   } catch (error) {
@@ -456,6 +459,7 @@ export async function runProcessFlashcardMapChunkPhase(
           cardCount,
           difficulty,
           topic,
+          smartLlm,
         });
       } else {
         await ctx.runMutation(internal.studio.jobMutations.flashcards.markFlashcardFailed, {

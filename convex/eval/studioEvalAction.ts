@@ -125,6 +125,9 @@ export const startReportEval = action({
   },
   handler: async (ctx, args): Promise<ReportEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
+    if (args.smartLlm !== undefined && args.smartLlm.trim() === "") {
+      throw new Error("smartLlm must be a non-empty model identifier when provided");
+    }
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
     const reportType = args.reportType ?? "summary";
@@ -195,6 +198,9 @@ export const startFlashcardsEval = action({
   },
   handler: async (ctx, args): Promise<FlashcardsEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
+    if (args.smartLlm !== undefined && args.smartLlm.trim() === "") {
+      throw new Error("smartLlm must be a non-empty model identifier when provided");
+    }
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(
       ctx,

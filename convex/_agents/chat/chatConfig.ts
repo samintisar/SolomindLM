@@ -26,11 +26,9 @@ export const FOLLOWUP_GENERATION_TIMEOUT_MS = 15000;
 export const RESPONSE_GENERATION_TIMEOUT_MS = 180000;
 
 /** Context selection configuration (token-based budgeting with relevance threshold) */
-export const MIN_RELEVANCE_THRESHOLD = parseFloat(
-  env.CHAT_MIN_RELEVANCE_THRESHOLD ?? "0.20"
-);
-export const CONTEXT_TOKEN_BUDGET = parseInt(env.CHAT_CONTEXT_TOKEN_BUDGET ?? "12000", 10);
-export const MAX_CHUNKS_HARD_LIMIT = parseInt(env.CHAT_MAX_CHUNKS_HARD_LIMIT ?? "50", 10);
+export const MIN_RELEVANCE_THRESHOLD = parseFloat(env.CHAT_MIN_RELEVANCE_THRESHOLD);
+export const CONTEXT_TOKEN_BUDGET = parseInt(env.CHAT_CONTEXT_TOKEN_BUDGET, 10);
+export const MAX_CHUNKS_HARD_LIMIT = parseInt(env.CHAT_MAX_CHUNKS_HARD_LIMIT, 10);
 
 /**
  * List queries retrieve a wide candidate pool upstream; context packing stays

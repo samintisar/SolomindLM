@@ -6,11 +6,11 @@ if (!convexUrl) {
   process.exit(1);
 }
 
-const client = new ConvexHttpClient(convexUrl);
+// Not yet implemented: querying reports requires auth that isn't wired here yet.
+// Until then, this script prints instructions for manual inspection.
+console.warn("fetch-reports: not yet implemented — printing dashboard instructions instead.\n");
 
-// We need to query reports - but list requires auth
-// Let's just output the report IDs that were generated
-// The user can view them in the Convex dashboard
+const _client = new ConvexHttpClient(convexUrl);
 
 console.log("Report eval completed. To view the actual report content:");
 console.log("1. Go to https://dashboard.convex.dev/");

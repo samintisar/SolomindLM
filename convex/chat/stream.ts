@@ -45,7 +45,7 @@ const _streaming = new PersistentTextStreaming(components.persistentTextStreamin
 /** Batched addChunk to stay under Convex mutation write throughput (e.g. 4 MiB/s on S16). */
 const CHAT_STREAM_FLUSH_MS = 85;
 const CHAT_STREAM_FLUSH_MIN_CHARS = 200;
-const CHAT_STREAM_MAX_CHUNK_CHARS = Math.min(65536, Math.max(1024, 65536));
+const CHAT_STREAM_MAX_CHUNK_CHARS = 65536;
 
 const CHAT_HISTORY_FETCH_LIMIT = 80;
 

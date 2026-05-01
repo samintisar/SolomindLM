@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for Claude Code working in this repository. Keep concise; this file is loaded into every session.
+Guidance for AI agents working in this repository. Keep concise; this file is loaded into every session.
 
 ## Quick Start
 

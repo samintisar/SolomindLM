@@ -115,9 +115,7 @@ export const SLIDE_COUNT_MAP = {
   default: { min: 8, max: 12 },
 } as const;
 
-/**
- * Graph configuration with environment-based settings.
- */
+/** Graph configuration. Defaults are defined in convex/_lib/env.ts. */
 const SLIDES_CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: parseInt(env.SLIDES_MAP_CHUNK_TOKENS, 10),
   REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.SLIDES_REDUCE_CHUNK_TOKENS, 10),

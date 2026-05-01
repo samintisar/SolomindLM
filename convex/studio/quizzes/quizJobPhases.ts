@@ -168,7 +168,7 @@ function createExpandLLM(): ChatTogetherAI {
     temperature: 0.3,
     timeout: CONFIG.EXPAND_TIMEOUT_MS,
     maxTokens: parseInt(env.QUIZ_EXPAND_MAX_TOKENS || "4096", 10),
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 

@@ -53,9 +53,9 @@ export const env = {
   AUDIO_TTS_TIMEOUT_MS: "300000",
   /** Together AI TTS model (e.g. Kokoro). */
   AUDIO_TTS_MODEL: "hexgrad/Kokoro-82M",
-  /** Kokoro voice IDs — see Together text-to-speech docs. */
-  AUDIO_VOICE_HOST_A: "af_sky",
-  AUDIO_VOICE_HOST_B: "am_echo",
+  /** Kokoro voice IDs — see Together text-to-speech docs. Override via AUDIO_VOICE_HOST_A / _B env vars. */
+  AUDIO_VOICE_HOST_A: process.env.AUDIO_VOICE_HOST_A || "af_sky",
+  AUDIO_VOICE_HOST_B: process.env.AUDIO_VOICE_HOST_B || "am_echo",
 
   // Flashcards
   FLASHCARD_MAP_CHUNK_TOKENS: "5000",
@@ -64,7 +64,7 @@ export const env = {
   FLASHCARD_REDUCE_TIMEOUT_MS: "240000",
   FLASHCARD_REDUCE_MAX_TOKENS: "32000",
 
-  // Quiz
+  // Quiz (map chunk was 2500 when timeout-sensitive; 5000 is safe with current model latency)
   QUIZ_MAP_CHUNK_TOKENS: "5000",
   QUIZ_REDUCE_CHUNK_TOKENS: "10000",
   QUIZ_MAP_TIMEOUT_MS: "400000",
@@ -112,7 +112,7 @@ export const env = {
   SPREADSHEET_MAP_TIMEOUT_MS: "300000",
   SPREADSHEET_REDUCE_TIMEOUT_MS: "300000",
 
-  // Written Questions (Convex env names must be < 40 chars; long names use WQ_ prefix)
+  // Written Questions
   WRITTEN_QUESTIONS_MAP_CHUNK_TOKENS: "5000",
   WRITTEN_QUESTIONS_REDUCE_CHUNK_TOKENS: "10000",
   WRITTEN_QUESTIONS_MAP_TIMEOUT_MS: "300000",
