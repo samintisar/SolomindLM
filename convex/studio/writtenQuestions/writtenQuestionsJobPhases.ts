@@ -79,8 +79,8 @@ const CONFIG = {
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
   MIN_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MIN_QUESTIONS_PER_CHUNK || "2", 10),
-  MAX_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MAX_QUESTIONS_PER_CHUNK || "10", 10),
-  BUFFER_MULTIPLIER: 1.5,
+  MAX_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MAX_QUESTIONS_PER_CHUNK || "15", 10),
+  BUFFER_MULTIPLIER: 2.0,
 } as const;
 
 export type WrittenQuestionsGenerationPhaseArgs = {
@@ -134,13 +134,14 @@ function createMapLLM(): ChatTogetherAI {
 }
 
 function createReduceLLM(): ChatTogetherAI {
+  const model = env.WRITTEN_QUESTIONS_LLM;
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.SMART_LLM,
+    model,
     temperature: 0.3,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
     maxTokens: parseInt(env.WRITTEN_QUESTIONS_REDUCE_MAX_TOKENS || "32000", 10),
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 
@@ -417,10 +418,13 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     console.log(`[WrittenQuestionsJob] ${chunkId} LLM completed in ${elapsed}ms`);
 
     // Assign fresh IDs per question so IDs are unique across parallel map chunks (models often repeat schemes like "1"–"5").
-    const questions = (response as WrittenQuestionsResponse).questions.map((q) => ({
-      ...q,
-      id: randomUUID(),
-    }));
+    // Filter out empty or invalid questions.
+    const questions = (response as WrittenQuestionsResponse).questions
+      .filter((q) => q.question && q.question.trim().length > 0 && q.modelAnswer && q.modelAnswer.trim().length > 0)
+      .map((q) => ({
+        ...q,
+        id: randomUUID(),
+      }));
     const result = {
       questions,
       processingTimeMs: elapsed,

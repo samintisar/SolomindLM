@@ -37,6 +37,8 @@ export interface StudioParams {
   topic?: string;
   questionCount?: number;
   slideCount?: number;
+  /** Override the smart LLM model used for reduce/collapse phases (eval only) */
+  smartLlm?: string;
 }
 
 /**

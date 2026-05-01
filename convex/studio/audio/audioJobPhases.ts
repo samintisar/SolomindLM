@@ -37,12 +37,12 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_MAP_CHUNK_TOKENS || "3750", 10),
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_REDUCE_CHUNK_TOKENS || "10000", 10),
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_MAP_CHUNK_TOKENS, 10),
+  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_REDUCE_CHUNK_TOKENS, 10),
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk
-  REDUCE_TIMEOUT_MS: parseInt(env.AUDIO_REDUCE_TIMEOUT_MS || "300000", 10),
-  REDUCE_MAX_OUTPUT_TOKENS: parseInt(env.AUDIO_REDUCE_MAX_OUTPUT_TOKENS || "16384", 10),
-  TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS || "300000", 10),
+  REDUCE_TIMEOUT_MS: parseInt(env.AUDIO_REDUCE_TIMEOUT_MS, 10),
+  REDUCE_MAX_OUTPUT_TOKENS: parseInt(env.AUDIO_REDUCE_MAX_OUTPUT_TOKENS, 10),
+  TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS, 10),
 } as const;
 
 export type AudioOverviewGenerationPhaseArgs = {
@@ -88,13 +88,14 @@ function createMapLLM(): ChatTogetherAI {
 }
 
 function createReduceLLM(): ChatTogetherAI {
+  const model = env.AUDIO_LLM;
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.SMART_LLM,
+    model,
     temperature: 0.6,
     maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 

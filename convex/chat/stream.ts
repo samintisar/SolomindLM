@@ -33,8 +33,8 @@ interface VectorSearchResult {
   metadata?: ChunkMetadata;
 }
 
-// Get threshold from env for filtering in vectorSearchRunner
-const VECTOR_MATCH_THRESHOLD = parseFloat(process.env.CHAT_VECTOR_MATCH_THRESHOLD ?? "0.4");
+// Vector match threshold for filtering in vectorSearchRunner
+const VECTOR_MATCH_THRESHOLD = 0.4;
 
 type DocumentChunkDoc = Doc<"documentChunks">;
 type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
@@ -43,14 +43,11 @@ type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
 const _streaming = new PersistentTextStreaming(components.persistentTextStreaming);
 
 /** Batched addChunk to stay under Convex mutation write throughput (e.g. 4 MiB/s on S16). */
-const CHAT_STREAM_FLUSH_MS = parseInt(process.env.CHAT_STREAM_FLUSH_MS ?? "85", 10);
-const CHAT_STREAM_FLUSH_MIN_CHARS = parseInt(process.env.CHAT_STREAM_FLUSH_MIN_CHARS ?? "200", 10);
-const CHAT_STREAM_MAX_CHUNK_CHARS = Math.min(
-  65536,
-  Math.max(1024, parseInt(process.env.CHAT_STREAM_MAX_CHUNK_CHARS ?? "65536", 10))
-);
+const CHAT_STREAM_FLUSH_MS = 85;
+const CHAT_STREAM_FLUSH_MIN_CHARS = 200;
+const CHAT_STREAM_MAX_CHUNK_CHARS = Math.min(65536, Math.max(1024, 65536));
 
-const CHAT_HISTORY_FETCH_LIMIT = parseInt(process.env.CHAT_HISTORY_FETCH_LIMIT ?? "80", 10);
+const CHAT_HISTORY_FETCH_LIMIT = 80;
 
 async function sleepMs(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
