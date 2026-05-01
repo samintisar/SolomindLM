@@ -17,7 +17,7 @@ import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { StudioRunnerKind, RunnerKind } from "./types";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { generateReport, formatReport } from "./reports";
-import type { EvalBaseline, EvalRunArtifact, MetricResult } from "./types";
+import type { EvalBaseline, EvalRunArtifact, EvalFixture, MetricResult } from "./types";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -35,6 +35,8 @@ interface CliOptions {
   exportArtifacts: boolean;
   /** Directory for exported artifacts (default: evals/rag/generated) */
   artifactsDir: string;
+  /** Override the smart LLM model for studio agent reduce phases */
+  smartLlm?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
@@ -105,6 +107,9 @@ function parseArgs(args: string[]): CliOptions {
       case "--artifacts-dir":
         opts.artifactsDir = args[++i];
         break;
+      case "--smart-llm":
+        opts.smartLlm = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -131,6 +136,7 @@ Options:
   --output, -o <path>      Write JSON report to file
   --export-artifacts       Export Ragas-compatible artifacts alongside report
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
+  --smart-llm <model>      Override smart LLM for studio agent reduce phases (e.g. meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -259,7 +265,10 @@ async function main(): Promise<void> {
   let runtimeErrorCount = 0;
 
   for (const id of fixtureIds) {
-    const fixture = getFixture(id);
+    const fixture: EvalFixture = { ...getFixture(id) };
+    if (opts.smartLlm) {
+      fixture.studioParams = { ...fixture.studioParams, smartLlm: opts.smartLlm };
+    }
     fixtureMeta.set(fixture.id, {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
@@ -288,6 +297,24 @@ async function main(): Promise<void> {
       }
 
       allArtifacts.push(artifact);
+
+      // Save studio output for manual inspection
+      if (artifact.studioOutput) {
+        const outputFile = `evals/rag/generated/${artifact.caseId}-${artifact.runner}-${Date.now()}.json`;
+        mkdirSync("evals/rag/generated", { recursive: true });
+        writeFileSync(
+          outputFile,
+          JSON.stringify({
+            caseId: artifact.caseId,
+            runner: artifact.runner,
+            smartLlm: opts.smartLlm,
+            answer: artifact.answer,
+            raw: artifact.studioOutput.raw,
+            latencyMs: artifact.latencyMs,
+          }, null, 2)
+        );
+        console.log(`  Output saved to: ${outputFile}`);
+      }
 
       // Load baseline for this case+runner if available
       const baseline = loadBaseline(fixture.id, artifact.runner);

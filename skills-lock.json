@@ -138,6 +138,24 @@
       "sourceType": "github",
       "computedHash": "f54f39ce967af3a4bba1f662c3600f0253467508d5fbbc7c545c67e102da2253"
     },
+    "tavily-best-practices": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tavily-best-practices/SKILL.md",
+      "computedHash": "b1912363d3ad92011952118994dbf9e01bcd6544aab166f9bf1ce243cd44f7a0"
+    },
+    "tavily-research": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tavily-research/SKILL.md",
+      "computedHash": "8f0d7dc0a3d838fc647c5666f7dd398626d35b8f95bd7f0ae2512df8927d8f29"
+    },
+    "tavily-search": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tavily-search/SKILL.md",
+      "computedHash": "8cc6213302c9e74916e135d8abf462b8b0fc1ddea328b6f6a6a3f1d7d4b5c2ac"
+    },
     "together-audio": {
       "source": "togethercomputer/skills",
       "sourceType": "github",

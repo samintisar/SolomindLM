@@ -108,14 +108,6 @@ export interface SlideResponse {
 // ============================================================
 
 /**
- * Safely parse integer env vars with fallback.
- */
-const safeParseInt = (val: string | undefined, fallback: number): number => {
-  const parsed = parseInt(val || "", 10);
-  return isNaN(parsed) ? fallback : parsed;
-};
-
-/**
  * Slide count range mapping for deck lengths.
  */
 export const SLIDE_COUNT_MAP = {
@@ -123,18 +115,16 @@ export const SLIDE_COUNT_MAP = {
   default: { min: 8, max: 12 },
 } as const;
 
-/**
- * Graph configuration with environment-based settings.
- */
+/** Graph configuration. Defaults are defined in convex/_lib/env.ts. */
 const SLIDES_CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: safeParseInt(env.SLIDES_MAP_CHUNK_TOKENS, 3000),
-  REDUCE_CHUNK_SIZE_TOKENS: safeParseInt(env.SLIDES_REDUCE_CHUNK_TOKENS, 12000),
-  MIN_SLIDES_PER_CHUNK: safeParseInt(env.SLIDES_MIN_SLIDES_PER_CHUNK, 1),
-  MAX_SLIDES_PER_CHUNK: safeParseInt(env.SLIDES_MAX_SLIDES_PER_CHUNK, 6),
-  MAX_TOKENS: safeParseInt(env.SLIDES_MAX_TOKENS, 8000),
-  MAP_TIMEOUT_MS: safeParseInt(env.SLIDES_MAP_TIMEOUT_MS, 180000),
-  REDUCE_TIMEOUT_MS: safeParseInt(env.SLIDES_REDUCE_TIMEOUT_MS, 240000),
-  IMAGE_TIMEOUT_MS: safeParseInt(env.SLIDES_IMAGE_TIMEOUT_MS, 180000), // 3 minutes per image (gpt-image-1.5 can be slow)
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.SLIDES_MAP_CHUNK_TOKENS, 10),
+  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.SLIDES_REDUCE_CHUNK_TOKENS, 10),
+  MIN_SLIDES_PER_CHUNK: parseInt(env.SLIDES_MIN_SLIDES_PER_CHUNK, 10),
+  MAX_SLIDES_PER_CHUNK: parseInt(env.SLIDES_MAX_SLIDES_PER_CHUNK, 10),
+  MAX_TOKENS: parseInt(env.SLIDES_MAX_TOKENS, 10),
+  MAP_TIMEOUT_MS: parseInt(env.SLIDES_MAP_TIMEOUT_MS, 10),
+  REDUCE_TIMEOUT_MS: parseInt(env.SLIDES_REDUCE_TIMEOUT_MS, 10),
+  IMAGE_TIMEOUT_MS: parseInt(env.SLIDES_IMAGE_TIMEOUT_MS, 10),
   MAX_COLLAPSE_DEPTH: 5,
 } as const;
 

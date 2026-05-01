@@ -121,9 +121,13 @@ export const startReportEval = action({
     documentIds: v.optional(v.array(v.id("documents"))),
     reportType: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<ReportEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
+    if (args.smartLlm !== undefined && args.smartLlm.trim() === "") {
+      throw new Error("smartLlm must be a non-empty model identifier when provided");
+    }
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
     const reportType = args.reportType ?? "summary";
@@ -133,7 +137,7 @@ export const startReportEval = action({
       notebookId: args.notebookId,
       title: "Report (eval)",
       reportType,
-      metadata: { status: "generating", documentIds },
+      metadata: { status: "generating", documentIds, smartLlm: args.smartLlm },
     });
     if (!report) throw new Error("Failed to create report row for eval");
     const reportId = report._id as Id<"reports">;
@@ -145,6 +149,7 @@ export const startReportEval = action({
       documentIds,
       reportType,
       customPrompt: args.customPrompt,
+      smartLlm: args.smartLlm,
     });
 
     return { reportId: reportId as string, startedAt: Date.now() };
@@ -189,9 +194,13 @@ export const startFlashcardsEval = action({
     cardCount: v.optional(v.number()),
     difficulty: v.optional(v.string()),
     topic: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<FlashcardsEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
+    if (args.smartLlm !== undefined && args.smartLlm.trim() === "") {
+      throw new Error("smartLlm must be a non-empty model identifier when provided");
+    }
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(
       ctx,
@@ -207,7 +216,7 @@ export const startFlashcardsEval = action({
       userId,
       notebookId: args.notebookId,
       title: "Flashcards (eval)",
-      metadata: { difficulty, cardCount, topic: args.topic, documentIds },
+      metadata: { difficulty, cardCount, topic: args.topic, documentIds, smartLlm: args.smartLlm },
     });
     if (!flashcard) throw new Error("Failed to create flashcard row for eval");
     const flashcardId = flashcard._id as Id<"flashcards">;
@@ -220,6 +229,7 @@ export const startFlashcardsEval = action({
       cardCount,
       difficulty,
       topic: args.topic,
+      smartLlm: args.smartLlm,
     });
 
     return { flashcardId: flashcardId as string, startedAt: Date.now() };

@@ -137,24 +137,26 @@ function createMapLLM(): ChatTogetherAI {
 }
 
 function createReduceLLM(): ChatTogetherAI {
+  const model = env.SLIDES_LLM;
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.SMART_LLM,
+    model,
     temperature: 0.3,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
     maxTokens: parseInt(env.SLIDES_MAX_TOKENS || "8000", 10),
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 
 function createRefineLLM(): ChatTogetherAI {
+  const model = env.SLIDES_LLM;
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.SMART_LLM,
+    model,
     temperature: 0.4,
     timeout: CONFIG.REFINE_TIMEOUT_MS,
     maxTokens: parseInt(env.SLIDES_MAX_TOKENS || "8000", 10),
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 

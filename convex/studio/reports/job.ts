@@ -20,6 +20,7 @@ export const reportGeneration = internalAction({
     documentIds: v.array(v.id("documents")),
     reportType: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -37,6 +38,7 @@ export const processReportMapChunk = internalAction({
     chunk: v.string(),
     reportType: v.string(),
     customPrompt: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -51,6 +53,7 @@ export const finalizeReportPhase = internalAction({
     notebookId: v.id("notebooks"),
     reportType: v.string(),
     customPrompt: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";

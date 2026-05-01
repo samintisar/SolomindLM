@@ -36,10 +36,10 @@ function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutp
 }
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_MAP_CHUNK_TOKENS || "5000", 10),
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_MAP_CHUNK_TOKENS, 10),
   PER_CHUNK_TIMEOUT_MS: 180000, // Increased from 90s to 180s (3 min) to match other studio jobs
   REDUCE_TIMEOUT_MS: 180000, // Increased from 90s to 180s (3 min)
-  MAX_OUTPUT_TOKENS: parseInt(env.REPORT_REDUCE_MAX_OUTPUT_TOKENS || "32000", 10),
+  MAX_OUTPUT_TOKENS: parseInt(env.REPORT_REDUCE_MAX_OUTPUT_TOKENS, 10),
   MIN_SUMMARY_LENGTH: 50,
 } as const;
 
@@ -49,19 +49,20 @@ function createMapLLM(): ChatTogetherAI {
     model: env.FAST_LLM,
     temperature: 0.3,
     timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    maxTokens: parseInt(env.REPORT_MAP_MAX_OUTPUT_TOKENS || "16384", 10), // Increased from 8192 to prevent truncation
+    maxTokens: parseInt(env.REPORT_MAP_MAX_OUTPUT_TOKENS, 10),
     modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
   });
 }
 
-function createReduceLLM(): ChatTogetherAI {
+function createReduceLLM(modelOverride?: string): ChatTogetherAI {
+  const model = modelOverride || env.REPORT_LLM;
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.SMART_LLM,
+    model,
     temperature: 0.5,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
     maxTokens: CONFIG.MAX_OUTPUT_TOKENS,
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 
@@ -72,6 +73,7 @@ export type ReportGenerationPhaseArgs = {
   documentIds: Id<"documents">[];
   reportType?: string;
   customPrompt?: string;
+  smartLlm?: string;
 };
 
 export type ProcessReportMapChunkArgs = {
@@ -83,6 +85,7 @@ export type ProcessReportMapChunkArgs = {
   chunk: string;
   reportType: string;
   customPrompt?: string;
+  smartLlm?: string;
 };
 
 export type FinalizeReportPhaseArgs = {
@@ -91,13 +94,14 @@ export type FinalizeReportPhaseArgs = {
   notebookId: Id<"notebooks">;
   reportType: string;
   customPrompt?: string;
+  smartLlm?: string;
 };
 
 export async function runReportGenerationPhase(
   ctx: ActionCtx,
   args: ReportGenerationPhaseArgs
 ): Promise<void> {
-  const { reportId, userId, notebookId, documentIds, reportType, customPrompt } = args;
+  const { reportId, userId, notebookId, documentIds, reportType, customPrompt, smartLlm } = args;
 
   const logger = createJobLogger({
     jobType: "report",
@@ -171,6 +175,7 @@ export async function runReportGenerationPhase(
         chunk: packedChunks[i],
         reportType: reportType || "summary",
         customPrompt,
+        smartLlm,
       });
       console.log(`[ReportJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
     }
@@ -208,7 +213,7 @@ export async function runProcessReportMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessReportMapChunkArgs
 ): Promise<void> {
-  const { reportId, userId, notebookId, chunkIndex, totalChunks, chunk, reportType, customPrompt } =
+  const { reportId, userId, notebookId, chunkIndex, totalChunks, chunk, reportType, customPrompt, smartLlm } =
     args;
 
   const logger = createJobLogger({
@@ -318,6 +323,7 @@ IMPORTANT: Respond with a JSON object containing:
         notebookId,
         reportType,
         customPrompt,
+        smartLlm,
       });
     }
   } catch (error) {
@@ -369,6 +375,7 @@ IMPORTANT: Respond with a JSON object containing:
           notebookId,
           reportType,
           customPrompt,
+          smartLlm,
         });
       } else {
         await ctx.runMutation(internal.studio.jobMutations.reports.markReportFailed, {
@@ -390,7 +397,7 @@ export async function runFinalizeReportPhase(
   ctx: ActionCtx,
   args: FinalizeReportPhaseArgs
 ): Promise<void> {
-  const { reportId, userId, notebookId, reportType, customPrompt } = args;
+  const { reportId, userId, notebookId, reportType, customPrompt, smartLlm } = args;
 
   const logger = createJobLogger({
     jobType: "report",
@@ -468,7 +475,7 @@ export async function runFinalizeReportPhase(
       },
     });
 
-    const llm = createReduceLLM();
+    const llm = createReduceLLM(smartLlm);
     const promptTemplate = REDUCE_PROMPTS[reportType] || REDUCE_PROMPTS["custom"];
 
     const prompt = promptTemplate

@@ -78,6 +78,7 @@ export function createConvexReportInvoker(
         documentIds: context.documentIds as Id<"documents">[] | undefined,
         reportType: context.studioParams?.reportType,
         customPrompt: context.studioParams?.customPrompt,
+        smartLlm: context.studioParams?.smartLlm,
       });
       const populated = await pollStatus(
         () =>
@@ -115,6 +116,7 @@ export function createConvexFlashcardsInvoker(
           cardCount: context.studioParams?.cardCount,
           difficulty: context.studioParams?.difficulty,
           topic: context.studioParams?.topic,
+          smartLlm: context.studioParams?.smartLlm,
         }
       );
       const populated = await pollStatus(
