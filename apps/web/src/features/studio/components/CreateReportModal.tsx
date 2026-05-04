@@ -187,6 +187,7 @@ export const CreateReportModal: React.FC<CreateReportModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfiguringFormat(null);
       setCustomPrompt("");
     }

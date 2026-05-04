@@ -1,8 +1,6 @@
 ---
 name: convex-quickstart
-description:
-  Creates or adds Convex to an app. Use for new Convex projects, npm create
-  convex@latest, frontend setup, env vars, or the first npx convex dev run.
+description: Creates or adds Convex to an app. Use for new Convex projects, npm create convex@latest, frontend setup, env vars, or the first npx convex dev run.
 ---
 
 # Convex Quickstart

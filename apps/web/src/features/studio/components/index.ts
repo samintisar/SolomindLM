@@ -16,5 +16,5 @@ export { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 export { CustomizeQuizModal } from "./CustomizeQuizModal";
 export { CustomizeAudioModal } from "./CustomizeAudioModal";
 export { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
-export { CustomizeSlidesModal } from "./CustomizeSlidesModal";
+export { CustomizeInfographicModal } from "./CustomizeInfographicModal";
 export { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";

@@ -1,28 +1,11 @@
-import { createContext, useContext, ReactNode, useState } from "react";
+import { ReactNode, useState } from "react";
 import { useQuery, useConvexAuth } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
 import { getNativeWebViewBridge, isNativeShell } from "@/utils/platformDetection";
-
-export interface User {
-  id: string;
-  email?: string;
-  name?: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  authError: string | null;
-  signInWithGoogle: () => Promise<void>;
-  signOut: () => Promise<void>;
-  clearAuthError: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext, User } from "./useAuth";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -70,10 +53,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
-  return context;
 }

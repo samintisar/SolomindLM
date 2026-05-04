@@ -67,6 +67,7 @@ export function extractTopicsFromMarkdown(markdown: string): string[] {
  */
 export function extractTopicsFromOutput(output: string): string[] {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsed = JSON.parse(output) as any;
     if (parsed._error === true) {
       return [];

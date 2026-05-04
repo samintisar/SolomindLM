@@ -10,7 +10,7 @@ import {
   useRenameWrittenQuestions,
   useDeleteWrittenQuestions,
 } from "../services/writtenQuestionsApi";
-import { useRenameSlideDeck, useDeleteSlideDeck } from "../services/slidesApi";
+import { useRenameInfographic, useDeleteInfographic } from "../services/infographicApi";
 import { useRenameSpreadsheet, useDeleteSpreadsheet } from "../services/spreadsheetsApi";
 import { useUpdateUserNote, useDeleteUserNote } from "@/features/chat/services/userNotesApi";
 
@@ -41,41 +41,28 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
   const deleteAudioOverview = useDeleteAudioOverview();
   const renameWrittenQuestions = useRenameWrittenQuestions();
   const deleteWrittenQuestions = useDeleteWrittenQuestions();
-  const renameSlideDeck = useRenameSlideDeck();
-  const deleteSlideDeck = useDeleteSlideDeck();
+  const renameInfographic = useRenameInfographic();
+  const deleteInfographic = useDeleteInfographic();
   const renameSpreadsheet = useRenameSpreadsheet();
   const deleteSpreadsheet = useDeleteSpreadsheet();
   const updateUserNote = useUpdateUserNote();
   const deleteUserNote = useDeleteUserNote();
 
-  const renameRegistry = new Map<string, RenameFn>([
-    ["report", (id, title) => updateReport(id, { title })],
-    ["flashcard", renameFlashcards],
-    ["quiz", renameQuiz],
-    ["mindmap", renameMindMap],
-    ["audioOverview", (id, title) => updateAudioOverview(id, { title })],
-    ["writtenQuestions", renameWrittenQuestions],
-    ["slides", renameSlideDeck],
-    ["spreadsheet", renameSpreadsheet],
-    ["note", (id, title) => updateUserNote(id, { title })],
-  ]);
-
-  const deleteRegistry = new Map<string, DeleteFn>([
-    ["report", deleteReport],
-    ["flashcard", deleteFlashcards],
-    ["quiz", deleteQuiz],
-    ["mindmap", deleteMindMap],
-    ["audioOverview", deleteAudioOverview],
-    ["writtenQuestions", deleteWrittenQuestions],
-    ["slides", deleteSlideDeck],
-    ["spreadsheet", deleteSpreadsheet],
-    ["note", deleteUserNote],
-  ]);
-
   const handleUpdateNote = useCallback(
     async (id: string, newTitle: string) => {
       const note = notes.find((n) => n.id === id);
       if (!note || !newTitle.trim()) return;
+      const renameRegistry = new Map<string, RenameFn>([
+        ["report", (id, title) => updateReport(id, { title })],
+        ["flashcard", renameFlashcards],
+        ["quiz", renameQuiz],
+        ["mindmap", renameMindMap],
+        ["audioOverview", (id, title) => updateAudioOverview(id, { title })],
+        ["writtenQuestions", renameWrittenQuestions],
+        ["infographic", renameInfographic],
+        ["spreadsheet", renameSpreadsheet],
+        ["note", (id, title) => updateUserNote(id, { title })],
+      ]);
       const rename = renameRegistry.get(note.type);
       if (!rename) {
         console.warn("Unknown note type for update:", (note as Note).type);
@@ -87,13 +74,24 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
         alertError(error, "Failed to update note");
       }
     },
-    [notes, renameRegistry]
+    [notes, updateReport, renameFlashcards, renameQuiz, renameMindMap, updateAudioOverview, renameWrittenQuestions, renameInfographic, renameSpreadsheet, updateUserNote]
   );
 
   const handleDeleteNote = useCallback(
     async (id: string) => {
       const note = notes.find((n) => n.id === id);
       if (!note) return;
+      const deleteRegistry = new Map<string, DeleteFn>([
+        ["report", deleteReport],
+        ["flashcard", deleteFlashcards],
+        ["quiz", deleteQuiz],
+        ["mindmap", deleteMindMap],
+        ["audioOverview", deleteAudioOverview],
+        ["writtenQuestions", deleteWrittenQuestions],
+        ["infographic", deleteInfographic],
+        ["spreadsheet", deleteSpreadsheet],
+        ["note", deleteUserNote],
+      ]);
       const del = deleteRegistry.get(note.type);
       if (!del) {
         console.warn("Unknown note type for delete:", (note as Note).type);
@@ -105,7 +103,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
         alertError(error, "Failed to delete note");
       }
     },
-    [notes, deleteRegistry]
+    [notes, deleteReport, deleteFlashcards, deleteQuiz, deleteMindMap, deleteAudioOverview, deleteWrittenQuestions, deleteInfographic, deleteSpreadsheet, deleteUserNote]
   );
 
   const handleSaveReportContent = useCallback(

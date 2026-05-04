@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useNotebookContext } from "@/features/notebooks/NotebookContext";
-import { useSourcesContext } from "@/features/sources/SourcesContext";
-import { useStudioContext } from "@/features/studio/StudioContext";
+import { useAuth } from "@/features/auth/useAuth";
+import { useNotebookContext } from "@/features/notebooks/useNotebookContext";
+import { useSourcesContext } from "@/features/sources/useSourcesContext";
+import { useStudioContext } from "@/features/studio/useStudioContext";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
 import { usePanelResize } from "@/shared/hooks/usePanelResize";
 import {
@@ -62,26 +62,31 @@ export function NotebookView() {
     }));
   }, []);
 
-  const handlePlayAudio = (
-    audioUrl: string,
-    title: string,
-    transcript?: string,
-    noteId?: string,
-    audioOverviewId?: string
-  ) => {
-    setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
-    setMiniPlayerVisible(true);
-    if (noteId) {
-      (window as any).__currentPlayingAudioNoteId = noteId;
-    }
-  };
+  const handlePlayAudio = useCallback(
+    (
+      audioUrl: string,
+      title: string,
+      transcript?: string,
+      noteId?: string,
+      audioOverviewId?: string
+    ) => {
+      setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
+      setMiniPlayerVisible(true);
+      if (noteId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__currentPlayingAudioNoteId = noteId;
+      }
+    },
+    []
+  );
 
-  const handleCloseMiniPlayer = () => {
+  const handleCloseMiniPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
-  };
+  }, []);
 
-  const handleExpandAudioPlayer = () => {
+  const handleExpandAudioPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const noteId = (window as any).__currentPlayingAudioNoteId;
     if (noteId) {
       const note = notes.find((n) => n.id === noteId);
@@ -90,7 +95,7 @@ export function NotebookView() {
         window.dispatchEvent(event);
       }
     }
-  };
+  }, [notes]);
 
   const audioPlayerContextValue = useMemo(
     () => ({
@@ -100,7 +105,7 @@ export function NotebookView() {
       onCloseMiniPlayer: handleCloseMiniPlayer,
       onExpandAudioPlayer: handleExpandAudioPlayer,
     }),
-    [miniPlayerVisible, miniPlayerData]
+    [miniPlayerVisible, miniPlayerData, handlePlayAudio, handleCloseMiniPlayer, handleExpandAudioPlayer]
   );
 
   return (
@@ -150,7 +155,7 @@ export function NotebookView() {
         </div>
 
         {/* Desktop Layout */}
-        <div className="hidden md:flex flex-1 overflow-hidden w-full">
+        <div className="hidden md:flex min-h-0 min-w-0 w-full flex-1 overflow-x-auto overflow-y-hidden">
           <SourcesPanel
             isOpen={isSourcesOpen}
             onClose={toggleSources}
@@ -170,18 +175,20 @@ export function NotebookView() {
             />
           )}
 
-          <ChatPanel
-            isLeftOpen={isSourcesOpen}
-            isRightOpen={isStudioOpen}
-            toggleLeft={toggleSources}
-            toggleRight={toggleStudio}
-            notebookId={urlNotebookId}
-            notebookTitle={notebookTitle}
-            notebookIcon={activeNotebook?.icon}
-            notebookCoverColor={activeNotebook?.coverColor}
-            chatSettings={activeNotebook?.chatSettings}
-            onOpenNotebookSource={handleOpenNotebookSourceFromChat}
-          />
+          <div className="flex min-h-0 min-w-70 flex-1 flex-col overflow-hidden">
+            <ChatPanel
+              isLeftOpen={isSourcesOpen}
+              isRightOpen={isStudioOpen}
+              toggleLeft={toggleSources}
+              toggleRight={toggleStudio}
+              notebookId={urlNotebookId}
+              notebookTitle={notebookTitle}
+              notebookIcon={activeNotebook?.icon}
+              notebookCoverColor={activeNotebook?.coverColor}
+              chatSettings={activeNotebook?.chatSettings}
+              onOpenNotebookSource={handleOpenNotebookSourceFromChat}
+            />
+          </div>
 
           {isStudioOpen && (
             <div

@@ -9,6 +9,7 @@ vi.mock("convex/react", () => ({
 }));
 
 // Mock the Convex API — use a deep proxy so api.notes.index.listAllByNotebook resolves to a string path
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deepProxy(): any {
   return new Proxy(
     {},
@@ -98,7 +99,7 @@ describe("useNotes (Convex-mocked integration)", () => {
     const dbNotes = [
       { _id: "q1", _type: "quiz", title: "Quiz", status: "completed", questionsData: [], metadata: {} },
       { _id: "m1", _type: "mindmap", title: "Map", status: "completed", data: { topic: "Root", id: "r", children: [] }, metadata: {} },
-      { _id: "s1", _type: "slides", title: "Slides", status: "completed", data: [], slideCount: 5, metadata: {} },
+      { _id: "i1", _type: "infographic", title: "Infographic", status: "completed", data: { imageUrl: "https://example.com/img.png" }, metadata: {} },
     ];
     mockUseQuery.mockReturnValue(dbNotes);
 
@@ -107,7 +108,7 @@ describe("useNotes (Convex-mocked integration)", () => {
     expect(result.current).toHaveLength(3);
     expect(result.current[0].type).toBe("quiz");
     expect(result.current[1].type).toBe("mindmap");
-    expect(result.current[2].type).toBe("slides");
+    expect(result.current[2].type).toBe("infographic");
   });
 });
 
@@ -123,7 +124,7 @@ describe("mapDatabaseNoteToNote — round-trip via useNotes", () => {
       { _id: "3", _type: "quiz", title: "Q", status: "completed", questionsData: [], metadata: {} },
       { _id: "4", _type: "mindmap", title: "M", status: "completed", data: { topic: "Root", id: "r", children: [] }, metadata: {} },
       { _id: "5", _type: "audioOverview", title: "A", status: "completed", metadata: {} },
-      { _id: "6", _type: "slides", title: "S", status: "completed", data: [], slideCount: 0, metadata: {} },
+      { _id: "6", _type: "infographic", title: "I", status: "completed", data: { imageUrl: "https://example.com/img.png" }, metadata: {} },
       { _id: "7", _type: "spreadsheet", title: "X", status: "completed", data: "", metadata: {} },
       { _id: "8", _type: "writtenQuestions", title: "W", status: "completed", questionsData: [], metadata: {} },
       { _id: "9", _type: "note", title: "N", status: "completed", content: "text", createdAt: "2024-01-15T10:00:00Z", metadata: {} },
@@ -137,7 +138,7 @@ describe("mapDatabaseNoteToNote — round-trip via useNotes", () => {
     const types = result.current.map((n) => n.type);
     expect(types).toEqual([
       "report", "flashcard", "quiz", "mindmap", "audioOverview",
-      "slides", "spreadsheet", "writtenQuestions", "note", "report",
+      "infographic", "spreadsheet", "writtenQuestions", "note", "report",
     ]);
   });
 });

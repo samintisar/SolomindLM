@@ -11,15 +11,15 @@ import {
   Pin,
   Settings2,
 } from "lucide-react";
-import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { DropdownMenu } from "@/shared/ui/DropdownMenu";
 import { Virtuoso } from "react-virtuoso";
 import { Message, Note, ReferenceChunk, ChatSettings } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
-import { useChatStreamingContext } from "../ChatStreamingContext";
+import { useToast } from "@/shared/contexts/useToast";
+import { useChatStreamingContext } from "../useChatStreaming";
 import { exportAsMarkdown } from "../utils/exportChat";
 import { useSaveChat } from "../services/userNotesApi";
-import { RefHandlers } from "../utils/messageRendering";
+import { RefHandlers } from "../utils/messageRendering.utils";
 import { MessageBubble } from "./MessageBubble";
 import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ChatEmptyState } from "./ChatEmptyState";
@@ -27,9 +27,8 @@ import { ChatInput } from "./ChatInput";
 import { ConversationList } from "./ConversationList";
 import { ConfigureChatModal } from "./ConfigureChatModal";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
-import { useSourcesContext } from "../../sources/SourcesContext";
+import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
-import { SourceSuggestionPrompt } from "./SourceSuggestionPrompt";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
@@ -82,8 +81,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onRenameConversation,
     onDeleteConversation,
     consumeResearchExecuteStream,
-    externalSources,
-    clearExternalSources,
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
@@ -172,6 +169,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleApproveResearchPlan = useCallback(async (planId: string) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await approvePlanMutation({ planId: planId as any });
       const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
         method: "POST",
@@ -197,6 +195,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleRejectResearchPlan = useCallback(async (planId: string) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await rejectPlanMutation({ planId: planId as any });
     } catch (err) {
       console.error("[ResearchPlan] Reject failed:", err);
@@ -210,6 +209,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const virtuosoRef = useRef<any>(null);
 
   // --- Chat action handlers ---
@@ -268,7 +268,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           success("Chat settings saved");
         }
         setIsConfigModalOpen(false);
-      } catch (e) {
+      } catch (_e) {
         toastError("Failed to save chat settings");
       } finally {
         setIsSavingConfig(false);
@@ -448,6 +448,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // --- Tooltip position computation ---
 
   const tooltipContent = useMemo(() => {
+     
+    // eslint-disable-next-line react-hooks/refs
     if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current)
       return null;
     const hoveredMessage = messages.find((msg) => msg.id === hoveredMessageId);
@@ -457,6 +459,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       hoveredRefId >= 1 && hoveredRefId <= refsArray.length
         ? refsArray[hoveredRefId - 1]
         : refsArray.find((r) => Number(r.id) === hoveredRefId);
+     
+    // eslint-disable-next-line react-hooks/refs
     const containerRect = messagesContainerRef.current.getBoundingClientRect();
     if (!ref || !containerRect) return null;
 
@@ -621,7 +625,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   return (
     <>
-      <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
+      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
         {/* Panel header: visible on mobile (z-20) like Sources/Studio; desktop uses md:z-10 */}
         <div className="flex items-center justify-between gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0 md:z-10">
           <div className="flex min-w-0 items-center gap-2 text-foreground">
@@ -666,6 +670,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   {message.researchPlan ? (
                     <ResearchPlanMessage
                       planId={message.researchPlan.planId}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       subQuestions={(message.researchPlan.subQuestions as any[]) ?? []}
                       onApprove={handleApproveResearchPlan}
                       onReject={handleRejectResearchPlan}
@@ -681,37 +686,29 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     onSetFeedback={onSetFeedback}
                     onSendFollowUp={handleSendChip}
                     onRetry={onRetry}
+                    externalSources={message.externalSources}
+                    onAddExternalSources={async (selectedSources) => {
+                      if (!notebookId) return;
+                      try {
+                        await addExternalSourcesMutation({
+                          notebookId: notebookId as Id<"notebooks">,
+                          sources: selectedSources.map((s) => ({
+                            title: s.title,
+                            url: s.url,
+                            snippet: s.snippet,
+                            sourceType: s.sourceType,
+                          })),
+                        });
+      } catch (e) {
+                        console.error("Failed to add external sources:", e);
+                      }
+                    }}
+                    showSourcesButton={
+                      message.role === "assistant" &&
+                      !!message.externalSources &&
+                      message.externalSources.length > 0
+                    }
                   />
-                  {message.role === "assistant" && externalSources.length > 0 && !isLoading && (() => {
-                    const isLast = messages[messages.length - 1]?.id === message.id
-                      || (message.id === "__streaming__" && messages[messages.length - 1]?.id === "__streaming__");
-                    if (!isLast) return null;
-                    return (
-                      <div className="mt-3 max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto">
-                        <SourceSuggestionPrompt
-                          sources={externalSources}
-                          onAddSelected={async (selectedSources) => {
-                            if (!notebookId) return;
-                            try {
-                              await addExternalSourcesMutation({
-                                notebookId: notebookId as Id<"notebooks">,
-                                sources: selectedSources.map((s) => ({
-                                  title: s.title,
-                                  url: s.url,
-                                  snippet: s.snippet,
-                                  sourceType: s.sourceType,
-                                })),
-                              });
-                              clearExternalSources?.();
-                            } catch (e) {
-                              console.error("Failed to add external sources:", e);
-                            }
-                          }}
-                          onDismiss={() => clearExternalSources?.()}
-                        />
-                      </div>
-                    );
-                  })()}
                   </>
                   )}
                 </div>
@@ -740,7 +737,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 ) {
                   return undefined;
                 }
+                // eslint-disable-next-line react-hooks/refs
                 return () => handleOpenReferenceInSources(tooltipContent.ref);
+              })()}
+              onAddToNotebook={(() => {
+                const isExternal = !tooltipContent.ref.documentId && !!tooltipContent.ref.sourceUrl;
+                if (!isExternal || !notebookId) return undefined;
+                return async () => {
+                  try {
+                    await addExternalSourcesMutation({
+                      notebookId: notebookId as Id<"notebooks">,
+                      sources: [{
+                        title: tooltipContent.ref.sourceTitle,
+                        url: tooltipContent.ref.sourceUrl!,
+                        snippet: tooltipContent.ref.content.slice(0, 500),
+                        sourceType: "web",
+                      }],
+                    });
+                  } catch (e) {
+                    console.error("Failed to add external source:", e);
+                  }
+                };
               })()}
               onMouseEnter={() => {
                 setIsTooltipHovered(true);
@@ -761,7 +778,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
-        <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex justify-center px-4">
+        <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex min-w-0 justify-center px-3 sm:px-4">
           <ChatInput
             value={inputMessage}
             onChange={setInputMessage}

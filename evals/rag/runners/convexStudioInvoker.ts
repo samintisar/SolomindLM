@@ -42,7 +42,7 @@ export interface StudioInvoker {
 // ─── Polling helpers ─────────────────────────────────────────
 
 const POLL_INTERVAL_MS = 5000;
-const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const POLL_TIMEOUT_MS = 20 * 60 * 1000;
 const TERMINAL_STATUSES = new Set(["completed", "failed"]);
 
 async function pollStatus<T extends { status: string }>(
@@ -202,21 +202,38 @@ export function createConvexMindmapInvoker(
   };
 }
 
-// ─── Slides (deferred) ───────────────────────────────────────
-// Slides currently exceeds the studio eval reliability budget and is
-// excluded from the eval suite at the runner-set level. Keep the factory
-// so single-fixture runs (`--case studio-slides-...`) still resolve, but
-// route them through whatever single-call action remains.
-export function createConvexSlidesInvoker(
-  _convexUrl: string,
-  _options: ConvexStudioInvokerOptions
+// ─── Infographic ─────────────────────────────────────────────
+
+export function createConvexInfographicInvoker(
+  convexUrl: string,
+  options: ConvexStudioInvokerOptions
 ): StudioInvoker {
+  const client = new ConvexHttpClient(convexUrl);
   return {
-    kind: "slides",
-    async invoke() {
-      throw new Error(
-        "Slides eval is currently disabled — no kickoff+poll action exists for this kind."
+    kind: "infographic",
+    async invoke(context) {
+      const startTime = Date.now();
+      const { infographicId } = await client.action(
+        api.eval.studioEvalAction.startInfographicEval,
+        {
+          evalSecret: options.evalSecret,
+          notebookId: context.notebookId as Id<"notebooks">,
+          documentIds: context.documentIds as Id<"documents">[] | undefined,
+          customPrompt: context.studioParams?.customPrompt,
+        }
       );
+      const populated = await pollStatus(
+        () =>
+          client.action(api.eval.studioEvalAction.getInfographicEvalStatus, {
+            evalSecret: options.evalSecret,
+            infographicId: infographicId as Id<"infographics">,
+          }),
+        `Infographic ${infographicId}`
+      );
+      return {
+        raw: { infographicId, ...populated },
+        latencyMs: Date.now() - startTime,
+      };
     },
   };
 }
@@ -313,6 +330,8 @@ export function createConvexAudioScriptInvoker(
           notebookId: context.notebookId as Id<"notebooks">,
           documentIds: context.documentIds as Id<"documents">[] | undefined,
           focus: context.studioParams?.topic,
+          length: context.studioParams?.length,
+          audioType: context.studioParams?.audioType,
         }
       );
       const populated = await pollStatus(
@@ -322,6 +341,44 @@ export function createConvexAudioScriptInvoker(
             audioOverviewId: audioOverviewId as Id<"audioOverviews">,
           }),
         `AudioScript ${audioOverviewId}`
+      );
+      return {
+        raw: { audioOverviewId, ...populated },
+        latencyMs: Date.now() - startTime,
+      };
+    },
+  };
+}
+
+// ─── Audio Script Only (no TTS) ──────────────────────────────
+
+export function createConvexAudioScriptOnlyInvoker(
+  convexUrl: string,
+  options: ConvexStudioInvokerOptions
+): StudioInvoker {
+  const client = new ConvexHttpClient(convexUrl);
+  return {
+    kind: "audioScriptOnly",
+    async invoke(context) {
+      const startTime = Date.now();
+      const { audioOverviewId } = await client.action(
+        api.eval.studioEvalAction.startAudioScriptOnlyEval,
+        {
+          evalSecret: options.evalSecret,
+          notebookId: context.notebookId as Id<"notebooks">,
+          documentIds: context.documentIds as Id<"documents">[] | undefined,
+          focus: context.studioParams?.topic,
+          length: context.studioParams?.length,
+          audioType: context.studioParams?.audioType,
+        }
+      );
+      const populated = await pollStatus(
+        () =>
+          client.action(api.eval.studioEvalAction.getAudioScriptOnlyEvalStatus, {
+            evalSecret: options.evalSecret,
+            audioOverviewId: audioOverviewId as Id<"audioOverviews">,
+          }),
+        `AudioScriptOnly ${audioOverviewId}`
       );
       return {
         raw: { audioOverviewId, ...populated },
@@ -349,10 +406,11 @@ export const STUDIO_INVOKER_FACTORIES: Partial<
   flashcards: createConvexFlashcardsInvoker,
   quiz: createConvexQuizInvoker,
   mindmap: createConvexMindmapInvoker,
-  slides: createConvexSlidesInvoker,
+  infographic: createConvexInfographicInvoker,
   spreadsheet: createConvexSpreadsheetInvoker,
   writtenQuestions: createConvexWrittenQuestionsInvoker,
   audioScript: createConvexAudioScriptInvoker,
+  audioScriptOnly: createConvexAudioScriptOnlyInvoker,
 };
 
 /**

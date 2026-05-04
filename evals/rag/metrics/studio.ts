@@ -13,6 +13,7 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
+import { evaluateInfographicWithVision } from "./visionJudge";
 
 function baseMetric(
   metric: string,
@@ -93,8 +94,10 @@ interface MindmapPayload {
     | { children?: unknown[] };
 }
 
-interface SlidesPayload {
-  data?: unknown[] | { slides?: unknown[]; deck?: unknown[] };
+interface InfographicPayload {
+  data?: { imageUrl?: string; title?: string; prompt?: string };
+  title?: string;
+  status?: string;
 }
 
 interface SpreadsheetPayload {
@@ -172,18 +175,21 @@ function mindmapNodeCount(fixture: EvalFixture, artifact: EvalRunArtifact): Metr
   );
 }
 
-function slideCount(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
-  const data = (artifact.studioOutput?.raw as SlidesPayload | undefined)?.data;
-  const slides = Array.isArray(data)
-    ? data
-    : (data?.slides ?? data?.deck ?? []);
-  return countGate(
-    "slide_count_match",
+function infographicHasImage(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
+  const data = (artifact.studioOutput?.raw as InfographicPayload | undefined)?.data;
+  const imageUrl = data?.imageUrl ?? "";
+  const hasImage = imageUrl.length > 0 && imageUrl.startsWith("http");
+  const passed = hasImage ? 1 : 0;
+  const message = hasImage
+    ? `Infographic generated with image URL: ${imageUrl.slice(0, 80)}...`
+    : "Infographic did not generate an image URL.";
+  return baseMetric(
+    "infographic_image_generated",
     fixture,
     artifact,
-    slides.length,
-    fixture.expectedStructure?.minItems,
-    "Slides"
+    passed === 1 ? "pass" : "fail",
+    passed,
+    message
   );
 }
 
@@ -250,6 +256,13 @@ function reportSectionPresence(
 
 // ─── Audio script length sanity ──────────────────────────────
 
+/** Target word counts per length setting */
+const AUDIO_TARGET_WORDS: Record<string, number> = {
+  short: 2000,
+  default: 4400,
+  long: 7000,
+};
+
 function audioScriptLength(
   fixture: EvalFixture,
   artifact: EvalRunArtifact
@@ -257,30 +270,36 @@ function audioScriptLength(
   const transcript =
     (artifact.studioOutput?.raw as { transcript?: string } | undefined)?.transcript ?? "";
   const wordCount = transcript.trim().split(/\s+/).filter(Boolean).length;
-  // Soft sanity: any non-trivial script (>50 words) passes; the LLM-judge
-  // metrics handle quality. Below 50 words is almost certainly a generation
-  // failure rather than a stylistic choice.
-  const status: MetricStatus = wordCount >= 50 ? "pass" : wordCount >= 20 ? "warn" : "fail";
-  const score = wordCount >= 50 ? 1 : wordCount / 50;
+
+  // Check against length target if fixture specifies one
+  const length = fixture.studioParams?.length ?? "default";
+  const targetWords = AUDIO_TARGET_WORDS[length] ?? AUDIO_TARGET_WORDS.default;
+  const ratio = wordCount / targetWords;
+
+  let status: MetricStatus;
+  if (ratio >= 0.9) status = "pass";
+  else if (ratio >= 0.7) status = "warn";
+  else status = "fail";
+
   return baseMetric(
     "audio_script_length",
     fixture,
     artifact,
     status,
-    score,
-    `Transcript word count: ${wordCount}.`,
-    { wordCount }
+    ratio,
+    `Word count: ${wordCount} / target ${targetWords} (${length}) = ${(ratio * 100).toFixed(1)}%`,
+    { wordCount, targetWords, length, ratio }
   );
 }
 
 // ─── Studio dispatcher ───────────────────────────────────────
 
 /** Run all studio scorers applicable to the given artifact. */
-export function scoreStudioMetrics(
+export async function scoreStudioMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   _baseline?: EvalBaseline
-): MetricResult[] {
+): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
   if (!artifact.studioOutput) return results;
 
@@ -300,13 +319,18 @@ export function scoreStudioMetrics(
     case "mindmap":
       results.push(mindmapNodeCount(fixture, artifact));
       break;
-    case "slides":
-      results.push(slideCount(fixture, artifact));
+    case "infographic": {
+      results.push(infographicHasImage(fixture, artifact));
+      // Add vision-based evaluation
+      const visionResults = await evaluateInfographicWithVision(fixture, artifact);
+      results.push(...visionResults);
       break;
+    }
     case "spreadsheet":
       results.push(spreadsheetRowCount(fixture, artifact));
       break;
     case "audioScript":
+    case "audioScriptOnly":
       results.push(audioScriptLength(fixture, artifact));
       break;
     default:

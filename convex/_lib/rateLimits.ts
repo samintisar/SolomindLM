@@ -16,20 +16,20 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   flashcardFree: { kind: "fixed window", rate: 5, period: DAY },
   quizFree: { kind: "fixed window", rate: 5, period: DAY },
   reportFree: { kind: "fixed window", rate: 5, period: DAY },
-  audioFree: { kind: "fixed window", rate: 1, period: DAY },
+  audioFree: { kind: "fixed window", rate: 5, period: DAY },
   writtenQuestionFree: { kind: "fixed window", rate: 5, period: DAY },
   spreadsheetFree: { kind: "fixed window", rate: 5, period: DAY },
-  slideFree: { kind: "fixed window", rate: 1, period: DAY },
+  infographicFree: { kind: "fixed window", rate: 5, period: DAY },
 
   // Pro tier daily limits
   chatPro: { kind: "fixed window", rate: 500, period: DAY },
   flashcardPro: { kind: "fixed window", rate: 100, period: DAY },
   quizPro: { kind: "fixed window", rate: 100, period: DAY },
   reportPro: { kind: "fixed window", rate: 100, period: DAY },
-  audioPro: { kind: "fixed window", rate: 5, period: DAY },
+  audioPro: { kind: "fixed window", rate: 100, period: DAY },
   writtenQuestionPro: { kind: "fixed window", rate: 100, period: DAY },
   spreadsheetPro: { kind: "fixed window", rate: 100, period: DAY },
-  slidePro: { kind: "fixed window", rate: 10, period: DAY },
+  infographicPro: { kind: "fixed window", rate: 100, period: DAY },
 
   /** Joining notebooks via share link (per user, per hour) */
   shareRedeem: { kind: "fixed window", rate: 60, period: HOUR },
@@ -46,10 +46,10 @@ export function getFreeLimit(feature: DailyFeature): number {
     flashcard: 5,
     quiz: 5,
     report: 5,
-    audio: 1,
+    audio: 5,
     writtenQuestion: 5,
     spreadsheet: 5,
-    slide: 1,
+    infographic: 5,
   };
   return limits[feature];
 }
@@ -63,10 +63,10 @@ export function getProLimit(feature: DailyFeature): number {
     flashcard: 100,
     quiz: 100,
     report: 100,
-    audio: 5,
+    audio: 100,
     writtenQuestion: 100,
     spreadsheet: 100,
-    slide: 10,
+    infographic: 100,
   };
   return limits[feature];
 }
@@ -82,4 +82,4 @@ export type DailyFeature =
   | "audio"
   | "writtenQuestion"
   | "spreadsheet"
-  | "slide";
+  | "infographic";

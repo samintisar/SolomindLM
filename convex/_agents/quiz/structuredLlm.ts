@@ -20,5 +20,6 @@ export function createStructuredLLM<T>(
   schema: z.ZodTypeAny,
   name: string
 ): StructuredOutputInvoker<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return llm.withStructuredOutput(schema, { name }) as any;
 }

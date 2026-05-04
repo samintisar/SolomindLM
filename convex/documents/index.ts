@@ -730,6 +730,7 @@ export const fetchChunks = internalAction({
     "use node";
 
     // Get all chunks for the specified documents
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allChunks: any[] = [];
 
     for (const documentId of args.documentIds) {
@@ -933,6 +934,7 @@ export const storeChunk = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkData: any = {
       documentId: args.documentId,
       userId: args.userId,

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { FolderItem } from "@/shared/types/index";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   Folder,
   Book,
@@ -83,10 +84,12 @@ export const CustomizeFolderModal: React.FC<CustomizeFolderModalProps> = ({
   // Update state when folder prop changes (when data is updated in parent)
   useEffect(() => {
     if (folder) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(folder.name);
       setSelectedColor(folder.color || "bg-blue-500");
       setSelectedIcon(folder.icon || "Folder");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folder?.id]); // Only update when folder ID changes (different folder selected)
 
   const CurrentIcon = IconMap[selectedIcon] || Folder;

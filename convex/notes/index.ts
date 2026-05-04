@@ -33,12 +33,13 @@ export const listAllByNotebook = query({
       "quizzes",
       "mindmaps",
       "audioOverviews",
-      "slides",
+      "infographics",
       "spreadsheets",
       "writtenQuestions",
       "notes",
     ];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const queries: Promise<any[]>[] = [];
 
     if (!args.types || args.types.includes("reports")) {
@@ -96,14 +97,14 @@ export const listAllByNotebook = query({
       );
     }
 
-    if (!args.types || args.types.includes("slides")) {
+    if (!args.types || args.types.includes("infographics")) {
       queries.push(
         ctx.db
-          .query("slides")
+          .query("infographics")
           .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
           .order("desc")
           .collect()
-          .then((items) => items.map((item) => ({ ...item, _type: "slides" as const })))
+          .then((items) => items.map((item) => ({ ...item, _type: "infographic" as const })))
       );
     }
 
@@ -158,7 +159,7 @@ export const getById = query({
       v.id("quizzes"),
       v.id("mindmaps"),
       v.id("audioOverviews"),
-      v.id("slides"),
+      v.id("infographics"),
       v.id("spreadsheets"),
       v.id("writtenQuestions"),
       v.id("notes")
@@ -174,7 +175,7 @@ export const getById = query({
       quiz: "quizzes",
       mindmap: "mindmaps",
       audioOverview: "audioOverviews",
-      slides: "slides",
+      infographic: "infographics",
       spreadsheet: "spreadsheets",
       writtenQuestions: "writtenQuestions",
       note: "notes",
@@ -185,6 +186,7 @@ export const getById = query({
       return null;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const note = await ctx.db.get(args.id as any);
     if (!note) return null;
 
@@ -234,7 +236,7 @@ export const countByType = query({
       quizzes,
       mindmaps,
       audioOverviews,
-      slides,
+      infographics,
       spreadsheets,
       writtenQuestions,
     ] = await Promise.all([
@@ -264,7 +266,7 @@ export const countByType = query({
         .collect()
         .then((items) => items.length),
       ctx.db
-        .query("slides")
+        .query("infographics")
         .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
         .collect()
         .then((items) => items.length),
@@ -288,7 +290,7 @@ export const countByType = query({
       quizzes,
       mindmaps,
       audioOverviews,
-      slides,
+      infographics,
       spreadsheets,
       writtenQuestions,
       notes,
@@ -298,7 +300,7 @@ export const countByType = query({
         quizzes +
         mindmaps +
         audioOverviews +
-        slides +
+        infographics +
         spreadsheets +
         writtenQuestions +
         notes,

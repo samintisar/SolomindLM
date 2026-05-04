@@ -7,7 +7,9 @@ describe("countTokens", () => {
   });
 
   it("returns 0 for non-string input", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(countTokens(null as any)).toBe(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(countTokens(undefined as any)).toBe(0);
   });
 
@@ -30,6 +32,7 @@ describe("countTokensBatch", () => {
   });
 
   it("returns empty array for null/undefined", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(countTokensBatch(null as any)).toEqual([]);
   });
 
@@ -45,6 +48,8 @@ describe("countTokensBatch", () => {
   });
 
   it("handles non-string entries", () => {
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = countTokensBatch(["hello", null as any, 42 as any]);
     expect(result).toEqual([2, 0, 0]);
   });

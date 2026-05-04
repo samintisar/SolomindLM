@@ -17,7 +17,8 @@ import { ForkNotebookPage } from "./features/notebooks/components/views/ForkNote
 import { ShareNotebookModal } from "./features/notebooks/components/modals/ShareNotebookModal";
 import { BillingPage } from "./features/billing/components/BillingPage";
 import { LandingPage } from "./features/landing/LandingPage";
-import { useAuth, AuthProvider } from "./features/auth/AuthContext";
+import { AuthProvider } from "./features/auth/AuthContext";
+import { useAuth } from "./features/auth/useAuth";
 import { AuthPage } from "./features/auth/AuthPage";
 import { ThemeProvider } from "./shared/contexts/ThemeContext";
 import { ToastProvider } from "./shared/contexts/ToastContext";
@@ -115,6 +116,7 @@ const AppContent: React.FC = () => {
   // Auto-select the most recently updated conversation when the list loads
   useEffect(() => {
     if (!activeConversationId && conversationCRUD.conversations && conversationCRUD.conversations.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveConversationId(conversationCRUD.conversations[0]._id);
     }
   }, [activeConversationId, conversationCRUD.conversations]);
@@ -152,8 +154,8 @@ const AppContent: React.FC = () => {
     location.pathname === "/billing" ||
     location.pathname.startsWith("/folder/");
 
-  const notebookList = notebooks ?? [];
-  const folderList = folders ?? [];
+  const notebookList = useMemo(() => notebooks ?? [], [notebooks]);
+  const folderList = useMemo(() => folders ?? [], [folders]);
   const featuredNotebooks = useMemo(
     () => notebookList.filter((nb: NotebookItem) => nb.isFeatured),
     [notebookList]
@@ -169,6 +171,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveNotebookId(urlNotebookId);
       setActiveConversationId(null);
     }
@@ -176,12 +179,13 @@ const AppContent: React.FC = () => {
       setActiveNotebookId(null);
       setActiveConversationId(null);
     }
-  }, [urlNotebookId, currentView]);
+  }, [urlNotebookId, currentView, activeNotebookId]);
 
   useEffect(() => {
     if (urlNotebookId && notebookList.length > 0) {
       const notebook = notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
       if (notebook) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNotebookTitle(notebook.title);
       }
     }
@@ -190,22 +194,23 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (!shareModalOpen) return;
     if (!urlNotebookId || !activeNotebook || activeNotebook.isSharedNotebook) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShareModalOpen(false);
     }
   }, [shareModalOpen, urlNotebookId, activeNotebook]);
 
-  const handleLogoClick = () => {
+  const handleLogoClick = useCallback(() => {
     navigate(isNativeShell() ? "/home" : "/");
     setActiveNotebookId(null);
-  };
+  }, [navigate]);
 
-  const handleSelectNotebook = (notebook: NotebookItem) => {
+  const handleSelectNotebook = useCallback((notebook: NotebookItem) => {
     navigate(`/notebook/${notebook.id}`);
-  };
+  }, [navigate]);
 
-  const handleSelectFolder = (folderId: string) => {
+  const handleSelectFolder = useCallback((folderId: string) => {
     navigate(`/folder/${folderId}`);
-  };
+  }, [navigate]);
 
   const notebookContextValue = useMemo(
     () => ({
@@ -247,6 +252,7 @@ const AppContent: React.FC = () => {
       currentView,
       folderList,
       handleSelectNotebook,
+      handleSelectFolder,
       notebookCRUD,
       folderCRUD,
       handleLogoClick,

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Globe, GraduationCap, Newspaper, TrendingUp, Plus, X, ExternalLink } from "lucide-react";
+import { Favicon } from "@/shared/components/Favicon";
 
 export interface ExternalSource {
   title: string;
@@ -35,6 +36,7 @@ export const SourceSuggestionPrompt: React.FC<SourceSuggestionPromptProps> = ({
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelected(new Set());
   }, [listFingerprint, sources.length]);
 
@@ -107,7 +109,11 @@ export const SourceSuggestionPrompt: React.FC<SourceSuggestionPromptProps> = ({
                 onChange={() => toggleIndex(index)}
                 aria-label={`Include ${source.title}`}
               />
-              <Icon className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />
+              {source.sourceType === "web" ? (
+                <Favicon url={source.url} size={16} className="mt-0.5" />
+              ) : (
+                <Icon className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <a

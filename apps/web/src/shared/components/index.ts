@@ -16,7 +16,8 @@ export { ErrorBoundary } from "./ErrorBoundary";
 export { ErrorMessage } from "./ErrorMessage";
 
 // Toast components
-export { ToastProvider, useToast } from "../contexts/ToastContext";
+export { ToastProvider } from "../contexts/ToastContext";
+export { useToast } from "../contexts/useToast";
 export { ToastContainer } from "./ToastContainer";
 
 // Re-export ProtectedRoute for convenience

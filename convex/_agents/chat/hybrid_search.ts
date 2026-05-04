@@ -154,6 +154,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
   ) {
     super(config, embeddingService, vectorSearchRunner, rerankFn);
     this.hybridConfig = { ...DEFAULT_HYBRID_CONFIG, ...config };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.keywordSearchRunner = keywordSearchRunner ?? (null as any);
   }
 

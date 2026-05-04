@@ -1,5 +1,4 @@
 "use node";
-import { MARKDOWN_MATH_NOTATION_FOR_APP } from "../_shared/markdownMathPrompt.js";
 
 /**
  * Prompts for AudioOverviewGraph.
@@ -44,9 +43,9 @@ export type AudioLength = "short" | "default" | "long";
 
 /** Target line counts for different audio lengths */
 export const TARGET_LINE_COUNTS: Record<AudioLength, number> = {
-  short: 30, // ~4 minutes (600-650 words)
-  default: 65, // ~7.5 minutes (1200-1300 words)
-  long: 100, // ~12.5 minutes (2000-2200 words)
+  short: 100, // ~12 minutes (2000 words)
+  default: 220, // ~27 minutes (4400 words)
+  long: 350, // ~43 minutes (7000 words)
 } as const;
 
 /** Estimated words per dialogue line */
@@ -169,9 +168,7 @@ TEXT TO ANALYZE:
 // ============================================================
 
 /** Main reduce prompt for generating dialogue scripts */
-export const REDUCE_PROMPT = `You are an expert podcast scriptwriter. Convert the following "dialogue beats" into a lively, natural conversation script between two hosts.
-
-${MARKDOWN_MATH_NOTATION_FOR_APP}
+export const REDUCE_PROMPT = `You are an expert podcast scriptwriter. Convert the following "dialogue beats" into a lively, messy, natural conversation script between two hosts.
 
 CRITICAL REQUIREMENT:
 Output ONLY a valid JSON array of dialogue lines with this exact format:
@@ -180,16 +177,26 @@ Output ONLY a valid JSON array of dialogue lines with this exact format:
   {"speaker": "host_b", "text": "..."}
 ]
 
-LENGTH (CEILING, not a quota):
-- The natural shape of the conversation decides where it ends. {targetLines} turns
-  / ~{estimatedWords} words is a CEILING — never a target to reach. If the dialogue
-  reaches a satisfying recap + sign-off in 30 turns, stop at 30. Do NOT generate
-  filler turns or restart the conversation to inflate the count.
-- A reaction can be five words; an explanation can be eight sentences. Same speaker
+CONVERSATIONAL DYNAMICS (CRITICAL):
+- NO Q&A PING-PONG: Host B must not just ask a series of interview questions. Host B should synthesize, make analogies, disagree, or finish Host A's sentences.
+- USE IMPERFECTIONS: Real people don't speak in perfect paragraphs. Use em-dashes (—) heavily for interruptions, self-corrections mid-sentence, and trailing off. 
+- ACTIVE LISTENING: Start turns with natural discourse markers like "Right,", "Yeah,", "Wait, but—", "Look,", or "I mean...".
+- NO DICTIONARY DEFINITIONS: Explain concepts casually, as if talking at a whiteboard, not reading from a textbook.
+
+LENGTH REQUIREMENT (MANDATORY):
+- You MUST generate approximately {targetLines} dialogue turns / ~{estimatedWords} words.
+  This is a HARD TARGET, not a suggestion. Count your turns as you write.
+- Use EVERY beat provided. If you have 40+ beats, each one should become at least
+  one turn (often 2-3). Draw out implications, show connections, let hosts react
+  to each other. Do NOT rush through beats to finish early.
+- A reaction can be two words; an explanation can be six sentences. Same speaker
   can take two or three turns in a row when telling a mini-story, working out an
   argument, or recovering from a misspoken phrase.
 - DO NOT summarize. Stay specific. If a beat hands you a number, an example, or
-  a counterpoint, use it verbatim instead of paraphrasing into something generic.
+  a counterpoint, use it verbatim. Do not compress multiple beats into one turn.
+- SELF-CHECK: Before closing the JSON array, verify you have generated close to
+  {targetLines} turns. If you have fewer than {targetLines} * 0.9 turns, continue
+  the conversation with remaining beats. Do not end early.
 
 ANTI-REPETITION:
 - Build on what was already said; don't restate it.
@@ -199,79 +206,42 @@ ANTI-REPETITION:
 
 {coveredTopicsPrompt}
 
-HOST VOICES (speak the way the samples below speak — do not just role-play the labels):
+HOST VOICES:
 
-host_a is the one who's been thinking about this stuff for years. Direct, slightly
-dry, no hedging. Drops in specific numbers and proper nouns without ceremony.
+host_a is the domain expert. Passionate but a bit scattered. Often self-corrects mid-thought. Drops in specific numbers and proper nouns casually.
 Sample:
-  "Okay so prompt chaining. You take a big task, break it into ordered steps, and you
-   feed each step's output into the next. That's it. The reason it works is every step
-   gets to fail loudly, in isolation. You're not asking one model call to do five things
-   at once and then wondering which of the five went wrong."
-  "Right, but routing isn't that. Routing is — you've got incoming work, and a small
-   classifier decides which downstream agent or tool actually handles it. Cheap, fast,
-   wrong half the time if you don't tune it. Different problem."
+  "Look, prompt chaining is basically—you don't ask the model to do five things at once. You break it into steps. Output of step one goes to step two. The reason it works is... well, if step three fails, it fails loudly in isolation. You actually know what broke."
+  "Right, but routing is completely different. That's just a classifier sitting at the front door deciding which agent gets the ticket. It's cheap, but if you don't tune the threshold, it's wrong half the time."
 
-host_b is the one hearing it for the first time but not pretending to be amazed.
-Asks the real follow-up. Pushes back when something's hand-wavy.
+host_b is the skeptical audience surrogate. Doesn't just ask questions—challenges assumptions and tries to translate expert jargon into normal terms.
 Sample:
-  "Hold on — you said it fails loudly. In practice, doesn't it just fail at step three
-   and the user sees a wall of JSON?"
-  "Hmm. So routing assumes you already know the categories. What happens when the request
-   doesn't fit any of them — does it default, or just sit there?"
+  "Wait, 'fails loudly' sounds great in theory, but doesn't the user just end up staring at a wall of broken JSON when step three crashes?"
+  "So routing is just a traffic cop. But what happens when a request is weird and doesn't fit any of your predefined buckets? Does it just guess?"
 
 DO NOT include the host names "Asteria" or "Orion" in the dialogue text. Just write
-their lines. The speaker labels are JSON metadata, not character names the listener hears.
+their lines. The speaker labels are JSON metadata.
 
 DO NOT use "..." as a stylistic pause. If a thought is unfinished, write it that way —
-"Hold on, that doesn't —" — but don't sprinkle ellipses to fake naturalness.
+"Hold on, that doesn't—" — but don't sprinkle ellipses to fake naturalness.
 
 OPENING:
 Start mid-thought, with something specific to this material — a number, a contradiction,
 a half-finished question. Never a stock podcast opener. Never "So, today we're talking
-about..." or "Welcome back, listeners."
+about..." or "Welcome back."
 
 NAMED-LIST RECAP (only when applicable):
-If the source enumerates a discrete named list (e.g. "the 20 patterns") and the deeper
-discussion only landed on a subset, near the end give host_a or host_b ONE substantive
-recap turn that names every remaining item in plain prose — like a person actually
-recalling a list, not a checklist robot. Example shape (do NOT copy wording literally):
-  host_a: "We hit the big ones, but to round it out — the rest of the list is reflection,
-   tool use, planning, multi-agent collaboration, memory management, learning and
-   adaptation, goal setting and monitoring, and a handful more. Each one's a separate
-   conversation, but at least you know the lay of the land."
-This is ONE turn, not a sprinkled checklist across multiple turns. Do not break it
-into ping-pong "And what about X?" / "Right, X is —" exchanges.
+If the source enumerates a discrete named list and you couldn't cover them all, give ONE of the hosts a casual, hand-wavy recap turn. Do not sound like a robot reading a checklist. Group them or speed-run them naturally.
+Example shape (do NOT copy wording literally):
+  host_a: "There's like ten others in the book—stuff like multi-agent collaboration, memory management, goal setting... we'd be here all day if we went through them. But they mostly fall into that same bucket of keeping the LLM on rails."
 
-ENDING ANCHOR (hard rule, overrides length target):
-After the recap turn (or, if no recap is applicable, after host_a's final
-explanation), produce at most ONE short closing turn from host_b — a brief
-take-away or sign-off, 1–2 sentences max — and then STOP. Close the JSON array.
-
-Things that are NOT permitted after the closing turn:
-- Restarting the conversation with a new opening hook (e.g. "The Google
-  engineer's 400-page book..." or "The author claims..." again).
-- Re-introducing the topic or re-naming items already covered or recapped.
-- Generating additional turns to "fill" the {targetLines} target — that
-  number is a ceiling, never a quota. Stopping early is correct; looping is
-  a generation defect.
-
-If you are tempted to keep going because you "haven't reached the target line
-count", you have already finished. Output the closing turn and emit "]".
-
-EXAMPLES OF GOOD RHYTHM (for cadence reference, not wording):
-host_a: "There are twenty of these patterns in the book. Most of them you can group
- into three or four families, but the author keeps them separate because the failure
- modes are different."
-host_b: "Twenty feels like a lot. Is the author padding, or are they actually all
- doing different work?"
-host_a: "Mostly different work. A few overlap — routing and prioritization are
- cousins. But things like reflection and exception-handling are doing genuinely
- different jobs even if they sound similar in a paragraph."
-host_b: "Okay. Start with the one you think people misuse the most."
+ENDING:
+Only after generating close to {targetLines} turns, give host_b one brief closing
+turn (1–2 sentences) — a takeaway or sign-off — and then close the JSON array.
+DO NOT end early. If you have not yet reached {targetLines} turns, continue the
+conversation using remaining beats or exploring implications of covered material.
 
 AUDIO TYPE: {audioType}
-ROUGH LENGTH: ~{targetLines} turns / ~{estimatedWords} words (approximate, not enforced)
+REQUIRED LENGTH: {targetLines} turns / ~{estimatedWords} words (MANDATORY)
 FOCUS AREA: {focus}
 
 SOURCE MATERIAL (dialogue beats):

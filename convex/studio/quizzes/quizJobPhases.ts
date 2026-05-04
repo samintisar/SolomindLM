@@ -39,11 +39,13 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 interface QuizCandidateOutputInvoker {
   invoke(
     messages: Array<SystemMessage | HumanMessage>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config?: any
   ): Promise<QuizCandidateResponse>;
 }
 
 interface QuizQuestionOutputInvoker {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<QuizQuestion>;
 }
 
@@ -231,6 +233,7 @@ export async function runQuizGenerationPhase(
     });
 
     // Extract content from chunk objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -361,6 +364,7 @@ export async function runProcessQuizMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -421,6 +425,7 @@ export async function runProcessQuizMapChunkPhase(
       try {
         response = await invokeStudioLlm({
           invoke: () =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (structuredLLM as any).invoke(
               [new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
               createLangSmithRunConfig({
@@ -554,6 +559,7 @@ export async function runProcessQuizMapChunkPhase(
       : 0;
     const totalMaps = quiz.metadata?.totalMapTasks || totalChunks;
     const failedMaps = quiz.metadata?.mapResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? Object.values(quiz.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
@@ -626,6 +632,7 @@ export async function runFinalizeQuizPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -697,6 +704,7 @@ export async function runFinalizeQuizPhase(
     const startTime = Date.now();
     const selectionResponse = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredSelectLLM as any).invoke(
           [new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)), new HumanMessage(selectionPrompt)],
           createLangSmithRunConfig({
@@ -770,6 +778,7 @@ export async function runFinalizeQuizPhase(
             const prompt = getExpandPrompt(candidate);
             return await invokeStudioLlm({
               invoke: () =>
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (structuredExpandLLM as any).invoke(
                   [new SystemMessage(withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
                   createLangSmithRunConfig({
@@ -845,6 +854,12 @@ export async function runFinalizeQuizPhase(
 
     // Clear intermediate data
     await ctx.runMutation(internal.studio.jobMutations.quizzes.clearQuizMapData, { quizId });
+
+    // Consume rate limit token on success
+    await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "quiz",
+    });
 
     logger.jobComplete({
       questionsGenerated: finalQuestions.length,

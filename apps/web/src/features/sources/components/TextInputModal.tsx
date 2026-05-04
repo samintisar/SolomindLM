@@ -19,6 +19,7 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTextInput("");
     }
   }, [isOpen]);

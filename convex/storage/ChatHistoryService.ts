@@ -150,6 +150,7 @@ export const getConversationWithMessages = internalAction({
     // Get or create conversation
     const conversationId: Id<"conversations"> = await ctx.runMutation(
       internal.storage.ChatHistoryService.getOrCreateConversation,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { userId: userId as any, notebookId }
     );
 

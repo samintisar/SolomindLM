@@ -50,6 +50,7 @@ const SKEW_MS = 120_000;
 
 export function useChatStream({ activeNotebookId, activeConversationId, sources, notes, documents }: UseChatStreamProps) {
   const sourcesRef = useRef(sources);
+  // eslint-disable-next-line react-hooks/refs
   sourcesRef.current = sources;
 
   const chatBundle = useQuery(
@@ -62,7 +63,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       : "skip"
   );
 
-  const messages = chatBundle?.messages ?? [];
+  const messages = useMemo(() => chatBundle?.messages ?? [], [chatBundle?.messages]);
   const chatRemoteGenerating = chatBundle?.chatGenerating ?? false;
 
   /** True when server reports an in-flight generation and the DB still expects a reply (last row is not assistant). */
@@ -101,6 +102,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
   >([]);
   const messagesLengthWhenStreamCompleteRef = useRef(0);
   const messagesRef = useRef(messages);
+  // eslint-disable-next-line react-hooks/refs
   messagesRef.current = messages;
   const streamStartedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -126,13 +128,14 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
     setStreamingGrounding([]);
     setStreamingClarification(null);
     setStreamingResearchPlan(null);
-    setExternalSources([]);
     streamStartedAtRef.current = null;
   }, []);
 
   // Reset streaming state when switching to a different conversation
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     resetStreamingState();
+    setExternalSources([]);
   }, [activeConversationId, resetStreamingState]);
 
   // Auto-release stale chat generations (when generation is stuck for >5 minutes)
@@ -173,6 +176,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       messages,
       activeNotebookId,
       releaseChatGenerationMutation,
+      STALE_GENERATION_MS,
     ]
   );
 
@@ -212,6 +216,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       setStreamingGrounding([]);
       setStreamingClarification(null);
       setLastAssistantFollowUps(null);
+      setExternalSources([]);
 
       const onStreamComplete = () => {
         setIsChatStreaming(false);
@@ -362,6 +367,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
     if (last?.role !== "assistant" || !last.content) return;
     if (last.content.trimEnd() !== streamingContent.trimEnd()) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsChatStreaming(false);
     setStreamingToolCalls([]);
     setStreamingTracePhases([]);
@@ -392,7 +398,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
 
   const chatDisplayMessages = useMemo((): Message[] => {
     const list: Message[] = messages.map((msg: Doc<"messages">, index: number) => {
-      const meta = (msg as Doc<"messages"> & { metadata?: { agentTrace?: ChatAgentTrace; researchPlanId?: string; isResearchPlan?: boolean } })
+      const meta = (msg as Doc<"messages"> & { metadata?: { agentTrace?: ChatAgentTrace; researchPlanId?: string; isResearchPlan?: boolean; externalSources?: Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }> } })
         .metadata;
       const trace = meta?.agentTrace;
       return {
@@ -401,6 +407,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
         content: msg.content,
         timestamp: new Date(msg.createdAt as number),
         references: msg.references,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         feedback: (msg as any).feedback as "up" | "down" | undefined,
         followUps:
           !streamingContent &&
@@ -410,11 +417,13 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
             ? lastAssistantFollowUps
             : undefined,
         agentTrace: trace,
+        externalSources: meta?.externalSources,
         researchPlan: meta?.isResearchPlan && meta?.researchPlanId
           ? streamingResearchPlan ?? { planId: meta.researchPlanId, subQuestions: [], sourcePolicy: {} }
           : undefined,
       };
     });
+    // eslint-disable-next-line react-hooks/refs
     const t0 = streamStartedAtRef.current;
     const last = messages[messages.length - 1] as Doc<"messages"> | undefined;
     const prev = messages[messages.length - 2] as Doc<"messages"> | undefined;
@@ -425,8 +434,25 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
           ? last.content
           : String(last.content);
     const ghostStuckAssistantRow =
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+       
+      // eslint-disable-next-line react-hooks/refs
       isChatStreaming &&
       !streamingContent.trim() &&
+      // eslint-disable-next-line react-hooks/refs
       t0 != null &&
       last?.role === "assistant" &&
       prev?.role === "user" &&
@@ -436,6 +462,8 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
 
     if (
       (isChatStreaming || streamingContent || streamingClarification) &&
+       
+      // eslint-disable-next-line react-hooks/refs
       !ghostStuckAssistantRow
     ) {
       const toolSearching = streamingToolCalls.some((t) => t.status === "searching");
@@ -486,6 +514,8 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
       !isChatStreaming &&
       !streamingContent.trim() &&
       !streamingClarification &&
+       
+      // eslint-disable-next-line react-hooks/refs
       !ghostStuckAssistantRow;
 
     if (showRemoteOnlyPlaceholder) {
@@ -577,6 +607,7 @@ export function useChatStream({ activeNotebookId, activeConversationId, sources,
     documents
   );
   const sourceCount = useMemo(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     () => documents.filter((d: any) => d.status === "completed").length,
     [documents]
   );

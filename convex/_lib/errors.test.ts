@@ -81,14 +81,14 @@ describe("isRetryableHttpStatus", () => {
 describe("getFeatureLimit", () => {
   it("returns pro limits when isPro=true", () => {
     expect(getFeatureLimit("chat", true)).toBe(500);
-    expect(getFeatureLimit("audio", true)).toBe(5);
-    expect(getFeatureLimit("slide", true)).toBe(10);
+    expect(getFeatureLimit("audio", true)).toBe(100);
+    expect(getFeatureLimit("infographic", true)).toBe(100);
   });
 
   it("returns free limits when isPro=false", () => {
     expect(getFeatureLimit("chat", false)).toBe(50);
     expect(getFeatureLimit("audio", false)).toBe(1);
-    expect(getFeatureLimit("slide", false)).toBe(1);
+    expect(getFeatureLimit("infographic", false)).toBe(5);
   });
 
   it("getFreeLimit and getProLimit return correct values", () => {

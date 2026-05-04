@@ -29,6 +29,7 @@ import { GRAPH_CONFIG } from "./config.js";
  */
 export async function writeScript(
   state: OverallStateType,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   smartLlm: any
 ): Promise<Partial<OverallStateType>> {
   const logger = createAgentGraphLogger("AudioOverviewGraph", "audio");

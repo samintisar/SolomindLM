@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 interface UseStripeRedirectProps {
   isAuthenticated: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any;
 }
 

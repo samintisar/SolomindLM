@@ -27,6 +27,8 @@ export const jobErrorMetadataValidator = v.object({
 /**
  * Build enhanced error metadata for database storage.
  */
+ 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildErrorMetadata(error: string, phase: string, metadata?: any): any {
   if (metadata?.errorType && metadata?.errorPhase) {
     return {
@@ -177,6 +179,7 @@ export const updateFlashcardStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -337,6 +340,7 @@ export const updateQuizStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -497,6 +501,7 @@ export const updateWrittenQuestionsStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -669,6 +674,7 @@ export const updateReportStatus = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -833,6 +839,7 @@ export const updateMindMapStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -943,162 +950,6 @@ export const clearMindMapMapData = internalMutation({
 });
 
 // ============================================================
-// SLIDE DECK HELPERS
-// ============================================================
-
-export const saveSlideDeckResults = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    slides: v.array(v.any()),
-    metadata: v.any(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.slideDeckId, {
-      data: args.slides,
-      status: "completed",
-      slideCount: args.slides.length,
-      updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Slide Deck",
-      metadata: {
-        ...args.metadata,
-        completedAt: Date.now(),
-      },
-    });
-  },
-});
-
-export const updateSlideDeckTitle = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.slideDeckId, {
-      title: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-export const updateSlideDeckStatus = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    status: v.string(),
-    metadata: v.optional(v.any()),
-  },
-  handler: async (ctx, args) => {
-    const updates: any = {
-      status: args.status,
-      updatedAt: Date.now(),
-    };
-    if (args.metadata) {
-      updates.metadata = args.metadata;
-    }
-    await ctx.db.patch(args.slideDeckId, updates);
-  },
-});
-
-export const markSlideDeckFailed = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    error: v.string(),
-    metadata: v.optional(v.any()),
-  },
-  handler: async (ctx, args) => {
-    const errorMetadata = buildErrorMetadata(
-      args.error,
-      args.metadata?.phase || "unknown",
-      args.metadata
-    );
-    await ctx.db.patch(args.slideDeckId, {
-      status: "failed",
-      updatedAt: Date.now(),
-      metadata: {
-        ...args.metadata,
-        ...errorMetadata,
-      },
-    });
-  },
-});
-
-// Multi-phase slide deck helpers
-export const initSlideDeckMapPhase = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    totalMapTasks: v.number(),
-    slideCount: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const slideDeck = await ctx.db.get(args.slideDeckId);
-    if (!slideDeck) return null;
-
-    await ctx.db.patch(args.slideDeckId, {
-      status: "generating",
-      updatedAt: Date.now(),
-      metadata: {
-        ...slideDeck.metadata,
-        phase: "map_processing",
-        progress: 30,
-        totalMapTasks: args.totalMapTasks,
-        completedMapTasks: 0,
-        mapResults: {},
-        slideCount: args.slideCount,
-      },
-    });
-    return args.slideDeckId;
-  },
-});
-
-export const storeSlideDeckMapResult = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-    chunkIndex: v.number(),
-    result: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const slideDeck = await ctx.db.get(args.slideDeckId);
-    if (!slideDeck) return null;
-
-    const existingResults = slideDeck.metadata?.mapResults || {};
-    const updatedResults = {
-      ...existingResults,
-      [args.chunkIndex]: args.result,
-    };
-
-    const completedCount = Object.keys(updatedResults).length;
-    const totalCount = slideDeck.metadata?.totalMapTasks || 0;
-
-    await ctx.db.patch(args.slideDeckId, {
-      updatedAt: Date.now(),
-      metadata: {
-        ...slideDeck.metadata,
-        mapResults: updatedResults,
-        completedMapTasks: completedCount,
-        progress: 30 + Math.floor((completedCount / totalCount) * 30),
-      },
-    });
-    return args.slideDeckId;
-  },
-});
-
-export const clearSlideDeckMapData = internalMutation({
-  args: {
-    slideDeckId: v.id("slides"),
-  },
-  handler: async (ctx, args) => {
-    const slideDeck = await ctx.db.get(args.slideDeckId);
-    if (!slideDeck) return null;
-
-    const { mapResults: _mapResults, ...restMetadata } =slideDeck.metadata || {};
-    await ctx.db.patch(args.slideDeckId, {
-      updatedAt: Date.now(),
-      metadata: restMetadata,
-    });
-    return args.slideDeckId;
-  },
-});
-
-// ============================================================
 // SPREADSHEET HELPERS
 // ============================================================
 
@@ -1142,6 +993,7 @@ export const updateSpreadsheetStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -1301,6 +1153,7 @@ export const updateAudioOverviewStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),

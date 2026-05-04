@@ -153,9 +153,9 @@ flowchart TD
   - Avoids token limits for long scripts
   - Calculates number of chunks based on target length
 - **Target Line Counts**:
-  - **short**: 30 lines (~4 minutes, 600-650 words)
-  - **default**: 65 lines (~7.5 minutes, 1200-1300 words)
-  - **long**: 100 lines (~12.5 minutes, 2000-2200 words)
+  - **short**: 100 lines (~12 minutes, 2000 words)
+  - **default**: 220 lines (~27 minutes, 4400 words)
+  - **long**: 350 lines (~43 minutes, 7000 words)
 - **Anti-Repetition**:
   - Tracks covered examples (not concepts - concepts can have multiple aspects)
   - Includes covered examples in prompt for subsequent chunks

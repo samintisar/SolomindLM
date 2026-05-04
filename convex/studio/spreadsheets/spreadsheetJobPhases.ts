@@ -249,6 +249,7 @@ export async function runSpreadsheetGenerationPhase(
     });
 
     // Extract content from chunk objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -364,6 +365,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -389,6 +391,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
           [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -490,6 +493,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
       : 0;
     const totalMaps = spreadsheet.metadata?.totalMapTasks || totalChunks;
     const failedMaps = spreadsheet.metadata?.mapResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? Object.values(spreadsheet.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
@@ -563,6 +567,7 @@ export async function runFinalizeSpreadsheetPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -657,6 +662,7 @@ export async function runFinalizeSpreadsheetPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (reduceLLM as any).invoke(
           [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -676,6 +682,7 @@ export async function runFinalizeSpreadsheetPhase(
     let finalOutput = cleanCsvOutput(rawContent);
 
     // Handle truncation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const responseAny = response as any;
     const metadata = responseAny.response_metadata || {};
     const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;
@@ -733,6 +740,12 @@ export async function runFinalizeSpreadsheetPhase(
     // Clear intermediate data
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.clearSpreadsheetMapData, {
       spreadsheetId,
+    });
+
+    // Consume rate limit token on success
+    await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "spreadsheet",
     });
 
     logger.jobComplete({
@@ -824,6 +837,7 @@ async function recursiveCollapse(
         try {
           const response = await invokeStudioLlm({
             invoke: () =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (reduceLLM as any).invoke(
                 [new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
                 createLangSmithRunConfig({

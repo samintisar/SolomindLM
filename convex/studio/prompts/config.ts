@@ -19,7 +19,7 @@ export const RATING_PRIOR_COUNT = 5;
 export const studioToolValidator = v.union(
   v.literal("report"),
   v.literal("spreadsheet"),
-  v.literal("slides"),
+  v.literal("infographic"),
   v.literal("flashcards"),
   v.literal("quiz"),
   v.literal("audio"),
@@ -27,4 +27,4 @@ export const studioToolValidator = v.union(
   v.literal("mindmap"),
 );
 
-export type StudioTool = "report" | "spreadsheet" | "slides" | "flashcards" | "quiz" | "audio" | "writtenQuestions" | "mindmap";
+export type StudioTool = "report" | "spreadsheet" | "infographic" | "flashcards" | "quiz" | "audio" | "writtenQuestions" | "mindmap";

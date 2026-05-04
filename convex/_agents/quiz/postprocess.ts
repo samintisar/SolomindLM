@@ -39,6 +39,7 @@ export async function expandQuestion(
     () =>
       invokeWithTimeout(
         () =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (deps.expandLlmQuestionStructured as any).invoke(
             [new SystemMessage(EXPAND_QUESTION_SYSTEM_PROMPT), new HumanMessage(prompt)],
             createLangSmithRunConfig({

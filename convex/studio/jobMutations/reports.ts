@@ -59,6 +59,7 @@ export const updateReportStatus = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),

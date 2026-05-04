@@ -119,6 +119,7 @@ export const TourTooltip: React.FC = () => {
 
   useEffect(() => {
     if (!step || tourStatus !== "active") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRect(null);
       return;
     }

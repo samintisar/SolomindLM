@@ -15,16 +15,16 @@ export const env = {
   FLASHCARDS_LLM: process.env.FLASHCARDS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   QUIZ_LLM: process.env.QUIZ_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   MINDMAP_LLM: process.env.MINDMAP_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  SLIDES_LLM: process.env.SLIDES_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   SPREADSHEET_LLM: process.env.SPREADSHEET_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   WRITTEN_QUESTIONS_LLM: process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   AUDIO_LLM: process.env.AUDIO_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
 
-  // Tavily (web search)
+  // Tavily (web search + extraction + deep research)
   TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",
 
-  // OpenAlex (academic papers)
-  OPENALEX_BASE_URL: process.env.OPENALEX_BASE_URL || "https://api.openalex.org",
+  // Academic APIs
+  SEMANTIC_SCHOLAR_API_KEY: process.env.SEMANTIC_SCHOLAR_API_KEY || "",
+  PUBMED_EMAIL: process.env.PUBMED_EMAIL || "",
 
   // Mistral (OCR)
   MISTRAL_API_KEY: process.env.MISTRAL_API_KEY || "",
@@ -93,15 +93,10 @@ export const env = {
   REPORT_COLLAPSE_CONCURRENCY: "5",
   REPORT_MAX_TOKENS: "64000",
 
-  // Slides
-  SLIDES_MAP_CHUNK_TOKENS: "3000",
-  SLIDES_REDUCE_CHUNK_TOKENS: "12000",
-  SLIDES_MIN_SLIDES_PER_CHUNK: "1",
-  SLIDES_MAX_SLIDES_PER_CHUNK: "6",
-  SLIDES_MAX_TOKENS: "8000",
-  SLIDES_MAP_TIMEOUT_MS: "180000",
-  SLIDES_REDUCE_TIMEOUT_MS: "240000",
-  SLIDES_IMAGE_TIMEOUT_MS: "60000",
+  // Infographics
+  INFOGRAPHIC_MAX_TOKENS: "8000",
+  INFOGRAPHIC_GENERATION_TIMEOUT_MS: "180000",
+  INFOGRAPHIC_IMAGE_TIMEOUT_MS: "180000",
 
   // Spreadsheet
   SPREADSHEET_MAP_CHUNK_TOKENS: "5000",

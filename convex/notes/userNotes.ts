@@ -8,6 +8,7 @@ import { internal } from "../_generated/api";
 /**
  * Convert chat messages to clean markdown format
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function messagesToMarkdown(messages: any[]): string {
   if (messages.length === 0) return "";
 
@@ -138,6 +139,7 @@ export const saveChat = action({
 
     // Generate title from first user message
     let title = "Chat Conversation";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstUserMessage = args.messages.find((m: any) => m.role === "user" && m.content);
 
     if (firstUserMessage && firstUserMessage.content) {

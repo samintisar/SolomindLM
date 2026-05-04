@@ -177,13 +177,10 @@ export interface MindMapNodeData {
   nodeData: MindMapNode;
 }
 
-// Slide deck slide
-export interface Slide {
-  slide_number: number;
-  slide_url?: string; // Legacy field name
-  imageUrl?: string; // New field name from gpt-image-1.5 generation
+// Infographic - single AI-generated image
+export interface Infographic {
+  imageUrl: string;
   title: string;
-  talking_points: string[];
   prompt?: string;
   metadata?: Record<string, unknown>;
 }
@@ -302,15 +299,19 @@ export interface WrittenQuestionsNote extends BaseNote {
   } & StudioGenerationMetadata;
 }
 
-// Slide deck note - AI-generated presentation slides
-export interface SlideDeckNote extends BaseNote {
-  type: "slides";
-  slides: Slide[];
+// Infographic note - single AI-generated infographic image
+export interface InfographicNote extends BaseNote {
+  type: "infographic";
+  imageUrl?: string;
+  title: string;
+  prompt?: string;
   metadata: {
-    slideType: "detailed_deck" | "presenter_slides";
-    deckLength: "short" | "default";
-    slideCount: number;
+    sourceDocumentIds: string[];
+    generatedAt?: number;
     customPrompt?: string;
+    orientation?: "landscape" | "portrait" | "square";
+    visualStyle?: string;
+    detailLevel?: "concise" | "standard" | "detailed";
     error?: string;
   } & StudioGenerationMetadata;
 }
@@ -356,7 +357,7 @@ export type Note =
   | AudioOverviewNote
   | MindMapNote
   | WrittenQuestionsNote
-  | SlideDeckNote
+  | InfographicNote
   | SpreadsheetNote
   | UserNote;
 
@@ -393,8 +394,8 @@ export function isWrittenQuestionsNote(note: Note): note is WrittenQuestionsNote
   return note.type === "writtenQuestions";
 }
 
-export function isSlideDeckNote(note: Note): note is SlideDeckNote {
-  return note.type === "slides";
+export function isInfographicNote(note: Note): note is InfographicNote {
+  return note.type === "infographic";
 }
 
 export function isSpreadsheetNote(note: Note): note is SpreadsheetNote {
@@ -554,7 +555,7 @@ export type DailyFeature =
   | "audio"
   | "writtenQuestion"
   | "spreadsheet"
-  | "slide";
+  | "infographic";
 
 /**
  * Error codes for different types of limit errors

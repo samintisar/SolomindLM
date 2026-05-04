@@ -5,7 +5,7 @@ import type { Id } from "@convex/_generated/dataModel";
 export type StudioTool =
   | "report"
   | "spreadsheet"
-  | "slides"
+  | "infographic"
   | "flashcards"
   | "quiz"
   | "audio"

@@ -5,6 +5,8 @@
  * All metric rows are tagged by runner, configHash, and caseId for grouping.
  */
 
+import type { SourceChannel } from "../../convex/_agents/research/types";
+
 // ─── Fixtures ────────────────────────────────────────────────
 
 /** Studio agent kinds that can be evaluated. Each corresponds to a Convex eval action. */
@@ -13,10 +15,11 @@ export type StudioRunnerKind =
   | "flashcards"
   | "quiz"
   | "mindmap"
-  | "slides"
+  | "infographic"
   | "spreadsheet"
   | "writtenQuestions"
-  | "audioScript";
+  | "audioScript"
+  | "audioScriptOnly";
 
 /** All runner kinds (RAG + studio). `"both"` is a fixture-side directive that expands into multiple runs. */
 export type RunnerKind = "chat" | "research" | "both" | StudioRunnerKind;
@@ -36,21 +39,31 @@ export interface StudioParams {
   difficulty?: string;
   topic?: string;
   questionCount?: number;
-  slideCount?: number;
+  /** Audio overview: short | default | long */
+  length?: string;
+  /** Audio overview: deep_dive | brief | critique | debate */
+  audioType?: string;
   /** Override the smart LLM model used for reduce/collapse phases (eval only) */
   smartLlm?: string;
+}
+
+export interface SourcePolicyConfig {
+  channels: SourceChannel[];
+  maxResultsPerChannel?: number;
+  domainAllowlist?: string[];
+  recencyDays?: number;
 }
 
 /**
  * Optional structural expectations used by studio metric scorers.
  * `requiredSections`: heading text that must appear in a markdown report.
- * `minItems`: minimum count for cards/questions/nodes/slides/rows.
+ * `minItems`: minimum count for cards/questions/nodes/rows.
  * `jsonShape`: which Zod-style validator to apply (only for structured outputs).
  */
 export interface ExpectedStructure {
   minItems?: number;
   requiredSections?: string[];
-  jsonShape?: "mindmap" | "slides" | "spreadsheet";
+  jsonShape?: "mindmap" | "spreadsheet";
 }
 
 export interface EvalFixture {
@@ -92,6 +105,8 @@ export interface EvalFixture {
   studioParams?: StudioParams;
   /** Studio-only: structural expectations used by studio metric scorers */
   expectedStructure?: ExpectedStructure;
+  /** Source filter configuration for testing retrieval across different channels */
+  sourcePolicy?: SourcePolicyConfig;
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -154,11 +169,19 @@ export interface EvalRunArtifact {
   evidence?: Array<{
     subQuestionId: string;
     sourceTitle: string;
-    relevanceScore: number;
+    relevanceScore: number | undefined;
     content: string;
   }>;
   /** Studio-only: structured output payload */
   studioOutput?: StudioOutput;
+  /** Source policy used for this run */
+  sourcePolicy?: SourcePolicyConfig;
+  /** Per-source-type evidence found (research runner only) */
+  sourceEvidence?: Array<{
+    channel: SourceChannel;
+    sourceCount: number;
+    topDomains?: string[];
+  }>;
   /** Latency in ms */
   latencyMs: number;
   /** Token usage if available */

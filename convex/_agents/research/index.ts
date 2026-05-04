@@ -26,6 +26,7 @@ export class ResearchAgent {
   }
 
   // Phase 2: Execute plan
+  // Phase 2: Execute plan
   async *executeResearch(
     query: string,
     subQuestions: SubQuestion[],
@@ -50,13 +51,18 @@ export class ResearchAgent {
         };
       }
 
-      // Yield references
+      // Yield references in the same shape as ChatAgent/ReferenceChunk
       const references = result.evidence.map((e, idx) => ({
-        id: String(idx + 1),
+        id: idx + 1,
+        sourceId: e.subQuestionId ? `${e.subQuestionId}-${idx}` : String(idx + 1),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        documentId: (e.metadata as any)?.documentId,
         sourceTitle: e.sourceTitle,
         sourceUrl: e.sourceUrl,
         sourceType: e.sourceType,
-        content: e.content.slice(0, 200),
+        content: e.content.slice(0, 300),
+        chunkIndex: idx,
+        similarity: e.relevanceScore ?? 0.5,
       }));
 
       yield { type: "references", data: references };

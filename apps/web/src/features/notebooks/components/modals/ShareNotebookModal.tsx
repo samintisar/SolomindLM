@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { X, Copy, Check, Users, GitFork, Ban, Loader2, Lock } from "lucide-react";
+import { X, Copy, Check, Users, GitFork, Ban, Loader2, Lock, Share2 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { Button } from "@/shared/components/ui/button";
 
 interface ShareNotebookModalProps {
@@ -48,10 +48,10 @@ function LinkUrlRow({
   const done = copied === copyKey;
   return (
     <div className="mt-4 animate-in fade-in duration-200">
-      <p className="mb-2 text-xs text-muted-foreground">Copy and share this URL with your invitee.</p>
+      <p className="mb-2 font-sans text-xs font-medium text-muted-foreground">Copy and share this URL.</p>
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div
-          className="min-w-0 flex-1 rounded-lg border border-border/80 bg-muted/40 px-3 py-2.5 shadow-sm"
+          className="min-w-0 flex-1 rounded-xl border border-border/70 bg-background/80 px-3 py-2.5 shadow-sm"
           title={url}
         >
           <p className="truncate font-mono text-[11px] leading-normal text-foreground/90 sm:text-xs">
@@ -159,44 +159,46 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
   };
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 p-4 font-sans backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <div
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+        className="relative flex max-h-[90vh] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="share-notebook-title"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
-          <div className="min-w-0 pr-2">
-            <h3 id="share-notebook-title" className="text-lg font-bold text-foreground">
+        <div className="flex shrink-0 items-center justify-between border-b border-border/50 bg-card p-6">
+          <div className="flex min-w-0 items-center gap-3 pr-2">
+            <Share2 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <h2
+              id="share-notebook-title"
+              className="truncate text-xl font-bold tracking-tight text-foreground"
+            >
               Share notebook
-            </h3>
-            <p className="mt-1 text-sm leading-snug text-muted-foreground">
-              Generate a signed-in link to collaborate or to let someone duplicate this notebook into
-              their account.
-            </p>
+            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-xl p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="shrink-0 rounded-xl p-2 text-muted-foreground transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid gap-0 md:grid-cols-2 md:divide-x md:divide-border">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-card/50">
+          <div className="grid gap-0 md:grid-cols-2 md:divide-x md:divide-border/80">
             {/* Cowork */}
-            <section className="flex flex-col border-b border-border p-6 md:border-b-0 md:pr-8">
-              <div className="mb-4 space-y-1">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            <section className="flex flex-col border-b border-border/80 p-6 md:border-b-0 md:pr-8">
+              <div className="mb-5 space-y-2">
+                <div className="flex items-center gap-2 font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
                   <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   Cowork
                 </div>
-                <p className="text-sm font-semibold text-foreground">Shared workspace</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-sans text-sm font-semibold text-foreground">Shared workspace</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   Editors can manage sources, folders, Studio, and chat. Chat threads stay in sync for
                   everyone on this notebook.
                 </p>
@@ -223,13 +225,13 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
 
             {/* Duplicate */}
             <section className="flex flex-col p-6 md:pl-8">
-              <div className="mb-4 space-y-1">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <div className="mb-5 space-y-2">
+                <div className="flex items-center gap-2 font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
                   <GitFork className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   Duplicate
                 </div>
-                <p className="text-sm font-semibold text-foreground">Copy to their account</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-sans text-sm font-semibold text-foreground">Copy to their account</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   Recipients get sources, Studio work, and manual notes they own. Conversations are
                   not copied.
                 </p>
@@ -257,14 +259,14 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
           </div>
 
           {activeLinks.length > 0 ? (
-            <div className="border-t border-border px-6 py-5">
+            <div className="border-t border-border/80 bg-card px-6 py-5">
               <div className="mb-3 flex items-center gap-2">
-                <h4 className="text-sm font-medium text-foreground">Active links</h4>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                <h4 className="font-sans text-sm font-semibold text-foreground">Active links</h4>
+                <span className="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
                   {activeLinks.length}
                 </span>
               </div>
-              <ul className="overflow-hidden rounded-lg border border-border/80 bg-muted/20">
+              <ul className="overflow-hidden rounded-xl border border-border/80 bg-muted/25 shadow-sm">
                 {activeLinks.map((l: ShareLinkRow, i: number) => (
                   <li
                     key={l.id}
@@ -321,7 +323,7 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
             </div>
           ) : null}
 
-          <div className="flex gap-3 border-t border-border bg-secondary/10 px-6 py-4">
+          <div className="flex gap-3 border-t border-border/80 bg-secondary/10 px-6 py-4">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             <p className="text-xs leading-relaxed text-muted-foreground">
               Links require sign-in. You remain the owner; coworkers join as editors until you remove

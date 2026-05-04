@@ -4,8 +4,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { User as UserIcon, Share2 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useAuth } from "../../features/auth/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../../features/auth/useAuth";
+import { useTheme } from "../contexts/useTheme";
 import { DropdownMenu } from "./DropdownMenu";
 import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 
@@ -61,11 +61,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Sync internal state if prop changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInputValue(title);
   }, [title]);
 
   useEffect(() => {
     if (!notebookRenamable && isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInputValue(title);
       setIsEditing(false);
     }

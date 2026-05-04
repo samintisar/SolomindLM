@@ -10,14 +10,17 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname, join } from "path";
-import { getFixture, listFixtureIds } from "./fixtures";
+import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
+import type { SourcePolicyConfig } from "./types";
 import { runEval, createConvexChatInvoker, createConvexStudioInvokers } from "./runners";
+import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
+import type { ResearchAgentInvoker } from "./runners/researchRunner";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { StudioRunnerKind, RunnerKind } from "./types";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { generateReport, formatReport } from "./reports";
-import type { EvalBaseline, EvalRunArtifact, EvalFixture, MetricResult } from "./types";
+import type { EvalBaseline, EvalRunArtifact, MetricResult, EvalFixture } from "./types";
 
 // ─── CLI Options ─────────────────────────────────────────────
 
@@ -35,6 +38,8 @@ interface CliOptions {
   exportArtifacts: boolean;
   /** Directory for exported artifacts (default: evals/rag/generated) */
   artifactsDir: string;
+  /** Comma-separated source channel combinations (e.g. "notebook,web+academic") */
+  sourceMatrix?: string;
   /** Override the smart LLM model for studio agent reduce phases */
   smartLlm?: string;
 }
@@ -47,10 +52,11 @@ const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
   "flashcards",
   "quiz",
   "mindmap",
-  "slides",
+  "infographic",
   "spreadsheet",
   "writtenQuestions",
   "audioScript",
+  "audioScriptOnly",
 ]);
 
 function parseRunners(value: string): RunnerKind[] {
@@ -107,6 +113,9 @@ function parseArgs(args: string[]): CliOptions {
       case "--artifacts-dir":
         opts.artifactsDir = args[++i];
         break;
+      case "--source-matrix":
+        opts.sourceMatrix = args[++i];
+        break;
       case "--smart-llm":
         opts.smartLlm = args[++i];
         break;
@@ -136,6 +145,7 @@ Options:
   --output, -o <path>      Write JSON report to file
   --export-artifacts       Export Ragas-compatible artifacts alongside report
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
+  --source-matrix <combos>  Test fixture against multiple channel combinations (e.g. "notebook,web+academic")
   --smart-llm <model>      Override smart LLM for studio agent reduce phases (e.g. meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)
   --help, -h               Show this help
 
@@ -190,7 +200,13 @@ function exportRagasArtifacts(
     return {
       question: fix?.question ?? "",
       answer: art.answer,
-      selectedChunks: art.selectedChunks.map((c) => ({ content: c.content })),
+      selectedChunks: art.selectedChunks.map((c) => ({
+        id: c.id,
+        sourceTitle: c.sourceTitle,
+        sourceUrl: c.sourceUrl,
+        content: c.content,
+        similarity: c.similarity,
+      })),
       expectedItems: fix?.expectedItems ?? [],
       citations: art.citations,
       subQueries: art.subQueries,
@@ -236,6 +252,7 @@ async function main(): Promise<void> {
 
   // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
   let chatInvoker: ChatAgentInvoker | undefined;
+  let researchInvoker: ResearchAgentInvoker | undefined;
   let studioInvokers: Partial<Record<StudioRunnerKind, StudioInvoker>> | undefined;
   if (!opts.dryRun) {
     const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
@@ -253,6 +270,7 @@ async function main(): Promise<void> {
     }
     console.log(`Using Convex at ${convexUrl} (eval mode)`);
     chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
+    researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
     studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
   }
 
@@ -264,11 +282,25 @@ async function main(): Promise<void> {
   // a stub artifact with score 0.
   let runtimeErrorCount = 0;
 
+  // Expand fixtures for source matrix testing and smartLlm override
+  const expandedFixtures: EvalFixture[] = [];
   for (const id of fixtureIds) {
     const fixture: EvalFixture = { ...getFixture(id) };
     if (opts.smartLlm) {
       fixture.studioParams = { ...fixture.studioParams, smartLlm: opts.smartLlm };
     }
+    if (opts.sourceMatrix) {
+      const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
+      const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
+        channels: combo.split("+"),
+      }));
+      expandedFixtures.push(...withSourceMatrix(fixture, matrix));
+    } else {
+      expandedFixtures.push(fixture);
+    }
+  }
+
+  for (const fixture of expandedFixtures) {
     fixtureMeta.set(fixture.id, {
       question: fixture.question,
       expectedItems: fixture.expectedItems,
@@ -281,6 +313,7 @@ async function main(): Promise<void> {
       results = await runEval(fixture, {
         dryRun: opts.dryRun,
         chatInvoker,
+        researchInvoker,
         studioInvokers,
       });
     } catch (err) {
@@ -322,7 +355,7 @@ async function main(): Promise<void> {
         console.log(`  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`);
       }
 
-      const metrics = scoreAllMetrics(fixture, artifact, baseline);
+      const metrics = await scoreAllMetrics(fixture, artifact, baseline);
       allMetrics.push(...metrics);
 
       if (opts.verbose || opts.full) {
@@ -344,6 +377,7 @@ async function main(): Promise<void> {
   const report = generateReport(allMetrics, {
     commitSha,
     includeWarnings: true,
+    groupBySourcePolicy: !!opts.sourceMatrix,
   });
 
   console.log(formatReport(report));

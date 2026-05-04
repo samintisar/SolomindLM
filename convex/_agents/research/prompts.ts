@@ -10,16 +10,16 @@ import type { SourceChannel } from "./types";
 export const SubQuestionSchema = z.object({
   id: z.string().describe("Short ID like sq1, sq2"),
   question: z.string().describe("Clear, specific sub-question"),
-  searchQueries: z.array(z.string()).describe("2-3 search queries optimized for each channel"),
+  searchQueries: z.array(z.string()).min(1).max(2).describe("1-2 highly targeted search queries (fewer precise queries beat many vague ones)"),
   sourceChannels: z.array(z.string()).describe("Target channels: notebook, web, academic, news"),
 });
 
 export const PlannerOutputSchema = z.object({
   subQuestions: z
     .array(SubQuestionSchema)
-    .min(3)
-    .max(7)
-    .describe("3-7 focused sub-questions"),
+    .min(2)
+    .max(3)
+    .describe("2-3 highly focused sub-questions — fewer precise questions beat many vague ones"),
 });
 
 export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
@@ -30,7 +30,7 @@ export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
 
 export function buildPlanPrompt(query: string, enabledChannels: SourceChannel[]): string {
   const channelList = enabledChannels.join(", ");
-  return `You are a research planner. Decompose the user's question into 3-7 focused sub-questions that together will comprehensively answer it.
+  return `You are a research planner. Decompose the user's question into 2-3 highly focused sub-questions that together will comprehensively answer it.
 
 USER QUESTION:
 ${query}
@@ -39,15 +39,22 @@ ENABLED SOURCE CHANNELS: ${channelList}
 
 For each sub-question:
 - Write a clear, specific question
-- Provide 2-3 search queries optimized for each relevant source channel
+- Provide exactly 1 search query (highly targeted, not broad)
 - Assign source channels based on where the best evidence would come from (use only from: ${channelList})
+  - Use "web" for general facts, concepts, and broad information
+  - Use "news" ONLY for current events, recent developments, or time-sensitive facts
+  - Use "academic" for research papers, studies, and scholarly sources
+  - Use "notebook" for user's uploaded documents
 - Use concise IDs like "sq1", "sq2", etc.
 
 Guidelines:
 - Start with the most important sub-questions first
 - Each sub-question should be independently answerable
 - Prefer specific, measurable questions over vague ones
-- Include at least one sub-question that directly addresses the user's core question`;
+- Include at least one sub-question that directly addresses the user's core question
+- AVOID redundant or overlapping sub-questions — each should cover a distinct angle
+- NEVER assign both "web" and "news" to the same sub-question; pick the one that fits better
+- Limit to 2-3 sub-questions total; fewer focused questions beat many vague ones`;
 }
 
 export function buildWriterPrompt(
@@ -73,7 +80,7 @@ export function buildWriterPrompt(
     })
     .join("\n\n---\n\n");
 
-  return `You are a research writer. Synthesize the evidence below into a comprehensive, well-structured answer to the user's question.
+  return `You are an expert curriculum designer. Synthesize the evidence into a focused, actionable learning roadmap.
 
 USER QUESTION:
 ${query}
@@ -81,11 +88,36 @@ ${query}
 EVIDENCE BY SUB-QUESTION:
 ${subQuestionSection}
 
+OUTPUT FORMAT — produce ONLY this structure:
+
+## Quick Overview (2-3 bullets)
+- What the user needs to learn and why
+
+## Learning Roadmap
+
+### Phase 1: [Foundational Topic]
+- **Key concepts**: 2-3 specific skills/concepts to master
+- **Resources**: specific courses, papers, or tutorials from the evidence
+- **Milestone**: how to verify they've learned this
+
+### Phase 2: [Next Topic]
+(same structure)
+
+### Phase 3: [Advanced Topic]
+(same structure)
+
+## Projects to Build
+- 2-3 concrete project ideas that combine multiple concepts
+
+## Common Pitfalls to Avoid
+- 2-3 mistakes beginners make at this stage
+
 Requirements:
-- Write in clear, well-organized prose with headers for each major section
-- Cite sources inline using [N] notation matching the **global** evidence numbers above (single sequence across all sub-questions, starting at [1])
-- If evidence is weak or missing for a sub-question, acknowledge it explicitly
-- Do NOT fabricate information — only use the provided evidence
-- Start with a brief summary, then address each sub-question in detail
-- End with a concise conclusion that directly answers the user's question`;
+- STRICT LENGTH: 1000-2000 words maximum
+- Cite sources inline using [N] notation matching the evidence numbers
+- Do NOT fabricate information — only use provided evidence
+- FOCUS on what to learn NEXT, not exhaustive theory
+- Be SPECIFIC: name concrete techniques, papers, and tools
+- If evidence is missing for a topic, provide the best guidance you can from the available evidence without calling attention to gaps
+`;
 }

@@ -1,16 +1,17 @@
 import { useCallback } from "react";
 import type { Note, FlashcardNote } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useCreateFlashcards } from "../../services/flashcardsApi";
 import type { FlashcardConfig } from "../../components/CustomizeFlashcardsModal";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 
+const FLASHCARD_COUNT_MAP = { fewer: 20, standard: 35, more: 55 };
+
 export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
   const createFlashcards = useCreateFlashcards();
   const catchGenerationError = useStudioGenerationCatch();
   const { error: showErrorToast } = useToast();
-  const countMap = { fewer: 20, standard: 35, more: 55 };
 
   return useCallback(
     async (config: FlashcardConfig) => {
@@ -30,7 +31,7 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
         return;
       }
 
-      const cardCount = countMap[config.count];
+      const cardCount = FLASHCARD_COUNT_MAP[config.count];
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,

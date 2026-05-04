@@ -1,56 +1,32 @@
 import React from "react";
 import {
   Loader2,
-  Play,
+  AudioLines,
   Layers,
   FileText,
   HelpCircle,
   GitFork,
   MessageSquareText,
-  Presentation,
+  Image,
   Table2,
 } from "lucide-react";
-import { Note, isAudioNote, isAudioOverviewNote } from "@/shared/types/index";
+import { Note } from "@/shared/types/index";
 
 interface NoteIconProps {
   note: Note;
-  onPlayAudio?: (note: Note) => void;
 }
 
 /**
  * NoteIcon component renders type-specific icons for notes.
- * Handles loading states and play buttons for audio notes.
+ * Matches Create tool grid styling (see STUDIO_TOOLS). Playback is handled on the row (NoteItem).
  */
-export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
+export const NoteIcon: React.FC<NoteIconProps> = ({ note }) => {
   // Generating state with spinner
   if (note.status === "generating") {
     return (
-      <div className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+      <div className="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
         <Loader2 className="w-4 h-4 text-primary animate-spin" />
       </div>
-    );
-  }
-
-  // Audio overview (studio) — same shape as legacy audio note but top-level audioUrl
-  const audioOverviewHref =
-    isAudioOverviewNote(note) && note.status === "completed" ? note.audioUrl?.trim() : "";
-  const audioNoteHref =
-    note.type === "audio" && isAudioNote(note) && note.status === "completed"
-      ? note.metadata.audioUrl?.trim()
-      : "";
-
-  if (audioOverviewHref || audioNoteHref) {
-    return (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onPlayAudio?.(note);
-        }}
-        className="shrink-0 w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center opacity-70 group-hover:opacity-100 hover:!opacity-100 hover:bg-primary hover:text-primary-foreground transition-all"
-        aria-label="Play audio"
-      >
-        <Play className="w-3.5 h-3.5 fill-current ml-0.5 shrink-0" />
-      </button>
     );
   }
 
@@ -59,6 +35,16 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
     string,
     { icon: React.FC<{ className?: string }>; bgClass: string; textClass: string }
   > = {
+    audioOverview: {
+      icon: AudioLines,
+      bgClass: "bg-teal-500/10",
+      textClass: "text-teal-700 dark:text-teal-400",
+    },
+    audio: {
+      icon: AudioLines,
+      bgClass: "bg-teal-500/10",
+      textClass: "text-teal-700 dark:text-teal-400",
+    },
     flashcard: { icon: Layers, bgClass: "bg-red-500/10", textClass: "text-red-700" },
     report: { icon: FileText, bgClass: "bg-amber-500/10", textClass: "text-amber-600" },
     quiz: { icon: HelpCircle, bgClass: "bg-blue-500/10", textClass: "text-blue-700" },
@@ -68,7 +54,7 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
       bgClass: "bg-green-500/10",
       textClass: "text-green-700",
     },
-    slides: { icon: Presentation, bgClass: "bg-violet-500/10", textClass: "text-violet-600" },
+    infographic: { icon: Image, bgClass: "bg-violet-500/10", textClass: "text-violet-600" },
     spreadsheet: { icon: Table2, bgClass: "bg-cyan-500/10", textClass: "text-cyan-600" },
     note: { icon: FileText, bgClass: "bg-indigo-500/10", textClass: "text-indigo-600" },
   };

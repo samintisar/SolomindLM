@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { useUploadDocument, useCreateDocument } from "../services/documentsApi";
 import { useUserLimits } from "@/features/billing/services/subscriptionApi";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 
 const ACCEPTED_FILE_TYPES = [
   ".pdf",

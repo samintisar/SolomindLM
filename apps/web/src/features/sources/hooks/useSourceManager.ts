@@ -6,7 +6,7 @@ import {
   useDeleteDocument,
   useRemoveManyDocuments,
 } from "../services/documentsApi";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { type Doc } from "@convex/_generated/dataModel";
 
 interface UseSourceManagerProps {
@@ -16,6 +16,7 @@ interface UseSourceManagerProps {
 
 export function useSourceManager({ documents, notebookId }: UseSourceManagerProps) {
   const [sources, setSources] = useState<Source[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prevDocumentsRef = useRef<any[]>([]);
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();

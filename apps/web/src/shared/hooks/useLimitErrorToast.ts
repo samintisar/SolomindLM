@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from "react";
-import { useToast } from "../contexts/ToastContext";
+import { useToast } from "../contexts/useToast";
 import { useCreateCheckout } from "@/features/billing/services/subscriptionApi";
 import {
   parseLimitError,

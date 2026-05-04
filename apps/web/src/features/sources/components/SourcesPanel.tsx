@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useSourcesContext } from "../SourcesContext";
+import { useSourcesContext } from "../useSourcesContext";
 import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
 import { AddSourceModal } from "./AddSourceModal";
 import { UrlInputModal } from "./UrlInputModal";
@@ -21,8 +21,8 @@ import {
   useRefreshRemoteSource,
 } from "../services/documentsApi";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
-import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import { useToast } from "@/shared/contexts/useToast";
 
 export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
@@ -131,7 +131,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   // Refs to avoid effect depending on sourceContent (which is a new object every render and would cause infinite loop)
   const onContentUpdateRef = useRef(sourceContent.onContentUpdate);
   const onLoadingStartRef = useRef(sourceContent.onLoadingStart);
+  // eslint-disable-next-line react-hooks/refs
   onContentUpdateRef.current = sourceContent.onContentUpdate;
+  // eslint-disable-next-line react-hooks/refs
   onLoadingStartRef.current = sourceContent.onLoadingStart;
 
   // Update content cache when documentContent changes
@@ -165,6 +167,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     const { documentId } = focusSourceRequest;
     const exists = sources.some((s) => s.id === documentId);
     if (exists) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewingSourceId(documentId);
     }
     onFocusSourceHandled?.();

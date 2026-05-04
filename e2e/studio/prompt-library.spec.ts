@@ -1,6 +1,5 @@
 import { test, expect } from "../fixtures/notebook.fixture";
 import { openStudioTool } from "../helpers/studio-assertions";
-import { shouldSkipAITests } from "../helpers/ai-service";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 test.describe.configure({ timeout: 90_000 });

@@ -21,6 +21,11 @@ import {
   latencyCostBudget,
 } from "./index";
 import { scoreStudioMetrics } from "./studio";
+import {
+  sourceDiversityScore,
+  sourceRecallByChannel,
+  externalSourceUtilization,
+} from "./sourceAware";
 
 function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
   return runner === "chat" || runner === "research";
@@ -32,11 +37,11 @@ function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
  * Returns a flat array of MetricResult entries. Metrics that produce
  * multiple results (e.g. retrievalItemRecall returns 3) are flattened.
  */
-export function scoreAllMetrics(
+export async function scoreAllMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   baseline?: EvalBaseline,
-): MetricResult[] {
+): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
 
   // Always-on: text-level recall and latency/cost.
@@ -50,9 +55,17 @@ export function scoreAllMetrics(
     results.push(abstentionCorrectness(fixture, artifact, baseline));
     results.push(citationValidity(fixture, artifact, baseline));
     results.push(...retrievalItemRecall(fixture, artifact, baseline));
+
+    // Source-aware metrics (only for runs with sourcePolicy configured)
+    if (artifact.sourcePolicy) {
+      results.push(sourceDiversityScore(fixture, artifact, baseline));
+      results.push(...sourceRecallByChannel(fixture, artifact, baseline));
+      results.push(externalSourceUtilization(fixture, artifact, baseline));
+    }
   } else {
     // Studio runners: structural scorers keyed on studioOutput.
-    results.push(...scoreStudioMetrics(fixture, artifact, baseline));
+    const studioResults = await scoreStudioMetrics(fixture, artifact, baseline);
+    results.push(...studioResults);
   }
 
   return results;

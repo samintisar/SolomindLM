@@ -1,6 +1,6 @@
 import { test, expect } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
-import { sendMessage, enableWebOnlyFilter } from "../helpers/chat-assertions";
+import { enableWebOnlyFilter } from "../helpers/chat-assertions";
 
 test.describe("Chat", () => {
   test("notebook page shows chat input", async ({ notebookPage }) => {

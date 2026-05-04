@@ -90,33 +90,37 @@ describe("mapDatabaseNoteToNote", () => {
     if (result.type === "audioOverview") {
       expect(result.audioUrl).toBe("https://audio.example.com/file.mp3");
       expect(result.transcript).toBe("Hello world");
+      expect(result.preview).toBe("Audio Overview");
     }
   });
 
-  it("maps slides type", () => {
-    const slides = [{ title: "Slide 1", content: "Content" }];
+  it("maps audioOverview preview with duration from metadata", () => {
     const result = mapDatabaseNoteToNote({
       ...baseNote,
-      _type: "slides",
-      data: slides,
-      slideCount: 1,
+      _type: "audioOverview",
+      audioUrl: "https://audio.example.com/file.wav",
+      transcript: "Hi",
+      metadata: { durationSeconds: 125.4 },
     });
-    expect(result.type).toBe("slides");
-    if (result.type === "slides") {
-      expect(result.slides).toEqual(slides);
-      expect(result.metadata.slideCount).toBe(1);
-    }
+    expect(result.preview).toBe("Audio Overview · 2:05");
   });
 
-  it("maps slides from nested data.slides", () => {
-    const slides = [{ title: "Slide 1" }];
+  it("maps infographic type", () => {
+    const infographicData = {
+      imageUrl: "https://example.com/image.png",
+      title: "Test Infographic",
+      prompt: "Test prompt",
+      metadata: { sourceDocumentIds: ["doc1"] },
+    };
     const result = mapDatabaseNoteToNote({
       ...baseNote,
-      _type: "slides",
-      data: { slides },
+      _type: "infographic",
+      data: infographicData,
     });
-    if (result.type === "slides") {
-      expect(result.slides).toEqual(slides);
+    expect(result.type).toBe("infographic");
+    if (result.type === "infographic") {
+      expect(result.imageUrl).toBe("https://example.com/image.png");
+      expect(result.title).toBe("Test Note");
     }
   });
 

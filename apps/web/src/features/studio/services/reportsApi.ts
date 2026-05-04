@@ -20,6 +20,7 @@ export interface CreateReportResponse {
 /**
  * Map a database report response to the frontend ReportNote interface with proper preview
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDatabaseReportToNote(dbReport: any): ReportNote {
   const reportType = normalizeReportTypeId(
     dbReport.reportType || dbReport.metadata?.reportType || "custom"
@@ -33,11 +34,11 @@ function mapDatabaseReportToNote(dbReport: any): ReportNote {
     dbReport.status === "collapsing" ||
     dbReport.status === "reducing"
   ) {
-    preview = getReportSubtitle(reportType) + " • Generating...";
+    preview = getReportSubtitle(reportType) + " · Generating…";
   } else if (dbReport.status === "completed") {
     preview = getReportSubtitle(reportType);
   } else if (dbReport.status === "failed") {
-    preview = `${getReportSubtitle(reportType)} • Failed`;
+    preview = `${getReportSubtitle(reportType)} · Failed`;
   } else {
     preview = getReportSubtitle(reportType);
   }

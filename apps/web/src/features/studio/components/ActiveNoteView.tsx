@@ -9,7 +9,7 @@ import {
   isAudioNote,
   isAudioOverviewNote,
   isWrittenQuestionsNote,
-  isSlideDeckNote,
+  isInfographicNote,
   isSpreadsheetNote,
   isUserNote,
 } from "@/shared/types/index";
@@ -18,9 +18,10 @@ import { FlashcardView } from "./views/FlashcardView";
 import { QuizView } from "./views/QuizView";
 import { MindMapView } from "./views/MindMapView";
 import { WrittenQuestionsView } from "./views/WrittenQuestionsView";
-import { SlidesView } from "./views/SlidesView";
+import { InfographicView } from "./views/InfographicView";
 import { SpreadsheetView } from "./views/SpreadsheetView";
 import { UserNoteView } from "./views/UserNoteView";
+import type { InfographicViewControls } from "./views/InfographicView";
 import { AudioPlayer } from "@/features/audio/components/AudioPlayer";
 import type { ReportNote } from "@/shared/types/index";
 
@@ -35,6 +36,7 @@ const ReportMarkdownEditor: React.FC<ReportMarkdownEditorProps> = ({ note, onSav
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftContent(note.content ?? "");
   }, [note.id, note.content]);
 
@@ -91,6 +93,8 @@ interface ActiveNoteViewProps {
   isEditingReportContent?: boolean;
   onSaveReportContent?: (reportId: string, content: string) => void | Promise<void>;
   onCancelEditReport?: () => void;
+  registerInfographicControls?: (controls: InfographicViewControls | null) => void;
+  onInfographicFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
 /**
@@ -107,6 +111,8 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
   isEditingReportContent,
   onSaveReportContent,
   onCancelEditReport,
+  registerInfographicControls,
+  onInfographicFullscreenChange,
 }) => {
   // Report view or report markdown editor
   if (isReportNote(activeNote)) {
@@ -264,13 +270,14 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     );
   }
 
-  // Slides view
-  if (isSlideDeckNote(activeNote)) {
+  // Infographic view
+  if (isInfographicNote(activeNote)) {
     return (
-      <SlidesView
+      <InfographicView
         note={activeNote}
         onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
-        onBack={isMobile ? onBack : undefined}
+        registerControls={registerInfographicControls}
+        onFullscreenChange={onInfographicFullscreenChange}
       />
     );
   }

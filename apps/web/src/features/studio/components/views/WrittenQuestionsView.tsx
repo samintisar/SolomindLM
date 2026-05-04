@@ -26,6 +26,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
 }) => {
   // Initialize currentIndex from note.metadata.lastViewedIndex if available
   const questions = note.questions || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
   const [currentIndex, setCurrentIndex] = useState(
     Math.min(initialIndex, Math.max(0, questions.length - 1))
@@ -49,9 +50,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   // Restore saved index on mount (from latestNote which has the latest data from server)
   useEffect(() => {
     if (!hasInitializedIndex.current && latestNote) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
       const boundedIndex = Math.min(savedIndex, Math.max(0, questions.length - 1));
       if (savedIndex > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentIndex(boundedIndex);
       }
       hasInitializedIndex.current = true;
@@ -69,8 +72,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
   useEffect(() => {
     if (latestNote?.userAnswers) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUserAnswers(latestNote.userAnswers);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverUserAnswersKey]);
 
   const currentQuestion = questions[currentIndex];

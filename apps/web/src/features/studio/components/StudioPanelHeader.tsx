@@ -1,11 +1,22 @@
 import React, { useRef, useEffect } from "react";
-import { ChevronRight, PenTool, ArrowLeft, Copy, Download, Loader2, Pencil } from "lucide-react";
+import {
+  ChevronRight,
+  PenTool,
+  ArrowLeft,
+  Copy,
+  Download,
+  Loader2,
+  Pencil,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import {
   Note,
   isReportNote,
   isFlashcardNote,
   isSpreadsheetNote,
   isUserNote,
+  isInfographicNote,
 } from "@/shared/types/index";
 
 interface StudioPanelHeaderProps {
@@ -25,6 +36,10 @@ interface StudioPanelHeaderProps {
   onExportFlashcards: () => void;
   onCopyUserNote: () => void;
   onDownloadUserNote: () => void;
+  onDownloadInfographic: () => void;
+  onToggleInfographicFullscreen: () => void;
+  canDownloadInfographic: boolean;
+  isInfographicFullscreen: boolean;
   canCopyOrDownload: boolean;
   canCopyOrDownloadUserNote: boolean;
   canExportFlashcards: boolean;
@@ -54,6 +69,10 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
   onExportFlashcards,
   onCopyUserNote,
   onDownloadUserNote,
+  onDownloadInfographic,
+  onToggleInfographicFullscreen,
+  canDownloadInfographic,
+  isInfographicFullscreen,
   canCopyOrDownload,
   canCopyOrDownloadUserNote,
   canExportFlashcards: _canExportFlashcards,
@@ -206,6 +225,33 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                   aria-label="Download as CSV"
                 >
                   <Download className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            {isInfographicNote(activeNote) && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={onDownloadInfographic}
+                  disabled={!canDownloadInfographic}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download infographic"
+                  aria-label="Download infographic"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onToggleInfographicFullscreen}
+                  className="p-2 hover:bg-secondary rounded-md transition-colors text-foreground/70 hover:text-foreground"
+                  title={isInfographicFullscreen ? "Exit fullscreen" : "Full screen"}
+                  aria-label={isInfographicFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {isInfographicFullscreen ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             )}
@@ -372,6 +418,33 @@ export const StudioPanelHeader: React.FC<StudioPanelHeaderProps> = ({
                 aria-label="Download as CSV"
               >
                 <Download className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {isInfographicNote(activeNote) && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={onDownloadInfographic}
+                disabled={!canDownloadInfographic}
+                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Download infographic"
+                aria-label="Download infographic"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onToggleInfographicFullscreen}
+                className="p-2 hover:bg-sidebar-accent rounded-sm transition-colors text-sidebar-foreground/70 hover:text-sidebar-foreground"
+                title={isInfographicFullscreen ? "Exit fullscreen" : "Full screen"}
+                aria-label={isInfographicFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              >
+                {isInfographicFullscreen ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
               </button>
             </div>
           )}

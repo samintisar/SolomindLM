@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useDocumentContent } from "../services/documentsApi";
-import { useAuth } from "@/features/auth/AuthContext";
+import { useAuth } from "@/features/auth/useAuth";
 import { Source } from "@/shared/types";
 
 interface UseSourceContentResult {
@@ -38,6 +38,7 @@ export function useSourceContent(): UseSourceContentResult {
 
   // Clear cache on user change for isolation
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setContentCache({});
     setContentErrors({});
     setLoadingContentId(null);

@@ -14,6 +14,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { Source } from "@/shared/types";
+import { Favicon } from "@/shared/components/Favicon";
 
 interface SourceListItemProps {
   source: Source;
@@ -58,7 +59,16 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   };
 
   const getIcon = () => {
-    if (source.type === "WEB") return <Globe className="w-5 h-5" />;
+    if (source.type === "WEB") {
+      return (
+        <Favicon
+          url={source.url}
+          size={20}
+          className="rounded-sm"
+          fallback={<Globe className="w-5 h-5" />}
+        />
+      );
+    }
     if (source.type === "PAPER") return <GraduationCap className="w-5 h-5" />;
     if (source.type === "IMG") return <File className="w-5 h-5" />;
     return <FileText className="w-5 h-5" />;

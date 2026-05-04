@@ -15,6 +15,7 @@ export interface CreateMindMapResponse {
   mindmap: MindMapNote;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
   const maybeWrapped = rawData?.nodeData?.nodeData ?? rawData?.nodeData ?? rawData;
   const normalized = maybeWrapped && typeof maybeWrapped === "object" ? { ...maybeWrapped } : {};
@@ -32,23 +33,24 @@ function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
 /**
  * Map a database mindmap response to the frontend MindMapNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapMindMapToNote(dbMindMap: any): MindMapNote {
   let preview: string;
 
-  // Determine preview based on status
+  // Align with `notesApi.getMindMapPreview` (unified studio list).
   if (
     dbMindMap.status === "generating" ||
     dbMindMap.status === "mapping" ||
     dbMindMap.status === "collapsing" ||
     dbMindMap.status === "reducing"
   ) {
-    preview = "Mind Map • Generating...";
+    preview = "Mind Map";
   } else if (dbMindMap.status === "completed") {
-    preview = "Mind Map • Visual Overview";
+    preview = "Mind Map";
   } else if (dbMindMap.status === "failed") {
-    preview = "Mind Map • Failed";
+    preview = "Mind Map · Failed";
   } else {
-    preview = "Mind Map • Visual Overview";
+    preview = "Mind Map";
   }
 
   // Parse data if it's a string
