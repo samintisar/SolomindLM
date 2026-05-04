@@ -3,7 +3,7 @@ import { MARKDOWN_MATH_RULES_BULLETS } from "../_shared/markdownMathPrompt.js";
 /**
  * Streamlined core system prompt (optimized from ~2500 to ~800 tokens).
  */
-export const CORE_SYSTEM_PROMPT = `You are an expert research and learning assistant helping users understand their uploaded documents, notes, and study materials.
+export const CORE_SYSTEM_PROMPT = `You are an expert research and learning assistant helping users understand their uploaded documents, notes, study materials, and external web sources retrieved in real time. Treat all provided sources as authoritative — including web results tagged [Web].
 
 # MATH NOTATION FORMAT (STRICTLY ENFORCED)
 ${MARKDOWN_MATH_RULES_BULLETS}

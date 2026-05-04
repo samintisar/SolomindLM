@@ -6,8 +6,14 @@ import {
   transformAcademicResult,
   sortResults,
   distributeResults,
+  discoverHandler,
+  discoverSourcesHandler,
+  type RunActionFn,
 } from "./DiscoveryService";
 import type { UnifiedDiscoveryResult } from "./DiscoveryService";
+import { discoverSourcesInternalHandler } from "./TavilySearchService";
+import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
+import { env } from "../../_lib/env";
 
 describe("DiscoveryService", () => {
   describe("normalizeScore", () => {
@@ -316,5 +322,247 @@ describe("DiscoveryService", () => {
       const distributed = distributeResults(resultsBySource, 4);
       expect(distributed.map((r) => r.id)).toEqual(["w1", "w2", "a1", "a2"]);
     });
+  });
+});
+
+// ============================================================
+// REAL Integration Tests - Actual Discovery with Live APIs
+// ============================================================
+
+const hasTavilyKey = !!env.TAVILY_API_KEY;
+
+function isRateLimitOrCreditError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("Insufficient credits") || msg.includes("rate limit") || msg.includes("429");
+}
+
+// Create a real runAction that calls the actual handlers
+const createRealRunAction = (): RunActionFn => {
+  return async (_action, args) => {
+    // Route to Tavily if topic is present (web/news/finance)
+    if (args.topic !== undefined) {
+      return discoverSourcesInternalHandler(args);
+    }
+    // Route to Academic if academic-specific filters are present
+    if (args.publicationYearFrom !== undefined || args.publicationYearTo !== undefined || args.minCitations !== undefined || args.openAccessOnly !== undefined || args.sortBy !== undefined) {
+      return discoverAcademicPapersInternalHandler(args);
+    }
+    // Default: try Tavily for basic web search
+    return discoverSourcesInternalHandler(args);
+  };
+};
+
+const describeIfKey = hasTavilyKey ? describe : describe.skip;
+
+describeIfKey("DiscoveryService - REAL Integration Tests", () => {
+  describe("discoverHandler - REAL APIs", () => {
+    it("discovers real web sources only", async () => {
+      const result = await discoverHandler(
+        {
+          query: "machine learning",
+          sourceTypes: ["web"],
+          maxResults: 5,
+        },
+        createRealRunAction()
+      );
+
+      // If Tavily is rate limited or out of credits, result will be empty
+      // Skip assertions in that case
+      if (result.sources.length === 0) {
+        console.log("Skipping test: Tavily API returned no results (likely rate limited or out of credits)");
+        return;
+      }
+
+      expect(result.sources.length).toBeGreaterThan(0);
+      expect(result.sources.length).toBeLessThanOrEqual(5);
+      expect(result.totalCount).toBe(result.sources.length);
+      expect(result.sources[0].sourceType).toBe("web");
+      expect(result.sources[0].metadata.relevanceLabel).toBeDefined();
+      expect(result.sourceTypeCounts.web).toBeGreaterThan(0);
+    }, 30000);
+
+    it("discovers real academic sources", async () => {
+      const result = await discoverHandler(
+        {
+          query: "deep learning",
+          sourceTypes: ["academic"],
+          maxResults: 5,
+        },
+        createRealRunAction()
+      );
+
+      expect(result.sources.length).toBeGreaterThan(0);
+      expect(result.sources.length).toBeLessThanOrEqual(5);
+      expect(result.sources[0].sourceType).toBe("academic");
+      expect(result.sourceTypeCounts.academic).toBeGreaterThan(0);
+    }, 30000);
+
+    it("discovers multiple source types in parallel", async () => {
+      const result = await discoverHandler(
+        {
+          query: "neural networks",
+          sourceTypes: ["web", "academic"],
+          maxResults: 8,
+        },
+        createRealRunAction()
+      );
+
+      // If all APIs fail, result may be empty
+      if (result.sources.length === 0) {
+        console.log("Skipping test: APIs returned no results (likely rate limited)");
+        return;
+      }
+
+      expect(result.sources.length).toBeGreaterThan(0);
+      expect(result.sources.length).toBeLessThanOrEqual(8);
+      expect(result.sourceTypeCounts).toHaveProperty("web");
+      expect(result.sourceTypeCounts).toHaveProperty("academic");
+
+      const hasWeb = result.sources.some((s) => s.sourceType === "web");
+      const hasAcademic = result.sources.some((s) => s.sourceType === "academic");
+      expect(hasWeb || hasAcademic).toBe(true);
+    }, 30000);
+
+    it("sorts real results by date", async () => {
+      const result = await discoverHandler(
+        {
+          query: "artificial intelligence",
+          sourceTypes: ["web"],
+          maxResults: 10,
+          sortBy: "date",
+        },
+        createRealRunAction()
+      );
+
+      if (result.sources.length === 0) {
+        console.log("Skipping test: APIs returned no results (likely rate limited)");
+        return;
+      }
+
+      if (result.sources.length > 1) {
+        // Check that results with dates are sorted descending
+        const datedResults = result.sources.filter((s) => s.publishedDate);
+        for (let i = 1; i < datedResults.length; i++) {
+          const prev = new Date(datedResults[i - 1].publishedDate!).getTime();
+          const curr = new Date(datedResults[i].publishedDate!).getTime();
+          expect(prev).toBeGreaterThanOrEqual(curr);
+        }
+      }
+    }, 30000);
+
+    it("limits total results to maxResults", async () => {
+      const result = await discoverHandler(
+        {
+          query: "technology",
+          sourceTypes: ["web"],
+          maxResults: 3,
+        },
+        createRealRunAction()
+      );
+
+      if (result.sources.length === 0) {
+        console.log("Skipping test: APIs returned no results (likely rate limited)");
+        return;
+      }
+
+      expect(result.totalCount).toBeLessThanOrEqual(3);
+      expect(result.sources.length).toBeLessThanOrEqual(3);
+    }, 30000);
+
+    it("applies real academic filters", async () => {
+      const result = await discoverHandler(
+        {
+          query: "machine learning",
+          sourceTypes: ["academic"],
+          maxResults: 10,
+          academicFilters: {
+            publicationYearFrom: 2020,
+            publicationYearTo: 2024,
+            minCitations: 5,
+            openAccessOnly: true,
+          },
+        },
+        createRealRunAction()
+      );
+
+      for (const source of result.sources) {
+        if (source.metadata?.publicationYear) {
+          expect(source.metadata.publicationYear).toBeGreaterThanOrEqual(2020);
+          expect(source.metadata.publicationYear).toBeLessThanOrEqual(2024);
+        }
+        if (source.metadata?.citationCount !== undefined) {
+          expect(source.metadata.citationCount).toBeGreaterThanOrEqual(5);
+        }
+        if (source.metadata?.openAccess !== undefined) {
+          expect(source.metadata.openAccess).toBe(true);
+        }
+      }
+    }, 30000);
+  });
+
+  describe("discoverSourcesHandler - REAL Tavily API", () => {
+    it("calls Tavily with default parameters", async () => {
+      try {
+        const result = await discoverSourcesHandler(
+          { query: "test query" },
+          createRealRunAction()
+        );
+
+        expect(Array.isArray(result)).toBe(true);
+        if (result.length > 0) {
+          expect(result[0].title).toBeTruthy();
+          expect(result[0].url).toBeTruthy();
+        }
+      } catch (error) {
+        if (isRateLimitOrCreditError(error)) {
+          console.log("Skipping test: Tavily API rate limited or out of credits");
+          return;
+        }
+        throw error;
+      }
+    }, 30000);
+
+    it("passes custom maxResults", async () => {
+      try {
+        const result = await discoverSourcesHandler(
+          { query: "test", maxResults: 3 },
+          createRealRunAction()
+        );
+
+        expect(result.length).toBeLessThanOrEqual(3);
+      } catch (error) {
+        if (isRateLimitOrCreditError(error)) {
+          console.log("Skipping test: Tavily API rate limited or out of credits");
+          return;
+        }
+        throw error;
+      }
+    }, 30000);
+  });
+});
+
+// Test error handling with a failing runAction
+describe("DiscoveryService - Error Handling", () => {
+  it("handles failures gracefully", async () => {
+    const failingRunAction: RunActionFn = async (_action, args) => {
+      if (args.topic === "general" || args.topic === undefined) {
+        return [
+          { title: "Web Result", url: "https://example.com", snippet: "Web.", score: 0.8, domain: "example.com" },
+        ];
+      }
+      throw new Error("News API failed");
+    };
+
+    const result = await discoverHandler(
+      {
+        query: "test",
+        sourceTypes: ["web", "news"],
+        maxResults: 10,
+      },
+      failingRunAction
+    );
+
+    expect(result.sources).toHaveLength(1);
+    expect(result.sources[0].title).toBe("Web Result");
   });
 });

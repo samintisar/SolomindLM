@@ -49,7 +49,7 @@ export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, width, a
               key={tool.id}
               aria-label={tool.label}
               onClick={() => onToolClick(tool.id)}
-              className={`group flex flex-col justify-between p-3 h-24 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer ${
+              className={`group flex flex-col justify-between p-3 h-[5.5rem] bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer overflow-hidden ${
                 isActive ? "ring-2 ring-primary/40 border-primary/45 shadow-md" : ""
               }`}
               role="button"
@@ -66,7 +66,7 @@ export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, width, a
                   className={`w-5 h-5 ${tool.color} opacity-90 group-hover:scale-110 transition-transform`}
                 />
               </div>
-              <span className="text-sm font-medium text-foreground leading-tight font-display tracking-tight">
+              <span className="text-xs font-medium text-foreground leading-tight font-display tracking-tight line-clamp-2">
                 {tool.label}
               </span>
             </div>

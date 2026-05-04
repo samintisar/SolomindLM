@@ -11,6 +11,7 @@ import {
   Globe,
   Newspaper,
   TrendingUp,
+  GraduationCap,
   ChevronDown,
   Check,
   Square,
@@ -26,6 +27,7 @@ const SOURCE_FILTERS = [
   { id: "web", label: "Web", icon: Globe },
   { id: "news", label: "News", icon: Newspaper },
   { id: "finance", label: "Finance", icon: TrendingUp },
+  { id: "academic", label: "Academic", icon: GraduationCap },
 ] as const;
 
 interface ChatInputProps {

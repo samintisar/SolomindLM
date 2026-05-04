@@ -10,7 +10,7 @@ import {
 } from "./extraction/MistralOCRService";
 
 /**
- * Scrape a URL using Firecrawl
+ * Scrape a URL using Tavily extract
  */
 export const scrapeUrl = action({
   args: { url: v.string() },
@@ -40,7 +40,7 @@ export const getYouTubeTranscript = action({
 });
 
 /**
- * Extract text from a URL using Firecrawl (legacy alias)
+ * Extract text from a URL using Tavily (legacy alias)
  */
 export const extractFromUrl = scrapeUrl;
 

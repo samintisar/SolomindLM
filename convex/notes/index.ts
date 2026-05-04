@@ -33,6 +33,7 @@ export const listAllByNotebook = query({
       "quizzes",
       "mindmaps",
       "audioOverviews",
+      "infographics",
       "slides",
       "spreadsheets",
       "writtenQuestions",
@@ -93,6 +94,17 @@ export const listAllByNotebook = query({
           .order("desc")
           .collect()
           .then((items) => items.map((item) => ({ ...item, _type: "audioOverview" as const })))
+      );
+    }
+
+    if (!args.types || args.types.includes("infographics")) {
+      queries.push(
+        ctx.db
+          .query("infographics")
+          .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+          .order("desc")
+          .collect()
+          .then((items) => items.map((item) => ({ ...item, _type: "infographic" as const })))
       );
     }
 
@@ -158,6 +170,7 @@ export const getById = query({
       v.id("quizzes"),
       v.id("mindmaps"),
       v.id("audioOverviews"),
+      v.id("infographics"),
       v.id("slides"),
       v.id("spreadsheets"),
       v.id("writtenQuestions"),
@@ -174,6 +187,7 @@ export const getById = query({
       quiz: "quizzes",
       mindmap: "mindmaps",
       audioOverview: "audioOverviews",
+      infographic: "infographics",
       slides: "slides",
       spreadsheet: "spreadsheets",
       writtenQuestions: "writtenQuestions",
@@ -234,6 +248,7 @@ export const countByType = query({
       quizzes,
       mindmaps,
       audioOverviews,
+      infographics,
       slides,
       spreadsheets,
       writtenQuestions,
@@ -264,6 +279,11 @@ export const countByType = query({
         .collect()
         .then((items) => items.length),
       ctx.db
+        .query("infographics")
+        .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
+        .collect()
+        .then((items) => items.length),
+      ctx.db
         .query("slides")
         .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
         .collect()
@@ -288,6 +308,7 @@ export const countByType = query({
       quizzes,
       mindmaps,
       audioOverviews,
+      infographics,
       slides,
       spreadsheets,
       writtenQuestions,
@@ -298,6 +319,7 @@ export const countByType = query({
         quizzes +
         mindmaps +
         audioOverviews +
+        infographics +
         slides +
         spreadsheets +
         writtenQuestions +

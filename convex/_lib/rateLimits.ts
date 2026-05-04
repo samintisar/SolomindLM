@@ -19,6 +19,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   audioFree: { kind: "fixed window", rate: 1, period: DAY },
   writtenQuestionFree: { kind: "fixed window", rate: 5, period: DAY },
   spreadsheetFree: { kind: "fixed window", rate: 5, period: DAY },
+  infographicFree: { kind: "fixed window", rate: 1, period: DAY },
   slideFree: { kind: "fixed window", rate: 1, period: DAY },
 
   // Pro tier daily limits
@@ -29,6 +30,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   audioPro: { kind: "fixed window", rate: 5, period: DAY },
   writtenQuestionPro: { kind: "fixed window", rate: 100, period: DAY },
   spreadsheetPro: { kind: "fixed window", rate: 100, period: DAY },
+  infographicPro: { kind: "fixed window", rate: 10, period: DAY },
   slidePro: { kind: "fixed window", rate: 10, period: DAY },
 
   /** Joining notebooks via share link (per user, per hour) */
@@ -49,6 +51,7 @@ export function getFreeLimit(feature: DailyFeature): number {
     audio: 1,
     writtenQuestion: 5,
     spreadsheet: 5,
+    infographic: 1,
     slide: 1,
   };
   return limits[feature];
@@ -66,6 +69,7 @@ export function getProLimit(feature: DailyFeature): number {
     audio: 5,
     writtenQuestion: 100,
     spreadsheet: 100,
+    infographic: 10,
     slide: 10,
   };
   return limits[feature];
@@ -82,4 +86,5 @@ export type DailyFeature =
   | "audio"
   | "writtenQuestion"
   | "spreadsheet"
+  | "infographic"
   | "slide";

@@ -31,6 +31,7 @@ import {
   chunkRankingScore,
   mergeChunkScores,
   selectChunksByTokenBudget,
+  selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
@@ -511,20 +512,25 @@ export class ChatAgent {
       logger.info("Notebook source search disabled — skipping hybrid retrieval");
     }
 
-    let merged = allChunks;
-    try {
-      merged = await this.applyGlobalRerank(allChunks, rerankQueryOpt, userMessage, logger);
-    } catch (e) {
-      logger.warn("Global rerank failed, using merged hybrid scores", { error: String(e) });
-    }
+    // Build set of external chunk keys before merging so we can identify them after rerank
+    const externalChunkKeys = new Set(
+      (context.externalChunks ?? []).map((c) => chunkDedupKey(c))
+    );
 
+    let merged = allChunks;
     if (context.externalChunks && context.externalChunks.length > 0) {
       merged = [...merged, ...context.externalChunks];
-      logger.info("Merged external chunks into context", {
+      logger.info("Merged external chunks before rerank", {
         notebookChunks: allChunks.length,
         externalChunks: context.externalChunks.length,
-        totalAfterMerge: merged.length,
+        totalBeforeRerank: merged.length,
       });
+    }
+
+    try {
+      merged = await this.applyGlobalRerank(merged, rerankQueryOpt, userMessage, logger);
+    } catch (e) {
+      logger.warn("Global rerank failed, using merged hybrid scores", { error: String(e) });
     }
 
     // GENERAL MULTI-SECTION DOCUMENT RETRIEVAL:
@@ -532,8 +538,13 @@ export class ChatAgent {
     // This applies whenever retrieval finds multiple relevant sections, regardless of query type.
     merged = await this.expandMultiSectionDocuments(merged, logger);
 
-    const rankedChunks = selectChunksByTokenBudget(
-      merged,
+    // Split merged chunks back into notebook and external pools
+    const notebookChunks = merged.filter((c) => !externalChunkKeys.has(chunkDedupKey(c)));
+    const externalChunks = merged.filter((c) => externalChunkKeys.has(chunkDedupKey(c)));
+
+    const rankedChunks = selectChunksByTokenBudgetWithReservation(
+      notebookChunks,
+      externalChunks,
       logger,
       undefined,
       isListQuery

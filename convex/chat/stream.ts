@@ -186,7 +186,7 @@ async function runResearchPlanPhase(
       if (webChannels.length > 0) {
         for (const channel of webChannels) {
           promises.push(
-            ctx.runAction(internal._services.search.FirecrawlSearchService.discoverSourcesInternal, {
+            ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
               query,
               maxResults: maxResults ?? 5,
               topic: channel === "web" ? "general" : channel,
@@ -806,7 +806,7 @@ export async function streamChatResponse(
   if (externalChannels.length > 0) {
     const maxPerChannel = Math.ceil(5 / externalChannels.length);
 
-    // Web/News channels via Firecrawl
+    // Web/News channels via Tavily
     const webChannels = externalChannels.filter((ch) =>
       ["web", "news", "finance"].includes(ch)
     );
@@ -832,7 +832,7 @@ export async function streamChatResponse(
       for (const channel of webChannels) {
         const topic = channelToTopic(channel);
         searchPromises.push(
-          ctx.runAction(internal._services.search.FirecrawlSearchService.discoverSourcesInternal, {
+          ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
             query: refinedQuery,
             maxResults: maxPerChannel,
             topic,
@@ -892,10 +892,17 @@ export async function streamChatResponse(
     // Build metadata for frontend and ReferenceChunks for the LLM
     externalSources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
     externalChunks = topResults
-      .filter((r) => r.rawContent && r.rawContent.trim().length > 100)
+      .filter((r) => {
+        const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
+        const hasSnippet = r.snippet && r.snippet.trim().length > 50;
+        return hasRawContent || hasSnippet;
+      })
       .map((r, i) => {
-        // Chunk raw content into ~3000 char pieces to fit within token budget
-        const raw = r.rawContent!.trim();
+        // Prefer rawContent when available, fallback to snippet
+        const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
+        const raw = hasRawContent ? r.rawContent!.trim() : r.snippet.trim();
+        
+        // Chunk content into ~3000 char pieces to fit within token budget
         const CHUNK_SIZE = 3000;
         const pieces: string[] = [];
         for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
@@ -1340,6 +1347,64 @@ export const runResearchExecute = internalAction({
             quiet: true,
           });
         },
+        discoverSources: async (query, channels, maxResults) => {
+          const promises: Promise<any[]>[] = [];
+          const webChannels = channels.filter((ch) => ch === "web" || ch === "news");
+          const academicChannels = channels.filter((ch) => ch === "academic");
+
+          if (webChannels.length > 0) {
+            for (const channel of webChannels) {
+              promises.push(
+                ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+                  query,
+                  maxResults: maxResults ?? 5,
+                  topic: channel === "web" ? "general" : channel,
+                }).catch((e: unknown) => {
+                  researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
+                  return [];
+                })
+              );
+            }
+          }
+
+          if (academicChannels.length > 0) {
+            promises.push(
+              ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
+                query,
+                maxResults: maxResults ?? 5,
+              }).catch((e: unknown) => {
+                researchLog.warn("research_academic_discovery_failed", { error: String(e) });
+                return [];
+              })
+            );
+          }
+
+          const results = await Promise.all(promises);
+          return results.flat().map((r: any) => ({
+            title: r.title ?? "Untitled",
+            url: r.url ?? "",
+            snippet: r.snippet ?? r.abstract ?? "",
+            sourceType: r.sourceType ?? r.metadata?.sourceApi ?? "web",
+            score: r.score,
+            rawContent: r.rawContent,
+            metadata: {
+              pdfUrl: r.metadata?.pdfUrl,
+              doi: r.metadata?.doi,
+              citationCount: r.metadata?.citationCount,
+              sourceApi: r.metadata?.sourceApi,
+            },
+          }));
+        },
+        loadWebPage: async (url: string) => {
+          const { WebLoaderService } = await import("../_services/extraction/WebLoaderService.js");
+          const loader = new WebLoaderService();
+          return loader.loadWebPageWithMeta(url);
+        },
+        loadPaper: async (paper) => {
+          const { AcademicLoaderService } = await import("../_services/extraction/AcademicLoaderService.js");
+          const loader = new AcademicLoaderService();
+          return loader.loadPaper(paper);
+        },
         onProgress: async (phase, subQuestionId, sourcesFound) => {
           await chunkAppender(
             `\n__RESEARCH_PROGRESS:${JSON.stringify({ phase, subQuestionId, sourcesFound })}\n`
@@ -1368,6 +1433,8 @@ export const runResearchExecute = internalAction({
         context
       );
 
+      let researchReferences: unknown[] = [];
+
       for await (const chunk of gen) {
         if (chunk.type === "evidence") {
           const mapped = mapAgentEvidenceForSave(chunk.data);
@@ -1381,6 +1448,7 @@ export const runResearchExecute = internalAction({
           fullResponse += chunk.data ?? "";
           await chunkAppender(chunk.data ?? "");
         } else if (chunk.type === "references") {
+          researchReferences = chunk.data ?? [];
           await chunkAppender(`\n__REFERENCES:${JSON.stringify(chunk.data)}\n`);
         } else if (chunk.type === "done") {
           await chunkAppender(`\n__DONE\n`);
@@ -1393,6 +1461,7 @@ export const runResearchExecute = internalAction({
         conversationId: plan.conversationId,
         streamId: args.streamId,
         content: contentFinal,
+        references: researchReferences.length > 0 ? researchReferences : undefined,
         metadata: { researchRunId: runId, isResearchResult: true },
       });
 

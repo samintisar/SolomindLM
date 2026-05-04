@@ -200,21 +200,30 @@ export function createConvexMindmapInvoker(
   };
 }
 
-// ─── Slides (deferred) ───────────────────────────────────────
-// Slides currently exceeds the studio eval reliability budget and is
-// excluded from the eval suite at the runner-set level. Keep the factory
-// so single-fixture runs (`--case studio-slides-...`) still resolve, but
-// route them through whatever single-call action remains.
-export function createConvexSlidesInvoker(
-  _convexUrl: string,
-  _options: ConvexStudioInvokerOptions
+// ─── Infographic ─────────────────────────────────────────────
+
+export function createConvexInfographicInvoker(
+  convexUrl: string,
+  options: ConvexStudioInvokerOptions
 ): StudioInvoker {
+  const client = new ConvexHttpClient(convexUrl);
   return {
-    kind: "slides",
-    async invoke() {
-      throw new Error(
-        "Slides eval is currently disabled — no kickoff+poll action exists for this kind."
+    kind: "infographic",
+    async invoke(context) {
+      const startTime = Date.now();
+      const result = await client.action(
+        api.eval.studioEvalAction.runInfographicEval,
+        {
+          evalSecret: options.evalSecret,
+          notebookId: context.notebookId as Id<"notebooks">,
+          documentIds: context.documentIds as Id<"documents">[] | undefined,
+          customPrompt: context.studioParams?.customPrompt,
+        }
       );
+      return {
+        raw: result,
+        latencyMs: Date.now() - startTime,
+      };
     },
   };
 }
@@ -347,7 +356,7 @@ export const STUDIO_INVOKER_FACTORIES: Partial<
   flashcards: createConvexFlashcardsInvoker,
   quiz: createConvexQuizInvoker,
   mindmap: createConvexMindmapInvoker,
-  slides: createConvexSlidesInvoker,
+  infographic: createConvexInfographicInvoker,
   spreadsheet: createConvexSpreadsheetInvoker,
   writtenQuestions: createConvexWrittenQuestionsInvoker,
   audioScript: createConvexAudioScriptInvoker,

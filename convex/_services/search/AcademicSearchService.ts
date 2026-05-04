@@ -89,7 +89,7 @@ export function extractXmlBlocks(xml: string, tag: string): string[] {
 // Utility Helpers
 // ============================================================
 
-function delay(ms: number): Promise<void> {
+export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -98,10 +98,16 @@ export function normalizeTitle(title: string): string {
 }
 
 export function calculateScore(paper: Omit<AcademicPaper, "score">): number {
-  const citationScore = Math.min(paper.citationCount ?? 0, 1000) / 1000;
+  // Normalize citation score: sigmoid-like scaling so low-citation papers don't get crushed
+  const rawCitations = paper.citationCount ?? 0;
+  const citationScore = rawCitations > 0 ? Math.min(Math.log10(rawCitations + 1) / 3, 1) : 0.3;
+  
   const currentYear = new Date().getFullYear();
-  const recencyScore = paper.year ? Math.min(paper.year, currentYear) / currentYear : 0.5;
-  return citationScore * 0.7 + recencyScore * 0.3;
+  const age = paper.year ? Math.max(0, currentYear - paper.year) : 5;
+  // Recency: 1.0 for current year, decaying to 0.5 at 10 years
+  const recencyScore = Math.max(0.5, 1 - age * 0.05);
+  
+  return citationScore * 0.5 + recencyScore * 0.5;
 }
 
 export function extractDomain(url: string): string | undefined {
@@ -614,6 +620,104 @@ export function sortPapers(papers: AcademicPaper[], sortBy: string): AcademicPap
 // Internal Action (makes actual API calls)
 // ============================================================
 
+export interface SearchInternalArgs {
+  query: string;
+  maxResults: number;
+  publicationYearFrom?: number;
+  publicationYearTo?: number;
+  minCitations?: number;
+  openAccessOnly?: boolean;
+  sortBy?: string;
+}
+
+export async function searchInternalHandler(
+  args: SearchInternalArgs
+): Promise<AcademicPaper[]> {
+  const {
+    query,
+    maxResults,
+    publicationYearFrom,
+    publicationYearTo,
+    minCitations,
+    openAccessOnly,
+    sortBy,
+  } = args;
+
+  const logger = createServiceLogger("academic_search", "searchInternal");
+  const startTime = Date.now();
+
+  const filters = {
+    publicationYearFrom,
+    publicationYearTo,
+    minCitations,
+    openAccessOnly,
+  };
+
+  logger.operationStart({
+    queryLen: query.length,
+    maxResults,
+    publicationYearFrom: publicationYearFrom ?? null,
+    publicationYearTo: publicationYearTo ?? null,
+    minCitations: minCitations ?? null,
+    openAccessOnly: openAccessOnly ?? null,
+    sortBy: sortBy || "relevance",
+  });
+
+  // Distribute maxResults across the three APIs
+  const perSourceMax = Math.ceil(maxResults / 3);
+
+  try {
+    // Call APIs in parallel with 200ms stagger to avoid rate-limit issues
+    const arxivPromise = searchArxiv(query, perSourceMax, filters);
+    await delay(200);
+    const semanticPromise = searchSemanticScholar(query, perSourceMax, filters);
+    await delay(200);
+    const pubmedPromise = searchPubMed(query, perSourceMax, filters);
+
+    const [arxivResults, semanticResults, pubmedResults] = await Promise.all([
+      arxivPromise.catch((error) => {
+        logger.warn("arXiv search failed", { message: (error as Error).message });
+        return [] as AcademicPaper[];
+      }),
+      semanticPromise.catch((error) => {
+        logger.warn("Semantic Scholar search failed", { message: (error as Error).message });
+        return [] as AcademicPaper[];
+      }),
+      pubmedPromise.catch((error) => {
+        logger.warn("PubMed search failed", { message: (error as Error).message });
+        return [] as AcademicPaper[];
+      }),
+    ]);
+
+    const allPapers = [...arxivResults, ...semanticResults, ...pubmedResults];
+
+    // Deduplicate by DOI or normalized title
+    let papers = deduplicatePapers(allPapers);
+
+    // Apply filters
+    papers = filterPapers(papers, filters);
+
+    // Sort
+    papers = sortPapers(papers, sortBy || "relevance");
+
+    // Cap to maxResults
+    papers = papers.slice(0, maxResults);
+
+    logger.operationComplete({
+      count: papers.length,
+      arxivCount: arxivResults.length,
+      semanticCount: semanticResults.length,
+      pubmedCount: pubmedResults.length,
+      durationMs: Date.now() - startTime,
+    });
+
+    return papers;
+  } catch (error) {
+    logger.operationError(error);
+    throw error;
+  }
+}
+
 export const searchInternal = internalAction({
   args: {
     query: v.string(),
@@ -624,92 +728,7 @@ export const searchInternal = internalAction({
     openAccessOnly: v.optional(v.boolean()),
     sortBy: v.optional(v.string()),
   },
-  handler: async (
-    _,
-    {
-      query,
-      maxResults,
-      publicationYearFrom,
-      publicationYearTo,
-      minCitations,
-      openAccessOnly,
-      sortBy,
-    }
-  ) => {
-    const logger = createServiceLogger("academic_search", "searchInternal");
-    const startTime = Date.now();
-
-    const filters = {
-      publicationYearFrom,
-      publicationYearTo,
-      minCitations,
-      openAccessOnly,
-    };
-
-    logger.operationStart({
-      queryLen: query.length,
-      maxResults,
-      publicationYearFrom: publicationYearFrom ?? null,
-      publicationYearTo: publicationYearTo ?? null,
-      minCitations: minCitations ?? null,
-      openAccessOnly: openAccessOnly ?? null,
-      sortBy: sortBy || "relevance",
-    });
-
-    // Distribute maxResults across the three APIs
-    const perSourceMax = Math.ceil(maxResults / 3);
-
-    try {
-      // Call APIs in parallel with 200ms stagger to avoid rate-limit issues
-      const arxivPromise = searchArxiv(query, perSourceMax, filters);
-      await delay(200);
-      const semanticPromise = searchSemanticScholar(query, perSourceMax, filters);
-      await delay(200);
-      const pubmedPromise = searchPubMed(query, perSourceMax, filters);
-
-      const [arxivResults, semanticResults, pubmedResults] = await Promise.all([
-        arxivPromise.catch((error) => {
-          logger.warn("arXiv search failed", { message: (error as Error).message });
-          return [] as AcademicPaper[];
-        }),
-        semanticPromise.catch((error) => {
-          logger.warn("Semantic Scholar search failed", { message: (error as Error).message });
-          return [] as AcademicPaper[];
-        }),
-        pubmedPromise.catch((error) => {
-          logger.warn("PubMed search failed", { message: (error as Error).message });
-          return [] as AcademicPaper[];
-        }),
-      ]);
-
-      const allPapers = [...arxivResults, ...semanticResults, ...pubmedResults];
-
-      // Deduplicate by DOI or normalized title
-      let papers = deduplicatePapers(allPapers);
-
-      // Apply filters
-      papers = filterPapers(papers, filters);
-
-      // Sort
-      papers = sortPapers(papers, sortBy || "relevance");
-
-      // Cap to maxResults
-      papers = papers.slice(0, maxResults);
-
-      logger.operationComplete({
-        count: papers.length,
-        arxivCount: arxivResults.length,
-        semanticCount: semanticResults.length,
-        pubmedCount: pubmedResults.length,
-        durationMs: Date.now() - startTime,
-      });
-
-      return papers;
-    } catch (error) {
-      logger.operationError(error);
-      throw error;
-    }
-  },
+  handler: async (_, args) => searchInternalHandler(args),
 });
 
 // ============================================================
@@ -737,6 +756,57 @@ function normalizeQuery(query: string): string {
  * with aggressive caching (24h) since papers don't change frequently.
  * Results are transformed into the DiscoveredSource format.
  */
+export interface DiscoverAcademicPapersArgs {
+  query: string;
+  maxResults?: number;
+  publicationYearFrom?: number;
+  publicationYearTo?: number;
+  minCitations?: number;
+  openAccessOnly?: boolean;
+  sortBy?: string;
+}
+
+export async function discoverAcademicPapersInternalHandler(
+  args: DiscoverAcademicPapersArgs,
+  fetchPapers: (args: SearchInternalArgs) => Promise<AcademicPaper[]> = (a) => searchInternalHandler(a)
+): Promise<DiscoveredSource[]> {
+  const logger = createServiceLogger("academic_search", "discoverAcademicPapersInternal");
+  const startTime = Date.now();
+  const normalizedQuery = normalizeQuery(args.query);
+
+  logger.operationStart({
+    queryPreview: normalizedQuery.substring(0, 50),
+    publicationYearFrom: args.publicationYearFrom ?? null,
+    publicationYearTo: args.publicationYearTo ?? null,
+    minCitations: args.minCitations ?? null,
+  });
+
+  try {
+    const papers = await fetchPapers({
+      query: normalizedQuery,
+      maxResults: args.maxResults ?? 20,
+      publicationYearFrom: args.publicationYearFrom,
+      publicationYearTo: args.publicationYearTo,
+      minCitations: args.minCitations,
+      openAccessOnly: args.openAccessOnly,
+      sortBy: args.sortBy ?? "relevance",
+    });
+
+    // Transform AcademicPaper[] → DiscoveredSource[]
+    const sources: DiscoveredSource[] = papers.map(toDiscoveredSource);
+
+    logger.operationComplete({
+      count: sources.length,
+      durationMs: Date.now() - startTime,
+    });
+
+    return sources;
+  } catch (error) {
+    logger.operationError(error);
+    throw error;
+  }
+}
+
 export const discoverAcademicPapersInternal = internalAction({
   args: {
     query: v.string(),

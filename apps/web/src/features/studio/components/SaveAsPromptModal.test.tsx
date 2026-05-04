@@ -92,7 +92,7 @@ describe("SaveAsPromptModal", () => {
       <SaveAsPromptModal
         isOpen={true}
         onClose={mockOnClose}
-        studioTool="slides"
+        studioTool="infographic"
         initialPromptText="Initial prompt text"
       />
     );
@@ -225,7 +225,7 @@ describe("SaveAsPromptModal", () => {
       <SaveAsPromptModal
         isOpen={true}
         onClose={mockOnClose}
-        studioTool="slides"
+        studioTool="infographic"
         initialPromptText="Test"
       />
     );
@@ -304,7 +304,7 @@ describe("SaveAsPromptModal", () => {
       <SaveAsPromptModal
         isOpen={true}
         onClose={mockOnClose}
-        studioTool="slides"
+        studioTool="infographic"
         initialPromptText="Test"
       />
     );

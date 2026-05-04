@@ -40,7 +40,7 @@ const STUDIO_RUNNER_KINDS: ReadonlySet<StudioRunnerKind> = new Set<StudioRunnerK
   "flashcards",
   "quiz",
   "mindmap",
-  "slides",
+  "infographic",
   "spreadsheet",
   "writtenQuestions",
   "audioScript",

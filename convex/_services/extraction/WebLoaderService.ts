@@ -1,10 +1,13 @@
 "use node";
 import { Supadata } from "@supadata/js";
-import FirecrawlApp from "@mendable/firecrawl-js";
 import { env } from "../../_lib/env";
 import { validateUrl } from "../../_lib/utils/urlValidation.js";
 import { invokeWithRetry } from "../../_agents/_shared/retry.js";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+
+import { tavily } from "@tavily/core";
+
+const tavilyClient = tavily({ apiKey: env.TAVILY_API_KEY });
 
 export interface WebPageMeta {
   title: string;
@@ -19,17 +22,15 @@ export interface TranscriptMeta {
 
 export class WebLoaderService {
   private supadata: Supadata;
-  private firecrawl: FirecrawlApp;
 
   constructor() {
     this.supadata = new Supadata({
       apiKey: env.SUPADATA_API_KEY,
     });
-    this.firecrawl = new FirecrawlApp({ apiKey: env.FIRECRAWL_API_KEY });
   }
 
   // ========================================================================
-  // Text cleaners (ported exactly from SupadataLoaderService)
+  // Text cleaners
   // ========================================================================
 
   /**
@@ -115,11 +116,11 @@ export class WebLoaderService {
   }
 
   // ========================================================================
-  // Firecrawl-backed methods
+  // Tavily-backed extraction
   // ========================================================================
 
   /**
-   * Scrape a web page and extract its text content
+   * Extract content from a web page using Tavily extract.
    */
   async loadWebPage(url: string): Promise<string> {
     const { content } = await this.loadWebPageWithMeta(url);
@@ -127,7 +128,8 @@ export class WebLoaderService {
   }
 
   /**
-   * Scrape a web page and extract text content plus page title and URL.
+   * Extract content plus page title and URL using Tavily extract.
+   * Tavily best practices: use markdown format, advanced depth for full content.
    */
   async loadWebPageWithMeta(url: string): Promise<WebPageMeta> {
     const validation = validateUrl(url);
@@ -139,17 +141,19 @@ export class WebLoaderService {
     logger.operationStart({ url });
 
     try {
-      const result = (await this.firecrawl.scrape(url, {
-        formats: ["markdown"],
-        proxy: "auto",
-        parsers: [],
-      })) as {
-        markdown?: string;
-        metadata?: { title?: string };
-      };
+      const result = await tavilyClient.extract([url], {
+        extractDepth: "advanced",
+        format: "markdown",
+        includeImages: false,
+      });
 
-      const text = result.markdown || "";
-      const title = result.metadata?.title ?? "";
+      const extracted = result.results?.[0];
+      if (!extracted) {
+        throw new Error(`Tavily extract returned no results for ${url}`);
+      }
+
+      const text = extracted.rawContent || "";
+      const title = "";
       const cleanedText = this.stripCookieConsentNoise(this.stripMedia(text));
 
       logger.operationComplete({
@@ -160,111 +164,11 @@ export class WebLoaderService {
 
       return { title, content: cleanedText, url };
     } catch (e) {
-      logger.error("Scrape failed", e, { url });
-      throw new Error(`Failed to scrape web page: ${e instanceof Error ? e.message : String(e)}`, {
-        cause: e,
-      });
-    }
-  }
-
-  /**
-   * Start a crawl job and return the jobId immediately. Does not poll.
-   */
-  async startCrawl(url: string, limit?: number): Promise<{ jobId: string }> {
-    const validation = validateUrl(url);
-    if (!validation.valid) {
-      throw new Error(`Invalid URL: ${validation.error}`);
-    }
-
-    const logger = createServiceLogger("web_loader", "startCrawl");
-    logger.operationStart({ url, limit });
-
-    try {
-      const result = (await this.firecrawl.crawl(url, {
-        limit,
-        scrapeOptions: {
-          formats: ["markdown"],
-          proxy: "auto",
-        },
-      })) as { id?: string; jobId?: string };
-
-      const jobId = result.id || result.jobId;
-      if (!jobId) {
-        throw new Error("Crawl job did not return a jobId");
-      }
-
-      logger.operationComplete({ jobId, url });
-      return { jobId };
-    } catch (e) {
-      logger.error("Crawl start failed", e, { url });
-      throw new Error(`Failed to start crawl: ${e instanceof Error ? e.message : String(e)}`, {
-        cause: e,
-      });
-    }
-  }
-
-  /**
-   * Check the status of a crawl job.
-   */
-  async checkCrawlStatus(
-    jobId: string
-  ): Promise<{ status: string; pages?: Array<{ url: string; content: string }> }> {
-    const logger = createServiceLogger("web_loader", "checkCrawlStatus");
-    logger.operationStart({ jobId });
-
-    try {
-      const result = (await this.firecrawl.getCrawlStatus(jobId)) as {
-        status?: string;
-        data?: Array<{
-          markdown?: string;
-          metadata?: { sourceURL?: string; url?: string };
-        }>;
-      };
-
-      const status = result.status || "unknown";
-      const pages = result.data?.map((page) => ({
-        url: page.metadata?.sourceURL || page.metadata?.url || "",
-        content: page.markdown || "",
-      }));
-
-      logger.operationComplete({ status, pageCount: pages?.length || 0, jobId });
-      return { status, pages };
-    } catch (e) {
-      logger.error("Check crawl status failed", e, { jobId });
+      logger.error("Extract failed", e, { url });
       throw new Error(
-        `Failed to check crawl status: ${e instanceof Error ? e.message : String(e)}`,
+        `Failed to extract web page: ${e instanceof Error ? e.message : String(e)}`,
         { cause: e }
       );
-    }
-  }
-
-  /**
-   * Map a website and return all discovered URLs.
-   */
-  async mapWebsite(url: string): Promise<{ urls: string[] }> {
-    const validation = validateUrl(url);
-    if (!validation.valid) {
-      throw new Error(`Invalid URL: ${validation.error}`);
-    }
-
-    const logger = createServiceLogger("web_loader", "mapWebsite");
-    logger.operationStart({ url });
-
-    try {
-      const result = (await this.firecrawl.map(url)) as unknown as {
-        links?: Array<string | { url?: string }>;
-      };
-      const urls =
-        result.links?.map((link) =>
-          typeof link === "string" ? link : link.url || ""
-        ).filter(Boolean) || [];
-      logger.operationComplete({ urlCount: urls.length, url });
-      return { urls };
-    } catch (e) {
-      logger.error("Map failed", e, { url });
-      throw new Error(`Failed to map website: ${e instanceof Error ? e.message : String(e)}`, {
-        cause: e,
-      });
     }
   }
 

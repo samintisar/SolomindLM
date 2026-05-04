@@ -4,7 +4,7 @@ import type { FlashcardConfig } from "../components/CustomizeFlashcardsModal";
 import type { QuizConfig } from "../components/CustomizeQuizModal";
 import type { AudioConfig } from "../components/CustomizeAudioModal";
 import type { WrittenQuestionsConfig } from "../components/CustomizeWrittenQuestionsModal";
-import type { SlideDeckConfig } from "../components/CustomizeSlidesModal";
+import type { InfographicConfig } from "../components/CustomizeInfographicModal";
 import type { SpreadsheetConfig } from "../components/CustomizeSpreadsheetsModal";
 import {
   type CreateFlowContext,
@@ -13,7 +13,7 @@ import {
   useCreateQuizFlow,
   useCreateMindMapFlow,
   useCreateWrittenQuestionsFlow,
-  useCreateSlidesFlow,
+  useCreateInfographicFlow,
   useCreateSpreadsheetFlow,
   useCreateAudioFlow,
 } from "./flows";
@@ -46,14 +46,14 @@ export interface UseStudioHandlersReturn {
   isQuizModalOpen: boolean;
   isAudioModalOpen: boolean;
   isWrittenQuestionsModalOpen: boolean;
-  isSlidesModalOpen: boolean;
+  isInfographicModalOpen: boolean;
   isSpreadsheetsModalOpen: boolean;
   setIsReportModalOpen: (open: boolean) => void;
   setIsFlashcardModalOpen: (open: boolean) => void;
   setIsQuizModalOpen: (open: boolean) => void;
   setIsAudioModalOpen: (open: boolean) => void;
   setIsWrittenQuestionsModalOpen: (open: boolean) => void;
-  setIsSlidesModalOpen: (open: boolean) => void;
+  setIsInfographicModalOpen: (open: boolean) => void;
   setIsSpreadsheetsModalOpen: (open: boolean) => void;
   handleToolClick: (toolId: string) => void;
   handleCreateReport: (formatId: string, customPrompt?: string) => Promise<void>;
@@ -62,7 +62,7 @@ export interface UseStudioHandlersReturn {
   handleCreateMindMap: () => Promise<void>;
   handleCreateAudio: (config: AudioConfig) => void;
   handleCreateWrittenQuestions: (config: WrittenQuestionsConfig) => void;
-  handleCreateSlides: (config: SlideDeckConfig) => Promise<void>;
+  handleCreateInfographic: (config: InfographicConfig) => Promise<void>;
   handleCreateSpreadsheet: (config: SpreadsheetConfig) => Promise<void>;
 }
 
@@ -81,7 +81,7 @@ export function useStudioHandlers({
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [isWrittenQuestionsModalOpen, setIsWrittenQuestionsModalOpen] = useState(false);
-  const [isSlidesModalOpen, setIsSlidesModalOpen] = useState(false);
+  const [isInfographicModalOpen, setIsInfographicModalOpen] = useState(false);
   const [isSpreadsheetsModalOpen, setIsSpreadsheetsModalOpen] = useState(false);
 
   const toast = useToast();
@@ -111,7 +111,7 @@ export function useStudioHandlers({
   const createQuizFlow = useCreateQuizFlow(flowContext);
   const createMindMapFlow = useCreateMindMapFlow(flowContext);
   const createWrittenQuestionsFlow = useCreateWrittenQuestionsFlow(flowContext);
-  const createSlidesFlow = useCreateSlidesFlow(flowContext);
+  const createInfographicFlow = useCreateInfographicFlow(flowContext);
   const createSpreadsheetFlow = useCreateSpreadsheetFlow(flowContext);
   const createAudioFlow = useCreateAudioFlow(flowContext);
 
@@ -120,7 +120,7 @@ export function useStudioHandlers({
       if (toolId === "reports") setIsReportModalOpen(true);
       else if (toolId === "flashcards") setIsFlashcardModalOpen(true);
       else if (toolId === "quiz") setIsQuizModalOpen(true);
-      else if (toolId === "slides") setIsSlidesModalOpen(true);
+      else if (toolId === "infographic") setIsInfographicModalOpen(true);
       else if (toolId === "audio") setIsAudioModalOpen(true);
       else if (toolId === "mindmap") createMindMapFlow();
       else if (toolId === "writtenQuestions") setIsWrittenQuestionsModalOpen(true);
@@ -169,12 +169,12 @@ export function useStudioHandlers({
     [createAudioFlow]
   );
 
-  const handleCreateSlides = useCallback(
-    async (config: SlideDeckConfig) => {
-      setIsSlidesModalOpen(false);
-      await createSlidesFlow(config);
+  const handleCreateInfographic = useCallback(
+    async (config: InfographicConfig) => {
+      setIsInfographicModalOpen(false);
+      await createInfographicFlow(config);
     },
-    [createSlidesFlow]
+    [createInfographicFlow]
   );
 
   const handleCreateSpreadsheet = useCallback(
@@ -191,14 +191,14 @@ export function useStudioHandlers({
     isQuizModalOpen,
     isAudioModalOpen,
     isWrittenQuestionsModalOpen,
-    isSlidesModalOpen,
+    isInfographicModalOpen,
     isSpreadsheetsModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
     setIsWrittenQuestionsModalOpen,
-    setIsSlidesModalOpen,
+    setIsInfographicModalOpen,
     setIsSpreadsheetsModalOpen,
     handleToolClick,
     handleCreateReport,
@@ -207,7 +207,7 @@ export function useStudioHandlers({
     handleCreateMindMap: createMindMapFlow,
     handleCreateAudio,
     handleCreateWrittenQuestions,
-    handleCreateSlides,
+    handleCreateInfographic,
     handleCreateSpreadsheet,
   };
 }

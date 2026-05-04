@@ -278,14 +278,30 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
-  // Slides table
+  // Infographics table
+  infographics: defineTable({
+    userId: v.id("users"),
+    notebookId: v.id("notebooks"),
+    title: v.string(),
+    data: v.any(), // Infographic data
+    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_user", ["notebookId", "userId"])
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
+
+  // Slides table (deprecated - will be removed after migration)
   slides: defineTable({
     userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
-    data: v.any(), // Slide deck structure data
-    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
-    slideCount: v.optional(v.number()), // Number of slides
+    data: v.any(),
+    status: v.string(),
+    slideCount: v.optional(v.number()),
     metadata: v.optional(v.any()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -498,7 +514,7 @@ export default defineSchema({
     sourceTypeCounts: v.optional(v.any()), // { web: 5, academic: 10 }
     performanceMs: v.number(), // Total time in milliseconds
     cached: v.boolean(), // Was served from cache
-    apiHealth: v.optional(v.any()), // { tavily: { status, timeMs }, openalex: { status, timeMs } }
+    apiHealth: v.optional(v.any()), // { tavily: { status, timeMs }, academic: { status, timeMs } }
     error: v.optional(v.string()), // Error message if any
     timestamp: v.number(),
   })
@@ -606,7 +622,7 @@ export default defineSchema({
     studioTool: v.union(
       v.literal("report"),
       v.literal("spreadsheet"),
-      v.literal("slides"),
+      v.literal("infographic"),
       v.literal("flashcards"),
       v.literal("quiz"),
       v.literal("audio"),

@@ -15,7 +15,7 @@ const PRO_DAILY_CAP: Record<DailyFeature, number> = {
   audio: 5,
   writtenQuestion: 100,
   spreadsheet: 100,
-  slide: 10,
+  infographic: 10,
 };
 
 function inferIsProFromDailyCap(feature: DailyFeature | undefined, limit: number): boolean {
@@ -232,7 +232,7 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
     else if (lowerMessage.includes("audio")) feature = "audio";
     else if (lowerMessage.includes("written question")) feature = "writtenQuestion";
     else if (lowerMessage.includes("spreadsheet")) feature = "spreadsheet";
-    else if (lowerMessage.includes("slide")) feature = "slide";
+    else if (lowerMessage.includes("infographic")) feature = "infographic";
 
     const match = message.match(/(\d+)\/(\d+)/);
     if (match) {
@@ -276,7 +276,7 @@ export function getLimitErrorMessage(parsedError: ParsedLimitError): string {
       audio: "audio overview",
       writtenQuestion: "written question set",
       spreadsheet: "spreadsheet",
-      slide: "slide deck",
+      infographic: "infographic",
     };
     const featureName = featureNames[feature] || feature;
     return `Daily ${featureName} limit reached (${current}/${limit}).`;
@@ -315,7 +315,7 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
       audio: "5 audio overviews/day",
       writtenQuestion: "100 question sets/day",
       spreadsheet: "100 spreadsheets/day",
-      slide: "10 slide decks/day",
+      infographic: "10 infographics/day",
     };
     return `Upgrade for ${proLimits[feature]}.`;
   }

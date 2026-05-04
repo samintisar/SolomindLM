@@ -7,7 +7,7 @@ import {
   HelpCircle,
   GitFork,
   MessageSquareText,
-  Presentation,
+  Image,
   Table2,
 } from "lucide-react";
 import { Note, isAudioNote, isAudioOverviewNote } from "@/shared/types/index";
@@ -68,7 +68,7 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note, onPlayAudio }) => {
       bgClass: "bg-green-500/10",
       textClass: "text-green-700",
     },
-    slides: { icon: Presentation, bgClass: "bg-violet-500/10", textClass: "text-violet-600" },
+    infographic: { icon: Image, bgClass: "bg-violet-500/10", textClass: "text-violet-600" },
     spreadsheet: { icon: Table2, bgClass: "bg-cyan-500/10", textClass: "text-cyan-600" },
     note: { icon: FileText, bgClass: "bg-indigo-500/10", textClass: "text-indigo-600" },
   };

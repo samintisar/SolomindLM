@@ -367,61 +367,57 @@ export const getMindmapEvalStatus = action({
   },
 });
 
-// ─── Slides ──────────────────────────────────────────────────
+// ─── Infographics ────────────────────────────────────────────
 
-export interface SlidesEvalResult {
-  slideDeckId: string;
+export interface InfographicEvalResult {
+  infographicId: string;
   title: string;
   status: string;
   data: unknown;
-  slideCount: number;
   latencyMs: number;
 }
 
-export const runSlidesEval = action({
+export const runInfographicEval = action({
   args: {
     evalSecret: v.string(),
     notebookId: v.id("notebooks"),
     documentIds: v.optional(v.array(v.id("documents"))),
-    slideCount: v.optional(v.number()),
+    customPrompt: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<SlidesEvalResult> => {
+  handler: async (ctx, args): Promise<InfographicEvalResult> => {
     assertRagEvalGate(args.evalSecret);
     const startTime = Date.now();
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
-    const slideCount = args.slideCount ?? 10;
 
-    const slideDeckId = await ctx.runMutation(
-      internal.eval._studioRowCreators.createSlideDeckInternal,
+    const infographicId = await ctx.runMutation(
+      internal.eval._studioRowCreators.createInfographicInternal,
       {
         userId,
         notebookId: args.notebookId,
-        title: "Slide Deck (eval)",
-        slideCount,
+        title: "Infographic (eval)",
       }
     );
 
-    await ctx.runAction(internal.studio.slides.job.slideDeckGeneration, {
-      slideDeckId,
-      userId: userId as string,
+    await ctx.runAction(internal.studio.infographic.generate.generateInfographicImage, {
+      infographicId,
+      userId,
       notebookId: args.notebookId,
       documentIds,
-      slideCount,
+      customPrompt: args.customPrompt,
     });
 
     const populated = await pollUntilTerminal(
       ctx,
-      () => ctx.runQuery(internal.studio.slides.index.getInternal, { id: slideDeckId }),
-      `Slides ${slideDeckId}`
+      () => ctx.runQuery(internal.studio.infographic.index.getInternal, { id: infographicId }),
+      `Infographic ${infographicId}`
     );
 
     return {
-      slideDeckId: slideDeckId as string,
+      infographicId: infographicId as string,
       title: populated.title,
       status: populated.status,
       data: populated.data,
-      slideCount,
       latencyMs: Date.now() - startTime,
     };
   },
@@ -547,7 +543,7 @@ export const startWrittenQuestionsEval = action({
       internal.studio.writtenQuestions.job.writtenQuestionsGeneration,
       {
         writtenQuestionId,
-        userId: userId as string,
+      userId,
         notebookId: args.notebookId,
         documentIds,
         questionCount,

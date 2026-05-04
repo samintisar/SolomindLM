@@ -69,6 +69,9 @@ export async function runExecuteGraph(
     finalResponse: "",
   };
 
+  const graphStartTime = Date.now();
+  const MAX_GRAPH_DURATION_MS = 240_000; // 4 minutes — stay under Convex's ~5 min action limit
+
   // Iterative retrieve loop
   while (state.iteration < state.maxIterations) {
     // Reset sub-question statuses for re-retrieval on subsequent iterations
@@ -91,6 +94,13 @@ export async function runExecuteGraph(
       evidence: [...state.evidence, ...newEvidence],
       iteration: state.iteration + 1,
     };
+
+    // Time-based circuit breaker — bail early if approaching action limit
+    const elapsedMs = Date.now() - graphStartTime;
+    if (elapsedMs > MAX_GRAPH_DURATION_MS) {
+      console.log(`[ResearchGraph] Time budget exhausted (${elapsedMs}ms > ${MAX_GRAPH_DURATION_MS}ms), stopping iteration`);
+      break;
+    }
 
     // Gap analysis: check if any sub-questions have insufficient evidence
     const evidenceBySubQuestion: Record<string, EvidenceEntry[]> = {};

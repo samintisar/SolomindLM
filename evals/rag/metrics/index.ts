@@ -665,7 +665,7 @@ const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   flashcards: 90000,
   quiz: 90000,
   mindmap: 90000,
-  slides: 240000,
+  infographic: 300000,
   spreadsheet: 90000,
   writtenQuestions: 90000,
   audioScript: 240000,

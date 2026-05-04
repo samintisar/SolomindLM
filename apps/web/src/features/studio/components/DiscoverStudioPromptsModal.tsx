@@ -51,7 +51,7 @@ const SORT_OPTIONS: { value: PromptSortBy; label: string }[] = [
 const TOOL_LABELS: Record<StudioTool, string> = {
   report: "Reports",
   spreadsheet: "Spreadsheets",
-  slides: "Slides",
+  infographic: "Infographics",
   flashcards: "Flashcards",
   quiz: "Quizzes",
   audio: "Audio",

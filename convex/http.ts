@@ -521,7 +521,7 @@ http.route({
       const writer = writable.getWriter();
       const encoder = new TextEncoder();
       const pollIntervalMs = 50;
-      const maxWaitMs = 180_000;
+      const maxWaitMs = 280_000; // ~4.7 min — stay under Convex's ~5 min action limit
       const start = Date.now();
       let lastLength = 0;
 

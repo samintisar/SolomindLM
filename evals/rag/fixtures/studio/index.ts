@@ -58,18 +58,17 @@ export const studioMindmapAgentic20: EvalFixture = {
   tags: sharedTags("mindmap"),
 };
 
-export const studioSlidesAgentic20: EvalFixture = {
+export const studioInfographicAgentic20: EvalFixture = {
   schemaVersion: 1,
-  id: "studio-slides-agentic-patterns-20",
-  question: "Build a slide deck covering the 20 agentic AI design patterns.",
-  runner: "slides",
+  id: "studio-infographic-agentic-patterns-20",
+  question: "Create an infographic visualizing the 20 agentic AI design patterns.",
+  runner: "infographic",
   notebookId: AGENTIC_20_NOTEBOOK_ID,
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
-    "Deck should have at least one slide per pattern (or grouped sets), with clear title and body content.",
-  studioParams: { slideCount: 12 },
-  expectedStructure: { minItems: 10 },
-  tags: sharedTags("slides"),
+    "Infographic should visually represent the agentic AI patterns with clear labels, icons, and an organized layout.",
+  studioParams: { customPrompt: "Visualize the 20 agentic AI design patterns as an infographic with icons and brief descriptions for each pattern." },
+  tags: sharedTags("infographic"),
 };
 
 export const studioSpreadsheetAgentic20: EvalFixture = {
@@ -120,7 +119,7 @@ export const STUDIO_FIXTURES: EvalFixture[] = [
   studioFlashcardsAgentic20,
   studioQuizAgentic20,
   studioMindmapAgentic20,
-  studioSlidesAgentic20,
+  studioInfographicAgentic20,
   studioSpreadsheetAgentic20,
   studioWrittenQuestionsAgentic20,
   studioAudioScriptAgentic20,

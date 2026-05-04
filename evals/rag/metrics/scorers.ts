@@ -37,11 +37,11 @@ function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
  * Returns a flat array of MetricResult entries. Metrics that produce
  * multiple results (e.g. retrievalItemRecall returns 3) are flattened.
  */
-export function scoreAllMetrics(
+export async function scoreAllMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
   baseline?: EvalBaseline,
-): MetricResult[] {
+): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
 
   // Always-on: text-level recall and latency/cost.
@@ -64,7 +64,8 @@ export function scoreAllMetrics(
     }
   } else {
     // Studio runners: structural scorers keyed on studioOutput.
-    results.push(...scoreStudioMetrics(fixture, artifact, baseline));
+    const studioResults = await scoreStudioMetrics(fixture, artifact, baseline);
+    results.push(...studioResults);
   }
 
   return results;

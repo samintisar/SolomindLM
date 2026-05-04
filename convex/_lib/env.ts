@@ -12,8 +12,8 @@ export const env = {
   FAST_LLM: process.env.FAST_LLM || "openai/gpt-oss-120b",
   SMART_LLM: process.env.SMART_LLM || "openai/gpt-oss-120b",
 
-  // Firecrawl (web search + extraction)
-  FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || "",
+  // Tavily (web search + extraction + deep research)
+  TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",
 
   // Academic APIs
   SEMANTIC_SCHOLAR_API_KEY: process.env.SEMANTIC_SCHOLAR_API_KEY || "",
@@ -86,7 +86,12 @@ export const env = {
   REPORT_COLLAPSE_CONCURRENCY: process.env.REPORT_COLLAPSE_CONCURRENCY || "5",
   REPORT_MAX_TOKENS: process.env.REPORT_MAX_TOKENS || "64000",
 
-  // Slides
+  // Infographics
+  INFOGRAPHIC_MAX_TOKENS: process.env.INFOGRAPHIC_MAX_TOKENS || "8000",
+  INFOGRAPHIC_GENERATION_TIMEOUT_MS: process.env.INFOGRAPHIC_GENERATION_TIMEOUT_MS || "180000",
+  INFOGRAPHIC_IMAGE_TIMEOUT_MS: process.env.INFOGRAPHIC_IMAGE_TIMEOUT_MS || "180000",
+
+  // Slides (deprecated - kept for backward compatibility)
   SLIDES_MAP_CHUNK_TOKENS: process.env.SLIDES_MAP_CHUNK_TOKENS || "3000",
   SLIDES_REDUCE_CHUNK_TOKENS: process.env.SLIDES_REDUCE_CHUNK_TOKENS || "12000",
   SLIDES_MIN_SLIDES_PER_CHUNK: process.env.SLIDES_MIN_SLIDES_PER_CHUNK || "1",

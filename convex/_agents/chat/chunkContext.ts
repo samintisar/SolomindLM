@@ -185,3 +185,45 @@ export function selectChunksByTokenBudget(
 
   return selectedChunks;
 }
+
+/**
+ * Selects chunks with a reserved token budget for external sources.
+ * Prevents external chunks from being starved out by high-scoring notebook chunks.
+ *
+ * Strategy:
+ * 1. Reserve a fixed token budget for top-N external chunks
+ * 2. Select notebook chunks from the reduced remaining budget
+ * 3. Merge both pools (externals appended after notebooks)
+ */
+export function selectChunksByTokenBudgetWithReservation(
+  notebookChunks: ReferenceChunk[],
+  externalChunks: ReferenceChunk[],
+  logger?: ContextLogger,
+  relevanceThreshold?: number,
+  options?: SelectChunksOptions
+): ReferenceChunk[] {
+  const EXTERNAL_RESERVED_TOKENS = 2000; // ~4-6 chunks
+  const EXTERNAL_TOP_N = 5;
+
+  // Always take top-N externals regardless of score
+  const topExternals = [...externalChunks]
+    .sort((a, b) => chunkRankingScore(b) - chunkRankingScore(a))
+    .slice(0, EXTERNAL_TOP_N);
+
+  const reducedBudget = (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) - EXTERNAL_RESERVED_TOKENS;
+
+  const notebookSelected = selectChunksByTokenBudget(
+    notebookChunks,
+    logger,
+    relevanceThreshold,
+    { ...options, maxContextTokens: Math.max(reducedBudget, 1000) }
+  );
+
+  logger?.info("Chunk selection with reservation", {
+    notebookSelected: notebookSelected.length,
+    externalSelected: topExternals.length,
+    reservedTokens: EXTERNAL_RESERVED_TOKENS,
+  });
+
+  return [...notebookSelected, ...topExternals];
+}

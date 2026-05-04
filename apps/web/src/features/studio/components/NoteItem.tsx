@@ -89,9 +89,9 @@ export const NoteItem: React.FC<NoteItemProps> = ({
       aria-label={
         isGenerating && generatingLines ? `${note.title}, ${generatingLines.primary}` : undefined
       }
-      className={`relative rounded-sm border border-border p-3 transition-[box-shadow,transform] duration-300 ${
+      className={`relative rounded-sm border border-border p-3 overflow-hidden transition-[box-shadow,transform] duration-300 ${
         isGenerating
-          ? "cursor-not-allowed overflow-hidden bg-card/95 shadow-sm"
+          ? "cursor-not-allowed bg-card/95 shadow-sm"
           : "bg-card shadow-sm hover:shadow-md cursor-pointer group"
       }`}
     >
@@ -127,7 +127,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
                   </p>
                 ) : null}
                 <div className="flex items-baseline justify-between gap-2 min-w-0">
-                  <p className="min-w-0 flex-1 text-xs leading-snug text-foreground">
+                  <p className="min-w-0 flex-1 text-xs leading-snug text-foreground truncate">
                     {generatingLines.primary}
                   </p>
                   {generatingLines.progressPercent !== null ? (
@@ -157,8 +157,8 @@ export const NoteItem: React.FC<NoteItemProps> = ({
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono tracking-tight">{note.preview}</span>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                <span className="font-mono tracking-tight truncate">{note.preview}</span>
               </div>
             )}
           </div>

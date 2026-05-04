@@ -28,6 +28,7 @@ export type DailyFeature =
   | "audio"
   | "writtenQuestion"
   | "spreadsheet"
+  | "infographic"
   | "slide";
 
 /**
@@ -149,6 +150,7 @@ export function createDailyLimitError(
     audio: "audio overview",
     writtenQuestion: "written question set",
     spreadsheet: "spreadsheet",
+    infographic: "infographic",
     slide: "slide deck",
   };
 
@@ -178,6 +180,7 @@ export function getProLimit(feature: DailyFeature): number {
     audio: 5,
     writtenQuestion: 100,
     spreadsheet: 100,
+    infographic: 10,
     slide: 10,
   };
   return limits[feature];
@@ -195,6 +198,7 @@ export function getFreeLimit(feature: DailyFeature): number {
     audio: 1,
     writtenQuestion: 5,
     spreadsheet: 5,
+    infographic: 1,
     slide: 1,
   };
   return limits[feature];

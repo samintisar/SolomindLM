@@ -13,7 +13,7 @@ export type StudioRunnerKind =
   | "flashcards"
   | "quiz"
   | "mindmap"
-  | "slides"
+  | "infographic"
   | "spreadsheet"
   | "writtenQuestions"
   | "audioScript";
@@ -36,7 +36,6 @@ export interface StudioParams {
   difficulty?: string;
   topic?: string;
   questionCount?: number;
-  slideCount?: number;
 }
 
 export interface SourcePolicyConfig {
@@ -49,13 +48,13 @@ export interface SourcePolicyConfig {
 /**
  * Optional structural expectations used by studio metric scorers.
  * `requiredSections`: heading text that must appear in a markdown report.
- * `minItems`: minimum count for cards/questions/nodes/slides/rows.
+ * `minItems`: minimum count for cards/questions/nodes/rows.
  * `jsonShape`: which Zod-style validator to apply (only for structured outputs).
  */
 export interface ExpectedStructure {
   minItems?: number;
   requiredSections?: string[];
-  jsonShape?: "mindmap" | "slides" | "spreadsheet";
+  jsonShape?: "mindmap" | "spreadsheet";
 }
 
 export interface EvalFixture {

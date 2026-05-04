@@ -12,7 +12,7 @@ export interface ChatAgentContext {
   enableNotebookSearch?: boolean;
   /** Overrides env CHAT_GROUNDING_MODE when set */
   groundingMode?: "async" | "sync" | "off";
-  /** Pre-fetched external source chunks (from Tavily web search, etc.) to inject into LLM context */
+  /** Pre-fetched external source chunks (from web search, etc.) to inject into LLM context */
   externalChunks?: ReferenceChunk[];
   /** Per-notebook chat customization (instruction mode, custom instructions, response length) */
   chatSettings?: {

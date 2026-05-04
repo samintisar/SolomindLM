@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useMemo } from "react";
 import { ReferenceChunk } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
+import { Favicon } from "@/shared/components/Favicon";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -88,23 +89,38 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
       onMouseLeave={onMouseLeave}
     >
       <div className="bg-popover border border-border rounded-2xl shadow-xl p-5 w-96 h-80 text-sm animate-in fade-in zoom-in-95 duration-200 relative flex flex-col">
-        {onOpenInSources ? (
-          <button
-            type="button"
-            className={`${headerTypography} cursor-pointer text-left w-full rounded-md -mx-1 px-1 py-0.5 hover:bg-accent/60 hover:text-accent-foreground transition-colors`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onOpenInSources();
-            }}
-          >
-            Reference {hoveredRefId} • {reference.sourceTitle}
-          </button>
-        ) : (
-          <p className={headerTypography}>
-            Reference {hoveredRefId} • {reference.sourceTitle}
-          </p>
-        )}
+        <div className="flex items-center mb-3 shrink-0 gap-2 min-w-0">
+          {reference.sourceUrl && (
+            <Favicon url={reference.sourceUrl} size={14} className="rounded-sm" />
+          )}
+          {onOpenInSources ? (
+            <button
+              type="button"
+              className={`${headerTypography} cursor-pointer text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-accent/60 hover:text-accent-foreground transition-colors mb-0 truncate min-w-0 flex-1`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenInSources();
+              }}
+            >
+              Reference {hoveredRefId} • {reference.sourceTitle}
+            </button>
+          ) : reference.sourceUrl ? (
+            <a
+              href={reference.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${headerTypography} cursor-pointer text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-accent/60 hover:text-accent-foreground transition-colors mb-0 truncate min-w-0 flex-1`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              Reference {hoveredRefId} • {reference.sourceTitle}
+            </a>
+          ) : (
+            <p className={`${headerTypography} mb-0 truncate min-w-0 flex-1`}>
+              Reference {hoveredRefId} • {reference.sourceTitle}
+            </p>
+          )}
+        </div>
         <div className="prose font-serif text-sm leading-relaxed max-w-none text-popover-foreground wrap-break-word min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
             <MarkdownRenderer components={tooltipMarkdownComponents as any}>

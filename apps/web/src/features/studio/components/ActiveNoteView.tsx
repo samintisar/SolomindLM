@@ -9,7 +9,7 @@ import {
   isAudioNote,
   isAudioOverviewNote,
   isWrittenQuestionsNote,
-  isSlideDeckNote,
+  isInfographicNote,
   isSpreadsheetNote,
   isUserNote,
 } from "@/shared/types/index";
@@ -18,7 +18,7 @@ import { FlashcardView } from "./views/FlashcardView";
 import { QuizView } from "./views/QuizView";
 import { MindMapView } from "./views/MindMapView";
 import { WrittenQuestionsView } from "./views/WrittenQuestionsView";
-import { SlidesView } from "./views/SlidesView";
+import { InfographicView } from "./views/InfographicView";
 import { SpreadsheetView } from "./views/SpreadsheetView";
 import { UserNoteView } from "./views/UserNoteView";
 import { AudioPlayer } from "@/features/audio/components/AudioPlayer";
@@ -264,10 +264,10 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
     );
   }
 
-  // Slides view
-  if (isSlideDeckNote(activeNote)) {
+  // Infographic view
+  if (isInfographicNote(activeNote)) {
     return (
-      <SlidesView
+      <InfographicView
         note={activeNote}
         onNoteUpdate={(updatedNote) => onUpdateNoteFull?.(activeNote.id, updatedNote)}
         onBack={isMobile ? onBack : undefined}

@@ -6,7 +6,7 @@ import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "./CustomizeQuizModal";
 import { CustomizeAudioModal } from "./CustomizeAudioModal";
 import { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
-import { CustomizeSlidesModal } from "./CustomizeSlidesModal";
+import { CustomizeInfographicModal } from "./CustomizeInfographicModal";
 import { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";
 import { ResizeHandle } from "./ResizeHandle";
 import { StudioPanelHeader } from "./StudioPanelHeader";
@@ -104,14 +104,14 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     isQuizModalOpen,
     isAudioModalOpen,
     isWrittenQuestionsModalOpen,
-    isSlidesModalOpen,
+    isInfographicModalOpen,
     isSpreadsheetsModalOpen,
     setIsReportModalOpen,
     setIsFlashcardModalOpen,
     setIsQuizModalOpen,
     setIsAudioModalOpen,
     setIsWrittenQuestionsModalOpen,
-    setIsSlidesModalOpen,
+    setIsInfographicModalOpen,
     setIsSpreadsheetsModalOpen,
     handleToolClick,
     handleCreateReport,
@@ -119,7 +119,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     handleCreateQuiz,
     handleCreateAudio,
     handleCreateWrittenQuestions,
-    handleCreateSlides,
+    handleCreateInfographic,
     handleCreateSpreadsheet,
   } = useStudioHandlers({
     notes,
@@ -148,7 +148,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       note.type === "audio" ||
       note.type === "audioOverview" ||
       note.type === "writtenQuestions" ||
-      note.type === "slides" ||
+      note.type === "infographic" ||
       note.type === "spreadsheet" ||
       note.type === "note"
     ) {
@@ -335,10 +335,10 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         onGenerate={handleCreateWrittenQuestions}
       />
 
-      <CustomizeSlidesModal
-        isOpen={isSlidesModalOpen}
-        onClose={() => setIsSlidesModalOpen(false)}
-        onGenerate={handleCreateSlides}
+      <CustomizeInfographicModal
+        isOpen={isInfographicModalOpen}
+        onClose={() => setIsInfographicModalOpen(false)}
+        onGenerate={handleCreateInfographic}
       />
 
       <CustomizeSpreadsheetsModal

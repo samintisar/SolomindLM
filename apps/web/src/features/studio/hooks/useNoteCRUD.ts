@@ -10,7 +10,7 @@ import {
   useRenameWrittenQuestions,
   useDeleteWrittenQuestions,
 } from "../services/writtenQuestionsApi";
-import { useRenameSlideDeck, useDeleteSlideDeck } from "../services/slidesApi";
+import { useRenameInfographic, useDeleteInfographic } from "../services/infographicApi";
 import { useRenameSpreadsheet, useDeleteSpreadsheet } from "../services/spreadsheetsApi";
 import { useUpdateUserNote, useDeleteUserNote } from "@/features/chat/services/userNotesApi";
 
@@ -41,8 +41,8 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
   const deleteAudioOverview = useDeleteAudioOverview();
   const renameWrittenQuestions = useRenameWrittenQuestions();
   const deleteWrittenQuestions = useDeleteWrittenQuestions();
-  const renameSlideDeck = useRenameSlideDeck();
-  const deleteSlideDeck = useDeleteSlideDeck();
+  const renameInfographic = useRenameInfographic();
+  const deleteInfographic = useDeleteInfographic();
   const renameSpreadsheet = useRenameSpreadsheet();
   const deleteSpreadsheet = useDeleteSpreadsheet();
   const updateUserNote = useUpdateUserNote();
@@ -55,7 +55,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
     ["mindmap", renameMindMap],
     ["audioOverview", (id, title) => updateAudioOverview(id, { title })],
     ["writtenQuestions", renameWrittenQuestions],
-    ["slides", renameSlideDeck],
+    ["infographic", renameInfographic],
     ["spreadsheet", renameSpreadsheet],
     ["note", (id, title) => updateUserNote(id, { title })],
   ]);
@@ -67,7 +67,7 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
     ["mindmap", deleteMindMap],
     ["audioOverview", deleteAudioOverview],
     ["writtenQuestions", deleteWrittenQuestions],
-    ["slides", deleteSlideDeck],
+    ["infographic", deleteInfographic],
     ["spreadsheet", deleteSpreadsheet],
     ["note", deleteUserNote],
   ]);

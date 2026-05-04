@@ -20,7 +20,7 @@ interface SaveAsPromptModalProps {
 const TOOL_LABELS: Record<StudioTool, string> = {
   report: "Reports",
   spreadsheet: "Spreadsheets",
-  slides: "Slides",
+  infographic: "Infographics",
   flashcards: "Flashcards",
   quiz: "Quizzes",
   audio: "Audio",

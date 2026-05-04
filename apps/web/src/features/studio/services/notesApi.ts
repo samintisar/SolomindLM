@@ -107,19 +107,22 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         metadata: dbNote.metadata,
       };
 
-    case "slides":
+    case "infographic":
       return {
         id: dbNote._id,
         title: dbNote.title,
-        preview: getSlidesPreview(dbNote),
-        type: "slides",
-        slides: Array.isArray(dbNote.data) ? dbNote.data : dbNote.data?.slides || [],
+        preview: getInfographicPreview(dbNote),
+        type: "infographic",
+        imageUrl: dbNote.data?.imageUrl || "",
+        prompt: dbNote.data?.prompt || "",
         status: dbNote.status,
         metadata: {
-          slideType: dbNote.metadata?.slideType || "detailed_deck",
-          deckLength: dbNote.metadata?.deckLength || "default",
-          slideCount: dbNote.slideCount || 0,
+          sourceDocumentIds: dbNote.data?.metadata?.sourceDocumentIds || [],
+          generatedAt: dbNote.data?.metadata?.generatedAt,
           customPrompt: dbNote.metadata?.customPrompt,
+          orientation: dbNote.metadata?.orientation,
+          visualStyle: dbNote.metadata?.visualStyle,
+          detailLevel: dbNote.metadata?.detailLevel,
           error: dbNote.metadata?.error,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
@@ -179,6 +182,24 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
+    case "slides":
+      return {
+        id: dbNote._id,
+        title: dbNote.title,
+        preview: getInfographicPreview(dbNote),
+        type: "infographic",
+        imageUrl: dbNote.data?.imageUrl || "",
+        prompt: dbNote.data?.prompt || "",
+        status: dbNote.status,
+        metadata: {
+          sourceDocumentIds: dbNote.data?.metadata?.sourceDocumentIds || [],
+          generatedAt: dbNote.data?.metadata?.generatedAt,
+          customPrompt: dbNote.metadata?.customPrompt,
+          error: dbNote.metadata?.error,
+          ...pickStudioGenerationFields(dbNote.metadata),
+        },
+      };
+
     default:
       throw new Error(`Unknown note type: ${_type}`);
   }
@@ -232,11 +253,10 @@ function getAudioOverviewPreview(dbNote: any): string {
   return "Audio Overview";
 }
 
-function getSlidesPreview(dbNote: any): string {
-  const count = dbNote.slideCount || 0;
-  if (dbNote.status === "generating") return `${count} Slide${count !== 1 ? "s" : ""}`;
-  if (dbNote.status === "failed") return `${count} Slides • Failed`;
-  return `${count} Slide${count !== 1 ? "s" : ""}`;
+function getInfographicPreview(dbNote: any): string {
+  if (dbNote.status === "generating") return "Infographic • Generating...";
+  if (dbNote.status === "failed") return "Infographic • Failed";
+  return "Infographic";
 }
 
 function getSpreadsheetPreview(dbNote: any): string {
@@ -325,5 +345,5 @@ export { useQuizzes } from "./quizzesApi";
 export { useMindMaps } from "./mindMapApi";
 export { useAudioOverviews } from "./audioApi";
 export { useWrittenQuestions } from "./writtenQuestionsApi";
-export { useSlideDecks } from "./slidesApi";
+export { useInfographics } from "./infographicApi";
 export { useSpreadsheets } from "./spreadsheetsApi";

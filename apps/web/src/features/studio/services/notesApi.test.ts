@@ -93,30 +93,36 @@ describe("mapDatabaseNoteToNote", () => {
     }
   });
 
-  it("maps slides type", () => {
-    const slides = [{ title: "Slide 1", content: "Content" }];
+  it("maps infographic type", () => {
+    const infographicData = {
+      imageUrl: "https://example.com/image.png",
+      title: "Test Infographic",
+      prompt: "Test prompt",
+      metadata: { sourceDocumentIds: ["doc1"] },
+    };
     const result = mapDatabaseNoteToNote({
       ...baseNote,
-      _type: "slides",
-      data: slides,
-      slideCount: 1,
+      _type: "infographic",
+      data: infographicData,
     });
-    expect(result.type).toBe("slides");
-    if (result.type === "slides") {
-      expect(result.slides).toEqual(slides);
-      expect(result.metadata.slideCount).toBe(1);
+    expect(result.type).toBe("infographic");
+    if (result.type === "infographic") {
+      expect(result.imageUrl).toBe("https://example.com/image.png");
+      expect(result.title).toBe("Test Infographic");
     }
   });
 
-  it("maps slides from nested data.slides", () => {
-    const slides = [{ title: "Slide 1" }];
+  it("maps legacy slides type to infographic", () => {
     const result = mapDatabaseNoteToNote({
       ...baseNote,
       _type: "slides",
-      data: { slides },
+      data: { imageUrl: "https://example.com/image.png", prompt: "Test prompt" },
+      status: "completed",
     });
-    if (result.type === "slides") {
-      expect(result.slides).toEqual(slides);
+    expect(result.type).toBe("infographic");
+    if (result.type === "infographic") {
+      expect(result.imageUrl).toBe("https://example.com/image.png");
+      expect(result.prompt).toBe("Test prompt");
     }
   });
 

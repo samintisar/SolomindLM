@@ -13,7 +13,9 @@ import { dirname, join } from "path";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import type { SourcePolicyConfig } from "./types";
 import { runEval, createConvexChatInvoker, createConvexStudioInvokers } from "./runners";
+import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
+import type { ResearchAgentInvoker } from "./runners/researchRunner";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
 import type { StudioRunnerKind, RunnerKind } from "./types";
 import { scoreAllMetrics } from "./metrics/scorers";
@@ -48,7 +50,7 @@ const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
   "flashcards",
   "quiz",
   "mindmap",
-  "slides",
+  "infographic",
   "spreadsheet",
   "writtenQuestions",
   "audioScript",
@@ -191,7 +193,13 @@ function exportRagasArtifacts(
     return {
       question: fix?.question ?? "",
       answer: art.answer,
-      selectedChunks: art.selectedChunks.map((c) => ({ content: c.content })),
+      selectedChunks: art.selectedChunks.map((c) => ({
+        id: c.id,
+        sourceTitle: c.sourceTitle,
+        sourceUrl: c.sourceUrl,
+        content: c.content,
+        similarity: c.similarity,
+      })),
       expectedItems: fix?.expectedItems ?? [],
       citations: art.citations,
       subQueries: art.subQueries,
@@ -237,6 +245,7 @@ async function main(): Promise<void> {
 
   // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
   let chatInvoker: ChatAgentInvoker | undefined;
+  let researchInvoker: ResearchAgentInvoker | undefined;
   let studioInvokers: Partial<Record<StudioRunnerKind, StudioInvoker>> | undefined;
   if (!opts.dryRun) {
     const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
@@ -254,6 +263,7 @@ async function main(): Promise<void> {
     }
     console.log(`Using Convex at ${convexUrl} (eval mode)`);
     chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
+    researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
     studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
   }
 
@@ -293,6 +303,7 @@ async function main(): Promise<void> {
       results = await runEval(fixture, {
         dryRun: opts.dryRun,
         chatInvoker,
+        researchInvoker,
         studioInvokers,
       });
     } catch (err) {
@@ -316,7 +327,7 @@ async function main(): Promise<void> {
         console.log(`  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`);
       }
 
-      const metrics = scoreAllMetrics(fixture, artifact, baseline);
+      const metrics = await scoreAllMetrics(fixture, artifact, baseline);
       allMetrics.push(...metrics);
 
       if (opts.verbose || opts.full) {

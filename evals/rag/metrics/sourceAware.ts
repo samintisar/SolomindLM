@@ -141,6 +141,7 @@ export function inferSourceChannel(sourceUrl?: string): string {
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
   if (url.includes("tiktok.com")) return "social";
   if (url.includes("news") || url.includes("bbc") || url.includes("reuters")) return "news";
+  if (url.includes("bloomberg") || url.includes("wsj.com") || url.includes("marketwatch") || url.includes("investopedia") || url.includes("ft.com") || url.includes("yahoo.com/finance") || url.includes("money")) return "finance";
   return "web";
 }
 
