@@ -26,8 +26,16 @@ export const get = query({
     if (!infographic) return null;
     try {
       await assertCanReadNotebook(ctx, infographic.notebookId, userId);
-    } catch {
-      return null;
+    } catch (e) {
+      if (
+        e instanceof Error &&
+        (e.message.includes("permission") ||
+          e.message.includes("not found") ||
+          e.message.includes("Unauthorized"))
+      ) {
+        return null;
+      }
+      throw e;
     }
     return infographic;
   },
@@ -159,7 +167,22 @@ export const updateData = internalMutation({
 });
 
 export const patch = internalMutation({
-  args: { infographicId: v.id("infographics"), patch: v.any() },
+  args: {
+    infographicId: v.id("infographics"),
+    patch: v.object({
+      title: v.optional(v.string()),
+      status: v.optional(
+        v.union(
+          v.literal("draft"),
+          v.literal("generating"),
+          v.literal("completed"),
+          v.literal("failed")
+        )
+      ),
+      data: v.optional(v.any()),
+      metadata: v.optional(v.any()),
+    }),
+  },
   handler: async (ctx, args) => {
     await Infographics.patchInfographic(ctx, args.infographicId, args.patch);
   },

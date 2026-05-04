@@ -240,8 +240,8 @@ Return JSON: {
       const designContent = designResponse.choices[0]?.message?.content || "{}";
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const design = parseLlmJson(designContent) as Record<string, any>;
-      if (!design.image_prompt && !design.title) {
-        throw new Error("LLM design step returned empty content — cannot generate a meaningful infographic");
+      if (!design.image_prompt) {
+        throw new Error("LLM design step did not return an image_prompt — cannot generate a meaningful infographic");
       }
       logger.phaseComplete("content_analysis", {
         title: design.title,
@@ -302,7 +302,11 @@ Return JSON: {
       let imageBytes: Uint8Array;
       if (imageUrl.startsWith("data:")) {
         // Extract base64 from data URL
-        const base64Data = imageUrl.split(",")[1];
+        const parts = imageUrl.split(",");
+        if (parts.length < 2 || !parts[1]) {
+          throw new Error("Together AI returned a malformed data URL — cannot decode image");
+        }
+        const base64Data = parts[1];
         imageBytes = Uint8Array.from(Buffer.from(base64Data, "base64"));
       } else {
         const imgRes = await fetch(imageUrl);

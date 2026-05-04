@@ -4,6 +4,9 @@ import { ResearchStateType } from "./state";
 import { plannerNode, retrieverNode, writerNode } from "./nodes";
 import type { ResearchNodeDeps } from "./nodes";
 import type { SubQuestion, SourcePolicy, ResearchContext, EvidenceEntry } from "./types";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+
+const graphLog = createServiceLogger("research", "executeGraph");
 
 // ============================================================
 // PLAN GRAPH — runs planner only, returns sub-questions
@@ -98,7 +101,7 @@ export async function runExecuteGraph(
     // Time-based circuit breaker — bail early if approaching action limit
     const elapsedMs = Date.now() - graphStartTime;
     if (elapsedMs > MAX_GRAPH_DURATION_MS) {
-      console.log(`[ResearchGraph] Time budget exhausted (${elapsedMs}ms > ${MAX_GRAPH_DURATION_MS}ms), stopping iteration`);
+      graphLog.info("time_budget_exhausted", { elapsedMs, limitMs: MAX_GRAPH_DURATION_MS });
       break;
     }
 
@@ -109,7 +112,7 @@ export async function runExecuteGraph(
       evidenceBySubQuestion[e.subQuestionId]!.push(e);
     }
 
-    const gaps = subQuestions
+    const gaps = state.subQuestions
       .map((sq) => ({
         subQuestionId: sq.id,
         evidenceCount: evidenceBySubQuestion[sq.id]?.length ?? 0,
@@ -118,9 +121,9 @@ export async function runExecuteGraph(
 
     // Early stop: if all sub-questions have evidence and total is reasonable, skip iteration 2
     const totalEvidence = state.evidence.length;
-    const hasMinimumCoverage = gaps.length === 0 && totalEvidence >= subQuestions.length * 2;
+    const hasMinimumCoverage = gaps.length === 0 && totalEvidence >= state.subQuestions.length * 2;
     if (hasMinimumCoverage) {
-      console.log(`[ResearchGraph] Early stop: sufficient evidence (${totalEvidence} pieces across ${subQuestions.length} sub-questions)`);
+      graphLog.info("early_stop_sufficient_evidence", { totalEvidence, subQuestionCount: state.subQuestions.length });
       break;
     }
 
@@ -130,7 +133,7 @@ export async function runExecuteGraph(
     }
 
     // Log gap analysis for debugging
-    console.log(`[ResearchGraph] Iteration ${state.iteration}: ${gaps.length} sub-questions need more evidence`);
+    graphLog.info("iteration_gaps", { iteration: state.iteration, gapCount: gaps.length });
   }
 
   // Write final response

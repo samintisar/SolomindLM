@@ -326,9 +326,16 @@ describe("AcademicSearchService - Result Processing", () => {
 
 // ============================================================
 // REAL Integration Tests - Actual API Calls
+// These tests require live internet access. Skip in restricted environments by
+// setting env var SKIP_NETWORK_TESTS=1 or running `bun run test:convex --testNamePattern`.
 // ============================================================
 
-describe("AcademicSearchService - REAL Integration Tests", () => {
+// Skip real network tests in CI or when SKIP_NETWORK_TESTS=1 is set.
+// Developers with live internet access can run locally without the flag.
+const describeIfNetwork =
+  process.env.CI || process.env.SKIP_NETWORK_TESTS === "1" ? describe.skip : describe;
+
+describeIfNetwork("AcademicSearchService - REAL Integration Tests", () => {
   vi.useRealTimers();
 
   describe("searchInternalHandler - REAL arXiv API", () => {

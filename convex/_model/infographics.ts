@@ -119,7 +119,7 @@ export async function updateInfographicData(
 export async function patchInfographic(
   ctx: MutationCtx,
   infographicId: Id<"infographics">,
-  patch: Record<string, unknown>
+  patch: Partial<InfographicUpdate>
 ): Promise<void> {
   await ctx.db.patch("infographics", infographicId, {
     ...patch,

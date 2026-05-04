@@ -15,7 +15,9 @@ import { tavily } from "@tavily/core";
 let _tavilyClient: ReturnType<typeof tavily> | null = null;
 function getTavilyClient(): ReturnType<typeof tavily> {
   if (!_tavilyClient) {
-    _tavilyClient = tavily({ apiKey: env.TAVILY_API_KEY });
+    const apiKey = env.TAVILY_API_KEY;
+    if (!apiKey) throw new Error("TAVILY_API_KEY is not configured");
+    _tavilyClient = tavily({ apiKey });
   }
   return _tavilyClient;
 }
@@ -136,7 +138,9 @@ export async function searchInternalHandler(
     logger.operationError(error);
     if (error instanceof Error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const httpStatus = (error as any).status ?? (error as any).statusCode ?? 0;
+      const e = error as any;
+      const httpStatus =
+        e.statusCode ?? e.status ?? e.response?.statusCode ?? e.response?.status ?? 0;
       throw createExternalServiceErrorFromResponse(
         "tavily",
         typeof httpStatus === "number" ? httpStatus : 0,
@@ -205,28 +209,23 @@ export async function discoverSourcesInternalHandler(
     timeRange: args.timeRange ?? null,
   });
 
-  try {
-    const result = await searchInternalHandler({
-      query: normalizedQuery,
-      maxResults: args.maxResults ?? 10,
-      scoreThreshold: args.scoreThreshold ?? 0.5,
-      topic: args.topic,
-      timeRange: args.timeRange,
-      searchDepth: args.searchDepth,
-      includeRawContent: args.includeRawContent,
-      excludeDomains: args.excludeDomains,
-      includeDomains: args.includeDomains,
-    });
+  const result = await searchInternalHandler({
+    query: normalizedQuery,
+    maxResults: args.maxResults ?? 10,
+    scoreThreshold: args.scoreThreshold ?? 0.5,
+    topic: args.topic,
+    timeRange: args.timeRange,
+    searchDepth: args.searchDepth,
+    includeRawContent: args.includeRawContent,
+    excludeDomains: args.excludeDomains,
+    includeDomains: args.includeDomains,
+  });
 
-    logger.operationComplete({
-      count: result.length,
-      durationMs: Date.now() - startTime,
-    });
-    return result;
-  } catch (error) {
-    logger.operationError(error);
-    throw error;
-  }
+  logger.operationComplete({
+    count: result.length,
+    durationMs: Date.now() - startTime,
+  });
+  return result;
 }
 
 export const discoverSourcesInternal = internalAction({
@@ -307,26 +306,28 @@ export async function deepResearchHandler(
     throw new Error("TAVILY_API_KEY is not configured");
   }
 
+  let requestId: string | undefined;
+
   try {
-      // Step 1: Start research task
-      const startResult = await getTavilyClient().research(input, {
+    // Step 1: Start research task
+    const startResult = await getTavilyClient().research(input, {
       model,
       ...(args.outputSchema ? { outputSchema: args.outputSchema } : {}),
     });
 
     // Handle both generator and direct response types
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof (startResult as any).next === 'function') {
+    if (typeof (startResult as any).next === "function") {
       throw new Error("Streaming research not supported in eval mode");
     }
     const researchResponse = startResult as { requestId: string };
-    const requestId = researchResponse.requestId;
+    requestId = researchResponse.requestId;
     logger.info("Deep research started", { requestId, model });
 
-    // Step 2: Poll until completed
-      let response = await getTavilyClient().getResearch(requestId);
+    // Step 2: Poll until completed — cap at 100 attempts (8.3 min) to stay within Convex's 10-min action limit
+    let response = await getTavilyClient().getResearch(requestId);
     let attempts = 0;
-    const maxAttempts = 120; // 10 minutes at 5s intervals
+    const maxAttempts = 100;
 
     while (
       response.status !== "completed" &&
@@ -346,9 +347,7 @@ export async function deepResearchHandler(
     if (response.status === "failed") {
       const failedResponse = response as { error?: string };
       const errorMsg = failedResponse.error || "Deep research task failed";
-      logger.error("Deep research failed", new Error(errorMsg), {
-        requestId,
-      });
+      logger.error("Deep research failed", new Error(errorMsg), { requestId });
       throw new Error(errorMsg);
     }
 
@@ -358,7 +357,7 @@ export async function deepResearchHandler(
         new Error("Max polling attempts exceeded"),
         { requestId }
       );
-      throw new Error("Deep research timed out after 10 minutes");
+      throw new Error("Deep research timed out after 8 minutes");
     }
 
     if (response.status !== "completed") {
@@ -367,10 +366,15 @@ export async function deepResearchHandler(
         new Error(`Unexpected status: ${response.status}`),
         { requestId, status: response.status }
       );
-      throw new Error(`Deep research ended with unexpected status: ${response.status}`);
+      throw new Error(
+        `Deep research ended with unexpected status: ${response.status}`
+      );
     }
 
-    const completedResponse = response as { content?: string; sources?: Array<{ title: string; url: string }> };
+    const completedResponse = response as {
+      content?: string;
+      sources?: Array<{ title: string; url: string }>;
+    };
 
     logger.operationComplete({
       requestId,
@@ -385,7 +389,12 @@ export async function deepResearchHandler(
       sources: completedResponse.sources,
     };
   } catch (error) {
-    logger.operationError(error);
+    const msg =
+      error instanceof Error ? error.message : String(error);
+    const contextual = requestId
+      ? `Deep research polling failed (requestId: ${requestId}): ${msg}`
+      : msg;
+    logger.operationError(new Error(contextual));
     throw error;
   }
 }

@@ -12,7 +12,7 @@ import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 // Configuration
 // ============================================================
 
-const VISION_JUDGE_MODEL = "Qwen/Qwen3.5-9B";
+const VISION_JUDGE_MODEL = "Qwen/Qwen3-VL-8B-Instruct";
 
 export interface VisionJudgeConfig {
   apiKey?: string;
@@ -164,15 +164,15 @@ export async function evaluateInfographicWithVision(
     try {
       result = JSON.parse(content) as VisionJudgeResult;
     } catch (_parseErr) {
-      // Fallback: return a single metric with the raw content
+      // Metric could not be computed — return fail with score 0 to avoid polluting aggregates
       return [
         baseMetric(
           "vision_judge",
           fixture,
           artifact,
-          "warn",
-          0.5,
-          `Vision judge returned non-JSON response (truncated or malformed). Raw content: ${content.slice(0, 200)}...`
+          "fail",
+          0,
+          `Vision judge returned non-JSON response — metric not computed. Raw: ${content.slice(0, 200)}`
         ),
       ];
     }

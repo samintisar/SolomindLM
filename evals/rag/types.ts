@@ -5,6 +5,8 @@
  * All metric rows are tagged by runner, configHash, and caseId for grouping.
  */
 
+import type { SourceChannel } from "../../convex/_agents/research/types";
+
 // ─── Fixtures ────────────────────────────────────────────────
 
 /** Studio agent kinds that can be evaluated. Each corresponds to a Convex eval action. */
@@ -44,7 +46,7 @@ export interface StudioParams {
 }
 
 export interface SourcePolicyConfig {
-  channels: string[];
+  channels: SourceChannel[];
   maxResultsPerChannel?: number;
   domainAllowlist?: string[];
   recencyDays?: number;
@@ -165,7 +167,7 @@ export interface EvalRunArtifact {
   evidence?: Array<{
     subQuestionId: string;
     sourceTitle: string;
-    relevanceScore: number;
+    relevanceScore: number | undefined;
     content: string;
   }>;
   /** Studio-only: structured output payload */
@@ -174,7 +176,7 @@ export interface EvalRunArtifact {
   sourcePolicy?: SourcePolicyConfig;
   /** Per-source-type evidence found (research runner only) */
   sourceEvidence?: Array<{
-    channel: string;
+    channel: SourceChannel;
     sourceCount: number;
     topDomains?: string[];
   }>;

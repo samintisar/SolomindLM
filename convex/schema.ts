@@ -611,6 +611,8 @@ export default defineSchema({
       v.literal("audio"),
       v.literal("writtenQuestions"),
       v.literal("mindmap"),
+      // "slides" kept for migration — remove after running _migration/removeSlidePrompts
+      v.literal("slides"),
     ),
     visibility: v.union(v.literal("private"), v.literal("public")),
     notebookId: v.optional(v.id("notebooks")),

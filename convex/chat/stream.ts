@@ -377,6 +377,7 @@ export const runWithStreamId = internalAction({
       conversationId: args.conversationId,
     });
 
+    let generationSucceeded = false;
     try {
       await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
         userId: args.userId,
@@ -412,11 +413,7 @@ export const runWithStreamId = internalAction({
         );
       }
 
-      // Consume rate limit token on success
-      await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
-        userId: args.userId,
-        feature: "chat",
-      });
+      generationSucceeded = true;
     } catch (e) {
       console.error("[ChatStream] runWithStreamId failed:", e);
       try {
@@ -441,6 +438,18 @@ export const runWithStreamId = internalAction({
         });
       } catch (flushErr) {
         console.error("[ChatStream] Final stream flush failed:", flushErr);
+      }
+    }
+
+    // Consume rate limit token after confirmed delivery — non-fatal if this fails
+    if (generationSucceeded) {
+      try {
+        await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+          userId: args.userId,
+          feature: "chat",
+        });
+      } catch (limitErr) {
+        console.error("[ChatStream] consumeDailyLimit failed (non-fatal):", limitErr);
       }
     }
 
@@ -926,7 +935,15 @@ export async function streamChatResponse(
           }))
         );
       } catch (e: unknown) {
-        chatStreamLog.warn("academic_search_failed", { error: String(e) });
+        chatStreamLog.warn("academic_search_failed", {
+          query: academicQuery,
+          error: e instanceof Error ? e.message : String(e),
+          errorType: e instanceof Error ? e.constructor.name : typeof e,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          statusCode: (e as any)?.statusCode ?? (e as any)?.status ?? undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          retryable: (e as any)?.retryable ?? undefined,
+        });
       }
     }
 

@@ -4,6 +4,9 @@ import type { ResearchStateType } from "./state";
 import type { SubQuestion, SourceChannel, EvidenceEntry, ResearchPhase } from "./types";
 import { buildPlanPrompt, buildWriterPrompt, PlannerOutputSchema } from "./prompts";
 import { createLLM } from "../_shared/llm_factory";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+
+const retrieverLog = createServiceLogger("research", "retrieverNode");
 
 // Safely extract hostname from a URL string; returns undefined for invalid/empty URLs.
 function safeGetDomain(url: string | undefined): string | undefined {
@@ -28,11 +31,15 @@ function truncateEvidenceContent(content: string, maxLength: number): string {
 
 // Timeout wrapper for slow external source loaders
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    ),
+    promise.finally(() => clearTimeout(timer)),
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms
+      );
+    }),
   ]);
 }
 
@@ -166,7 +173,7 @@ export async function retrieverNode(
             });
           }
         } catch (err) {
-          console.error(`[ResearchRetriever] Notebook search failed for "${searchQuery}":`, err);
+          retrieverLog.error("notebook_search_failed", err, { query: searchQuery });
         }
       }
 
@@ -202,7 +209,7 @@ export async function retrieverNode(
           );
           discoveredSources.push(...sources);
         } catch (_err) {
-          console.error(`[ResearchRetriever] Web discovery failed for "${webQuery}":`, _err);
+          retrieverLog.error("web_discovery_failed", _err, { channel: primaryChannel, query: webQuery });
         }
 
         // Sort by score and take top results
@@ -243,10 +250,12 @@ export async function retrieverNode(
               });
             }
           } catch (_err) {
-            console.warn(
-              `[ResearchRetriever] Scrape failed for "${source.url}", using snippet fallback:`,
-              _err instanceof Error ? _err.message : _err
-            );
+            retrieverLog.warn("scrape_failed_using_snippet", {
+              url: source.url,
+              channel: source.sourceType,
+              error: _err instanceof Error ? _err.message : String(_err),
+              errorType: _err instanceof Error ? _err.constructor.name : typeof _err,
+            });
             allChunks.push({
               subQuestionId: sq.id,
               sourceType: source.sourceType as SourceChannel,
@@ -297,7 +306,7 @@ export async function retrieverNode(
           );
           discoveredPapers.push(...sources);
         } catch (_err) {
-          console.error(`[ResearchRetriever] Academic discovery failed for "${academicQuery}":`, _err);
+          retrieverLog.error("academic_discovery_failed", _err, { query: academicQuery });
         }
 
         // Sort by score and take top results
@@ -347,7 +356,10 @@ export async function retrieverNode(
             academicChunks[i].content = truncateEvidenceContent(loaded.content, MAX_EVIDENCE_CONTENT_LENGTH);
           } catch (_err) {
             // Keep the abstract/snippet fallback — no action needed
-            console.warn(`[ResearchRetriever] Full-text load failed for "${paper.title.slice(0, 40)}", using abstract fallback`);
+            retrieverLog.warn("fulltext_load_failed_using_abstract", {
+              title: paper.title.slice(0, 40),
+              error: _err instanceof Error ? _err.message : String(_err),
+            });
           }
         }
 
@@ -433,11 +445,13 @@ export async function writerNode(
 
   // Final safety: hard truncate if still over
   if (prompt.length > MAX_PROMPT_CHARS) {
+    const originalLength = prompt.length;
     prompt = prompt.slice(0, MAX_PROMPT_CHARS);
     const lastBreak = prompt.lastIndexOf("\n\n");
     if (lastBreak > MAX_PROMPT_CHARS * 0.8) {
       prompt = prompt.slice(0, lastBreak) + "\n\n[Additional evidence truncated to fit context window]";
     }
+    retrieverLog.warn("prompt_hard_truncated", { originalLength, limitChars: MAX_PROMPT_CHARS });
   }
 
   const llm = createLLM({
