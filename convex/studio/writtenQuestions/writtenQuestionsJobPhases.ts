@@ -77,11 +77,11 @@ function createQuestionSelectionLLM(llm: ChatTogetherAI): WrittenQuestionSelecti
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.WRITTEN_QUESTIONS_MAP_CHUNK_TOKENS || "10000", 10),
-  PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
-  MIN_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MIN_QUESTIONS_PER_CHUNK || "2", 10),
-  MAX_QUESTIONS_PER_CHUNK: parseInt(env.WRITTEN_QUESTIONS_MAX_QUESTIONS_PER_CHUNK || "15", 10),
+  MAP_CHUNK_SIZE_TOKENS: 5_000,
+  PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
+  REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
+  MIN_QUESTIONS_PER_CHUNK: 2,
+  MAX_QUESTIONS_PER_CHUNK: 30,
   BUFFER_MULTIPLIER: 2.0,
 } as const;
 
@@ -142,7 +142,7 @@ function createReduceLLM(): ChatTogetherAI {
     model,
     temperature: 0.3,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: parseInt(env.WRITTEN_QUESTIONS_REDUCE_MAX_TOKENS || "32000", 10),
+    maxTokens: 32_000,
     modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }

@@ -41,10 +41,10 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.FLASHCARD_MAP_CHUNK_TOKENS, 10),
-  PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
-  REDUCE_MAX_TOKENS: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
+  MAP_CHUNK_SIZE_TOKENS: 5_000,
+  PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
+  REDUCE_TIMEOUT_MS: 240_000, // 4 minutes
+  REDUCE_MAX_TOKENS: 32_000,
   MIN_CARDS_PER_CHUNK: 2,
   BUFFER_MULTIPLIER: 1.5,
   MAX_CARDS_PER_CHUNK: 30,

@@ -67,10 +67,10 @@ function createQuestionLLM(llm: ChatTogetherAI): QuizQuestionOutputInvoker {
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.QUIZ_MAP_CHUNK_TOKENS || "2500", 10),
-  PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce (selection + expansion)
-  EXPAND_TIMEOUT_MS: 60000, // 60 seconds per question expansion
+  MAP_CHUNK_SIZE_TOKENS: 5_000,
+  PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
+  REDUCE_TIMEOUT_MS: 400_000, // ~6.7 minutes
+  EXPAND_TIMEOUT_MS: 60_000, // 60 seconds per question expansion
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 20,
   BUFFER_MULTIPLIER: 1.2,
@@ -146,7 +146,7 @@ function createMapLLM(): ChatTogetherAI {
     // Increased from 8000 to handle large chunks (19-22K chars = ~6-8K input tokens)
     // Need room for 8 candidates × ~300 tokens each = ~2400 output tokens
     // Total: ~6K input + ~2.4K output + ~1K prompt = ~10K tokens minimum
-    maxTokens: parseInt(env.QUIZ_MAX_TOKENS || "16000", 10),
+    maxTokens: 16_000,
   });
 }
 
@@ -157,7 +157,7 @@ function createReduceLLM(): ChatTogetherAI {
     model,
     temperature: 0.3,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: parseInt(env.QUIZ_REDUCE_MAX_TOKENS || "24000", 10),
+    maxTokens: 24_000,
     modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
@@ -169,7 +169,7 @@ function createExpandLLM(): ChatTogetherAI {
     model,
     temperature: 0.3,
     timeout: CONFIG.EXPAND_TIMEOUT_MS,
-    maxTokens: parseInt(env.QUIZ_EXPAND_MAX_TOKENS || "4096", 10),
+    maxTokens: 4_096,
     modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }

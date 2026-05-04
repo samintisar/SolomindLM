@@ -53,9 +53,9 @@ function createConceptExtractionLLM(llm: ChatTogetherAI): ConceptExtractionInvok
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.MINDMAP_MAP_CHUNK_TOKENS || "3750", 10),
-  PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
+  MAP_CHUNK_SIZE_TOKENS: 5_000,
+  PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
+  REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
 } as const;
 
 export type MindmapGenerationPhaseArgs = {

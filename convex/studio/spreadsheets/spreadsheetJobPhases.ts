@@ -30,10 +30,10 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.SPREADSHEET_MAP_CHUNK_TOKENS || "5000", 10),
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.SPREADSHEET_REDUCE_CHUNK_TOKENS || "15000", 10),
-  PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
-  REDUCE_TIMEOUT_MS: 120000, // 120 seconds for reduce
+  MAP_CHUNK_SIZE_TOKENS: 5_000,
+  REDUCE_CHUNK_SIZE_TOKENS: 15_000,
+  PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk (under 100s Cloudflare limit)
+  REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
   COLLAPSE_CONCURRENCY: 5,
 } as const;
 
@@ -76,7 +76,7 @@ function createMapLLM(): ChatTogetherAI {
     temperature: 0.3,
     timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
     modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-    maxTokens: parseInt(env.SPREADSHEET_MAP_MAX_OUTPUT_TOKENS || "4096", 10),
+    maxTokens: 8_192,
   });
 }
 
@@ -87,7 +87,7 @@ function createReduceLLM(): ChatTogetherAI {
     model,
     temperature: 0.5,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: parseInt(env.SPREADSHEET_REDUCE_MAX_OUTPUT_TOKENS || "32000", 10),
+    maxTokens: 32_000,
     modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }

@@ -116,7 +116,7 @@ async function recursiveCollapse(
     `[SpreadsheetGraph] Collapsing ${groups.length} token-aware groups (target: ${TARGET_TOKENS} tokens each)`
   );
 
-  const concurrency = parseInt(env.SPREADSHEET_COLLAPSE_CONCURRENCY || "5", 10);
+  const concurrency = GRAPH_CONFIG.COLLAPSE_CONCURRENCY;
   const collapsed = await allWithConcurrency(
     groups.map((group, idx) => {
       const totalTokens = group.reduce((sum, t) => sum + deps.estimateTokens(t), 0);

@@ -36,10 +36,10 @@ function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutp
 }
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.REPORT_MAP_CHUNK_TOKENS, 10),
-  PER_CHUNK_TIMEOUT_MS: 180000, // Increased from 90s to 180s (3 min) to match other studio jobs
-  REDUCE_TIMEOUT_MS: 180000, // Increased from 90s to 180s (3 min)
-  MAX_OUTPUT_TOKENS: parseInt(env.REPORT_REDUCE_MAX_OUTPUT_TOKENS, 10),
+  MAP_CHUNK_SIZE_TOKENS: 5_000,
+  PER_CHUNK_TIMEOUT_MS: 600_000, // 10 minutes
+  REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
+  MAX_OUTPUT_TOKENS: 32_000,
   MIN_SUMMARY_LENGTH: 50,
 } as const;
 
@@ -49,7 +49,7 @@ function createMapLLM(): ChatTogetherAI {
     model: env.FAST_LLM,
     temperature: 0.3,
     timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    maxTokens: parseInt(env.REPORT_MAP_MAX_OUTPUT_TOKENS, 10),
+    maxTokens: 8_192,
     modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
   });
 }

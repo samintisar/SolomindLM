@@ -39,12 +39,12 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_MAP_CHUNK_TOKENS, 10),
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_REDUCE_CHUNK_TOKENS, 10),
-  PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk
-  REDUCE_TIMEOUT_MS: parseInt(env.AUDIO_REDUCE_TIMEOUT_MS, 10),
-  REDUCE_MAX_OUTPUT_TOKENS: parseInt(env.AUDIO_REDUCE_MAX_OUTPUT_TOKENS, 10),
-  TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS, 10),
+  MAP_CHUNK_SIZE_TOKENS: 20_000,
+  REDUCE_CHUNK_SIZE_TOKENS: 40_000,
+  PER_CHUNK_TIMEOUT_MS: 90_000, // 90 seconds per chunk
+  REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
+  REDUCE_MAX_OUTPUT_TOKENS: 16_384,
+  TTS_TIMEOUT_MS: 300_000, // 5 minutes
 } as const;
 
 export type AudioOverviewGenerationPhaseArgs = {

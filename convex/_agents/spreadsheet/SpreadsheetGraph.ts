@@ -34,7 +34,7 @@ export class SpreadsheetGraph {
       model: mapModel,
       temperature: 0.3,
       timeout: GRAPH_CONFIG.MAP_TIMEOUT_MS,
-      maxTokens: parseInt(env.SPREADSHEET_MAP_MAX_OUTPUT_TOKENS || "4096", 10),
+      maxTokens: GRAPH_CONFIG.MAP_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(mapModel, "fast"),
     });
 
@@ -44,7 +44,7 @@ export class SpreadsheetGraph {
       model: reduceModel,
       temperature: 0.5,
       timeout: GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-      maxTokens: parseInt(env.SPREADSHEET_REDUCE_MAX_OUTPUT_TOKENS || "32000", 10),
+      maxTokens: GRAPH_CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
 

@@ -1,12 +1,11 @@
 "use node";
 
-import { env } from "../../_lib/env";
-
 /** Configuration constants for AudioOverviewGraph */
 export const GRAPH_CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_MAP_CHUNK_TOKENS || "3750", 10), // ~15K chars ≈ 3.75K tokens
-  REDUCE_CHUNK_SIZE_TOKENS: parseInt(env.AUDIO_REDUCE_CHUNK_TOKENS || "10000", 10), // ~40K chars ≈ 10K tokens
-  MAP_TIMEOUT_MS: parseInt(env.AUDIO_MAP_TIMEOUT_MS || "180000", 10),
-  REDUCE_TIMEOUT_MS: parseInt(env.AUDIO_REDUCE_TIMEOUT_MS || "600000", 10),
-  TTS_TIMEOUT_MS: parseInt(env.AUDIO_TTS_TIMEOUT_MS || "300000", 10),
+  MAP_CHUNK_SIZE_TOKENS: 20_000,
+  REDUCE_CHUNK_SIZE_TOKENS: 40_000,
+  MAP_TIMEOUT_MS: 300_000, // 5 minutes
+  REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
+  TTS_TIMEOUT_MS: 300_000, // 5 minutes
+  REDUCE_MAX_OUTPUT_TOKENS: 16_384,
 } as const;

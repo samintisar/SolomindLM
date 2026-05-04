@@ -88,7 +88,7 @@ async function recursiveCollapse(
     groups.push(currentGroup);
   }
 
-  const concurrency = parseInt(env.REPORT_COLLAPSE_CONCURRENCY || "5", 10);
+  const concurrency = GRAPH_CONFIG.COLLAPSE_CONCURRENCY;
   console.log(
     `[ReportGraph] Collapsing ${groups.length} groups with concurrency limit of ${concurrency}`
   );

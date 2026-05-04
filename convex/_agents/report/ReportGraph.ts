@@ -3,7 +3,6 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { END, START, StateGraph, type Send } from "@langchain/langgraph";
 
-import { env } from "../../_lib/env.js";
 import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.js";
 import { countTokens } from "../_shared/index.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
@@ -26,13 +25,13 @@ export class ReportGraph {
   private fastLlmStructured: MapOutputInvoker;
   private maxTokens: number;
 
-  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = 64000) {
+  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = GRAPH_CONFIG.MAX_TOKENS) {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
       temperature: 0.3,
       timeout: GRAPH_CONFIG.MAP_TIMEOUT_MS,
-      maxTokens: parseInt(env.REPORT_MAP_MAX_OUTPUT_TOKENS || "8192", 10),
+      maxTokens: GRAPH_CONFIG.MAP_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(mapModel, "fast"),
     });
 
@@ -41,7 +40,7 @@ export class ReportGraph {
       model: reduceModel,
       temperature: 0.5,
       timeout: GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
-      maxTokens: parseInt(env.REPORT_REDUCE_MAX_OUTPUT_TOKENS || "32000", 10),
+      maxTokens: GRAPH_CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
 

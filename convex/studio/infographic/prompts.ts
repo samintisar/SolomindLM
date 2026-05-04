@@ -45,9 +45,9 @@ const safeParseInt = (val: string | undefined, fallback: number): number => {
 };
 
 export const INFOGRAPHIC_CONFIG = {
-  MAX_TOKENS: safeParseInt(env.INFOGRAPHIC_MAX_TOKENS, 8000),
-  GENERATION_TIMEOUT_MS: safeParseInt(env.INFOGRAPHIC_GENERATION_TIMEOUT_MS, 180000),
-  IMAGE_TIMEOUT_MS: safeParseInt(env.INFOGRAPHIC_IMAGE_TIMEOUT_MS, 180000),
+  MAX_TOKENS: 8_000,
+  GENERATION_TIMEOUT_MS: 180_000,
+  IMAGE_TIMEOUT_MS: 180_000,
 } as const;
 
 // ============================================================

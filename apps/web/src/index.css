@@ -414,7 +414,10 @@
 }
 
 /* Flush first block (chat: no dead space below agent activity / above first heading) */
-.prose > :first-child {
+.prose > :first-child,
+.prose > :first-child > :first-child,
+.prose > :first-child > :first-child > :first-child,
+.prose > :first-child > :first-child > :first-child > :first-child {
   margin-top: 0;
 }
 
