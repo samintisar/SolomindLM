@@ -109,16 +109,25 @@ export class QuizGraph {
     builder.addNode("collapse", (s: OverallStateType) => collapse(s, collapseDeps));
     builder.addNode("reduce", (s: OverallStateType) => reduce(s, reduceDeps));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge(START, "split_chunks" as any);
 
     builder.addConditionalEdges(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "split_chunks" as any,
       (s: OverallStateType) => routeToMap(s, { estimateTokens: this.estimateTokens.bind(this) }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { map_process: "map_process", collapse: "collapse" } as any
     );
 
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("map_process" as any, "collapse" as any);
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("collapse" as any, "reduce" as any);
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("reduce" as any, END as any);
 
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });

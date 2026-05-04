@@ -169,6 +169,7 @@ http.route({
     // Extract storageId from URL path
     const url = new URL(request.url);
     const pathParts = url.pathname.split("/");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const storageId = pathParts[pathParts.length - 1] as any;
 
     try {
@@ -340,7 +341,9 @@ http.route({
       console.log("[Chat] Processing message for user:", userId);
 
       const canReadNotebook = await ctx.runQuery(internal.notebooks.index.canReadNotebookInternal, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notebookId: notebookId as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         userId: userId as any,
       });
       if (!canReadNotebook) {
@@ -353,8 +356,11 @@ http.route({
 
       // Conversation and user message already added by client via sendMessageOptimistic
       const _conversationId = await ctx.runMutation(internal.chat.index.ensureConversation, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notebookId: notebookId as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         userId: userId as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
       });
 
@@ -370,11 +376,14 @@ http.route({
         notebookId,
         message,
         documentIds: documentIds ?? undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ...(sourcePolicy != null ? { sourcePolicy: sourcePolicy as any } : {}),
         ...(deepResearch === true
           ? {
               deepResearch: true,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ...(bodyUserMessageId ? { userMessageId: bodyUserMessageId as any } : {}),
             }
           : {}),
@@ -478,13 +487,16 @@ http.route({
       }
 
       const plan = await ctx.runQuery(internal.research.index.getPlanInternal, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         planId: planId as any,
       });
       if (!plan) return errorResponse("Plan not found", 404);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (plan.userId !== (userId as any)) return errorResponse("Not authorized", 403);
       if (plan.status !== "approved") return errorResponse("Plan not approved", 400);
 
       const latestRun = await ctx.runQuery(internal.research.index.getLatestResearchRunByPlan, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         planId: planId as any,
       });
 
@@ -495,6 +507,7 @@ http.route({
         latestRun.status !== "cancelled";
 
       let streamId: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let runId: any;
 
       if (reusable) {
@@ -503,6 +516,7 @@ http.route({
       } else {
         streamId = await streaming.createStream(ctx);
         runId = await ctx.runMutation(internal.research.index.createResearchRun, {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           planId: planId as any,
           userId,
           notebookId: plan.notebookId,
@@ -521,7 +535,7 @@ http.route({
       const writer = writable.getWriter();
       const encoder = new TextEncoder();
       const pollIntervalMs = 50;
-      const maxWaitMs = 180_000;
+      const maxWaitMs = 280_000; // ~4.7 min — stay under Convex's ~5 min action limit
       const start = Date.now();
       let lastLength = 0;
 

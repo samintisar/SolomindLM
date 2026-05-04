@@ -70,6 +70,7 @@ export async function mapProcess(
       () =>
         invokeWithTimeout(
           () =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (deps.fastLlmCandidateStructured as any).invoke(
               [new SystemMessage(MAP_CANDIDATES_SYSTEM_PROMPT), new HumanMessage(prompt)],
               createLangSmithRunConfig({

@@ -4,6 +4,6 @@ export { useCreateFlashcardsFlow } from "./useCreateFlashcardsFlow";
 export { useCreateQuizFlow } from "./useCreateQuizFlow";
 export { useCreateMindMapFlow } from "./useCreateMindMapFlow";
 export { useCreateWrittenQuestionsFlow } from "./useCreateWrittenQuestionsFlow";
-export { useCreateSlidesFlow } from "./useCreateSlidesFlow";
+export { useCreateInfographicFlow } from "./useCreateInfographicFlow";
 export { useCreateSpreadsheetFlow } from "./useCreateSpreadsheetFlow";
 export { useCreateAudioFlow } from "./useCreateAudioFlow";

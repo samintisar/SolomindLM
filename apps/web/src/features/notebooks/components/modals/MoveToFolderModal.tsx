@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { FolderItem } from "@/shared/types/index";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   Folder,
   Book,

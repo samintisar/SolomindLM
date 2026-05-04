@@ -204,18 +204,17 @@ export async function performNotebookFork(
     });
   }
 
-  const slides = await ctx.db
-    .query("slides")
+  const infographics = await ctx.db
+    .query("infographics")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
     .collect();
-  for (const r of slides) {
-    await ctx.db.insert("slides", {
+  for (const r of infographics) {
+    await ctx.db.insert("infographics", {
       userId: forkUserId,
       notebookId: newNotebookId,
       title: r.title,
       data: r.data,
       status: r.status,
-      slideCount: r.slideCount,
       metadata: r.metadata,
       createdAt: now,
       updatedAt: now,

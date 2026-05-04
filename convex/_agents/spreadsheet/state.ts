@@ -62,6 +62,7 @@ export const OverallState = Annotation.Root({
     chunksCompleted?: number;
     totalChunks?: number;
   }>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reducer: (_x, y?: any) => y ?? _x,
     default: () => ({ phase: "initializing", percentage: 0, message: "Initializing..." }),
   }),

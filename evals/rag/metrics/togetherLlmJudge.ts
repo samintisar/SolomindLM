@@ -1,11 +1,11 @@
 /**
  * Together AI invoker for LLM judge metrics.
  *
- * Uses OpenAI-compatible SDK with Together AI endpoints.
+ * Uses Together AI SDK directly.
  * Designed for eval scripts running outside of Convex.
  */
 
-import OpenAI from "openai";
+import Together from "together-ai";
 import type { LlmJudgeOptions } from "./llmJudge";
 
 // ============================================================
@@ -39,9 +39,9 @@ const PREMIUM_JUDGE_MODEL = "Qwen/Qwen2.5-72B-Instruct-Turbo";
 // ============================================================
 
 /**
- * Create an OpenAI client configured for Together AI.
+ * Create a Together AI client for judge operations.
  */
-export function createTogetherClient(config: TogetherJudgeConfig = {}): OpenAI {
+export function createTogetherClient(config: TogetherJudgeConfig = {}): Together {
   const apiKey = config.apiKey ?? process.env.TOGETHER_AI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -49,7 +49,7 @@ export function createTogetherClient(config: TogetherJudgeConfig = {}): OpenAI {
     );
   }
 
-  return new OpenAI({
+  return new Together({
     apiKey,
     baseURL: config.baseURL ?? "https://api.together.xyz/v1",
   });

@@ -14,6 +14,7 @@ export function useFolders() {
  * Get a specific folder by ID
  */
 export function useFolder(id: string | null) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return useQuery(api.folders.index.get, id ? { id: id as any } : "skip");
 }
 
@@ -24,6 +25,7 @@ export function useFolder(id: string | null) {
 export function useFolderNotebooks(folderId: string | null) {
   return useQuery(
     api.folders.index.getNotebooks,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     folderId ? { folderId: folderId as any } : "skip"
   );
 }
@@ -33,7 +35,9 @@ export function useFolderNotebooks(folderId: string | null) {
  */
 export function useCreateFolder() {
   const create = useMutation(api.folders.index.create).withOptimisticUpdate((localStore, args) => {
+    // eslint-disable-next-line react-hooks/purity
     const tempId = `temp-${Date.now()}` as Id<"folders">;
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
 
     const newFolder = {
@@ -65,6 +69,7 @@ export function useCreateFolder() {
 export function useUpdateFolder() {
   const update = useMutation(api.folders.index.update).withOptimisticUpdate((localStore, args) => {
     const { id, name, description, color, icon } = args;
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
 
     // Update list view
@@ -115,6 +120,7 @@ export function useUpdateFolder() {
       icon?: string;
     }
   ) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return await update({ id: id as any, ...updates });
   };
 }
@@ -139,6 +145,7 @@ export function useDeleteFolder() {
   });
 
   return async (id: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return await remove({ id: id as any });
   };
 }

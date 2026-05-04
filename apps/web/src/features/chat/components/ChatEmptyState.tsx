@@ -36,7 +36,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
 }) => {
   const hasSources = sourceCount > 0;
   const displaySuggestions = hasSources && suggestions?.length ? suggestions : STARTER_PROMPTS;
-  const NotebookGlyph = getNotebookLucideIcon(notebookIcon);
+  const notebookGlyph = getNotebookLucideIcon(notebookIcon);
   const iconTintClass = notebookCoverColor?.length
     ? notebookCoverColor.replace("bg-", "text-")
     : "text-primary";
@@ -56,7 +56,10 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
           className={`flex size-16 items-center justify-center rounded-2xl ${iconBgClass} ring-1 ring-border shadow-sm`}
           aria-hidden
         >
-          <NotebookGlyph className={`size-8 ${iconTintClass}`} strokeWidth={1.6} />
+          {React.createElement(notebookGlyph, {
+            className: `size-8 ${iconTintClass}`,
+            strokeWidth: 1.6,
+          })}
         </div>
 
         {/* Heading */}

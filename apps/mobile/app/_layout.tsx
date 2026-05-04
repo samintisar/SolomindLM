@@ -17,10 +17,6 @@ import { useRegisterPushNotifications } from "@mobile/services/push/pushService"
 
 export { ErrorBoundary } from "expo-router";
 
-export const unstable_settings = {
-  initialRouteName: "index",
-};
-
 SplashScreen.preventAutoHideAsync();
 
 Sentry.init({

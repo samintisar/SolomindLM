@@ -16,6 +16,8 @@ export const jobErrorMetadataValidator = v.object({
 /**
  * Build enhanced error metadata for database storage.
  */
+ 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function buildErrorMetadata(error: string, phase: string, metadata?: any): any {
   if (metadata?.errorType && metadata?.errorPhase) {
     return {

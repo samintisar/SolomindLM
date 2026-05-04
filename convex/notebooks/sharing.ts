@@ -8,9 +8,11 @@ import { rateLimiter } from "../_lib/rateLimits";
 import * as Notebooks from "../_model/notebooks";
 import { performNotebookFork } from "./_forkNotebook";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findActiveShareByTokenHash(ctx: { db: any }, tokenHash: string) {
   const row = await ctx.db
     .query("notebookShareLinks")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .withIndex("by_token_hash", (q: any) => q.eq("tokenHash", tokenHash))
     .first();
   if (!row || row.revokedAt !== undefined) {

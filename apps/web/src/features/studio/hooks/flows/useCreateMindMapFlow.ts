@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Note, MindMapNote } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useCreateMindMap } from "../../services/mindMapApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";

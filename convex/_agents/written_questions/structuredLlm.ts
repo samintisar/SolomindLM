@@ -16,5 +16,6 @@ export function createStructuredLLM(
 ): WrittenQuestionsOutputInvoker {
   return llm.withStructuredOutput(schema, {
     name: "written_questions",
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as any;
 }

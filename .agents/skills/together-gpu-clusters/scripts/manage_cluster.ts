@@ -54,6 +54,7 @@ async function createCluster(
   driverVersion: DriverVersion,
   billingType: BillingType = "ON_DEMAND",
   clusterType: ClusterType = "KUBERNETES",
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const { cudaVersion, nvidiaDriver } = parseDriverVersion(driverVersion);
   const cluster = await client.beta.clusters.create({
@@ -76,6 +77,7 @@ async function waitForReady(
   clusterId: string,
   timeoutMs: number = 1_800_000,
   pollMs: number = 30_000,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -93,6 +95,7 @@ async function waitForReady(
   throw new Error(`Cluster not ready after ${timeoutMs / 1000}s`);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function scaleCluster(clusterId: string, numGpus: number): Promise<any> {
   const cluster = await client.beta.clusters.update(clusterId, {
     num_gpus: numGpus,
@@ -101,7 +104,7 @@ async function scaleCluster(clusterId: string, numGpus: number): Promise<any> {
   return cluster;
 }
 
-async function deleteCluster(clusterId: string): Promise<void> {
+async function _deleteCluster(clusterId: string): Promise<void> {
   await client.beta.clusters.delete(clusterId);
   console.log(`Deleted cluster: ${clusterId}`);
 }

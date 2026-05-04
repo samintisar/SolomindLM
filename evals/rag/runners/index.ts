@@ -40,10 +40,11 @@ const STUDIO_RUNNER_KINDS: ReadonlySet<StudioRunnerKind> = new Set<StudioRunnerK
   "flashcards",
   "quiz",
   "mindmap",
-  "slides",
+  "infographic",
   "spreadsheet",
   "writtenQuestions",
   "audioScript",
+  "audioScriptOnly",
 ]);
 
 function isStudioRunner(runner: EvalFixture["runner"]): runner is StudioRunnerKind {

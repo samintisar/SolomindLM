@@ -19,11 +19,17 @@ export interface CreateFlashcardsResponse {
   note: { _id: string; title: string; status: string };
 }
 
+function capitalizeDifficulty(difficulty: string | undefined): string {
+  const d = (difficulty || "medium").toLowerCase();
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
+
 /**
- * Get preview text based on status, actual flashcard count, and metadata
+ * Matches unified list copy in `notesApi.getFlashcardPreview`.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPreviewText(status: string, cardCount: number, metadata?: any): string {
-  const difficulty = metadata?.difficulty || "medium";
+  const difficulty = capitalizeDifficulty(metadata?.difficulty);
 
   if (
     status === "generating" ||
@@ -31,17 +37,18 @@ function getPreviewText(status: string, cardCount: number, metadata?: any): stri
     status === "collapsing" ||
     status === "reducing"
   ) {
-    return `${cardCount} Card${cardCount !== 1 ? "s" : ""} • ${difficulty}`;
+    return `${cardCount} Flashcard${cardCount !== 1 ? "s" : ""} · ${difficulty}`;
   }
   if (status === "failed") {
-    return "Flashcards • Failed";
+    return `${cardCount} Flashcards · ${difficulty} · Failed`;
   }
-  return `${cardCount} Cards • ${difficulty}`;
+  return `${cardCount} Flashcard${cardCount !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
 /**
  * Map a database flashcard response to the frontend FlashcardNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapFlashcardToNote(dbFlashcard: any): FlashcardNote {
   // Flashcards are stored in the cardsData field
   const flashcards: Flashcard[] = dbFlashcard.cardsData || [];

@@ -9,6 +9,8 @@ export interface MindMapViewProps {
   onBack?: () => void;
 }
 
+ 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any {
   if (!node || typeof node !== "object") {
     return {
@@ -28,6 +30,7 @@ function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any
         : `node-${Math.random().toString(36).slice(2, 9)}`;
 
   const children = Array.isArray(node.children)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? node.children.map((child: any) => sanitizeNodeTree(child, fallbackTopic, false))
     : [];
 
@@ -46,13 +49,15 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
   onBack,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mindRef = useRef<any>(null);
   const [scale, setScale] = useState(1);
   const mindMapData = note.mindMapData;
 
   // Initialize Mind Elixir after data is loaded
   useEffect(() => {
-    if (!containerRef.current || !mindMapData) return;
+    const containerEl = containerRef.current;
+    if (!containerEl || !mindMapData) return;
 
     // Clean up previous instance
     if (mindRef.current) {
@@ -77,15 +82,21 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
         toolBar: false, // Disable default toolbar to use custom controls
         nodeMenu: false, // Disable node menu on right-click
         keypress: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         locale: "en" as any,
         overflowHidden: false,
         mainLinkStyle: 2,
         // Keep drag-to-pan on left mouse; marquee selection only on right mouse.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         mouseSelectionButton: 2 as any,
         before: {
+           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           insertSibling(_el: any, _obj: any) {
             return true;
           },
+           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           async addChild(_el: any, _obj: any) {
             return true;
           },
@@ -108,6 +119,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
             "--main-radius": "8px",
             "--topic-radius": "8px",
           },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       };
 
@@ -142,8 +154,9 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
         }
       }, 100); // Poll every 100ms
 
-      if (containerRef.current) {
-        (containerRef.current as any)._cleanupSelection = () => {
+      if (containerEl) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (containerEl as any)._cleanupSelection = () => {
           clearInterval(pollInterval);
         };
       }
@@ -151,15 +164,18 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
 
     return () => {
       // Clean up selection prevention
-      if (containerRef.current && (containerRef.current as any)._cleanupSelection) {
-        (containerRef.current as any)._cleanupSelection();
-        delete (containerRef.current as any)._cleanupSelection;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (containerEl && (containerEl as any)._cleanupSelection) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (containerEl as any)._cleanupSelection();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (containerEl as any)._cleanupSelection;
       }
       if (mindRef.current) {
         mindRef.current = null;
       }
     };
-  }, [mindMapData]);
+  }, [mindMapData, note.title]);
 
   // Control functions
   const handleZoomIn = () => {

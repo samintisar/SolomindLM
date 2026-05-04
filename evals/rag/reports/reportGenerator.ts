@@ -6,6 +6,8 @@ export interface GenerateReportOptions {
   commitSha: string;
   /** Include warnings in failure groups (default: true) */
   includeWarnings?: boolean;
+  /** Group results by source policy for A/B comparison */
+  groupBySourcePolicy?: boolean;
 }
 
 /**
@@ -56,6 +58,32 @@ export function formatReport(report: EvalReport): string {
     `    INFO : ${report.summary.info}`,
     "",
   ];
+
+  // Source Policy Comparison (if source-matrix was used)
+  const sourcePolicyMetrics = report.metrics.filter((m) => m.metric === "expected_item_recall" && m.caseId.includes("--src"));
+  if (sourcePolicyMetrics.length > 0) {
+    lines.push("  Source Policy Comparison:");
+    lines.push("  " + "-".repeat(50));
+
+    // Group by base case ID
+    const byBaseCase = new Map<string, typeof sourcePolicyMetrics>();
+    for (const m of sourcePolicyMetrics) {
+      const baseId = m.caseId.split("--src")[0];
+      if (!byBaseCase.has(baseId)) byBaseCase.set(baseId, []);
+      byBaseCase.get(baseId)!.push(m);
+    }
+
+    for (const [baseId, variants] of byBaseCase) {
+      lines.push(`    ${baseId}:`);
+      for (const v of variants.sort((a, b) => b.score - a.score)) {
+        const channelInfo = v.configHash.slice(0, 20); // First 20 chars of config hash
+        const icon = v.status === "pass" ? "✓" : v.status === "warn" ? "!" : "✗";
+        lines.push(`      ${icon} ${v.score.toFixed(2)}  ${channelInfo}  ${v.detail.slice(0, 60)}`);
+      }
+      lines.push("");
+    }
+    lines.push("");
+  }
 
   if (report.failureGroups.length > 0) {
     lines.push("  Failure Groups:");

@@ -15,7 +15,7 @@ import { CreateReportModal } from "@/features/studio/components/CreateReportModa
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
-import { CustomizeSlidesModal } from "@/features/studio/components/CustomizeSlidesModal";
+import { CustomizeInfographicModal } from "@/features/studio/components/CustomizeInfographicModal";
 import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
@@ -28,7 +28,7 @@ type LandingStudioPreviewModal =
   | "reports"
   | "flashcards"
   | "quiz"
-  | "slides"
+  | "infographic"
   | "audio"
   | "writtenQuestions"
   | "spreadsheets";
@@ -65,7 +65,7 @@ export function LandingHeroMockup({
     if (id === "reports") setStudioModal("reports");
     else if (id === "flashcards") setStudioModal("flashcards");
     else if (id === "quiz") setStudioModal("quiz");
-    else if (id === "slides") setStudioModal("slides");
+    else if (id === "infographic") setStudioModal("infographic");
     else if (id === "audio") setStudioModal("audio");
     else if (id === "writtenQuestions") setStudioModal("writtenQuestions");
     else if (id === "spreadsheets") setStudioModal("spreadsheets");
@@ -399,9 +399,9 @@ export function LandingHeroMockup({
         onGenerate={() => {}}
       />
 
-      <CustomizeSlidesModal
+      <CustomizeInfographicModal
         embedded
-        isOpen={studioModal === "slides"}
+        isOpen={studioModal === "infographic"}
         onClose={closeStudioModal}
         onGenerate={() => {}}
       />

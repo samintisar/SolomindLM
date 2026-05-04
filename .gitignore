@@ -17,6 +17,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 evals/rag/reports/
 evals/ragas/__pycache__/
 
+# Local lint/build debug artifacts
+lint_*.txt
+any_warnings.txt
+
 # Runtime data
 pids
 *.pid

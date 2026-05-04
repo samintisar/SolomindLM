@@ -26,7 +26,7 @@ export const FeaturesGrid: React.FC = () => {
         return Layers;
       case "quiz":
         return HelpCircle;
-      case "slides":
+      case "infographic":
         return Presentation;
       case "writtenQuestions":
         return MessageSquareText;
@@ -51,7 +51,7 @@ export const FeaturesGrid: React.FC = () => {
         return "text-red-700";
       case "quiz":
         return "text-blue-700";
-      case "slides":
+      case "infographic":
         return "text-violet-600";
       case "writtenQuestions":
         return "text-green-700";

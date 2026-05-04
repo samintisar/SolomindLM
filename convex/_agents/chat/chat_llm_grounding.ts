@@ -16,7 +16,8 @@ export function buildGroundingPrompt(
       const docType = inferDocumentType(chunk.sourceTitle);
       const typeLabel = docType ? ` (${docType})` : "";
 
-      let contextHeader = `[${index + 1}] From "${chunk.sourceTitle}"${typeLabel}`;
+      const sourceLabel = chunk.sourceUrl?.startsWith("http") ? "[Web] " : "";
+      let contextHeader = `${sourceLabel}[${index + 1}] From "${chunk.sourceTitle}"${typeLabel}`;
 
       if (meta?.headingPath && meta.headingPath.length > 0) {
         contextHeader += ` > ${meta.headingPath.join(" > ")}`;
@@ -186,7 +187,7 @@ export function inferDocumentType(title: string): string | null {
   if (lower.includes("lecture")) return "Lecture";
   if (lower.includes("paper") || lower.includes("journal")) return "Paper";
   if (lower.includes("notes")) return "Notes";
-  if (lower.includes("slides")) return "Slides";
+  if (lower.includes("infographic")) return "Infographics";
 
   return null;
 }

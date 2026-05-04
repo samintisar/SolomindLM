@@ -39,6 +39,7 @@ export const fixSpecificAudioUrl = internalMutation({
     console.log(`  Extracted storageId: ${storageId}`);
 
     // Generate the correct Convex storage URL
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const correctUrl = await ctx.storage.getUrl(storageId as any);
 
     if (!correctUrl) {

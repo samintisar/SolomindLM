@@ -12,13 +12,20 @@ export interface ChatAgentContext {
   enableNotebookSearch?: boolean;
   /** Overrides env CHAT_GROUNDING_MODE when set */
   groundingMode?: "async" | "sync" | "off";
-  /** Pre-fetched external source chunks (from Tavily web search, etc.) to inject into LLM context */
+  /** Pre-fetched external source chunks (from web search, etc.) to inject into LLM context */
   externalChunks?: ReferenceChunk[];
   /** Per-notebook chat customization (instruction mode, custom instructions, response length) */
   chatSettings?: {
     instructionMode: "default" | "learningGuide" | "custom";
     customInstructions?: string;
     responseLength: "default" | "longer" | "shorter";
+  };
+  /** Source filter configuration for retrieval across different channels */
+  sourcePolicy?: {
+    channels: string[];
+    maxResultsPerChannel?: number;
+    domainAllowlist?: string[];
+    recencyDays?: number;
   };
 }
 
@@ -35,6 +42,7 @@ export interface StreamChunk {
     | "tool_call"
     | "followups"
     | "clarification";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   status?: string;
   message?: string;

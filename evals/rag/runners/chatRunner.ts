@@ -1,4 +1,5 @@
 import type { EvalFixture, EvalRunArtifact, ChunkSnapshot } from "../types";
+import { inferSourceChannel } from "../metrics/sourceAware";
 import { computeConfigHash } from "../configHash";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
@@ -11,7 +12,7 @@ import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 // call and returns a structured result.
 
 export interface ChatAgentInvoker {
-  invoke(context: ChatAgentContext): Promise<{
+  invoke(context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -20,6 +21,7 @@ export interface ChatAgentInvoker {
     selectedChunks: ReferenceChunk[];
     latencyMs: number;
     tokenUsage?: { prompt: number; completion: number; total: number };
+    sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
 }
 
@@ -122,12 +124,37 @@ export async function runChatEval(
     noteId: fixture.notebookId ?? "",
     conversationHistory: [{ role: "user", content: fixture.question }],
     documentIds: fixture.documentIds,
+    sourcePolicy: fixture.sourcePolicy,
   };
 
   const errors: string[] = [];
 
   try {
     const result = await invoker.invoke(agentContext);
+
+    // Build source evidence summary from selected chunks
+    const sourceEvidenceMap = new Map<string, { sourceCount: number; topDomains: string[] }>();
+    for (const chunk of result.selectedChunks) {
+      const channel = inferSourceChannel(chunk.sourceUrl);
+      const existing = sourceEvidenceMap.get(channel) ?? { sourceCount: 0, topDomains: [] };
+      existing.sourceCount++;
+      if (chunk.sourceUrl) {
+        try {
+          const domain = new URL(chunk.sourceUrl).hostname;
+          if (!existing.topDomains.includes(domain)) {
+            existing.topDomains.push(domain);
+          }
+        } catch {
+          // Invalid URL, skip
+        }
+      }
+      sourceEvidenceMap.set(channel, existing);
+    }
+    const sourceEvidence = Array.from(sourceEvidenceMap.entries()).map(([channel, data]) => ({
+      channel,
+      sourceCount: data.sourceCount,
+      topDomains: data.topDomains.slice(0, 5),
+    }));
 
     const artifact: EvalRunArtifact = {
       caseId: fixture.id,
@@ -141,6 +168,8 @@ export async function runChatEval(
       subQueries: result.subQueries,
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
+      sourcePolicy: result.sourcePolicy,
+      sourceEvidence,
       timestamp: new Date().toISOString(),
     };
 

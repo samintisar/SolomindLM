@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Note } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { getReportSubtitle } from "@/shared/types/reportTypes";
 import { useCreateReport } from "../../services/reportsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";

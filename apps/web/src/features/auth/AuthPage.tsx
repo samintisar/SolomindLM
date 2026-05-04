@@ -12,18 +12,18 @@ import {
   Search,
   Send,
 } from "lucide-react";
-import { useAuth } from "@/features/auth/AuthContext";
+import { useAuth } from "@/features/auth/useAuth";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthFormPanel, type AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
 import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
-import { CustomizeSlidesModal } from "@/features/studio/components/CustomizeSlidesModal";
+import { CustomizeInfographicModal } from "@/features/studio/components/CustomizeInfographicModal";
 import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { STUDIO_TOOLS } from "@/shared/constants";
 
 type HeroMode = "chat" | "studio";
@@ -33,7 +33,7 @@ type AuthStudioPreviewModal =
   | "reports"
   | "flashcards"
   | "quiz"
-  | "slides"
+  | "infographic"
   | "audio"
   | "writtenQuestions"
   | "spreadsheets";
@@ -68,7 +68,7 @@ function AuthHeroMockup() {
     if (id === "reports") setStudioModal("reports");
     else if (id === "flashcards") setStudioModal("flashcards");
     else if (id === "quiz") setStudioModal("quiz");
-    else if (id === "slides") setStudioModal("slides");
+    else if (id === "infographic") setStudioModal("infographic");
     else if (id === "audio") setStudioModal("audio");
     else if (id === "writtenQuestions") setStudioModal("writtenQuestions");
     else if (id === "spreadsheets") setStudioModal("spreadsheets");
@@ -411,8 +411,8 @@ function AuthHeroMockup() {
         }}
       />
 
-      <CustomizeSlidesModal
-        isOpen={studioModal === "slides"}
+      <CustomizeInfographicModal
+        isOpen={studioModal === "infographic"}
         onClose={closeStudioModal}
         onGenerate={() => {
           afterPreviewAction();

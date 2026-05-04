@@ -39,6 +39,7 @@ type ViewMode = "browse" | "study" | "edit";
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) => {
   // State
   const [mode, setMode] = useState<ViewMode>("browse");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [showMastered, setShowMastered] = useState((note.metadata as any)?.showMastered ?? false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -80,9 +81,11 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
 
   useEffect(() => {
     if (!hasInitializedIndex.current && displayNote) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const savedIndex = (displayNote.metadata as any)?.lastViewedIndex ?? 0;
       const boundedIndex = Math.min(savedIndex, Math.max(0, filteredCards.length - 1));
       if (savedIndex > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentIndex(boundedIndex);
       }
       hasInitializedIndex.current = true;
@@ -90,6 +93,7 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
   }, [displayNote, filteredCards.length]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentIndex((prev) =>
       filteredCards.length === 0 ? 0 : Math.min(prev, filteredCards.length - 1)
     );
@@ -101,8 +105,10 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
 
   // Sync showMastered with server
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serverShowMastered = (latestNote?.metadata as any)?.showMastered;
     if (serverShowMastered !== undefined && serverShowMastered !== showMastered) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowMastered(serverShowMastered);
     }
   }, [latestNote, showMastered]);

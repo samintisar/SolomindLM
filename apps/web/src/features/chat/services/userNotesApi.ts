@@ -6,6 +6,7 @@ import type { Id } from "@convex/_generated/dataModel";
 /**
  * Map a database note response to the frontend UserNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDatabaseNoteToUserNote(dbNote: any): UserNote {
   const isChat = dbNote.type === "chat";
   const messageCount = dbNote.messageCount || 0;
@@ -57,6 +58,7 @@ export function useSaveChat() {
 
   return async (params: {
     notebookId: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messages: any[];
     messageCount: number;
     conversationId?: string;

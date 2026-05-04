@@ -38,6 +38,7 @@ export const submitAndGrade = action({
     }
 
     // Find the specific question
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const question = writtenQuestion.questionsData?.find((q: any) => q.id === questionId);
     if (!question) {
       throw new Error("Question not found");

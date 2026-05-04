@@ -12,7 +12,7 @@ import {
 import { NotebookItem, FolderItem } from "@/shared/types/index";
 import { NotebookCard } from "../cards/NotebookCard";
 import { useNotebookHandlers, useNotebookSorting } from "../../hooks";
-import { useNotebookContext } from "../../NotebookContext";
+import { useNotebookContext } from "../../useNotebookContext";
 import { useFolderNotebooks } from "../../services/foldersApi";
 import { useCreateNotebook, useUpdateNotebook } from "../../services/notebooksApi";
 import { CustomizeNotebookModal, MoveToFolderModal } from "../modals";

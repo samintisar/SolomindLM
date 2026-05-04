@@ -226,6 +226,8 @@ describe("validateWithPreset", () => {
 
   it("returns warning for unknown preset", () => {
     // TypeScript would catch this at compile time, but runtime guard test
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = validateWithPreset("content" as any, "nonexistent" as any);
     expect(result.isValid).toBe(false);
     expect(result.warnings[0]).toContain("Unknown validation preset");

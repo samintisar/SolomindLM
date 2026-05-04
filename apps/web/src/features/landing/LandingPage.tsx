@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/features/auth/AuthContext";
+import { useAuth } from "@/features/auth/useAuth";
 import { isNativeShell } from "@/utils/platformDetection";
 import { NavigationHeader } from "./components/NavigationHeader";
 import { HeroSection } from "./components/HeroSection";
@@ -11,12 +11,12 @@ import { PricingSection } from "./components/PricingSection";
 import { FAQSection } from "./components/FAQSection";
 import { Footer } from "./components/Footer";
 import {
-  SEOMeta,
   generateOrganizationStructuredData,
   generateWebSiteStructuredData,
   generateSoftwareApplicationStructuredData,
   generateFAQStructuredData,
-} from "@/shared/seo/SEOMeta";
+} from "@/shared/seo/structuredData";
+import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { LANDING_FAQS } from "./constants";
 
 interface LandingPageProps {

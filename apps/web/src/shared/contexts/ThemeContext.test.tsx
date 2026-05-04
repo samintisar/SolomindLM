@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { ThemeProvider, useTheme } from "@/shared/contexts/ThemeContext";
+import { ThemeProvider } from "@/shared/contexts/ThemeContext";
+import { useTheme } from "@/shared/contexts/useTheme";
 
 // Minimal localStorage stub for jsdom environments where it may not be fully available
 const localStorageStore = new Map<string, string>();

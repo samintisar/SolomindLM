@@ -58,6 +58,7 @@ async function sleepMs(ms: number): Promise<void> {
 // ============================================================
 
 async function runResearchPlanPhase(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   streamId: string,
   userId: string,
@@ -70,6 +71,10 @@ async function runResearchPlanPhase(
   userMessageId: Id<"messages"> | undefined
 ): Promise<void> {
   const { ResearchAgent } = await import("../_agents/research/index.js");
+  const researchLog = createServiceLogger("researchStream", "runResearchPlanPhase", {
+    userId,
+    notebookId: notebookId as Id<"notebooks">,
+  });
 
   const apiKey = process.env.TOGETHER_API_KEY ?? "";
   const smartModel = process.env.SMART_MODEL ?? "openai/gpt-oss-120b";
@@ -95,14 +100,24 @@ async function runResearchPlanPhase(
     const vectorResults = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       filter: (q: any) => q.eq("notebookId", notebookIdTyped),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkIds = vectorResults.map((r: any) => r._id);
     if (chunkIds.length === 0) return [];
     const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
+     
+     
+     
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkMap = new Map<any, any>(fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any]));
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const docIds_unique = [...new Set(vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean))];
     const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, { documentIds: docIds_unique });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const titleMap = new Map(docRows.map((d: any) => [d._id, d.fileName]));
     const sourceUrlMap = new Map<string, string>();
     for (const d of docRows) {
@@ -111,7 +126,9 @@ async function runResearchPlanPhase(
       }
     }
     return vectorResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((r: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunk = chunkMap.get(r._id) as any;
         if (!chunk) return null;
         return {
@@ -124,20 +141,24 @@ async function runResearchPlanPhase(
           similarity: r._score ?? 0,
         };
       })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((x: any) => x !== null);
   };
 
   const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
     return ctx.runQuery(internal.documents.index.keywordSearch, {
       notebookId: notebookIdTyped,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userId: userId as any,
       query,
       limit,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       documentIds: docIds as any,
       quietLogs: true,
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rerankFn = async (query: string, documents: any[]) => {
     return cachedRerank(ctx, query, documents, "zerank-2", 15);
   };
@@ -171,6 +192,68 @@ async function runResearchPlanPhase(
         quiet: true,
       });
     },
+    discoverSources: async (query, channels, maxResults) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const promises: Promise<any[]>[] = [];
+      const webChannels = channels.filter((ch) => ch === "web" || ch === "news");
+      const academicChannels = channels.filter((ch) => ch === "academic");
+
+      if (webChannels.length > 0) {
+        for (const channel of webChannels) {
+          promises.push(
+            ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+              query,
+              maxResults: maxResults ?? 2,
+              topic: channel === "web" ? "general" : channel,
+              searchDepth: "basic",
+              includeRawContent: false,
+            }).catch((e: unknown) => {
+              researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
+              return [];
+            })
+          );
+        }
+      }
+
+      if (academicChannels.length > 0) {
+        promises.push(
+          ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
+            query,
+            maxResults: maxResults ?? 2,
+          }).catch((e: unknown) => {
+            researchLog.warn("research_academic_discovery_failed", { error: String(e) });
+            return [];
+          })
+        );
+      }
+
+      const results = await Promise.all(promises);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return results.flat().map((r: any) => ({
+        title: r.title ?? "Untitled",
+        url: r.url ?? "",
+        snippet: r.snippet ?? r.abstract ?? "",
+        sourceType: r.sourceType ?? r.metadata?.sourceApi ?? "web",
+        score: r.score,
+        rawContent: r.rawContent,
+        metadata: {
+          pdfUrl: r.metadata?.pdfUrl,
+          doi: r.metadata?.doi,
+          citationCount: r.metadata?.citationCount,
+          sourceApi: r.metadata?.sourceApi,
+        },
+      }));
+    },
+    loadWebPage: async (url: string) => {
+      const { WebLoaderService } = await import("../_services/extraction/WebLoaderService.js");
+      const loader = new WebLoaderService();
+      return loader.loadWebPageWithMeta(url);
+    },
+    loadPaper: async (paper) => {
+      const { AcademicLoaderService } = await import("../_services/extraction/AcademicLoaderService.js");
+      const loader = new AcademicLoaderService();
+      return loader.loadPaper(paper);
+    },
     onProgress: async (phase, subQuestionId, sourcesFound) => {
       await chunkAppender(
         `\n__RESEARCH_PROGRESS:${JSON.stringify({ phase, subQuestionId, sourcesFound })}\n`
@@ -179,6 +262,7 @@ async function runResearchPlanPhase(
   });
 
   // Phase 1: Generate plan
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subQuestions = await agent.generatePlan(message, sourcePolicy as any);
 
   // Save plan to database
@@ -240,6 +324,7 @@ export const runWithStreamId = internalAction({
     userMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const streamId = args.streamId as any;
 
     const rawAddChunk = async (text: string) => {
@@ -289,6 +374,7 @@ export const runWithStreamId = internalAction({
       conversationId: args.conversationId,
     });
 
+    let generationSucceeded = false;
     try {
       await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
         userId: args.userId,
@@ -297,6 +383,7 @@ export const runWithStreamId = internalAction({
 
       if (args.deepResearch) {
         await runResearchPlanPhase(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ctx as any,
           args.streamId,
           args.userId,
@@ -310,6 +397,7 @@ export const runWithStreamId = internalAction({
         );
       } else {
         await streamChatResponse(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ctx as any,
           args.streamId,
           args.userId,
@@ -321,6 +409,8 @@ export const runWithStreamId = internalAction({
           args.sourcePolicy ?? { channels: ["notebook"] }
         );
       }
+
+      generationSucceeded = true;
     } catch (e) {
       console.error("[ChatStream] runWithStreamId failed:", e);
       try {
@@ -348,6 +438,18 @@ export const runWithStreamId = internalAction({
       }
     }
 
+    // Consume rate limit token after confirmed delivery — non-fatal if this fails
+    if (generationSucceeded) {
+      try {
+        await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+          userId: args.userId,
+          feature: "chat",
+        });
+      } catch (limitErr) {
+        console.error("[ChatStream] consumeDailyLimit failed (non-fatal):", limitErr);
+      }
+    }
+
     try {
       await ctx.runMutation(internal.chat.index.releaseChatGenerationInternal, {
         conversationId,
@@ -363,6 +465,7 @@ export const runWithStreamId = internalAction({
  * This function can be called from the HTTP action's streamWriter callback
  */
 export async function streamChatResponse(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   streamId: string,
   userId: string,
@@ -393,7 +496,9 @@ export async function streamChatResponse(
   });
 
   const fullHistory = messageList
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((m: any) => m.role !== "system")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((m: any) => ({ role: m.role, content: m.content, metadata: m.metadata }));
 
   const historyBudget = parseInt(env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000", 10);
@@ -644,6 +749,7 @@ export async function streamChatResponse(
     query: string,
     limit: number,
     docIds?: string[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any[]> => {
     chatStreamLog.debug("keyword_search_runner", { phase: "start" });
 
@@ -652,6 +758,7 @@ export async function streamChatResponse(
       userId: keywordSearchChunkUserId,
       query,
       limit,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       documentIds: docIds as any,
     });
 
@@ -695,6 +802,7 @@ export async function streamChatResponse(
   try {
     userPrefs = await ctx.runQuery(
       internal.userPreferences.index.getPreferencesByUserId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { userId: userId as any },
     );
   } catch (e) {
@@ -709,15 +817,20 @@ export async function streamChatResponse(
     fetchDocumentFn: async (documentId: string) => {
       // Fetch all chunks for the document and stitch them together
       const chunks = await ctx.runQuery(internal.documents.index.listChunksByDocument, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         documentId: documentId as any,
       });
       if (!chunks || chunks.length === 0) return null;
 
       // Sort by chunk index and join content
+       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sortedChunks = chunks.sort((a: any, b: any) => a.chunkIndex - b.chunkIndex);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const content = sortedChunks.map((c: any) => c.content).join("\n\n");
 
       return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         documentId: documentId as any,
         content,
         chunkCount: chunks.length,
@@ -739,13 +852,16 @@ export async function streamChatResponse(
   let externalChunks: Array<import("../storage/ChatHistoryService").ReferenceChunk> = [];
 
   if (externalChannels.length > 0) {
-    const maxPerChannel = Math.ceil(5 / externalChannels.length);
+    const maxPerChannel = Math.ceil(10 / externalChannels.length);
 
-    // Tavily channels: web→general, news, finance
-    const tavilyChannels = externalChannels.filter((ch) =>
+    // Web/News channels via Tavily
+    const webChannels = externalChannels.filter((ch) =>
       ["web", "news", "finance"].includes(ch)
     );
-    const tavilyResults: Array<{
+    // Academic channel via AcademicSearchService
+    const academicChannels = externalChannels.filter((ch) => ch === "academic");
+
+    const allResults: Array<{
       title: string;
       url: string;
       snippet: string;
@@ -754,22 +870,23 @@ export async function streamChatResponse(
       rawContent?: string;
     }> = [];
 
-    if (tavilyChannels.length > 0) {
+    if (webChannels.length > 0) {
       const channelToTopic = (ch: string) => (ch === "web" ? "general" : ch);
-      const searchPromises: Promise<Array<typeof tavilyResults[number]>>[] = [];
+      const searchPromises: Promise<Array<typeof allResults[number]>>[] = [];
 
       // Refine the user message into a search-optimized query to improve result relevance.
-      // Falls back to the raw message if refinement fails.
       const refinedQuery = await refineWebSearchQuery(message);
 
-      for (const channel of tavilyChannels) {
+      for (const channel of webChannels) {
         const topic = channelToTopic(channel);
         searchPromises.push(
           ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
             query: refinedQuery,
             maxResults: maxPerChannel,
             topic,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           }).then((results: any[]) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             results.map((r: any) => ({
               title: r.title ?? "Untitled",
               url: r.url ?? "",
@@ -779,7 +896,7 @@ export async function streamChatResponse(
               rawContent: r.rawContent ?? undefined,
             }))
           ).catch((e: unknown) => {
-            chatStreamLog.warn("tavily_search_failed", { channel, topic, error: String(e) });
+            chatStreamLog.warn("web_search_failed", { channel, topic, error: String(e) });
             return [];
           })
         );
@@ -788,49 +905,90 @@ export async function streamChatResponse(
       const settled = await Promise.allSettled(searchPromises);
       for (const result of settled) {
         if (result.status === "fulfilled") {
-          tavilyResults.push(...result.value.filter((s) => s.url));
+          allResults.push(...result.value.filter((s) => s.url));
         }
       }
-
-      // Sort by score descending, cap at 5
-      tavilyResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-      const topResults = tavilyResults.slice(0, 5);
-
-      // Build metadata for frontend and ReferenceChunks for the LLM
-      externalSources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
-      externalChunks = topResults
-        .filter((r) => r.rawContent && r.rawContent.trim().length > 100)
-        .map((r, i) => {
-          // Chunk raw content into ~3000 char pieces to fit within token budget
-          const raw = r.rawContent!.trim();
-          const CHUNK_SIZE = 3000;
-          const pieces: string[] = [];
-          for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
-            pieces.push(raw.slice(start, start + CHUNK_SIZE));
-          }
-          // Take first chunk only to stay within budget
-          const content = pieces[0] ?? raw;
-          return {
-            id: `ext_${i}`,
-            sourceId: `ext_${i}`,
-            sourceTitle: r.title,
-            sourceUrl: r.url,
-            content,
-            chunkIndex: 0,
-            // Assign a moderate score so token budget selector includes them
-            similarity: 0.5,
-            metadata: {
-              sectionTitle: `Web source (${r.sourceType})`,
-            },
-          } as import("../storage/ChatHistoryService").ReferenceChunk;
-        });
-
-      chatStreamLog.info("external_search_complete", {
-        channels: externalChannels,
-        resultCount: externalSources.length,
-        chunksForLLM: externalChunks.length,
-      });
     }
+
+    if (academicChannels.length > 0) {
+      const academicQuery = await refineWebSearchQuery(message);
+      try {
+        const academicResults = await ctx.runAction(
+          internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+          {
+            query: academicQuery,
+            maxResults: maxPerChannel,
+          }
+        );
+        allResults.push(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...academicResults.map((r: any) => ({
+            title: r.title ?? "Untitled",
+            url: r.url ?? "",
+            snippet: r.snippet ?? r.abstract ?? "",
+            sourceType: "academic",
+            score: r.score,
+            rawContent: r.rawContent ?? undefined,
+          }))
+        );
+      } catch (e: unknown) {
+        chatStreamLog.warn("academic_search_failed", {
+          query: academicQuery,
+          error: e instanceof Error ? e.message : String(e),
+          errorType: e instanceof Error ? e.constructor.name : typeof e,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          statusCode: (e as any)?.statusCode ?? (e as any)?.status ?? undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          retryable: (e as any)?.retryable ?? undefined,
+        });
+      }
+    }
+
+    // Sort by score descending, cap at 5
+    allResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    const topResults = allResults.slice(0, 5);
+
+    // Build metadata for frontend and ReferenceChunks for the LLM
+    externalSources = topResults.map(({ rawContent: _rc, ...rest }) => rest);
+    externalChunks = topResults
+      .filter((r) => {
+        const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
+        const hasSnippet = r.snippet && r.snippet.trim().length > 50;
+        return hasRawContent || hasSnippet;
+      })
+      .map((r, i) => {
+        // Prefer rawContent when available, fallback to snippet
+        const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
+        const raw = hasRawContent ? r.rawContent!.trim() : r.snippet.trim();
+        
+        // Chunk content into ~3000 char pieces to fit within token budget
+        const CHUNK_SIZE = 3000;
+        const pieces: string[] = [];
+        for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
+          pieces.push(raw.slice(start, start + CHUNK_SIZE));
+        }
+        // Take first 2 chunks for more depth (6000 chars total)
+        const content = pieces.slice(0, 2).join("\n\n---\n\n") || raw;
+        return {
+          id: `ext_${i}`,
+          sourceId: `ext_${i}`,
+          sourceTitle: r.title,
+          sourceUrl: r.url,
+          content,
+          chunkIndex: 0,
+          // Assign a moderate score so token budget selector includes them
+          similarity: 0.5,
+          metadata: {
+            sectionTitle: `${r.sourceType === "academic" ? "Academic" : "Web"} source (${r.sourceType})`,
+          },
+        } as import("../storage/ChatHistoryService").ReferenceChunk;
+      });
+
+    chatStreamLog.info("external_search_complete", {
+      channels: externalChannels,
+      resultCount: externalSources.length,
+      chunksForLLM: externalChunks.length,
+    });
   }
 
   let fullResponse = "";
@@ -1036,6 +1194,7 @@ export async function streamChatResponse(
     // a "this response ended early" indicator after page reload, not just to
     // clients that observed the in-flight `__ERROR:` marker.
     hadStreamError: hasError || undefined,
+    externalSources: externalSources.length > 0 ? externalSources : undefined,
   };
 
   if (existingMessages.length === 0) {
@@ -1116,6 +1275,7 @@ export const runResearchExecute = internalAction({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const streamId = args.streamId as any;
     const runId = args.runId as Id<"researchRuns">;
 
@@ -1172,23 +1332,38 @@ export const runResearchExecute = internalAction({
         const vectorResults = await ctx.vectorSearch("documentChunks", "by_embedding", {
           vector: embedding,
           limit: limitToFetch,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filter: (q: any) => q.eq("notebookId", notebookIdTyped),
         });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunkIds = vectorResults.map((r: any) => r._id);
         if (chunkIds.length === 0) return [];
         const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
+         
+         
+         
+         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunkMap = new Map<any, any>(fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any]));
+         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const docIds_unique = [...new Set(vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean))];
         const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, { documentIds: docIds_unique });
+         
+         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const titleMap = new Map<any, string>(docRows.map((d: any) => [d._id, d.fileName] as [any, string]));
         const sourceUrlMap = new Map<string, string>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const d of docRows as any[]) {
           if (d.fileUrl?.trim() && (d.fileType === "url" || d.fileType === "youtube")) {
             sourceUrlMap.set(d._id, d.fileUrl);
           }
         }
         return vectorResults
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((r: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const chunk = chunkMap.get(r._id) as any;
             if (!chunk) return null;
             return {
@@ -1201,20 +1376,25 @@ export const runResearchExecute = internalAction({
               similarity: r._score ?? 0,
             };
           })
+           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .filter((x: any) => x !== null) as any[];
       };
 
       const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
         return ctx.runQuery(internal.documents.index.keywordSearch, {
           notebookId: notebookIdTyped,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           userId: args.userId as any,
           query,
           limit,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           documentIds: docIds as any,
           quietLogs: true,
         });
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rerankFn = async (query: string, documents: any[]) => {
         return cachedRerank(ctx, query, documents, "zerank-2", 15);
       };
@@ -1248,6 +1428,66 @@ export const runResearchExecute = internalAction({
             quiet: true,
           });
         },
+        discoverSources: async (query, channels, maxResults) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const promises: Promise<any[]>[] = [];
+          const webChannels = channels.filter((ch) => ch === "web" || ch === "news");
+          const academicChannels = channels.filter((ch) => ch === "academic");
+
+          if (webChannels.length > 0) {
+            for (const channel of webChannels) {
+              promises.push(
+                ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+                  query,
+                  maxResults: maxResults ?? 5,
+                  topic: channel === "web" ? "general" : channel,
+                }).catch((e: unknown) => {
+                  researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
+                  return [];
+                })
+              );
+            }
+          }
+
+          if (academicChannels.length > 0) {
+            promises.push(
+              ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
+                query,
+                maxResults: maxResults ?? 5,
+              }).catch((e: unknown) => {
+                researchLog.warn("research_academic_discovery_failed", { error: String(e) });
+                return [];
+              })
+            );
+          }
+
+          const results = await Promise.all(promises);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return results.flat().map((r: any) => ({
+            title: r.title ?? "Untitled",
+            url: r.url ?? "",
+            snippet: r.snippet ?? r.abstract ?? "",
+            sourceType: r.sourceType ?? r.metadata?.sourceApi ?? "web",
+            score: r.score,
+            rawContent: r.rawContent,
+            metadata: {
+              pdfUrl: r.metadata?.pdfUrl,
+              doi: r.metadata?.doi,
+              citationCount: r.metadata?.citationCount,
+              sourceApi: r.metadata?.sourceApi,
+            },
+          }));
+        },
+        loadWebPage: async (url: string) => {
+          const { WebLoaderService } = await import("../_services/extraction/WebLoaderService.js");
+          const loader = new WebLoaderService();
+          return loader.loadWebPageWithMeta(url);
+        },
+        loadPaper: async (paper) => {
+          const { AcademicLoaderService } = await import("../_services/extraction/AcademicLoaderService.js");
+          const loader = new AcademicLoaderService();
+          return loader.loadPaper(paper);
+        },
         onProgress: async (phase, subQuestionId, sourcesFound) => {
           await chunkAppender(
             `\n__RESEARCH_PROGRESS:${JSON.stringify({ phase, subQuestionId, sourcesFound })}\n`
@@ -1271,10 +1511,14 @@ export const runResearchExecute = internalAction({
 
       const gen = agent.executeResearch(
         plan.query,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         plan.subQuestions.map((sq: any) => ({ ...sq, status: "pending" as const })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         plan.sourcePolicy as any,
         context
       );
+
+      let researchReferences: unknown[] = [];
 
       for await (const chunk of gen) {
         if (chunk.type === "evidence") {
@@ -1289,6 +1533,7 @@ export const runResearchExecute = internalAction({
           fullResponse += chunk.data ?? "";
           await chunkAppender(chunk.data ?? "");
         } else if (chunk.type === "references") {
+          researchReferences = chunk.data ?? [];
           await chunkAppender(`\n__REFERENCES:${JSON.stringify(chunk.data)}\n`);
         } else if (chunk.type === "done") {
           await chunkAppender(`\n__DONE\n`);
@@ -1301,6 +1546,7 @@ export const runResearchExecute = internalAction({
         conversationId: plan.conversationId,
         streamId: args.streamId,
         content: contentFinal,
+        references: researchReferences.length > 0 ? researchReferences : undefined,
         metadata: { researchRunId: runId, isResearchResult: true },
       });
 

@@ -68,6 +68,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run Convex Tests
+        env:
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: bun run test:convex
 
       - name: Run Web Tests

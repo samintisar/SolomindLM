@@ -22,6 +22,7 @@ describe("exportAsMarkdown", () => {
   it("does nothing for empty messages array", () => {
     const clickSpy = vi.fn();
     const anchor = { click: clickSpy, href: "", download: "" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(document, "createElement").mockReturnValue(anchor as any);
 
     exportAsMarkdown([], "Test Notebook");
@@ -31,6 +32,7 @@ describe("exportAsMarkdown", () => {
   it("creates a markdown file and triggers download", () => {
     const clickSpy = vi.fn();
     const anchor = { click: clickSpy, href: "", download: "" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(document, "createElement").mockReturnValue(anchor as any);
 
     const messages = [
@@ -51,6 +53,7 @@ describe("exportAsMarkdown", () => {
   it("sanitizes notebook title in filename", () => {
     const clickSpy = vi.fn();
     const anchor = { click: clickSpy, href: "", download: "" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(document, "createElement").mockReturnValue(anchor as any);
 
     const messages = [makeMessage("user", "hello")];
@@ -64,6 +67,7 @@ describe("exportAsMarkdown", () => {
   it("includes messages in markdown content", () => {
     const clickSpy = vi.fn();
     const anchor = { click: clickSpy, href: "", download: "" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(document, "createElement").mockReturnValue(anchor as any);
 
     const messages = [
@@ -84,6 +88,7 @@ describe("exportAsMarkdown", () => {
   it("uses provided timestamp", () => {
     const clickSpy = vi.fn();
     const anchor = { click: clickSpy, href: "", download: "" };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(document, "createElement").mockReturnValue(anchor as any);
 
     const messages = [makeMessage("user", "hello")];

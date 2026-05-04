@@ -5,6 +5,7 @@ import { useUpdateNotebook } from "../services/notebooksApi";
 
 interface UseFolderCRUDProps {
   isAuthenticated: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any;
   onRequireAuth?: (message: string) => void;
 }

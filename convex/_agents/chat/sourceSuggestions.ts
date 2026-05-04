@@ -105,6 +105,9 @@ export const generateSuggestionsInternal = internalAction({
       }
     );
 
+     
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
 
     if (completed.length === 0) {
@@ -114,6 +117,7 @@ export const generateSuggestionsInternal = internalAction({
     // Build compact document summary for LLM
     const docLines = completed
       .slice(0, 20)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((d: any) => {
         const flags: string[] = [];
         if (d.metadata?.hasMathNotation) flags.push("math");

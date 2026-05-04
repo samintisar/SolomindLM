@@ -160,35 +160,34 @@ function serializeMindmap(raw: unknown): string {
   return lines.join("\n");
 }
 
-interface Slide {
+interface InfographicPayload {
+  data?: { imageUrl?: string; title?: string; prompt?: string };
   title?: string;
-  heading?: string;
-  body?: string;
-  content?: string;
-  bullets?: string[];
-  talking_points?: string[];
+  status?: string;
 }
 
-function extractSlides(raw: unknown): Slide[] {
-  const data = (raw as { data?: unknown } | undefined)?.data;
-  if (Array.isArray(data)) return data as Slide[];
-  const obj = data as { slides?: Slide[]; deck?: Slide[] } | undefined;
-  return obj?.slides ?? obj?.deck ?? [];
-}
+function serializeInfographic(raw: unknown): string {
+  const payload = raw as InfographicPayload | undefined;
+  const data = payload?.data;
+  const title = data?.title ?? payload?.title ?? "Untitled";
+  const imageUrl = data?.imageUrl ?? "";
+  const prompt = data?.prompt ?? "";
+  const status = payload?.status ?? "unknown";
 
-function serializeSlides(raw: unknown): string {
-  const slides = extractSlides(raw);
-  return slides
-    .map((s, i) => {
-      const title = s.title ?? s.heading ?? "";
-      const points = s.talking_points ?? s.bullets ?? [];
-      const body =
-        s.body ??
-        s.content ??
-        (points.length > 0 ? points.map((b) => `- ${b}`).join("\n") : "");
-      return `Slide ${i + 1}${title ? `: ${title}` : ""}${body ? `\n${body}` : ""}`;
-    })
-    .join("\n\n");
+  const lines: string[] = [
+    `Title: ${title}`,
+    `Status: ${status}`,
+  ];
+  if (imageUrl) {
+    lines.push(`Image URL: ${imageUrl}`);
+  }
+  if (prompt) {
+    lines.push(`Prompt: ${prompt}`);
+  }
+  if (!imageUrl) {
+    lines.push("WARNING: No image URL generated.");
+  }
+  return lines.join("\n");
 }
 
 function serializeSpreadsheet(raw: unknown): string {
@@ -216,10 +215,11 @@ const SERIALIZERS: Partial<Record<StudioRunnerKind, (raw: unknown) => string>> =
   flashcards: serializeFlashcards,
   quiz: serializeQuiz,
   mindmap: serializeMindmap,
-  slides: serializeSlides,
+  infographic: serializeInfographic,
   spreadsheet: serializeSpreadsheet,
   writtenQuestions: serializeWrittenQuestions,
   audioScript: serializeAudioScript,
+  audioScriptOnly: serializeAudioScript,
 };
 
 function serialize(kind: StudioRunnerKind, raw: unknown): string {

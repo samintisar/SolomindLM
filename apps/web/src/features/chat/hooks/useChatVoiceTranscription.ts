@@ -203,6 +203,7 @@ export function useChatVoiceTranscription({
     goToIdle,
     stopStream,
     clearTimers,
+    setBoth,
   ]);
 
   const startRecording = useCallback(async () => {

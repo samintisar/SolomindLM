@@ -39,13 +39,18 @@ function getQuestionCountLabel(count: string | number): string {
   return String(count);
 }
 
+function capitalizeDifficulty(difficulty: string | undefined): string {
+  const d = (difficulty || "medium").toLowerCase();
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
+
 /**
- * Get preview text based on status and metadata
+ * Matches unified list copy in `notesApi.getQuizPreview`.
  */
-function getPreviewText(status: string, metadata?: any): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPreviewText(status: string, actualQuestionCount: number, metadata?: any): string {
   const phase = metadata?.phase || status;
-  const questionCount = metadata?.questionCount || "standard";
-  const difficulty = metadata?.difficulty || "medium";
+  const difficulty = capitalizeDifficulty(metadata?.difficulty);
 
   const isGenerating =
     status === "generating" ||
@@ -54,18 +59,24 @@ function getPreviewText(status: string, metadata?: any): string {
     phase === "collapsing" ||
     phase === "reducing";
 
+  const n =
+    actualQuestionCount > 0
+      ? actualQuestionCount
+      : parseInt(String(getQuestionCountLabel(metadata?.questionCount || "standard")), 10) || 0;
+
   if (isGenerating) {
-    return `${getQuestionCountLabel(questionCount)} Questions • ${difficulty} • Generating...`;
+    return `${n} Question${n !== 1 ? "s" : ""} · ${difficulty}`;
   }
   if (status === "failed" || phase === "failed") {
-    return "Quiz • Failed";
+    return `${n} Questions · ${difficulty} · Failed`;
   }
-  return `${getQuestionCountLabel(questionCount)} Questions • ${difficulty}`;
+  return `${n} Question${n !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
 /**
  * Map a database quiz response to the frontend QuizNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapQuizToNote(dbQuiz: any): QuizNote {
   // Quizzes are stored in the questionsData field
   const questions: QuizQuestion[] = dbQuiz.questionsData || [];
@@ -74,7 +85,7 @@ function mapQuizToNote(dbQuiz: any): QuizNote {
   return {
     id: dbQuiz._id,
     title: dbQuiz.title,
-    preview: getPreviewText(dbQuiz.status, dbQuiz.metadata),
+    preview: getPreviewText(dbQuiz.status, questionCount, dbQuiz.metadata),
     type: "quiz" as const,
     questions,
     userAnswers: dbQuiz.metadata?.userAnswers || {},

@@ -278,14 +278,13 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
-  // Slides table
-  slides: defineTable({
+  // Infographics table
+  infographics: defineTable({
     userId: v.id("users"),
     notebookId: v.id("notebooks"),
     title: v.string(),
-    data: v.any(), // Slide deck structure data
-    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
-    slideCount: v.optional(v.number()), // Number of slides
+    data: v.any(), // Infographic data
+    status: v.union(v.literal("draft"), v.literal("generating"), v.literal("completed"), v.literal("failed")),
     metadata: v.optional(v.any()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -498,7 +497,7 @@ export default defineSchema({
     sourceTypeCounts: v.optional(v.any()), // { web: 5, academic: 10 }
     performanceMs: v.number(), // Total time in milliseconds
     cached: v.boolean(), // Was served from cache
-    apiHealth: v.optional(v.any()), // { tavily: { status, timeMs }, openalex: { status, timeMs } }
+    apiHealth: v.optional(v.any()), // { tavily: { status, timeMs }, academic: { status, timeMs } }
     error: v.optional(v.string()), // Error message if any
     timestamp: v.number(),
   })
@@ -606,12 +605,14 @@ export default defineSchema({
     studioTool: v.union(
       v.literal("report"),
       v.literal("spreadsheet"),
-      v.literal("slides"),
+      v.literal("infographic"),
       v.literal("flashcards"),
       v.literal("quiz"),
       v.literal("audio"),
       v.literal("writtenQuestions"),
       v.literal("mindmap"),
+      // "slides" kept for migration — remove after running _migration/removeSlidePrompts
+      v.literal("slides"),
     ),
     visibility: v.union(v.literal("private"), v.literal("public")),
     notebookId: v.optional(v.id("notebooks")),

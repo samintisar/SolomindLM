@@ -20,8 +20,9 @@ import {
 import { Source, UnifiedDiscoveryResult } from "@/shared/types/index";
 import { normalizeSourceUrlForNotebookMatch } from "@/shared/utils/sourceUrlMatch";
 import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
+import { Favicon } from "@/shared/components/Favicon";
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
@@ -56,7 +57,7 @@ const DEFAULT_FILTERS: FilterState = {
   academic: {},
 };
 
-/** Tavily Search caps `max_results` at 20; discovery total budget matches that ceiling. */
+/** Discovery total budget ceiling (Tavily caps `max_results` at 20). */
 const MAX_DISCOVERY_TOTAL_RESULTS = 20;
 
 /** One pastel system per type: filters, list border, icons, and grid labels stay aligned */
@@ -152,7 +153,7 @@ function formatAcademicByline(r: UnifiedDiscoveryResult): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
-function normalizeOpenAlexKey(id: string): string {
+function normalizeDiscoveryKey(id: string): string {
   return id.replace(/^https:\/\/openalex\.org\//i, "").toLowerCase();
 }
 
@@ -172,7 +173,7 @@ function academicAccessChip(
     return {
       label: "OA PDF",
       title:
-        "OpenAlex lists an open-access PDF. We try to ingest it; some repositories block automated downloads.",
+        "An open-access PDF is available. We try to ingest it; some repositories block automated downloads.",
       className: `${META_CHIP} border-emerald-200/70 bg-emerald-50/80 text-emerald-950`,
     };
   }
@@ -241,7 +242,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       const u = source.url?.trim();
       if (u) s.add(normalizeSourceUrlForNotebookMatch(u));
       const oa = source.paper?.openAlexId?.trim();
-      if (oa) s.add(`oa:${normalizeOpenAlexKey(oa)}`);
+      if (oa) s.add(`oa:${normalizeDiscoveryKey(oa)}`);
       const dk = normalizeDoiKey(source.paper?.doi);
       if (dk) s.add(`doi:${dk}`);
     }
@@ -253,7 +254,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       if (notebookDiscoveryKeys.has(normalizeSourceUrlForNotebookMatch(r.url))) return true;
       if (r.sourceType !== "academic") return false;
       const oa = r.metadata.openAlexId?.trim();
-      if (oa && notebookDiscoveryKeys.has(`oa:${normalizeOpenAlexKey(oa)}`)) return true;
+      if (oa && notebookDiscoveryKeys.has(`oa:${normalizeDiscoveryKey(oa)}`)) return true;
       const dk = normalizeDoiKey(r.metadata.doi);
       if (dk && notebookDiscoveryKeys.has(`doi:${dk}`)) return true;
       return false;
@@ -882,7 +883,10 @@ const ResultRow: React.FC<ResultRowProps> = ({
           >
             {typeConfig.label}
           </span>
-          <span className={META_CHIP}>{result.metadata.domain || getHostname(result.url)}</span>
+          <span className={`${META_CHIP} gap-1`}>
+            <Favicon url={result.url} size={12} />
+            {result.metadata.domain || getHostname(result.url)}
+          </span>
           {badge && <span className={badge.className}>{badge.label}</span>}
           {accessChip && (
             <span
@@ -999,7 +1003,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, isAdding, isAdded, isAt
         )}
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={META_CHIP}>{result.metadata.domain || getHostname(result.url)}</span>
+          <span className={`${META_CHIP} gap-1`}>
+            <Favicon url={result.url} size={12} />
+            {result.metadata.domain || getHostname(result.url)}
+          </span>
           {badge && <span className={badge.className}>{badge.label}</span>}
           {accessChip && (
             <span

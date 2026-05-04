@@ -39,6 +39,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   // Fetch PDF signed URL only when user switches to Original PDF tab (avoids loading PDF until needed)
   useEffect(() => {
     if (viewMode !== "pdf" || !pdfStorageId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (viewMode !== "pdf") setPdfUrl(null);
       return;
     }

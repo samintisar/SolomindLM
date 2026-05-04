@@ -67,7 +67,7 @@ async function basicTextToVideo(): Promise<void> {
   await downloadVideo(url, "output.mp4");
 }
 
-async function advancedParameters(): Promise<void> {
+async function _advancedParameters(): Promise<void> {
   console.log("\n=== Advanced Parameters ===");
   const job = await client.videos.create({
     prompt: "A futuristic city at night with neon lights reflecting on wet streets",
@@ -87,7 +87,7 @@ async function advancedParameters(): Promise<void> {
   await waitForVideo(job.id);
 }
 
-async function imageToVideo(): Promise<void> {
+async function _imageToVideo(): Promise<void> {
   console.log("\n=== Image-to-Video (Keyframe) ===");
   const job = await client.videos.create({
     prompt: "Smooth camera zoom out revealing a vast landscape",

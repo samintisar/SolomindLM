@@ -119,6 +119,7 @@ export const reembedDocumentChunks = internalAction({
     }
 
     // Generate new embeddings
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const texts = chunks.map((chunk: any) => chunk.content);
     const newEmbeddings = await embeddingService.embedBatch(texts);
 

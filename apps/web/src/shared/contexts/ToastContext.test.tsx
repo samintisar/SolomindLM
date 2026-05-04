@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { ToastProvider, useToast } from "@/shared/contexts/ToastContext";
+import { ToastProvider } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 
 describe("ToastProvider", () => {
   beforeEach(() => {

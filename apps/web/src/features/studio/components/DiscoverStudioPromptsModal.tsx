@@ -27,7 +27,7 @@ import {
   type PromptSortBy,
   type PublicPrompt,
 } from "../services/promptsApi";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import type { Id } from "@convex/_generated/dataModel";
 
 // ── Props ──────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ const SORT_OPTIONS: { value: PromptSortBy; label: string }[] = [
 const TOOL_LABELS: Record<StudioTool, string> = {
   report: "Reports",
   spreadsheet: "Spreadsheets",
-  slides: "Slides",
+  infographic: "Infographics",
   flashcards: "Flashcards",
   quiz: "Quizzes",
   audio: "Audio",

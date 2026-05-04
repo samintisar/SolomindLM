@@ -67,6 +67,7 @@ export const rerankInternal = internalAction({
       console.log("[RerankInternal] Results count:", response.results?.length ?? 0);
 
       // Return results with indices for mapping back to original documents
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results = (response.results || []).map((item: any, index: number) => ({
         index,
         text: item.text ?? item.document,
@@ -114,6 +115,7 @@ function normalizeQuery(query: string): string {
  * @returns Reranked results with original document IDs preserved
  */
 export async function cachedRerank(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   query: string,
   documents: RerankDocument[],

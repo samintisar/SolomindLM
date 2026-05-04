@@ -14,6 +14,7 @@ export interface CreateSpreadsheetParams {
 export interface CreateSpreadsheetResponse {
   spreadsheetId: string;
   status: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   spreadsheet: any; // Full database object
 }
 
@@ -38,16 +39,17 @@ export function getSpreadsheetSubtitle(spreadsheetType: string, status?: string)
   const typeLabel = getSpreadsheetTypeLabel(spreadsheetType);
 
   if (status === "generating") {
-    return `Spreadsheet • Generating...`;
+    return `Spreadsheet · Generating…`;
   } else if (status === "failed") {
-    return `Spreadsheet • Failed`;
+    return `Spreadsheet · Failed`;
   }
-  return `Spreadsheet • ${typeLabel}`;
+  return `Spreadsheet · ${typeLabel}`;
 }
 
 /**
  * Map a database spreadsheet response to the frontend SpreadsheetNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
   const spreadsheetType = dbSpreadsheet.metadata?.spreadsheetType || "custom";
   const preview = getSpreadsheetSubtitle(spreadsheetType, dbSpreadsheet.status);

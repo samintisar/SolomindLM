@@ -12,10 +12,10 @@ const PRO_DAILY_CAP: Record<DailyFeature, number> = {
   flashcard: 100,
   quiz: 100,
   report: 100,
-  audio: 5,
+  audio: 100,
   writtenQuestion: 100,
   spreadsheet: 100,
-  slide: 10,
+  infographic: 100,
 };
 
 function inferIsProFromDailyCap(feature: DailyFeature | undefined, limit: number): boolean {
@@ -68,6 +68,7 @@ export function isLimitError(error: unknown): error is ParsedLimitError {
   if (!error || typeof error !== "object") return false;
 
   // Check for structured error with data property (from Convex serialization)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const err = error as any;
   if (err.data && typeof err.data === "object") {
     return (
@@ -106,6 +107,7 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
     }
 
     // Check if error has structured data attached
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
       const raw = err.data as Record<string, unknown>;
@@ -136,6 +138,7 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
 
   // Handle plain objects with error data
   if (typeof error === "object" && error !== null) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
       const raw = err.data as Record<string, unknown>;
@@ -232,7 +235,7 @@ function parseLegacyLimitError(message: string): ParsedLimitError | null {
     else if (lowerMessage.includes("audio")) feature = "audio";
     else if (lowerMessage.includes("written question")) feature = "writtenQuestion";
     else if (lowerMessage.includes("spreadsheet")) feature = "spreadsheet";
-    else if (lowerMessage.includes("slide")) feature = "slide";
+    else if (lowerMessage.includes("infographic")) feature = "infographic";
 
     const match = message.match(/(\d+)\/(\d+)/);
     if (match) {
@@ -276,7 +279,7 @@ export function getLimitErrorMessage(parsedError: ParsedLimitError): string {
       audio: "audio overview",
       writtenQuestion: "written question set",
       spreadsheet: "spreadsheet",
-      slide: "slide deck",
+      infographic: "infographic",
     };
     const featureName = featureNames[feature] || feature;
     return `Daily ${featureName} limit reached (${current}/${limit}).`;
@@ -312,10 +315,10 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
       flashcard: "100 flashcard sets/day",
       quiz: "100 quizzes/day",
       report: "100 reports/day",
-      audio: "5 audio overviews/day",
+      audio: "100 audio overviews/day",
       writtenQuestion: "100 question sets/day",
       spreadsheet: "100 spreadsheets/day",
-      slide: "10 slide decks/day",
+      infographic: "100 infographics/day",
     };
     return `Upgrade for ${proLimits[feature]}.`;
   }

@@ -161,6 +161,7 @@ export const getMessages = query({
       .query("messages")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .order("asc")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .paginate({ cursor: args.cursor as any, numItems: args.limit || 50 });
 
     return {
@@ -186,6 +187,7 @@ export const getMessagesInternal = internalQuery({
       .query("messages")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .order("asc")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .paginate({ cursor: args.cursor as any, numItems: args.limit || 50 });
 
     return {

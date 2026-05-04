@@ -1,33 +1,13 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { replaceCitationMarkersOutsideMath } from "./citationMarkers";
-
-const MarkdownRenderer = lazy(() =>
-  import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
-
-export function stripReferencesSection(content: string): string {
-  const referencesPattern = /\n?(?:References|Reference):\s*\n?[\d\s.,\-:–—]*$/i;
-  const match = content.match(referencesPattern);
-  if (match) {
-    return content.substring(0, match.index).trim();
-  }
-  return content;
-}
-
-export interface RefHandlers {
-  onRefHover: (refId: number, messageId: string, event: React.MouseEvent) => void;
-  onRefLeave: () => void;
-  onRefClick: (
-    refId: number,
-    messageId: string,
-    event: React.MouseEvent | React.TouchEvent
-  ) => void;
-}
+import { stripReferencesSection, RefHandlers } from "./messageRendering.utils";
+import { MarkdownRendererLazy } from "./MarkdownRendererLazy";
 
 export function renderMessageWithReferences(
   messageId: string,
   content: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _references: any[] | undefined,
   handlers: RefHandlers,
   options?: { isStreamingVisual?: boolean }
@@ -44,7 +24,7 @@ export function renderMessageWithReferences(
       }
     >
       <div className="prose max-w-none space-y-2 font-serif text-base leading-relaxed">
-        <MarkdownRenderer
+        <MarkdownRendererLazy
           mode={streaming ? "streaming" : "static"}
           parseIncompleteMarkdown={streaming}
           isAnimating={streaming}
@@ -86,6 +66,7 @@ export function renderMessageWithReferences(
               ),
             p: ({ children }) => <p className="text-base leading-relaxed">{children}</p>,
             /** Citation pills: backend replaces [n] with `CITE:n` (inline code). Streamdown uses `inlineCode` for backticks. */
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             inlineCode: ({ children }: any) => {
               const text = String(children);
               if (text.startsWith("CITE:")) {
@@ -113,7 +94,7 @@ export function renderMessageWithReferences(
           }}
         >
           {processedContent}
-        </MarkdownRenderer>
+        </MarkdownRendererLazy>
       </div>
     </Suspense>
   );

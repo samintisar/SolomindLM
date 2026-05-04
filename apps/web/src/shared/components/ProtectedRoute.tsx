@@ -39,6 +39,7 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   useEffect(() => {
     if (!shareToken || !notebookId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRedeemFinished(true);
       return;
     }
@@ -69,6 +70,7 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   const notebook = useQuery(
     api.notebooks.index.get,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     notebookId ? { id: notebookId as any } : "skip"
   );
 

@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useMemo,
   useState,
   type ReactNode,
@@ -11,18 +9,7 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { convexAuthSecureStorage } from "@mobile/services/auth/convexAuthSecureStorage";
 import { convexAuthStorageKeys } from "@mobile/services/auth/convexAuthStorageKeys";
 import { convexClient, convexDeploymentUrl } from "@mobile/services/convex/client";
-
-type BridgeMessage =
-  | { type: "convex-auth-tokens"; jwt: string; refresh: string }
-  | { type: "convex-auth-clear" };
-
-type NativeConvexAuthBridgeContextValue = {
-  onWebViewMessage: (raw: string) => void;
-};
-
-const NativeConvexAuthBridgeContext = createContext<NativeConvexAuthBridgeContextValue | null>(
-  null
-);
+import { NativeConvexAuthBridgeContext } from "./useNativeConvexAuthBridge";
 
 export function NativeConvexAuthBridgeProvider({ children }: { children: ReactNode }) {
   const keys = useMemo(() => convexAuthStorageKeys(convexDeploymentUrl), []);
@@ -54,7 +41,7 @@ export function NativeConvexAuthBridgeProvider({ children }: { children: ReactNo
   const onWebViewMessage = useCallback(
     (raw: string) => {
       try {
-        const msg = JSON.parse(raw) as BridgeMessage;
+        const msg = JSON.parse(raw) as { type: "convex-auth-tokens"; jwt: string; refresh: string } | { type: "convex-auth-clear" };
         if (msg.type === "convex-auth-tokens" && msg.jwt && msg.refresh) {
           void persistTokens(msg.jwt, msg.refresh);
         } else if (msg.type === "convex-auth-clear") {
@@ -82,12 +69,4 @@ export function NativeConvexAuthBridgeProvider({ children }: { children: ReactNo
       </ConvexAuthProvider>
     </NativeConvexAuthBridgeContext.Provider>
   );
-}
-
-export function useNativeConvexAuthBridge(): NativeConvexAuthBridgeContextValue {
-  const v = useContext(NativeConvexAuthBridgeContext);
-  if (!v) {
-    throw new Error("useNativeConvexAuthBridge requires NativeConvexAuthBridgeProvider");
-  }
-  return v;
 }

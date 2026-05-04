@@ -37,6 +37,7 @@ const ConceptExtractionSchema = z.object({
 
 // Interface for the structured LLM to avoid deep type instantiation
 interface ConceptExtractionInvoker {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<ConceptExtraction>;
 }
 
@@ -265,6 +266,7 @@ export async function runMindmapGenerationPhase(
     });
 
     // Extract content from chunk objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -367,6 +369,7 @@ export async function runProcessMindMapMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -385,6 +388,7 @@ export async function runProcessMindMapMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
           [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -480,6 +484,7 @@ export async function runProcessMindMapMapChunkPhase(
       : 0;
     const totalMaps = mindmap.metadata?.totalMapTasks || totalChunks;
     const failedMaps = mindmap.metadata?.mapResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? Object.values(mindmap.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
@@ -551,6 +556,7 @@ export async function runFinalizeMindMapPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -618,6 +624,7 @@ export async function runFinalizeMindMapPhase(
       const startTime = Date.now();
       const response = await invokeStudioLlm({
         invoke: () =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (llm as any).invoke(
             [
               new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
