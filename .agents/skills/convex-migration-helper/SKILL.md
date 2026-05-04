@@ -1,6 +1,9 @@
 ---
 name: convex-migration-helper
-description: Plans Convex schema and data migrations with widen-migrate-narrow and @convex-dev/migrations. Use for breaking schema changes, backfills, table reshaping, or zero-downtime rollouts.
+description:
+  Plans Convex schema and data migrations with widen-migrate-narrow and
+  @convex-dev/migrations. Use for breaking schema changes, backfills, table
+  reshaping, or zero-downtime rollouts.
 ---
 
 # Convex Migration Helper

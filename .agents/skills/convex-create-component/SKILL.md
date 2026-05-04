@@ -1,6 +1,9 @@
 ---
 name: convex-create-component
-description: Builds reusable Convex components with isolated tables and app-facing APIs. Use for new components, reusable backend modules, integrations, or component boundary work.
+description:
+  Builds reusable Convex components with isolated tables and app-facing APIs.
+  Use for new components, reusable backend modules, integrations, or component
+  boundary work.
 ---
 
 # Convex Create Component

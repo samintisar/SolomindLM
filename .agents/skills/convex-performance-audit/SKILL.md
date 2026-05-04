@@ -1,6 +1,9 @@
 ---
 name: convex-performance-audit
-description: Audits Convex performance for reads, subscriptions, write contention, and function limits. Use for slow features, insights findings, OCC conflicts, or read amplification.
+description:
+  Audits Convex performance for reads, subscriptions, write contention, and
+  function limits. Use for slow features, insights findings, OCC conflicts, or
+  read amplification.
 ---
 
 # Convex Performance Audit
