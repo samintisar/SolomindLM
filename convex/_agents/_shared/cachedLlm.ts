@@ -78,6 +78,7 @@ function messageContentToString(message: { content?: unknown } | undefined): str
  * Best-effort assistant text from a Together / OpenAI-style chat completion choice.
  * Some responses use legacy `text`; hybrid models may place a JSON payload only in `reasoning`.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function togetherChoiceAssistantText(choice: any): string {
   if (!choice) return "";
   const msg = choice.message;
@@ -97,6 +98,7 @@ function togetherChoiceAssistantText(choice: any): string {
   return "";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function logEmptyTogetherAssistant(model: string, choice: any): void {
   const msg = choice?.message;
   console.warn("[Together LLM] empty assistant text", {
@@ -187,6 +189,7 @@ async function executeTogetherLlmRequest(
         throw err;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
       try {
         data = JSON.parse(bodyText);
@@ -290,6 +293,7 @@ const llmCache = createCachedAction(internal._agents._shared.cachedLlm.llmIntern
  * @param options - LLM options including model, messages, temperature
  * @returns LLM response with content and usage stats
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function cachedLlmCall(ctx: any, options: LLMOptions): Promise<LLMResponse> {
   // Skip caching for non-deterministic calls
   if (options.temperature > 0) {

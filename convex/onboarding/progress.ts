@@ -26,7 +26,6 @@ const ARTIFACT_TABLES = [
   "mindmaps",
   "audioOverviews",
   "infographics",
-  "slides",
   "spreadsheets",
   "writtenQuestions",
 ] as const;

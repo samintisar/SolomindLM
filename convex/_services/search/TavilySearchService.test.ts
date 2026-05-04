@@ -30,6 +30,7 @@ describe("TavilySearchService - Helpers", () => {
 describe("TavilySearchService - searchInternalHandler", () => {
   it("throws when API key is missing", async () => {
     const originalKey = env.TAVILY_API_KEY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (env as any).TAVILY_API_KEY = "";
 
     await expect(
@@ -40,6 +41,7 @@ describe("TavilySearchService - searchInternalHandler", () => {
       })
     ).rejects.toThrow("TAVILY_API_KEY is not configured");
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (env as any).TAVILY_API_KEY = originalKey;
   });
 });

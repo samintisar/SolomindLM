@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { StudioTool, Note, isAudioOverviewNote } from "@/shared/types/index";
-import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { StudioTool, Note, isAudioOverviewNote, isInfographicNote } from "@/shared/types/index";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { CreateReportModal } from "./CreateReportModal";
 import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "./CustomizeQuizModal";
@@ -13,10 +13,11 @@ import { StudioPanelHeader } from "./StudioPanelHeader";
 import { NoteListView } from "./NoteListView";
 import { ActiveNoteView } from "./ActiveNoteView";
 import { MiniAudioPlayer } from "@/features/audio/components/MiniAudioPlayer";
-import { useStudioContext } from "../StudioContext";
-import { useAudioPlayerContext } from "@/features/audio/AudioPlayerContext";
+import { useStudioContext } from "../useStudioContext";
+import { useAudioPlayerContext } from "@/features/audio/useAudioPlayer";
 import { useStudioHandlers } from "../hooks/useStudioHandlers";
 import { useNoteActions } from "../hooks/useNoteActions";
+import type { InfographicViewControls } from "./views/InfographicView";
 
 interface StudioPanelProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ interface StudioPanelProps {
   tools: StudioTool[];
   width: number;
   isResizing: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sources?: any[];
   userId?: string | null;
   noteId?: string | null;
@@ -54,9 +56,33 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   const [isMindMapExpanded, setIsMindMapExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isEditingReportContent, setIsEditingReportContent] = useState(false);
+  const [isInfographicFullscreen, setIsInfographicFullscreen] = useState(false);
+  const infographicControlsRef = useRef<InfographicViewControls | null>(null);
 
   // Derived state
   const activeNote = notes.find((n) => n.id === activeNoteId) || null;
+
+  const canDownloadInfographic =
+    !!activeNote &&
+    isInfographicNote(activeNote) &&
+    activeNote.status !== "generating" &&
+    activeNote.status !== "failed" &&
+    Boolean(activeNote.imageUrl?.trim());
+
+  const handleInfographicControlsRegister = useCallback(
+    (controls: InfographicViewControls | null) => {
+      infographicControlsRef.current = controls;
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!activeNote || !isInfographicNote(activeNote)) {
+      infographicControlsRef.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsInfographicFullscreen(false);
+    }
+  }, [activeNote]);
 
   // Mobile detection
   useEffect(() => {
@@ -180,6 +206,10 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   // Handle back button
   const handleBack = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    }
+    setIsInfographicFullscreen(false);
     setActiveNoteId(null);
     setIsEditingReportContent(false);
   };
@@ -245,6 +275,12 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           onExportFlashcards={noteActions.handleExportFlashcards}
           onCopyUserNote={noteActions.handleCopyUserNote}
           onDownloadUserNote={noteActions.handleDownloadUserNote}
+          onDownloadInfographic={() => infographicControlsRef.current?.download()}
+          onToggleInfographicFullscreen={() =>
+            infographicControlsRef.current?.toggleFullscreen()
+          }
+          canDownloadInfographic={canDownloadInfographic}
+          isInfographicFullscreen={isInfographicFullscreen}
           canCopyOrDownload={noteActions.canCopyOrDownloadReport}
           canCopyOrDownloadUserNote={noteActions.canCopyOrDownloadUserNote}
           canExportFlashcards={noteActions.canExportFlashcards}
@@ -268,6 +304,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               isEditingReportContent={isEditingReportContent}
               onSaveReportContent={handleSaveReportContent}
               onCancelEditReport={handleCancelEditReport}
+              registerInfographicControls={handleInfographicControlsRegister}
+              onInfographicFullscreenChange={setIsInfographicFullscreen}
             />
           ) : (
             <NoteListView

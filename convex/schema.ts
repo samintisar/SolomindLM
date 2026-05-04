@@ -294,23 +294,6 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
-  // Slides table (deprecated - will be removed after migration)
-  slides: defineTable({
-    userId: v.id("users"),
-    notebookId: v.id("notebooks"),
-    title: v.string(),
-    data: v.any(),
-    status: v.string(),
-    slideCount: v.optional(v.number()),
-    metadata: v.optional(v.any()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_notebook", ["notebookId"])
-    .index("by_notebook_and_user", ["notebookId", "userId"])
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
-
   // Spreadsheets table
   spreadsheets: defineTable({
     userId: v.id("users"),

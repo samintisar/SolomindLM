@@ -17,7 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { NotebookItem } from "@/shared/types/index";
-import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
 const IconMap: Record<string, React.FC<{ className?: string }>> = {
   Folder,

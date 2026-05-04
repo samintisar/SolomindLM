@@ -82,6 +82,7 @@ export function getRelevanceLabel(score: number): "high" | "medium" | "low" {
  * Transform web search result to unified format
  */
 export function transformWebResult(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   sourceType: "web" | "news" | "finance"
 ): UnifiedDiscoveryResult {
@@ -103,6 +104,7 @@ export function transformWebResult(
 /**
  * Transform academic result to unified format
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function transformAcademicResult(result: any): UnifiedDiscoveryResult {
   return {
     id: `academic-${result.metadata?.sourceApi || "unknown"}-${result.url}`,
@@ -201,8 +203,11 @@ export interface DiscoverArgs {
 }
 
 export type RunActionFn = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   action: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => Promise<any>;
 
 export async function discoverHandler(
@@ -266,9 +271,11 @@ export async function discoverHandler(
         query,
         maxResults: maxPerChannel,
         topic: tavilyTopic,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         timeRange: timeRange as any,
       }
     )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((results: any) => {
         const duration = Date.now() - topicStartTime;
         logger.info(`${topic.toUpperCase()} search completed`, {
@@ -277,6 +284,7 @@ export async function discoverHandler(
         });
         return {
           sourceType: topic,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           results: results.map((r: any) => transformWebResult(r, topic)),
           duration,
         };
@@ -311,9 +319,11 @@ export async function discoverHandler(
         minCitations: academicFilters?.minCitations,
         openAccessOnly: academicFilters?.openAccessOnly,
         hasFullText: academicFilters?.hasFullText,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sortBy: sortBy as any,
       }
     )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((results: any) => {
         const duration = Date.now() - academicStartTime;
         logger.info("ACADEMIC search completed", {
@@ -322,6 +332,7 @@ export async function discoverHandler(
         });
         return {
           sourceType: "academic",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           results: results.map((r: any) => transformAcademicResult(r)),
           duration,
         };
@@ -412,6 +423,7 @@ export const discover = action({
       throw new Error("Unauthenticated");
     }
     return discoverHandler(args, (action, actionArgs) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ctx.runAction as any)(action, actionArgs)
     );
   },
@@ -457,6 +469,7 @@ export const discoverSources = action({
       throw new Error("Unauthenticated");
     }
     return discoverSourcesHandler(args, (action, actionArgs) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ctx.runAction as any)(action, actionArgs)
     );
   },

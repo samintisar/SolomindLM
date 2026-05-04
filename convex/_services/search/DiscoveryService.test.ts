@@ -246,6 +246,7 @@ describe("DiscoveryService", () => {
         url: `http://${prefix}-${i}`,
         snippet: "S",
         score: 1 - i * 0.1,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sourceType: prefix as any,
       }));
 

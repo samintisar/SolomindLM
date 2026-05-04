@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Note, InfographicNote } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useCreateInfographic } from "../../services/infographicApi";
 import type { InfographicConfig } from "../../components/CustomizeInfographicModal";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";

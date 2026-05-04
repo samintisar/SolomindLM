@@ -46,6 +46,7 @@ async function collapseGroup(
     () =>
       invokeWithTimeout(
         () =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (deps.smartLlm as any).invoke(
             [new SystemMessage(COLLAPSE_SYSTEM_PROMPT), new HumanMessage(prompt)],
             createLangSmithRunConfig({

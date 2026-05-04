@@ -2,7 +2,9 @@
 
 import type Together from "together-ai";
 
+import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
 import { synthesizeSpeechToBuffer } from "../../_services/ai/togetherTts.js";
+import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { env } from "../../_lib/env.js";
 import { withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
@@ -110,13 +112,15 @@ export async function synthesizeAudio(
     );
   }
 
-  const audioBuffer = Buffer.concat(sortedBuffers);
+  const wavBuffer = concatenateWavBuffers(sortedBuffers);
+  const audioBuffer = encodePcmWavToMp3(wavBuffer);
 
   logger.info("AUDIO GENERATION COMPLETE", {
     agent: "AudioOverviewGraph",
     phase: "generation_complete",
     linesSucceeded: successCount,
     totalLines: dialogueScript.length,
+    wavAudioSize: wavBuffer.length,
     finalAudioSize: audioBuffer.length,
     milestone: true,
   });

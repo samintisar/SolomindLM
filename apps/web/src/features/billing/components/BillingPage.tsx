@@ -5,7 +5,7 @@ import {
   useCreateCheckout,
   useCancelSubscription,
 } from "../services/subscriptionApi";
-import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
 interface BillingPageProps {
   onBack: () => void;
@@ -18,7 +18,7 @@ const freeFeatures = [
   "5 flashcards/day",
   "5 quizzes/day",
   "5 reports/day",
-  "1 audio overview/day",
+  "5 audio overviews/day",
   "5 written questions/day",
 ];
 
@@ -29,7 +29,7 @@ const proFeatures = [
   "100 flashcards/day",
   "100 quizzes/day",
   "100 reports/day",
-  "5 audio overviews/day",
+  "100 audio overviews/day",
   "100 written questions/day",
 ];
 

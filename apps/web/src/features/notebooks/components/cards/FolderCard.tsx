@@ -15,8 +15,9 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { FolderItem } from "@/shared/types/index";
-import { useConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   Folder,
   Book,

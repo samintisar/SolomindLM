@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X, Loader2, Bookmark, Globe, Lock, Eye } from "lucide-react";
 import { useCreatePrompt, usePublishPrompt, type StudioTool } from "../services/promptsApi";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 
 // ── Props ──────────────────────────────────────────────────────────────
 

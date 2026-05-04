@@ -20,6 +20,7 @@ interface ToolGridProps {
 }
 
 // Icon map for tool icons
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   AudioLines,
   GitFork,

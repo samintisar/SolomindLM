@@ -53,7 +53,6 @@ export function ModelBrandIcon({ brand, className, variant = "brand" }: Props) {
   const qwenMaskId = `${uid}-qwen-mask`;
   const qwenGradOuter = `${uid}-qwen-go`;
   const qwenGradCenter = `${uid}-qwen-gc`;
-  const moonshotGradId = `${uid}-moonshot`;
   const minimaxGradId = `${uid}-minimax`;
 
   switch (brand) {
@@ -61,7 +60,7 @@ export function ModelBrandIcon({ brand, className, variant = "brand" }: Props) {
       if (variant === "brand") {
         return (
           <svg className={cn} viewBox="0 0 20 20" aria-hidden role="img" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#0D0D0D" d={OPENAI_SYMBOL_PATH} />
+            <path fill="#10A37F" d={OPENAI_SYMBOL_PATH} />
           </svg>
         );
       }
@@ -143,13 +142,7 @@ export function ModelBrandIcon({ brand, className, variant = "brand" }: Props) {
       if (variant === "brand") {
         return (
           <svg className={cn} viewBox="0 0 24 24" aria-hidden role="img" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id={moonshotGradId} x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#FF5722" />
-                <stop offset="1" stopColor="#FFA726" />
-              </linearGradient>
-            </defs>
-            <path fill={`url(#${moonshotGradId})`} d={MOONSHOT_GLYPH_PATH} />
+            <path fill="#000000" d={MOONSHOT_GLYPH_PATH} />
           </svg>
         );
       }

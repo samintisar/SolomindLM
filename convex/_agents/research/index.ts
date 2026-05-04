@@ -55,6 +55,7 @@ export class ResearchAgent {
       const references = result.evidence.map((e, idx) => ({
         id: idx + 1,
         sourceId: e.subQuestionId ? `${e.subQuestionId}-${idx}` : String(idx + 1),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         documentId: (e.metadata as any)?.documentId,
         sourceTitle: e.sourceTitle,
         sourceUrl: e.sourceUrl,

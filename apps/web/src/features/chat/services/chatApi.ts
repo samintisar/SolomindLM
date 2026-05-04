@@ -62,6 +62,7 @@ export interface ApiMessage {
   content: string;
   created_at: string;
   references?: ReferenceChunk[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -620,6 +621,7 @@ interface SourceSuggestionsResult {
 
 export function useSourceSuggestions(
   notebookId: string | null,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   documents: any[]
 ): SourceSuggestionsResult {
   const [result, setResult] = useState<SourceSuggestionsResult>({
@@ -632,14 +634,17 @@ export function useSourceSuggestions(
   const sourceSuggestions = useAction(api.chat.sourceSuggestions.getSourceSuggestions);
 
   const documentSignature = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed = documents.filter((d: any) => d.status === "completed");
     return completed
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((d: any) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
       .join("|");
   }, [documents]);
 
   useEffect(() => {
     if (!notebookId || !documentSignature) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResult({ summary: null, suggestions: null, isLoading: false });
       fetchedSignatureRef.current = null;
       return;
@@ -656,6 +661,7 @@ export function useSourceSuggestions(
       notebookId: notebookId as Id<"notebooks">,
       documentSignature,
     })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => {
         if (cancelled) return;
         setResult({

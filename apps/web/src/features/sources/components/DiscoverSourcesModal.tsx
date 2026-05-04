@@ -20,7 +20,7 @@ import {
 import { Source, UnifiedDiscoveryResult } from "@/shared/types/index";
 import { normalizeSourceUrlForNotebookMatch } from "@/shared/utils/sourceUrlMatch";
 import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import { Favicon } from "@/shared/components/Favicon";
 

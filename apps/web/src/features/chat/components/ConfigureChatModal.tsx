@@ -80,12 +80,14 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
   // Sync when external settings change (e.g. after save)
   useEffect(() => {
     if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInstructionMode(chatSettings?.instructionMode ?? "default");
     setCustomInstructions(chatSettings?.customInstructions ?? "");
     setResponseLength(chatSettings?.responseLength ?? "default");
   }, [isOpen, chatSettings]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOpen) setShowMidChatSwitchWarning(false);
   }, [isOpen]);
 

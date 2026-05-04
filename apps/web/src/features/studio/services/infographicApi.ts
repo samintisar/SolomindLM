@@ -26,6 +26,7 @@ export interface InfographicConfig {
 /**
  * Get preview text based on status and metadata
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPreviewText(status: string, metadata?: any): string {
   const phase = metadata?.phase || status;
 
@@ -37,10 +38,10 @@ function getPreviewText(status: string, metadata?: any): string {
     phase === "generating_image";
 
   if (isGenerating) {
-    return `Infographic • Generating...`;
+    return `Infographic · Generating…`;
   }
   if (status === "failed" || phase === "failed") {
-    return `Infographic • Failed`;
+    return `Infographic · Failed`;
   }
   return `Infographic`;
 }
@@ -48,6 +49,7 @@ function getPreviewText(status: string, metadata?: any): string {
 /**
  * Map a database infographic response to the frontend InfographicNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapInfographicToNote(dbInfographic: any): InfographicNote {
   let imageUrl = "";
   let prompt = "";
@@ -102,7 +104,7 @@ export function useInfographics(notebookId: string | null) {
 export function useInfographic(infographicId: string | null) {
   const infographic = useQuery(
     api.studio.infographic.index.get,
-    infographicId ? { id: infographicId as Id<"slides"> } : "skip"
+    infographicId ? { id: infographicId as Id<"infographics"> } : "skip"
   );
   return infographic ? mapInfographicToNote(infographic) : null;
 }
@@ -169,7 +171,7 @@ export function useRenameInfographic() {
 
   return async (infographicId: string, newTitle: string) => {
     return await update({
-      id: infographicId as Id<"slides">,
+      id: infographicId as Id<"infographics">,
       title: newTitle,
     });
   };
@@ -203,6 +205,6 @@ export function useDeleteInfographic() {
   );
 
   return async (infographicId: string) => {
-    await remove({ id: infographicId as Id<"slides"> });
+    await remove({ id: infographicId as Id<"infographics"> });
   };
 }

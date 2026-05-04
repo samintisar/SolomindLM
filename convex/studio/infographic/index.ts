@@ -4,7 +4,7 @@ import { internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
 import { checkDailyLimit } from "../../_lib/limits";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
-import * as Infographics from "../../_model/infographic";
+import * as Infographics from "../../_model/infographics";
 
 // List, get, create, update, remove use model functions
 export const list = query({

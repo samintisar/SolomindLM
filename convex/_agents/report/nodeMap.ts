@@ -77,6 +77,7 @@ IMPORTANT: Respond with a JSON object containing:
   } catch (error) {
     const elapsed = Date.now() - startTime;
     const isTimeout =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (error as any).isTimeout ||
       (error instanceof Error &&
         (error.message.includes("timeout") ||
@@ -99,7 +100,9 @@ IMPORTANT: Respond with a JSON object containing:
               name: error.name,
               message: error.message,
               stack: error.stack?.split("\n").slice(0, 5).join("\n"),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               phase: (error as any).phase,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               isTimeout: (error as any).isTimeout,
             }
           : String(error),

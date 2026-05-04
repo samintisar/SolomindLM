@@ -73,8 +73,8 @@ export const CustomizeAudioModal: React.FC<CustomizeAudioModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border/50 bg-card">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-secondary/50 rounded-lg">
-              <AudioLines className="w-5 h-5 text-primary" />
+            <div className="p-2 rounded-lg bg-teal-500/10">
+              <AudioLines className="w-5 h-5 text-teal-700 dark:text-teal-400" />
             </div>
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Audio Overview</h2>
           </div>

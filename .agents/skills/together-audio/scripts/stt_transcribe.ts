@@ -120,6 +120,7 @@ async function translate(args: ParsedArgs): Promise<void> {
 }
 
 async function diarize(args: ParsedArgs): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response: any = await client.audio.transcriptions.create({
     file: loadAudioFile(args.audioFile),
     model: args.model,
@@ -142,6 +143,7 @@ async function diarize(args: ParsedArgs): Promise<void> {
 }
 
 async function timestamps(args: ParsedArgs): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response: any = await client.audio.transcriptions.create({
     file: loadAudioFile(args.audioFile),
     model: args.model,

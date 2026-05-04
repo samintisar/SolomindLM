@@ -65,13 +65,13 @@ test.describe("Studio Tool Grid", () => {
     ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("clicking Slide Deck tool opens slides modal", async ({ notebookPage }) => {
+  test("clicking Infographic tool opens infographic modal", async ({ notebookPage }) => {
     const page = notebookPage;
 
-    await openStudioTool(page, "Slide Deck");
+    await openStudioTool(page, "Infographic");
 
     await expect(
-      page.getByRole("heading", { name: /customize slide deck/i })
+      page.getByRole("heading", { name: /customize infographic/i })
     ).toBeVisible({ timeout: 15_000 });
   });
 

@@ -36,6 +36,7 @@ export const SourceSuggestionPrompt: React.FC<SourceSuggestionPromptProps> = ({
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelected(new Set());
   }, [listFingerprint, sources.length]);
 

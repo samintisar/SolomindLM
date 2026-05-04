@@ -232,6 +232,7 @@ export async function runProcessReportMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -258,6 +259,7 @@ IMPORTANT: Respond with a JSON object containing:
     const startTime = Date.now();
     const mapOutput = (await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
           [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(structuredPrompt)],
           createLangSmithRunConfig({
@@ -412,6 +414,7 @@ export async function runFinalizeReportPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -480,6 +483,7 @@ export async function runFinalizeReportPhase(
     const startTime = Date.now();
     const response = (await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
           [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -527,6 +531,12 @@ export async function runFinalizeReportPhase(
     });
 
     await ctx.runMutation(internal.studio.jobMutations.reports.clearReportMapData, { reportId });
+
+    // Consume rate limit token on success
+    await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "report",
+    });
 
     logger.jobComplete({
       contentLength: content.length,

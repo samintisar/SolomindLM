@@ -15,6 +15,7 @@ import {
 // convex-test resolves function references like api.studio.prompts.index.createPrompt
 // by looking up module keys. We need keys relative to convex/ root (e.g. "./studio/prompts/index.ts").
 // From this subdirectory, we use a root-relative glob and normalize the keys.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<any>>;
 const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [
@@ -38,6 +39,7 @@ async function seedNotebook(t: ReturnType<typeof convexTest>, ownerUserId: strin
   const now = Date.now();
   return await t.run(async (ctx) => {
     return await ctx.db.insert("notebooks", {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userId: ownerUserId as any,
       title: "Test notebook",
       createdAt: now,
@@ -65,6 +67,7 @@ describe("Prompt Library — createPrompt", () => {
     expect(promptId).toBeDefined();
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -75,6 +78,7 @@ describe("Prompt Library — createPrompt", () => {
       studioTool: "report",
       visibility: "private",
       status: "active",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userId: userId as any,
     });
   });
@@ -114,6 +118,7 @@ describe("Prompt Library — createPrompt", () => {
         title: "T",
         promptText: "Body",
         studioTool: "report",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notebookId: notebookId as any,
       }),
     ).rejects.toThrow("Notebook not found");
@@ -169,6 +174,7 @@ describe("Prompt Library — createPrompt", () => {
     });
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -189,10 +195,12 @@ describe("Prompt Library — publishPrompt / unpublishPrompt", () => {
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -213,6 +221,7 @@ describe("Prompt Library — publishPrompt / unpublishPrompt", () => {
 
     await expect(
       asUser(t, other).mutation(api.studio.prompts.index.publishPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
       }),
     ).rejects.toThrow("Not found or not owner");
@@ -229,14 +238,17 @@ describe("Prompt Library — publishPrompt / unpublishPrompt", () => {
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.unpublishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -257,16 +269,19 @@ describe("Prompt Library — savePublicPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const copyId = await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
     });
 
     expect(copyId).toBeDefined();
 
     const copy = await asUser(t, saver).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: copyId as any,
     });
 
@@ -274,10 +289,12 @@ describe("Prompt Library — savePublicPrompt", () => {
       title: "Great Prompt",
       promptText: "Use this template",
       visibility: "private",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       sourcePromptId: promptId as any,
     });
 
     const original = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(original!.saveCount).toBe(1);
@@ -295,20 +312,24 @@ describe("Prompt Library — savePublicPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const copyId1 = await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
     });
 
     const copyId2 = await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
     });
 
     expect(copyId2).toEqual(copyId1);
 
     const original = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(original!.saveCount).toBe(1);
@@ -328,12 +349,15 @@ describe("Prompt Library — savePublicPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await expect(
       asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notebookId: foreignNotebook as any,
       }),
     ).rejects.toThrow("Notebook not found");
@@ -353,15 +377,18 @@ describe("Prompt Library — ratePrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
       rating: 5,
     });
 
     const prompt = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -385,20 +412,24 @@ describe("Prompt Library — ratePrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
       rating: 3,
     });
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
       rating: 5,
     });
 
     const prompt = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -419,11 +450,13 @@ describe("Prompt Library — ratePrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await expect(
       asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
         rating: 0,
       }),
@@ -431,6 +464,7 @@ describe("Prompt Library — ratePrompt", () => {
 
     await expect(
       asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
         rating: 6,
       }),
@@ -438,6 +472,7 @@ describe("Prompt Library — ratePrompt", () => {
 
     await expect(
       asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
         rating: 3.5,
       }),
@@ -458,15 +493,18 @@ describe("Prompt Library — reportPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
       reason: "Inappropriate",
     });
 
     const prompt = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -486,11 +524,13 @@ describe("Prompt Library — reportPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await expect(
       asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
         reason: "x".repeat(PROMPT_REPORT_REASON_MAX_LENGTH + 1),
       }),
@@ -508,17 +548,20 @@ describe("Prompt Library — reportPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     for (let i = 0; i < PROMPT_REPORT_AUTO_HIDE_THRESHOLD; i++) {
       const reporter = await seedUser(t);
       await asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
       });
     }
 
     const prompt = await asUser(t, author).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -538,15 +581,18 @@ describe("Prompt Library — reportPrompt", () => {
     });
 
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await expect(
       asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
       }),
     ).rejects.toThrow("Already reported");
@@ -565,10 +611,12 @@ describe("Prompt Library — deletePrompt", () => {
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.deletePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -586,14 +634,17 @@ describe("Prompt Library — deletePrompt", () => {
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.deletePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -613,12 +664,14 @@ describe("Prompt Library — updatePrompt", () => {
     });
 
     await asUser(t, userId).mutation(api.studio.prompts.index.updatePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
       title: "Updated Title",
       promptText: "Updated text",
     });
 
     const prompt = await asUser(t, userId).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
@@ -639,6 +692,7 @@ describe("Prompt Library — updatePrompt", () => {
 
     await expect(
       asUser(t, other).mutation(api.studio.prompts.index.updatePrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
         title: "Hacked Title",
       }),
@@ -658,6 +712,7 @@ describe("Prompt Library — listPublicPrompts", () => {
       studioTool: overrides.studioTool ?? "report",
     });
     await asUser(t, userId).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     return promptId;
@@ -692,7 +747,9 @@ describe("Prompt Library — listPublicPrompts", () => {
     // Force hidden + removed by directly mutating the db (auto-hide threshold
     // is exercised separately; this exercises the listing filter only).
     await t.run(async (ctx) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ctx.db.patch(hiddenId as any, { status: "hidden" });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ctx.db.patch(removedId as any, { status: "removed" });
     });
 
@@ -730,12 +787,15 @@ describe("Prompt Library — listPublicPrompts", () => {
     const saver1 = await seedUser(t);
     const saver2 = await seedUser(t);
     await asUser(t, saver1).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: b as any,
     });
     await asUser(t, saver2).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: b as any,
     });
     await asUser(t, saver1).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: a as any,
     });
 
@@ -745,6 +805,7 @@ describe("Prompt Library — listPublicPrompts", () => {
       paginationOpts: { numItems: 20, cursor: null },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(result.page.map((p: any) => p._id)).toEqual([b, a]);
   });
 
@@ -762,6 +823,7 @@ describe("Prompt Library — listPublicPrompts", () => {
       paginationOpts: { numItems: 20, cursor: null },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(result.page.map((p: any) => p._id)).toEqual([second, first]);
   });
 });
@@ -779,6 +841,7 @@ describe("Prompt Library — getPrompt access matrix", () => {
     });
 
     const seen = await asUser(t, other).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(seen).toBeNull();
@@ -795,6 +858,7 @@ describe("Prompt Library — getPrompt access matrix", () => {
     });
 
     const seen = await t.query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(seen).toBeNull();
@@ -811,10 +875,12 @@ describe("Prompt Library — getPrompt access matrix", () => {
       studioTool: "report",
     });
     await asUser(t, owner).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     const seen = await asUser(t, other).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(seen!._id).toEqual(promptId);
@@ -831,18 +897,22 @@ describe("Prompt Library — getPrompt access matrix", () => {
       studioTool: "report",
     });
     await asUser(t, owner).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     await t.run(async (ctx) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ctx.db.patch(promptId as any, { status: "hidden" });
     });
 
     const otherSees = await asUser(t, other).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(otherSees).toBeNull();
 
     const ownerSees = await asUser(t, owner).query(api.studio.prompts.index.getPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
     expect(ownerSees!._id).toEqual(promptId);
@@ -862,27 +932,32 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       studioTool: "report",
     });
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     expect(
       await asUser(t, saver).query(api.studio.prompts.index.hasSavedPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBe(false);
 
     await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
     });
 
     expect(
       await asUser(t, saver).query(api.studio.prompts.index.hasSavedPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBe(true);
 
     expect(
       await asUser(t, stranger).query(api.studio.prompts.index.hasSavedPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBe(false);
@@ -898,11 +973,13 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       studioTool: "report",
     });
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     expect(
       await t.query(api.studio.prompts.index.hasSavedPrompt, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBe(false);
@@ -919,33 +996,39 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       studioTool: "report",
     });
     await asUser(t, author).mutation(api.studio.prompts.index.publishPrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       promptId: promptId as any,
     });
 
     expect(
       await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBeNull();
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
       rating: 4,
     });
 
     expect(
       await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBe(4);
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       publicPromptId: promptId as any,
       rating: 2,
     });
 
     expect(
       await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
       }),
     ).toBe(2);

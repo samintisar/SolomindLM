@@ -72,11 +72,10 @@ async function resolveDocumentIds(
 // for the row to reach a terminal status before reading it.
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "failed"]);
 const POLL_INTERVAL_MS = 2000;
-// Audio reduce alone is configured to allow up to 5 minutes of LLM time
-// (AUDIO_REDUCE_TIMEOUT_MS), and a job can have multiple slow phases. Keep
-// the eval ceiling well above the longest single-phase timeout so the eval
-// reflects genuine agent failure instead of polling impatience.
-const POLL_TIMEOUT_MS = 10 * 60 * 1000;
+// Audio reduce alone is configured to allow up to 10 minutes of LLM time
+// (AUDIO_REDUCE_TIMEOUT_MS), and a job can have multiple slow phases plus
+// TTS. Keep the eval ceiling well above the total expected time.
+const POLL_TIMEOUT_MS = 20 * 60 * 1000;
 
 async function pollUntilTerminal<T extends { status?: string } | null>(
   ctx: EvalActionCtx,
@@ -369,24 +368,26 @@ export const getMindmapEvalStatus = action({
 
 // ─── Infographics ────────────────────────────────────────────
 
-export interface InfographicEvalResult {
+export interface InfographicEvalKickoff {
   infographicId: string;
-  title: string;
-  status: string;
-  data: unknown;
-  latencyMs: number;
+  startedAt: number;
 }
 
-export const runInfographicEval = action({
+export interface InfographicEvalStatus {
+  status: string;
+  title: string;
+  data: unknown;
+}
+
+export const startInfographicEval = action({
   args: {
     evalSecret: v.string(),
     notebookId: v.id("notebooks"),
     documentIds: v.optional(v.array(v.id("documents"))),
     customPrompt: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<InfographicEvalResult> => {
+  handler: async (ctx, args): Promise<InfographicEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
-    const startTime = Date.now();
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
 
@@ -399,7 +400,7 @@ export const runInfographicEval = action({
       }
     );
 
-    await ctx.runAction(internal.studio.infographic.generate.generateInfographicImage, {
+    await ctx.scheduler.runAfter(0, internal.studio.infographic.generate.generateInfographicImage, {
       infographicId,
       userId,
       notebookId: args.notebookId,
@@ -407,18 +408,22 @@ export const runInfographicEval = action({
       customPrompt: args.customPrompt,
     });
 
-    const populated = await pollUntilTerminal(
-      ctx,
-      () => ctx.runQuery(internal.studio.infographic.index.getInternal, { id: infographicId }),
-      `Infographic ${infographicId}`
-    );
+    return { infographicId: infographicId as string, startedAt: Date.now() };
+  },
+});
 
+export const getInfographicEvalStatus = action({
+  args: { evalSecret: v.string(), infographicId: v.id("infographics") },
+  handler: async (ctx, args): Promise<InfographicEvalStatus> => {
+    assertRagEvalGate(args.evalSecret);
+    const populated = await ctx.runQuery(internal.studio.infographic.index.getInternal, {
+      id: args.infographicId,
+    });
+    if (!populated) throw new Error(`Infographic ${args.infographicId} not found`);
     return {
-      infographicId: infographicId as string,
-      title: populated.title,
       status: populated.status,
+      title: populated.title,
       data: populated.data,
-      latencyMs: Date.now() - startTime,
     };
   },
 });
@@ -640,6 +645,89 @@ export const startAudioScriptEval = action({
 });
 
 export const getAudioScriptEvalStatus = action({
+  args: {
+    evalSecret: v.string(),
+    audioOverviewId: v.id("audioOverviews"),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    status: string;
+    title: string;
+    transcript: string;
+    audioUrl?: string;
+  }> => {
+    assertRagEvalGate(args.evalSecret);
+    const populated = await ctx.runQuery(internal.studio.audio.index.getInternal, {
+      id: args.audioOverviewId,
+    });
+    if (!populated) {
+      throw new Error(`AudioOverview ${args.audioOverviewId} not found`);
+    }
+    return {
+      status: populated.status,
+      title: populated.title,
+      transcript: populated.transcript ?? "",
+      audioUrl: populated.audioUrl,
+    };
+  },
+});
+
+// ─── Audio Script (SCRIPT-ONLY, no TTS) ─────────────────────
+
+/** Script-only eval: generates dialogue script without TTS for faster iteration */
+export const startAudioScriptOnlyEval = action({
+  args: {
+    evalSecret: v.string(),
+    notebookId: v.id("notebooks"),
+    documentIds: v.optional(v.array(v.id("documents"))),
+    audioType: v.optional(v.string()),
+    length: v.optional(v.string()),
+    focus: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ audioOverviewId: string; startedAt: number }> => {
+    assertRagEvalGate(args.evalSecret);
+    const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
+    const documentIds = await resolveDocumentIds(
+      ctx,
+      args.notebookId,
+      userId,
+      args.documentIds
+    );
+
+    const audioOverviewId = await ctx.runMutation(
+      internal.eval._studioRowCreators.createAudioOverviewInternal,
+      {
+        userId,
+        notebookId: args.notebookId,
+        title: "Audio Overview (eval, script-only)",
+        audioType: args.audioType,
+        length: args.length,
+        focus: args.focus,
+        skipTts: true,
+      }
+    );
+
+    // Run full pipeline but TTS will be skipped because skipTts is in metadata
+    await ctx.scheduler.runAfter(0, internal.studio.audio.job.audioOverviewGeneration, {
+      audioOverviewId,
+      userId: userId as string,
+      notebookId: args.notebookId,
+      documentIds,
+    });
+
+    return {
+      audioOverviewId: audioOverviewId as string,
+      startedAt: Date.now(),
+    };
+  },
+});
+
+export const getAudioScriptOnlyEvalStatus = action({
   args: {
     evalSecret: v.string(),
     audioOverviewId: v.id("audioOverviews"),

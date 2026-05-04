@@ -254,6 +254,7 @@ export async function reduce(
       () =>
         invokeWithTimeout(
           () =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (structuredLlm as any).invoke(
               [new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT), new HumanMessage(selectionPrompt)],
               createLangSmithRunConfig({
@@ -329,6 +330,7 @@ export async function reduce(
       return new Send("reduce", {
         ...withoutMapOutputs(state),
         reduceRetryCount: retryCount + 1,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
     }
 

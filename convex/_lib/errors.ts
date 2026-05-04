@@ -28,8 +28,7 @@ export type DailyFeature =
   | "audio"
   | "writtenQuestion"
   | "spreadsheet"
-  | "infographic"
-  | "slide";
+  | "infographic";
 
 /**
  * Structured error data that can be serialized through Convex
@@ -151,7 +150,6 @@ export function createDailyLimitError(
     writtenQuestion: "written question set",
     spreadsheet: "spreadsheet",
     infographic: "infographic",
-    slide: "slide deck",
   };
 
   const featureName = featureNames[feature] || feature;
@@ -177,11 +175,10 @@ export function getProLimit(feature: DailyFeature): number {
     flashcard: 100,
     quiz: 100,
     report: 100,
-    audio: 5,
+    audio: 100,
     writtenQuestion: 100,
     spreadsheet: 100,
-    infographic: 10,
-    slide: 10,
+    infographic: 100,
   };
   return limits[feature];
 }
@@ -198,8 +195,7 @@ export function getFreeLimit(feature: DailyFeature): number {
     audio: 1,
     writtenQuestion: 5,
     spreadsheet: 5,
-    infographic: 1,
-    slide: 1,
+    infographic: 5,
   };
   return limits[feature];
 }

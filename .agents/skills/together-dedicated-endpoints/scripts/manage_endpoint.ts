@@ -43,6 +43,7 @@ async function createEndpoint(
   minReplicas: number = 1,
   maxReplicas: number = 1,
   displayName?: string,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const endpoint = await client.endpoints.create({
     model,
@@ -62,6 +63,7 @@ async function waitForReady(
   endpointId: string,
   timeoutMs: number = 600_000,
   pollMs: number = 10_000,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -95,7 +97,7 @@ async function stopEndpoint(endpointId: string): Promise<void> {
   console.log(`Stopped endpoint: ${endpoint.id}  (state: ${endpoint.state})`);
 }
 
-async function deleteEndpoint(endpointId: string): Promise<void> {
+async function _deleteEndpoint(endpointId: string): Promise<void> {
   await client.endpoints.delete(endpointId);
   console.log(`Deleted endpoint: ${endpointId}`);
 }

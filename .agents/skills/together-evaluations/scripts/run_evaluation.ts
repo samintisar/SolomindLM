@@ -233,6 +233,7 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function pollEvaluation(workflowId: string, pollIntervalSeconds: number): Promise<any> {
   while (true) {
     const result = await client.evals.status(workflowId);
@@ -250,6 +251,7 @@ async function pollEvaluation(workflowId: string, pollIntervalSeconds: number): 
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getResultFileId(result: any): string | undefined {
   return result?.results?.result_file_id;
 }
@@ -356,6 +358,7 @@ function sampleDatasetForArgs(args: ScriptArgs): DatasetRow[] {
   ];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function maybeDownloadResults(args: ScriptArgs, result: any): Promise<void> {
   const fileId = getResultFileId(result);
   if (fileId) {

@@ -15,6 +15,8 @@ import {
   createTogetherTtsClient,
   synthesizeSpeechToBuffer,
 } from "../../_services/ai/togetherTts.js";
+import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
+import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { packChunks, validateChunks } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import {
@@ -154,6 +156,7 @@ export async function runAudioOverviewGenerationPhase(
     });
 
     // Extract content from chunk objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -266,6 +269,7 @@ export async function runProcessAudioMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -291,6 +295,7 @@ export async function runProcessAudioMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
           [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -311,6 +316,7 @@ export async function runProcessAudioMapChunkPhase(
     });
 
     const elapsed = Date.now() - startTime;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const output = String((response as any).content);
 
     console.log(`[AudioJob] ${chunkId} LLM completed in ${elapsed}ms`);
@@ -388,6 +394,7 @@ export async function runProcessAudioMapChunkPhase(
       : 0;
     const totalMaps = audioOverview.metadata?.totalMapTasks || totalChunks;
     const failedMaps = audioOverview.metadata?.mapResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? Object.values(audioOverview.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
@@ -459,6 +466,7 @@ export async function runFinalizeAudioOverviewPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -560,6 +568,7 @@ export async function runFinalizeAudioOverviewPhase(
 
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
           [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(reducePrompt)],
           createLangSmithRunConfig({
@@ -578,6 +587,7 @@ export async function runFinalizeAudioOverviewPhase(
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const responseAny = response as any;
     const responseContent = responseAny?.content;
     const responseText =
@@ -585,6 +595,7 @@ export async function runFinalizeAudioOverviewPhase(
         ? responseContent
         : Array.isArray(responseContent)
           ? responseContent
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .map((part: any) => {
                 if (typeof part === "string") return part;
                 if (part && typeof part === "object" && typeof part.text === "string")
@@ -604,31 +615,62 @@ export async function runFinalizeAudioOverviewPhase(
       `[AudioJob] Script response responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}, finishReason=${finishReason ?? "unknown"}`
     );
 
+    // Try multiple parsing strategies
     if (jsonStart !== -1 && jsonEnd !== -1) {
+      // Strategy 1: Parse the full JSON array
       try {
         const parsed = JSON.parse(
           responseText.substring(jsonStart, jsonEnd + 1)
         ) as DialogueLine[];
         if (Array.isArray(parsed) && parsed.length > 0) {
           fullDialogueScript = parsed;
-        } else {
-          console.log(`[AudioJob] Script parsed empty or invalid array`);
+          console.log(`[AudioJob] Parsed ${fullDialogueScript.length} lines via full JSON parse`);
         }
       } catch (error) {
         console.log(
-          `[AudioJob] Script parse failed: ${error instanceof Error ? error.message : String(error)}`
+          `[AudioJob] Full JSON parse failed: ${error instanceof Error ? error.message : String(error)}`
         );
-        console.log(`[AudioJob] Script response preview: ${responseText.slice(0, 500)}`);
       }
-    } else {
-      console.log(
-        `[AudioJob] Script missing JSON array; response preview: ${responseText.slice(0, 500)}`
-      );
+
+      // Strategy 2: If full parse failed, try extracting individual objects
+      if (fullDialogueScript.length === 0) {
+        console.log(`[AudioJob] Attempting object-by-object recovery`);
+        const objectRegex = /\{\s*"speaker"\s*:\s*"(host_a|host_b)"\s*,\s*"text"\s*:\s*"([^"]*)"\s*\}/g;
+        let match;
+        const recoveredLines: DialogueLine[] = [];
+        while ((match = objectRegex.exec(responseText)) !== null) {
+          recoveredLines.push({ speaker: match[1] as "host_a" | "host_b", text: match[2] });
+        }
+        if (recoveredLines.length > 0) {
+          fullDialogueScript = recoveredLines;
+          console.log(`[AudioJob] Recovered ${fullDialogueScript.length} lines via regex extraction`);
+        }
+      }
+
+      // Strategy 3: Try parsing truncated JSON by finding the last complete object
+      if (fullDialogueScript.length === 0) {
+        console.log(`[AudioJob] Attempting truncated JSON recovery`);
+        const truncated = responseText.substring(jsonStart, jsonEnd + 1);
+        // Try to find the last valid complete object and close the array
+        const lastCompleteObject = truncated.lastIndexOf('"},');
+        if (lastCompleteObject > 0) {
+          const fixedJson = truncated.substring(0, lastCompleteObject + 2) + "\n]";
+          try {
+            const parsed = JSON.parse(fixedJson) as DialogueLine[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              fullDialogueScript = parsed;
+              console.log(`[AudioJob] Recovered ${fullDialogueScript.length} lines via truncation fix`);
+            }
+          } catch (_e) {
+            // Ignore
+          }
+        }
+      }
     }
 
     if (fullDialogueScript.length === 0) {
       console.log(
-        "[AudioJob] Dialogue generation returned no parsable JSON, using fallback script"
+        `[AudioJob] Dialogue generation returned no parsable JSON, using fallback script. Response preview: ${responseText.slice(0, 500)}`
       );
       fullDialogueScript = [
         { speaker: "host_a", text: "I've analyzed the content you provided." },
@@ -690,9 +732,10 @@ export async function runFinalizeAudioOverviewPhase(
       throw new Error(`Too many synthesis failures: ${successCount}/${fullDialogueScript.length}`);
     }
 
-    const audioBuffer = Buffer.concat(sortedBuffers);
+    const wavBuffer = concatenateWavBuffers(sortedBuffers);
+    const audioBuffer = encodePcmWavToMp3(wavBuffer);
     console.log(
-      `[AudioJob] Audio synthesis complete: ${successCount} lines, ${audioBuffer.length} bytes`
+      `[AudioJob] Audio synthesis complete: ${successCount} lines, ${wavBuffer.length} WAV bytes, ${audioBuffer.length} MP3 bytes`
     );
 
     // Update status for uploading
@@ -707,7 +750,7 @@ export async function runFinalizeAudioOverviewPhase(
     });
 
     // Upload to Convex storage
-    const blob = new Blob([audioBuffer], { type: "audio/mpeg" });
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: "audio/mpeg" });
     const storageId = await ctx.storage.store(blob);
 
     // Get the standard Convex storage URL first

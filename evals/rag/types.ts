@@ -16,7 +16,8 @@ export type StudioRunnerKind =
   | "infographic"
   | "spreadsheet"
   | "writtenQuestions"
-  | "audioScript";
+  | "audioScript"
+  | "audioScriptOnly";
 
 /** All runner kinds (RAG + studio). `"both"` is a fixture-side directive that expands into multiple runs. */
 export type RunnerKind = "chat" | "research" | "both" | StudioRunnerKind;
@@ -36,6 +37,10 @@ export interface StudioParams {
   difficulty?: string;
   topic?: string;
   questionCount?: number;
+  /** Audio overview: short | default | long */
+  length?: string;
+  /** Audio overview: deep_dive | brief | critique | debate */
+  audioType?: string;
 }
 
 export interface SourcePolicyConfig {

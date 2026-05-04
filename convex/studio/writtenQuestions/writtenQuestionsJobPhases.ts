@@ -40,6 +40,7 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 interface WrittenQuestionsOutputInvoker {
   invoke(
     messages: Array<SystemMessage | HumanMessage>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config?: any
   ): Promise<WrittenQuestionsResponse>;
 }
@@ -60,6 +61,7 @@ type WrittenQuestionIdSelectionResponse = z.infer<typeof WrittenQuestionIdSelect
 interface WrittenQuestionSelectionInvoker {
   invoke(
     messages: Array<SystemMessage | HumanMessage>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config?: any
   ): Promise<WrittenQuestionIdSelectionResponse>;
 }
@@ -219,6 +221,7 @@ export async function runWrittenQuestionsGenerationPhase(
     });
 
     // Extract content from chunk objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -365,6 +368,7 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -391,6 +395,7 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
           [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -508,6 +513,7 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       : 0;
     const totalMaps = writtenQuestion.metadata?.totalMapTasks || totalChunks;
     const failedMaps = writtenQuestion.metadata?.mapResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
@@ -591,6 +597,7 @@ export async function runFinalizeWrittenQuestionsPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -759,6 +766,12 @@ export async function runFinalizeWrittenQuestionsPhase(
       internal.studio.jobMutations.writtenQuestions.clearWrittenQuestionsMapData,
       { writtenQuestionId }
     );
+
+    // Consume rate limit token on success
+    await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "writtenQuestion",
+    });
 
     logger.jobComplete({
       questionsGenerated: finalQuestions.length,

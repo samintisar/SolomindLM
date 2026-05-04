@@ -90,7 +90,19 @@ describe("mapDatabaseNoteToNote", () => {
     if (result.type === "audioOverview") {
       expect(result.audioUrl).toBe("https://audio.example.com/file.mp3");
       expect(result.transcript).toBe("Hello world");
+      expect(result.preview).toBe("Audio Overview");
     }
+  });
+
+  it("maps audioOverview preview with duration from metadata", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "audioOverview",
+      audioUrl: "https://audio.example.com/file.wav",
+      transcript: "Hi",
+      metadata: { durationSeconds: 125.4 },
+    });
+    expect(result.preview).toBe("Audio Overview · 2:05");
   });
 
   it("maps infographic type", () => {
@@ -108,21 +120,7 @@ describe("mapDatabaseNoteToNote", () => {
     expect(result.type).toBe("infographic");
     if (result.type === "infographic") {
       expect(result.imageUrl).toBe("https://example.com/image.png");
-      expect(result.title).toBe("Test Infographic");
-    }
-  });
-
-  it("maps legacy slides type to infographic", () => {
-    const result = mapDatabaseNoteToNote({
-      ...baseNote,
-      _type: "slides",
-      data: { imageUrl: "https://example.com/image.png", prompt: "Test prompt" },
-      status: "completed",
-    });
-    expect(result.type).toBe("infographic");
-    if (result.type === "infographic") {
-      expect(result.imageUrl).toBe("https://example.com/image.png");
-      expect(result.prompt).toBe("Test prompt");
+      expect(result.title).toBe("Test Note");
     }
   });
 

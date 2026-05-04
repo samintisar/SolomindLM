@@ -50,10 +50,13 @@ export type ProgressInfo = ProgressInfoType;
  * });
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createGraphState<TOutput = any>(options?: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customFields?: Record<string, any>;
   outputDefault?: TOutput;
 }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fields: Record<string, any> = {
     // Standard fields used by all MapReduce agents
     documentIds: Annotation<string[]>({
@@ -161,5 +164,6 @@ export interface ChunkProcessStateBase {
  * }>;
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CreateChunkProcessState<T extends Record<string, any> = Record<string, never>> =
   ChunkProcessStateBase & T;

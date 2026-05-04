@@ -25,6 +25,7 @@ export function useFolderExpansion({
     if (!expandedFolderId || folders.length === 0) return;
     const exists = folders.some((f) => f.id === expandedFolderId);
     if (!exists) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpandedFolderId(null);
     }
   }, [folders, expandedFolderId]);

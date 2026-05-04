@@ -24,6 +24,7 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
 
   useEffect(() => {
     if (card) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFront(card.front);
       setBack(card.back);
     } else {

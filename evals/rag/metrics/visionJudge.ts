@@ -5,7 +5,7 @@
  * the generated infographic image for quality, visual appeal, and content accuracy.
  */
 
-import OpenAI from "openai";
+import Together from "together-ai";
 import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 
 // ============================================================
@@ -20,7 +20,7 @@ export interface VisionJudgeConfig {
   baseURL?: string;
 }
 
-function createVisionClient(config: VisionJudgeConfig = {}): OpenAI {
+function createVisionClient(config: VisionJudgeConfig = {}): Together {
   const apiKey = config.apiKey ?? process.env.TOGETHER_AI_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -28,7 +28,7 @@ function createVisionClient(config: VisionJudgeConfig = {}): OpenAI {
     );
   }
 
-  return new OpenAI({
+  return new Together({
     apiKey,
     baseURL: config.baseURL ?? "https://api.together.xyz/v1",
   });
@@ -140,12 +140,42 @@ export async function evaluateInfographicWithVision(
           ],
         },
       ],
-      max_tokens: 2048,
+      max_tokens: 4096,
       temperature: 0.1,
     });
 
-    const content = response.choices[0]?.message?.content ?? "{}";
-    const result = JSON.parse(content) as VisionJudgeResult;
+    let content = response.choices[0]?.message?.content ?? "{}";
+    
+    // Try to extract JSON if wrapped in markdown or has extra text
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      content = jsonMatch[0];
+    }
+    
+    // Handle truncated JSON by trying to close it
+    if (!content.trim().endsWith("}")) {
+      const lastBrace = content.lastIndexOf("}");
+      if (lastBrace > 0) {
+        content = content.substring(0, lastBrace + 1);
+      }
+    }
+    
+    let result: VisionJudgeResult;
+    try {
+      result = JSON.parse(content) as VisionJudgeResult;
+    } catch (_parseErr) {
+      // Fallback: return a single metric with the raw content
+      return [
+        baseMetric(
+          "vision_judge",
+          fixture,
+          artifact,
+          "warn",
+          0.5,
+          `Vision judge returned non-JSON response (truncated or malformed). Raw content: ${content.slice(0, 200)}...`
+        ),
+      ];
+    }
 
     const metrics: MetricResult[] = [];
 

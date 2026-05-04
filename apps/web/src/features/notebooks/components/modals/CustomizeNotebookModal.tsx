@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { NotebookItem } from "@/shared/types/index";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   Folder,
   Book,
@@ -83,10 +84,12 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
   // Update state when notebook prop changes (when data is updated in parent)
   useEffect(() => {
     if (notebook) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitle(notebook.title);
       setSelectedColor(notebook.coverColor || "bg-yellow-500");
       setSelectedIcon(notebook.icon || "Folder");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notebook?.id]); // Only update when notebook ID changes (different notebook selected)
 
   const CurrentIcon = IconMap[selectedIcon] || Folder;

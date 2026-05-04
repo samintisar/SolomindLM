@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Note, AudioOverviewNote } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useCreateAudioOverview } from "../../services/audioApi";
 import type { AudioConfig } from "../../components/CustomizeAudioModal";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import {
   getLimitErrorMessage,
   getServiceErrorMessage,

@@ -1,41 +1,5 @@
-import { Streamdown, type StreamdownProps } from "streamdown";
-import { createCodePlugin } from "@streamdown/code";
-import { createMathPlugin } from "@streamdown/math";
-
-/**
- * Shiki themes for fenced blocks must match the code panel background from `index.css`.
- * We use light panels everywhere so `github-light` tokens (dark, saturated hues) stay readable.
- */
-const codePlugin = createCodePlugin({
-  themes: ["github-light", "github-light"],
-});
-
-/** Shared plugins for all app markdown (Shiki + KaTeX). Inline $...$ enabled to match previous app behavior. */
-const mathPlugin = createMathPlugin({
-  singleDollarTextMath: true,
-  errorColor: "#6b7280",
-});
-
-export const streamdownPlugins: NonNullable<StreamdownProps["plugins"]> = {
-  code: codePlugin,
-  math: mathPlugin,
-};
-
-export interface MarkdownRendererProps extends Pick<
-  StreamdownProps,
-  | "className"
-  | "components"
-  | "controls"
-  | "isAnimating"
-  | "lineNumbers"
-  | "mode"
-  | "parseIncompleteMarkdown"
-  | "shikiTheme"
-> {
-  children: string;
-  /** Word/stream animation; prefer false for static Studio content. */
-  animated?: StreamdownProps["animated"];
-}
+import { Streamdown } from "streamdown";
+import { streamdownPlugins, MarkdownRendererProps } from "./MarkdownRenderer.utils";
 
 /**
  * Shared markdown renderer (Streamdown + code + math plugins).

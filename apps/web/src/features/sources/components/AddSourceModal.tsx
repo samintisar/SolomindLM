@@ -60,6 +60,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
   // onDragLeave is recreated each render, so [isOpen, onDragLeave] would retrigger after setState).
   const onDragLeaveRef = useRef(onDragLeave);
+  // eslint-disable-next-line react-hooks/refs
   onDragLeaveRef.current = onDragLeave;
 
   // Reset dragging state when modal closes (run only when isOpen changes, not when callback identity changes).

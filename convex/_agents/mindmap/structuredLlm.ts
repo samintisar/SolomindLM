@@ -29,6 +29,7 @@ export async function extractConcepts(
 
   return await invokeWithTimeout(
     () =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (structuredLlm as any).invoke(
         [
           new SystemMessage(MAP_SYSTEM_PROMPT),

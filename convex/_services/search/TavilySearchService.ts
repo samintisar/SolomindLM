@@ -39,6 +39,7 @@ export interface SearchInternalArgs {
   topic?: string;
   timeRange?: string;
   searchDepth?: string;
+  includeRawContent?: boolean;
   excludeDomains?: string[];
   includeDomains?: string[];
 }
@@ -53,6 +54,7 @@ export async function searchInternalHandler(
     topic,
     timeRange,
     searchDepth,
+    includeRawContent,
     excludeDomains,
     includeDomains,
   } = args;
@@ -81,12 +83,15 @@ export async function searchInternalHandler(
       });
 
       const response = await tavilyClient.search(query, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         searchDepth: (searchDepth || "basic") as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         topic: (topic || "general") as any,
         maxResults,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         timeRange: timeRange as any,
         includeAnswer: false,
-        includeRawContent: "markdown",
+        includeRawContent: includeRawContent ? "markdown" : false,
         includeImages: false,
         includeImageDescriptions: false,
         includeFavicon: false,
@@ -102,6 +107,7 @@ export async function searchInternalHandler(
       return response;
     }, "tavily_search");
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sources: DiscoveredSource[] = (data.results || []).map((result: any) => ({
       title: result.title || "Untitled",
       url: result.url,
@@ -142,6 +148,7 @@ export const searchInternal = internalAction({
     topic: v.optional(v.string()),
     timeRange: v.optional(v.string()),
     searchDepth: v.optional(v.string()),
+    includeRawContent: v.optional(v.boolean()),
     excludeDomains: v.optional(v.array(v.string())),
     includeDomains: v.optional(v.array(v.string())),
   },
@@ -172,6 +179,7 @@ export interface DiscoverSourcesArgs {
   topic?: string;
   timeRange?: string;
   searchDepth?: string;
+  includeRawContent?: boolean;
   excludeDomains?: string[];
   includeDomains?: string[];
 }
@@ -197,6 +205,7 @@ export async function discoverSourcesInternalHandler(
       topic: args.topic,
       timeRange: args.timeRange,
       searchDepth: args.searchDepth,
+      includeRawContent: args.includeRawContent,
       excludeDomains: args.excludeDomains,
       includeDomains: args.includeDomains,
     });
@@ -220,6 +229,7 @@ export const discoverSourcesInternal = internalAction({
     topic: v.optional(v.string()),
     timeRange: v.optional(v.string()),
     searchDepth: v.optional(v.string()),
+    includeRawContent: v.optional(v.boolean()),
     excludeDomains: v.optional(v.array(v.string())),
     includeDomains: v.optional(v.array(v.string())),
   },
@@ -242,6 +252,7 @@ export const discoverSourcesInternal = internalAction({
         topic: args.topic,
         timeRange: args.timeRange,
         searchDepth: args.searchDepth,
+        includeRawContent: args.includeRawContent,
         excludeDomains: args.excludeDomains,
         includeDomains: args.includeDomains,
       });
@@ -296,6 +307,7 @@ export async function deepResearchHandler(
     });
 
     // Handle both generator and direct response types
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof (startResult as any).next === 'function') {
       throw new Error("Streaming research not supported in eval mode");
     }
@@ -370,6 +382,7 @@ export const deepResearch = internalAction({
   handler: async (_, args) =>
     deepResearchHandler({
       input: args.input,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       model: (args.model as any) || "auto",
       outputSchema: args.outputSchema,
     }),

@@ -61,6 +61,7 @@ async function sleepMs(ms: number): Promise<void> {
 // ============================================================
 
 async function runResearchPlanPhase(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   streamId: string,
   userId: string,
@@ -102,14 +103,24 @@ async function runResearchPlanPhase(
     const vectorResults = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       filter: (q: any) => q.eq("notebookId", notebookIdTyped),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkIds = vectorResults.map((r: any) => r._id);
     if (chunkIds.length === 0) return [];
     const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
+     
+     
+     
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkMap = new Map<any, any>(fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any]));
+     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const docIds_unique = [...new Set(vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean))];
     const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, { documentIds: docIds_unique });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const titleMap = new Map(docRows.map((d: any) => [d._id, d.fileName]));
     const sourceUrlMap = new Map<string, string>();
     for (const d of docRows) {
@@ -118,7 +129,9 @@ async function runResearchPlanPhase(
       }
     }
     return vectorResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((r: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunk = chunkMap.get(r._id) as any;
         if (!chunk) return null;
         return {
@@ -131,20 +144,24 @@ async function runResearchPlanPhase(
           similarity: r._score ?? 0,
         };
       })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((x: any) => x !== null);
   };
 
   const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
     return ctx.runQuery(internal.documents.index.keywordSearch, {
       notebookId: notebookIdTyped,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       userId: userId as any,
       query,
       limit,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       documentIds: docIds as any,
       quietLogs: true,
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rerankFn = async (query: string, documents: any[]) => {
     return cachedRerank(ctx, query, documents, "zerank-2", 15);
   };
@@ -179,6 +196,7 @@ async function runResearchPlanPhase(
       });
     },
     discoverSources: async (query, channels, maxResults) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const promises: Promise<any[]>[] = [];
       const webChannels = channels.filter((ch) => ch === "web" || ch === "news");
       const academicChannels = channels.filter((ch) => ch === "academic");
@@ -188,8 +206,10 @@ async function runResearchPlanPhase(
           promises.push(
             ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
               query,
-              maxResults: maxResults ?? 5,
+              maxResults: maxResults ?? 2,
               topic: channel === "web" ? "general" : channel,
+              searchDepth: "basic",
+              includeRawContent: false,
             }).catch((e: unknown) => {
               researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
               return [];
@@ -202,7 +222,7 @@ async function runResearchPlanPhase(
         promises.push(
           ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
             query,
-            maxResults: maxResults ?? 5,
+            maxResults: maxResults ?? 2,
           }).catch((e: unknown) => {
             researchLog.warn("research_academic_discovery_failed", { error: String(e) });
             return [];
@@ -211,6 +231,7 @@ async function runResearchPlanPhase(
       }
 
       const results = await Promise.all(promises);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return results.flat().map((r: any) => ({
         title: r.title ?? "Untitled",
         url: r.url ?? "",
@@ -244,6 +265,7 @@ async function runResearchPlanPhase(
   });
 
   // Phase 1: Generate plan
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subQuestions = await agent.generatePlan(message, sourcePolicy as any);
 
   // Save plan to database
@@ -305,6 +327,7 @@ export const runWithStreamId = internalAction({
     userMessageId: v.optional(v.id("messages")),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const streamId = args.streamId as any;
 
     const rawAddChunk = async (text: string) => {
@@ -362,6 +385,7 @@ export const runWithStreamId = internalAction({
 
       if (args.deepResearch) {
         await runResearchPlanPhase(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ctx as any,
           args.streamId,
           args.userId,
@@ -375,6 +399,7 @@ export const runWithStreamId = internalAction({
         );
       } else {
         await streamChatResponse(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ctx as any,
           args.streamId,
           args.userId,
@@ -386,6 +411,12 @@ export const runWithStreamId = internalAction({
           args.sourcePolicy ?? { channels: ["notebook"] }
         );
       }
+
+      // Consume rate limit token on success
+      await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+        userId: args.userId,
+        feature: "chat",
+      });
     } catch (e) {
       console.error("[ChatStream] runWithStreamId failed:", e);
       try {
@@ -428,6 +459,7 @@ export const runWithStreamId = internalAction({
  * This function can be called from the HTTP action's streamWriter callback
  */
 export async function streamChatResponse(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   streamId: string,
   userId: string,
@@ -458,7 +490,9 @@ export async function streamChatResponse(
   });
 
   const fullHistory = messageList
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((m: any) => m.role !== "system")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((m: any) => ({ role: m.role, content: m.content, metadata: m.metadata }));
 
   const historyBudget = parseInt(env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000", 10);
@@ -709,6 +743,7 @@ export async function streamChatResponse(
     query: string,
     limit: number,
     docIds?: string[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any[]> => {
     chatStreamLog.debug("keyword_search_runner", { phase: "start" });
 
@@ -717,6 +752,7 @@ export async function streamChatResponse(
       userId: keywordSearchChunkUserId,
       query,
       limit,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       documentIds: docIds as any,
     });
 
@@ -760,6 +796,7 @@ export async function streamChatResponse(
   try {
     userPrefs = await ctx.runQuery(
       internal.userPreferences.index.getPreferencesByUserId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { userId: userId as any },
     );
   } catch (e) {
@@ -774,15 +811,20 @@ export async function streamChatResponse(
     fetchDocumentFn: async (documentId: string) => {
       // Fetch all chunks for the document and stitch them together
       const chunks = await ctx.runQuery(internal.documents.index.listChunksByDocument, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         documentId: documentId as any,
       });
       if (!chunks || chunks.length === 0) return null;
 
       // Sort by chunk index and join content
+       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sortedChunks = chunks.sort((a: any, b: any) => a.chunkIndex - b.chunkIndex);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const content = sortedChunks.map((c: any) => c.content).join("\n\n");
 
       return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         documentId: documentId as any,
         content,
         chunkCount: chunks.length,
@@ -804,7 +846,7 @@ export async function streamChatResponse(
   let externalChunks: Array<import("../storage/ChatHistoryService").ReferenceChunk> = [];
 
   if (externalChannels.length > 0) {
-    const maxPerChannel = Math.ceil(5 / externalChannels.length);
+    const maxPerChannel = Math.ceil(10 / externalChannels.length);
 
     // Web/News channels via Tavily
     const webChannels = externalChannels.filter((ch) =>
@@ -836,7 +878,9 @@ export async function streamChatResponse(
             query: refinedQuery,
             maxResults: maxPerChannel,
             topic,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           }).then((results: any[]) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             results.map((r: any) => ({
               title: r.title ?? "Untitled",
               url: r.url ?? "",
@@ -871,6 +915,7 @@ export async function streamChatResponse(
           }
         );
         allResults.push(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...academicResults.map((r: any) => ({
             title: r.title ?? "Untitled",
             url: r.url ?? "",
@@ -1135,6 +1180,7 @@ export async function streamChatResponse(
     // a "this response ended early" indicator after page reload, not just to
     // clients that observed the in-flight `__ERROR:` marker.
     hadStreamError: hasError || undefined,
+    externalSources: externalSources.length > 0 ? externalSources : undefined,
   };
 
   if (existingMessages.length === 0) {
@@ -1215,6 +1261,7 @@ export const runResearchExecute = internalAction({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const streamId = args.streamId as any;
     const runId = args.runId as Id<"researchRuns">;
 
@@ -1271,23 +1318,38 @@ export const runResearchExecute = internalAction({
         const vectorResults = await ctx.vectorSearch("documentChunks", "by_embedding", {
           vector: embedding,
           limit: limitToFetch,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           filter: (q: any) => q.eq("notebookId", notebookIdTyped),
         });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunkIds = vectorResults.map((r: any) => r._id);
         if (chunkIds.length === 0) return [];
         const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
+         
+         
+         
+         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunkMap = new Map<any, any>(fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any]));
+         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const docIds_unique = [...new Set(vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean))];
         const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, { documentIds: docIds_unique });
+         
+         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const titleMap = new Map<any, string>(docRows.map((d: any) => [d._id, d.fileName] as [any, string]));
         const sourceUrlMap = new Map<string, string>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const d of docRows as any[]) {
           if (d.fileUrl?.trim() && (d.fileType === "url" || d.fileType === "youtube")) {
             sourceUrlMap.set(d._id, d.fileUrl);
           }
         }
         return vectorResults
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((r: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const chunk = chunkMap.get(r._id) as any;
             if (!chunk) return null;
             return {
@@ -1300,20 +1362,25 @@ export const runResearchExecute = internalAction({
               similarity: r._score ?? 0,
             };
           })
+           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .filter((x: any) => x !== null) as any[];
       };
 
       const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
         return ctx.runQuery(internal.documents.index.keywordSearch, {
           notebookId: notebookIdTyped,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           userId: args.userId as any,
           query,
           limit,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           documentIds: docIds as any,
           quietLogs: true,
         });
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rerankFn = async (query: string, documents: any[]) => {
         return cachedRerank(ctx, query, documents, "zerank-2", 15);
       };
@@ -1348,6 +1415,7 @@ export const runResearchExecute = internalAction({
           });
         },
         discoverSources: async (query, channels, maxResults) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const promises: Promise<any[]>[] = [];
           const webChannels = channels.filter((ch) => ch === "web" || ch === "news");
           const academicChannels = channels.filter((ch) => ch === "academic");
@@ -1380,6 +1448,7 @@ export const runResearchExecute = internalAction({
           }
 
           const results = await Promise.all(promises);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return results.flat().map((r: any) => ({
             title: r.title ?? "Untitled",
             url: r.url ?? "",
@@ -1428,7 +1497,9 @@ export const runResearchExecute = internalAction({
 
       const gen = agent.executeResearch(
         plan.query,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         plan.subQuestions.map((sq: any) => ({ ...sq, status: "pending" as const })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         plan.sourcePolicy as any,
         context
       );

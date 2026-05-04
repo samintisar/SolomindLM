@@ -87,10 +87,10 @@ export function getReportTypeDisplayName(reportTypeId: string): string {
 /**
  * Get the subtitle for a report item
  * @param reportTypeId - The report type ID
- * @returns The subtitle string in format "Report • {DisplayName}"
+ * @returns The subtitle string in format "Report · {DisplayName}"
  */
 export function getReportSubtitle(reportTypeId: string): string {
   const normalized = normalizeReportTypeId(reportTypeId);
   const displayName = getReportTypeDisplayName(normalized);
-  return `Report • ${displayName}`;
+  return `Report · ${displayName}`;
 }

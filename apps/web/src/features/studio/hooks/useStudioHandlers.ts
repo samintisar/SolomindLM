@@ -17,7 +17,7 @@ import {
   useCreateSpreadsheetFlow,
   useCreateAudioFlow,
 } from "./flows";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 
 export interface UseStudioHandlersProps {
   notes: Note[];

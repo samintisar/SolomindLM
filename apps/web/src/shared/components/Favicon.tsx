@@ -14,6 +14,8 @@ interface FaviconProps {
   size?: number;
   className?: string;
   fallback?: React.ReactNode;
+  /** `cover` fills the box (good for circular avatars); default `contain` preserves full icon with letterboxing */
+  fit?: "contain" | "cover";
 }
 
 export const Favicon: React.FC<FaviconProps> = ({
@@ -21,6 +23,7 @@ export const Favicon: React.FC<FaviconProps> = ({
   size = 16,
   className = "",
   fallback,
+  fit = "contain",
 }) => {
   const [error, setError] = useState(false);
 
@@ -32,16 +35,23 @@ export const Favicon: React.FC<FaviconProps> = ({
 
   if (!src || error) {
     return (
-      <span className={`shrink-0 inline-block ${className}`}>
-        {fallback ?? <Globe className="w-4 h-4 text-muted-foreground" />}
+      <span className={`shrink-0 self-start inline-block ${className}`}>
+        {fallback ?? <Globe className="h-4 w-4 text-muted-foreground" />}
       </span>
     );
   }
 
   return (
-    <span
-      className={`shrink-0 inline-block bg-contain bg-center bg-no-repeat -mt-[4px] ${className}`}
-      style={{ width: size, height: size, backgroundImage: `url(${src})` }}
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      aria-hidden="true"
+      loading="lazy"
+      className={`shrink-0 self-start inline-block ${fit === "cover" ? "object-cover" : "object-contain"} ${className}`}
+      style={{ width: size, height: size, maxWidth: size, maxHeight: size }}
+      onError={() => setError(true)}
     />
   );
 };

@@ -44,6 +44,7 @@ const STUDIO_RUNNER_KINDS: ReadonlySet<StudioRunnerKind> = new Set<StudioRunnerK
   "spreadsheet",
   "writtenQuestions",
   "audioScript",
+  "audioScriptOnly",
 ]);
 
 function isStudioRunner(runner: EvalFixture["runner"]): runner is StudioRunnerKind {

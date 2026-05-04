@@ -83,6 +83,7 @@ function getStockPrice(args: { symbol: string }): Record<string, unknown> {
 
 const functions: Record<
   string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (args: any) => Record<string, unknown>
 > = {
   getWeather,

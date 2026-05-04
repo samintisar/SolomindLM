@@ -13,6 +13,8 @@ export function createTogetherTtsClient(): Together {
 
 /**
  * Non-streaming REST TTS via Together `/v1/audio/speech` (Kokoro, Orpheus, etc.).
+ * We request WAV per line so multi-voice snippets can be concatenated as PCM;
+ * callers encode the final combined file once for compact, seekable playback.
  */
 export async function synthesizeSpeechToBuffer(
   client: Together,
@@ -29,7 +31,7 @@ export async function synthesizeSpeechToBuffer(
       model,
       input,
       voice,
-      response_format: "mp3",
+      response_format: "wav",
       sample_rate: 24000,
       language: "en",
       stream: false,

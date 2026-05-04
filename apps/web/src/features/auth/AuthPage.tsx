@@ -12,7 +12,7 @@ import {
   Search,
   Send,
 } from "lucide-react";
-import { useAuth } from "@/features/auth/AuthContext";
+import { useAuth } from "@/features/auth/useAuth";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthFormPanel, type AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
 import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
@@ -23,7 +23,7 @@ import { CustomizeInfographicModal } from "@/features/studio/components/Customiz
 import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { STUDIO_TOOLS } from "@/shared/constants";
 
 type HeroMode = "chat" | "studio";

@@ -30,16 +30,13 @@ import {
   chunkDedupKey,
   chunkRankingScore,
   mergeChunkScores,
-  selectChunksByTokenBudget,
   selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
-  SUBQUERY_POOL_MULTIPLIER,
 } from "./chatConfig.js";
-import { countTokens } from "../_shared/tokenizer.js";
-
 /**
+
  * Threshold for when to use full-document mode.
  * If retrieved chunks represent more than this fraction of a document's total chunks,
  * fetch the full document instead.

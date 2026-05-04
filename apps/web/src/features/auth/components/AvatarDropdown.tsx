@@ -1,6 +1,6 @@
 import React from "react";
 import { LogIn, LogOut, Sun, Moon, ListChecks } from "lucide-react";
-import type { User } from "../AuthContext";
+import type { User } from "../useAuth";
 import { LanguageSelector } from "./LanguageSelector";
 
 interface AvatarDropdownProps {

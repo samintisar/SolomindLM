@@ -436,6 +436,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
 
       // Parse the accumulated JSON
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let parsedResponse: any;
       try {
         parsedResponse = JSON.parse(fullResponse);
@@ -531,6 +532,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
       name: "chat_response",
     });
@@ -547,6 +549,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     });
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await structuredLlm.invoke(messages, traceConfig);
       const validated = ChatResponseSchema.safeParse(response);
 
@@ -577,6 +580,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     return extractUniqueSortedCitationIndices(text);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private salvageResponse(response: any): ChatResponse | null {
     try {
       let answerText = "";

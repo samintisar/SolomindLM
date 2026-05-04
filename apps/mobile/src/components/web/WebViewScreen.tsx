@@ -4,7 +4,7 @@ import { WebView } from "react-native-webview";
 import * as Linking from "expo-linking";
 import Constants from "expo-constants";
 
-import { useNativeConvexAuthBridge } from "@mobile/context/NativeConvexAuthBridgeContext";
+import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
 import {
   convexDeploymentUrl,
   isConvexDeploymentConfigured,
@@ -35,7 +35,7 @@ export function WebViewScreen({ path, onUrlChange, syncConvexAuth = true }: WebV
         ? buildConvexAuthFlushInjectScript(convexDeploymentUrl)
         : "";
     return `${NATIVE_SHELL_INJECT}\n${flush}`;
-  }, [syncConvexAuth, convexDeploymentUrl]);
+  }, [syncConvexAuth]);
 
   if (!base) {
     return (

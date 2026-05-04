@@ -72,6 +72,7 @@ export async function reduceNode(
     phase: "reduce",
     inputSize: inputData.length,
     truncatedSize: safeInput.length,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: (smartLlm as any).model,
   });
 
@@ -79,6 +80,7 @@ export async function reduceNode(
     const start = Date.now();
     const response = await invokeWithTimeout(
       () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (smartLlm as any).invoke(
           [
             new SystemMessage(REDUCE_SYSTEM_PROMPT),

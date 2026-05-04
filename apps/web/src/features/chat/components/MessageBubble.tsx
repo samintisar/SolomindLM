@@ -1,9 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
 import { Check, Copy, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
+import { Favicon } from "@/shared/components/Favicon";
 import { Message, type ChatActivityPhase } from "@/shared/types/index";
-import { renderMessageWithReferences, RefHandlers } from "../utils/messageRendering";
+import { renderMessageWithReferences } from "../utils/messageRendering";
+import { RefHandlers } from "../utils/messageRendering.utils";
 import { getStatusIcon, getStatusMessage } from "../utils/messageStatus";
 import { AgentActivityPanel } from "./AgentActivityPanel";
+import { ExternalSourcesModal } from "./ExternalSourcesModal";
+
+interface ExternalSource {
+  title: string;
+  url: string;
+  snippet: string;
+  sourceType: string;
+  score?: number;
+}
 
 interface MessageBubbleProps {
   message: Message;
@@ -15,6 +26,12 @@ interface MessageBubbleProps {
   onSetFeedback?: (messageId: string, feedback: "up" | "down" | null) => void;
   onSendFollowUp?: (text: string) => void;
   onRetry?: (messageId: string) => void;
+  /** External sources discovered during this query — shown via the sources button */
+  externalSources?: ExternalSource[];
+  /** Called when user adds external sources from the modal or tooltip */
+  onAddExternalSources?: (sources: ExternalSource[]) => void;
+  /** Whether to show the "X sources" button for this message */
+  showSourcesButton?: boolean;
 }
 
 const ACTION_FLASH_MS = 220;
@@ -29,11 +46,16 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     onSetFeedback,
     onSendFollowUp,
     onRetry,
+    externalSources,
+    onAddExternalSources,
+    showSourcesButton = false,
   }) => {
     const isUser = message.role === "user";
     const isCopied = copiedMessageId === message.id;
     const [flashedActionId, setFlashedActionId] = React.useState<string | null>(null);
     const flashTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [isSourcesModalOpen, setIsSourcesModalOpen] = useState(false);
+    const [isAddingSources, setIsAddingSources] = useState(false);
 
     React.useEffect(() => {
       return () => {
@@ -49,6 +71,25 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
         flashTimerRef.current = null;
       }, ACTION_FLASH_MS);
     }, []);
+
+    const sourcePreviewUrls = React.useMemo(() => {
+      const list = externalSources ?? [];
+      const seen = new Set<string>();
+      const urls: string[] = [];
+      for (const s of list) {
+        let key: string;
+        try {
+          key = new URL(s.url).hostname;
+        } catch {
+          key = s.url;
+        }
+        if (seen.has(key)) continue;
+        seen.add(key);
+        urls.push(s.url);
+        if (urls.length >= 3) break;
+      }
+      return urls;
+    }, [externalSources]);
 
     const messageActions: Array<{
       id: string;
@@ -150,6 +191,34 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
             </React.Fragment>
           );
         })}
+        {showSourcesButton && externalSources && externalSources.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setIsSourcesModalOpen(true)}
+            className="ml-2 sm:ml-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-left font-sans text-xs font-medium text-muted-foreground transition-[color,background-color] duration-200 ease-out hover:bg-primary/10 hover:text-foreground dark:hover:bg-primary/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-10 md:min-h-8 md:py-1 md:px-2.5 motion-reduce:transition-none"
+            aria-label={`View ${externalSources.length} source${externalSources.length === 1 ? "" : "s"}`}
+          >
+            <span className="relative flex shrink-0 flex-row items-center pl-0.5" aria-hidden>
+              {sourcePreviewUrls.map((url, index) => (
+                <span
+                  key={`${url}-${index}`}
+                  className="relative inline-flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-2 ring-background dark:ring-background"
+                  style={{ zIndex: index + 1, marginLeft: index === 0 ? 0 : -7 }}
+                >
+                  <Favicon
+                    url={url}
+                    size={16}
+                    fit="cover"
+                    className="size-full min-h-full min-w-full rounded-full"
+                  />
+                </span>
+              ))}
+            </span>
+            <span>
+              {externalSources.length} source{externalSources.length === 1 ? "" : "s"}
+            </span>
+          </button>
+        ) : null}
       </div>
     );
 
@@ -225,6 +294,17 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
           </div>
         </div>
       );
+    };
+
+    const handleAddExternalSources = async (selectedSources: ExternalSource[]) => {
+      if (!onAddExternalSources) return;
+      setIsAddingSources(true);
+      try {
+        await onAddExternalSources(selectedSources);
+        setIsSourcesModalOpen(false);
+      } finally {
+        setIsAddingSources(false);
+      }
     };
 
     const FollowUpChips = () => {
@@ -325,6 +405,13 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
                   <ActionBar />
                 </div>
                 <FollowUpChips />
+                <ExternalSourcesModal
+                  isOpen={isSourcesModalOpen}
+                  onClose={() => setIsSourcesModalOpen(false)}
+                  sources={externalSources ?? []}
+                  onAddSelected={handleAddExternalSources}
+                  isLoading={isAddingSources}
+                />
               </div>
             )}
           </>
@@ -345,7 +432,9 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     prev.message.clarificationQuestion === next.message.clarificationQuestion &&
     JSON.stringify(prev.message.agentTrace) === JSON.stringify(next.message.agentTrace) &&
     prev.copiedMessageId === next.copiedMessageId &&
-    prev.isAssistantStreamActive === next.isAssistantStreamActive
+    prev.isAssistantStreamActive === next.isAssistantStreamActive &&
+    prev.showSourcesButton === next.showSourcesButton &&
+    JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources)
 );
 
 MessageBubble.displayName = "MessageBubble";

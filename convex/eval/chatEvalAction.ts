@@ -252,6 +252,7 @@ export const runChatEval = action({
               }
             );
             allResults.push(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ...results.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
@@ -278,6 +279,7 @@ export const runChatEval = action({
             }
           );
           allResults.push(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ...academicResults.map((r: any) => ({
               title: r.title ?? "Untitled",
               url: r.url ?? "",

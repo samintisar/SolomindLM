@@ -21,6 +21,7 @@ export interface CreateAudioOverviewResponse {
 /**
  * Map a database audio overview response to the frontend AudioOverviewNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapAudioOverviewToNote(dbAudio: any): AudioOverviewNote {
   // Audio content is stored in transcript and audioUrl fields
   const audioUrl = dbAudio.audioUrl || "";
@@ -29,7 +30,7 @@ function mapAudioOverviewToNote(dbAudio: any): AudioOverviewNote {
   return {
     id: dbAudio._id,
     title: dbAudio.title,
-    preview: getPreviewText(dbAudio.status),
+    preview: getPreviewText(dbAudio.status, dbAudio.metadata),
     type: "audioOverview",
     audioUrl,
     transcript,
@@ -41,12 +42,21 @@ function mapAudioOverviewToNote(dbAudio: any): AudioOverviewNote {
 /**
  * Get preview text based on status
  */
-function getPreviewText(status: string): string {
+function getPreviewText(status: string, metadata?: Record<string, unknown>): string {
   if (status === "generating") {
-    return "Audio Overview • Generating...";
+    return "Audio Overview";
   }
   if (status === "failed") {
-    return "Audio Overview • Failed";
+    return "Audio Overview · Failed";
+  }
+  const durRaw = metadata?.durationSeconds;
+  const dur = typeof durRaw === "number" && Number.isFinite(durRaw) ? durRaw : null;
+  if (dur != null && dur >= 0) {
+    const s = Math.max(0, Math.round(dur));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    const mmss = `${m}:${String(r).padStart(2, "0")}`;
+    return `Audio Overview · ${mmss}`;
   }
   return "Audio Overview";
 }

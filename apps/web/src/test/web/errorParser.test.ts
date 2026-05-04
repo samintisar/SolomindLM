@@ -40,6 +40,7 @@ describe("isLimitError", () => {
 describe("parseLimitError", () => {
   it("extracts data from Error with structured data", () => {
     const err = new Error("limit");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err as any).data = {
       code: "NOTEBOOK_LIMIT_REACHED",
       limit: 5,

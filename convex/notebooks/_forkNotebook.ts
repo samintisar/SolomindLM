@@ -221,24 +221,6 @@ export async function performNotebookFork(
     });
   }
 
-  const slides = await ctx.db
-    .query("slides")
-    .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))
-    .collect();
-  for (const r of slides) {
-    await ctx.db.insert("slides", {
-      userId: forkUserId,
-      notebookId: newNotebookId,
-      title: r.title,
-      data: r.data,
-      status: r.status,
-      slideCount: r.slideCount,
-      metadata: r.metadata,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
   const spreadsheets = await ctx.db
     .query("spreadsheets")
     .withIndex("by_notebook", (q) => q.eq("notebookId", sourceNotebookId))

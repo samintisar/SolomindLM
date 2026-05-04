@@ -130,8 +130,8 @@ export async function retrieverNode(
 ): Promise<Partial<ResearchStateType>> {
   const { subQuestions, iteration, sourcePolicy } = state;
   const maxResultsPerChannel = sourcePolicy.maxResultsPerChannel ?? 10;
-  // Cap external sources aggressively to avoid timeouts and token overflow
-  const externalMaxResults = Math.min(maxResultsPerChannel, 3);
+  // Cap external sources to 2 for cheap discovery; escalate only for high-value sources
+  const externalMaxResults = Math.min(maxResultsPerChannel, 2);
   // Hard cap on raw content length from any scraped source — prevents prompt bloat
   const MAX_EVIDENCE_CONTENT_LENGTH = 4000;
   const newEvidence: EvidenceEntry[] = [];
@@ -178,7 +178,13 @@ export async function retrieverNode(
     if (webChannels.length > 0 && deps.discoverSources && deps.loadWebPage) {
       await deps.onProgress("retrieving_web", sq.id, 0);
 
-      const webQueries = sq.searchQueries.slice(0, 2); // Limit queries to avoid rate limits
+      // Use only 1 best query per sub-question to minimize search cost
+      const webQuery = sq.searchQueries[0];
+      if (!webQuery) {
+        await deps.onProgress("retrieving_web", sq.id, 0);
+        continue;
+      }
+
       const discoveredSources: Array<{
         title: string;
         url: string;
@@ -188,17 +194,20 @@ export async function retrieverNode(
         rawContent?: string;
       }> = [];
 
-      for (const searchQuery of webQueries) {
-        try {
-          const sources = await deps.discoverSources(
-            searchQuery,
-            webChannels as Array<"web" | "news">,
-            Math.ceil(externalMaxResults / webQueries.length)
-          );
-          discoveredSources.push(...sources);
-        } catch (_err) {
-          console.error(`[ResearchRetriever] Web discovery failed for "${searchQuery}":`, _err);
-        }
+      // Pick the single best channel: news only if explicitly requested, otherwise web
+      const primaryChannel = webChannels.includes("news") && sq.sourceChannels.includes("news")
+        ? "news"
+        : "web";
+
+      try {
+        const sources = await deps.discoverSources(
+          webQuery,
+          [primaryChannel],
+          externalMaxResults
+        );
+        discoveredSources.push(...sources);
+      } catch (_err) {
+        console.error(`[ResearchRetriever] Web discovery failed for "${webQuery}":`, _err);
       }
 
       // Sort by score and take top results
@@ -238,7 +247,7 @@ export async function retrieverNode(
               },
             });
           }
-        } catch (err) {
+        } catch (_err) {
           // If scraping fails, use snippet as fallback
           allChunks.push({
             subQuestionId: sq.id,
@@ -262,7 +271,13 @@ export async function retrieverNode(
     if (sq.sourceChannels.includes("academic") && deps.discoverSources && deps.loadPaper) {
       await deps.onProgress("retrieving_web", sq.id, 0); // Reuse web phase for academic
 
-      const academicQueries = sq.searchQueries.slice(0, 2);
+      // Use only 1 best query per sub-question to minimize search cost
+      const academicQuery = sq.searchQueries[0];
+      if (!academicQuery) {
+        await deps.onProgress("retrieving_web", sq.id, 0);
+        continue;
+      }
+
       const discoveredPapers: Array<{
         title: string;
         url: string;
@@ -278,17 +293,15 @@ export async function retrieverNode(
         };
       }> = [];
 
-      for (const searchQuery of academicQueries) {
-        try {
-          const sources = await deps.discoverSources(
-            searchQuery,
-            ["academic"],
-            Math.ceil(externalMaxResults / academicQueries.length)
-          );
-          discoveredPapers.push(...sources);
-        } catch (_err) {
-          console.error(`[ResearchRetriever] Academic discovery failed for "${searchQuery}":`, _err);
-        }
+      try {
+        const sources = await deps.discoverSources(
+          academicQuery,
+          ["academic"],
+          externalMaxResults
+        );
+        discoveredPapers.push(...sources);
+      } catch (_err) {
+        console.error(`[ResearchRetriever] Academic discovery failed for "${academicQuery}":`, _err);
       }
 
       // Sort by score and take top results
@@ -336,7 +349,7 @@ export async function retrieverNode(
 
           // Replace the snippet with full content for this paper
           academicChunks[i].content = truncateEvidenceContent(loaded.content, MAX_EVIDENCE_CONTENT_LENGTH);
-        } catch (err) {
+        } catch (_err) {
           // Keep the abstract/snippet fallback — no action needed
           console.warn(`[ResearchRetriever] Full-text load failed for "${paper.title.slice(0, 40)}", using abstract fallback`);
         }

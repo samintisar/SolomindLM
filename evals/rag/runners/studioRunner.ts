@@ -219,6 +219,7 @@ const SERIALIZERS: Partial<Record<StudioRunnerKind, (raw: unknown) => string>> =
   spreadsheet: serializeSpreadsheet,
   writtenQuestions: serializeWrittenQuestions,
   audioScript: serializeAudioScript,
+  audioScriptOnly: serializeAudioScript,
 };
 
 function serialize(kind: StudioRunnerKind, raw: unknown): string {

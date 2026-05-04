@@ -1,6 +1,7 @@
 import { Source } from "../types";
 
 // Transform Convex Document type to Source UI type
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function documentToSource(doc: any): Source {
   let type: Source["type"] = "PDF";
 

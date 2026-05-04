@@ -114,7 +114,15 @@ export async function runExecuteGraph(
         subQuestionId: sq.id,
         evidenceCount: evidenceBySubQuestion[sq.id]?.length ?? 0,
       }))
-      .filter((g) => g.evidenceCount < 2); // Threshold: at least 2 evidence pieces per SQ
+      .filter((g) => g.evidenceCount < 1); // Threshold: at least 1 evidence piece per SQ
+
+    // Early stop: if all sub-questions have evidence and total is reasonable, skip iteration 2
+    const totalEvidence = state.evidence.length;
+    const hasMinimumCoverage = gaps.length === 0 && totalEvidence >= subQuestions.length * 2;
+    if (hasMinimumCoverage) {
+      console.log(`[ResearchGraph] Early stop: sufficient evidence (${totalEvidence} pieces across ${subQuestions.length} sub-questions)`);
+      break;
+    }
 
     // Stop if we have enough evidence or reached max iterations
     if (gaps.length === 0 || state.iteration >= state.maxIterations) {

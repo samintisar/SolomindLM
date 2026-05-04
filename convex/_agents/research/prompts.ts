@@ -17,9 +17,9 @@ export const SubQuestionSchema = z.object({
 export const PlannerOutputSchema = z.object({
   subQuestions: z
     .array(SubQuestionSchema)
-    .min(3)
-    .max(5)
-    .describe("3-5 focused sub-questions — quality over quantity"),
+    .min(2)
+    .max(3)
+    .describe("2-3 highly focused sub-questions — fewer precise questions beat many vague ones"),
 });
 
 export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
@@ -30,7 +30,7 @@ export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
 
 export function buildPlanPrompt(query: string, enabledChannels: SourceChannel[]): string {
   const channelList = enabledChannels.join(", ");
-  return `You are a research planner. Decompose the user's question into 3-5 focused sub-questions that together will comprehensively answer it.
+  return `You are a research planner. Decompose the user's question into 2-3 highly focused sub-questions that together will comprehensively answer it.
 
 USER QUESTION:
 ${query}
@@ -39,8 +39,12 @@ ENABLED SOURCE CHANNELS: ${channelList}
 
 For each sub-question:
 - Write a clear, specific question
-- Provide 2-3 search queries optimized for each relevant source channel
+- Provide exactly 1 search query (highly targeted, not broad)
 - Assign source channels based on where the best evidence would come from (use only from: ${channelList})
+  - Use "web" for general facts, concepts, and broad information
+  - Use "news" ONLY for current events, recent developments, or time-sensitive facts
+  - Use "academic" for research papers, studies, and scholarly sources
+  - Use "notebook" for user's uploaded documents
 - Use concise IDs like "sq1", "sq2", etc.
 
 Guidelines:
@@ -49,7 +53,8 @@ Guidelines:
 - Prefer specific, measurable questions over vague ones
 - Include at least one sub-question that directly addresses the user's core question
 - AVOID redundant or overlapping sub-questions — each should cover a distinct angle
-- Limit to 3-5 sub-questions total; fewer focused questions beat many vague ones`;
+- NEVER assign both "web" and "news" to the same sub-question; pick the one that fits better
+- Limit to 2-3 sub-questions total; fewer focused questions beat many vague ones`;
 }
 
 export function buildWriterPrompt(
@@ -115,3 +120,4 @@ Requirements:
 - Be SPECIFIC: name concrete techniques, papers, and tools
 - If evidence is missing for a topic, provide the best guidance you can from the available evidence without calling attention to gaps
 `;
+}

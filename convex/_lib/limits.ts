@@ -82,7 +82,8 @@ export function getSubscriptionLimit(feature: DailyFeature, isPro: boolean): num
 
 /**
  * Check daily limit for a content generation feature.
- * Uses the Convex rate limiter to enforce per-user daily quotas.
+ * Uses the Convex rate limiter to verify the user is under their quota
+ * WITHOUT consuming a token. Call consumeDailyLimit on success.
  *
  * @throws LimitError if daily limit is reached
  */
@@ -103,10 +104,10 @@ export async function checkDailyLimit(
   const suffix = isPro ? "Pro" : "Free";
   const limitKey = `${feature}${suffix}` as const;
 
-  // Check the rate limit
+  // Check the rate limit without consuming a token
   // This will throw RateLimitError when exceeded
   try {
-    await rateLimiter.limit(ctx, limitKey, { key: userId, throws: true });
+    await rateLimiter.check(ctx, limitKey, { key: userId, throws: true });
   } catch {
     // Convert RateLimitError to our structured LimitError
     const limit = isPro ? getProRateLimit(feature) : getFreeRateLimit(feature);
@@ -116,6 +117,35 @@ export async function checkDailyLimit(
     const used = limit;
 
     throw createDailyLimitError(feature, used, limit, isPro);
+  }
+}
+
+/**
+ * Consume a daily limit token for a content generation feature.
+ * Call this ONLY after the operation has succeeded.
+ * Silently logs if consumption fails (e.g. race condition).
+ */
+export async function consumeDailyLimit(
+  ctx: MutationCtx,
+  userId: string,
+  feature: DailyFeature
+): Promise<void> {
+  const subscription = await ctx.db
+    .query("stripeSubscriptions")
+    .withIndex("by_user_and_status", (q) =>
+      q.eq("userId", userId as Id<"users">).eq("status", "active")
+    )
+    .first();
+
+  const isPro = !!subscription;
+  const suffix = isPro ? "Pro" : "Free";
+  const limitKey = `${feature}${suffix}` as const;
+
+  try {
+    await rateLimiter.limit(ctx, limitKey, { key: userId, throws: true });
+  } catch (err) {
+    // Log but don't fail — the work is already done
+    console.warn(`[RateLimit] Failed to consume ${feature} limit for user ${userId}:`, err);
   }
 }
 
@@ -130,5 +160,19 @@ export const checkDailyLimitInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     await checkDailyLimit(ctx, args.userId as Id<"users">, args.feature as DailyFeature);
+  },
+});
+
+/**
+ * Internal mutation wrapper for consumeDailyLimit.
+ * This allows actions to consume the daily limit token on success.
+ */
+export const consumeDailyLimitInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    feature: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await consumeDailyLimit(ctx, args.userId as Id<"users">, args.feature as DailyFeature);
   },
 });

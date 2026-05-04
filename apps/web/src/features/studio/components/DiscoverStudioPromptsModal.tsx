@@ -27,7 +27,7 @@ import {
   type PromptSortBy,
   type PublicPrompt,
 } from "../services/promptsApi";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import type { Id } from "@convex/_generated/dataModel";
 
 // ── Props ──────────────────────────────────────────────────────────────

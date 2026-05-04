@@ -426,6 +426,7 @@ export const docEmbedding = internalAction({
         const chunk = chunksWithMetadata[i];
         await ctx.runMutation(internal.documents.index.storeChunk, {
           documentId,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           userId: chunkUserId as any,
           notebookId,
           content: chunk.content,

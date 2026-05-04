@@ -113,6 +113,7 @@ describe("AcademicSearchService - Utility Helpers", () => {
   describe("calculateScore", () => {
     it("calculates score from citations and recency", () => {
       const paper = { citationCount: 500, year: 2023 };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const score = calculateScore(paper as any);
       // citationScore = log10(501)/3 ≈ 0.90, recencyScore = 1 - 1*0.05 = 0.95
       // total = 0.90*0.5 + 0.95*0.5 = 0.925
@@ -122,12 +123,14 @@ describe("AcademicSearchService - Utility Helpers", () => {
 
     it("caps score at 1", () => {
       const paper = { citationCount: 5000, year: 2023 };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const score = calculateScore(paper as any);
       expect(score).toBeLessThanOrEqual(1);
     });
 
     it("uses default recency score when year is missing", () => {
       const paper = { citationCount: 0 };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const score = calculateScore(paper as any);
       // citationScore = 0.3, recencyScore = 0.75 (default age=5)
       // total = 0.3*0.5 + 0.75*0.5 = 0.525
@@ -136,6 +139,7 @@ describe("AcademicSearchService - Utility Helpers", () => {
 
     it("returns max score for highly cited recent paper", () => {
       const paper = { citationCount: 1000, year: 2024 };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const score = calculateScore(paper as any);
       expect(score).toBeGreaterThanOrEqual(0.95);
       expect(score).toBeLessThanOrEqual(1.0);

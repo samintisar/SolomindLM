@@ -39,34 +39,40 @@ function questionCountToNumber(count: "fewer" | "standard" | "more"): number {
   return map[count] ?? 10;
 }
 
-/**
- * Get preview text based on status, actual question count, and question type
- */
-function getPreviewText(status: string, questionCount: number, questionType: string): string {
-  const isGenerating = status === "generating";
+function capitalizeDifficulty(difficulty: string | undefined): string {
+  const d = (difficulty || "medium").toLowerCase();
+  return d.charAt(0).toUpperCase() + d.slice(1);
+}
 
-  if (isGenerating) {
-    return `${questionCount} Questions • ${questionType} • Generating...`;
+/**
+ * Matches unified list copy in `notesApi.getWrittenQuestionsPreview`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPreviewText(status: string, questionCount: number, metadata?: any): string {
+  const difficulty = capitalizeDifficulty(metadata?.difficulty);
+
+  if (status === "generating") {
+    return `${questionCount} Question${questionCount !== 1 ? "s" : ""} · ${difficulty}`;
   }
   if (status === "failed") {
-    return "Written Questions • Failed";
+    return `${questionCount} Questions · ${difficulty} · Failed`;
   }
-  return `${questionCount} Questions • ${questionType}`;
+  return `${questionCount} Question${questionCount !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
 /**
  * Map a database written questions response to the frontend WrittenQuestionsNote interface
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
   // Questions are stored in the questionsData field
   const questions: WrittenQuestion[] = dbWQ.questionsData || [];
   const questionCount = questions.length;
-  const questionType = dbWQ.questionType || dbWQ.metadata?.questionType || "short";
 
   return {
     id: dbWQ._id,
     title: dbWQ.title,
-    preview: getPreviewText(dbWQ.status, questionCount, questionType),
+    preview: getPreviewText(dbWQ.status, questionCount, dbWQ.metadata),
     type: "writtenQuestions" as const,
     questions,
     userAnswers: dbWQ.metadata?.userAnswers || {},
@@ -74,7 +80,7 @@ function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
     metadata: {
       questionCount,
       difficulty: dbWQ.metadata?.difficulty || "medium",
-      questionType,
+      questionType: dbWQ.metadata?.questionType || "short",
       focusArea: dbWQ.metadata?.focus,
       lastViewedIndex: dbWQ.metadata?.lastViewedIndex,
     },

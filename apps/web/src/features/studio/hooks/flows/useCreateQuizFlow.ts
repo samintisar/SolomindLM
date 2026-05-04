@@ -1,16 +1,17 @@
 import { useCallback } from "react";
 import type { Note, QuizNote } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useCreateQuiz } from "../../services/quizzesApi";
 import type { QuizConfig } from "../../components/CustomizeQuizModal";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 
+const QUIZ_COUNT_MAP = { fewer: 10, standard: 20, more: 30 };
+
 export function useCreateQuizFlow(ctx: CreateFlowContext) {
   const createQuiz = useCreateQuiz();
   const catchGenerationError = useStudioGenerationCatch();
   const { error: showErrorToast } = useToast();
-  const countMap = { fewer: 10, standard: 20, more: 30 };
 
   return useCallback(
     async (config: QuizConfig) => {
@@ -30,7 +31,7 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
         return;
       }
 
-      const questionCount = countMap[config.count];
+      const questionCount = QUIZ_COUNT_MAP[config.count];
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,

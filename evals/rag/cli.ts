@@ -54,6 +54,7 @@ const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
   "spreadsheet",
   "writtenQuestions",
   "audioScript",
+  "audioScriptOnly",
 ]);
 
 function parseRunners(value: string): RunnerKind[] {

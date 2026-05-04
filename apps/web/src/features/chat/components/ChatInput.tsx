@@ -142,23 +142,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="flex w-full max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
+    <div className="flex w-full min-w-0 max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
       <div
         data-onboarding="chat-input"
-        className="pointer-events-auto relative flex w-full flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
+        className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
       >
         <textarea
           ref={textareaRef}
           placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
-          className="w-full bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-lg"
+          className="w-full min-w-0 bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-base @min-[400px]/chat-input:text-lg"
           rows={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
-        <div className="flex justify-between items-center gap-2 px-1.5 pb-0.5 w-full">
-        <div className="flex items-center gap-1.5 min-h-10">
+        <div className="flex w-full min-w-0 flex-col gap-2 px-1.5 pb-0.5 @min-[400px]/chat-input:flex-row @min-[400px]/chat-input:items-center @min-[400px]/chat-input:justify-between @min-[400px]/chat-input:gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 min-h-10">
           {/* "+" button with dropup menu */}
           <div className="relative" ref={menuRef}>
             <button
@@ -238,10 +238,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 min-h-10">
+        <div className="flex min-h-10 min-w-0 w-full items-center justify-between gap-2 @min-[400px]/chat-input:w-auto @min-[400px]/chat-input:justify-end">
+          <div className="flex min-w-0 flex-1 items-center @min-[400px]/chat-input:flex-initial">
           {/* Model selector */}
           {onModelChange && (
-            <div className="relative" ref={modelDropdownRef}>
+            <div className="relative max-w-full min-w-0" ref={modelDropdownRef}>
               <button
                 type="button"
                 onClick={() => setModelDropdownOpen((prev) => !prev)}
@@ -249,17 +250,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 aria-expanded={modelDropdownOpen}
                 aria-haspopup="listbox"
                 className={[
-                  "group h-8 shrink-0 inline-flex items-center gap-1.5 rounded-md border border-transparent bg-transparent px-1.5 font-sans text-sm font-medium tabular-nums text-muted-foreground",
+                  "group h-8 max-w-full min-w-0 inline-flex items-center gap-1.5 rounded-md border border-transparent bg-transparent px-1.5 font-sans text-sm font-medium tabular-nums text-muted-foreground",
                   "transition-[color,background-color,transform] duration-150",
                   "hover:bg-muted/45 hover:text-foreground",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
                   "disabled:cursor-not-allowed disabled:opacity-50",
                   modelDropdownOpen && "bg-muted/40 text-foreground",
                 ].join(" ")}
-                title="Model"
+                title={currentModel?.name ?? "Choose model"}
               >
                 <ModelBrandIcon brand={currentModel?.brand ?? "openai"} />
-                <span className="max-w-[6.5rem] truncate sm:max-w-[10rem]">
+                <span className="min-w-0 max-w-[min(10rem,45vw)] truncate @max-[340px]/chat-input:sr-only @min-[400px]/chat-input:max-w-[10rem] @min-[520px]/chat-input:max-w-[14rem]">
                   {currentModel?.name ?? "GPT-OSS 120B"}
                 </span>
                 <ChevronDown
@@ -318,6 +319,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               )}
             </div>
           )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
           {onAppendTranscription && (
             <div
               className={
@@ -419,6 +422,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <ArrowUp className="w-5 h-5" />
           )}
         </button>
+          </div>
         </div>
         </div>
       </div>

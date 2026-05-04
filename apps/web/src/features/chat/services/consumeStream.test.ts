@@ -133,6 +133,7 @@ describe("consumePersistentTextStream", () => {
     await consumePersistentTextStream(response, callbacks);
 
     expect(callbacks.calls.onToolCalls.length).toBeGreaterThan(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const lastToolCalls = callbacks.calls.onToolCalls[callbacks.calls.onToolCalls.length - 1][0] as any[];
     expect(lastToolCalls).toHaveLength(1);
     expect(lastToolCalls[0].status).toBe("done");

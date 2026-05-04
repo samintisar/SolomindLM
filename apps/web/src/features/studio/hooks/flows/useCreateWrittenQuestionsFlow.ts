@@ -1,16 +1,17 @@
 import { useCallback } from "react";
 import type { Note, WrittenQuestionsNote } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/ToastContext";
+import { useToast } from "@/shared/contexts/useToast";
 import { useCreateWrittenQuestions } from "../../services/writtenQuestionsApi";
 import type { WrittenQuestionsConfig } from "../../components/CustomizeWrittenQuestionsModal";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 
+const WQ_COUNT_MAP = { fewer: 5, standard: 10, more: 15 };
+
 export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
   const createWrittenQuestions = useCreateWrittenQuestions();
   const catchGenerationError = useStudioGenerationCatch();
   const { error: showErrorToast } = useToast();
-  const countMap = { fewer: 5, standard: 10, more: 15 };
 
   return useCallback(
     async (config: WrittenQuestionsConfig) => {
@@ -30,7 +31,7 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
         return;
       }
 
-      const questionCount = countMap[config.count];
+      const questionCount = WQ_COUNT_MAP[config.count];
       const placeholderId = Math.random().toString(36).slice(2, 11);
       const newNote: Note = {
         id: placeholderId,

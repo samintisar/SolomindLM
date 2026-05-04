@@ -13,8 +13,7 @@ import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { ResearchAgent } from "../_agents/research/index.js";
-import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
-import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
+
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { env } from "../_lib/env";
 import type { SubQuestion, SourcePolicy, ResearchContext } from "../_agents/research/types";
@@ -73,6 +72,7 @@ export const runResearchEval = action({
     const keywordSearchChunkUserId = evalUserId;
 
     // In-memory cache for discoverSources to avoid duplicate API calls within one eval run
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const searchCache = new Map<string, any[]>();
 
     const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
@@ -142,28 +142,6 @@ export const runResearchEval = action({
 
     const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY || "");
 
-    const rerankFn = async (query: string, documents: Array<{ id: string; content: string }>) => {
-      return cachedRerank(ctx, query, documents as RerankDocument[], "zerank-2", 15);
-    };
-
-    const hybridSearch = new HybridSearchHandler(
-      {
-        vectorMatchThreshold: parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD),
-        vectorMatchCount: parseInt(env.CHAT_VECTOR_MATCH_COUNT, 10),
-        rerankThreshold: parseInt(env.CHAT_RERANK_THRESHOLD, 10),
-        rerankTopN: parseInt(env.CHAT_RERANK_TOP_N, 10),
-        maxResults: parseInt(env.CHAT_MAX_RESULTS, 10),
-        keywordMatchCount: parseInt(env.CHAT_KEYWORD_MATCH_COUNT, 10),
-        rrfK: parseInt(env.CHAT_RRF_K, 10),
-        enableHybrid: env.CHAT_ENABLE_HYBRID_SEARCH !== "false",
-        hybridThreshold: parseFloat(env.CHAT_HYBRID_THRESHOLD),
-      },
-      embeddingService,
-      vectorSearchRunner,
-      keywordSearchRunner,
-      rerankFn
-    );
-
     // Build deps for ResearchAgent
     const deps = {
       apiKey: process.env.TOGETHER_AI_API_KEY || "",
@@ -175,11 +153,13 @@ export const runResearchEval = action({
         // Merge and deduplicate (simplified)
         const merged = [...vectorResults, ...keywordResults];
         const seen = new Set<string>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return merged.filter((r: any) => {
           const id = r._id || r.sourceId || String(r.documentId) + ":" + r.chunkIndex;
           if (seen.has(id)) return false;
           seen.add(id);
           return true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }).map((r: any) => ({
           sourceId: r._id ? String(r._id) : (r.sourceId || String(r.documentId) + ":" + r.chunkIndex),
           documentId: r.documentId ? String(r.documentId) : undefined,
@@ -191,6 +171,7 @@ export const runResearchEval = action({
         }));
       },
       discoverSources: async (query: string, channels: Array<"web" | "news" | "academic">, maxResults?: number) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const allResults: Array<any> = [];
         const refinedQuery = await refineWebSearchQuery(query);
         const maxPerChannel = Math.ceil((maxResults || 5) / channels.length);
@@ -203,6 +184,7 @@ export const runResearchEval = action({
             continue;
           }
 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let channelResults: any[] = [];
           if (channel === "academic") {
             try {
@@ -210,6 +192,7 @@ export const runResearchEval = action({
                 internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
                 { query: refinedQuery, maxResults: maxPerChannel }
               );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               channelResults = results.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
@@ -232,6 +215,7 @@ export const runResearchEval = action({
                   searchDepth: "advanced",
                 }
               );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               channelResults = results.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
@@ -260,6 +244,7 @@ export const runResearchEval = action({
         searchCache.set(cacheKey, [result]);
         return result;
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       loadPaper: async (paper: any) => {
         const cacheKey = `paper::${paper.url}`;
         const cached = searchCache.get(cacheKey);

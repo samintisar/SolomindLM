@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { Note } from "@/shared/types/index";
+import { MoreVertical, Pencil, Play, Trash2 } from "lucide-react";
+import { Note, isAudioNote, isAudioOverviewNote } from "@/shared/types/index";
 import { getStudioGeneratingListLines } from "../utils/studioGenerationLabels";
 import { NoteIcon } from "./NoteIcon";
 
@@ -79,6 +79,14 @@ export const NoteItem: React.FC<NoteItemProps> = ({
   const isGenerating = note.status === "generating";
   const generatingLines = isGenerating ? getStudioGeneratingListLines(note) : null;
 
+  const canPlayInline =
+    Boolean(onPlayAudio) &&
+    !isGenerating &&
+    ((isAudioOverviewNote(note) && Boolean(note.audioUrl?.trim())) ||
+      (note.type === "audio" &&
+        isAudioNote(note) &&
+        Boolean(note.metadata.audioUrl?.trim())));
+
   return (
     <div
       data-testid="studio-note-card"
@@ -97,7 +105,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
     >
       <div className="flex justify-between items-start gap-3">
         <div className="flex-1 flex gap-3 min-w-0">
-          <NoteIcon note={note} onPlayAudio={onPlayAudio} />
+          <NoteIcon note={note} />
           <div className="flex-1 min-w-0">
             {isEditing ? (
               <input
@@ -122,12 +130,12 @@ export const NoteItem: React.FC<NoteItemProps> = ({
             {isGenerating && generatingLines ? (
               <div className="relative z-1 mt-2 min-w-0 space-y-2">
                 {note.preview ? (
-                  <p className="text-sm leading-snug text-muted-foreground font-mono tracking-tight truncate">
+                  <p className="text-sm leading-snug text-muted-foreground font-serif tracking-normal truncate">
                     {note.preview}
                   </p>
                 ) : null}
                 <div className="flex items-baseline justify-between gap-2 min-w-0">
-                  <p className="min-w-0 flex-1 text-xs leading-snug text-foreground truncate">
+                  <p className="min-w-0 flex-1 text-xs leading-snug text-foreground font-serif truncate">
                     {generatingLines.primary}
                   </p>
                   {generatingLines.progressPercent !== null ? (
@@ -158,12 +166,28 @@ export const NoteItem: React.FC<NoteItemProps> = ({
               </div>
             ) : (
               <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-                <span className="font-mono tracking-tight truncate">{note.preview}</span>
+                <span className="truncate font-serif tracking-normal tabular-nums">
+                  {note.preview}
+                </span>
               </div>
             )}
           </div>
         </div>
-        <div className="relative kebab-menu shrink-0">
+        <div className="relative flex items-start gap-0.5 shrink-0">
+          {canPlayInline ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlayAudio?.(note);
+              }}
+              className="text-teal-700/85 hover:text-teal-900 dark:text-teal-400/90 dark:hover:text-teal-300 p-1.5 rounded-md hover:bg-teal-500/10 transition-colors flex items-center justify-center shrink-0"
+              aria-label="Play audio overview"
+            >
+              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
+            </button>
+          ) : null}
+          <div className="relative kebab-menu">
           <button
             ref={menuButtonRef}
             onClick={(e) => {
@@ -210,6 +234,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
               </div>,
               document.body
             )}
+          </div>
         </div>
       </div>
     </div>

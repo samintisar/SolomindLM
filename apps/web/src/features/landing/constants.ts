@@ -89,7 +89,7 @@ function getFeatureDescription(id: string): string {
     reports: "Study guides and reports, on demand",
     flashcards: "Auto-generated cards from any content",
     quiz: "Test yourself with AI-built quizzes",
-    slides: "Presentation-ready decks from your sources",
+    infographic: "Visual infographics from your sources",
     writtenQuestions: "Written Q&A with instant feedback",
     rag: "Answers grounded in your sources",
     spreadsheets: "Sources turned into tables and data",

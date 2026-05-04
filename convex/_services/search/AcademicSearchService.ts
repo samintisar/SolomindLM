@@ -7,7 +7,7 @@ import { CACHE_TTL, withJitter } from "../cache/cache";
 import { internal } from "../../_generated/api";
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
+import { createExternalServiceErrorFromResponse, ExternalServiceError, isRetryableHttpStatus } from "../../_lib/errors";
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 
 /**
@@ -279,8 +279,15 @@ async function searchSemanticScholar(
     headers["x-api-key"] = env.SEMANTIC_SCHOLAR_API_KEY;
   }
 
-  return invokeWithHttpRetry(
-    async () => {
+  // Custom retry config for Semantic Scholar rate limits
+  const MAX_ATTEMPTS = 5;
+  const BASE_DELAY_MS = 2000;
+
+  let lastError: Error | undefined;
+  let retryAfterMs: number | undefined;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
       const t0 = Date.now();
       logger.apiCall("semantic_scholar", "/graph/v1/paper/search", {
         query: query.substring(0, 50),
@@ -290,15 +297,30 @@ async function searchSemanticScholar(
 
       if (!response.ok) {
         const errorText = await response.text();
+        const status = response.status;
+
         logger.apiError(
           "semantic_scholar",
           "/graph/v1/paper/search",
-          new Error(`HTTP ${response.status}`),
-          { status: response.status }
+          new Error(`HTTP ${status}`),
+          { status }
         );
+
+        // Check for Retry-After header on 429
+        retryAfterMs = undefined;
+        if (status === 429) {
+          const retryAfter = response.headers.get("retry-after");
+          if (retryAfter) {
+            const parsed = parseInt(retryAfter, 10);
+            if (!isNaN(parsed)) {
+              retryAfterMs = parsed * 1000;
+            }
+          }
+        }
+
         throw createExternalServiceErrorFromResponse(
           "semantic_scholar",
-          response.status,
+          status,
           "/graph/v1/paper/search",
           errorText.slice(0, 500)
         );
@@ -349,9 +371,34 @@ async function searchSemanticScholar(
       }
 
       return papers;
-    },
-    "semantic_scholar_search"
-  );
+    } catch (error) {
+      lastError = error as Error;
+
+      const isRetryable =
+        lastError instanceof ExternalServiceError
+          ? lastError.retryable
+          : (() => {
+              const m = lastError.message.match(/\bHTTP\s+(\d{3})\b/i);
+              if (m) return isRetryableHttpStatus(parseInt(m[1], 10));
+              return false;
+            })();
+
+      if (!isRetryable || attempt >= MAX_ATTEMPTS - 1) {
+        break;
+      }
+
+      // Calculate delay: respect Retry-After if present, else exponential backoff with jitter
+      let delayMs = retryAfterMs ?? BASE_DELAY_MS * Math.pow(2, attempt);
+      // Add ±25% jitter
+      const jitterAmount = delayMs * 0.25;
+      delayMs = Math.max(0, Math.floor(delayMs + (Math.random() - 0.5) * 2 * jitterAmount));
+
+      logger.info("Retrying Semantic Scholar after delay", { attempt: attempt + 1, delayMs });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError ?? new Error("Semantic Scholar search failed after all retries");
 }
 
 // ============================================================
@@ -670,8 +717,17 @@ export async function searchInternalHandler(
     // Call APIs in parallel with 200ms stagger to avoid rate-limit issues
     const arxivPromise = searchArxiv(query, perSourceMax, filters);
     await delay(200);
-    const semanticPromise = searchSemanticScholar(query, perSourceMax, filters);
+
+    // Wrap Semantic Scholar in an 8-second timeout so rate-limit retries
+    // don't block the entire search (arXiv + PubMed usually finish in ~2s)
+    const semanticPromise = Promise.race([
+      searchSemanticScholar(query, perSourceMax, filters),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Semantic Scholar timeout after 8000ms")), 8000)
+      ),
+    ]);
     await delay(200);
+
     const pubmedPromise = searchPubMed(query, perSourceMax, filters);
 
     const [arxivResults, semanticResults, pubmedResults] = await Promise.all([

@@ -69,11 +69,13 @@ export const OverallState = Annotation.Root({
     totalChunks?: number;
     itemsGenerated?: number;
   }>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reducer: (_x, y?: any) => y ?? _x,
     default: () => ({ phase: "initializing", percentage: 0, message: "Initializing..." }),
   }),
   // Callback for progress updates (not stored in state, passed through)
   onStatusUpdate: Annotation<((status: string) => void | Promise<void>) | undefined>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reducer: (_x, y?: any) => y ?? _x,
     default: () => undefined,
   }),

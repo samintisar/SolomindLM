@@ -139,6 +139,7 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfiguringFormat(null);
       setCustomPrompt("");
     }

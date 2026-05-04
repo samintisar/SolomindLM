@@ -67,6 +67,7 @@ async function main() {
   console.log(`Created batch: ${batchId}`);
 
   // --- 4. Poll for completion ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let batch: any;
   while (true) {
     batch = await client.batches.retrieve(batchId);

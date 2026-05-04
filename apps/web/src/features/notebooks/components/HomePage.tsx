@@ -4,7 +4,7 @@ import { NotebookItem, FolderItem } from "@/shared/types/index";
 import { FeaturedSection, RecentSection } from "./views";
 import { CustomizeNotebookModal, MoveToFolderModal, CustomizeFolderModal } from "./modals";
 import { useNotebookHandlers, useFolderHandlers, useNotebookSorting } from "../hooks";
-import { useNotebookContext } from "../NotebookContext";
+import { useNotebookContext } from "../useNotebookContext";
 import { useCreateNotebook, useUpdateNotebook } from "../services/notebooksApi";
 import { useCreateFolder, useUpdateFolder } from "../services/foldersApi";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
@@ -152,27 +152,23 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   const sortedRecentNotebooks = getSortedNotebooks(recentNotebooks);
   const sortedFeaturedNotebooks = getSortedNotebooks(featuredNotebooks);
 
+  // Destructure handlers to use as stable dependencies
+  const { activeMenuId, setActiveMenuId } = notebookHandlers;
+  const { folderActiveMenuId, setFolderActiveMenuId } = folderHandlers;
+
   // Click outside to close menus
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (notebookHandlers.activeMenuId && !(e.target as Element).closest(".kebab-menu")) {
-        notebookHandlers.setActiveMenuId(null);
+      if (activeMenuId && !(e.target as Element).closest(".kebab-menu")) {
+        setActiveMenuId(null);
       }
-      if (
-        folderHandlers.folderActiveMenuId &&
-        !(e.target as Element).closest(".folder-kebab-menu")
-      ) {
-        folderHandlers.setFolderActiveMenuId(null);
+      if (folderActiveMenuId && !(e.target as Element).closest(".folder-kebab-menu")) {
+        setFolderActiveMenuId(null);
       }
     };
     window.addEventListener("mousedown", handleClickOutside);
     return () => window.removeEventListener("mousedown", handleClickOutside);
-  }, [
-    notebookHandlers.activeMenuId,
-    folderHandlers.folderActiveMenuId,
-    notebookHandlers.setActiveMenuId,
-    folderHandlers.setFolderActiveMenuId,
-  ]);
+  }, [activeMenuId, folderActiveMenuId, setActiveMenuId, setFolderActiveMenuId]);
 
   const handleMoveNotebook = (notebookId: string, folderId: string | null) => {
     if (onMoveNotebookToFolder) {

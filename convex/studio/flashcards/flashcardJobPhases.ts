@@ -166,6 +166,7 @@ export async function runFlashcardGenerationPhase(
     });
 
     // Extract content from chunk objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -298,6 +299,7 @@ export async function runProcessFlashcardMapChunkPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -323,6 +325,7 @@ export async function runProcessFlashcardMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
           [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
           createLangSmithRunConfig({
@@ -430,6 +433,7 @@ export async function runProcessFlashcardMapChunkPhase(
       : 0;
     const totalMaps = flashcard.metadata?.totalMapTasks || totalChunks;
     const failedMaps = flashcard.metadata?.mapResults
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? Object.values(flashcard.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
@@ -504,6 +508,7 @@ export async function runFinalizeFlashcardPhase(
     try {
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { userId: userId as any },
       );
     } catch (e) {
@@ -636,6 +641,12 @@ export async function runFinalizeFlashcardPhase(
     // Clear intermediate data
     await ctx.runMutation(internal.studio.jobMutations.flashcards.clearFlashcardMapData, {
       flashcardId,
+    });
+
+    // Consume rate limit token on success
+    await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+      userId,
+      feature: "flashcard",
     });
 
     logger.jobComplete({

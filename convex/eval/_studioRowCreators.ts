@@ -59,6 +59,7 @@ export const createAudioOverviewInternal = internalMutation({
     audioType: v.optional(v.string()),
     length: v.optional(v.string()),
     focus: v.optional(v.string()),
+    skipTts: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return await AudioOverviews.createAudioOverview(ctx, {
@@ -69,6 +70,7 @@ export const createAudioOverviewInternal = internalMutation({
         audioType: args.audioType ?? "deep_dive",
         length: args.length ?? "default",
         focus: args.focus,
+        skipTts: args.skipTts ?? false,
       },
       status: "generating",
     });

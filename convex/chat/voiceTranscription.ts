@@ -57,6 +57,13 @@ export const transcribeChatAudio = action({
     try {
       const service = new AudioTranscriptionService(env.TOGETHER_AI_API_KEY);
       const text = await service.transcribe(url);
+
+      // Consume rate limit token on success
+      await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+        userId,
+        feature: "chat",
+      });
+
       logger.operationComplete();
       return { text: text.trim() };
     } catch (err) {
