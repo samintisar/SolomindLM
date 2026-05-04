@@ -9,8 +9,8 @@ vi.mock("../services/promptsApi", () => ({
   usePublishPrompt: () => vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock the ToastContext
-vi.mock("@/shared/contexts/ToastContext", () => ({
+// Mock the useToast hook
+vi.mock("@/shared/contexts/useToast", () => ({
   useToast: () => ({
     success: vi.fn(),
     error: vi.fn(),

@@ -37,7 +37,7 @@ vi.mock("@convex/_generated/api", () => ({
   },
 }));
 
-vi.mock("../../features/auth/AuthContext", () => ({
+vi.mock("../../features/auth/useAuth", () => ({
   useAuth: () => ({
     user: { id: "u1", email: "user@example.com", name: "User" },
     isAuthenticated: true,
@@ -45,7 +45,7 @@ vi.mock("../../features/auth/AuthContext", () => ({
   }),
 }));
 
-vi.mock("../contexts/ThemeContext", () => ({
+vi.mock("../contexts/useTheme", () => ({
   useTheme: () => ({ theme: "light", toggleTheme: vi.fn() }),
 }));
 

@@ -1,13 +1,9 @@
 "use node";
-import { Supadata } from "@supadata/js";
+import { Supadata, SupadataError } from "@supadata/js";
 import { env } from "../../_lib/env";
 import { validateUrl } from "../../_lib/utils/urlValidation.js";
 import { invokeWithRetry } from "../../_agents/_shared/retry.js";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-
-import { tavily } from "@tavily/core";
-
-const tavilyClient = tavily({ apiKey: env.TAVILY_API_KEY });
 
 export interface WebPageMeta {
   title: string;
@@ -116,11 +112,11 @@ export class WebLoaderService {
   }
 
   // ========================================================================
-  // Tavily-backed extraction
+  // Supadata-backed web extraction
   // ========================================================================
 
   /**
-   * Extract content from a web page using Tavily extract.
+   * Extract content from a web page using Supadata.
    */
   async loadWebPage(url: string): Promise<string> {
     const { content } = await this.loadWebPageWithMeta(url);
@@ -128,8 +124,8 @@ export class WebLoaderService {
   }
 
   /**
-   * Extract content plus page title and URL using Tavily extract.
-   * Tavily best practices: use markdown format, advanced depth for full content.
+   * Extract content plus page title using Supadata web scrape.
+   * Supadata returns the page title in the `name` field.
    */
   async loadWebPageWithMeta(url: string): Promise<WebPageMeta> {
     const validation = validateUrl(url);
@@ -138,42 +134,57 @@ export class WebLoaderService {
     }
 
     const logger = createServiceLogger("web_loader", "loadWebPageWithMeta");
+    return invokeWithRetry(
+      () => this.loadWebPageWithMetaInternal(url),
+      {
+        maxAttempts: 5,
+        baseDelayMs: 2000,
+        jitter: true,
+        retryableErrors: (err) =>
+          /limit exceeded|rate limit|too many requests|429/i.test(err.message),
+        onRetry: (attempt, error, delayMs) =>
+          logger.warn("Rate limited, retrying web scrape", {
+            attempt,
+            delayMs,
+            message: error.message,
+          }),
+      },
+      "loadWebPageWithMeta"
+    );
+  }
+
+  private async loadWebPageWithMetaInternal(url: string): Promise<WebPageMeta> {
+    const logger = createServiceLogger("web_loader", "scrapeWebPage");
     logger.operationStart({ url });
 
     try {
-      const result = await tavilyClient.extract([url], {
-        extractDepth: "advanced",
-        format: "markdown",
-        includeImages: false,
-      });
-
-      const extracted = result.results?.[0];
-      if (!extracted) {
-        throw new Error(`Tavily extract returned no results for ${url}`);
-      }
-
-      const text = extracted.rawContent || "";
-      const title = "";
+      const result = (await this.supadata.web.scrape(url)) as {
+        content?: string;
+        name?: string;
+      };
+      const text = result.content || "";
+      const title = result.name ?? "";
       const cleanedText = this.stripCookieConsentNoise(this.stripMedia(text));
 
       logger.operationComplete({
         rawChars: text.length,
         cleanedChars: cleanedText.length,
+        title,
         url,
       });
 
       return { title, content: cleanedText, url };
     } catch (e) {
-      logger.error("Extract failed", e, { url });
-      throw new Error(
-        `Failed to extract web page: ${e instanceof Error ? e.message : String(e)}`,
-        { cause: e }
-      );
+      if (e instanceof SupadataError) {
+        logger.error("Scrape failed", e, { code: e.error, url });
+        throw new Error(`Failed to scrape web page: ${e.message}`, { cause: e });
+      }
+      throw e;
     }
   }
 
   // ========================================================================
-  // Supadata-backed methods (social media transcripts)
+  // Supadata-backed social media transcripts
   // ========================================================================
 
   /**
