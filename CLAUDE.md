@@ -118,6 +118,7 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
 Plugin `superpowers@claude-plugins-official` is installed. Invoke via `Skill` tool. Project-specific triggers and overrides:
 
 | Skill | When | Project notes |
+
 |---|---|---|
 | `brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
 | `writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |

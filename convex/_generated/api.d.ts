@@ -178,6 +178,7 @@ import type * as _lib_utils_urlValidation from "../_lib/utils/urlValidation.js";
 import type * as _migration_index from "../_migration/index.js";
 import type * as _migration_reembedBatchesWorker from "../_migration/reembedBatchesWorker.js";
 import type * as _migration_reembedChunks from "../_migration/reembedChunks.js";
+import type * as _migration_removeSlidePrompts from "../_migration/removeSlidePrompts.js";
 import type * as _model_audioOverviews from "../_model/audioOverviews.js";
 import type * as _model_conversations from "../_model/conversations.js";
 import type * as _model_documents from "../_model/documents.js";
@@ -480,6 +481,7 @@ declare const fullApi: ApiFromModules<{
   "_migration/index": typeof _migration_index;
   "_migration/reembedBatchesWorker": typeof _migration_reembedBatchesWorker;
   "_migration/reembedChunks": typeof _migration_reembedChunks;
+  "_migration/removeSlidePrompts": typeof _migration_removeSlidePrompts;
   "_model/audioOverviews": typeof _model_audioOverviews;
   "_model/conversations": typeof _model_conversations;
   "_model/documents": typeof _model_documents;

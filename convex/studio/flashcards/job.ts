@@ -21,6 +21,7 @@ export const flashcardGeneration = internalAction({
     cardCount: v.number(),
     difficulty: v.string(),
     topic: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -40,6 +41,7 @@ export const processFlashcardMapChunk = internalAction({
     cardsPerChunk: v.number(),
     difficulty: v.string(),
     topic: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";
@@ -55,6 +57,7 @@ export const finalizeFlashcardPhase = internalAction({
     cardCount: v.number(),
     difficulty: v.string(),
     topic: v.optional(v.string()),
+    smartLlm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     "use node";

@@ -40,6 +40,8 @@ interface CliOptions {
   artifactsDir: string;
   /** Comma-separated source channel combinations (e.g. "notebook,web+academic") */
   sourceMatrix?: string;
+  /** Override the smart LLM model for studio agent reduce phases */
+  smartLlm?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
@@ -114,6 +116,9 @@ function parseArgs(args: string[]): CliOptions {
       case "--source-matrix":
         opts.sourceMatrix = args[++i];
         break;
+      case "--smart-llm":
+        opts.smartLlm = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -141,6 +146,7 @@ Options:
   --export-artifacts       Export Ragas-compatible artifacts alongside report
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
   --source-matrix <combos>  Test fixture against multiple channel combinations (e.g. "notebook,web+academic")
+  --smart-llm <model>      Override smart LLM for studio agent reduce phases (e.g. meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -276,10 +282,13 @@ async function main(): Promise<void> {
   // a stub artifact with score 0.
   let runtimeErrorCount = 0;
 
-  // Expand fixtures for source matrix testing
+  // Expand fixtures for source matrix testing and smartLlm override
   const expandedFixtures: EvalFixture[] = [];
   for (const id of fixtureIds) {
-    const fixture = getFixture(id);
+    const fixture: EvalFixture = { ...getFixture(id) };
+    if (opts.smartLlm) {
+      fixture.studioParams = { ...fixture.studioParams, smartLlm: opts.smartLlm };
+    }
     if (opts.sourceMatrix) {
       const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
       const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
@@ -321,6 +330,24 @@ async function main(): Promise<void> {
       }
 
       allArtifacts.push(artifact);
+
+      // Save studio output for manual inspection
+      if (artifact.studioOutput) {
+        const outputFile = `evals/rag/generated/${artifact.caseId}-${artifact.runner}-${Date.now()}.json`;
+        mkdirSync("evals/rag/generated", { recursive: true });
+        writeFileSync(
+          outputFile,
+          JSON.stringify({
+            caseId: artifact.caseId,
+            runner: artifact.runner,
+            smartLlm: opts.smartLlm,
+            answer: artifact.answer,
+            raw: artifact.studioOutput.raw,
+            latencyMs: artifact.latencyMs,
+          }, null, 2)
+        );
+        console.log(`  Output saved to: ${outputFile}`);
+      }
 
       // Load baseline for this case+runner if available
       const baseline = loadBaseline(fixture.id, artifact.runner);

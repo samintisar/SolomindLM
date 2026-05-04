@@ -41,7 +41,7 @@ import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioL
 // ============================================================
 
 const CONFIG = {
-  MAP_CHUNK_SIZE_TOKENS: parseInt(env.FLASHCARD_MAP_CHUNK_TOKENS || "7500", 10),
+  MAP_CHUNK_SIZE_TOKENS: parseInt(env.FLASHCARD_MAP_CHUNK_TOKENS, 10),
   PER_CHUNK_TIMEOUT_MS: 90000, // 90 seconds per chunk (under 100s Cloudflare limit)
   REDUCE_TIMEOUT_MS: FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
   REDUCE_MAX_TOKENS: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
@@ -58,6 +58,7 @@ export type FlashcardGenerationPhaseArgs = {
   cardCount: number;
   difficulty: string;
   topic?: string;
+  smartLlm?: string;
 };
 
 export type ProcessFlashcardMapChunkPhaseArgs = {
@@ -71,6 +72,7 @@ export type ProcessFlashcardMapChunkPhaseArgs = {
   cardsPerChunk: number;
   difficulty: string;
   topic?: string;
+  smartLlm?: string;
 };
 
 export type FinalizeFlashcardPhaseArgs = {
@@ -80,6 +82,7 @@ export type FinalizeFlashcardPhaseArgs = {
   cardCount: number;
   difficulty: string;
   topic?: string;
+  smartLlm?: string;
 };
 
 // ============================================================
@@ -96,14 +99,15 @@ function createMapLLM(): ChatTogetherAI {
   });
 }
 
-function createReduceLLM(): ChatTogetherAI {
+function createReduceLLM(modelOverride?: string): ChatTogetherAI {
+  const model = modelOverride || env.FLASHCARDS_LLM;
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.SMART_LLM,
+    model,
     temperature: 0.3,
     timeout: CONFIG.REDUCE_TIMEOUT_MS,
     maxTokens: CONFIG.REDUCE_MAX_TOKENS,
-    modelKwargs: mergeModelKwargs(env.SMART_LLM, "smart"),
+    modelKwargs: mergeModelKwargs(model, "smart"),
   });
 }
 
@@ -117,7 +121,7 @@ export async function runFlashcardGenerationPhase(
 ): Promise<void> {
   "use node";
 
-  const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic } = args;
+  const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic, smartLlm } = args;
 
   // Initialize structured logger
   const logger = createJobLogger({
@@ -216,6 +220,7 @@ export async function runFlashcardGenerationPhase(
         cardsPerChunk,
         difficulty,
         topic,
+        smartLlm,
       });
       console.log(`[FlashcardJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
     }
@@ -273,6 +278,7 @@ export async function runProcessFlashcardMapChunkPhase(
     cardsPerChunk,
     difficulty,
     topic,
+    smartLlm,
   } = args;
 
   const logger = createJobLogger({
@@ -397,6 +403,7 @@ export async function runProcessFlashcardMapChunkPhase(
         cardCount,
         difficulty,
         topic,
+        smartLlm,
       });
     }
   } catch (error) {
@@ -456,6 +463,7 @@ export async function runProcessFlashcardMapChunkPhase(
           cardCount,
           difficulty,
           topic,
+          smartLlm,
         });
       } else {
         await ctx.runMutation(internal.studio.jobMutations.flashcards.markFlashcardFailed, {
@@ -483,7 +491,7 @@ export async function runFinalizeFlashcardPhase(
 ): Promise<void> {
   "use node";
 
-  const { flashcardId, userId, notebookId, cardCount, difficulty, topic } = args;
+  const { flashcardId, userId, notebookId, cardCount, difficulty, topic, smartLlm } = args;
 
   const logger = createJobLogger({
     jobType: "flashcard",
@@ -558,7 +566,7 @@ export async function runFinalizeFlashcardPhase(
 
     // Collapse and reduce with the shared flashcard pipeline helpers
     const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
-    const llm = createReduceLLM();
+    const llm = createReduceLLM(smartLlm);
     const collapseReduceDeps = {
       smartLlm: llm,
       estimateTokens: countTokens,

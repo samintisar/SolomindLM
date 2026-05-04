@@ -30,15 +30,8 @@ export interface GroundingValidationResult {
 // Constants
 // ============================================================
 
-/**
- * Semantic similarity threshold for grounding validation.
- * Configurable via GROUNDING_SIMILARITY_THRESHOLD (see convex/_lib/env.ts).
- * - OpenAI text-embedding-3-small: ~0.30 default is more lenient for long, paraphrased answers
- */
-const DEFAULT_GROUNDING_THRESHOLD = 0.3;
-const GROUNDING_THRESHOLD = parseFloat(
-  process.env.GROUNDING_SIMILARITY_THRESHOLD ?? String(DEFAULT_GROUNDING_THRESHOLD)
-);
+/** Semantic similarity threshold for grounding validation (text-embedding-3-small: ~0.30 is lenient for long, paraphrased answers). */
+const GROUNDING_THRESHOLD = 0.3;
 
 /**
  * text-embedding-3-small has max 8192 tokens (~4 chars/token).

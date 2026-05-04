@@ -43,6 +43,8 @@ export interface StudioParams {
   length?: string;
   /** Audio overview: deep_dive | brief | critique | debate */
   audioType?: string;
+  /** Override the smart LLM model used for reduce/collapse phases (eval only) */
+  smartLlm?: string;
 }
 
 export interface SourcePolicyConfig {

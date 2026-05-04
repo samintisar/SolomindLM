@@ -167,6 +167,12 @@ GitHub Flow: feature branches → PR to `main` (protected, requires PR + CI). Br
 
 CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `VITE_CONVEX_URL`, no second `convex deploy` — avoids racing Vercel).
 
+## Claude Code Hooks
+
+Auto-typecheck runs after edits in `apps/web/` (web typecheck) and `convex/` (convex typecheck). Config: `.claude/settings.json`.
+
+Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; hooks belong in `settings.json` (not `settings.local.json`); no `shell: "powershell"` (use default); restart Claude Code to reload.
+
 ---
 
 ## Gotchas
@@ -186,7 +192,48 @@ CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `
 - **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
 - **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.
 
----
+## Process Skills (superpowers)
+
+Plugin `superpowers@claude-plugins-official` is installed. Invoke via `Skill` tool. Project-specific triggers and overrides:
+
+| Skill | When | Project notes |
+
+|---|---|---|
+| `superpowers:brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
+| `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
+| `superpowers:executing-plans` | Executing a written plan in a separate session | — |
+| `superpowers:subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
+| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Prefer `Explore` subagent for >3-query codebase searches |
+| `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
+| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
+| `superpowers:requesting-code-review` | Before merging significant work | — |
+| `superpowers:receiving-code-review` | When handling review feedback | — |
+| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
+| `superpowers:using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
+| `superpowers:writing-skills` | Creating or editing a skill | Edit canonical copy under `.agents/skills/<name>/SKILL.md` |
+| `superpowers:test-driven-development` | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
+
+## Project-Specific Skill Triggers
+
+Skill descriptions are loaded automatically; below are *project* triggers, not generic descriptions.
+
+**Convex** (`convex-create-component`, `convex-migration-helper`, `convex-performance-audit`, `convex-quickstart`, `convex-setup-auth`):
+
+- Schema or table change → `convex-migration-helper` (widen-migrate-narrow)
+- Read amplification, OCC conflicts, `npx convex insights` warnings → `convex-performance-audit`
+- New isolated table-owning module → `convex-create-component`
+
+**LangChain / LangGraph** (`langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`): touching anything under `convex/_agents/`, especially RAG retrieval, graph state, or new agent types.
+
+**Together AI** (`together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`): when modifying `convex/_services/ai/` or `convex/studio/audio/`.
+
+**Frontend** (`vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `bun`): use as triggers describe; `web-design-guidelines` for any new UI surface.
+
+**Serena**: see MCP section below.
+
+## MCP Servers
+
+- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. Prefer `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file` over `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
 
 ## Skills Installation
 
