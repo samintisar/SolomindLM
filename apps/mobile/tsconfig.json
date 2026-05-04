@@ -3,22 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ],
-      "@mobile/*": [
-        "./src/*"
-      ],
-      "@convex/*": [
-        "../../convex/*"
-      ]
+      "@/*": ["./*"],
+      "@mobile/*": ["./src/*"],
+      "@convex/*": ["../../convex/*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "src/types/env.d.ts",
-    "expo-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "src/types/env.d.ts", "expo-env.d.ts"]
 }

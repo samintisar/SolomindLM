@@ -44,10 +44,7 @@ function parseLlmJson(content: string): Record<string, unknown> {
     return JSON.parse(jsonStr) as Record<string, unknown>;
   } catch (parseErr) {
     // Try to fix unquoted property names (basic heuristic)
-    const fixedStr = jsonStr.replace(
-      /([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g,
-      '$1"$2":'
-    );
+    const fixedStr = jsonStr.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
     try {
       return JSON.parse(fixedStr) as Record<string, unknown>;
     } catch {
@@ -77,16 +74,25 @@ function getImageSize(orientation: string | undefined): string {
 function getVisualStyleInstruction(style: string | undefined): string {
   const styles: Record<string, string> = {
     auto: "Use a professional, clean infographic design with a cohesive modern aesthetic.",
-    sketch_note: "Use a hand-drawn sketch note style with doodles, arrows, organic layouts, and a casual pen-on-paper feel.",
-    kawaii: "Use a cute kawaii style with pastel colors, rounded shapes, adorable characters, and playful decorations.",
-    professional: "Use a corporate professional style with clean lines, modern sans-serif typography, and a refined blue/grey color palette.",
-    scientific: "Use an academic scientific poster style with structured sections, data visualizations, precise labeling, and a neutral color scheme.",
-    anime: "Use an anime manga style with vibrant colors, dynamic compositions, speed lines, and Japanese aesthetic influences.",
+    sketch_note:
+      "Use a hand-drawn sketch note style with doodles, arrows, organic layouts, and a casual pen-on-paper feel.",
+    kawaii:
+      "Use a cute kawaii style with pastel colors, rounded shapes, adorable characters, and playful decorations.",
+    professional:
+      "Use a corporate professional style with clean lines, modern sans-serif typography, and a refined blue/grey color palette.",
+    scientific:
+      "Use an academic scientific poster style with structured sections, data visualizations, precise labeling, and a neutral color scheme.",
+    anime:
+      "Use an anime manga style with vibrant colors, dynamic compositions, speed lines, and Japanese aesthetic influences.",
     clay: "Use a 3D clay render style with soft rounded forms, pastel colors, tactile textures, and gentle lighting.",
-    editorial: "Use a magazine editorial layout with elegant serif typography, high contrast, sophisticated design, and plenty of white space.",
-    instructional: "Use a step-by-step instructional guide style with numbered sections, clear diagrams, icons, and a how-to format.",
-    bento_grid: "Use a bento box grid layout with modular card-based sections, rounded corners, organized compartments, and subtle shadows.",
-    bricks: "Use a brick wall mosaic style with rectangular blocks, bold colors, geometric patterns, and a tiled layout.",
+    editorial:
+      "Use a magazine editorial layout with elegant serif typography, high contrast, sophisticated design, and plenty of white space.",
+    instructional:
+      "Use a step-by-step instructional guide style with numbered sections, clear diagrams, icons, and a how-to format.",
+    bento_grid:
+      "Use a bento box grid layout with modular card-based sections, rounded corners, organized compartments, and subtle shadows.",
+    bricks:
+      "Use a brick wall mosaic style with rectangular blocks, bold colors, geometric patterns, and a tiled layout.",
   };
   return styles[style || "auto"] || styles["auto"];
 }
@@ -115,12 +121,25 @@ export const generateInfographicImage = internalAction({
     notebookId: v.id("notebooks"),
     documentIds: v.array(v.id("documents")),
     customPrompt: v.optional(v.string()),
-    orientation: v.optional(v.union(v.literal("landscape"), v.literal("portrait"), v.literal("square"))),
+    orientation: v.optional(
+      v.union(v.literal("landscape"), v.literal("portrait"), v.literal("square"))
+    ),
     visualStyle: v.optional(v.string()),
-    detailLevel: v.optional(v.union(v.literal("concise"), v.literal("standard"), v.literal("detailed"))),
+    detailLevel: v.optional(
+      v.union(v.literal("concise"), v.literal("standard"), v.literal("detailed"))
+    ),
   },
   handler: async (ctx, args) => {
-    const { infographicId, userId, notebookId, documentIds, customPrompt, orientation, visualStyle, detailLevel } = args;
+    const {
+      infographicId,
+      userId,
+      notebookId,
+      documentIds,
+      customPrompt,
+      orientation,
+      visualStyle,
+      detailLevel,
+    } = args;
 
     const logger = createJobLogger({
       jobType: "infographic",
@@ -241,17 +260,21 @@ Return JSON: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const design = parseLlmJson(designContent) as Record<string, any>;
       if (!design.image_prompt) {
-        throw new Error("LLM design step did not return an image_prompt — cannot generate a meaningful infographic");
+        throw new Error(
+          "LLM design step did not return an image_prompt — cannot generate a meaningful infographic"
+        );
       }
       logger.phaseComplete("content_analysis", {
         title: design.title,
         layout: design.layout_type,
-        sections: design.sections?.length || 0
+        sections: design.sections?.length || 0,
       });
 
       // Use the LLM-generated image prompt
       logger.phaseStart("prompt_generation");
-      const imagePrompt = design.image_prompt || `Professional infographic: ${design.title}. ${design.visual_metaphor}. Clean layout. ${styleInstruction}`;
+      const imagePrompt =
+        design.image_prompt ||
+        `Professional infographic: ${design.title}. ${design.visual_metaphor}. Clean layout. ${styleInstruction}`;
       logger.phaseComplete("prompt_generation", { title: design.title || "(generated)" });
 
       // Generate image via Together AI gpt-image-1.5
@@ -260,7 +283,7 @@ Return JSON: {
       const [widthStr, heightStr] = size.split("x");
       const width = parseInt(widthStr, 10);
       const height = parseInt(heightStr, 10);
-      
+
       const imageResponse = await invokeWithRetry(
         () =>
           togetherClient.images.generate({
@@ -282,10 +305,10 @@ Return JSON: {
         },
         "InfographicImageGen"
       );
-      
+
       const imageData = imageResponse.data?.[0];
       let imageUrl: string;
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((imageData as any)?.b64_json) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -315,7 +338,9 @@ Return JSON: {
         }
         imageBytes = new Uint8Array(await imgRes.arrayBuffer());
       }
-      const storageId = await ctx.storage.store(new Blob([imageBytes.buffer as ArrayBuffer], { type: "image/png" }));
+      const storageId = await ctx.storage.store(
+        new Blob([imageBytes.buffer as ArrayBuffer], { type: "image/png" })
+      );
       const publicUrl = await ctx.storage.getUrl(storageId);
 
       if (!publicUrl) {

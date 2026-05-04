@@ -25,7 +25,12 @@ export class ReportGraph {
   private fastLlmStructured: MapOutputInvoker;
   private maxTokens: number;
 
-  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = GRAPH_CONFIG.MAX_TOKENS) {
+  constructor(
+    apiKey: string,
+    mapModel: string,
+    reduceModel: string,
+    maxTokens: number = GRAPH_CONFIG.MAX_TOKENS
+  ) {
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,

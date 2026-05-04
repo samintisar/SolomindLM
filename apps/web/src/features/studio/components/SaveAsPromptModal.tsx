@@ -124,9 +124,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
               <p data-testid="save-as-prompt-tool-label" className="text-xs text-muted-foreground">
                 {TOOL_LABELS[studioTool]}
               </p>
-              <h2 className="text-lg font-bold leading-snug tracking-tight">
-                Save as Prompt
-              </h2>
+              <h2 className="text-lg font-bold leading-snug tracking-tight">Save as Prompt</h2>
             </div>
           </div>
           <button
@@ -154,9 +152,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
               className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               maxLength={100}
             />
-            <p className="text-[11px] text-muted-foreground text-right">
-              {title.length}/100
-            </p>
+            <p className="text-[11px] text-muted-foreground text-right">{title.length}/100</p>
           </div>
 
           {/* Description (optional) */}
@@ -172,9 +168,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
               className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/50"
               maxLength={300}
             />
-            <p className="text-[11px] text-muted-foreground text-right">
-              {description.length}/300
-            </p>
+            <p className="text-[11px] text-muted-foreground text-right">{description.length}/300</p>
           </div>
 
           {/* Prompt Text */}
@@ -189,9 +183,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
               className="w-full h-32 px-4 py-3 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors resize-none placeholder:text-muted-foreground/50 font-mono"
               maxLength={2000}
             />
-            <p className="text-[11px] text-muted-foreground text-right">
-              {promptText.length}/2000
-            </p>
+            <p className="text-[11px] text-muted-foreground text-right">{promptText.length}/2000</p>
           </div>
 
           {/* Visibility Toggle */}
@@ -203,9 +195,7 @@ export const SaveAsPromptModal: React.FC<SaveAsPromptModalProps> = ({
                 <Lock className="w-5 h-5 text-muted-foreground" />
               )}
               <div>
-                <p className="text-sm font-medium">
-                  {makePublic ? "Public" : "Private"}
-                </p>
+                <p className="text-sm font-medium">{makePublic ? "Public" : "Private"}</p>
                 <p className="text-[11px] text-muted-foreground">
                   {makePublic
                     ? "Anyone can discover and use this prompt"

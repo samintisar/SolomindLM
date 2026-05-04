@@ -60,9 +60,7 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
   const runsQueryLoading = isApproved && latestRun === undefined;
   const runRowMissing = isApproved && latestRun === null;
   const runInFlight =
-    isApproved &&
-    latestRun != null &&
-    (runState === "pending" || runState === "running");
+    isApproved && latestRun != null && (runState === "pending" || runState === "running");
   const runSucceeded = isApproved && latestRun != null && runState === "completed";
   const runFailed = isApproved && latestRun != null && runState === "failed";
   const showProgressSpinner = runsQueryLoading || runRowMissing || runInFlight;
@@ -89,14 +87,13 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
     }
   };
 
-  const cardClass =
-    isRejected
-      ? "border-border/80 bg-muted/25 shadow-none"
-      : runFailed
-        ? "border-destructive/25 bg-gradient-to-b from-destructive/[0.06] to-card shadow-sm"
-        : runSucceeded
-          ? "border-success/25 bg-gradient-to-b from-success/[0.07] via-card to-card shadow-sm"
-          : "border-primary/25 bg-card shadow-sm";
+  const cardClass = isRejected
+    ? "border-border/80 bg-muted/25 shadow-none"
+    : runFailed
+      ? "border-destructive/25 bg-gradient-to-b from-destructive/[0.06] to-card shadow-sm"
+      : runSucceeded
+        ? "border-success/25 bg-gradient-to-b from-success/[0.07] via-card to-card shadow-sm"
+        : "border-primary/25 bg-card shadow-sm";
 
   const headerEyebrow = isRejected
     ? "Plan status"
@@ -175,7 +172,9 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
               {headerTitle}
             </h4>
             {headerSubtitle ? (
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{headerSubtitle}</p>
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                {headerSubtitle}
+              </p>
             ) : null}
           </div>
         </div>
@@ -232,7 +231,11 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
             disabled={submitting || displaySubQuestions.length === 0}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
             Approve & Research
           </button>
           <button

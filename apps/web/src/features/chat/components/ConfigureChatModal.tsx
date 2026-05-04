@@ -17,9 +17,24 @@ interface ConfigureChatModalProps {
 }
 
 const INSTRUCTION_MODES = [
-  { value: "default" as const, label: "Default", icon: MessageSquare, description: "Standard assistant behavior" },
-  { value: "learningGuide" as const, label: "Learning Guide", icon: GraduationCap, description: "Step-by-step teaching style" },
-  { value: "custom" as const, label: "Custom", icon: PenLine, description: "Your own instructions" },
+  {
+    value: "default" as const,
+    label: "Default",
+    icon: MessageSquare,
+    description: "Standard assistant behavior",
+  },
+  {
+    value: "learningGuide" as const,
+    label: "Learning Guide",
+    icon: GraduationCap,
+    description: "Step-by-step teaching style",
+  },
+  {
+    value: "custom" as const,
+    label: "Custom",
+    icon: PenLine,
+    description: "Your own instructions",
+  },
 ] as const;
 
 const RESPONSE_LENGTHS = [
@@ -96,8 +111,7 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
   const handleSave = useCallback(() => {
     onSave({
       instructionMode,
-      customInstructions:
-        instructionMode === "custom" ? customInstructions.trim() : undefined,
+      customInstructions: instructionMode === "custom" ? customInstructions.trim() : undefined,
       responseLength,
       smartModel: savedBaseline.smartModel,
     });
@@ -107,8 +121,7 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
 
   const pendingSave: ChatSettings = {
     instructionMode,
-    customInstructions:
-      instructionMode === "custom" ? customInstructions.trim() : undefined,
+    customInstructions: instructionMode === "custom" ? customInstructions.trim() : undefined,
     responseLength,
     smartModel: savedBaseline.smartModel,
   };

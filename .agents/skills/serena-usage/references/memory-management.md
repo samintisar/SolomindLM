@@ -8,15 +8,15 @@ Serena's memory system provides persistent project context across AI agent sessi
 
 Use standardized names for core memories to ensure consistency:
 
-| Memory Name | Purpose | Update Frequency |
-|---|---|---|
-| `project-brief` | Core requirements, goals, project scope | Rarely (foundation document) |
-| `active-context` | Current work focus, recent changes, next steps | Every session |
-| `system-patterns` | Architecture, design patterns, component relationships | When patterns change |
-| `tech-context` | Technologies, setup, constraints, dependencies | When stack changes |
-| `progress` | What works, what's left, known issues | After significant work |
-| `task-index` | Master list of all tasks with statuses | When tasks change |
-| `task-{id}` | Individual task details (e.g. `task-001-auth`) | During task work |
+| Memory Name       | Purpose                                                | Update Frequency             |
+| ----------------- | ------------------------------------------------------ | ---------------------------- |
+| `project-brief`   | Core requirements, goals, project scope                | Rarely (foundation document) |
+| `active-context`  | Current work focus, recent changes, next steps         | Every session                |
+| `system-patterns` | Architecture, design patterns, component relationships | When patterns change         |
+| `tech-context`    | Technologies, setup, constraints, dependencies         | When stack changes           |
+| `progress`        | What works, what's left, known issues                  | After significant work       |
+| `task-index`      | Master list of all tasks with statuses                 | When tasks change            |
+| `task-{id}`       | Individual task details (e.g. `task-001-auth`)         | During task work             |
 
 ### Custom Memory Names
 
@@ -117,20 +117,24 @@ Parameters:
 
 ```markdown
 ## Project Name
+
 Kitchen Odyssey - Recipe Management Application
 
 ## Core Requirements
+
 - User authentication and profiles
 - Recipe CRUD with rich media
 - Search and filtering
 - Social features (comments, ratings)
 
 ## Goals
+
 - Responsive, accessible UI
 - Sub-200ms API response times
 - Support 1000+ concurrent users
 
 ## Scope Boundaries
+
 - No payment processing
 - No real-time collaboration (v1)
 ```
@@ -139,19 +143,24 @@ Kitchen Odyssey - Recipe Management Application
 
 ```markdown
 ## Current Focus
+
 [One sentence describing the primary task]
 
 ## Recent Changes
+
 - [Change 1 with date]
 - [Change 2 with date]
 
 ## Active Decisions
+
 - Chose [X] over [Y] because [reason]
 
 ## Blockers
+
 - [Any blocking issues]
 
 ## Next Steps
+
 1. [Immediate next action]
 2. [Follow-up action]
 ```
@@ -160,18 +169,22 @@ Kitchen Odyssey - Recipe Management Application
 
 ```markdown
 ## Architecture
+
 [High-level architecture description]
 
 ## Design Patterns
+
 - Repository pattern for data access
 - Context providers for shared state
 - Compound components for complex UI
 
 ## Component Relationships
+
 - AuthContext wraps all protected routes
 - RootLayout provides navigation and sidebar
 
 ## Conventions
+
 - File naming: PascalCase for components, camelCase for utilities
 - API routes follow REST conventions
 ```
@@ -180,22 +193,28 @@ Kitchen Odyssey - Recipe Management Application
 
 ```markdown
 ## Task: [Title]
+
 **Status:** In Progress
 **Priority:** High
 
 ## Description
+
 [What needs to be done]
 
 ## Approach
+
 [How it will be implemented]
 
 ## Subtasks
+
 - [x] Subtask 1
 - [ ] Subtask 2
 - [ ] Subtask 3
 
 ## Progress Log
+
 ### 2026-02-11
+
 - Started implementation of feature X
 - Discovered dependency on module Y
 ```
@@ -222,6 +241,7 @@ Reference other memories by name within content:
 
 ```markdown
 ## Authentication Decision
+
 Chose JWT over sessions. Full rationale in `tech-context`.
 Implementation tracked in `task-005-auth`.
 Related patterns documented in `system-patterns` under "Auth Flow".

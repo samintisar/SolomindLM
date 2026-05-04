@@ -1,9 +1,9 @@
 import React, { lazy, Suspense, useState, useEffect } from "react";
 import { CheckSquare, Square, XCircle, Loader2, FileText, FileType } from "lucide-react";
 import { Source } from "@/shared/types";
-import { sanitizeMarkdown } from "@/shared/utils";
+import { sanitizeMarkdown, extractYouTubeVideoId, youTubeEmbedSrc } from "@/shared/utils";
 import { useGetSignedUrl } from "../services/documentsApi";
-import { PdfViewer } from "./PdfViewer";
+const PdfViewer = lazy(() => import("./PdfViewer").then((m) => ({ default: m.PdfViewer })));
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -36,6 +36,10 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   const [pdfUrlLoading, setPdfUrlLoading] = useState(false);
   const getSignedUrl = useGetSignedUrl();
 
+  const youTubeVideoId =
+    source.type === "YOUTUBE" ? extractYouTubeVideoId(source.url) : null;
+  const youTubeEmbed = youTubeVideoId ? youTubeEmbedSrc(youTubeVideoId) : null;
+
   // Fetch PDF signed URL only when user switches to Original PDF tab (avoids loading PDF until needed)
   useEffect(() => {
     if (viewMode !== "pdf" || !pdfStorageId) {
@@ -53,11 +57,19 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
       .finally(() => setPdfUrlLoading(false));
   }, [viewMode, pdfStorageId, getSignedUrl, pdfUrl]);
 
+  const isPdfLayout = Boolean(canShowPdf && viewMode === "pdf");
+
   return (
-    <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/50">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm">
-          {source.type} • {source.date}
+    <div
+      className={`flex min-h-0 flex-1 flex-col p-6 animate-in fade-in slide-in-from-right-4 duration-200 ${isPdfLayout ? "space-y-3 overflow-hidden" : "space-y-4 overflow-y-auto"}`}
+    >
+      <div className={`flex shrink-0 items-center justify-between border-b border-border/50 pb-4 ${isPdfLayout ? "mb-0" : "mb-4"}`}>
+        <span
+          className={`text-xs tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm ${
+            source.type === "YOUTUBE" ? "normal-case" : "uppercase"
+          }`}
+        >
+          {source.type === "YOUTUBE" ? "YouTube" : source.type} • {source.date}
         </span>
 
         <button
@@ -117,7 +129,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
 
       {/* PDF / Markdown view toggle (PDF sources only when pdfUrl is available) */}
       {canShowPdf && !isLoading && !error && (
-        <div className="flex gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="flex shrink-0 gap-1 rounded-lg border border-border bg-muted/50 p-1">
           <button
             type="button"
             onClick={() => setViewMode("markdown")}
@@ -152,50 +164,75 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         <>
           {canShowPdf && viewMode === "pdf" ? (
             pdfUrlLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex flex-1 items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 <span className="ml-2 text-sm text-muted-foreground">Loading PDF…</span>
               </div>
             ) : pdfUrl ? (
-              <PdfViewer file={pdfUrl} />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <Suspense
+                  fallback={
+                    <div className="flex flex-1 items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading PDF viewer…</span>
+                    </div>
+                  }
+                >
+                  <PdfViewer file={pdfUrl} className="min-h-0 min-w-0 flex-1" />
+                </Suspense>
+              </div>
             ) : (
-              <p className="text-sm text-destructive">Could not load PDF.</p>
+              <p className="shrink-0 text-sm text-destructive">Could not load PDF.</p>
             )
           ) : (
-            <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
-              <Suspense
-                fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}
-              >
-                <MarkdownRenderer
-                  components={{
-                    img: () => null,
-                    a: ({ children }) => <span className="text-foreground">{children}</span>,
-                    video: () => null,
-                    audio: () => null,
-                    iframe: () => null,
-                    table: ({ children }) => (
-                      <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
-                        {children}
-                      </table>
-                    ),
-                    thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
-                    th: ({ children }) => (
-                      <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
-                        {children}
-                      </td>
-                    ),
-                  }}
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+              {youTubeEmbed && (
+                <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-black shadow-sm">
+                  <iframe
+                    src={youTubeEmbed}
+                    title={`YouTube: ${source.title}`}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+              <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
+                <Suspense
+                  fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}
                 >
-                  {sanitizeMarkdown(content || "No content available.")}
-                </MarkdownRenderer>
-              </Suspense>
+                  <MarkdownRenderer
+                    components={{
+                      img: () => null,
+                      a: ({ children }) => <span className="text-foreground">{children}</span>,
+                      video: () => null,
+                      audio: () => null,
+                      iframe: () => null,
+                      table: ({ children }) => (
+                        <table className="w-full border-collapse border border-border rounded-lg overflow-hidden">
+                          {children}
+                        </table>
+                      ),
+                      thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
+                      th: ({ children }) => (
+                        <th className="px-4 py-2 text-left font-semibold text-foreground border-r border-border last:border-r-0">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-4 py-2 text-foreground border-r border-border last:border-r-0">
+                          {children}
+                        </td>
+                      ),
+                    }}
+                  >
+                    {sanitizeMarkdown(content || "No content available.")}
+                  </MarkdownRenderer>
+                </Suspense>
+              </div>
             </div>
           )}
         </>

@@ -21,9 +21,7 @@ const client = new Together({
 
 async function listHardware(model?: string): Promise<void> {
   console.log("=== Available Hardware ===");
-  const response = await client.endpoints.listHardware(
-    model ? { model } : undefined,
-  );
+  const response = await client.endpoints.listHardware(model ? { model } : undefined);
   for (const hw of response.data) {
     console.log(`  ${hw.id}`);
   }
@@ -42,8 +40,8 @@ async function createEndpoint(
   hardware: string,
   minReplicas: number = 1,
   maxReplicas: number = 1,
-  displayName?: string,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  displayName?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const endpoint = await client.endpoints.create({
     model,
@@ -62,8 +60,8 @@ async function createEndpoint(
 async function waitForReady(
   endpointId: string,
   timeoutMs: number = 600_000,
-  pollMs: number = 10_000,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pollMs: number = 10_000
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

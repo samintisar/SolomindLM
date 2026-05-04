@@ -9,7 +9,6 @@ export interface MindMapViewProps {
   onBack?: () => void;
 }
 
- 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any {
   if (!node || typeof node !== "object") {
@@ -30,8 +29,8 @@ function sanitizeNodeTree(node: any, fallbackTopic: string, isRoot = false): any
         : `node-${Math.random().toString(36).slice(2, 9)}`;
 
   const children = Array.isArray(node.children)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? node.children.map((child: any) => sanitizeNodeTree(child, fallbackTopic, false))
+    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      node.children.map((child: any) => sanitizeNodeTree(child, fallbackTopic, false))
     : [];
 
   return {
@@ -90,12 +89,11 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         mouseSelectionButton: 2 as any,
         before: {
-           
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           insertSibling(_el: any, _obj: any) {
             return true;
           },
-           
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           async addChild(_el: any, _obj: any) {
             return true;
@@ -119,7 +117,7 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
             "--main-radius": "8px",
             "--topic-radius": "8px",
           },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       };
 

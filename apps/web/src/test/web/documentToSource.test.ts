@@ -24,14 +24,14 @@ describe("documentToSource", () => {
     expect(result.title).toBe("my report");
   });
 
-  it("maps YouTube fileType to WEB with url", () => {
+  it("maps YouTube fileType to YOUTUBE with url", () => {
     const result = documentToSource({
       ...baseDoc,
       fileType: "youtube",
       fileName: "Cool Video",
       fileUrl: "https://youtube.com/watch?v=123",
     });
-    expect(result.type).toBe("WEB");
+    expect(result.type).toBe("YOUTUBE");
     expect(result.url).toBe("https://youtube.com/watch?v=123");
   });
 

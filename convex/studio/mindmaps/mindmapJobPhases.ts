@@ -370,10 +370,13 @@ export async function runProcessMindMapMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[mindmap] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[mindmap] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -390,7 +393,10 @@ export async function runProcessMindMapMapChunkPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+          [
+            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ],
           createLangSmithRunConfig({
             runName: "MindMapJob.MapProcess",
             tags: ["agent", "mindmap", "map"],
@@ -484,8 +490,8 @@ export async function runProcessMindMapMapChunkPhase(
       : 0;
     const totalMaps = mindmap.metadata?.totalMapTasks || totalChunks;
     const failedMaps = mindmap.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(mindmap.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(mindmap.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -557,10 +563,13 @@ export async function runFinalizeMindMapPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[mindmap] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[mindmap] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 

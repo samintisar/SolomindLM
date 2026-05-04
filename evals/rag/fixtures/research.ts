@@ -11,14 +11,9 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-001-inflation-factors",
-    question: "What are the main factors driving inflation in modern economies, and how do central banks typically respond?",
-    expectedItems: [
-      "inflation",
-      "central banks",
-      "monetary policy",
-      "interest rates",
-      "economies",
-    ],
+    question:
+      "What are the main factors driving inflation in modern economies, and how do central banks typically respond?",
+    expectedItems: ["inflation", "central banks", "monetary policy", "interest rates", "economies"],
     expectedBehavior:
       "Should decompose into sub-questions covering inflation causes and central bank responses. Should retrieve evidence from multiple sources.",
     runner: "research",
@@ -30,7 +25,8 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-002-transformer-vs-rnn",
-    question: "How does transformer architecture differ from recurrent neural networks, and what are the tradeoffs for sequence modeling tasks?",
+    question:
+      "How does transformer architecture differ from recurrent neural networks, and what are the tradeoffs for sequence modeling tasks?",
     expectedItems: [
       "transformer",
       "recurrent neural networks",
@@ -49,7 +45,8 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-003-llm-hallucination",
-    question: "What are the most promising approaches to making large language models more reliable and less prone to hallucination?",
+    question:
+      "What are the most promising approaches to making large language models more reliable and less prone to hallucination?",
     expectedItems: [
       "hallucination",
       "large language models",
@@ -68,7 +65,8 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-004-quantum-computing",
-    question: "What has changed in quantum computing capabilities over the past two years, and where does the field stand today?",
+    question:
+      "What has changed in quantum computing capabilities over the past two years, and where does the field stand today?",
     expectedItems: [
       "quantum computing",
       "qubits",
@@ -87,14 +85,9 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-005-intermittent-fasting",
-    question: "Is intermittent fasting actually effective for long-term weight loss, and what does the evidence say?",
-    expectedItems: [
-      "intermittent fasting",
-      "weight loss",
-      "evidence",
-      "studies",
-      "metabolism",
-    ],
+    question:
+      "Is intermittent fasting actually effective for long-term weight loss, and what does the evidence say?",
+    expectedItems: ["intermittent fasting", "weight loss", "evidence", "studies", "metabolism"],
     expectedBehavior:
       "Should examine contradictory evidence, analyze studies on intermittent fasting effectiveness, and discuss metabolic impacts.",
     runner: "research",
@@ -107,13 +100,7 @@ export const researchFixtures: EvalFixture[] = [
     schemaVersion: 1,
     id: "research-006-crispr-mechanism",
     question: "How does the CRISPR-Cas9 gene editing mechanism work at a molecular level?",
-    expectedItems: [
-      "CRISPR",
-      "Cas9",
-      "gene editing",
-      "DNA",
-      "molecular",
-    ],
+    expectedItems: ["CRISPR", "Cas9", "gene editing", "DNA", "molecular"],
     expectedBehavior:
       "Should explain the CRISPR-Cas9 mechanism in detail without over-fragmenting into too many sub-questions.",
     runner: "research",
@@ -125,14 +112,9 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-007-2008-financial-crisis",
-    question: "How did the 2008 financial crisis develop, and what regulatory changes did it trigger?",
-    expectedItems: [
-      "2008",
-      "financial crisis",
-      "regulatory changes",
-      "banking",
-      "reforms",
-    ],
+    question:
+      "How did the 2008 financial crisis develop, and what regulatory changes did it trigger?",
+    expectedItems: ["2008", "financial crisis", "regulatory changes", "banking", "reforms"],
     expectedBehavior:
       "Should trace the crisis development and identify key regulatory reforms that followed.",
     runner: "research",
@@ -144,14 +126,9 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-008-notebook-only",
-    question: "Based on the available sources, what are the key arguments presented about this topic?",
-    expectedItems: [
-      "arguments",
-      "sources",
-      "evidence",
-      "claims",
-      "supporting",
-    ],
+    question:
+      "Based on the available sources, what are the key arguments presented about this topic?",
+    expectedItems: ["arguments", "sources", "evidence", "claims", "supporting"],
     expectedBehavior:
       "Should retrieve and synthesize information exclusively from notebook sources without using external search.",
     runner: "research",
@@ -164,7 +141,8 @@ export const researchFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "research-009-ml-learning-path",
-    question: "what should I learn about Neural Networks, CNNs, RNNs and transformers to take me to the next stage of machine learning?",
+    question:
+      "what should I learn about Neural Networks, CNNs, RNNs and transformers to take me to the next stage of machine learning?",
     expectedItems: [
       "neural networks",
       "CNN",

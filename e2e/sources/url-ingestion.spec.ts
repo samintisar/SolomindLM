@@ -18,9 +18,7 @@ test.describe("URL Ingestion", () => {
     await page.getByRole("button", { name: "Add Sources" }).click();
 
     // Should show validation error
-    await expect(
-      page.getByText(/Please enter at least one valid URL/)
-    ).toBeVisible();
+    await expect(page.getByText(/Please enter at least one valid URL/)).toBeVisible();
   });
 
   test("URL source processes to completed", async ({ notebookPage }) => {

@@ -9,9 +9,7 @@ import {
   extractDocumentMetadata,
   getFileExtension,
 } from "../_services/processing/DocumentMetadataExtractor";
-import {
-  StructuralChunker,
-} from "../_services/processing/StructuralChunker";
+import { StructuralChunker } from "../_services/processing/StructuralChunker";
 import {
   E5_RAG_CHUNK_OVERLAP_TOKENS,
   E5_RAG_CHUNK_SIZE_TOKENS,
@@ -233,10 +231,9 @@ export const docEmbedding = internalAction({
         logger.info("Extracting web page content");
         const rawUrl = docDetails.fileUrl || "";
         effectiveFileUrl = rawUrl;
-        const meta = await ctx.runAction(
-          internal._services.extractors.scrapeWebPageInternal,
-          { url: rawUrl }
-        );
+        const meta = await ctx.runAction(internal._services.extractors.scrapeWebPageInternal, {
+          url: rawUrl,
+        });
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
         logger.phaseComplete("extraction", {
@@ -244,7 +241,9 @@ export const docEmbedding = internalAction({
           title: extractedTitle,
         });
       } else if (docDetails.fileType === "paper_record") {
-        logger.info("Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)");
+        logger.info(
+          "Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)"
+        );
         const pr = docDetails.paperRecord;
         if (!pr) {
           throw new Error("paper_record document missing paperRecord");
@@ -275,7 +274,9 @@ export const docEmbedding = internalAction({
             });
           }
         } catch (e) {
-          logger.warn("AcademicLoaderService failed", { message: e instanceof Error ? e.message : String(e) });
+          logger.warn("AcademicLoaderService failed", {
+            message: e instanceof Error ? e.message : String(e),
+          });
         }
 
         if (!extractedText?.trim()) {

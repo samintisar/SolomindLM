@@ -1,6 +1,11 @@
 import { test, expect } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
-import { firstStudioNoteCard, openStudioTool, deleteNote, renameNote } from "../helpers/studio-assertions";
+import {
+  firstStudioNoteCard,
+  openStudioTool,
+  deleteNote,
+  renameNote,
+} from "../helpers/studio-assertions";
 import { seedPastedTextSourceForStudio } from "../helpers/studio-seed";
 
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -28,9 +33,7 @@ test.describe("Studio Note Lifecycle", () => {
     return { card, title };
   }
 
-  test("generating note shows progress bar with aria attributes", async ({
-    notebookPage,
-  }) => {
+  test("generating note shows progress bar with aria attributes", async ({ notebookPage }) => {
     test.skip(shouldSkipAITests(), "Requires AI for generation");
 
     const page = notebookPage;

@@ -330,7 +330,7 @@ export async function reduce(
       return new Send("reduce", {
         ...withoutMapOutputs(state),
         reduceRetryCount: retryCount + 1,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
     }
 

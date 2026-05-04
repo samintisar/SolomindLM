@@ -33,8 +33,7 @@ import {
   selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
-import {
-} from "./chatConfig.js";
+import {} from "./chatConfig.js";
 /**
 
  * Threshold for when to use full-document mode.
@@ -81,9 +80,7 @@ export class ChatAgent {
   /**
    * Fetch full document content
    */
-  private async fetchFullDocumentContent(
-    documentId: string
-  ): Promise<string | null> {
+  private async fetchFullDocumentContent(documentId: string): Promise<string | null> {
     if (!this.fetchDocumentFn) return null;
     try {
       const result = await this.fetchDocumentFn(documentId);
@@ -132,9 +129,7 @@ export class ChatAgent {
 
       // Expand if we have a significant portion of the document
       // OR if we have many chunks regardless of document size
-      const shouldExpand =
-        ratio >= FULL_DOCUMENT_CHUNK_RATIO_THRESHOLD ||
-        retrievedCount >= 10; // Absolute threshold for larger documents
+      const shouldExpand = ratio >= FULL_DOCUMENT_CHUNK_RATIO_THRESHOLD || retrievedCount >= 10; // Absolute threshold for larger documents
 
       if (shouldExpand && totalChunks > 1) {
         documentsToExpand.push(docId);
@@ -430,7 +425,11 @@ export class ChatAgent {
     if (route.type === "direct") {
       logger.info("Router decision: direct response");
       yield { type: "status", status: "thinking", message: "Generating response..." };
-      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, effectiveTurns, context.chatSettings);
+      const directAnswer = await this.llmWrapper.generateDirectResponse(
+        userMessage,
+        effectiveTurns,
+        context.chatSettings
+      );
       for (const para of directAnswer.split(/\n\n+/)) {
         if (para.trim().length > 0) {
           for await (const piece of sliceParagraphForStream(para)) {
@@ -510,9 +509,7 @@ export class ChatAgent {
     }
 
     // Build set of external chunk keys before merging so we can identify them after rerank
-    const externalChunkKeys = new Set(
-      (context.externalChunks ?? []).map((c) => chunkDedupKey(c))
-    );
+    const externalChunkKeys = new Set((context.externalChunks ?? []).map((c) => chunkDedupKey(c)));
 
     let merged = allChunks;
     if (context.externalChunks && context.externalChunks.length > 0) {
@@ -556,7 +553,11 @@ export class ChatAgent {
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");
       yield { type: "status", status: "thinking", message: "Generating response..." };
-      const directAnswer = await this.llmWrapper.generateDirectResponse(userMessage, effectiveTurns, context.chatSettings);
+      const directAnswer = await this.llmWrapper.generateDirectResponse(
+        userMessage,
+        effectiveTurns,
+        context.chatSettings
+      );
       for (const para of directAnswer.split(/\n\n+/)) {
         if (para.trim().length > 0) {
           for await (const piece of sliceParagraphForStream(para)) {
@@ -569,7 +570,13 @@ export class ChatAgent {
       return;
     }
 
-    yield* this.streamRagAnswerFromChunks(context, userMessage, effectiveTurns, rankedChunks, logger);
+    yield* this.streamRagAnswerFromChunks(
+      context,
+      userMessage,
+      effectiveTurns,
+      rankedChunks,
+      logger
+    );
   }
 
   private async *streamRagAnswerFromChunks(
@@ -586,7 +593,11 @@ export class ChatAgent {
       id: String(i + 1),
     }));
 
-    yield { type: "status", status: "reading", message: `Reading ${citationChunks.length} passages...` };
+    yield {
+      type: "status",
+      status: "reading",
+      message: `Reading ${citationChunks.length} passages...`,
+    };
     yield { type: "references", data: citationChunks };
 
     logger.info("Generating grounded response", {

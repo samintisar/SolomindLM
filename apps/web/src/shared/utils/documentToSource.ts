@@ -31,7 +31,7 @@ export function documentToSource(doc: any): Source {
   }
 
   if (doc.fileType === "youtube") {
-    type = "WEB";
+    type = "YOUTUBE";
   } else if (doc.fileType === "url") {
     type = "WEB";
   } else if (doc.fileType === "text") {

@@ -85,7 +85,10 @@ export const reembedAllChunks = internalAction({
       processed: 0,
       errors: 0,
     });
-    return { scheduled: true, message: "Re-embedding started; watch logs for reembedBatchesWorker progress." };
+    return {
+      scheduled: true,
+      message: "Re-embedding started; watch logs for reembedBatchesWorker progress.",
+    };
   },
 });
 

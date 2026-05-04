@@ -53,10 +53,10 @@ export const getSocialTranscriptInternal = internalAction({
 // Cached Wrappers
 // ============================================================
 
-const scrapeCache = createCachedAction(
-  internal._services.extractors.scrapeWebPageInternal,
-  { ttl: withJitter(CACHE_TTL.documentContent, 0.15), name: "supadata-scrape" }
-);
+const scrapeCache = createCachedAction(internal._services.extractors.scrapeWebPageInternal, {
+  ttl: withJitter(CACHE_TTL.documentContent, 0.15),
+  name: "supadata-scrape",
+});
 
 const transcriptCache = createCachedAction(
   internal._services.extractors.getSocialTranscriptInternal,

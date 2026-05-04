@@ -145,13 +145,13 @@ export async function evaluateInfographicWithVision(
     });
 
     let content = response.choices[0]?.message?.content ?? "{}";
-    
+
     // Try to extract JSON if wrapped in markdown or has extra text
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       content = jsonMatch[0];
     }
-    
+
     // Handle truncated JSON by trying to close it
     if (!content.trim().endsWith("}")) {
       const lastBrace = content.lastIndexOf("}");
@@ -159,7 +159,7 @@ export async function evaluateInfographicWithVision(
         content = content.substring(0, lastBrace + 1);
       }
     }
-    
+
     let result: VisionJudgeResult;
     try {
       result = JSON.parse(content) as VisionJudgeResult;
@@ -181,8 +181,7 @@ export async function evaluateInfographicWithVision(
 
     // Overall score
     const overallScore = result.overall?.score ?? 0;
-    const overallStatus =
-      overallScore >= 0.7 ? "pass" : overallScore >= 0.4 ? "warn" : "fail";
+    const overallStatus = overallScore >= 0.7 ? "pass" : overallScore >= 0.4 ? "warn" : "fail";
 
     metrics.push(
       baseMetric(
@@ -207,8 +206,7 @@ export async function evaluateInfographicWithVision(
       const dimResult = result[dim];
       if (dimResult) {
         const score = dimResult.score ?? 0;
-        const status =
-          score >= 0.7 ? "pass" : score >= 0.4 ? "warn" : "fail";
+        const status = score >= 0.7 ? "pass" : score >= 0.4 ? "warn" : "fail";
         metrics.push(
           baseMetric(
             `vision_judge_${dim}`,
@@ -226,14 +224,7 @@ export async function evaluateInfographicWithVision(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return [
-      baseMetric(
-        "vision_judge",
-        fixture,
-        artifact,
-        "fail",
-        0,
-        `Vision judge failed: ${message}`
-      ),
+      baseMetric("vision_judge", fixture, artifact, "fail", 0, `Vision judge failed: ${message}`),
     ];
   }
 }

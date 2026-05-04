@@ -23,7 +23,7 @@ async function submitAndPoll(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload: Record<string, any>,
   priority: number = 1
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const job = await client.beta.jig.queue.submit({
     model: DEPLOYMENT,
@@ -111,11 +111,7 @@ async function main() {
 
   // --- Example 3: Submit batch ---
   console.log("=== Batch submit ===");
-  const ids = await submitMultiple([
-    { name: "Alice" },
-    { name: "Bob" },
-    { name: "Charlie" },
-  ]);
+  const ids = await submitMultiple([{ name: "Alice" }, { name: "Bob" }, { name: "Charlie" }]);
   console.log(`Submitted ${ids.length} jobs`);
 
   for (const rid of ids) {

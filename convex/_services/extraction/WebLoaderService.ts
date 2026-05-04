@@ -242,10 +242,7 @@ export class WebLoaderService {
       logger.info("Started async transcript job", {
         jobId: (transcriptResult as { jobId: string }).jobId,
       });
-      return this.pollForTranscriptWithMeta(
-        (transcriptResult as { jobId: string }).jobId,
-        url
-      );
+      return this.pollForTranscriptWithMeta((transcriptResult as { jobId: string }).jobId, url);
     }
 
     const title = await this.fetchTitleFromMetadata(url);
@@ -322,8 +319,8 @@ export class WebLoaderService {
     ];
     try {
       const hostname = new URL(url).hostname.toLowerCase();
-      return supportedDomains.some((domain) =>
-        hostname === domain || hostname.endsWith(`.${domain}`)
+      return supportedDomains.some(
+        (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
       );
     } catch {
       return false;

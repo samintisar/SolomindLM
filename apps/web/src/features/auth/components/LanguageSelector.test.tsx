@@ -21,9 +21,7 @@ describe("LanguageSelector", () => {
 
     await user.click(screen.getByRole("button", { name: /output language/i }));
 
-    expect(
-      screen.getByRole("listbox", { name: /output language options/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: /output language options/i })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /english/i })).toBeInTheDocument();
   });
 });

@@ -44,7 +44,7 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <ChecklistCard />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
@@ -88,7 +88,7 @@ describe("ChecklistCard", () => {
     render(
       <MemoryRouter initialEntries={["/notebook/abc"]}>
         <ChecklistCard />
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     expect(screen.getByText(/Get started/i)).toBeInTheDocument();
   });

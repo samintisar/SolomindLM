@@ -108,15 +108,20 @@ export const generateInfographic = mutation({
     documentIds: v.array(v.id("documents")),
     title: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
-    orientation: v.optional(v.union(v.literal("landscape"), v.literal("portrait"), v.literal("square"))),
+    orientation: v.optional(
+      v.union(v.literal("landscape"), v.literal("portrait"), v.literal("square"))
+    ),
     visualStyle: v.optional(v.string()),
-    detailLevel: v.optional(v.union(v.literal("concise"), v.literal("standard"), v.literal("detailed"))),
+    detailLevel: v.optional(
+      v.union(v.literal("concise"), v.literal("standard"), v.literal("detailed"))
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     await checkDailyLimit(ctx, userId, "infographic");
-    const { notebookId, documentIds, title, customPrompt, orientation, visualStyle, detailLevel } = args;
+    const { notebookId, documentIds, title, customPrompt, orientation, visualStyle, detailLevel } =
+      args;
     if (documentIds.length === 0) {
       throw new Error(
         "Please select at least one source. Content generation uses only your selected sources."
@@ -153,7 +158,15 @@ export const generateInfographic = mutation({
 
 // Internal mutations delegate to model
 export const updateStatus = internalMutation({
-  args: { infographicId: v.id("infographics"), status: v.union(v.literal("draft"), v.literal("generating"), v.literal("completed"), v.literal("failed")) },
+  args: {
+    infographicId: v.id("infographics"),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("generating"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+  },
   handler: async (ctx, args) => {
     await Infographics.updateInfographicStatus(ctx, args.infographicId, args.status);
   },

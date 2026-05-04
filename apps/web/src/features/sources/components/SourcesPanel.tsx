@@ -412,7 +412,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           onResizeStart={handleResizeStart}
         />
 
-        <div className="flex-1 overflow-y-auto w-full">
+        <div
+          className={
+            viewingSource
+              ? "flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+              : "w-full flex-1 overflow-y-auto"
+          }
+        >
           {viewingSource ? (
             <SourceViewer
               source={viewingSource}

@@ -119,9 +119,7 @@ function NotebookMenuDropdown({
 
 /** Shared badge for shared notebooks */
 function SharedBadge({ size = "sm" }: { size?: "sm" | "md" }) {
-  const sizeClasses = size === "sm"
-    ? "gap-0.5 px-2 py-0.5 text-[9px]"
-    : "gap-1 px-2 py-1 text-xs";
+  const sizeClasses = size === "sm" ? "gap-0.5 px-2 py-0.5 text-[9px]" : "gap-1 px-2 py-1 text-xs";
   return (
     <span
       className={`inline-flex items-center rounded-xl bg-primary/10 font-semibold uppercase tracking-wide text-primary ${sizeClasses}`}
@@ -287,10 +285,7 @@ interface NotebookCardListProps extends SharedNotebookCardProps {
   showAuthor?: boolean;
 }
 
-export function NotebookCardList({
-  showAuthor = false,
-  ...props
-}: NotebookCardListProps) {
+export function NotebookCardList({ showAuthor = false, ...props }: NotebookCardListProps) {
   const { notebook, onSelectNotebook } = props;
   const {
     isMenuOpen,

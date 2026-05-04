@@ -44,11 +44,7 @@ function readRect(selector: string): Rect | null {
     if (vw > 0 && left + width > vw) width = Math.max(0, vw - left);
     if (vh > 0 && top + height > vh) height = Math.max(0, vh - top);
 
-    const rx = Math.min(
-      innerRx + SPOTLIGHT_PADDING_PX,
-      width / 2,
-      height / 2,
-    );
+    const rx = Math.min(innerRx + SPOTLIGHT_PADDING_PX, width / 2, height / 2);
 
     return { top, left, width, height, rx };
   }
@@ -86,9 +82,7 @@ function logSelectorInvariants(step: StepDefinition) {
   if (!import.meta.env.DEV) return;
   const matches = document.querySelectorAll(step.targetSelector);
   if (matches.length === 0) {
-    console.error(
-      `[onboarding] step "${step.id}" has no element matching ${step.targetSelector}`,
-    );
+    console.error(`[onboarding] step "${step.id}" has no element matching ${step.targetSelector}`);
     return;
   }
   // Only warn when more than one match is currently visible.
@@ -99,7 +93,7 @@ function logSelectorInvariants(step: StepDefinition) {
   if (visibleMatches.length > 1) {
     console.error(
       `[onboarding] step "${step.id}" has ${visibleMatches.length} visible elements:`,
-      visibleMatches,
+      visibleMatches
     );
   }
 }
@@ -190,21 +184,9 @@ export const TourTooltip: React.FC = () => {
 
   return createPortal(
     <>
-      <svg
-        className="fixed inset-0 z-40 pointer-events-none"
-        width={vw}
-        height={vh}
-        aria-hidden
-      >
+      <svg className="fixed inset-0 z-40 pointer-events-none" width={vw} height={vh} aria-hidden>
         <defs>
-          <mask
-            id={spotlightMaskId}
-            maskUnits="userSpaceOnUse"
-            x="0"
-            y="0"
-            width={vw}
-            height={vh}
-          >
+          <mask id={spotlightMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width={vw} height={vh}>
             <rect width={vw} height={vh} fill="white" />
             <rect
               x={rect.left}
@@ -217,12 +199,7 @@ export const TourTooltip: React.FC = () => {
             />
           </mask>
         </defs>
-        <rect
-          width={vw}
-          height={vh}
-          fill="rgba(0, 0, 0, 0.42)"
-          mask={`url(#${spotlightMaskId})`}
-        />
+        <rect width={vw} height={vh} fill="rgba(0, 0, 0, 0.42)" mask={`url(#${spotlightMaskId})`} />
       </svg>
       <div
         role="dialog"
@@ -244,6 +221,6 @@ export const TourTooltip: React.FC = () => {
         </div>
       </div>
     </>,
-    document.body,
+    document.body
   );
 };

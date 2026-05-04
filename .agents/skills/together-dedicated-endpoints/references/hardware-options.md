@@ -1,4 +1,5 @@
 # Dedicated Endpoints Hardware Reference
+
 ## Contents
 
 - [Hardware ID Format](#hardware-id-format)
@@ -11,7 +12,6 @@
 - [Scaling](#scaling)
 - [Autoscaling Schema](#autoscaling-schema)
 
-
 ## Hardware ID Format
 
 `[count]x_nvidia_[gpu_type]_[memory]_[link]`
@@ -20,13 +20,13 @@ Example: `2x_nvidia_h100_80gb_sxm`
 
 ## GPU Types
 
-| GPU | Memory | Notes |
-|-----|--------|-------|
-| H100 SXM | 80GB | Highest performance, recommended for production |
-| A100 SXM | 80GB | Good balance of cost and performance |
-| A100 PCIe | 80GB | Cost-effective option |
-| L40 | 48GB | Mid-range option |
-| RTX-6000 | 24GB | Entry-level for smaller models |
+| GPU       | Memory | Notes                                           |
+| --------- | ------ | ----------------------------------------------- |
+| H100 SXM  | 80GB   | Highest performance, recommended for production |
+| A100 SXM  | 80GB   | Good balance of cost and performance            |
+| A100 PCIe | 80GB   | Cost-effective option                           |
+| L40       | 48GB   | Mid-range option                                |
+| RTX-6000  | 24GB   | Entry-level for smaller models                  |
 
 Hardware availability varies by region and demand. Use the API or CLI to get current options:
 
@@ -47,23 +47,23 @@ together endpoints hardware --model Qwen/Qwen3.5-9B-FP8 --available
 
 ## Common Configurations
 
-| Hardware ID | GPU | Count | Typical Use |
-|------------|-----|-------|-------------|
-| `1x_nvidia_h100_80gb_sxm` | H100 | 1 | Small models (up to ~9B) |
-| `2x_nvidia_h100_80gb_sxm` | H100 | 2 | Medium models (7-20B) |
-| `4x_nvidia_h100_80gb_sxm` | H100 | 4 | Large models (70B) |
-| `8x_nvidia_h100_80gb_sxm` | H100 | 8 | Very large models (120B+, MoE) |
-| `1x_nvidia_a100_80gb_sxm` | A100 | 1 | Small models, cost-effective |
-| `2x_nvidia_a100_80gb_sxm` | A100 | 2 | Medium models, cost-effective |
-| `4x_nvidia_a100_80gb_sxm` | A100 | 4 | Large models, cost-effective |
-| `8x_nvidia_a100_80gb_sxm` | A100 | 8 | Very large models, cost-effective |
+| Hardware ID               | GPU  | Count | Typical Use                       |
+| ------------------------- | ---- | ----- | --------------------------------- |
+| `1x_nvidia_h100_80gb_sxm` | H100 | 1     | Small models (up to ~9B)          |
+| `2x_nvidia_h100_80gb_sxm` | H100 | 2     | Medium models (7-20B)             |
+| `4x_nvidia_h100_80gb_sxm` | H100 | 4     | Large models (70B)                |
+| `8x_nvidia_h100_80gb_sxm` | H100 | 8     | Very large models (120B+, MoE)    |
+| `1x_nvidia_a100_80gb_sxm` | A100 | 1     | Small models, cost-effective      |
+| `2x_nvidia_a100_80gb_sxm` | A100 | 2     | Medium models, cost-effective     |
+| `4x_nvidia_a100_80gb_sxm` | A100 | 4     | Large models, cost-effective      |
+| `8x_nvidia_a100_80gb_sxm` | A100 | 8     | Very large models, cost-effective |
 
 ## Hardware Availability Status
 
-| Status | Meaning |
-|--------|---------|
-| `available` | Ready for deployment |
-| `unavailable` | Currently not available |
+| Status         | Meaning                          |
+| -------------- | -------------------------------- |
+| `available`    | Ready for deployment             |
+| `unavailable`  | Currently not available          |
 | `insufficient` | Some capacity but may be limited |
 
 ## Hardware Response Object
@@ -93,15 +93,15 @@ together endpoints hardware --model Qwen/Qwen3.5-9B-FP8 --available
 
 ## GPU Selection Guide
 
-| Need | Recommendation |
-|------|---------------|
-| Small models (up to 9B) | 1x H100 or 1x A100 |
-| Medium models (7-20B) | 1-2x H100/A100 |
-| Large models (70B) | 4-8x H100/A100 |
-| Very large / MoE models (120B+) | 8x H100 |
-| Maximum throughput | 8x H100 + multiple replicas |
-| Cost-effective | A100 (lower per-minute cost) |
-| Maximum performance | H100 (faster inference) |
+| Need                            | Recommendation               |
+| ------------------------------- | ---------------------------- |
+| Small models (up to 9B)         | 1x H100 or 1x A100           |
+| Medium models (7-20B)           | 1-2x H100/A100               |
+| Large models (70B)              | 4-8x H100/A100               |
+| Very large / MoE models (120B+) | 8x H100                      |
+| Maximum throughput              | 8x H100 + multiple replicas  |
+| Cost-effective                  | A100 (lower per-minute cost) |
+| Maximum performance             | H100 (faster inference)      |
 
 Fine-tuned and custom-uploaded models may require larger hardware than their base parameter count
 suggests. For example, a fine-tuned 8B model may only be eligible for 4x or 8x H100 configs.

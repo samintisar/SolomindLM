@@ -1,4 +1,5 @@
 # CLI Reference for GPU Clusters
+
 ## Contents
 
 - [Installation](#installation)
@@ -6,7 +7,6 @@
 - [Storage Commands](#storage-commands)
 - [Instance Types](#instance-types)
 - [Driver Versions](#driver-versions)
-
 
 The Together GPU Clusters CLI is available in two forms:
 
@@ -18,6 +18,7 @@ Both CLIs provide equivalent functionality. This reference uses the `together be
 ## Installation
 
 **Together CLI (via pip):**
+
 ```shell
 uv pip install "together>=2.0.0"
 together auth login
@@ -26,18 +27,21 @@ together auth login
 **tcloud standalone binary:**
 
 Mac (Universal):
+
 ```shell
 curl -LO https://tcloud-cli-downloads.s3.us-west-2.amazonaws.com/releases/latest/tcloud-darwin-universal.tar.gz
 tar xzf tcloud-darwin-universal.tar.gz
 ```
 
 Linux (AMD64):
+
 ```shell
 curl -LO https://tcloud-cli-downloads.s3.us-west-2.amazonaws.com/releases/latest/tcloud-linux-amd64.tar.gz
 tar xzf tcloud-linux-amd64.tar.gz
 ```
 
 Authenticate tcloud:
+
 ```shell
 tcloud sso login
 ```
@@ -54,18 +58,18 @@ together beta clusters create [OPTIONS]
 
 **Options:**
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--name` | string | Name of the cluster |
-| `--num-gpus` | number | Number of GPUs (must be a multiple of 8) |
-| `--gpu-type` | enum | `H100_SXM`, `H200_SXM`, `B200_SXM`, `H100_SXM_INF`, `L40_PCIE`, `RTX_6000_PCI` |
-| `--region` | string | Region (use `clusters list-regions` to find valid regions) |
-| `--billing-type` | enum | `ON_DEMAND` or `RESERVED` |
-| `--duration-days` | number | Reservation length in days (only with `RESERVED` billing) |
-| `--driver-version` | enum | CUDA driver version (use `clusters list-regions` for options) |
-| `--cluster-type` | enum | `KUBERNETES` or `SLURM` |
-| `--volume` | string | Existing storage volume ID to attach |
-| `--json` | -- | Output in JSON format |
+| Flag               | Type   | Description                                                                    |
+| ------------------ | ------ | ------------------------------------------------------------------------------ |
+| `--name`           | string | Name of the cluster                                                            |
+| `--num-gpus`       | number | Number of GPUs (must be a multiple of 8)                                       |
+| `--gpu-type`       | enum   | `H100_SXM`, `H200_SXM`, `B200_SXM`, `H100_SXM_INF`, `L40_PCIE`, `RTX_6000_PCI` |
+| `--region`         | string | Region (use `clusters list-regions` to find valid regions)                     |
+| `--billing-type`   | enum   | `ON_DEMAND` or `RESERVED`                                                      |
+| `--duration-days`  | number | Reservation length in days (only with `RESERVED` billing)                      |
+| `--driver-version` | enum   | CUDA driver version (use `clusters list-regions` for options)                  |
+| `--cluster-type`   | enum   | `KUBERNETES` or `SLURM`                                                        |
+| `--volume`         | string | Existing storage volume ID to attach                                           |
+| `--json`           | --     | Output in JSON format                                                          |
 
 **Examples:**
 
@@ -94,6 +98,7 @@ together beta clusters create \
 ```
 
 Equivalent tcloud command:
+
 ```shell
 tcloud cluster create my-training-cluster \
   --num-gpus 8 \
@@ -130,11 +135,11 @@ together beta clusters update <CLUSTER_ID> [OPTIONS]
 
 **Options:**
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--num-gpus` | number | New GPU count (must be a multiple of 8) |
-| `--cluster-type` | enum | `KUBERNETES` or `SLURM` |
-| `--json` | -- | Output in JSON format |
+| Flag             | Type   | Description                             |
+| ---------------- | ------ | --------------------------------------- |
+| `--num-gpus`     | number | New GPU count (must be a multiple of 8) |
+| `--cluster-type` | enum   | `KUBERNETES` or `SLURM`                 |
+| `--json`         | --     | Output in JSON format                   |
 
 **Example:**
 
@@ -147,6 +152,7 @@ together beta clusters update <CLUSTER_ID> --cluster-type SLURM
 ```
 
 Equivalent tcloud command:
+
 ```shell
 tcloud cluster scale <CLUSTER_UUID> --num-gpus 16
 ```
@@ -160,6 +166,7 @@ together beta clusters delete <CLUSTER_ID>
 ```
 
 Equivalent tcloud command:
+
 ```shell
 tcloud cluster delete <CLUSTER_UUID>
 ```
@@ -176,23 +183,20 @@ together beta clusters list-regions
 
 ```json
 {
-    "regions": [
-        {
-            "driver_versions": [
-                "CUDA_12_6_565",
-                "CUDA_12_5_555",
-                "CUDA_12_8_570",
-                "CUDA_12_9_575",
-                "CUDA_12_6_560",
-                "CUDA_12_4_550"
-            ],
-            "name": "us-central-8",
-            "supported_instance_types": [
-                "H100_SXM",
-                "H200_SXM"
-            ]
-        }
-    ]
+  "regions": [
+    {
+      "driver_versions": [
+        "CUDA_12_6_565",
+        "CUDA_12_5_555",
+        "CUDA_12_8_570",
+        "CUDA_12_9_575",
+        "CUDA_12_6_560",
+        "CUDA_12_4_550"
+      ],
+      "name": "us-central-8",
+      "supported_instance_types": ["H100_SXM", "H200_SXM"]
+    }
+  ]
 }
 ```
 
@@ -206,12 +210,12 @@ together beta clusters get-credentials <CLUSTER_ID> [OPTIONS]
 
 **Options:**
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--file` | path or `-` | Path to write kubeconfig. `-` prints to stdout. Default: `~/.kube/config` |
-| `--context-name` | string | Name for the kubeconfig context. Default: cluster name |
-| `--overwrite-existing` | -- | Overwrite existing kubeconfig entries on conflict |
-| `--set-default-context` | -- | Set the new context as default for kubectl |
+| Flag                    | Type        | Description                                                               |
+| ----------------------- | ----------- | ------------------------------------------------------------------------- |
+| `--file`                | path or `-` | Path to write kubeconfig. `-` prints to stdout. Default: `~/.kube/config` |
+| `--context-name`        | string      | Name for the kubeconfig context. Default: cluster name                    |
+| `--overwrite-existing`  | --          | Overwrite existing kubeconfig entries on conflict                         |
+| `--set-default-context` | --          | Set the new context as default for kubectl                                |
 
 **Examples:**
 
@@ -250,12 +254,12 @@ together beta clusters storage create [OPTIONS]
 
 **Options:**
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--volume-name` | string | Name of the storage volume (required) |
-| `--size-tib` | number | Size in tebibytes (required) |
-| `--region` | string | Region to create the volume in (required) |
-| `--json` | -- | Output in JSON format |
+| Flag            | Type   | Description                               |
+| --------------- | ------ | ----------------------------------------- |
+| `--volume-name` | string | Name of the storage volume (required)     |
+| `--size-tib`    | number | Size in tebibytes (required)              |
+| `--region`      | string | Region to create the volume in (required) |
+| `--json`        | --     | Output in JSON format                     |
 
 **Example:**
 
@@ -292,14 +296,14 @@ together beta clusters storage delete <VOLUME_ID>
 
 ## Instance Types
 
-| CLI Value | GPU | Memory | Notes |
-|-----------|-----|--------|-------|
-| `H100_SXM` | NVIDIA H100 | 80GB | InfiniBand networking |
-| `H100_SXM_INF` | NVIDIA H100 | 80GB | Inference-optimized, lower IB bandwidth |
-| `H200_SXM` | NVIDIA H200 | 141GB | InfiniBand networking |
-| `B200_SXM` | NVIDIA B200 | 192GB | InfiniBand networking |
-| `L40_PCIE` | NVIDIA L40 | 48GB | PCIe |
-| `RTX_6000_PCI` | NVIDIA RTX 6000 | 24GB | PCIe |
+| CLI Value      | GPU             | Memory | Notes                                   |
+| -------------- | --------------- | ------ | --------------------------------------- |
+| `H100_SXM`     | NVIDIA H100     | 80GB   | InfiniBand networking                   |
+| `H100_SXM_INF` | NVIDIA H100     | 80GB   | Inference-optimized, lower IB bandwidth |
+| `H200_SXM`     | NVIDIA H200     | 141GB  | InfiniBand networking                   |
+| `B200_SXM`     | NVIDIA B200     | 192GB  | InfiniBand networking                   |
+| `L40_PCIE`     | NVIDIA L40      | 48GB   | PCIe                                    |
+| `RTX_6000_PCI` | NVIDIA RTX 6000 | 24GB   | PCIe                                    |
 
 ## Driver Versions
 

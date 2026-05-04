@@ -174,9 +174,7 @@ export function ConversationList({
       <div
         key={conv._id}
         className={`group flex min-h-[38px] w-full max-w-full items-stretch overflow-hidden rounded-lg transition-colors duration-150 ${
-          isActive
-            ? "bg-muted/50 text-foreground"
-            : "text-foreground/90 hover:bg-muted/45"
+          isActive ? "bg-muted/50 text-foreground" : "text-foreground/90 hover:bg-muted/45"
         }`}
       >
         <button
@@ -242,9 +240,7 @@ export function ConversationList({
     );
   }
 
-  const threadMenuPinned = threadMenuDoc
-    ? (pinnedIds?.has(threadMenuDoc._id) ?? false)
-    : false;
+  const threadMenuPinned = threadMenuDoc ? (pinnedIds?.has(threadMenuDoc._id) ?? false) : false;
 
   return (
     <>
@@ -266,46 +262,46 @@ export function ConversationList({
       {threadMenu &&
         threadMenuDoc &&
         createPortal(
-            <div
-              ref={threadMenuBoxRef}
-              role="menu"
-              data-thread-submenu-root
-              className="fixed z-200 min-w-36 overflow-hidden rounded-lg border border-border bg-card py-1 font-sans text-sm antialiased shadow-lg"
-              style={{ top: threadMenu.top, right: threadMenu.right }}
-            >
-              {onTogglePin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onTogglePin(threadMenuDoc._id);
-                    setThreadMenu(null);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
-                  role="menuitem"
-                >
-                  <Pin className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  {threadMenuPinned ? "Unpin" : "Pin"}
-                </button>
-              )}
+          <div
+            ref={threadMenuBoxRef}
+            role="menu"
+            data-thread-submenu-root
+            className="fixed z-200 min-w-36 overflow-hidden rounded-lg border border-border bg-card py-1 font-sans text-sm antialiased shadow-lg"
+            style={{ top: threadMenu.top, right: threadMenu.right }}
+          >
+            {onTogglePin && (
               <button
                 type="button"
-                onClick={() => handleStartRename(threadMenuDoc)}
+                onClick={() => {
+                  onTogglePin(threadMenuDoc._id);
+                  setThreadMenu(null);
+                }}
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
                 role="menuitem"
               >
-                <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-                Rename
+                <Pin className="h-3.5 w-3.5" strokeWidth={1.75} />
+                {threadMenuPinned ? "Unpin" : "Pin"}
               </button>
-              <button
-                type="button"
-                onClick={() => void handleDelete(threadMenuDoc)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans text-destructive hover:bg-muted/80"
-                role="menuitem"
-              >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                Delete
-              </button>
-            </div>,
+            )}
+            <button
+              type="button"
+              onClick={() => handleStartRename(threadMenuDoc)}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans hover:bg-muted/80"
+              role="menuitem"
+            >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Rename
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDelete(threadMenuDoc)}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-sans text-destructive hover:bg-muted/80"
+              role="menuitem"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Delete
+            </button>
+          </div>,
           document.body
         )}
     </>

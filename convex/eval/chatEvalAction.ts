@@ -161,10 +161,7 @@ export const runChatEval = action({
 
     const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY || "");
 
-    const rerankFn = async (
-      query: string,
-      documents: Array<{ id: string; content: string }>
-    ) => {
+    const rerankFn = async (query: string, documents: Array<{ id: string; content: string }>) => {
       return cachedRerank(ctx, query, documents as RerankDocument[], "zerank-2", 15);
     };
 
@@ -231,9 +228,7 @@ export const runChatEval = action({
         rawContent?: string;
       }> = [];
 
-      const webChannels = externalChannels.filter((ch) =>
-        ["web", "news", "finance"].includes(ch)
-      );
+      const webChannels = externalChannels.filter((ch) => ["web", "news", "finance"].includes(ch));
       const academicChannels = externalChannels.filter((ch) => ch === "academic");
 
       if (webChannels.length > 0) {
@@ -308,7 +303,7 @@ export const runChatEval = action({
           // Prefer rawContent when available, fallback to snippet
           const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
           const raw = hasRawContent ? r.rawContent!.trim() : r.snippet.trim();
-          
+
           const CHUNK_SIZE = 3000;
           const pieces: string[] = [];
           for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
@@ -344,7 +339,9 @@ export const runChatEval = action({
         sourcePolicy: {
           channels: sourcePolicyChannels,
           maxResultsPerChannel: args.sourcePolicy?.maxResultsPerChannel ?? 5,
-          ...(args.sourcePolicy?.domainAllowlist ? { domainAllowlist: args.sourcePolicy.domainAllowlist } : {}),
+          ...(args.sourcePolicy?.domainAllowlist
+            ? { domainAllowlist: args.sourcePolicy.domainAllowlist }
+            : {}),
           ...(args.sourcePolicy?.recencyDays ? { recencyDays: args.sourcePolicy.recencyDays } : {}),
         },
         externalChunks: externalChunks.length > 0 ? externalChunks : undefined,

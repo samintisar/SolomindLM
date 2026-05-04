@@ -1,4 +1,5 @@
 # Dedicated Endpoints API Reference
+
 ## Contents
 
 - [Endpoints](#endpoints)
@@ -21,19 +22,18 @@
 - [CLI Reference](#cli-reference)
 - [Endpoint Response Object](#endpoint-response-object)
 
-
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST /endpoints` | Create endpoint | Deploy a new dedicated endpoint |
-| `GET /endpoints` | List endpoints | List all endpoints |
-| `GET /endpoints/{id}` | Get endpoint | Get endpoint details |
-| `PATCH /endpoints/{id}` | Update endpoint | Update config/scaling |
-| `DELETE /endpoints/{id}` | Delete endpoint | Remove endpoint |
-| `GET /hardware` | List hardware | Available hardware configs |
-| `POST /models` | Upload model | Upload custom model |
-| `GET /models` | List models | List available models |
+| Method                   | Path            | Description                     |
+| ------------------------ | --------------- | ------------------------------- |
+| `POST /endpoints`        | Create endpoint | Deploy a new dedicated endpoint |
+| `GET /endpoints`         | List endpoints  | List all endpoints              |
+| `GET /endpoints/{id}`    | Get endpoint    | Get endpoint details            |
+| `PATCH /endpoints/{id}`  | Update endpoint | Update config/scaling           |
+| `DELETE /endpoints/{id}` | Delete endpoint | Remove endpoint                 |
+| `GET /hardware`          | List hardware   | Available hardware configs      |
+| `POST /models`           | Upload model    | Upload custom model             |
+| `GET /models`            | List models     | List available models           |
 
 Base URL: `https://api.together.xyz/v1`
 
@@ -91,16 +91,16 @@ together endpoints create \
 
 ### Request Body
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `model` | string | Yes | - | Model to deploy |
-| `hardware` | string | Yes | - | Hardware config ID |
-| `autoscaling` | object | Yes | - | `{min_replicas, max_replicas}` |
-| `display_name` | string | No | - | Human-readable name |
-| `disable_speculative_decoding` | bool | No | false | Disable spec decoding |
-| `state` | string | No | `"STARTED"` | `"STARTED"` or `"STOPPED"` |
-| `inactive_timeout` | int/null | No | 60 | Minutes before auto-stop (0/null disables) |
-| `availability_zone` | string | No | - | Preferred zone |
+| Field                          | Type     | Required | Default     | Description                                |
+| ------------------------------ | -------- | -------- | ----------- | ------------------------------------------ |
+| `model`                        | string   | Yes      | -           | Model to deploy                            |
+| `hardware`                     | string   | Yes      | -           | Hardware config ID                         |
+| `autoscaling`                  | object   | Yes      | -           | `{min_replicas, max_replicas}`             |
+| `display_name`                 | string   | No       | -           | Human-readable name                        |
+| `disable_speculative_decoding` | bool     | No       | false       | Disable spec decoding                      |
+| `state`                        | string   | No       | `"STARTED"` | `"STARTED"` or `"STOPPED"`                 |
+| `inactive_timeout`             | int/null | No       | 60          | Minutes before auto-stop (0/null disables) |
+| `availability_zone`            | string   | No       | -           | Preferred zone                             |
 
 ## Get Endpoint
 
@@ -160,22 +160,22 @@ together endpoints list --json
 
 ### Query Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `type` | string | Filter by `dedicated` or `serverless` |
-| `usage_type` | string | Filter by `on-demand` or `reserved` |
-| `mine` | boolean | Only endpoints owned by the caller |
+| Parameter    | Type    | Description                           |
+| ------------ | ------- | ------------------------------------- |
+| `type`       | string  | Filter by `dedicated` or `serverless` |
+| `usage_type` | string  | Filter by `on-demand` or `reserved`   |
+| `mine`       | boolean | Only endpoints owned by the caller    |
 
 ## Endpoint States
 
-| State | Description |
-|-------|-------------|
-| `PENDING` | Waiting for resources |
-| `STARTING` | Initializing |
-| `STARTED` | Running, accepting requests |
-| `STOPPING` | Shutting down |
-| `STOPPED` | Not running |
-| `ERROR` | Failed |
+| State      | Description                 |
+| ---------- | --------------------------- |
+| `PENDING`  | Waiting for resources       |
+| `STARTING` | Initializing                |
+| `STARTED`  | Running, accepting requests |
+| `STOPPING` | Shutting down               |
+| `STOPPED`  | Not running                 |
+| `ERROR`    | Failed                      |
 
 ## Update Endpoint
 
@@ -373,15 +373,15 @@ together models upload \
 
 ### Upload Parameters
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `model_name` | string | Yes | Name for the uploaded model |
-| `model_source` | string | Yes | Hugging Face repo URL or S3 presigned URL |
-| `model_type` | string | No | `"model"` (default) or `"adapter"` |
-| `hf_token` | string | No | Hugging Face token for private repos |
-| `description` | string | No | Model description |
-| `base_model` | string | No | Base model for adapters (serverless) |
-| `lora_model` | string | No | LoRA pool for adapters (dedicated) |
+| Field          | Type   | Required | Description                               |
+| -------------- | ------ | -------- | ----------------------------------------- |
+| `model_name`   | string | Yes      | Name for the uploaded model               |
+| `model_source` | string | Yes      | Hugging Face repo URL or S3 presigned URL |
+| `model_type`   | string | No       | `"model"` (default) or `"adapter"`        |
+| `hf_token`     | string | No       | Hugging Face token for private repos      |
+| `description`  | string | No       | Model description                         |
+| `base_model`   | string | No       | Base model for adapters (serverless)      |
+| `lora_model`   | string | No       | LoRA pool for adapters (dedicated)        |
 
 ### Upload Response
 
@@ -444,7 +444,7 @@ response = client.chat.completions.create(
 
 ```typescript
 const response = await together.chat.completions.create({
-  model: "endpoint-abc123",  // or endpoint name
+  model: "endpoint-abc123", // or endpoint name
   messages: [{ role: "user", content: "Hello!" }],
 });
 console.log(response.choices[0].message.content);
@@ -487,82 +487,82 @@ Restricting zones narrows available capacity and can make hardware placement har
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Hardware unavailable | Try a different compatible model or retry when capacity changes |
+| Issue                                                       | Solution                                                                                                                                                                                       |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hardware unavailable                                        | Try a different compatible model or retry when capacity changes                                                                                                                                |
 | Hardware not eligible (404: "not available for this model") | The model only supports specific hardware configs. Run `list_hardware(model=...)` to see eligible options. Fine-tuned models often require larger hardware than their parameter count suggests |
-| Endpoint queued (not starting) | Reduce `min_replicas` to match currently available capacity |
-| Low replica scaling | Reduce `max_replicas` or wait for more hardware to become available |
-| Model not supported | Use a dedicated-eligible model from `together models list --type dedicated` |
-| Fine-tuned model won't deploy | Confirm the base model is supported on dedicated endpoints |
+| Endpoint queued (not starting)                              | Reduce `min_replicas` to match currently available capacity                                                                                                                                    |
+| Low replica scaling                                         | Reduce `max_replicas` or wait for more hardware to become available                                                                                                                            |
+| Model not supported                                         | Use a dedicated-eligible model from `together models list --type dedicated`                                                                                                                    |
+| Fine-tuned model won't deploy                               | Confirm the base model is supported on dedicated endpoints                                                                                                                                     |
 
 ## CLI Reference
 
 ### Endpoint Commands
 
-| Command | Description |
-|---------|-------------|
-| `together endpoints create` | Create a new endpoint |
-| `together endpoints retrieve <ID>` | Get endpoint details |
-| `together endpoints list` | List endpoints |
-| `together endpoints update <ID>` | Update endpoint config |
-| `together endpoints start <ID>` | Start a stopped endpoint |
-| `together endpoints stop <ID>` | Stop a running endpoint |
-| `together endpoints delete <ID>` | Delete an endpoint |
-| `together endpoints hardware` | List available hardware |
-| `together endpoints availability-zones` | List availability zones |
+| Command                                 | Description              |
+| --------------------------------------- | ------------------------ |
+| `together endpoints create`             | Create a new endpoint    |
+| `together endpoints retrieve <ID>`      | Get endpoint details     |
+| `together endpoints list`               | List endpoints           |
+| `together endpoints update <ID>`        | Update endpoint config   |
+| `together endpoints start <ID>`         | Start a stopped endpoint |
+| `together endpoints stop <ID>`          | Stop a running endpoint  |
+| `together endpoints delete <ID>`        | Delete an endpoint       |
+| `together endpoints hardware`           | List available hardware  |
+| `together endpoints availability-zones` | List availability zones  |
 
 ### Model Commands
 
-| Command | Description |
-|---------|-------------|
+| Command                  | Description           |
+| ------------------------ | --------------------- |
 | `together models upload` | Upload a custom model |
-| `together models list` | List available models |
+| `together models list`   | List available models |
 
 ### Create Options
 
-| Flag | Description |
-|------|-------------|
-| `--model` | (required) Model to deploy |
-| `--hardware` | (required) Hardware config ID |
-| `--min-replicas` | Minimum replica count |
-| `--max-replicas` | Maximum replica count |
-| `--display-name` | Human-readable name |
-| `--no-auto-start` | Create in STOPPED state |
-| `--no-speculative-decoding` | Disable speculative decoding |
-| `--availability-zone` | Preferred availability zone |
-| `--wait` | Wait for endpoint to be ready |
-| `--json` | Output in JSON format |
+| Flag                        | Description                   |
+| --------------------------- | ----------------------------- |
+| `--model`                   | (required) Model to deploy    |
+| `--hardware`                | (required) Hardware config ID |
+| `--min-replicas`            | Minimum replica count         |
+| `--max-replicas`            | Maximum replica count         |
+| `--display-name`            | Human-readable name           |
+| `--no-auto-start`           | Create in STOPPED state       |
+| `--no-speculative-decoding` | Disable speculative decoding  |
+| `--availability-zone`       | Preferred availability zone   |
+| `--wait`                    | Wait for endpoint to be ready |
+| `--json`                    | Output in JSON format         |
 
 ### List Options
 
-| Flag | Description |
-|------|-------------|
-| `--mine` | Show only your endpoints |
-| `--type` | Filter by `dedicated` or `serverless` |
-| `--usage-type` | Filter by `on-demand` or `reserved` |
-| `--json` | Output in JSON format |
+| Flag           | Description                           |
+| -------------- | ------------------------------------- |
+| `--mine`       | Show only your endpoints              |
+| `--type`       | Filter by `dedicated` or `serverless` |
+| `--usage-type` | Filter by `on-demand` or `reserved`   |
+| `--json`       | Output in JSON format                 |
 
 ### Hardware Options
 
-| Flag | Description |
-|------|-------------|
-| `--model` | Filter by model compatibility |
+| Flag          | Description                                       |
+| ------------- | ------------------------------------------------- |
+| `--model`     | Filter by model compatibility                     |
 | `--available` | Show only available hardware (requires `--model`) |
-| `--json` | Output in JSON format |
+| `--json`      | Output in JSON format                             |
 
 ### Upload Options
 
-| Flag | Description |
-|------|-------------|
-| `--model-name` | (required) Name for the uploaded model |
+| Flag             | Description                                |
+| ---------------- | ------------------------------------------ |
+| `--model-name`   | (required) Name for the uploaded model     |
 | `--model-source` | (required) HF repo URL or S3 presigned URL |
-| `--model-type` | `model` or `adapter` |
-| `--hf-token` | Hugging Face API token |
-| `--description` | Model description |
-| `--base-model` | Base model for adapters (serverless) |
-| `--lora-model` | LoRA pool for adapters (dedicated) |
-| `--json` | Output in JSON format |
+| `--model-type`   | `model` or `adapter`                       |
+| `--hf-token`     | Hugging Face API token                     |
+| `--description`  | Model description                          |
+| `--base-model`   | Base model for adapters (serverless)       |
+| `--lora-model`   | LoRA pool for adapters (dedicated)         |
+| `--json`         | Output in JSON format                      |
 
 ## Endpoint Response Object
 

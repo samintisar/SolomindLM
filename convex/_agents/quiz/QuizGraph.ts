@@ -120,13 +120,12 @@ export class QuizGraph {
       { map_process: "map_process", collapse: "collapse" } as any
     );
 
-     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("map_process" as any, "collapse" as any);
-     
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("collapse" as any, "reduce" as any);
-     
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("reduce" as any, END as any);
 

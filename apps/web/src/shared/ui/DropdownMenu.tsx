@@ -63,9 +63,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
           role="menu"
           className={`absolute top-full mt-2 ${alignClass} z-200 min-w-[200px] bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200`}
           onClick={(e) => {
-            const menuItem = (e.target as HTMLElement).closest<HTMLElement>(
-              '[role="menuitem"]',
-            );
+            const menuItem = (e.target as HTMLElement).closest<HTMLElement>('[role="menuitem"]');
             const opensSubmenu =
               menuItem?.hasAttribute("aria-haspopup") &&
               menuItem.getAttribute("aria-haspopup") !== "false";

@@ -29,9 +29,7 @@ test.describe("Report Generation", () => {
     return { card };
   }
 
-  test("Summary format with no sources shows needs-sources dialog", async ({
-    notebookPage,
-  }) => {
+  test("Summary format with no sources shows needs-sources dialog", async ({ notebookPage }) => {
     const page = notebookPage;
 
     await openStudioTool(page, "Reports");
@@ -45,9 +43,7 @@ test.describe("Report Generation", () => {
     await page.getByRole("button", { name: "Cancel" }).click();
   });
 
-  test("report creation creates placeholder with generating status", async ({
-    notebookPage,
-  }) => {
+  test("report creation creates placeholder with generating status", async ({ notebookPage }) => {
     test.skip(shouldSkipAITests(), "Requires source ingestion + report job (E2E_AI_ENABLED=1)");
 
     const page = notebookPage;

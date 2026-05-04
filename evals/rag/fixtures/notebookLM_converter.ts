@@ -32,14 +32,15 @@ export function parseNotebookLMOutput(text: string): ParsedQaPair[] {
       const question = extractField(block, "Question");
       const expectedAnswer = extractField(block, "Expected Answer");
       const itemsField = extractField(block, "Expected Items");
-      const scenarioCategory = extractField(block, "Scenario Category").trim().toLowerCase() as ScenarioCategory;
+      const scenarioCategory = extractField(block, "Scenario Category")
+        .trim()
+        .toLowerCase() as ScenarioCategory;
       const expectedBehavior = extractField(block, "Expected Behavior");
 
       if (!question || !expectedAnswer) continue;
 
-      const expectedItems = itemsField === "N/A" || !itemsField
-        ? []
-        : itemsField.split(",").map((i) => i.trim());
+      const expectedItems =
+        itemsField === "N/A" || !itemsField ? [] : itemsField.split(",").map((i) => i.trim());
 
       pairs.push({
         question: question.trim(),
@@ -65,8 +66,16 @@ function extractField(block: string, fieldName: string): string {
 
 function isValidScenario(cat: string): cat is ScenarioCategory {
   const valid: ScenarioCategory[] = [
-    "factoid", "list-enumeration", "comparison", "causality", "temporal",
-    "ambiguous", "multi-doc", "technical", "summarization", "explanation",
+    "factoid",
+    "list-enumeration",
+    "comparison",
+    "causality",
+    "temporal",
+    "ambiguous",
+    "multi-doc",
+    "technical",
+    "summarization",
+    "explanation",
   ];
   return valid.includes(cat as ScenarioCategory);
 }

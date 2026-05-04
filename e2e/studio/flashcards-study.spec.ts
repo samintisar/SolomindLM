@@ -41,9 +41,9 @@ test.describe("Flashcards Study Mode", () => {
     await page.getByRole("button", { name: "Reveal answer" }).click();
     await page.getByRole("button", { name: /Good\s+in 10 min/i }).click();
 
-    await expect(
-      page.getByText("What should the Good button do on a new flashcard?")
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("What should the Good button do on a new flashcard?")).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByText("1 of 3 reviewed")).toBeVisible();
 
     await page.getByRole("button", { name: "Browse Mode" }).click();

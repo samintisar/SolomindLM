@@ -43,8 +43,8 @@ test.describe("Add Source Modal", () => {
     await page.getByRole("button", { name: /Discover sources/ }).click();
 
     // Should show discover modal with search input
-    await expect(
-      page.getByPlaceholder("Search for articles, papers, or websites...")
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByPlaceholder("Search for articles, papers, or websites...")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 });

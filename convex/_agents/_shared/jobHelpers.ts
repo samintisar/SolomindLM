@@ -27,7 +27,7 @@ export const jobErrorMetadataValidator = v.object({
 /**
  * Build enhanced error metadata for database storage.
  */
- 
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildErrorMetadata(error: string, phase: string, metadata?: any): any {
   if (metadata?.errorType && metadata?.errorPhase) {
@@ -286,7 +286,7 @@ export const clearFlashcardMapData = internalMutation({
     const flashcard = await ctx.db.get(args.flashcardId);
     if (!flashcard) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } =flashcard.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = flashcard.metadata || {};
     await ctx.db.patch(args.flashcardId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
@@ -447,7 +447,7 @@ export const clearQuizMapData = internalMutation({
     const quiz = await ctx.db.get(args.quizId);
     if (!quiz) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } =quiz.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = quiz.metadata || {};
     await ctx.db.patch(args.quizId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
@@ -610,7 +610,7 @@ export const clearWrittenQuestionsMapData = internalMutation({
     const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
     if (!writtenQuestion) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } =writtenQuestion.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = writtenQuestion.metadata || {};
     await ctx.db.patch(args.writtenQuestionId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
@@ -786,7 +786,11 @@ export const clearReportMapData = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
-    const { packedChunks: _packedChunks, mapResults: _mapResults, ...restMetadata } =report.metadata || {};
+    const {
+      packedChunks: _packedChunks,
+      mapResults: _mapResults,
+      ...restMetadata
+    } = report.metadata || {};
     await ctx.db.patch(args.reportId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
@@ -940,7 +944,7 @@ export const clearMindMapMapData = internalMutation({
     const mindmap = await ctx.db.get(args.mindmapId);
     if (!mindmap) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } =mindmap.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = mindmap.metadata || {};
     await ctx.db.patch(args.mindmapId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
@@ -1098,7 +1102,7 @@ export const clearSpreadsheetMapData = internalMutation({
     const spreadsheet = await ctx.db.get(args.spreadsheetId);
     if (!spreadsheet) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } =spreadsheet.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = spreadsheet.metadata || {};
     await ctx.db.patch(args.spreadsheetId, {
       updatedAt: Date.now(),
       metadata: restMetadata,
@@ -1254,7 +1258,7 @@ export const clearAudioOverviewMapData = internalMutation({
     const audioOverview = await ctx.db.get(args.audioOverviewId);
     if (!audioOverview) return null;
 
-    const { mapResults: _mapResults, ...restMetadata } =audioOverview.metadata || {};
+    const { mapResults: _mapResults, ...restMetadata } = audioOverview.metadata || {};
     await ctx.db.patch(args.audioOverviewId, {
       updatedAt: Date.now(),
       metadata: restMetadata,

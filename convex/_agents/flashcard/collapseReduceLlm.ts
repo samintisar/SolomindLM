@@ -108,7 +108,10 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
       invokeWithTimeout(
         () =>
           structuredLlm.invoke(
-            [new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+            [
+              new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
+              new HumanMessage(prompt),
+            ],
             createLangSmithRunConfig({
               runName: "FlashcardGraph.CollapseGroup",
               tags: ["agent", "flashcard", "collapse"],
@@ -208,7 +211,10 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
       invokeWithTimeout(
         () =>
           structuredLlm.invoke(
-            [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+            [
+              new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+              new HumanMessage(prompt),
+            ],
             createLangSmithRunConfig({
               runName: "FlashcardGraph.RefineSelection",
               tags: ["agent", "flashcard", "reduce"],

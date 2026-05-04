@@ -66,9 +66,7 @@ function parseRunners(value: string): RunnerKind[] {
     .filter(Boolean);
   for (const p of parts) {
     if (!ALL_RUNNERS.has(p as RunnerKind)) {
-      throw new Error(
-        `Unknown runner kind "${p}". Valid: ${Array.from(ALL_RUNNERS).join(", ")}`
-      );
+      throw new Error(`Unknown runner kind "${p}". Valid: ${Array.from(ALL_RUNNERS).join(", ")}`);
     }
   }
   return parts as RunnerKind[];
@@ -193,7 +191,7 @@ interface RagasExportRow {
 function exportRagasArtifacts(
   fixtures: Map<string, { question: string; expectedItems: string[] }>,
   artifacts: EvalRunArtifact[],
-  outDir: string,
+  outDir: string
 ): string {
   const rows: RagasExportRow[] = artifacts.map((art) => {
     const fix = fixtures.get(art.caseId);
@@ -258,13 +256,19 @@ async function main(): Promise<void> {
     const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
     const evalSecret = process.env.RAG_EVAL_SECRET?.trim();
     if (!convexUrl) {
-      console.error("FATAL: Set RAG_EVAL_CONVEX_URL to your dev Convex URL (https://….convex.cloud).");
+      console.error(
+        "FATAL: Set RAG_EVAL_CONVEX_URL to your dev Convex URL (https://….convex.cloud)."
+      );
       console.error("  Do not point this at prod. Use --dry-run to validate fixtures offline.");
       process.exit(2);
     }
     if (!evalSecret) {
-      console.error("FATAL: Set RAG_EVAL_SECRET to match the RAG_EVAL_SECRET env var on that deployment.");
-      console.error("  Convex must also set RAG_EVALS_ENABLED=true on that deployment for eval actions.");
+      console.error(
+        "FATAL: Set RAG_EVAL_SECRET to match the RAG_EVAL_SECRET env var on that deployment."
+      );
+      console.error(
+        "  Convex must also set RAG_EVALS_ENABLED=true on that deployment for eval actions."
+      );
       console.error("  Use --dry-run to validate fixtures without Convex.");
       process.exit(2);
     }
@@ -337,14 +341,18 @@ async function main(): Promise<void> {
         mkdirSync("evals/rag/generated", { recursive: true });
         writeFileSync(
           outputFile,
-          JSON.stringify({
-            caseId: artifact.caseId,
-            runner: artifact.runner,
-            smartLlm: opts.smartLlm,
-            answer: artifact.answer,
-            raw: artifact.studioOutput.raw,
-            latencyMs: artifact.latencyMs,
-          }, null, 2)
+          JSON.stringify(
+            {
+              caseId: artifact.caseId,
+              runner: artifact.runner,
+              smartLlm: opts.smartLlm,
+              answer: artifact.answer,
+              raw: artifact.studioOutput.raw,
+              latencyMs: artifact.latencyMs,
+            },
+            null,
+            2
+          )
         );
         console.log(`  Output saved to: ${outputFile}`);
       }
@@ -352,7 +360,9 @@ async function main(): Promise<void> {
       // Load baseline for this case+runner if available
       const baseline = loadBaseline(fixture.id, artifact.runner);
       if (baseline) {
-        console.log(`  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`);
+        console.log(
+          `  Baseline loaded: ${baseline.latencyMs}ms, ${baseline.tokenUsage.total} tokens`
+        );
       }
 
       const metrics = await scoreAllMetrics(fixture, artifact, baseline);
@@ -360,7 +370,8 @@ async function main(): Promise<void> {
 
       if (opts.verbose || opts.full) {
         for (const m of metrics) {
-          const icon = m.status === "pass" ? "+" : m.status === "fail" ? "x" : m.status === "warn" ? "!" : "i";
+          const icon =
+            m.status === "pass" ? "+" : m.status === "fail" ? "x" : m.status === "warn" ? "!" : "i";
           console.log(`  [${icon}] ${m.metric}: ${m.score.toFixed(2)} — ${m.detail}`);
         }
       } else {

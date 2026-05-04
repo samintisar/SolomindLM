@@ -39,12 +39,14 @@ export interface PublicPrompt {
 export function usePublicPrompts(
   studioTool: StudioTool,
   sortBy: PromptSortBy = "saves",
-  searchQuery?: string,
+  searchQuery?: string
 ) {
-  return useQuery(
-    api.studio.prompts.index.listPublicPrompts,
-    { studioTool, sortBy, query: searchQuery, paginationOpts: { numItems: 20, cursor: null } },
-  );
+  return useQuery(api.studio.prompts.index.listPublicPrompts, {
+    studioTool,
+    sortBy,
+    query: searchQuery,
+    paginationOpts: { numItems: 20, cursor: null },
+  });
 }
 
 /** List the current user's prompts. */
@@ -53,23 +55,20 @@ export function useMyPrompts(studioTool?: StudioTool) {
     api.studio.prompts.index.listMyPrompts,
     studioTool
       ? { studioTool, paginationOpts: { numItems: 50, cursor: null } }
-      : { paginationOpts: { numItems: 50, cursor: null } },
+      : { paginationOpts: { numItems: 50, cursor: null } }
   );
 }
 
 /** Get a single prompt by ID. */
 export function usePrompt(promptId: Id<"studioPrompts"> | null) {
-  return useQuery(
-    api.studio.prompts.index.getPrompt,
-    promptId ? { promptId } : "skip",
-  );
+  return useQuery(api.studio.prompts.index.getPrompt, promptId ? { promptId } : "skip");
 }
 
 /** Check if the current user has saved a public prompt. */
 export function useHasSavedPrompt(publicPromptId: Id<"studioPrompts"> | null) {
   return useQuery(
     api.studio.prompts.index.hasSavedPrompt,
-    publicPromptId ? { publicPromptId } : "skip",
+    publicPromptId ? { publicPromptId } : "skip"
   );
 }
 
@@ -77,7 +76,7 @@ export function useHasSavedPrompt(publicPromptId: Id<"studioPrompts"> | null) {
 export function useMyRating(publicPromptId: Id<"studioPrompts"> | null) {
   return useQuery(
     api.studio.prompts.index.getMyRating,
-    publicPromptId ? { publicPromptId } : "skip",
+    publicPromptId ? { publicPromptId } : "skip"
   );
 }
 
@@ -140,7 +139,7 @@ export function useUpdatePrompt() {
   const update = useMutation(api.studio.prompts.index.updatePrompt);
   return async (
     promptId: Id<"studioPrompts">,
-    updates: { title?: string; description?: string; promptText?: string },
+    updates: { title?: string; description?: string; promptText?: string }
   ) => {
     await update({ promptId, ...updates });
   };

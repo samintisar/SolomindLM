@@ -68,7 +68,7 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
   },
 ];
 
-export type SmartModelId = typeof AVAILABLE_SMART_MODELS[number]["id"];
+export type SmartModelId = (typeof AVAILABLE_SMART_MODELS)[number]["id"];
 
 /**
  * Find a model by its ID.

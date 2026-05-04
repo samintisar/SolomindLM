@@ -54,10 +54,10 @@ async function resolveDocumentIds(
   provided?: Id<"documents">[]
 ): Promise<Id<"documents">[]> {
   if (provided && provided.length > 0) return provided;
-  const docs = await ctx.runQuery(
-    internal.documents.index.listDocumentsForNotebookReadInternal,
-    { notebookId, userId }
-  );
+  const docs = await ctx.runQuery(internal.documents.index.listDocumentsForNotebookReadInternal, {
+    notebookId,
+    userId,
+  });
   const ids = (docs as Array<{ _id: Id<"documents"> }>).map((d) => d._id);
   if (ids.length === 0) {
     throw new Error(
@@ -201,12 +201,7 @@ export const startFlashcardsEval = action({
       throw new Error("smartLlm must be a non-empty model identifier when provided");
     }
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
-    const documentIds = await resolveDocumentIds(
-      ctx,
-      args.notebookId,
-      userId,
-      args.documentIds
-    );
+    const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
 
     const cardCount = args.cardCount ?? 35;
     const difficulty = args.difficulty ?? "medium";
@@ -343,11 +338,14 @@ export const startMindmapEval = action({
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
     const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
 
-    const mindmapId = await ctx.runMutation(internal.eval._studioRowCreators.createMindmapInternal, {
-      userId,
-      notebookId: args.notebookId,
-      title: "Mind Map (eval)",
-    });
+    const mindmapId = await ctx.runMutation(
+      internal.eval._studioRowCreators.createMindmapInternal,
+      {
+        userId,
+        notebookId: args.notebookId,
+        title: "Mind Map (eval)",
+      }
+    );
 
     await ctx.scheduler.runAfter(0, internal.studio.mindmaps.job.mindmapGeneration, {
       mindmapId,
@@ -466,17 +464,14 @@ export const startSpreadsheetEval = action({
     const spreadsheetType = args.spreadsheetType ?? "custom";
     const customPrompt = args.customPrompt ?? "";
 
-    const spreadsheet = await ctx.runMutation(
-      internal.studio.spreadsheets.index.createInternal,
-      {
-        userId,
-        notebookId: args.notebookId,
-        title: "Spreadsheet (eval)",
-        spreadsheetType,
-        customPrompt,
-        metadata: { status: "generating", documentIds },
-      }
-    );
+    const spreadsheet = await ctx.runMutation(internal.studio.spreadsheets.index.createInternal, {
+      userId,
+      notebookId: args.notebookId,
+      title: "Spreadsheet (eval)",
+      spreadsheetType,
+      customPrompt,
+      metadata: { status: "generating", documentIds },
+    });
     if (!spreadsheet) throw new Error("Failed to create spreadsheet row for eval");
     const spreadsheetId = spreadsheet._id as Id<"spreadsheets">;
 
@@ -540,16 +535,13 @@ export const startWrittenQuestionsEval = action({
     const difficulty = args.difficulty ?? "medium";
     const questionType = args.questionType ?? "short";
 
-    const wq = await ctx.runMutation(
-      internal.studio.writtenQuestions.index.createInternal,
-      {
-        userId,
-        notebookId: args.notebookId,
-        title: "Written Questions (eval)",
-        questionType,
-        metadata: { difficulty, questionCount, focus: args.focus, documentIds },
-      }
-    );
+    const wq = await ctx.runMutation(internal.studio.writtenQuestions.index.createInternal, {
+      userId,
+      notebookId: args.notebookId,
+      title: "Written Questions (eval)",
+      questionType,
+      metadata: { difficulty, questionCount, focus: args.focus, documentIds },
+    });
     if (!wq) throw new Error("Failed to create writtenQuestion row for eval");
     const writtenQuestionId = wq._id as Id<"writtenQuestions">;
 
@@ -558,7 +550,7 @@ export const startWrittenQuestionsEval = action({
       internal.studio.writtenQuestions.job.writtenQuestionsGeneration,
       {
         writtenQuestionId,
-      userId,
+        userId,
         notebookId: args.notebookId,
         documentIds,
         questionCount,
@@ -576,10 +568,9 @@ export const getWrittenQuestionsEvalStatus = action({
   args: { evalSecret: v.string(), writtenQuestionId: v.id("writtenQuestions") },
   handler: async (ctx, args): Promise<WrittenQuestionsEvalStatus> => {
     assertRagEvalGate(args.evalSecret);
-    const populated = await ctx.runQuery(
-      internal.studio.writtenQuestions.index.getInternal,
-      { id: args.writtenQuestionId }
-    );
+    const populated = await ctx.runQuery(internal.studio.writtenQuestions.index.getInternal, {
+      id: args.writtenQuestionId,
+    });
     if (!populated) throw new Error(`WrittenQuestion ${args.writtenQuestionId} not found`);
     return {
       status: populated.status,
@@ -615,18 +606,10 @@ export const startAudioScriptEval = action({
     length: v.optional(v.string()),
     focus: v.optional(v.string()),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{ audioOverviewId: string; startedAt: number }> => {
+  handler: async (ctx, args): Promise<{ audioOverviewId: string; startedAt: number }> => {
     assertRagEvalGate(args.evalSecret);
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
-    const documentIds = await resolveDocumentIds(
-      ctx,
-      args.notebookId,
-      userId,
-      args.documentIds
-    );
+    const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
 
     const audioOverviewId = await ctx.runMutation(
       internal.eval._studioRowCreators.createAudioOverviewInternal,
@@ -696,18 +679,10 @@ export const startAudioScriptOnlyEval = action({
     length: v.optional(v.string()),
     focus: v.optional(v.string()),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{ audioOverviewId: string; startedAt: number }> => {
+  handler: async (ctx, args): Promise<{ audioOverviewId: string; startedAt: number }> => {
     assertRagEvalGate(args.evalSecret);
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
-    const documentIds = await resolveDocumentIds(
-      ctx,
-      args.notebookId,
-      userId,
-      args.documentIds
-    );
+    const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
 
     const audioOverviewId = await ctx.runMutation(
       internal.eval._studioRowCreators.createAudioOverviewInternal,

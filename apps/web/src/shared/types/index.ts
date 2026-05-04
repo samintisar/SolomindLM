@@ -5,6 +5,8 @@ export interface Source {
     | "PDF"
     | "TXT"
     | "WEB"
+    /** YouTube ingestion (`fileType: youtube`) — distinct from generic WEB urls */
+    | "YOUTUBE"
     | "DOCX"
     | "PPTX"
     | "IMG"
@@ -20,7 +22,7 @@ export interface Source {
   selected: boolean;
   content?: string;
   status?: "pending" | "processing" | "completed" | "failed";
-  /** Original URL for WEB sources (url or youtube); used to open in new tab */
+  /** Original URL for WEB / YOUTUBE sources; used for embed + open in new tab */
   url?: string;
   /** Kebab Refresh: web page (`url` type, not YouTube) or Google Drive–backed file */
   remoteRefreshKind?: "url" | "drive";

@@ -69,7 +69,10 @@ export const studioInfographicAgentic20: EvalFixture = {
     "An infographic showing 20 agentic AI design patterns with visual icons/labels for each: prompt chaining, routing, parallelization, reflection, tool use, planning, multi-agent collaboration, memory management, learning and adaptation, goal setting and monitoring, exception handling and recovery, human in the loop, knowledge retrieval, inter-agent communication, resource-aware optimization, reasoning techniques, evaluation and monitoring, guardrails and safety patterns, prioritization, exploration and discovery.",
   expectedBehavior:
     "Infographic should visually represent the agentic AI patterns with clear labels, icons, and an organized layout.",
-  studioParams: { customPrompt: "Visualize the 20 agentic AI design patterns as an infographic with icons and brief descriptions for each pattern." },
+  studioParams: {
+    customPrompt:
+      "Visualize the 20 agentic AI design patterns as an infographic with icons and brief descriptions for each pattern.",
+  },
   tags: sharedTags("infographic"),
 };
 

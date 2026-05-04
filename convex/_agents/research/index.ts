@@ -18,10 +18,7 @@ export class ResearchAgent {
   }
 
   // Phase 1: Generate plan
-  async generatePlan(
-    query: string,
-    sourcePolicy: SourcePolicy
-  ): Promise<SubQuestion[]> {
+  async generatePlan(query: string, sourcePolicy: SourcePolicy): Promise<SubQuestion[]> {
     return runPlanGraph(query, sourcePolicy, this.deps);
   }
 

@@ -366,10 +366,13 @@ export async function runProcessSpreadsheetMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[spreadsheet] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[spreadsheet] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -393,7 +396,10 @@ export async function runProcessSpreadsheetMapChunkPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+          [
+            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ],
           createLangSmithRunConfig({
             runName: "SpreadsheetJob.MapProcess",
             tags: ["agent", "spreadsheet", "map"],
@@ -493,8 +499,8 @@ export async function runProcessSpreadsheetMapChunkPhase(
       : 0;
     const totalMaps = spreadsheet.metadata?.totalMapTasks || totalChunks;
     const failedMaps = spreadsheet.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(spreadsheet.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(spreadsheet.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -568,10 +574,13 @@ export async function runFinalizeSpreadsheetPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[spreadsheet] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[spreadsheet] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -629,7 +638,12 @@ export async function runFinalizeSpreadsheetPhase(
       console.log(
         `[SpreadsheetJob] Collapsing ${allOutputs.length} outputs (${totalTokens} tokens)`
       );
-      collapsedOutputs = await recursiveCollapse(allOutputs, spreadsheetType, customPrompt, language);
+      collapsedOutputs = await recursiveCollapse(
+        allOutputs,
+        spreadsheetType,
+        customPrompt,
+        language
+      );
     }
 
     // Update status for reduce
@@ -664,7 +678,10 @@ export async function runFinalizeSpreadsheetPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (reduceLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+          [
+            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ],
           createLangSmithRunConfig({
             runName: "SpreadsheetJob.Reduce",
             tags: ["agent", "spreadsheet", "reduce"],
@@ -839,7 +856,10 @@ async function recursiveCollapse(
             invoke: () =>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (reduceLLM as any).invoke(
-                [new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+                [
+                  new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
+                  new HumanMessage(prompt),
+                ],
                 createLangSmithRunConfig({
                   runName: "SpreadsheetJob.CollapseGroup",
                   tags: ["agent", "spreadsheet", "collapse"],

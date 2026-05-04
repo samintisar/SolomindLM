@@ -165,13 +165,15 @@ describe("validateWithPreset", () => {
   });
 
   it("validates with briefing preset", () => {
-    const output = "## Executive Summary\nContent\n## Main Themes\nContent\n## Key Findings\nContent\n## Recommendations\nContent.";
+    const output =
+      "## Executive Summary\nContent\n## Main Themes\nContent\n## Key Findings\nContent\n## Recommendations\nContent.";
     const result = validateWithPreset(output, "briefing");
     expect(result.missing).toHaveLength(0);
   });
 
   it("validates with blog_post preset", () => {
-    const output = "## Introduction\n1. Takeaway one\n2. Takeaway two\n3. Takeaway three\n## Conclusion";
+    const output =
+      "## Introduction\n1. Takeaway one\n2. Takeaway two\n3. Takeaway three\n## Conclusion";
     const result = validateWithPreset(output, "blog_post");
     expect(result.missing).toHaveLength(0);
   });
@@ -183,7 +185,8 @@ describe("validateWithPreset", () => {
   });
 
   it("validates with technical_report preset", () => {
-    const output = "## Executive Summary\n## Technical Specifications\n## Methodologies\n## Findings";
+    const output =
+      "## Executive Summary\n## Technical Specifications\n## Methodologies\n## Findings";
     const result = validateWithPreset(output, "technical_report");
     expect(result.missing).toHaveLength(0);
   });
@@ -226,7 +229,7 @@ describe("validateWithPreset", () => {
 
   it("returns warning for unknown preset", () => {
     // TypeScript would catch this at compile time, but runtime guard test
-     
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = validateWithPreset("content" as any, "nonexistent" as any);
     expect(result.isValid).toBe(false);
@@ -291,7 +294,8 @@ describe("validateQuiz", () => {
   });
 
   it("passes within 80% tolerance", () => {
-    const output = Array.from({ length: 4 }, (_, i) => `${i + 1}. Q${i}?`).join("\n") + "\nAnswer: a";
+    const output =
+      Array.from({ length: 4 }, (_, i) => `${i + 1}. Q${i}?`).join("\n") + "\nAnswer: a";
     const result = validateQuiz(output, 5);
     expect(result.warnings.some((w) => w.includes("target was 5"))).toBe(false);
   });

@@ -207,7 +207,7 @@ export type RunActionFn = (
   action: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => Promise<any>;
 
 export async function discoverHandler(
@@ -218,14 +218,7 @@ export async function discoverHandler(
   totalCount: number;
   sourceTypeCounts: Record<string, number>;
 }> {
-  const {
-    query,
-    sourceTypes,
-    timeRange,
-    academicFilters,
-    maxResults,
-    sortBy = "relevance",
-  } = args;
+  const { query, sourceTypes, timeRange, academicFilters, maxResults, sortBy = "relevance" } = args;
 
   const logger = createServiceLogger("discovery", "discover");
   const startTime = Date.now();

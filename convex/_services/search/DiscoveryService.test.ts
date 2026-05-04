@@ -314,8 +314,22 @@ describe("DiscoveryService", () => {
         {
           sourceType: "academic",
           results: [
-            { id: "a1", title: "Academic 1", url: "", snippet: "", score: 0.95, sourceType: "academic" },
-            { id: "a2", title: "Academic 2", url: "", snippet: "", score: 0.85, sourceType: "academic" },
+            {
+              id: "a1",
+              title: "Academic 1",
+              url: "",
+              snippet: "",
+              score: 0.95,
+              sourceType: "academic",
+            },
+            {
+              id: "a2",
+              title: "Academic 2",
+              url: "",
+              snippet: "",
+              score: 0.85,
+              sourceType: "academic",
+            },
           ],
         },
       ];
@@ -345,7 +359,13 @@ const createRealRunAction = (): RunActionFn => {
       return discoverSourcesInternalHandler(args);
     }
     // Route to Academic if academic-specific filters are present
-    if (args.publicationYearFrom !== undefined || args.publicationYearTo !== undefined || args.minCitations !== undefined || args.openAccessOnly !== undefined || args.sortBy !== undefined) {
+    if (
+      args.publicationYearFrom !== undefined ||
+      args.publicationYearTo !== undefined ||
+      args.minCitations !== undefined ||
+      args.openAccessOnly !== undefined ||
+      args.sortBy !== undefined
+    ) {
       return discoverAcademicPapersInternalHandler(args);
     }
     // Default: try Tavily for basic web search
@@ -370,7 +390,9 @@ describeIfKey("DiscoveryService - REAL Integration Tests", () => {
       // If Tavily is rate limited or out of credits, result will be empty
       // Skip assertions in that case
       if (result.sources.length === 0) {
-        console.log("Skipping test: Tavily API returned no results (likely rate limited or out of credits)");
+        console.log(
+          "Skipping test: Tavily API returned no results (likely rate limited or out of credits)"
+        );
         return;
       }
 
@@ -394,7 +416,9 @@ describeIfKey("DiscoveryService - REAL Integration Tests", () => {
 
       // Soft-failure: academic APIs may be unavailable or rate-limited
       if (result.sources.length === 0) {
-        console.log("Skipping assertions: academic APIs returned no results (rate-limited or unreachable)");
+        console.log(
+          "Skipping assertions: academic APIs returned no results (rate-limited or unreachable)"
+        );
         return;
       }
       expect(result.sources.length).toBeGreaterThan(0);
@@ -509,10 +533,7 @@ describeIfKey("DiscoveryService - REAL Integration Tests", () => {
   describe("discoverSourcesHandler - REAL Tavily API", () => {
     it("calls Tavily with default parameters", async () => {
       try {
-        const result = await discoverSourcesHandler(
-          { query: "test query" },
-          createRealRunAction()
-        );
+        const result = await discoverSourcesHandler({ query: "test query" }, createRealRunAction());
 
         expect(Array.isArray(result)).toBe(true);
         if (result.length > 0) {
@@ -553,7 +574,13 @@ describe("DiscoveryService - Error Handling", () => {
     const failingRunAction: RunActionFn = async (_action, args) => {
       if (args.topic === "general" || args.topic === undefined) {
         return [
-          { title: "Web Result", url: "https://example.com", snippet: "Web.", score: 0.8, domain: "example.com" },
+          {
+            title: "Web Result",
+            url: "https://example.com",
+            snippet: "Web.",
+            score: 0.8,
+            domain: "example.com",
+          },
         ];
       }
       throw new Error("News API failed");

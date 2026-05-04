@@ -16,7 +16,7 @@ export const AVAILABLE_SMART_MODEL_IDS = [
   "zai-org/GLM-5.1",
 ] as const;
 
-export type SmartModelId = typeof AVAILABLE_SMART_MODEL_IDS[number];
+export type SmartModelId = (typeof AVAILABLE_SMART_MODEL_IDS)[number];
 
 /** HyDE + embed + hybrid search must finish before Convex action limits kill the stream (client saw only `searching` then disconnect). */
 export const SEARCH_PIPELINE_TIMEOUT_MS = 70000;

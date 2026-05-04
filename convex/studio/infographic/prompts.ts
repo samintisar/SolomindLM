@@ -77,7 +77,6 @@ CRITICAL RULES:
 10. Cards need generous padding and whitespace — never cram text to the edges
 11. VALIDATION STEP: Before finalizing your prompt, count every item you included. If the count doesn't match the source, redesign the layout to fit all items.`;
 
-
 // ============================================================
 // GENERATION PROMPT
 // ============================================================

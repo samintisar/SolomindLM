@@ -78,7 +78,9 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
 }) => {
   const isCreateMode = !notebook;
   const [title, setTitle] = useState(notebook?.title || "");
-  const [selectedColor, setSelectedColor] = useState(notebook?.coverColor || "bg-vintage-brown-300");
+  const [selectedColor, setSelectedColor] = useState(
+    notebook?.coverColor || "bg-vintage-brown-300"
+  );
   const [selectedIcon, setSelectedIcon] = useState(notebook?.icon || "Folder");
 
   // Update state when notebook prop changes (when data is updated in parent)

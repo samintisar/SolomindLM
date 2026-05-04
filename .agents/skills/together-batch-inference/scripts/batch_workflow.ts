@@ -71,9 +71,7 @@ async function main() {
   let batch: any;
   while (true) {
     batch = await client.batches.retrieve(batchId);
-    console.log(
-      `  Status: ${batch.status} | Progress: ${(batch.progress ?? 0).toFixed(0)}%`
-    );
+    console.log(`  Status: ${batch.status} | Progress: ${(batch.progress ?? 0).toFixed(0)}%`);
 
     if (batch.status === "COMPLETED") {
       break;
@@ -97,8 +95,7 @@ async function main() {
     for (const line of text.trim().split("\n")) {
       const result = JSON.parse(line);
       const customId = result.custom_id ?? "?";
-      const content =
-        result.response?.body?.choices?.[0]?.message?.content ?? "";
+      const content = result.response?.body?.choices?.[0]?.message?.content ?? "";
       console.log(`  [${customId}] ${content.slice(0, 100)}`);
     }
   }

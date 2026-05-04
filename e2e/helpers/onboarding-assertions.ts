@@ -7,7 +7,7 @@ import { expect } from "@playwright/test";
  */
 export async function expectFixedBackdropZIndex100(
   page: Page,
-  headingName: string | RegExp,
+  headingName: string | RegExp
 ): Promise<void> {
   const heading = page.getByRole("heading", { name: headingName });
   await expect(heading).toBeVisible();

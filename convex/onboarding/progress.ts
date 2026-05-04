@@ -38,19 +38,17 @@ const ARTIFACT_TABLES = [
 async function userHasAny(
   ctx: QueryCtx,
   table: (typeof ARTIFACT_TABLES)[number] | "notebooks" | "documents",
-  userId: Id<"users">,
+  userId: Id<"users">
 ): Promise<boolean> {
   // Dynamic table name forces us through `any`; the `by_user` index exists on
   // every table listed in this function's signature.
   const q = ctx.db.query(table as never) as unknown as {
     withIndex: (
       name: string,
-      cb: (b: { eq: (field: string, value: unknown) => unknown }) => unknown,
+      cb: (b: { eq: (field: string, value: unknown) => unknown }) => unknown
     ) => { first: () => Promise<unknown> };
   };
-  const first = await q
-    .withIndex("by_user", (b) => b.eq("userId", userId))
-    .first();
+  const first = await q.withIndex("by_user", (b) => b.eq("userId", userId)).first();
   return first !== null;
 }
 
@@ -58,10 +56,7 @@ async function userHasAny(
  * `conversations` only has `by_user_notebook` (compound) and `by_notebook`.
  * Prefix-match on `userId` over the compound index for user-scope lookups.
  */
-async function userHasAnyConversation(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-): Promise<boolean> {
+async function userHasAnyConversation(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
   const first = await ctx.db
     .query("conversations")
     .withIndex("by_user_notebook", (q) => q.eq("userId", userId))
@@ -80,16 +75,14 @@ const EMPTY_CHECKLIST_PROGRESS = {
 async function resolveTourNotebookId(
   ctx: QueryCtx,
   userId: Id<"users">,
-  row: { tourNotebookId?: Id<"notebooks">; startedAt?: number },
+  row: { tourNotebookId?: Id<"notebooks">; startedAt?: number }
 ): Promise<Id<"notebooks"> | undefined> {
   let tourNotebookId = row.tourNotebookId;
   if (!tourNotebookId && row.startedAt !== undefined) {
     const startedAt = row.startedAt;
     const firstSinceStart = await ctx.db
       .query("notebooks")
-      .withIndex("by_user_and_createdAt", (q) =>
-        q.eq("userId", userId).gte("createdAt", startedAt),
-      )
+      .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId).gte("createdAt", startedAt))
       .first();
     tourNotebookId = firstSinceStart?._id;
   }
@@ -97,16 +90,11 @@ async function resolveTourNotebookId(
 }
 
 /** Progress flags for steps after step 1, scoped to `tourNotebookId`. Step 1 is satisfied whenever that notebook exists. */
-async function checklistProgressForTourNotebook(
-  ctx: QueryCtx,
-  tourNotebookId: Id<"notebooks">,
-) {
+async function checklistProgressForTourNotebook(ctx: QueryCtx, tourNotebookId: Id<"notebooks">) {
   const [addSource, askQuestion, ...artifactFlags] = await Promise.all([
     notebookHasAny(ctx, "documents", tourNotebookId),
     notebookHasAny(ctx, "conversations", tourNotebookId),
-    ...ARTIFACT_TABLES.map((tbl) =>
-      notebookHasAny(ctx, tbl, tourNotebookId),
-    ),
+    ...ARTIFACT_TABLES.map((tbl) => notebookHasAny(ctx, tbl, tourNotebookId)),
   ]);
 
   return {
@@ -119,23 +107,18 @@ async function checklistProgressForTourNotebook(
 
 async function notebookHasAny(
   ctx: QueryCtx,
-  table:
-    | (typeof ARTIFACT_TABLES)[number]
-    | "documents"
-    | "conversations",
-  notebookId: Id<"notebooks">,
+  table: (typeof ARTIFACT_TABLES)[number] | "documents" | "conversations",
+  notebookId: Id<"notebooks">
 ): Promise<boolean> {
   // Dynamic table name forces us through `any`; the `by_notebook` index exists
   // on every table listed in this function's signature.
   const q = ctx.db.query(table as never) as unknown as {
     withIndex: (
       name: string,
-      cb: (b: { eq: (field: string, value: unknown) => unknown }) => unknown,
+      cb: (b: { eq: (field: string, value: unknown) => unknown }) => unknown
     ) => { first: () => Promise<unknown> };
   };
-  const first = await q
-    .withIndex("by_notebook", (b) => b.eq("notebookId", notebookId))
-    .first();
+  const first = await q.withIndex("by_notebook", (b) => b.eq("notebookId", notebookId)).first();
   return first !== null;
 }
 
@@ -161,13 +144,12 @@ export const getChecklistProgress = query({
       return await checklistProgressForTourNotebook(ctx, tourNotebookId);
     }
 
-    const [hasNotebook, hasDocument, hasConversation, ...artifactFlags] =
-      await Promise.all([
-        userHasAny(ctx, "notebooks", userId),
-        userHasAny(ctx, "documents", userId),
-        userHasAnyConversation(ctx, userId),
-        ...ARTIFACT_TABLES.map((tbl) => userHasAny(ctx, tbl, userId)),
-      ]);
+    const [hasNotebook, hasDocument, hasConversation, ...artifactFlags] = await Promise.all([
+      userHasAny(ctx, "notebooks", userId),
+      userHasAny(ctx, "documents", userId),
+      userHasAnyConversation(ctx, userId),
+      ...ARTIFACT_TABLES.map((tbl) => userHasAny(ctx, tbl, userId)),
+    ]);
 
     return {
       createNotebook: hasNotebook,
@@ -197,9 +179,7 @@ export const getTourProgress = query({
     // tourNotebookId comes from the row once step 1 has been advanced. Before
     // that (fresh tour or after restart), find the first notebook the user
     // created since startedAt so advanceTourStep can bind it on the next call.
-    const tourNotebookId = row
-      ? await resolveTourNotebookId(ctx, userId, row)
-      : undefined;
+    const tourNotebookId = row ? await resolveTourNotebookId(ctx, userId, row) : undefined;
 
     if (!tourNotebookId) {
       return empty;

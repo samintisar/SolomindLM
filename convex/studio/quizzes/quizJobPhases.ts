@@ -365,10 +365,13 @@ export async function runProcessQuizMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[quiz] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[quiz] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -427,7 +430,10 @@ export async function runProcessQuizMapChunkPhase(
           invoke: () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (structuredLLM as any).invoke(
-              [new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+              [
+                new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)),
+                new HumanMessage(prompt),
+              ],
               createLangSmithRunConfig({
                 runName: `QuizJob.MapCandidates.r${round}`,
                 tags: ["agent", "quiz", "map"],
@@ -559,8 +565,8 @@ export async function runProcessQuizMapChunkPhase(
       : 0;
     const totalMaps = quiz.metadata?.totalMapTasks || totalChunks;
     const failedMaps = quiz.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(quiz.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(quiz.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -633,10 +639,13 @@ export async function runFinalizeQuizPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[quiz] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[quiz] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -706,7 +715,10 @@ export async function runFinalizeQuizPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredSelectLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)), new HumanMessage(selectionPrompt)],
+          [
+            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+            new HumanMessage(selectionPrompt),
+          ],
           createLangSmithRunConfig({
             runName: "QuizJob.Select",
             tags: ["agent", "quiz", "reduce"],
@@ -780,7 +792,12 @@ export async function runFinalizeQuizPhase(
               invoke: () =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (structuredExpandLLM as any).invoke(
-                  [new SystemMessage(withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+                  [
+                    new SystemMessage(
+                      withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)
+                    ),
+                    new HumanMessage(prompt),
+                  ],
                   createLangSmithRunConfig({
                     runName: "QuizJob.Expand",
                     tags: ["agent", "quiz", "expand"],

@@ -39,10 +39,10 @@ export const transcribeChatAudio = action({
     });
 
     // Verify the user can read the notebook
-    await ctx.runQuery(
-      internal.chat.voiceTranscriptionAccess.assertCanReadNotebookForChatVoice,
-      { notebookId: args.notebookId, userId }
-    );
+    await ctx.runQuery(internal.chat.voiceTranscriptionAccess.assertCanReadNotebookForChatVoice, {
+      notebookId: args.notebookId,
+      userId,
+    });
 
     // Verify the storage blob exists
     const url = await ctx.storage.getUrl(args.storageId);

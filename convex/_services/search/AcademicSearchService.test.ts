@@ -224,8 +224,24 @@ describe("AcademicSearchService - Result Processing", () => {
   describe("deduplicatePapers", () => {
     it("removes duplicates by DOI", () => {
       const papers: AcademicPaper[] = [
-        { title: "Paper A", authors: ["A"], abstract: "A", url: "http://a", source: "arxiv", doi: "10.1234/a", score: 0.8 },
-        { title: "Paper B", authors: ["B"], abstract: "B", url: "http://b", source: "arxiv", doi: "10.1234/a", score: 0.9 },
+        {
+          title: "Paper A",
+          authors: ["A"],
+          abstract: "A",
+          url: "http://a",
+          source: "arxiv",
+          doi: "10.1234/a",
+          score: 0.8,
+        },
+        {
+          title: "Paper B",
+          authors: ["B"],
+          abstract: "B",
+          url: "http://b",
+          source: "arxiv",
+          doi: "10.1234/a",
+          score: 0.9,
+        },
       ];
 
       const result = deduplicatePapers(papers);
@@ -235,8 +251,22 @@ describe("AcademicSearchService - Result Processing", () => {
 
     it("removes duplicates by normalized title when no DOI", () => {
       const papers: AcademicPaper[] = [
-        { title: "Same Title", authors: ["A"], abstract: "A", url: "http://a", source: "arxiv", score: 0.8 },
-        { title: "Same Title!", authors: ["B"], abstract: "B", url: "http://b", source: "arxiv", score: 0.9 },
+        {
+          title: "Same Title",
+          authors: ["A"],
+          abstract: "A",
+          url: "http://a",
+          source: "arxiv",
+          score: 0.8,
+        },
+        {
+          title: "Same Title!",
+          authors: ["B"],
+          abstract: "B",
+          url: "http://b",
+          source: "arxiv",
+          score: 0.9,
+        },
       ];
 
       const result = deduplicatePapers(papers);
@@ -245,8 +275,22 @@ describe("AcademicSearchService - Result Processing", () => {
 
     it("keeps unique papers", () => {
       const papers: AcademicPaper[] = [
-        { title: "Paper A", authors: ["A"], abstract: "A", url: "http://a", source: "arxiv", score: 0.8 },
-        { title: "Paper B", authors: ["B"], abstract: "B", url: "http://b", source: "arxiv", score: 0.9 },
+        {
+          title: "Paper A",
+          authors: ["A"],
+          abstract: "A",
+          url: "http://a",
+          source: "arxiv",
+          score: 0.8,
+        },
+        {
+          title: "Paper B",
+          authors: ["B"],
+          abstract: "B",
+          url: "http://b",
+          source: "arxiv",
+          score: 0.9,
+        },
       ];
 
       const result = deduplicatePapers(papers);
@@ -256,11 +300,57 @@ describe("AcademicSearchService - Result Processing", () => {
 
   describe("filterPapers", () => {
     const papers: AcademicPaper[] = [
-      { title: "Old", authors: ["A"], year: 2010, abstract: "A", url: "http://a", source: "arxiv", citationCount: 100, score: 0.8 },
-      { title: "New", authors: ["B"], year: 2023, abstract: "B", url: "http://b", source: "arxiv", citationCount: 50, score: 0.9 },
-      { title: "Cited", authors: ["C"], year: 2023, abstract: "C", url: "http://c", source: "arxiv", citationCount: 200, score: 0.95 },
-      { title: "Open", authors: ["D"], year: 2023, abstract: "D", url: "http://d", source: "arxiv", citationCount: 10, pdfUrl: "http://d.pdf", score: 0.7 },
-      { title: "Closed", authors: ["E"], year: 2023, abstract: "E", url: "http://e", source: "arxiv", citationCount: 10, score: 0.6 },
+      {
+        title: "Old",
+        authors: ["A"],
+        year: 2010,
+        abstract: "A",
+        url: "http://a",
+        source: "arxiv",
+        citationCount: 100,
+        score: 0.8,
+      },
+      {
+        title: "New",
+        authors: ["B"],
+        year: 2023,
+        abstract: "B",
+        url: "http://b",
+        source: "arxiv",
+        citationCount: 50,
+        score: 0.9,
+      },
+      {
+        title: "Cited",
+        authors: ["C"],
+        year: 2023,
+        abstract: "C",
+        url: "http://c",
+        source: "arxiv",
+        citationCount: 200,
+        score: 0.95,
+      },
+      {
+        title: "Open",
+        authors: ["D"],
+        year: 2023,
+        abstract: "D",
+        url: "http://d",
+        source: "arxiv",
+        citationCount: 10,
+        pdfUrl: "http://d.pdf",
+        score: 0.7,
+      },
+      {
+        title: "Closed",
+        authors: ["E"],
+        year: 2023,
+        abstract: "E",
+        url: "http://e",
+        source: "arxiv",
+        citationCount: 10,
+        score: 0.6,
+      },
     ];
 
     it("filters by publication year from", () => {
@@ -301,9 +391,33 @@ describe("AcademicSearchService - Result Processing", () => {
 
   describe("sortPapers", () => {
     const papers: AcademicPaper[] = [
-      { title: "Medium", authors: ["A"], abstract: "A", url: "http://a", source: "arxiv", citationCount: 50, score: 0.7 },
-      { title: "High", authors: ["B"], abstract: "B", url: "http://b", source: "arxiv", citationCount: 200, score: 0.9 },
-      { title: "Low", authors: ["C"], abstract: "C", url: "http://c", source: "arxiv", citationCount: 10, score: 0.5 },
+      {
+        title: "Medium",
+        authors: ["A"],
+        abstract: "A",
+        url: "http://a",
+        source: "arxiv",
+        citationCount: 50,
+        score: 0.7,
+      },
+      {
+        title: "High",
+        authors: ["B"],
+        abstract: "B",
+        url: "http://b",
+        source: "arxiv",
+        citationCount: 200,
+        score: 0.9,
+      },
+      {
+        title: "Low",
+        authors: ["C"],
+        abstract: "C",
+        url: "http://c",
+        source: "arxiv",
+        citationCount: 10,
+        score: 0.5,
+      },
     ];
 
     it("sorts by relevance (score) descending", () => {

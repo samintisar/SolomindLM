@@ -7,12 +7,13 @@ description: "INVOKE THIS SKILL when setting up a new project or when asked abou
 The LangChain ecosystem is split into focused, independently-versioned packages. Understanding which packages you need — and their version constraints — prevents incompatibilities and keeps upgrades predictable.
 
 **Key principles:**
+
 - **LangChain 1.0 is the current LTS release.** Always start new projects on 1.0+. LangChain 0.3 is legacy maintenance-only — do not use it for new work.
 - **langchain-core** is the shared foundation: always install it explicitly alongside any other package.
 - **langchain-community** (Python only) does NOT follow semantic versioning; pin it conservatively.
 - **LangGraph vs Deep Agents:** choose one orchestration approach based on your use case — they are alternatives, not a required stack (see [Framework Choice](#framework-choice) below).
 - Provider integrations (model, vector store, tools) are installed separately so you only pull in what you use.
-</overview>
+  </overview>
 
 ---
 
@@ -20,11 +21,11 @@ The LangChain ecosystem is split into focused, independently-versioned packages.
 
 <environment-requirements>
 
-| Requirement | Python | TypeScript / Node |
-|-------------|--------|-------------------|
-| Runtime minimum | **Python 3.10+** | **Node.js 20+** |
-| LangChain | **1.0+ (LTS)** | **1.0+ (LTS)** |
-| LangSmith SDK | >= 0.3.0 | >= 0.3.0 |
+| Requirement     | Python           | TypeScript / Node |
+| --------------- | ---------------- | ----------------- |
+| Runtime minimum | **Python 3.10+** | **Node.js 20+**   |
+| LangChain       | **1.0+ (LTS)**   | **1.0+ (LTS)**    |
+| LangSmith SDK   | >= 0.3.0         | >= 0.3.0          |
 
 </environment-requirements>
 
@@ -35,9 +36,9 @@ The LangChain ecosystem is split into focused, independently-versioned packages.
 <framework-choice>
 Pick **one** agent orchestration layer. You do not need both.
 
-| Framework | When to use | Core extra package |
-|-----------|-------------|--------------------|
-| **LangGraph** | Need fine-grained graph control, custom workflows, loops, or branching | `langgraph` / `@langchain/langgraph` |
+| Framework       | When to use                                                                       | Core extra package                                                   |
+| --------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **LangGraph**   | Need fine-grained graph control, custom workflows, loops, or branching            | `langgraph` / `@langchain/langgraph`                                 |
 | **Deep Agents** | Want batteries-included planning, memory, file context, and skills out of the box | `deepagents` (depends on LangGraph; installs it as a transitive dep) |
 
 Both sit on top of `langchain` + `langchain-core` + `langsmith`.
@@ -51,51 +52,51 @@ Both sit on top of `langchain` + `langchain-core` + `langsmith`.
 
 ### Python — always required
 
-| Package | Role | Min version |
-|---------|------|-------------|
-| `langchain` | Agents, chains, retrieval | 1.0 |
-| `langchain-core` | Base types & interfaces (peer dep) | 1.0 |
-| `langsmith` | Tracing, evaluation, datasets | 0.3.0 |
+| Package          | Role                               | Min version |
+| ---------------- | ---------------------------------- | ----------- |
+| `langchain`      | Agents, chains, retrieval          | 1.0         |
+| `langchain-core` | Base types & interfaces (peer dep) | 1.0         |
+| `langsmith`      | Tracing, evaluation, datasets      | 0.3.0       |
 
 ### Python — orchestration (pick one)
 
-| Package | Use when | Min version |
-|---------|----------|-------------|
-| `langgraph` | Building custom graphs directly | 1.0 |
-| `deepagents` | Using the Deep Agents framework | latest |
+| Package      | Use when                        | Min version |
+| ------------ | ------------------------------- | ----------- |
+| `langgraph`  | Building custom graphs directly | 1.0         |
+| `deepagents` | Using the Deep Agents framework | latest      |
 
 ### Python — model providers (pick the one(s) you use)
 
-| Package | Provider |
-|---------|----------|
-| `langchain-openai` | OpenAI (GPT-4o, o3, …) |
-| `langchain-anthropic` | Anthropic (Claude) |
-| `langchain-google-genai` | Google (Gemini) |
-| `langchain-mistralai` | Mistral |
-| `langchain-groq` | Groq (fast inference) |
-| `langchain-cohere` | Cohere |
-| `langchain-fireworks` | Fireworks AI |
-| `langchain-together` | Together AI |
-| `langchain-huggingface` | Hugging Face Hub |
-| `langchain-ollama` | Ollama (local models) |
-| `langchain-aws` | AWS Bedrock |
-| `langchain-azure-ai` | Azure AI Foundry |
+| Package                  | Provider               |
+| ------------------------ | ---------------------- |
+| `langchain-openai`       | OpenAI (GPT-4o, o3, …) |
+| `langchain-anthropic`    | Anthropic (Claude)     |
+| `langchain-google-genai` | Google (Gemini)        |
+| `langchain-mistralai`    | Mistral                |
+| `langchain-groq`         | Groq (fast inference)  |
+| `langchain-cohere`       | Cohere                 |
+| `langchain-fireworks`    | Fireworks AI           |
+| `langchain-together`     | Together AI            |
+| `langchain-huggingface`  | Hugging Face Hub       |
+| `langchain-ollama`       | Ollama (local models)  |
+| `langchain-aws`          | AWS Bedrock            |
+| `langchain-azure-ai`     | Azure AI Foundry       |
 
 ### Python — common tool & retrieval packages
 
 These packages have tighter compatibility requirements — use the latest available version unless you have a specific reason not to.
 
-| Package | Adds | Notes |
-|---------|------|-------|
-| `langchain-tavily` | Tavily web search (`TavilySearch`) | Dedicated integration package; prefer latest |
-| `langchain-text-splitters` | Text chunking utilities | Semver, keep current |
-| `langchain-community` | 1000+ integrations (fallback) | **NOT semver — pin to minor series** |
-| `faiss-cpu` | FAISS vector store (local) | Via `langchain-community`; use latest |
-| `langchain-chroma` | Chroma vector store | Dedicated integration package; prefer latest |
-| `langchain-pinecone` | Pinecone vector store | Dedicated integration package; prefer latest |
-| `langchain-qdrant` | Qdrant vector store | Dedicated integration package; prefer latest |
-| `langchain-weaviate` | Weaviate vector store | Dedicated integration package; prefer latest |
-| `langsmith[pytest]` | pytest plugin for LangSmith | Requires langsmith >= 0.3.4 |
+| Package                    | Adds                               | Notes                                        |
+| -------------------------- | ---------------------------------- | -------------------------------------------- |
+| `langchain-tavily`         | Tavily web search (`TavilySearch`) | Dedicated integration package; prefer latest |
+| `langchain-text-splitters` | Text chunking utilities            | Semver, keep current                         |
+| `langchain-community`      | 1000+ integrations (fallback)      | **NOT semver — pin to minor series**         |
+| `faiss-cpu`                | FAISS vector store (local)         | Via `langchain-community`; use latest        |
+| `langchain-chroma`         | Chroma vector store                | Dedicated integration package; prefer latest |
+| `langchain-pinecone`       | Pinecone vector store              | Dedicated integration package; prefer latest |
+| `langchain-qdrant`         | Qdrant vector store                | Dedicated integration package; prefer latest |
+| `langchain-weaviate`       | Weaviate vector store              | Dedicated integration package; prefer latest |
+| `langsmith[pytest]`        | pytest plugin for LangSmith        | Requires langsmith >= 0.3.4                  |
 
 > **langchain-community stability note:** This package is NOT on semantic versioning. Minor releases can contain breaking changes. Prefer dedicated integration packages (e.g. `langchain-chroma`, `langchain-tavily`) when they exist — they are independently versioned and more stable.
 
@@ -105,42 +106,42 @@ These packages have tighter compatibility requirements — use the latest availa
 
 ### TypeScript — always required
 
-| Package | Role | Min version |
-|---------|------|-------------|
-| `@langchain/core` | Base types & interfaces (peer dep) | 1.0 |
-| `langchain` | Agents, chains, retrieval | 1.0 |
-| `langsmith` | Tracing, evaluation, datasets | 0.3.0 |
+| Package           | Role                               | Min version |
+| ----------------- | ---------------------------------- | ----------- |
+| `@langchain/core` | Base types & interfaces (peer dep) | 1.0         |
+| `langchain`       | Agents, chains, retrieval          | 1.0         |
+| `langsmith`       | Tracing, evaluation, datasets      | 0.3.0       |
 
 ### TypeScript — orchestration (pick one)
 
-| Package | Use when | Min version |
-|---------|----------|-------------|
-| `@langchain/langgraph` | Building custom graphs directly | 1.0 |
-| `deepagents` | Using the Deep Agents framework | latest |
+| Package                | Use when                        | Min version |
+| ---------------------- | ------------------------------- | ----------- |
+| `@langchain/langgraph` | Building custom graphs directly | 1.0         |
+| `deepagents`           | Using the Deep Agents framework | latest      |
 
 ### TypeScript — model providers (pick the one(s) you use)
 
-| Package | Provider |
-|---------|----------|
-| `@langchain/openai` | OpenAI (GPT-4o, o3, …) |
-| `@langchain/anthropic` | Anthropic (Claude) |
-| `@langchain/google-genai` | Google (Gemini) |
-| `@langchain/mistralai` | Mistral |
-| `@langchain/groq` | Groq (fast inference) |
-| `@langchain/cohere` | Cohere |
-| `@langchain/aws` | AWS Bedrock |
-| `@langchain/azure-openai` | Azure OpenAI |
-| `@langchain/ollama` | Ollama (local models) |
+| Package                   | Provider               |
+| ------------------------- | ---------------------- |
+| `@langchain/openai`       | OpenAI (GPT-4o, o3, …) |
+| `@langchain/anthropic`    | Anthropic (Claude)     |
+| `@langchain/google-genai` | Google (Gemini)        |
+| `@langchain/mistralai`    | Mistral                |
+| `@langchain/groq`         | Groq (fast inference)  |
+| `@langchain/cohere`       | Cohere                 |
+| `@langchain/aws`          | AWS Bedrock            |
+| `@langchain/azure-openai` | Azure OpenAI           |
+| `@langchain/ollama`       | Ollama (local models)  |
 
 ### TypeScript — common tool & retrieval packages
 
-| Package | Adds | Notes |
-|---------|------|-------|
-| `@langchain/tavily` | Tavily web search (`TavilySearch`) | Dedicated integration package; prefer latest |
-| `@langchain/community` | Broad set of community integrations | Use sparingly; prefer dedicated packages |
-| `@langchain/pinecone` | Pinecone vector store | Dedicated integration package; prefer latest |
-| `@langchain/qdrant` | Qdrant vector store | Dedicated integration package; prefer latest |
-| `@langchain/weaviate` | Weaviate vector store | Dedicated integration package; prefer latest |
+| Package                | Adds                                | Notes                                        |
+| ---------------------- | ----------------------------------- | -------------------------------------------- |
+| `@langchain/tavily`    | Tavily web search (`TavilySearch`)  | Dedicated integration package; prefer latest |
+| `@langchain/community` | Broad set of community integrations | Use sparingly; prefer dedicated packages     |
+| `@langchain/pinecone`  | Pinecone vector store               | Dedicated integration package; prefer latest |
+| `@langchain/qdrant`    | Qdrant vector store                 | Dedicated integration package; prefer latest |
+| `@langchain/weaviate`  | Weaviate vector store               | Dedicated integration package; prefer latest |
 
 > **`@langchain/core` must be installed explicitly** in yarn workspaces and monorepos — it is a peer dependency and will not always be hoisted automatically.
 
@@ -161,10 +162,14 @@ langgraph>=1.0,<2.0
 langsmith>=0.3.0
 
 # Add your model provider, e.g.:
+
 # langchain-openai
+
 # langchain-anthropic
+
 # langchain-google-genai
-```
+
+````
 </python>
 </ex-langgraph-python>
 
@@ -180,7 +185,8 @@ Minimal package.json dependencies for a LangGraph project (provider-agnostic).
     "langsmith": "^0.3.0"
   }
 }
-```
+````
+
 </typescript>
 </ex-langgraph-typescript>
 
@@ -195,9 +201,12 @@ langchain-core>=1.0,<2.0
 langsmith>=0.3.0
 
 # Add your model provider, e.g.:
+
 # langchain-anthropic
+
 # langchain-openai
-```
+
+````
 </python>
 </ex-deepagents-python>
 
@@ -213,7 +222,8 @@ Minimal package.json dependencies for a Deep Agents project (provider-agnostic).
     "langsmith": "^0.3.0"
   }
 }
-```
+````
+
 </typescript>
 </ex-deepagents-typescript>
 
@@ -228,19 +238,26 @@ langgraph>=1.0,<2.0
 langsmith>=0.3.0
 
 # Web search
-langchain-tavily          # use latest; partner package, semver
+
+langchain-tavily # use latest; partner package, semver
 
 # Vector store — pick one:
-langchain-chroma          # use latest; partner package, semver
-# langchain-pinecone      # use latest; partner package, semver
-# langchain-qdrant        # use latest; partner package, semver
+
+langchain-chroma # use latest; partner package, semver
+
+# langchain-pinecone # use latest; partner package, semver
+
+# langchain-qdrant # use latest; partner package, semver
 
 # Text processing
-langchain-text-splitters  # use latest; semver
+
+langchain-text-splitters # use latest; semver
 
 # Your model provider:
+
 # langchain-openai / langchain-anthropic / etc.
-```
+
+````
 </python>
 </ex-with-tools-python>
 
@@ -258,7 +275,8 @@ Adding Tavily search and a vector store to a LangGraph project.
     "@langchain/pinecone": "latest"
   }
 }
-```
+````
+
 </typescript>
 </ex-with-tools-typescript>
 
@@ -268,14 +286,14 @@ Adding Tavily search and a vector store to a LangGraph project.
 
 <versioning-policy>
 
-| Package group | Versioning | Safe upgrade strategy |
-|---------------|------------|-----------------------|
-| `langchain`, `langchain-core` | Strict semver (1.0 LTS) | Allow minor: `>=1.0,<2.0` |
-| `langgraph` / `@langchain/langgraph` | Strict semver (v1 LTS) | Allow minor: `>=1.0,<2.0` |
-| `langsmith` | Strict semver | Allow minor: `>=0.3.0` |
-| Dedicated integration packages (e.g. `langchain-tavily`, `langchain-chroma`) | Independently versioned | Allow minor updates; use latest |
-| `langchain-community` | **NOT semver** | Pin exact minor: `>=0.4.0,<0.5.0` |
-| `deepagents` | Follow project releases | Pin to tested version in production |
+| Package group                                                                | Versioning              | Safe upgrade strategy               |
+| ---------------------------------------------------------------------------- | ----------------------- | ----------------------------------- |
+| `langchain`, `langchain-core`                                                | Strict semver (1.0 LTS) | Allow minor: `>=1.0,<2.0`           |
+| `langgraph` / `@langchain/langgraph`                                         | Strict semver (v1 LTS)  | Allow minor: `>=1.0,<2.0`           |
+| `langsmith`                                                                  | Strict semver           | Allow minor: `>=0.3.0`              |
+| Dedicated integration packages (e.g. `langchain-tavily`, `langchain-chroma`) | Independently versioned | Allow minor updates; use latest     |
+| `langchain-community`                                                        | **NOT semver**          | Pin exact minor: `>=0.4.0,<0.5.0`   |
+| `deepagents`                                                                 | Follow project releases | Pin to tested version in production |
 
 **Breaking changes only happen in major versions** (1.x → 2.x) for all semver-compliant packages. Deprecated features remain functional across the entire 1.x series with warnings.
 
@@ -312,6 +330,7 @@ HUGGINGFACEHUB_API_TOKEN=<your-key>
 TAVILY_API_KEY=<your-key>          # for Tavily search
 PINECONE_API_KEY=<your-key>        # for Pinecone
 ```
+
 </environment-variables>
 
 ---
@@ -325,18 +344,24 @@ Never start a new project on LangChain 0.3. It is maintenance-only until Decembe
 langchain>=0.3,<0.4
 
 # CORRECT: LangChain 1.0 LTS
+
 langchain>=1.0,<2.0
+
 ```
 </fix-legacy-version>
 
 <fix-community-unpinned>
 `langchain-community` can break on minor version bumps — it does not follow semver.
 ```
+
 # WRONG: allows minor-version updates that may be breaking
+
 langchain-community>=0.4
 
 # CORRECT: pin to exact minor series
+
 langchain-community>=0.4.0,<0.5.0
+
 ```
 Also consider switching to the equivalent dedicated integration package if one exists (e.g. `langchain-chroma` instead of the community Chroma integration).
 </fix-community-unpinned>
@@ -344,12 +369,16 @@ Also consider switching to the equivalent dedicated integration package if one e
 <fix-community-tool-outdated>
 Community tool packages like `langchain-tavily` and vector store integrations release compatibility fixes alongside LangChain updates. Using an old pinned version can cause import errors or broken tool schemas.
 ```
+
 # RISKY: old pin may be incompatible with LangChain 1.0
+
 langchain-tavily==0.0.1
 
 # BETTER: allow latest within the current major
+
 langchain-tavily>=0.1
-```
+
+````
 </fix-community-tool-outdated>
 
 <fix-community-import-deprecated>
@@ -367,7 +396,7 @@ from langchain_tavily import TavilySearch                  # pip: langchain-tavi
 from langchain_community.tools import WikipediaQueryRun  # no dedicated pkg yet
 from langchain_chroma import Chroma                       # pip: langchain-chroma
 from langchain_pinecone import PineconeVectorStore        # pip: langchain-pinecone
-```
+````
 
 To find the current canonical import for any integration, search the integrations directory:
 https://python.langchain.com/docs/integrations/tools/
@@ -388,12 +417,13 @@ Each entry shows the correct package and import path. If a dedicated package exi
 
 // CORRECT: always list @langchain/core explicitly
 {
-  "dependencies": {
-    "@langchain/core": "^1.0.0",
-    "@langchain/langgraph": "^1.0.0"
-  }
+"dependencies": {
+"@langchain/core": "^1.0.0",
+"@langchain/langgraph": "^1.0.0"
 }
-```
+}
+
+````
 </typescript>
 </fix-core-not-installed>
 
@@ -404,7 +434,8 @@ Python 3.9 and below are not supported by LangChain 1.0.
 # Verify before installing
 import sys
 assert sys.version_info >= (3, 10), "Python 3.10+ required for LangChain 1.0"
-```
+````
+
 </python>
 </fix-python-version>
 

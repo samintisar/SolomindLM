@@ -370,10 +370,13 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[writtenQuestions] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[writtenQuestions] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -398,7 +401,10 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+          [
+            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ],
           createLangSmithRunConfig({
             runName: "WrittenQuestionsJob.MapProcess",
             tags: ["agent", "written_questions", "map"],
@@ -425,7 +431,13 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     // Assign fresh IDs per question so IDs are unique across parallel map chunks (models often repeat schemes like "1"–"5").
     // Filter out empty or invalid questions.
     const questions = (response as WrittenQuestionsResponse).questions
-      .filter((q) => q.question && q.question.trim().length > 0 && q.modelAnswer && q.modelAnswer.trim().length > 0)
+      .filter(
+        (q) =>
+          q.question &&
+          q.question.trim().length > 0 &&
+          q.modelAnswer &&
+          q.modelAnswer.trim().length > 0
+      )
       .map((q) => ({
         ...q,
         id: randomUUID(),
@@ -517,8 +529,8 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       : 0;
     const totalMaps = writtenQuestion.metadata?.totalMapTasks || totalChunks;
     const failedMaps = writtenQuestion.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -602,10 +614,13 @@ export async function runFinalizeWrittenQuestionsPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[writtenQuestions] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[writtenQuestions] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -679,7 +694,10 @@ export async function runFinalizeWrittenQuestionsPhase(
       const selectionResponse = await invokeStudioLlm({
         invoke: () =>
           structuredSelectLLM.invoke(
-            [new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)), new HumanMessage(selectionPrompt)],
+            [
+              new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+              new HumanMessage(selectionPrompt),
+            ],
             createLangSmithRunConfig({
               runName: "WrittenQuestionsJob.Select",
               tags: ["agent", "written_questions", "select"],

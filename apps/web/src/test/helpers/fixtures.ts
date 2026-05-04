@@ -10,9 +10,7 @@ export function createMockMessage(overrides: Partial<Message> = {}): Message {
   };
 }
 
-export function createMockReferenceChunk(
-  overrides: Partial<ReferenceChunk> = {}
-): ReferenceChunk {
+export function createMockReferenceChunk(overrides: Partial<ReferenceChunk> = {}): ReferenceChunk {
   return {
     id: 1,
     sourceId: "src-1",

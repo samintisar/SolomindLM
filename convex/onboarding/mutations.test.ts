@@ -5,15 +5,9 @@ import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
-  string,
-  () => Promise<unknown>
->;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
@@ -22,21 +16,14 @@ function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
 
 type OnboardingPatch = {
   tourStatus?: "pending" | "active" | "skipped" | "completed";
-  currentStepId?:
-    | "createNotebook"
-    | "addSource"
-    | "askQuestion"
-    | "generateArtifact";
+  currentStepId?: "createNotebook" | "addSource" | "askQuestion" | "generateArtifact";
   tourNotebookId?: Id<"notebooks">;
   checklistDismissed?: boolean;
   startedAt?: number;
   completedAt?: number;
 };
 
-async function seedRow(
-  t: ReturnType<typeof convexTest>,
-  patch: OnboardingPatch = {},
-) {
+async function seedRow(t: ReturnType<typeof convexTest>, patch: OnboardingPatch = {}) {
   return await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { name: "U" });
     await ctx.db.insert("userOnboarding", {
@@ -52,29 +39,23 @@ async function seedRow(
   });
 }
 
-async function readRow(
-  t: ReturnType<typeof convexTest>,
-  userId: Id<"users">,
-) {
+async function readRow(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return await t.run(async (ctx) =>
     ctx.db
       .query("userOnboarding")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique(),
+      .unique()
   );
 }
 
-async function insertNotebookFor(
-  t: ReturnType<typeof convexTest>,
-  userId: Id<"users">,
-) {
+async function insertNotebookFor(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return await t.run(async (ctx) =>
     ctx.db.insert("notebooks", {
       userId,
       title: "N",
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    }),
+    })
   );
 }
 
@@ -82,10 +63,7 @@ describe("startTour", () => {
   test("happy path: pending -> active with createNotebook", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, { tourStatus: "pending" });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.startTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.startTour, {});
     const row = await readRow(t, userId);
     expect(row).toMatchObject({
       tourStatus: "active",
@@ -100,10 +78,7 @@ describe("startTour", () => {
       tourStatus: "active",
       currentStepId: "addSource",
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.startTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.startTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("active");
     expect(row?.currentStepId).toBe("addSource");
@@ -112,10 +87,7 @@ describe("startTour", () => {
   test("no-op when status is completed", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, { tourStatus: "completed" });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.startTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.startTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("completed");
   });
@@ -123,10 +95,7 @@ describe("startTour", () => {
   test("no-op when status is skipped", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedRow(t, { tourStatus: "skipped" });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.startTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.startTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("skipped");
   });
@@ -174,10 +143,9 @@ describe("advanceTourStep", () => {
       currentStepId: "createNotebook",
     });
     await expect(
-      withAuth(t, userId).mutation(
-        api.onboarding.mutations.advanceTourStep,
-        { expectedCurrentStepId: "addSource" },
-      ),
+      withAuth(t, userId).mutation(api.onboarding.mutations.advanceTourStep, {
+        expectedCurrentStepId: "addSource",
+      })
     ).rejects.toThrow();
   });
 
@@ -188,10 +156,9 @@ describe("advanceTourStep", () => {
       currentStepId: "addSource",
     });
     await expect(
-      withAuth(t, userId).mutation(
-        api.onboarding.mutations.advanceTourStep,
-        { expectedCurrentStepId: "addSource" },
-      ),
+      withAuth(t, userId).mutation(api.onboarding.mutations.advanceTourStep, {
+        expectedCurrentStepId: "addSource",
+      })
     ).resolves.toBeNull();
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("skipped");
@@ -207,10 +174,7 @@ describe("skipTour", () => {
       currentStepId: "addSource",
       checklistDismissed: false,
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.skipTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.skipTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("skipped");
     expect(row?.checklistDismissed).toBe(false);
@@ -222,10 +186,7 @@ describe("skipTour", () => {
       tourStatus: "active",
       currentStepId: "addSource",
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.skipTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.skipTour, {});
     const row = await readRow(t, userId);
     expect(row?.currentStepId).toBeUndefined();
   });
@@ -238,10 +199,7 @@ describe("completeTour", () => {
       tourStatus: "active",
       currentStepId: "generateArtifact",
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.completeTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.completeTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("completed");
     expect(row?.completedAt).toBeTypeOf("number");
@@ -253,10 +211,7 @@ describe("completeTour", () => {
       tourStatus: "active",
       currentStepId: "generateArtifact",
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.completeTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.completeTour, {});
     const row = await readRow(t, userId);
     expect(row?.currentStepId).toBeUndefined();
   });
@@ -270,10 +225,7 @@ describe("dismissChecklist", () => {
       currentStepId: "addSource",
       checklistDismissed: false,
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.dismissChecklist,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.dismissChecklist, {});
     const row = await readRow(t, userId);
     expect(row?.checklistDismissed).toBe(true);
     expect(row?.tourStatus).toBe("active");
@@ -283,9 +235,7 @@ describe("dismissChecklist", () => {
 describe("restartTour", () => {
   test("sets active + createNotebook, clears tourNotebookId", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     const tourNb = await insertNotebookFor(t, userId);
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
@@ -294,12 +244,9 @@ describe("restartTour", () => {
         tourNotebookId: tourNb,
         checklistDismissed: false,
         completedAt: Date.now(),
-      }),
+      })
     );
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.restartTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.restartTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("active");
     expect(row?.currentStepId).toBe("createNotebook");
@@ -314,10 +261,7 @@ describe("restartTour", () => {
       tourStatus: "completed",
       checklistDismissed: true,
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.restartTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.restartTour, {});
     const row = await readRow(t, userId);
     expect(row?.checklistDismissed).toBe(false);
   });
@@ -330,10 +274,7 @@ describe("showChecklist", () => {
       tourStatus: "active",
       checklistDismissed: true,
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.showChecklist,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.showChecklist, {});
     const row = await readRow(t, userId);
     expect(row?.checklistDismissed).toBe(false);
   });
@@ -360,8 +301,8 @@ describe("auth requirement", () => {
             | "restartTour"
             | "showChecklist"
         ],
-        {},
-      ),
+        {}
+      )
     ).rejects.toThrow();
   });
 
@@ -370,7 +311,7 @@ describe("auth requirement", () => {
     await expect(
       t.mutation(api.onboarding.mutations.advanceTourStep, {
         expectedCurrentStepId: "createNotebook",
-      }),
+      })
     ).rejects.toThrow();
   });
 });

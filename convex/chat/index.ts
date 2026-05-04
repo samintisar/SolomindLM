@@ -2,10 +2,7 @@ import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "../_generated/server";
 import { getAuthUserId } from "../auth";
 import { getNotebookAccess } from "../_lib/notebookAccess";
-import {
-  assertCanReadConversation,
-  assertCanEditConversation,
-} from "../_lib/conversationAccess";
+import { assertCanReadConversation, assertCanEditConversation } from "../_lib/conversationAccess";
 import * as ConvModel from "../_model/conversations";
 
 /**
@@ -217,9 +214,7 @@ export const getRecentConversationTurnsForResearchInternal = internalQuery({
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .order("desc")
       .take(cap);
-    return rows
-      .reverse()
-      .map((m) => ({ role: m.role, content: m.content }));
+    return rows.reverse().map((m) => ({ role: m.role, content: m.content }));
   },
 });
 

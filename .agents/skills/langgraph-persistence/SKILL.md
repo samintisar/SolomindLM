@@ -11,17 +11,18 @@ LangGraph's persistence layer enables durable execution by checkpointing graph s
 - **Store**: Cross-thread memory for user preferences, facts
 
 **Two memory types:**
+
 - **Short-term** (checkpointer): Thread-scoped conversation history
 - **Long-term** (store): Cross-thread user preferences, facts
-</overview>
+  </overview>
 
 <checkpointer-selection>
 
-| Checkpointer | Use Case | Production Ready |
-|--------------|----------|------------------|
-| `InMemorySaver` | Testing, development | No |
-| `SqliteSaver` | Local development | Partial |
-| `PostgresSaver` | Production | Yes |
+| Checkpointer    | Use Case             | Production Ready |
+| --------------- | -------------------- | ---------------- |
+| `InMemorySaver` | Testing, development | No               |
+| `SqliteSaver`   | Local development    | Partial          |
+| `PostgresSaver` | Production           | Yes              |
 
 </checkpointer-selection>
 
@@ -39,30 +40,32 @@ from typing_extensions import TypedDict, Annotated
 import operator
 
 class State(TypedDict):
-    messages: Annotated[list, operator.add]
+messages: Annotated[list, operator.add]
 
 def add_message(state: State) -> dict:
-    return {"messages": ["Bot response"]}
+return {"messages": ["Bot response"]}
 
 checkpointer = InMemorySaver()
 
 graph = (
-    StateGraph(State)
-    .add_node("respond", add_message)
-    .add_edge(START, "respond")
-    .add_edge("respond", END)
-    .compile(checkpointer=checkpointer)  # Pass at compile time
+StateGraph(State)
+.add_node("respond", add_message)
+.add_edge(START, "respond")
+.add_edge("respond", END)
+.compile(checkpointer=checkpointer) # Pass at compile time
 )
 
 # ALWAYS provide thread_id
+
 config = {"configurable": {"thread_id": "conversation-1"}}
 
 result1 = graph.invoke({"messages": ["Hello"]}, config)
-print(len(result1["messages"]))  # 2
+print(len(result1["messages"])) # 2
 
 result2 = graph.invoke({"messages": ["How are you?"]}, config)
-print(len(result2["messages"]))  # 4 (previous + new)
-```
+print(len(result2["messages"])) # 4 (previous + new)
+
+````
 </python>
 <typescript>
 Set up a basic graph with in-memory checkpointing and thread-based state persistence.
@@ -92,7 +95,8 @@ console.log(result1.messages.length);  // 2
 
 const result2 = await graph.invoke({ messages: [new HumanMessage("How are you?")] }, config);
 console.log(result2.messages.length);  // 4 (previous + new)
-```
+````
+
 </typescript>
 </ex-basic-persistence>
 
@@ -103,11 +107,12 @@ Configure PostgreSQL-backed checkpointing for production deployments.
 from langgraph.checkpoint.postgres import PostgresSaver
 
 with PostgresSaver.from_conn_string(
-    "postgresql://user:pass@localhost/db"
+"postgresql://user:pass@localhost/db"
 ) as checkpointer:
-    checkpointer.setup()  # only needed on first use to create tables
-    graph = builder.compile(checkpointer=checkpointer)
-```
+checkpointer.setup() # only needed on first use to create tables
+graph = builder.compile(checkpointer=checkpointer)
+
+````
 </python>
 <typescript>
 Configure PostgreSQL-backed checkpointing for production deployments.
@@ -120,7 +125,8 @@ const checkpointer = PostgresSaver.fromConnString(
 await checkpointer.setup(); // only needed on first use to create tables
 
 const graph = builder.compile({ checkpointer });
-```
+````
+
 </typescript>
 </ex-production-postgres>
 
@@ -140,7 +146,8 @@ graph.invoke({"messages": ["Hi from Alice"]}, alice_config)
 graph.invoke({"messages": ["Hi from Bob"]}, bob_config)
 
 # Alice's state is isolated from Bob's
-```
+
+````
 </python>
 <typescript>
 Demonstrate isolated state between different thread IDs.
@@ -153,7 +160,8 @@ await graph.invoke({ messages: [new HumanMessage("Hi from Alice")] }, aliceConfi
 await graph.invoke({ messages: [new HumanMessage("Hi from Bob")] }, bobConfig);
 
 // Alice's state is isolated from Bob's
-```
+````
+
 </typescript>
 </ex-separate-threads>
 
@@ -170,16 +178,20 @@ config = {"configurable": {"thread_id": "session-1"}}
 result = graph.invoke({"messages": ["start"]}, config)
 
 # Browse checkpoint history
+
 states = list(graph.get_state_history(config))
 
 # Replay from a past checkpoint
+
 past = states[-2]
-result = graph.invoke(None, past.config)  # None = resume from checkpoint
+result = graph.invoke(None, past.config) # None = resume from checkpoint
 
 # Or fork: update state at a past checkpoint, then resume
+
 fork_config = graph.update_state(past.config, {"messages": ["edited"]})
 result = graph.invoke(None, fork_config)
-```
+
+````
 </python>
 <typescript>
 Time travel: browse checkpoint history and replay or fork from a past state.
@@ -201,7 +213,8 @@ const replayed = await graph.invoke(null, past.config);  // null = resume from c
 // Or fork: update state at a past checkpoint, then resume
 const forkConfig = await graph.updateState(past.config, { messages: ["edited"] });
 const forked = await graph.invoke(null, forkConfig);
-```
+````
+
 </typescript>
 </ex-resume-from-checkpoint>
 
@@ -212,11 +225,14 @@ Manually update graph state before resuming execution.
 config = {"configurable": {"thread_id": "session-1"}}
 
 # Modify state before resuming
+
 graph.update_state(config, {"data": "manually_updated"})
 
 # Resume with updated state
+
 result = graph.invoke(None, config)
-```
+
+````
 </python>
 <typescript>
 Manually update graph state before resuming execution.
@@ -228,7 +244,8 @@ await graph.updateState(config, { data: "manually_updated" });
 
 // Resume with updated state
 const result = await graph.invoke(null, config);
-```
+````
+
 </typescript>
 </ex-update-state>
 
@@ -240,13 +257,13 @@ When compiling a subgraph, the `checkpointer` parameter controls persistence beh
 
 <subgraph-checkpointer-scoping-table>
 
-| Feature | `checkpointer=False` | `None` (default) | `True` |
-|---|---|---|---|
-| Interrupts (HITL) | No | Yes | Yes |
-| Multi-turn memory | No | No | Yes |
-| Multiple calls (different subgraphs) | Yes | Yes | Warning (namespace conflicts possible) |
-| Multiple calls (same subgraph) | Yes | Yes | No |
-| State inspection | No | Warning (current invocation only) | Yes |
+| Feature                              | `checkpointer=False` | `None` (default)                  | `True`                                 |
+| ------------------------------------ | -------------------- | --------------------------------- | -------------------------------------- |
+| Interrupts (HITL)                    | No                   | Yes                               | Yes                                    |
+| Multi-turn memory                    | No                   | No                                | Yes                                    |
+| Multiple calls (different subgraphs) | Yes                  | Yes                               | Warning (namespace conflicts possible) |
+| Multiple calls (same subgraph)       | Yes                  | Yes                               | No                                     |
+| State inspection                     | No                   | Warning (current invocation only) | Yes                                    |
 
 </subgraph-checkpointer-scoping-table>
 
@@ -274,11 +291,14 @@ Choose the right checkpointer mode for your subgraph.
 subgraph = subgraph_builder.compile(checkpointer=False)
 
 # Need interrupts but not cross-invocation persistence (default)
+
 subgraph = subgraph_builder.compile()
 
 # Need cross-invocation persistence (stateful)
+
 subgraph = subgraph_builder.compile(checkpointer=True)
-```
+
+````
 </python>
 <typescript>
 Choose the right checkpointer mode for your subgraph.
@@ -291,7 +311,8 @@ const subgraph = subgraphBuilder.compile();
 
 // Need cross-invocation persistence (stateful)
 const subgraph = subgraphBuilder.compile({ checkpointer: true });
-```
+````
+
 </typescript>
 </ex-subgraph-checkpointer-modes>
 
@@ -305,25 +326,26 @@ When multiple **different** stateful subgraphs run in parallel, wrap each in its
 ```python
 from langgraph.graph import MessagesState, StateGraph
 
-def create_sub_agent(model, *, name, **kwargs):
-    """Wrap an agent with a unique node name for namespace isolation."""
-    agent = create_agent(model=model, name=name, **kwargs)
-    return (
-        StateGraph(MessagesState)
-        .add_node(name, agent)  # unique name -> stable namespace
-        .add_edge("__start__", name)
-        .compile()
-    )
+def create_sub_agent(model, \*, name, **kwargs):
+"""Wrap an agent with a unique node name for namespace isolation."""
+agent = create_agent(model=model, name=name, **kwargs)
+return (
+StateGraph(MessagesState)
+.add_node(name, agent) # unique name -> stable namespace
+.add_edge("**start**", name)
+.compile()
+)
 
 fruit_agent = create_sub_agent(
-    "gpt-4.1-mini", name="fruit_agent",
-    tools=[fruit_info], prompt="...", checkpointer=True,
+"gpt-4.1-mini", name="fruit_agent",
+tools=[fruit_info], prompt="...", checkpointer=True,
 )
 veggie_agent = create_sub_agent(
-    "gpt-4.1-mini", name="veggie_agent",
-    tools=[veggie_info], prompt="...", checkpointer=True,
+"gpt-4.1-mini", name="veggie_agent",
+tools=[veggie_info], prompt="...", checkpointer=True,
 )
-```
+
+````
 </python>
 <typescript>
 ```typescript
@@ -343,7 +365,8 @@ const fruitAgent = createSubAgent("gpt-4.1-mini", {
 const veggieAgent = createSubAgent("gpt-4.1-mini", {
   name: "veggie_agent", tools: [veggieInfo], prompt: "...", checkpointer: true,
 });
-```
+````
+
 </typescript>
 
 Note: Subgraphs added as nodes (via `add_node`) already get name-based namespaces automatically and don't need this wrapper.
@@ -363,22 +386,27 @@ from langgraph.store.memory import InMemoryStore
 store = InMemoryStore()
 
 # Save user preference (available across ALL threads)
+
 store.put(("alice", "preferences"), "language", {"preference": "short responses"})
 
 # Node with store — access via runtime
+
 from langgraph.runtime import Runtime
 
 def respond(state, runtime: Runtime):
-    prefs = runtime.store.get((state["user_id"], "preferences"), "language")
-    return {"response": f"Using preference: {prefs.value}"}
+prefs = runtime.store.get((state["user_id"], "preferences"), "language")
+return {"response": f"Using preference: {prefs.value}"}
 
 # Compile with BOTH checkpointer and store
+
 graph = builder.compile(checkpointer=checkpointer, store=store)
 
 # Both threads access same long-term memory
+
 graph.invoke({"user_id": "alice"}, {"configurable": {"thread_id": "thread-1"}})
-graph.invoke({"user_id": "alice"}, {"configurable": {"thread_id": "thread-2"}})  # Same preferences!
-```
+graph.invoke({"user_id": "alice"}, {"configurable": {"thread_id": "thread-2"}}) # Same preferences!
+
+````
 </python>
 <typescript>
 Use a Store for cross-thread memory to share user preferences across conversations.
@@ -402,7 +430,8 @@ const graph = builder.compile({ checkpointer, store });
 // Both threads access same long-term memory
 await graph.invoke({ userId: "alice" }, { configurable: { thread_id: "thread-1" } });
 await graph.invoke({ userId: "alice" }, { configurable: { thread_id: "thread-2" } });  // Same preferences!
-```
+````
+
 </typescript>
 </ex-long-term-memory-store>
 
@@ -414,11 +443,12 @@ from langgraph.store.memory import InMemoryStore
 
 store = InMemoryStore()
 
-store.put(("user-123", "facts"), "location", {"city": "San Francisco"})  # Put
-item = store.get(("user-123", "facts"), "location")  # Get
-results = store.search(("user-123", "facts"), filter={"city": "San Francisco"})  # Search
-store.delete(("user-123", "facts"), "location")  # Delete
-```
+store.put(("user-123", "facts"), "location", {"city": "San Francisco"}) # Put
+item = store.get(("user-123", "facts"), "location") # Get
+results = store.search(("user-123", "facts"), filter={"city": "San Francisco"}) # Search
+store.delete(("user-123", "facts"), "location") # Delete
+
+````
 </python>
 </ex-store-operations>
 
@@ -438,7 +468,8 @@ graph.invoke({"messages": ["What did I say?"]})  # Doesn't remember!
 config = {"configurable": {"thread_id": "session-1"}}
 graph.invoke({"messages": ["Hello"]}, config)
 graph.invoke({"messages": ["What did I say?"]}, config)  # Remembers!
-```
+````
+
 </python>
 <typescript>
 Always provide thread_id in config to enable state persistence.
@@ -450,8 +481,9 @@ await graph.invoke({ messages: [new HumanMessage("What did I say?")] });  // Doe
 // CORRECT: Always provide thread_id
 const config = { configurable: { thread_id: "session-1" } };
 await graph.invoke({ messages: [new HumanMessage("Hello")] }, config);
-await graph.invoke({ messages: [new HumanMessage("What did I say?")] }, config);  // Remembers!
-```
+await graph.invoke({ messages: [new HumanMessage("What did I say?")] }, config); // Remembers!
+
+````
 </typescript>
 </fix-thread-id-required>
 
@@ -468,7 +500,8 @@ from langgraph.checkpoint.postgres import PostgresSaver
 with PostgresSaver.from_conn_string("postgresql://...") as checkpointer:
     checkpointer.setup()  # only needed on first use to create tables
     graph = builder.compile(checkpointer=checkpointer)
-```
+````
+
 </python>
 <typescript>
 Use PostgresSaver instead of MemorySaver for production persistence.
@@ -480,7 +513,8 @@ const checkpointer = new MemorySaver();  // In-memory only!
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 const checkpointer = PostgresSaver.fromConnString("postgresql://...");
 await checkpointer.setup(); // only needed on first use to create tables
-```
+
+````
 </typescript>
 </fix-inmemory-not-for-production>
 
@@ -499,7 +533,8 @@ graph.update_state(config, {"items": ["C"]})  # Result: ["A", "B", "C"] - Append
 
 # To REPLACE instead, use Overwrite
 graph.update_state(config, {"items": Overwrite(["C"])})  # Result: ["C"] - Replaced
-```
+````
+
 </python>
 <typescript>
 Use Overwrite to replace state values instead of passing through reducers.
@@ -510,11 +545,12 @@ import { Overwrite } from "@langchain/langgraph";
 // Current state: { items: ["A", "B"] }
 
 // updateState PASSES THROUGH reducers
-await graph.updateState(config, { items: ["C"] });  // Result: ["A", "B", "C"] - Appended!
+await graph.updateState(config, { items: ["C"] }); // Result: ["A", "B", "C"] - Appended!
 
 // To REPLACE instead, use Overwrite
-await graph.updateState(config, { items: new Overwrite(["C"]) });  // Result: ["C"] - Replaced
-```
+await graph.updateState(config, { items: new Overwrite(["C"]) }); // Result: ["C"] - Replaced
+
+````
 </typescript>
 </fix-update-state-with-reducers>
 
@@ -531,7 +567,8 @@ from langgraph.runtime import Runtime
 
 def my_node(state, runtime: Runtime):
     runtime.store.put(...)  # Correct store instance
-```
+````
+
 </python>
 <typescript>
 Access store via runtime parameter in graph nodes.
@@ -543,8 +580,9 @@ const myNode = async (state) => {
 
 // CORRECT: Access store via runtime
 const myNode = async (state, runtime) => {
-  await runtime.store?.put(...);  // Correct store instance
+await runtime.store?.put(...); // Correct store instance
 };
+
 ```
 </typescript>
 </fix-store-injection>
@@ -558,3 +596,4 @@ const myNode = async (state, runtime) => {
 - Run the same stateful subgraph (`checkpointer=True`) in parallel within one node — namespace conflict
 - Access store directly in a node — use `runtime.store` via the `Runtime` param
 </boundaries>
+```

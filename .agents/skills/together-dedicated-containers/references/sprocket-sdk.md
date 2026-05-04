@@ -1,4 +1,5 @@
 # Sprocket SDK Reference
+
 ## Contents
 
 - [Overview](#overview)
@@ -15,8 +16,8 @@
 - [Multi-GPU Pattern](#multi-gpu-pattern)
 - [Graceful Shutdown](#graceful-shutdown)
 
-
 ## Overview
+
 Sprocket is the worker framework for Together Dedicated Containers. It handles job receiving, processing, and result reporting.
 
 ## Installation
@@ -56,26 +57,26 @@ if __name__ == "__main__":
 
 ### Methods
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `setup` | `setup(self) -> None` | Called once at startup. Load models and resources. |
-| `predict` | `predict(self, args: dict) -> dict` | Called per job. Return results dict. |
-| `shutdown` | `shutdown(self) -> None` | Optional. Cleanup on shutdown. |
+| Method     | Signature                           | Description                                        |
+| ---------- | ----------------------------------- | -------------------------------------------------- |
+| `setup`    | `setup(self) -> None`               | Called once at startup. Load models and resources. |
+| `predict`  | `predict(self, args: dict) -> dict` | Called per job. Return results dict.               |
+| `shutdown` | `shutdown(self) -> None`            | Optional. Cleanup on shutdown.                     |
 
 ### Class Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `processor` | `Type[InputOutputProcessor]` | `InputOutputProcessor` | Custom I/O processor |
-| `warmup_inputs` | `list[dict]` | `[]` | Inputs for cache warmup |
+| Attribute       | Type                         | Default                | Description             |
+| --------------- | ---------------------------- | ---------------------- | ----------------------- |
+| `processor`     | `Type[InputOutputProcessor]` | `InputOutputProcessor` | Custom I/O processor    |
+| `warmup_inputs` | `list[dict]`                 | `[]`                   | Inputs for cache warmup |
 
 ## `sprocket.run(sprocket, name, use_torchrun=False)`
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `sprocket` | Sprocket | Your Sprocket instance |
-| `name` | str | Deployment name (used for queue routing) |
-| `use_torchrun` | bool | Enable multi-GPU mode. Default: False |
+| Parameter      | Type     | Description                              |
+| -------------- | -------- | ---------------------------------------- |
+| `sprocket`     | Sprocket | Your Sprocket instance                   |
+| `name`         | str      | Deployment name (used for queue routing) |
+| `use_torchrun` | bool     | Enable multi-GPU mode. Default: False    |
 
 ## `sprocket.FileOutput`
 
@@ -107,6 +108,7 @@ def predict(self, args):
 ```
 
 Constraints:
+
 - Must serialize to under 4,096 bytes JSON
 - Updates batched and merged (later values overwrite earlier)
 - With `use_torchrun=True`, call only from rank 0
@@ -128,27 +130,27 @@ class CustomProcessor(sprocket.InputOutputProcessor):
 
 ## HTTP Endpoints (Sprocket exposes)
 
-| Endpoint | Method | Response |
-|----------|--------|---------|
-| `/health` | GET | `{"status": "healthy"}` (200) or `{"status": "unhealthy"}` (503) |
-| `/metrics` | GET | Prometheus format: `requests_inflight 0.0` |
-| `/generate` | POST | Direct HTTP inference (non-queue mode) |
+| Endpoint    | Method | Response                                                         |
+| ----------- | ------ | ---------------------------------------------------------------- |
+| `/health`   | GET    | `{"status": "healthy"}` (200) or `{"status": "unhealthy"}` (503) |
+| `/metrics`  | GET    | Prometheus format: `requests_inflight 0.0`                       |
+| `/generate` | POST   | Direct HTTP inference (non-queue mode)                           |
 
 ## CLI Arguments
 
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--queue` | false | Enable queue worker mode |
-| `--port` | 8000 | HTTP server port |
+| Argument  | Default | Description              |
+| --------- | ------- | ------------------------ |
+| `--queue` | false   | Enable queue worker mode |
+| `--port`  | 8000    | HTTP server port         |
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TOGETHER_API_KEY` | Required | API key |
-| `TOGETHER_API_BASE_URL` | `https://api.together.ai` | API base URL |
-| `TERMINATION_GRACE_PERIOD_SECONDS` | 300 | Shutdown + prediction timeout |
-| `WORLD_SIZE` | 1 | GPU processes (set by torchrun) |
+| Variable                           | Default                   | Description                     |
+| ---------------------------------- | ------------------------- | ------------------------------- |
+| `TOGETHER_API_KEY`                 | Required                  | API key                         |
+| `TOGETHER_API_BASE_URL`            | `https://api.together.ai` | API base URL                    |
+| `TERMINATION_GRACE_PERIOD_SECONDS` | 300                       | Shutdown + prediction timeout   |
+| `WORLD_SIZE`                       | 1                         | GPU processes (set by torchrun) |
 
 ## Multi-GPU Pattern
 
@@ -171,6 +173,7 @@ sprocket.run(MultiGPUModel(), "my-model", use_torchrun=True)
 ```
 
 Config for multi-GPU:
+
 ```toml
 [tool.jig.deploy]
 gpu_type = "h100-80gb"

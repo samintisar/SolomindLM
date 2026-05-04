@@ -12,35 +12,36 @@
 
 ## File Map
 
-| File | Status | Responsibility |
-|---|---|---|
-| `convex/schema.ts` | Modify | Add `userPreferences` table |
-| `convex/userPreferences/index.ts` | New | `getMyPreferences`, `getPreferencesByUserId`, `setOutputLanguage` |
-| `convex/userPreferences/index.test.ts` | New | convex-test: preference CRUD + validation |
-| `convex/_agents/_shared/languageInstruction.ts` | New | `withLanguageInstruction()`, `SUPPORTED_LANGUAGES` |
-| `convex/_agents/_shared/languageInstruction.test.ts` | New | vitest: pure function behavior |
-| `convex/_agents/chat/chat_llm_types.ts` | Modify | Add `outputLanguage?` to `LLMWrapperConfig` |
-| `convex/_agents/chat/ChatAgent.ts` | Modify | Pass `outputLanguage` from options to `ChatLLMWrapper` |
-| `convex/_agents/chat/llm_wrapper.ts` | Modify | Store `outputLanguage`; apply `withLanguageInstruction` in all system prompt assemblies |
-| `convex/chat/stream.ts` | Modify | Fetch preference, pass `outputLanguage` to `new ChatAgent(...)` |
-| `convex/studio/flashcards/flashcardJobPhases.ts` | Modify | Fetch preference, wrap `MAP_SYSTEM_PROMPT` |
-| `convex/studio/reports/` | Modify | Same pattern — see Task 6 |
-| `convex/studio/quizzes/` | Modify | Same pattern |
-| `convex/studio/slides/` | Modify | Same pattern |
-| `convex/studio/spreadsheets/` | Modify | Same pattern |
-| `convex/studio/writtenQuestions/` | Modify | Same pattern |
-| `convex/studio/mindmaps/` | Modify | Same pattern |
-| `convex/studio/audio/` | Modify | Same pattern (transcript only) |
-| `apps/web/src/features/auth/constants/languages.ts` | New | `SUPPORTED_LANGUAGES`, `LanguageCode` type |
-| `apps/web/src/features/auth/hooks/useOutputLanguage.ts` | New | React hook: read/write preference |
-| `apps/web/src/features/auth/components/LanguageSelector.tsx` | New | Self-contained dropdown row |
-| `apps/web/src/features/auth/components/AvatarDropdown.tsx` | Modify | Render `<LanguageSelector>` |
+| File                                                         | Status | Responsibility                                                                          |
+| ------------------------------------------------------------ | ------ | --------------------------------------------------------------------------------------- |
+| `convex/schema.ts`                                           | Modify | Add `userPreferences` table                                                             |
+| `convex/userPreferences/index.ts`                            | New    | `getMyPreferences`, `getPreferencesByUserId`, `setOutputLanguage`                       |
+| `convex/userPreferences/index.test.ts`                       | New    | convex-test: preference CRUD + validation                                               |
+| `convex/_agents/_shared/languageInstruction.ts`              | New    | `withLanguageInstruction()`, `SUPPORTED_LANGUAGES`                                      |
+| `convex/_agents/_shared/languageInstruction.test.ts`         | New    | vitest: pure function behavior                                                          |
+| `convex/_agents/chat/chat_llm_types.ts`                      | Modify | Add `outputLanguage?` to `LLMWrapperConfig`                                             |
+| `convex/_agents/chat/ChatAgent.ts`                           | Modify | Pass `outputLanguage` from options to `ChatLLMWrapper`                                  |
+| `convex/_agents/chat/llm_wrapper.ts`                         | Modify | Store `outputLanguage`; apply `withLanguageInstruction` in all system prompt assemblies |
+| `convex/chat/stream.ts`                                      | Modify | Fetch preference, pass `outputLanguage` to `new ChatAgent(...)`                         |
+| `convex/studio/flashcards/flashcardJobPhases.ts`             | Modify | Fetch preference, wrap `MAP_SYSTEM_PROMPT`                                              |
+| `convex/studio/reports/`                                     | Modify | Same pattern — see Task 6                                                               |
+| `convex/studio/quizzes/`                                     | Modify | Same pattern                                                                            |
+| `convex/studio/slides/`                                      | Modify | Same pattern                                                                            |
+| `convex/studio/spreadsheets/`                                | Modify | Same pattern                                                                            |
+| `convex/studio/writtenQuestions/`                            | Modify | Same pattern                                                                            |
+| `convex/studio/mindmaps/`                                    | Modify | Same pattern                                                                            |
+| `convex/studio/audio/`                                       | Modify | Same pattern (transcript only)                                                          |
+| `apps/web/src/features/auth/constants/languages.ts`          | New    | `SUPPORTED_LANGUAGES`, `LanguageCode` type                                              |
+| `apps/web/src/features/auth/hooks/useOutputLanguage.ts`      | New    | React hook: read/write preference                                                       |
+| `apps/web/src/features/auth/components/LanguageSelector.tsx` | New    | Self-contained dropdown row                                                             |
+| `apps/web/src/features/auth/components/AvatarDropdown.tsx`   | Modify | Render `<LanguageSelector>`                                                             |
 
 ---
 
 ## Task 1: Frontend language constants
 
 **Files:**
+
 - Create: `apps/web/src/features/auth/constants/languages.ts`
 
 - [ ] **Step 1: Create the constants file**
@@ -48,21 +49,21 @@
 ```typescript
 // apps/web/src/features/auth/constants/languages.ts
 export const SUPPORTED_LANGUAGES = [
-  { code: "en",    label: "English" },
-  { code: "ar",    label: "Arabic" },
+  { code: "en", label: "English" },
+  { code: "ar", label: "Arabic" },
   { code: "zh-CN", label: "Chinese (Simplified)" },
-  { code: "fr",    label: "French" },
-  { code: "de",    label: "German" },
-  { code: "hi",    label: "Hindi" },
-  { code: "id",    label: "Indonesian" },
-  { code: "ja",    label: "Japanese" },
-  { code: "ko",    label: "Korean" },
-  { code: "pt",    label: "Portuguese" },
-  { code: "ru",    label: "Russian" },
-  { code: "es",    label: "Spanish" },
-  { code: "tr",    label: "Turkish" },
-  { code: "ur",    label: "Urdu" },
-  { code: "vi",    label: "Vietnamese" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "hi", label: "Hindi" },
+  { code: "id", label: "Indonesian" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "es", label: "Spanish" },
+  { code: "tr", label: "Turkish" },
+  { code: "ur", label: "Urdu" },
+  { code: "vi", label: "Vietnamese" },
 ] as const;
 
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
@@ -88,6 +89,7 @@ git commit -m "feat(lang): frontend language constants"
 ## Task 2: Backend language instruction helper (TDD)
 
 **Files:**
+
 - Create: `convex/_agents/_shared/languageInstruction.ts`
 - Create: `convex/_agents/_shared/languageInstruction.test.ts`
 
@@ -144,21 +146,21 @@ Expected: `Cannot find module './languageInstruction'`
 ```typescript
 // convex/_agents/_shared/languageInstruction.ts
 export const SUPPORTED_LANGUAGES = [
-  { code: "en",    label: "English" },
-  { code: "ar",    label: "Arabic" },
+  { code: "en", label: "English" },
+  { code: "ar", label: "Arabic" },
   { code: "zh-CN", label: "Chinese (Simplified)" },
-  { code: "fr",    label: "French" },
-  { code: "de",    label: "German" },
-  { code: "hi",    label: "Hindi" },
-  { code: "id",    label: "Indonesian" },
-  { code: "ja",    label: "Japanese" },
-  { code: "ko",    label: "Korean" },
-  { code: "pt",    label: "Portuguese" },
-  { code: "ru",    label: "Russian" },
-  { code: "es",    label: "Spanish" },
-  { code: "tr",    label: "Turkish" },
-  { code: "ur",    label: "Urdu" },
-  { code: "vi",    label: "Vietnamese" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "hi", label: "Hindi" },
+  { code: "id", label: "Indonesian" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "es", label: "Spanish" },
+  { code: "tr", label: "Turkish" },
+  { code: "ur", label: "Urdu" },
+  { code: "vi", label: "Vietnamese" },
 ] as const;
 
 export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
@@ -197,6 +199,7 @@ git commit -m "feat(lang): withLanguageInstruction helper + tests"
 ## Task 3: Convex schema + userPreferences module (TDD)
 
 **Files:**
+
 - Modify: `convex/schema.ts`
 - Create: `convex/userPreferences/index.ts`
 - Create: `convex/userPreferences/index.test.ts`
@@ -214,15 +217,9 @@ import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
-  string,
-  () => Promise<unknown>
->;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
@@ -244,7 +241,7 @@ describe("setOutputLanguage", () => {
       ctx.db
         .query("userPreferences")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique(),
+        .unique()
     );
     expect(prefs?.outputLanguage).toBe("es");
   });
@@ -259,7 +256,7 @@ describe("setOutputLanguage", () => {
       ctx.db
         .query("userPreferences")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
+        .collect()
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].outputLanguage).toBe("ja");
@@ -271,7 +268,7 @@ describe("setOutputLanguage", () => {
     await expect(
       withAuth(t, userId).mutation(api.userPreferences.index.setOutputLanguage, {
         outputLanguage: "xx",
-      }),
+      })
     ).rejects.toThrow();
   });
 });
@@ -404,6 +401,7 @@ git commit -m "feat(lang): userPreferences table + Convex module + tests"
 ## Task 4: UI — hook, LanguageSelector, AvatarDropdown
 
 **Files:**
+
 - Create: `apps/web/src/features/auth/hooks/useOutputLanguage.ts`
 - Create: `apps/web/src/features/auth/components/LanguageSelector.tsx`
 - Modify: `apps/web/src/features/auth/components/AvatarDropdown.tsx`
@@ -476,6 +474,7 @@ The `stopPropagation` on both `onClick` and `onChange` prevents the custom `Drop
 In `apps/web/src/features/auth/components/AvatarDropdown.tsx`:
 
 Add import at the top:
+
 ```typescript
 import { LanguageSelector } from "./LanguageSelector";
 ```
@@ -483,65 +482,68 @@ import { LanguageSelector } from "./LanguageSelector";
 Inside the `<div className="py-1">` block, add `<LanguageSelector>` between the theme toggle button and the `onRestartTour` button:
 
 ```tsx
-        {/* Language Selector */}
-        <LanguageSelector isAuthenticated={isAuthenticated} />
+{
+  /* Language Selector */
+}
+<LanguageSelector isAuthenticated={isAuthenticated} />;
 ```
 
 The full `<div className="py-1">` block after the change:
+
 ```tsx
-      <div className="py-1">
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-          role="menuitem"
-        >
-          {theme === "dark" ? (
-            <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
-          ) : (
-            <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
-          )}
-          <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
-        </button>
+<div className="py-1">
+  {/* Theme Toggle */}
+  <button
+    onClick={toggleTheme}
+    className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+    role="menuitem"
+  >
+    {theme === "dark" ? (
+      <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
+    ) : (
+      <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
+    )}
+    <span>{theme === "light" ? "Dark mode" : "Light mode"}</span>
+  </button>
 
-        {/* Language Selector */}
-        <LanguageSelector isAuthenticated={isAuthenticated} />
+  {/* Language Selector */}
+  <LanguageSelector isAuthenticated={isAuthenticated} />
 
-        {isAuthenticated && onRestartTour && (
-          <button
-            onClick={onRestartTour}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <RotateCcw className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Restart tour</span>
-          </button>
-        )}
-        {isAuthenticated && showChecklistDismissed && onShowChecklist && (
-          <button
-            onClick={onShowChecklist}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Show getting-started checklist</span>
-          </button>
-        )}
+  {isAuthenticated && onRestartTour && (
+    <button
+      onClick={onRestartTour}
+      className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+      role="menuitem"
+    >
+      <RotateCcw className="w-4 h-4 text-muted-foreground shrink-0" />
+      <span>Restart tour</span>
+    </button>
+  )}
+  {isAuthenticated && showChecklistDismissed && onShowChecklist && (
+    <button
+      onClick={onShowChecklist}
+      className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+      role="menuitem"
+    >
+      <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
+      <span>Show getting-started checklist</span>
+    </button>
+  )}
 
-        {/* Login/Logout */}
-        <button
-          onClick={isAuthenticated ? handleLogout : onLogin}
-          className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-          role="menuitem"
-        >
-          {isAuthenticated ? (
-            <LogOut className="w-4 h-4 text-muted-foreground shrink-0" />
-          ) : (
-            <LogIn className="w-4 h-4 text-muted-foreground shrink-0" />
-          )}
-          <span>{isAuthenticated ? "Logout" : "Login"}</span>
-        </button>
-      </div>
+  {/* Login/Logout */}
+  <button
+    onClick={isAuthenticated ? handleLogout : onLogin}
+    className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+    role="menuitem"
+  >
+    {isAuthenticated ? (
+      <LogOut className="w-4 h-4 text-muted-foreground shrink-0" />
+    ) : (
+      <LogIn className="w-4 h-4 text-muted-foreground shrink-0" />
+    )}
+    <span>{isAuthenticated ? "Logout" : "Login"}</span>
+  </button>
+</div>
 ```
 
 - [ ] **Step 4: Typecheck web**
@@ -566,6 +568,7 @@ git commit -m "feat(lang): LanguageSelector UI + hook"
 ## Task 5: Chat agent injection
 
 **Files:**
+
 - Modify: `convex/_agents/chat/chat_llm_types.ts` (add `outputLanguage?` to `LLMWrapperConfig`)
 - Modify: `convex/_agents/chat/ChatAgent.ts` (pass `outputLanguage` from `ChatAgentOptions` to `ChatLLMWrapper`)
 - Modify: `convex/_agents/chat/llm_wrapper.ts` (store + apply in system prompt assembly)
@@ -574,12 +577,14 @@ git commit -m "feat(lang): LanguageSelector UI + hook"
 - [ ] **Step 1: Add `outputLanguage` to `LLMWrapperConfig` and `ChatAgentOptions`**
 
 In `convex/_agents/chat/chat_llm_types.ts`, add to `LLMWrapperConfig` (after `fastApiKey?`):
+
 ```typescript
   /** BCP-47 language code for output language instruction. undefined = English (no prompt overhead). */
   outputLanguage?: string;
 ```
 
 In `convex/_agents/chat/types.ts`, add to `ChatAgentOptions` (after `fetchDocumentFn?`):
+
 ```typescript
   /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
   outputLanguage?: string;
@@ -590,14 +595,14 @@ In `convex/_agents/chat/types.ts`, add to `ChatAgentOptions` (after `fetchDocume
 In `convex/_agents/chat/ChatAgent.ts`, in the `constructor` where `new ChatLLMWrapper({...})` is called (around line 59), add `outputLanguage: options?.outputLanguage`:
 
 ```typescript
-    this.llmWrapper = new ChatLLMWrapper({
-      apiKey: env.TOGETHER_AI_API_KEY,
-      model: smartModel,
-      temperature: parseFloat(env.CHAT_LLM_TEMPERATURE ?? "0.1"),
-      fastModel: env.FAST_LLM,
-      fastApiKey: env.TOGETHER_AI_API_KEY,
-      outputLanguage: options?.outputLanguage,   // ADD THIS LINE
-    });
+this.llmWrapper = new ChatLLMWrapper({
+  apiKey: env.TOGETHER_AI_API_KEY,
+  model: smartModel,
+  temperature: parseFloat(env.CHAT_LLM_TEMPERATURE ?? "0.1"),
+  fastModel: env.FAST_LLM,
+  fastApiKey: env.TOGETHER_AI_API_KEY,
+  outputLanguage: options?.outputLanguage, // ADD THIS LINE
+});
 ```
 
 - [ ] **Step 3: Apply `withLanguageInstruction` in `llm_wrapper.ts`**
@@ -605,43 +610,49 @@ In `convex/_agents/chat/ChatAgent.ts`, in the `constructor` where `new ChatLLMWr
 In `convex/_agents/chat/llm_wrapper.ts`:
 
 **3a.** Add import at the top (with the other `_shared` imports):
+
 ```typescript
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 ```
 
 **3b.** Add a private field to `ChatLLMWrapper` class (below the `togetherClient` field declaration):
+
 ```typescript
   private readonly outputLanguage?: string;
 ```
 
 **3c.** In the `constructor`, store the value (after `this.togetherClient = new Together({...})`):
+
 ```typescript
-    this.outputLanguage = config.outputLanguage;
+this.outputLanguage = config.outputLanguage;
 ```
 
 **3d.** In `generateDirectResponse` (around line 96), after the `if (chatSettings)` block, apply the instruction:
+
 ```typescript
-    systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
+systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 ```
 
 The full patched section:
+
 ```typescript
-    let systemPrompt =
-      "You are a helpful study assistant. Answer the user conversationally and concisely. " +
-      "If they are asking about specific content from their documents, let them know you can search " +
-      "for it if they rephrase their question.";
-    if (chatSettings) {
-      systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
-    }
-    systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);  // ADD
+let systemPrompt =
+  "You are a helpful study assistant. Answer the user conversationally and concisely. " +
+  "If they are asking about specific content from their documents, let them know you can search " +
+  "for it if they rephrase their question.";
+if (chatSettings) {
+  systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
+}
+systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage); // ADD
 ```
 
 **3e.** There are two places in `llm_wrapper.ts` where `CORE_SYSTEM_PROMPT` is assembled into `systemPrompt` (search for `let systemPrompt = strictGrounding`). In **both** places, apply `withLanguageInstruction` after the `if (chatSettings)` block:
+
 ```typescript
-    if (chatSettings) {
-      systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
-    }
-    systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);  // ADD
+if (chatSettings) {
+  systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
+}
+systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage); // ADD
 ```
 
 - [ ] **Step 4: Fetch preference in `convex/chat/stream.ts` and pass to `ChatAgent`**
@@ -649,22 +660,22 @@ The full patched section:
 In `convex/chat/stream.ts`, find the action handler that calls `new ChatAgent({...})` (around line 697). Add a preference fetch immediately before it.
 
 `internal` is already imported in `stream.ts` (line 4). Add the preference fetch and pass `outputLanguage` to `ChatAgent`:
-```typescript
-  // Fetch output language preference for this user
-  const userPrefs = await ctx.runQuery(
-    internal.userPreferences.index.getPreferencesByUserId,
-    { userId: userId as any },
-  );
 
-  const agent = new ChatAgent({
-    vectorSearchHandler: hybridSearch,
-    globalRerankFn,
-    smartModel: resolvedSmartModel,
-    outputLanguage: userPrefs?.outputLanguage,   // ADD
-    fetchDocumentFn: async (documentId: string) => {
-      // ... existing body unchanged
-    },
-  });
+```typescript
+// Fetch output language preference for this user
+const userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+  userId: userId as any,
+});
+
+const agent = new ChatAgent({
+  vectorSearchHandler: hybridSearch,
+  globalRerankFn,
+  smartModel: resolvedSmartModel,
+  outputLanguage: userPrefs?.outputLanguage, // ADD
+  fetchDocumentFn: async (documentId: string) => {
+    // ... existing body unchanged
+  },
+});
 ```
 
 - [ ] **Step 5: Typecheck Convex**
@@ -691,30 +702,33 @@ git commit -m "feat(lang): inject output language into chat agent"
 ## Task 6: Studio job injection
 
 **Pattern:** In the `*JobPhases.ts` file for each studio type, add two things:
+
 1. A preference fetch at the start of the phase function that runs the LLM (using the `userId` and `ctx` already available).
 2. Wrap every `new SystemMessage(SOME_PROMPT)` call with `withLanguageInstruction(SOME_PROMPT, language)`.
 
 The import to add in each phase file:
+
 ```typescript
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { internal } from "../../_generated/api";
 ```
 
 The DB fetch pattern to add at the start of each phase function that calls an LLM:
+
 ```typescript
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: args.userId as any },
-    );
-    const language = userPrefs?.outputLanguage;
+const userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+  userId: args.userId as any,
+});
+const language = userPrefs?.outputLanguage;
 ```
 
 The prompt wrap pattern (example for a map-phase system message):
+
 ```typescript
 // Before:
-new SystemMessage(MAP_SYSTEM_PROMPT)
+new SystemMessage(MAP_SYSTEM_PROMPT);
 // After:
-new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language))
+new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language));
 ```
 
 **Full worked example — Flashcards:**
@@ -722,26 +736,30 @@ new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language))
 - [ ] **Step 1: Modify `convex/studio/flashcards/flashcardJobPhases.ts`**
 
 Add imports:
+
 ```typescript
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 ```
+
 (`internal` is already imported in this file.)
 
 In `runProcessFlashcardMapChunkPhase` — find the line `new SystemMessage(MAP_SYSTEM_PROMPT)` (around line 313–316) and replace with:
+
 ```typescript
-new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language))
+new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language));
 ```
 
 Add the preference fetch at the start of `runProcessFlashcardMapChunkPhase` (it already has `ctx` and `args.userId`):
+
 ```typescript
-    const userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: args.userId as any },
-    );
-    const language = userPrefs?.outputLanguage;
+const userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+  userId: args.userId as any,
+});
+const language = userPrefs?.outputLanguage;
 ```
 
 The collapse and reduce system prompts (`COLLAPSE_SYSTEM_PROMPT`, `REDUCE_SYSTEM_PROMPT`) are used in `convex/_agents/flashcard/collapseReduceLlm.ts`, which is called from within the flashcard phase functions. Add `language?: string` as a parameter to `recursiveCollapse` and `refineFlashcardSelection` in that file, thread the value through from the calling phase function, and apply `withLanguageInstruction` to `COLLAPSE_SYSTEM_PROMPT` and `REDUCE_SYSTEM_PROMPT` there. Grep to find all call sites:
+
 ```bash
 grep -n "new SystemMessage\|COLLAPSE_SYSTEM\|REDUCE_SYSTEM" convex/_agents/flashcard/collapseReduceLlm.ts
 ```
@@ -750,17 +768,18 @@ grep -n "new SystemMessage\|COLLAPSE_SYSTEM\|REDUCE_SYSTEM" convex/_agents/flash
 
 For each job, find the `*JobPhases.ts` file (or equivalent phase file) and apply the same fetch + wrap pattern to every `new SystemMessage(...)` call:
 
-| Studio | Phase file(s) to modify |
-|---|---|
-| Reports | `convex/studio/reports/reportJobPhases.ts` |
-| Quizzes | `convex/studio/quizzes/quizJobPhases.ts` |
-| Slides | `convex/studio/slides/slideDeckJobPhases.ts` |
-| Spreadsheets | `convex/studio/spreadsheets/spreadsheetJobPhases.ts` |
-| Written questions | `convex/studio/writtenQuestions/writtenQuestionsJobPhases.ts` |
-| Mindmaps | `convex/studio/mindmaps/mindmapJobPhases.ts` |
-| Audio | `convex/studio/audio/audioJobPhases.ts` (transcript generation only — `withLanguageInstruction` does not affect TTS voice; the language instruction will make the transcript itself be in the target language, which TTS will then speak) |
+| Studio            | Phase file(s) to modify                                                                                                                                                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reports           | `convex/studio/reports/reportJobPhases.ts`                                                                                                                                                                                                |
+| Quizzes           | `convex/studio/quizzes/quizJobPhases.ts`                                                                                                                                                                                                  |
+| Slides            | `convex/studio/slides/slideDeckJobPhases.ts`                                                                                                                                                                                              |
+| Spreadsheets      | `convex/studio/spreadsheets/spreadsheetJobPhases.ts`                                                                                                                                                                                      |
+| Written questions | `convex/studio/writtenQuestions/writtenQuestionsJobPhases.ts`                                                                                                                                                                             |
+| Mindmaps          | `convex/studio/mindmaps/mindmapJobPhases.ts`                                                                                                                                                                                              |
+| Audio             | `convex/studio/audio/audioJobPhases.ts` (transcript generation only — `withLanguageInstruction` does not affect TTS voice; the language instruction will make the transcript itself be in the target language, which TTS will then speak) |
 
 To find every system prompt injection point across all studio phase files at once:
+
 ```bash
 grep -rn "new SystemMessage(" convex/studio/ --include="*.ts"
 ```

@@ -14,9 +14,7 @@ test.describe("Chat", () => {
     await chatInput.fill("What is machine learning?");
     await chatInput.press("Enter");
 
-    await expect(
-      page.getByText(/select at least one source/i)
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/select at least one source/i)).toBeVisible({ timeout: 5_000 });
   });
 
   test("chat with web source filter sends message", async ({ notebookPage }) => {

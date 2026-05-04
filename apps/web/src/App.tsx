@@ -115,7 +115,11 @@ const AppContent: React.FC = () => {
 
   // Auto-select the most recently updated conversation when the list loads
   useEffect(() => {
-    if (!activeConversationId && conversationCRUD.conversations && conversationCRUD.conversations.length > 0) {
+    if (
+      !activeConversationId &&
+      conversationCRUD.conversations &&
+      conversationCRUD.conversations.length > 0
+    ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveConversationId(conversationCRUD.conversations[0]._id);
     }
@@ -204,13 +208,19 @@ const AppContent: React.FC = () => {
     setActiveNotebookId(null);
   }, [navigate]);
 
-  const handleSelectNotebook = useCallback((notebook: NotebookItem) => {
-    navigate(`/notebook/${notebook.id}`);
-  }, [navigate]);
+  const handleSelectNotebook = useCallback(
+    (notebook: NotebookItem) => {
+      navigate(`/notebook/${notebook.id}`);
+    },
+    [navigate]
+  );
 
-  const handleSelectFolder = useCallback((folderId: string) => {
-    navigate(`/folder/${folderId}`);
-  }, [navigate]);
+  const handleSelectFolder = useCallback(
+    (folderId: string) => {
+      navigate(`/folder/${folderId}`);
+    },
+    [navigate]
+  );
 
   const notebookContextValue = useMemo(
     () => ({
@@ -290,8 +300,7 @@ const AppContent: React.FC = () => {
       onRenameConversation: conversationCRUD.handleRename,
       onDeleteConversation: async (id: string) => {
         const list = conversationCRUD.conversations;
-        const wasOnlyThread =
-          list != null && list.length === 1 && list[0]._id === id;
+        const wasOnlyThread = list != null && list.length === 1 && list[0]._id === id;
         await conversationCRUD.handleDelete(id);
         if (wasOnlyThread) {
           const newId = await conversationCRUD.handleCreate();

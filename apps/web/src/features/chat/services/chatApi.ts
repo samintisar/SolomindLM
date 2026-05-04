@@ -90,10 +90,26 @@ export interface SendMessageCallbacks {
   onGroundingChecks?: (checks: AgentGroundingCheck[]) => void;
   onFollowUps?: (questions: string[]) => void;
   onClarification?: (question: string) => void;
-  onResearchPlan?: (plan: { planId: string; subQuestions: unknown[]; sourcePolicy: unknown }) => void;
-  onResearchProgress?: (progress: { phase: string; subQuestionId?: string; sourcesFound?: number }) => void;
+  onResearchPlan?: (plan: {
+    planId: string;
+    subQuestions: unknown[];
+    sourcePolicy: unknown;
+  }) => void;
+  onResearchProgress?: (progress: {
+    phase: string;
+    subQuestionId?: string;
+    sourcesFound?: number;
+  }) => void;
   /** External sources discovered from web/academic/news/finance search */
-  onExternalSources?: (sources: Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }>) => void;
+  onExternalSources?: (
+    sources: Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      sourceType: string;
+      score?: number;
+    }>
+  ) => void;
   onComplete: () => void;
   onError: (error: string | ChatError) => void;
   /** Called when stream is stopped by user */
@@ -578,7 +594,7 @@ export function useSendMessage() {
           await releaseGenerationIfSafe();
         }
         // If aborted, call onStopped instead of onError
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (error instanceof Error && error.name === "AbortError") {
           callbacks.onStopped?.();
         } else {
           callbacks.onError(error instanceof Error ? error.message : "Failed to send message");
@@ -636,10 +652,12 @@ export function useSourceSuggestions(
   const documentSignature = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed = documents.filter((d: any) => d.status === "completed");
-    return completed
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((d: any) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
-      .join("|");
+    return (
+      completed
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((d: any) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
+        .join("|")
+    );
   }, [documents]);
 
   useEffect(() => {

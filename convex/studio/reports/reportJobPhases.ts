@@ -213,8 +213,17 @@ export async function runProcessReportMapChunkPhase(
   ctx: ActionCtx,
   args: ProcessReportMapChunkArgs
 ): Promise<void> {
-  const { reportId, userId, notebookId, chunkIndex, totalChunks, chunk, reportType, customPrompt, smartLlm } =
-    args;
+  const {
+    reportId,
+    userId,
+    notebookId,
+    chunkIndex,
+    totalChunks,
+    chunk,
+    reportType,
+    customPrompt,
+    smartLlm,
+  } = args;
 
   const logger = createJobLogger({
     jobType: "report",
@@ -238,10 +247,13 @@ export async function runProcessReportMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[report] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[report] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -266,7 +278,10 @@ IMPORTANT: Respond with a JSON object containing:
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(structuredPrompt)],
+          [
+            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+            new HumanMessage(structuredPrompt),
+          ],
           createLangSmithRunConfig({
             runName: "ReportJob.MapProcess",
             tags: ["agent", "report", "map"],
@@ -422,10 +437,13 @@ export async function runFinalizeReportPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[report] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[report] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -492,7 +510,10 @@ export async function runFinalizeReportPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
-          [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+          [
+            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ],
           createLangSmithRunConfig({
             runName: "ReportJob.Reduce",
             tags: ["agent", "report", "reduce"],

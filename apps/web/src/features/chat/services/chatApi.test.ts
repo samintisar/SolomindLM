@@ -69,7 +69,9 @@ describe("parseStreamBody", () => {
   });
 
   it("parses __EXTERNAL_SOURCES marker", () => {
-    const sources = [{ title: "Paper", url: "https://example.com", snippet: "abc", sourceType: "web", score: 0.8 }];
+    const sources = [
+      { title: "Paper", url: "https://example.com", snippet: "abc", sourceType: "web", score: 0.8 },
+    ];
     const result = parseStreamBody(`__EXTERNAL_SOURCES:${JSON.stringify(sources)}`);
     expect(result.externalSources).toEqual(sources);
   });

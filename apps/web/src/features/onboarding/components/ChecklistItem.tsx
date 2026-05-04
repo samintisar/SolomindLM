@@ -13,9 +13,7 @@ export const ChecklistItem: React.FC<Props> = ({ label, done }) => (
     ) : (
       <Circle className="w-4 h-4 text-muted-foreground shrink-0" />
     )}
-    <span
-      className={`text-sm ${done ? "line-through text-muted-foreground" : "text-foreground"}`}
-    >
+    <span className={`text-sm ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
       {label}
     </span>
   </li>

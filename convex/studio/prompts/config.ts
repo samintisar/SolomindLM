@@ -24,7 +24,15 @@ export const studioToolValidator = v.union(
   v.literal("quiz"),
   v.literal("audio"),
   v.literal("writtenQuestions"),
-  v.literal("mindmap"),
+  v.literal("mindmap")
 );
 
-export type StudioTool = "report" | "spreadsheet" | "infographic" | "flashcards" | "quiz" | "audio" | "writtenQuestions" | "mindmap";
+export type StudioTool =
+  | "report"
+  | "spreadsheet"
+  | "infographic"
+  | "flashcards"
+  | "quiz"
+  | "audio"
+  | "writtenQuestions"
+  | "mindmap";

@@ -113,7 +113,9 @@ export const InfographicView: React.FC<InfographicViewProps> = ({
         isFullscreen ? "fixed inset-0 z-50" : ""
       }`}
     >
-      <div className={`flex-1 flex flex-col items-center justify-center min-h-0 ${isFullscreen ? "p-2" : "p-4 md:p-8"}`}>
+      <div
+        className={`flex-1 flex flex-col items-center justify-center min-h-0 ${isFullscreen ? "p-2" : "p-4 md:p-8"}`}
+      >
         <div
           className={`relative bg-black overflow-hidden shadow-2xl ${
             isFullscreen ? "h-full max-h-full" : "max-w-5xl w-full rounded-xl"

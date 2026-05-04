@@ -19,25 +19,39 @@ import type {
  * Maps canonical names to alternative names the LLM might use.
  */
 const SYNONYM_MAPPINGS: Record<string, string[]> = {
-  "routing": ["tool selection", "tool use", "router", "routing", "intelligent routing"],
-  "parallelization": ["parallel workers", "parallel", "parallelization", "multi-worker"],
+  routing: ["tool selection", "tool use", "router", "routing", "intelligent routing"],
+  parallelization: ["parallel workers", "parallel", "parallelization", "multi-worker"],
   "learning and adaptation": ["feedback loop", "adaptation", "learning", "continuous improvement"],
-  "resource-aware optimization": ["resource aware", "resource optimization", "routing by complexity"],
-  "prioritization": ["task scoring", "triage", "priority", "task prioritization", "scoring"],
-  "multi-agent collaboration": ["multi agent", "multi-agent", "agent collaboration", "orchestration"],
+  "resource-aware optimization": [
+    "resource aware",
+    "resource optimization",
+    "routing by complexity",
+  ],
+  prioritization: ["task scoring", "triage", "priority", "task prioritization", "scoring"],
+  "multi-agent collaboration": [
+    "multi agent",
+    "multi-agent",
+    "agent collaboration",
+    "orchestration",
+  ],
   "memory management": ["memory", "long-term memory", "memory systems"],
   "human in the loop": ["human in the loop", "human-in-the-loop", "human intervention", "hitl"],
   "guardrails and safety patterns": ["guardrails", "safety", "safety patterns", "security"],
   "goal setting and monitoring": ["goal setting", "goal monitoring", "smart goals", "planning"],
-  "exception handling and recovery": ["exception handling", "error handling", "recovery", "fallback"],
+  "exception handling and recovery": [
+    "exception handling",
+    "error handling",
+    "recovery",
+    "fallback",
+  ],
   "knowledge retrieval": ["retrieval", "knowledge", "rag", "context retrieval"],
   "inter-agent communication": ["communication", "agent communication", "messaging"],
   "reasoning techniques": ["reasoning", "tree of thought", "branching", "to"],
   "evaluation and monitoring": ["evaluation", "monitoring", "testing", "metrics"],
   "exploration and discovery": ["exploration", "discovery", "research"],
   "tool use": ["tool", "tools", "tool calling", "function calling"],
-  "planning": ["planning", "plan", "step-by-step", "sequential"],
-  "reflection": ["reflection", "critique", "self-reflection", "review"],
+  planning: ["planning", "plan", "step-by-step", "sequential"],
+  reflection: ["reflection", "critique", "self-reflection", "review"],
   "prompt chaining": ["prompt chaining", "chaining", "chain"],
 };
 
@@ -50,7 +64,10 @@ function getAllVariations(term: string): string[] {
 
   // Check if term has synonym mappings
   for (const [canonical, synonyms] of Object.entries(SYNONYM_MAPPINGS)) {
-    if (normalized === normalizeForMatch(canonical) || synonyms.some(s => normalizeForMatch(s) === normalized)) {
+    if (
+      normalized === normalizeForMatch(canonical) ||
+      synonyms.some((s) => normalizeForMatch(s) === normalized)
+    ) {
       // Add all synonyms
       for (const synonym of synonyms) {
         variations.push(normalizeForMatch(synonym));
@@ -78,11 +95,12 @@ function generateVariations(term: string): string[] {
   const variations = getAllVariations(normalized);
 
   // Split by space and generate word-level variations
-  const words = normalized.split(" ").filter(w => w.length > 2);
+  const words = normalized.split(" ").filter((w) => w.length > 2);
 
   // Add individual significant words as variations
   for (const word of words) {
-    if (word.length >= 4) { // Only meaningful words
+    if (word.length >= 4) {
+      // Only meaningful words
       variations.push(word);
     }
   }
@@ -115,7 +133,10 @@ function containsIgnoreCase(haystack: string, needle: string): boolean {
 }
 
 /** How many items from `items` are found via fuzzy matching in `text`. */
-function countMatches(text: string, items: string[]): {
+function countMatches(
+  text: string,
+  items: string[]
+): {
   matched: string[];
   unmatched: string[];
 } {
@@ -145,7 +166,7 @@ function baseMetric(
   status: MetricStatus,
   score: number,
   detail: string,
-  breakdown?: Record<string, unknown>,
+  breakdown?: Record<string, unknown>
 ): MetricResult {
   return {
     metric,
@@ -192,7 +213,7 @@ function answerAbstains(answer: string): boolean {
 /** Recall of expected items within a set of chunks (checks all chunk content). */
 function chunkRecall(
   chunks: Array<{ content: string }>,
-  items: string[],
+  items: string[]
 ): { matched: string[]; unmatched: string[]; score: number } {
   const combinedText = chunks.map((c) => c.content).join("\n");
   const { matched, unmatched } = countMatches(combinedText, items);
@@ -211,7 +232,7 @@ function chunkRecall(
 export function expectedItemRecall(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
     return baseMetric(
@@ -221,13 +242,10 @@ export function expectedItemRecall(
       "pass",
       1,
       "No expected items — recall checked via expectedAnswer / LLM judge only.",
-      { matched: [], unmatched: [] },
+      { matched: [], unmatched: [] }
     );
   }
-  const { matched, unmatched } = countMatches(
-    artifact.answer,
-    fixture.expectedItems,
-  );
+  const { matched, unmatched } = countMatches(artifact.answer, fixture.expectedItems);
   const score = recallScore(matched.length, fixture.expectedItems.length);
 
   let status: MetricStatus;
@@ -258,7 +276,7 @@ export function expectedItemRecall(
 export function retrievalItemRecall(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult[] {
   const stages: Array<{
     label: string;
@@ -283,10 +301,7 @@ export function retrievalItemRecall(
   ];
 
   return stages.map(({ label, metric, chunks }) => {
-    const { matched, unmatched, score } = chunkRecall(
-      chunks,
-      fixture.expectedItems,
-    );
+    const { matched, unmatched, score } = chunkRecall(chunks, fixture.expectedItems);
 
     const detail =
       unmatched.length === 0
@@ -314,7 +329,7 @@ export function retrievalItemRecall(
 export function retrievalPrecisionAtK(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
     return baseMetric(
@@ -323,7 +338,7 @@ export function retrievalPrecisionAtK(
       artifact,
       "pass",
       1,
-      "No expected items — precision@K not applicable.",
+      "No expected items — precision@K not applicable."
     );
   }
   const total = artifact.selectedChunks.length;
@@ -334,7 +349,7 @@ export function retrievalPrecisionAtK(
       artifact,
       "fail",
       0,
-      "No chunks selected; precision undefined.",
+      "No chunks selected; precision undefined."
     );
   }
 
@@ -361,7 +376,7 @@ export function retrievalPrecisionAtK(
     status,
     score,
     `${relevant}/${total} selected chunks are relevant (contain at least one expected item).`,
-    { relevant, total, chunkRelevance },
+    { relevant, total, chunkRelevance }
   );
 }
 
@@ -378,7 +393,7 @@ export function retrievalPrecisionAtK(
 export function retrievalNdcgAtK(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
     return baseMetric(
@@ -387,7 +402,7 @@ export function retrievalNdcgAtK(
       artifact,
       "pass",
       1,
-      "No expected items — nDCG not applicable.",
+      "No expected items — nDCG not applicable."
     );
   }
   const chunks = artifact.selectedChunks;
@@ -400,7 +415,7 @@ export function retrievalNdcgAtK(
       artifact,
       "fail",
       0,
-      "No chunks selected; nDCG undefined.",
+      "No chunks selected; nDCG undefined."
     );
   }
 
@@ -439,7 +454,13 @@ export function retrievalNdcgAtK(
     status,
     score,
     `nDCG@${k} = ${score.toFixed(3)} (${relevantCount}/${k} relevant chunks).`,
-    { k, dcg: Math.round(dcg * 1000) / 1000, idcg: Math.round(idcg * 1000) / 1000, relevantCount, relevance },
+    {
+      k,
+      dcg: Math.round(dcg * 1000) / 1000,
+      idcg: Math.round(idcg * 1000) / 1000,
+      relevantCount,
+      relevance,
+    }
   );
 }
 
@@ -455,7 +476,7 @@ export function retrievalNdcgAtK(
 export function abstentionCorrectness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   if (fixture.expectedItems.length === 0) {
     return baseMetric(
@@ -465,26 +486,17 @@ export function abstentionCorrectness(
       "pass",
       1,
       "No expected items — abstention vs retrieval not scored deterministically.",
-      { category: "none" },
+      { category: "none" }
     );
   }
-  const selectedRecall = chunkRecall(
-    artifact.selectedChunks,
-    fixture.expectedItems,
-  ).score;
-  const preRerankRecall = chunkRecall(
-    artifact.preRerankChunks,
-    fixture.expectedItems,
-  ).score;
-  const postRerankRecall = chunkRecall(
-    artifact.postRerankChunks,
-    fixture.expectedItems,
-  ).score;
+  const selectedRecall = chunkRecall(artifact.selectedChunks, fixture.expectedItems).score;
+  const preRerankRecall = chunkRecall(artifact.preRerankChunks, fixture.expectedItems).score;
+  const postRerankRecall = chunkRecall(artifact.postRerankChunks, fixture.expectedItems).score;
 
   const abstains = answerAbstains(artifact.answer);
   const answerRecall = recallScore(
     countMatches(artifact.answer, fixture.expectedItems).matched.length,
-    fixture.expectedItems.length,
+    fixture.expectedItems.length
   );
 
   // Rule 1: Sufficient context was selected but answer still abstained.
@@ -503,15 +515,12 @@ export function abstentionCorrectness(
         postRerankRecall,
         answerRecall,
         abstains: true,
-      },
+      }
     );
   }
 
   // Rule 2: Pre-rerank or post-rerank had items, but context selection dropped them.
-  if (
-    (preRerankRecall >= 0.7 || postRerankRecall >= 0.7) &&
-    selectedRecall < 0.7
-  ) {
+  if ((preRerankRecall >= 0.7 || postRerankRecall >= 0.7) && selectedRecall < 0.7) {
     return baseMetric(
       "abstention_correctness",
       fixture,
@@ -526,7 +535,7 @@ export function abstentionCorrectness(
         postRerankRecall,
         answerRecall,
         abstains,
-      },
+      }
     );
   }
 
@@ -546,7 +555,7 @@ export function abstentionCorrectness(
         postRerankRecall,
         answerRecall,
         abstains,
-      },
+      }
     );
   }
 
@@ -565,7 +574,7 @@ export function abstentionCorrectness(
       postRerankRecall,
       answerRecall,
       abstains: false,
-    },
+    }
   );
 }
 
@@ -582,15 +591,14 @@ export function abstentionCorrectness(
 export function citationValidity(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   const selectedChunkIds = new Set(artifact.selectedChunks.map((c) => c.id));
   const citations = artifact.citations;
   // Word-boundary cues only — avoid false positives (e.g. "resources" contains "source").
-  const expectsCitation =
-    /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(
-      fixture.expectedBehavior,
-    );
+  const expectsCitation = /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(
+    fixture.expectedBehavior
+  );
 
   // No citations found in the answer.
   if (citations.length === 0) {
@@ -602,7 +610,7 @@ export function citationValidity(
         "fail",
         0,
         "No citations found in answer, but expectedBehavior requires citations.",
-        { totalCitations: 0, validCitations: 0, expectsCitation: true },
+        { totalCitations: 0, validCitations: 0, expectsCitation: true }
       );
     }
     // No citations required, neutral pass.
@@ -613,7 +621,7 @@ export function citationValidity(
       "pass",
       1,
       "No citations in answer and none expected.",
-      { totalCitations: 0, validCitations: 0, expectsCitation: false },
+      { totalCitations: 0, validCitations: 0, expectsCitation: false }
     );
   }
 
@@ -640,7 +648,7 @@ export function citationValidity(
     status,
     score,
     `${valid}/${citations.length} citations reference valid selected chunks.`,
-    { totalCitations: citations.length, validCitations: valid, citationDetails },
+    { totalCitations: citations.length, validCitations: valid, citationDetails }
   );
 }
 
@@ -680,17 +688,14 @@ const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
 export function latencyCostBudget(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline,
+  baseline?: EvalBaseline
 ): MetricResult {
   const latencyMs = artifact.latencyMs;
   const totalTokens = artifact.tokenUsage?.total ?? 0;
 
   if (baseline) {
     const latencyRatio = latencyMs / baseline.latencyMs;
-    const tokenRatio =
-      baseline.tokenUsage.total > 0
-        ? totalTokens / baseline.tokenUsage.total
-        : 0;
+    const tokenRatio = baseline.tokenUsage.total > 0 ? totalTokens / baseline.tokenUsage.total : 0;
     const worstRatio = Math.max(latencyRatio, tokenRatio);
 
     let status: MetricStatus;
@@ -712,30 +717,25 @@ export function latencyCostBudget(
         tokenRatio: Math.round(tokenRatio * 100) / 100,
         baselineLatencyMs: baseline.latencyMs,
         baselineTotalTokens: baseline.tokenUsage.total,
-      },
+      }
     );
   }
 
   // No baseline: use static gates (per-runner where defined).
-  const latencyGate =
-    PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
+  const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
   const latencyOk = latencyMs <= latencyGate;
   const tokensOk = totalTokens <= STATIC_TOTAL_TOKENS_GATE;
 
   let status: MetricStatus;
   if (latencyOk && tokensOk) status = "pass";
-  else if (
-    latencyMs <= latencyGate * 2 &&
-    totalTokens <= STATIC_TOTAL_TOKENS_GATE * 2
-  )
+  else if (latencyMs <= latencyGate * 2 && totalTokens <= STATIC_TOTAL_TOKENS_GATE * 2)
     status = "warn";
   else status = "fail";
 
   const score =
     latencyOk && tokensOk
       ? 1
-      : latencyMs <= latencyGate * 2 &&
-          totalTokens <= STATIC_TOTAL_TOKENS_GATE * 2
+      : latencyMs <= latencyGate * 2 && totalTokens <= STATIC_TOTAL_TOKENS_GATE * 2
         ? 0.5
         : 0;
 
@@ -754,7 +754,7 @@ export function latencyCostBudget(
       latencyOk,
       tokensOk,
       hasBaseline: false,
-    },
+    }
   );
 }
 

@@ -8,9 +8,7 @@ vi.mock("./LanguageSelector", () => ({
   LanguageSelector: () => <div data-testid="language-selector" />,
 }));
 
-function renderMenu(
-  overrides: Partial<ComponentProps<typeof AvatarDropdown>> = {},
-) {
+function renderMenu(overrides: Partial<ComponentProps<typeof AvatarDropdown>> = {}) {
   const props: ComponentProps<typeof AvatarDropdown> = {
     user: { id: "u1", email: "user@example.com", name: "User" },
     isAuthenticated: true,
@@ -46,7 +44,7 @@ describe("AvatarDropdown onboarding actions", () => {
     expect(
       screen.queryByRole("menuitem", {
         name: /show getting-started checklist/i,
-      }),
+      })
     ).not.toBeInTheDocument();
   });
 });

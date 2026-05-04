@@ -5,12 +5,7 @@ import { OnboardingProvider } from "./OnboardingProvider";
 import { TourTooltip } from "./components/TourTooltip";
 import { ChecklistCard } from "./components/ChecklistCard";
 
-const STEPS = [
-  "createNotebook",
-  "addSource",
-  "askQuestion",
-  "generateArtifact",
-] as const;
+const STEPS = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 
 let state: {
   tourStatus: string;
@@ -48,9 +43,7 @@ const mockMutations = {
   }),
   advanceTourStep: vi.fn(
     async (args: { expectedCurrentStepId: string; tourNotebookId?: string }) => {
-      const idx = STEPS.indexOf(
-        args.expectedCurrentStepId as (typeof STEPS)[number],
-      );
+      const idx = STEPS.indexOf(args.expectedCurrentStepId as (typeof STEPS)[number]);
       if (args.tourNotebookId) {
         tour = { ...tour, tourNotebookId: args.tourNotebookId };
       }
@@ -59,7 +52,7 @@ const mockMutations = {
       } else {
         state = { ...state, currentStepId: STEPS[idx + 1] };
       }
-    },
+    }
   ),
   skipTour: vi.fn(async () => {
     state = { ...state, tourStatus: "skipped", currentStepId: undefined };
@@ -177,9 +170,7 @@ describe("Onboarding integration - happy path", () => {
     await waitFor(() => expect(mockMutations.startTour).toHaveBeenCalled());
     rerender(<App />);
 
-    await waitFor(() =>
-      expect(screen.getByText(/Create your first one/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Create your first one/)).toBeInTheDocument());
 
     setupTarget("add-source-button");
     tour = { ...tour, createNotebook: true, tourNotebookId: "nb1" };
@@ -189,12 +180,10 @@ describe("Onboarding integration - happy path", () => {
       expect(mockMutations.advanceTourStep).toHaveBeenLastCalledWith({
         expectedCurrentStepId: "createNotebook",
         tourNotebookId: "nb1",
-      }),
+      })
     );
     rerender(<App />);
-    await waitFor(() =>
-      expect(screen.getByText(/Add a PDF/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Add a PDF/)).toBeInTheDocument());
 
     setupTarget("chat-input");
     tour = { ...tour, addSource: true };
@@ -203,13 +192,11 @@ describe("Onboarding integration - happy path", () => {
     await waitFor(() =>
       expect(mockMutations.advanceTourStep).toHaveBeenLastCalledWith({
         expectedCurrentStepId: "addSource",
-      }),
+      })
     );
     rerender(<App />);
     await waitFor(() =>
-      expect(
-        screen.getByText(/Ask anything about your sources/),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Ask anything about your sources/)).toBeInTheDocument()
     );
 
     setupTarget("studio-tool-grid");
@@ -219,12 +206,10 @@ describe("Onboarding integration - happy path", () => {
     await waitFor(() =>
       expect(mockMutations.advanceTourStep).toHaveBeenLastCalledWith({
         expectedCurrentStepId: "askQuestion",
-      }),
+      })
     );
     rerender(<App />);
-    await waitFor(() =>
-      expect(screen.getByText(/Pick any tool/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Pick any tool/)).toBeInTheDocument());
 
     tour = { ...tour, generateArtifact: true };
     checklist = { ...checklist, generateArtifact: true };
@@ -232,7 +217,7 @@ describe("Onboarding integration - happy path", () => {
     await waitFor(() =>
       expect(mockMutations.advanceTourStep).toHaveBeenLastCalledWith({
         expectedCurrentStepId: "generateArtifact",
-      }),
+      })
     );
     rerender(<App />);
     await waitFor(() => expect(state.tourStatus).toBe("completed"));

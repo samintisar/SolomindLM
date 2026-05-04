@@ -26,14 +26,10 @@ export default defineSchema({
         instructionMode: v.union(
           v.literal("default"),
           v.literal("learningGuide"),
-          v.literal("custom"),
+          v.literal("custom")
         ),
         customInstructions: v.optional(v.string()),
-        responseLength: v.union(
-          v.literal("default"),
-          v.literal("longer"),
-          v.literal("shorter"),
-        ),
+        responseLength: v.union(v.literal("default"), v.literal("longer"), v.literal("shorter")),
         smartModel: v.optional(v.string()),
       })
     ),
@@ -54,15 +50,15 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("active"),
       v.literal("skipped"),
-      v.literal("completed"),
+      v.literal("completed")
     ),
     currentStepId: v.optional(
       v.union(
         v.literal("createNotebook"),
         v.literal("addSource"),
         v.literal("askQuestion"),
-        v.literal("generateArtifact"),
-      ),
+        v.literal("generateArtifact")
+      )
     ),
     tourNotebookId: v.optional(v.id("notebooks")),
     checklistDismissed: v.boolean(),
@@ -284,7 +280,12 @@ export default defineSchema({
     notebookId: v.id("notebooks"),
     title: v.string(),
     data: v.any(), // Infographic data
-    status: v.union(v.literal("draft"), v.literal("generating"), v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("generating"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
     metadata: v.optional(v.any()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -518,11 +519,7 @@ export default defineSchema({
         question: v.string(),
         searchQueries: v.array(v.string()),
         sourceChannels: v.array(v.string()), // "notebook" | "web" | "academic" | "news"
-        status: v.union(
-          v.literal("pending"),
-          v.literal("researching"),
-          v.literal("completed")
-        ),
+        status: v.union(v.literal("pending"), v.literal("researching"), v.literal("completed")),
       })
     ),
     sourcePolicy: v.object({
@@ -612,7 +609,7 @@ export default defineSchema({
       v.literal("writtenQuestions"),
       v.literal("mindmap"),
       // "slides" kept for migration — remove after running _migration/removeSlidePrompts
-      v.literal("slides"),
+      v.literal("slides")
     ),
     visibility: v.union(v.literal("private"), v.literal("public")),
     notebookId: v.optional(v.id("notebooks")),

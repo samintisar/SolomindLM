@@ -78,6 +78,7 @@ Use the following prefixes for branches:
 - `test/` — Test additions or improvements
 
 Examples:
+
 ```bash
 git checkout -b feature/rag-citation-improvements
 git checkout -b fix/oauth-redirect-bug
@@ -87,6 +88,7 @@ git checkout -b docs/api-documentation
 ### Making Changes
 
 1. **Create a branch** from `main`:
+
    ```bash
    git checkout main
    git pull upstream main
@@ -96,14 +98,15 @@ git checkout -b docs/api-documentation
 2. **Make your changes** with clear, focused commits
 
 3. **Test your changes:**
+
    ```bash
    # Type checking
    bun run typecheck:web
    bun run typecheck:convex
-   
+
    # Linting
    bun run lint
-   
+
    # Testing
    bun run test:convex
    bun run test:web
@@ -117,12 +120,14 @@ git checkout -b docs/api-documentation
 ## Pull Request Process
 
 1. **Update your branch** with the latest `main`:
+
    ```bash
    git fetch upstream
    git rebase upstream/main
    ```
 
 2. **Push your branch** to your fork:
+
    ```bash
    git push origin feature/your-feature
    ```
@@ -222,11 +227,13 @@ test("renders correctly", () => {
 ### Test Coverage
 
 Aim for high test coverage, especially for:
+
 - Convex queries and mutations
 - Utility functions
 - Complex UI components
 
 Run coverage reports:
+
 ```bash
 bun run test:web:coverage
 ```
@@ -258,6 +265,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org):
 ```
 
 Types:
+
 - `feat:` — New feature
 - `fix:` — Bug fix
 - `docs:` — Documentation
@@ -268,6 +276,7 @@ Types:
 - `chore:` — Maintenance
 
 Examples:
+
 ```
 feat(chat): add citation support to RAG responses
 fix(auth): resolve Google OAuth redirect loop

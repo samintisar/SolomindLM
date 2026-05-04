@@ -63,11 +63,16 @@ const MAX_DISCOVERY_TOTAL_RESULTS = 20;
 /** One pastel system per type: filters, list border, icons, and grid labels stay aligned */
 const SOURCE_TYPE_STYLES: Record<
   "web" | "news" | "academic" | "finance",
-  { filterActive: string; filterInactive: string; listAccent: string; icon: string; typeChip: string }
+  {
+    filterActive: string;
+    filterInactive: string;
+    listAccent: string;
+    icon: string;
+    typeChip: string;
+  }
 > = {
   web: {
-    filterActive:
-      "bg-sky-100/90 text-sky-950 border-sky-300/80 shadow-sm ring-1 ring-sky-200/50",
+    filterActive: "bg-sky-100/90 text-sky-950 border-sky-300/80 shadow-sm ring-1 ring-sky-200/50",
     filterInactive:
       "border-transparent bg-sky-50/50 text-sky-800/80 hover:bg-sky-100/80 hover:border-sky-200/50",
     listAccent: "border-l-sky-400/85",
@@ -159,7 +164,10 @@ function normalizeDiscoveryKey(id: string): string {
 
 function normalizeDoiKey(doi: string | undefined): string | null {
   if (!doi?.trim()) return null;
-  const d = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim().toLowerCase();
+  const d = doi
+    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "")
+    .trim()
+    .toLowerCase();
   return d || null;
 }
 
@@ -196,7 +204,8 @@ function academicAccessChip(
 }
 
 function getScoreBadge(score: number) {
-  const base = "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-none";
+  const base =
+    "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-none";
   if (score >= 0.8) {
     return {
       label: "high relevance",
@@ -234,7 +243,10 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [filters, setFilters] = useSessionStorage<FilterState>("discovery-filters", DEFAULT_FILTERS);
+  const [filters, setFilters] = useSessionStorage<FilterState>(
+    "discovery-filters",
+    DEFAULT_FILTERS
+  );
 
   const notebookDiscoveryKeys = useMemo(() => {
     const s = new Set<string>();
@@ -542,26 +554,29 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             </div>
 
             <div className="border border-border/50 rounded-xl p-4 bg-card shadow-sm flex flex-wrap items-center gap-2">
-              {(Object.entries(SOURCE_TYPE_CONFIG) as [SourceType, (typeof SOURCE_TYPE_CONFIG)[SourceType]][]).map(
-                ([key, config]) => {
-                  const Icon = config.icon;
-                  const isActive = filters.sourceTypes.includes(key);
-                  const pastel = SOURCE_TYPE_STYLES[key];
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => toggleSourceType(key)}
-                      className={`inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg border text-sm font-medium transition-all ${
-                        isActive ? pastel.filterActive : pastel.filterInactive
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5 shrink-0" />
-                      {config.label}
-                    </button>
-                  );
-                }
-              )}
+              {(
+                Object.entries(SOURCE_TYPE_CONFIG) as [
+                  SourceType,
+                  (typeof SOURCE_TYPE_CONFIG)[SourceType],
+                ][]
+              ).map(([key, config]) => {
+                const Icon = config.icon;
+                const isActive = filters.sourceTypes.includes(key);
+                const pastel = SOURCE_TYPE_STYLES[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleSourceType(key)}
+                    className={`inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg border text-sm font-medium transition-all ${
+                      isActive ? pastel.filterActive : pastel.filterInactive
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    {config.label}
+                  </button>
+                );
+              })}
 
               <div className="flex-1 min-w-[1rem]" />
 
@@ -579,126 +594,135 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                   Filters
                 </button>
                 {showFilters && (
-              <div className="absolute right-0 top-full mt-2 bg-card border border-border rounded-xl shadow-lg p-4 w-56 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
-                {/* Time range */}
-                <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                  Time range
-                </label>
-                <select
-                  value={filters.timeRange || ""}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      timeRange: (e.target.value || undefined) as FilterState["timeRange"],
-                    }))
-                  }
-                  className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-3 focus:outline-none focus:border-primary"
-                >
-                  <option value="">All time</option>
-                  <option value="day">Past day</option>
-                  <option value="week">Past week</option>
-                  <option value="month">Past month</option>
-                  <option value="year">Past year</option>
-                </select>
-
-                {/* Sort */}
-                <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                  Sort by
-                </label>
-                <select
-                  value={filters.sortBy}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, sortBy: e.target.value as FilterState["sortBy"] }))
-                  }
-                  className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-3 focus:outline-none focus:border-primary"
-                >
-                  <option value="relevance">Relevance</option>
-                  <option value="date">Date</option>
-                  <option value="citations">Citations</option>
-                </select>
-
-                {/* Total result budget, split across selected source types */}
-                <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                  Total results: {filters.maxResults}
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max={MAX_DISCOVERY_TOTAL_RESULTS}
-                  step="5"
-                  value={filters.maxResults}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, maxResults: parseInt(e.target.value) }))
-                  }
-                  className="w-full"
-                />
-
-                {/* Academic filters */}
-                {filters.sourceTypes.includes("academic") && (
-                  <>
-                    <div className="border-t border-border/50 my-3" />
+                  <div className="absolute right-0 top-full mt-2 bg-card border border-border rounded-xl shadow-lg p-4 w-56 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
+                    {/* Time range */}
                     <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Academic
+                      Time range
                     </label>
                     <select
-                      value={filters.academic.minCitations || ""}
+                      value={filters.timeRange || ""}
                       onChange={(e) =>
                         setFilters((prev) => ({
                           ...prev,
-                          academic: {
-                            ...prev.academic,
-                            minCitations: e.target.value ? parseInt(e.target.value) : undefined,
-                          },
+                          timeRange: (e.target.value || undefined) as FilterState["timeRange"],
                         }))
                       }
-                      className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-2 focus:outline-none focus:border-primary"
+                      className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-3 focus:outline-none focus:border-primary"
                     >
-                      <option value="">Any citations</option>
-                      <option value="10">10+</option>
-                      <option value="50">50+</option>
-                      <option value="100">100+</option>
-                      <option value="500">500+</option>
+                      <option value="">All time</option>
+                      <option value="day">Past day</option>
+                      <option value="week">Past week</option>
+                      <option value="month">Past month</option>
+                      <option value="year">Past year</option>
                     </select>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm mb-1">
-                      <input
-                        type="checkbox"
-                        checked={filters.academic.openAccessOnly || false}
-                        onChange={(e) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            academic: { ...prev.academic, openAccessOnly: e.target.checked || undefined },
-                          }))
-                        }
-                        className="w-3.5 h-3.5 rounded border-border"
-                      />
-                      Open access only
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={filters.academic.hasFullText || false}
-                        onChange={(e) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            academic: { ...prev.academic, hasFullText: e.target.checked || undefined },
-                          }))
-                        }
-                        className="w-3.5 h-3.5 rounded border-border"
-                      />
-                      Has full text
-                    </label>
-                  </>
-                )}
 
-                {/* Reset */}
-                <button
-                  type="button"
-                  onClick={() => setFilters(DEFAULT_FILTERS)}
-                  className="w-full mt-3 px-3 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors border border-border rounded-md hover:border-destructive/30"
-                >
-                  Reset filters
-                </button>
-              </div>
+                    {/* Sort */}
+                    <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                      Sort by
+                    </label>
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          sortBy: e.target.value as FilterState["sortBy"],
+                        }))
+                      }
+                      className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-3 focus:outline-none focus:border-primary"
+                    >
+                      <option value="relevance">Relevance</option>
+                      <option value="date">Date</option>
+                      <option value="citations">Citations</option>
+                    </select>
+
+                    {/* Total result budget, split across selected source types */}
+                    <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                      Total results: {filters.maxResults}
+                    </label>
+                    <input
+                      type="range"
+                      min="5"
+                      max={MAX_DISCOVERY_TOTAL_RESULTS}
+                      step="5"
+                      value={filters.maxResults}
+                      onChange={(e) =>
+                        setFilters((prev) => ({ ...prev, maxResults: parseInt(e.target.value) }))
+                      }
+                      className="w-full"
+                    />
+
+                    {/* Academic filters */}
+                    {filters.sourceTypes.includes("academic") && (
+                      <>
+                        <div className="border-t border-border/50 my-3" />
+                        <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                          Academic
+                        </label>
+                        <select
+                          value={filters.academic.minCitations || ""}
+                          onChange={(e) =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              academic: {
+                                ...prev.academic,
+                                minCitations: e.target.value ? parseInt(e.target.value) : undefined,
+                              },
+                            }))
+                          }
+                          className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-2 focus:outline-none focus:border-primary"
+                        >
+                          <option value="">Any citations</option>
+                          <option value="10">10+</option>
+                          <option value="50">50+</option>
+                          <option value="100">100+</option>
+                          <option value="500">500+</option>
+                        </select>
+                        <label className="flex items-center gap-2 cursor-pointer text-sm mb-1">
+                          <input
+                            type="checkbox"
+                            checked={filters.academic.openAccessOnly || false}
+                            onChange={(e) =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                academic: {
+                                  ...prev.academic,
+                                  openAccessOnly: e.target.checked || undefined,
+                                },
+                              }))
+                            }
+                            className="w-3.5 h-3.5 rounded border-border"
+                          />
+                          Open access only
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer text-sm">
+                          <input
+                            type="checkbox"
+                            checked={filters.academic.hasFullText || false}
+                            onChange={(e) =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                academic: {
+                                  ...prev.academic,
+                                  hasFullText: e.target.checked || undefined,
+                                },
+                              }))
+                            }
+                            className="w-3.5 h-3.5 rounded border-border"
+                          />
+                          Has full text
+                        </label>
+                      </>
+                    )}
+
+                    {/* Reset */}
+                    <button
+                      type="button"
+                      onClick={() => setFilters(DEFAULT_FILTERS)}
+                      className="w-full mt-3 px-3 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors border border-border rounded-md hover:border-destructive/30"
+                    >
+                      Reset filters
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -730,58 +754,60 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
           <div
             className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-card/50 px-6 md:px-10 ${selectedCount > 0 ? "pb-0" : "pb-6"}`}
           >
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center min-h-80 text-center space-y-3">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <div>
-                <p className="font-medium text-sm">Searching across sources...</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Finding the most relevant sources for you.
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center min-h-80 text-center space-y-3">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <div>
+                  <p className="font-medium text-sm">Searching across sources...</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Finding the most relevant sources for you.
+                  </p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center min-h-80 text-center p-6">
+                <p className="text-destructive font-medium text-sm mb-0.5">
+                  Search encountered an issue
                 </p>
+                <p className="text-muted-foreground text-xs">{error}</p>
               </div>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center min-h-80 text-center p-6">
-              <p className="text-destructive font-medium text-sm mb-0.5">Search encountered an issue</p>
-              <p className="text-muted-foreground text-xs">{error}</p>
-            </div>
-          ) : results.length > 0 ? (
-            viewMode === "list" ? (
-              <div className="space-y-2 py-1">
-                {results.map((result) => (
-                  <ResultRow
-                    key={result.id}
-                    result={result}
-                    isSelected={selectedIds.has(result.id)}
-                    isAdding={addingIds.has(result.id)}
-                    isAdded={isDiscoveryResultInNotebook(result)}
-                    isAtLimit={isAtLimit}
-                    onToggleSelect={() => toggleSelect(result.id)}
-                    onAdd={() => handleAddSingle(result)}
-                  />
-                ))}
-              </div>
+            ) : results.length > 0 ? (
+              viewMode === "list" ? (
+                <div className="space-y-2 py-1">
+                  {results.map((result) => (
+                    <ResultRow
+                      key={result.id}
+                      result={result}
+                      isSelected={selectedIds.has(result.id)}
+                      isAdding={addingIds.has(result.id)}
+                      isAdded={isDiscoveryResultInNotebook(result)}
+                      isAtLimit={isAtLimit}
+                      onToggleSelect={() => toggleSelect(result.id)}
+                      onAdd={() => handleAddSingle(result)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 py-4">
+                  {results.map((result) => (
+                    <ResultCard
+                      key={result.id}
+                      result={result}
+                      isAdding={addingIds.has(result.id)}
+                      isAdded={isDiscoveryResultInNotebook(result)}
+                      isAtLimit={isAtLimit}
+                      onAdd={() => handleAddSingle(result)}
+                    />
+                  ))}
+                </div>
+              )
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 py-4">
-                {results.map((result) => (
-                  <ResultCard
-                    key={result.id}
-                    result={result}
-                    isAdding={addingIds.has(result.id)}
-                    isAdded={isDiscoveryResultInNotebook(result)}
-                    isAtLimit={isAtLimit}
-                    onAdd={() => handleAddSingle(result)}
-                  />
-                ))}
+              <div className="flex flex-col items-center justify-center min-h-80 text-center opacity-40">
+                <Search className="w-8 h-8 mb-3" />
+                <p className="text-sm italic">Enter a topic to discover related sources</p>
               </div>
-            )
-          ) : (
-            <div className="flex flex-col items-center justify-center min-h-80 text-center opacity-40">
-              <Search className="w-8 h-8 mb-3" />
-              <p className="text-sm italic">Enter a topic to discover related sources</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </div>
 
         {selectedCount > 0 && (
@@ -861,12 +887,11 @@ const ResultRow: React.FC<ResultRowProps> = ({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2 min-w-0">
-          <TypeIcon
-            className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${typeStyle.icon}`}
-            aria-hidden
-          />
+          <TypeIcon className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${typeStyle.icon}`} aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">{result.title}</p>
+            <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">
+              {result.title}
+            </p>
             {byline && (
               <p className="text-[11px] text-muted-foreground/90 mt-0.5 line-clamp-1">{byline}</p>
             )}
@@ -999,7 +1024,9 @@ const ResultCard: React.FC<ResultCardProps> = ({ result, isAdding, isAdded, isAt
         {byline && <p className="text-[11px] text-muted-foreground/90 line-clamp-1">{byline}</p>}
 
         {showSnippet && (
-          <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{result.snippet}</p>
+          <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+            {result.snippet}
+          </p>
         )}
 
         <div className="flex items-center gap-1.5 flex-wrap">

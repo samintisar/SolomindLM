@@ -72,7 +72,7 @@ export async function runResearchEval(
   if (!invoker) {
     throw new Error(
       "No ResearchAgentInvoker provided for real run. " +
-      "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
+        "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
     );
   }
 

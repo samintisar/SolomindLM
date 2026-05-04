@@ -169,9 +169,7 @@ export class VectorSearchHandler {
       });
     }
 
-    let filtered = withScore.filter(
-      (r) => (r.similarity ?? 0) >= this.config.vectorMatchThreshold
-    );
+    let filtered = withScore.filter((r) => (r.similarity ?? 0) >= this.config.vectorMatchThreshold);
     if (!quiet) {
       log.debug("after_threshold", { count: filtered.length });
     }
@@ -361,7 +359,7 @@ export class VectorSearchHandler {
           log.debug("rerank_complete", { count: reranked.length, path: "cached" });
         }
         return reranked;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         const log = createServiceLogger("vectorSearch", "rerank");
         log.error("cached_rerank_failed", err, { message: err?.message });
@@ -419,7 +417,7 @@ export class VectorSearchHandler {
           log.debug("rerank_complete", { count: reranked.length, path: "zeroentropy" });
         }
         return reranked;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         const log = createServiceLogger("vectorSearch", "rerank");
         const is429 = err?.statusCode === 429 || err?.status === 429;

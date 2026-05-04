@@ -39,17 +39,13 @@ test.describe("Chat Input", () => {
     await expect(page.getByText("Deep research")).toBeVisible();
 
     // Placeholder should change to research-specific text
-    await expect(
-      page.getByPlaceholder(/Ask a complex research question/)
-    ).toBeVisible();
+    await expect(page.getByPlaceholder(/Ask a complex research question/)).toBeVisible();
   });
 
   test("chat input shows correct placeholder", async ({ notebookPage }) => {
     const page = notebookPage;
 
     // Default placeholder when deep research is off
-    await expect(
-      page.getByPlaceholder(/Ask a question about your sources/)
-    ).toBeVisible();
+    await expect(page.getByPlaceholder(/Ask a question about your sources/)).toBeVisible();
   });
 });

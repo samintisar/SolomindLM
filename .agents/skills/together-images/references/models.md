@@ -1,4 +1,5 @@
 # Image Generation Models Reference
+
 ## Contents
 
 - [Complete Model Table](#complete-model-table)
@@ -8,36 +9,35 @@
 - [Supported Dimensions](#supported-dimensions)
 - [FLUX Pricing Formula](#flux-pricing-formula)
 
-
 ## Complete Model Table
 
-| Organization | Model | API String | Default Steps |
-|-------------|-------|-----------|--------------|
-| Google | Imagen 4.0 Preview | `google/imagen-4.0-preview` | - |
-| Google | Imagen 4.0 Fast | `google/imagen-4.0-fast` | - |
-| Google | Imagen 4.0 Ultra | `google/imagen-4.0-ultra` | - |
-| Google | Flash Image 2.5 | `google/flash-image-2.5` | - |
-| Google | Gemini 3 Pro Image | `google/gemini-3-pro-image` | - |
-| Black Forest Labs | FLUX.2 [pro] | `black-forest-labs/FLUX.2-pro` | - |
-| Black Forest Labs | FLUX.2 [dev] | `black-forest-labs/FLUX.2-dev` | - |
-| Black Forest Labs | FLUX.2 [flex] | `black-forest-labs/FLUX.2-flex` | - |
-| Black Forest Labs | FLUX.1 [schnell] | `black-forest-labs/FLUX.1-schnell` | 4 |
-| Black Forest Labs | FLUX.1.1 [pro] | `black-forest-labs/FLUX.1.1-pro` | - |
-| Black Forest Labs | FLUX.1 Kontext [pro] | `black-forest-labs/FLUX.1-kontext-pro` | 28 |
-| Black Forest Labs | FLUX.1 Kontext [max] | `black-forest-labs/FLUX.1-kontext-max` | 28 |
-| Black Forest Labs | FLUX.1 Krea [dev] | `black-forest-labs/FLUX.1-krea-dev` | 28 |
-| ByteDance | Seedream 4.0 | `ByteDance-Seed/Seedream-4.0` | - |
-| ByteDance | Seedream 3.0 | `ByteDance-Seed/Seedream-3.0` | - |
-| Qwen | Qwen Image | `Qwen/Qwen-Image` | - |
-| Ideogram | Ideogram 3.0 | `ideogram/ideogram-3.0` | - |
-| HiDream | HiDream-I1-Full | `HiDream-ai/HiDream-I1-Full` | - |
-| HiDream | HiDream-I1-Dev | `HiDream-ai/HiDream-I1-Dev` | - |
-| HiDream | HiDream-I1-Fast | `HiDream-ai/HiDream-I1-Fast` | - |
-| RunDiffusion | Juggernaut Pro Flux | `RunDiffusion/Juggernaut-pro-flux` | - |
-| RunDiffusion | Juggernaut Lightning | `Rundiffusion/Juggernaut-Lightning-Flux` | - |
-| Lykon | DreamShaper | `Lykon/DreamShaper` | - |
-| Stability AI | SD 3 Medium | `stabilityai/stable-diffusion-3-medium` | - |
-| Stability AI | SD 3 Medium | `stabilityai/stable-diffusion-3-medium` | - |
+| Organization      | Model                | API String                               | Default Steps |
+| ----------------- | -------------------- | ---------------------------------------- | ------------- |
+| Google            | Imagen 4.0 Preview   | `google/imagen-4.0-preview`              | -             |
+| Google            | Imagen 4.0 Fast      | `google/imagen-4.0-fast`                 | -             |
+| Google            | Imagen 4.0 Ultra     | `google/imagen-4.0-ultra`                | -             |
+| Google            | Flash Image 2.5      | `google/flash-image-2.5`                 | -             |
+| Google            | Gemini 3 Pro Image   | `google/gemini-3-pro-image`              | -             |
+| Black Forest Labs | FLUX.2 [pro]         | `black-forest-labs/FLUX.2-pro`           | -             |
+| Black Forest Labs | FLUX.2 [dev]         | `black-forest-labs/FLUX.2-dev`           | -             |
+| Black Forest Labs | FLUX.2 [flex]        | `black-forest-labs/FLUX.2-flex`          | -             |
+| Black Forest Labs | FLUX.1 [schnell]     | `black-forest-labs/FLUX.1-schnell`       | 4             |
+| Black Forest Labs | FLUX.1.1 [pro]       | `black-forest-labs/FLUX.1.1-pro`         | -             |
+| Black Forest Labs | FLUX.1 Kontext [pro] | `black-forest-labs/FLUX.1-kontext-pro`   | 28            |
+| Black Forest Labs | FLUX.1 Kontext [max] | `black-forest-labs/FLUX.1-kontext-max`   | 28            |
+| Black Forest Labs | FLUX.1 Krea [dev]    | `black-forest-labs/FLUX.1-krea-dev`      | 28            |
+| ByteDance         | Seedream 4.0         | `ByteDance-Seed/Seedream-4.0`            | -             |
+| ByteDance         | Seedream 3.0         | `ByteDance-Seed/Seedream-3.0`            | -             |
+| Qwen              | Qwen Image           | `Qwen/Qwen-Image`                        | -             |
+| Ideogram          | Ideogram 3.0         | `ideogram/ideogram-3.0`                  | -             |
+| HiDream           | HiDream-I1-Full      | `HiDream-ai/HiDream-I1-Full`             | -             |
+| HiDream           | HiDream-I1-Dev       | `HiDream-ai/HiDream-I1-Dev`              | -             |
+| HiDream           | HiDream-I1-Fast      | `HiDream-ai/HiDream-I1-Fast`             | -             |
+| RunDiffusion      | Juggernaut Pro Flux  | `RunDiffusion/Juggernaut-pro-flux`       | -             |
+| RunDiffusion      | Juggernaut Lightning | `Rundiffusion/Juggernaut-Lightning-Flux` | -             |
+| Lykon             | DreamShaper          | `Lykon/DreamShaper`                      | -             |
+| Stability AI      | SD 3 Medium          | `stabilityai/stable-diffusion-3-medium`  | -             |
+| Stability AI      | SD 3 Medium          | `stabilityai/stable-diffusion-3-medium`  | -             |
 
 ## Model Categories
 
@@ -66,24 +66,24 @@ All models above support text-to-image generation via the `prompt` parameter.
 
 ## Recommended Models
 
-| Use Case | Model | API String |
-|----------|-------|-----------|
-| Best quality | Flash Image 2.5 | `google/flash-image-2.5` |
-| Highest quality FLUX | FLUX.2 Pro | `black-forest-labs/FLUX.2-pro` |
-| Image editing | FLUX.1 Kontext Max | `black-forest-labs/FLUX.1-kontext-max` |
-| Fast generation | FLUX.1 Schnell | `black-forest-labs/FLUX.1-schnell` |
-| LoRA styles | FLUX.2 Dev | `black-forest-labs/FLUX.2-dev` |
-| Typography | FLUX.2 Flex | `black-forest-labs/FLUX.2-flex` |
-| Text in images | Ideogram 3.0 | `ideogram/ideogram-3.0` |
-| Up to 4K output | Gemini 3 Pro Image | `google/gemini-3-pro-image` |
+| Use Case             | Model              | API String                             |
+| -------------------- | ------------------ | -------------------------------------- |
+| Best quality         | Flash Image 2.5    | `google/flash-image-2.5`               |
+| Highest quality FLUX | FLUX.2 Pro         | `black-forest-labs/FLUX.2-pro`         |
+| Image editing        | FLUX.1 Kontext Max | `black-forest-labs/FLUX.1-kontext-max` |
+| Fast generation      | FLUX.1 Schnell     | `black-forest-labs/FLUX.1-schnell`     |
+| LoRA styles          | FLUX.2 Dev         | `black-forest-labs/FLUX.2-dev`         |
+| Typography           | FLUX.2 Flex        | `black-forest-labs/FLUX.2-flex`        |
+| Text in images       | Ideogram 3.0       | `ideogram/ideogram-3.0`                |
+| Up to 4K output      | Gemini 3 Pro Image | `google/gemini-3-pro-image`            |
 
 ## FLUX.2 Model Comparison
 
-| Variant | Best For | Unique Features |
-|---------|----------|-----------------|
-| Pro | Production, highest fidelity | Up to 9MP output, fastest |
-| Dev | Development, LoRA support | `guidance`, `steps`, `image_loras` |
-| Flex | Maximum control, typography | `guidance`, `steps`, adjustable |
+| Variant | Best For                     | Unique Features                    |
+| ------- | ---------------------------- | ---------------------------------- |
+| Pro     | Production, highest fidelity | Up to 9MP output, fastest          |
+| Dev     | Development, LoRA support    | `guidance`, `steps`, `image_loras` |
+| Flex    | Maximum control, typography  | `guidance`, `steps`, adjustable    |
 
 ## Supported Dimensions
 

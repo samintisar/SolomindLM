@@ -10,7 +10,11 @@ import type { SourceChannel } from "./types";
 export const SubQuestionSchema = z.object({
   id: z.string().describe("Short ID like sq1, sq2"),
   question: z.string().describe("Clear, specific sub-question"),
-  searchQueries: z.array(z.string()).min(1).max(2).describe("1-2 highly targeted search queries (fewer precise queries beat many vague ones)"),
+  searchQueries: z
+    .array(z.string())
+    .min(1)
+    .max(2)
+    .describe("1-2 highly targeted search queries (fewer precise queries beat many vague ones)"),
   sourceChannels: z.array(z.string()).describe("Target channels: notebook, web, academic, news"),
 });
 
@@ -60,7 +64,10 @@ Guidelines:
 export function buildWriterPrompt(
   query: string,
   subQuestions: Array<{ id: string; question: string }>,
-  evidenceBySubQuestion: Record<string, Array<{ sourceTitle: string; sourceUrl?: string; content: string; sourceType: string }>>
+  evidenceBySubQuestion: Record<
+    string,
+    Array<{ sourceTitle: string; sourceUrl?: string; content: string; sourceType: string }>
+  >
 ): string {
   let globalN = 0;
   const subQuestionSection = subQuestions

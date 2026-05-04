@@ -104,10 +104,7 @@ interface SpreadsheetPayload {
   data?: string | { rows?: unknown[]; columns?: unknown[]; headers?: unknown[] };
 }
 
-function flashcardCountMatch(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function flashcardCountMatch(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const cards = (artifact.studioOutput?.raw as ItemArrayPayload | undefined)?.cards ?? [];
   return countGate(
     "flashcard_count_match",
@@ -131,10 +128,7 @@ function quizCountMatch(fixture: EvalFixture, artifact: EvalRunArtifact): Metric
   );
 }
 
-function writtenQuestionsCountMatch(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function writtenQuestionsCountMatch(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const qs = (artifact.studioOutput?.raw as ItemArrayPayload | undefined)?.questions ?? [];
   return countGate(
     "written_questions_count_match",
@@ -160,10 +154,7 @@ function mindmapNodeCount(fixture: EvalFixture, artifact: EvalRunArtifact): Metr
   const wrapped = data as
     | { nodeData?: { children?: unknown[] }; root?: { children?: unknown[] } }
     | undefined;
-  const root =
-    wrapped?.nodeData ??
-    wrapped?.root ??
-    (data as { children?: unknown[] } | undefined);
+  const root = wrapped?.nodeData ?? wrapped?.root ?? (data as { children?: unknown[] } | undefined);
   const total = countMindmapNodes(root as { children?: unknown[] });
   return countGate(
     "mindmap_node_count",
@@ -193,10 +184,7 @@ function infographicHasImage(fixture: EvalFixture, artifact: EvalRunArtifact): M
   );
 }
 
-function spreadsheetRowCount(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function spreadsheetRowCount(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const data = (artifact.studioOutput?.raw as SpreadsheetPayload | undefined)?.data;
   let rowCount = 0;
   if (typeof data === "string") {
@@ -218,10 +206,7 @@ function spreadsheetRowCount(
 
 // ─── Report: required-section presence ───────────────────────
 
-function reportSectionPresence(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function reportSectionPresence(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const required = fixture.expectedStructure?.requiredSections;
   if (!required || required.length === 0) {
     return baseMetric(
@@ -263,10 +248,7 @@ const AUDIO_TARGET_WORDS: Record<string, number> = {
   long: 7000,
 };
 
-function audioScriptLength(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function audioScriptLength(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const transcript =
     (artifact.studioOutput?.raw as { transcript?: string } | undefined)?.transcript ?? "";
   const wordCount = transcript.trim().split(/\s+/).filter(Boolean).length;

@@ -18,11 +18,7 @@ import {
   getNotebookAccess,
 } from "../_lib/notebookAccess";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
-import {
-  deriveFulltextStatus,
-  paperRecordValidator,
-  primaryLinkUrlForPaper,
-} from "./paperRecord";
+import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
 /**
  * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
@@ -811,9 +807,7 @@ export const keywordSearch = internalQuery({
       const u = doc?.fileUrl?.trim();
       const sourceUrl =
         u &&
-        (doc?.fileType === "url" ||
-          doc?.fileType === "youtube" ||
-          doc?.fileType === "paper_record")
+        (doc?.fileType === "url" || doc?.fileType === "youtube" || doc?.fileType === "paper_record")
           ? u
           : undefined;
       docMetaMap.set(id, { fileName, sourceUrl });
@@ -1035,7 +1029,10 @@ export const addExternalSources = mutation({
       });
     }
 
-    logger.operationComplete({ createdCount: createdIds.length, skippedCount: args.sources.length - createdIds.length });
+    logger.operationComplete({
+      createdCount: createdIds.length,
+      skippedCount: args.sources.length - createdIds.length,
+    });
 
     return createdIds;
   },

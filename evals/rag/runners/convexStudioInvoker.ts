@@ -107,18 +107,15 @@ export function createConvexFlashcardsInvoker(
     kind: "flashcards",
     async invoke(context) {
       const startTime = Date.now();
-      const { flashcardId } = await client.action(
-        api.eval.studioEvalAction.startFlashcardsEval,
-        {
-          evalSecret: options.evalSecret,
-          notebookId: context.notebookId as Id<"notebooks">,
-          documentIds: context.documentIds as Id<"documents">[] | undefined,
-          cardCount: context.studioParams?.cardCount,
-          difficulty: context.studioParams?.difficulty,
-          topic: context.studioParams?.topic,
-          smartLlm: context.studioParams?.smartLlm,
-        }
-      );
+      const { flashcardId } = await client.action(api.eval.studioEvalAction.startFlashcardsEval, {
+        evalSecret: options.evalSecret,
+        notebookId: context.notebookId as Id<"notebooks">,
+        documentIds: context.documentIds as Id<"documents">[] | undefined,
+        cardCount: context.studioParams?.cardCount,
+        difficulty: context.studioParams?.difficulty,
+        topic: context.studioParams?.topic,
+        smartLlm: context.studioParams?.smartLlm,
+      });
       const populated = await pollStatus(
         () =>
           client.action(api.eval.studioEvalAction.getFlashcardsEvalStatus, {
@@ -399,9 +396,7 @@ export type StudioInvokerFactory = (
   options: ConvexStudioInvokerOptions
 ) => StudioInvoker;
 
-export const STUDIO_INVOKER_FACTORIES: Partial<
-  Record<StudioRunnerKind, StudioInvokerFactory>
-> = {
+export const STUDIO_INVOKER_FACTORIES: Partial<Record<StudioRunnerKind, StudioInvokerFactory>> = {
   report: createConvexReportInvoker,
   flashcards: createConvexFlashcardsInvoker,
   quiz: createConvexQuizInvoker,

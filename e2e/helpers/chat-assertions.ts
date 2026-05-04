@@ -97,17 +97,12 @@ export async function getLastAssistantMessageProse(page: Page): Promise<string> 
   });
 }
 
-export async function waitForAssistantMessage(
-  page: Page,
-  timeout = 15_000
-): Promise<boolean> {
+export async function waitForAssistantMessage(page: Page, timeout = 15_000): Promise<boolean> {
   try {
     await page.waitForFunction(
       () => {
         const els = document.querySelectorAll("[data-message-id]");
-        return Array.from(els).some((el) =>
-          el.classList.contains("items-start")
-        );
+        return Array.from(els).some((el) => el.classList.contains("items-start"));
       },
       { timeout }
     );
@@ -123,10 +118,7 @@ export async function waitForAssistantMessage(
  * Uses `.prose.max-w-none` inside the assistant row so AgentActivityPanel / tool traces
  * do not keep `textContent` changing after the model has finished.
  */
-export async function waitForStreamingComplete(
-  page: Page,
-  timeoutMs = 30_000
-): Promise<string> {
+export async function waitForStreamingComplete(page: Page, timeoutMs = 30_000): Promise<string> {
   const startTime = Date.now();
   let lastContent = "";
   let stableCount = 0;
@@ -134,9 +126,7 @@ export async function waitForStreamingComplete(
   while (Date.now() - startTime < timeoutMs) {
     const content = await page.evaluate(() => {
       const els = document.querySelectorAll("[data-message-id]");
-      const assistantEls = Array.from(els).filter((el) =>
-        el.classList.contains("items-start")
-      );
+      const assistantEls = Array.from(els).filter((el) => el.classList.contains("items-start"));
       if (assistantEls.length === 0) return "";
       const root = assistantEls[assistantEls.length - 1];
       const prose = root.querySelector(".prose.max-w-none");

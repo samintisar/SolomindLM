@@ -16,7 +16,7 @@ import {
   synthesizeSpeechToBuffer,
 } from "../../_services/ai/togetherTts.js";
 import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
-import { concatenateWavBuffers } from "../../_services/ai/wav.js";
+import { concatenateWavBuffers, getPcmWavDurationSeconds } from "../../_services/ai/wav.js";
 import { packChunks, validateChunks } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import {
@@ -271,10 +271,13 @@ export async function runProcessAudioMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[audio] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[audio] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -298,7 +301,10 @@ export async function runProcessAudioMapChunkPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
+          [
+            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ],
           createLangSmithRunConfig({
             runName: "AudioJob.ExtractBeats",
             tags: ["agent", "audio-overview", "map"],
@@ -395,8 +401,8 @@ export async function runProcessAudioMapChunkPhase(
       : 0;
     const totalMaps = audioOverview.metadata?.totalMapTasks || totalChunks;
     const failedMaps = audioOverview.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(audioOverview.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(audioOverview.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -468,10 +474,13 @@ export async function runFinalizeAudioOverviewPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[audio] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[audio] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -571,7 +580,10 @@ export async function runFinalizeAudioOverviewPhase(
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke(
-          [new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)), new HumanMessage(reducePrompt)],
+          [
+            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+            new HumanMessage(reducePrompt),
+          ],
           createLangSmithRunConfig({
             runName: "AudioJob.WriteScript",
             tags: ["agent", "audio-overview", "reduce"],
@@ -620,9 +632,7 @@ export async function runFinalizeAudioOverviewPhase(
     if (jsonStart !== -1 && jsonEnd !== -1) {
       // Strategy 1: Parse the full JSON array
       try {
-        const parsed = JSON.parse(
-          responseText.substring(jsonStart, jsonEnd + 1)
-        ) as DialogueLine[];
+        const parsed = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1)) as DialogueLine[];
         if (Array.isArray(parsed) && parsed.length > 0) {
           fullDialogueScript = parsed;
           console.log(`[AudioJob] Parsed ${fullDialogueScript.length} lines via full JSON parse`);
@@ -636,7 +646,8 @@ export async function runFinalizeAudioOverviewPhase(
       // Strategy 2: If full parse failed, try extracting individual objects
       if (fullDialogueScript.length === 0) {
         console.log(`[AudioJob] Attempting object-by-object recovery`);
-        const objectRegex = /\{\s*"speaker"\s*:\s*"(host_a|host_b)"\s*,\s*"text"\s*:\s*"([^"]*)"\s*\}/g;
+        const objectRegex =
+          /\{\s*"speaker"\s*:\s*"(host_a|host_b)"\s*,\s*"text"\s*:\s*"([^"]*)"\s*\}/g;
         let match;
         const recoveredLines: DialogueLine[] = [];
         while ((match = objectRegex.exec(responseText)) !== null) {
@@ -644,7 +655,9 @@ export async function runFinalizeAudioOverviewPhase(
         }
         if (recoveredLines.length > 0) {
           fullDialogueScript = recoveredLines;
-          console.log(`[AudioJob] Recovered ${fullDialogueScript.length} lines via regex extraction`);
+          console.log(
+            `[AudioJob] Recovered ${fullDialogueScript.length} lines via regex extraction`
+          );
         }
       }
 
@@ -660,7 +673,9 @@ export async function runFinalizeAudioOverviewPhase(
             const parsed = JSON.parse(fixedJson) as DialogueLine[];
             if (Array.isArray(parsed) && parsed.length > 0) {
               fullDialogueScript = parsed;
-              console.log(`[AudioJob] Recovered ${fullDialogueScript.length} lines via truncation fix`);
+              console.log(
+                `[AudioJob] Recovered ${fullDialogueScript.length} lines via truncation fix`
+              );
             }
           } catch (_e) {
             // Ignore
@@ -734,6 +749,7 @@ export async function runFinalizeAudioOverviewPhase(
     }
 
     const wavBuffer = concatenateWavBuffers(sortedBuffers);
+    const durationSeconds = getPcmWavDurationSeconds(wavBuffer);
     const audioBuffer = encodePcmWavToMp3(wavBuffer);
     console.log(
       `[AudioJob] Audio synthesis complete: ${successCount} lines, ${wavBuffer.length} WAV bytes, ${audioBuffer.length} MP3 bytes`
@@ -797,6 +813,7 @@ export async function runFinalizeAudioOverviewPhase(
         mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
         mapFailedCount: failedCount.count,
         dialogueLines: successCount,
+        durationSeconds,
       },
     });
 

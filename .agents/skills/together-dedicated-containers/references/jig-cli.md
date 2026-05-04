@@ -1,4 +1,5 @@
 # Jig CLI Reference
+
 ## Contents
 
 - [Installation](#installation)
@@ -14,7 +15,6 @@
 - [Container Registry](#container-registry)
 - [Debug Mode](#debug-mode)
 
-
 ## Installation
 
 ```shell
@@ -27,12 +27,12 @@ Jig commands are under `together beta jig`.
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TOGETHER_API_KEY` | Required | Your Together API key |
-| `TOGETHER_DEBUG` | `""` | Enable debug logging (`"1"` or `"true"`) |
-| `WARMUP_ENV_NAME` | `TORCHINDUCTOR_CACHE_DIR` | Environment variable for cache location |
-| `WARMUP_DEST` | `torch_cache` | Cache directory path in container |
+| Variable           | Default                   | Description                              |
+| ------------------ | ------------------------- | ---------------------------------------- |
+| `TOGETHER_API_KEY` | Required                  | Your Together API key                    |
+| `TOGETHER_DEBUG`   | `""`                      | Enable debug logging (`"1"` or `"true"`) |
+| `WARMUP_ENV_NAME`  | `TORCHINDUCTOR_CACHE_DIR` | Environment variable for cache location  |
+| `WARMUP_DEST`      | `torch_cache`             | Cache directory path in container        |
 
 All commands are subcommands of `together beta jig`. Use `--config <path>` to specify a custom config file (default: `pyproject.toml`).
 
@@ -62,10 +62,10 @@ Build the Docker image locally.
 together beta jig build [flags]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--tag <tag>` | Image tag (default: content-hash) |
-| `--warmup` | Pre-generate compile caches after build (requires GPU) |
+| Flag          | Description                                            |
+| ------------- | ------------------------------------------------------ |
+| `--tag <tag>` | Image tag (default: content-hash)                      |
+| `--warmup`    | Pre-generate compile caches after build (requires GPU) |
 
 ### jig push
 
@@ -75,8 +75,8 @@ Push the built image to Together's registry at `registry.together.xyz`.
 together beta jig push [flags]
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag          | Description       |
+| ------------- | ----------------- |
 | `--tag <tag>` | Image tag to push |
 
 ## Deployment Commands
@@ -89,11 +89,11 @@ Build, push, and create or update the deployment. Combines `build`, `push`, and 
 together beta jig deploy [flags]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--tag <tag>` | Image tag |
-| `--warmup` | Pre-generate compile caches (requires GPU) |
-| `--build-only` | Build and push only, skip deployment creation |
+| Flag            | Description                                   |
+| --------------- | --------------------------------------------- |
+| `--tag <tag>`   | Image tag                                     |
+| `--warmup`      | Pre-generate compile caches (requires GPU)    |
+| `--build-only`  | Build and push only, skip deployment creation |
 | `--image <ref>` | Deploy an existing image, skip build and push |
 
 ### jig status
@@ -120,8 +120,8 @@ Retrieve deployment logs.
 together beta jig logs [flags]
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag       | Description              |
+| ---------- | ------------------------ |
 | `--follow` | Stream logs in real-time |
 
 ### jig endpoint
@@ -150,11 +150,11 @@ Submit a job to the deployment's queue.
 together beta jig submit [flags]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--prompt <text>` | Shorthand for `--payload '{"prompt": "..."}'` |
-| `--payload <json>` | Full JSON payload |
-| `--watch` | Wait for the job to complete and print the result |
+| Flag               | Description                                       |
+| ------------------ | ------------------------------------------------- |
+| `--prompt <text>`  | Shorthand for `--payload '{"prompt": "..."}'`     |
+| `--payload <json>` | Full JSON payload                                 |
+| `--watch`          | Wait for the job to complete and print the result |
 
 Example:
 
@@ -170,8 +170,8 @@ Get the status of a submitted job.
 together beta jig job_status --request-id <id>
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag                | Description                     |
+| ------------------- | ------------------------------- |
 | `--request-id <id>` | The job's request ID (required) |
 
 ### jig queue_status
@@ -204,10 +204,17 @@ import Together from "together-ai";
 const client = new Together();
 
 // Submit
-const job = await client.beta.jig.queue.submit({ model: "my-deployment", payload: { prompt: "Hello" }, priority: 1 });
+const job = await client.beta.jig.queue.submit({
+  model: "my-deployment",
+  payload: { prompt: "Hello" },
+  priority: 1,
+});
 
 // Poll status
-const status = await client.beta.jig.queue.retrieve({ request_id: job.requestId!, model: "my-deployment" });
+const status = await client.beta.jig.queue.retrieve({
+  request_id: job.requestId!,
+  model: "my-deployment",
+});
 ```
 
 ### cURL
@@ -253,27 +260,27 @@ curl https://api.together.ai/v1/deployment-request/my-deployment/health \
 
 ### Queue Submit Request
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `model` | string | Yes | Deployment name |
-| `payload` | object | Yes | Freeform model input (passed to predict()) |
-| `priority` | integer | No | Higher values process first (default: 0) |
-| `info` | object | No | Arbitrary metadata stored with the job |
+| Field      | Type    | Required | Description                                |
+| ---------- | ------- | -------- | ------------------------------------------ |
+| `model`    | string  | Yes      | Deployment name                            |
+| `payload`  | object  | Yes      | Freeform model input (passed to predict()) |
+| `priority` | integer | No       | Higher values process first (default: 0)   |
+| `info`     | object  | No       | Arbitrary metadata stored with the job     |
 
 ### Queue Status Response
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `request_id` | string | Job identifier |
-| `model` | string | Deployment name |
-| `status` | string | `pending`, `running`, `done`, `failed`, `canceled` |
-| `outputs` | object | Model output (when done) |
-| `info` | object | Job metadata (including emit_info updates) |
-| `priority` | integer | Job priority |
-| `retries` | integer | Retry count (fails after 3) |
-| `created_at` | datetime | Submission time |
-| `claimed_at` | datetime | Worker claim time |
-| `done_at` | datetime | Completion time |
+| Field        | Type     | Description                                        |
+| ------------ | -------- | -------------------------------------------------- |
+| `request_id` | string   | Job identifier                                     |
+| `model`      | string   | Deployment name                                    |
+| `status`     | string   | `pending`, `running`, `done`, `failed`, `canceled` |
+| `outputs`    | object   | Model output (when done)                           |
+| `info`       | object   | Job metadata (including emit_info updates)         |
+| `priority`   | integer  | Job priority                                       |
+| `retries`    | integer  | Retry count (fails after 3)                        |
+| `created_at` | datetime | Submission time                                    |
+| `claimed_at` | datetime | Worker claim time                                  |
+| `done_at`    | datetime | Completion time                                    |
 
 ## Secrets Commands
 
@@ -285,10 +292,10 @@ Secrets are encrypted environment variables injected at runtime.
 together beta jig secrets set --name <name> --value <value> [flags]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--name <name>` | Secret name (required) |
-| `--value <value>` | Secret value (required) |
+| Flag                   | Description                |
+| ---------------------- | -------------------------- |
+| `--name <name>`        | Secret name (required)     |
+| `--value <value>`      | Secret value (required)    |
 | `--description <text>` | Human-readable description |
 
 Example:
@@ -325,9 +332,9 @@ Create a volume and upload files.
 together beta jig volumes create --name <name> --source <path>
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--name <name>` | Volume name (required) |
+| Flag              | Description                          |
+| ----------------- | ------------------------------------ |
+| `--name <name>`   | Volume name (required)               |
 | `--source <path>` | Local directory to upload (required) |
 
 Example:
@@ -388,15 +395,15 @@ This is useful for managing multiple environments (e.g., `staging_jig.toml`, `pr
 
 ### `[tool.jig.image]` -- Build Settings
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `python_version` | string | `"3.11"` | Python version for the container base image |
-| `system_packages` | string[] | `[]` | APT packages to install (e.g., `ffmpeg`, `git`, `libgl1`) |
-| `environment` | object | `{}` | Build-time + runtime env vars (set as `ENV` directives) |
-| `run` | string[] | `[]` | Extra shell commands during build (each becomes a `RUN` instruction). See [CUDA PyTorch note](#cuda-pytorch) |
-| `cmd` | string | `"python app.py"` | Container startup command (Docker `CMD`). Include `--queue` for Sprocket |
-| `copy` | string[] | `[]` | Files and directories to include in container |
-| `auto_include_git` | bool | `false` | Auto-include git-tracked files (requires clean repo) |
+| Key                | Type     | Default           | Description                                                                                                  |
+| ------------------ | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `python_version`   | string   | `"3.11"`          | Python version for the container base image                                                                  |
+| `system_packages`  | string[] | `[]`              | APT packages to install (e.g., `ffmpeg`, `git`, `libgl1`)                                                    |
+| `environment`      | object   | `{}`              | Build-time + runtime env vars (set as `ENV` directives)                                                      |
+| `run`              | string[] | `[]`              | Extra shell commands during build (each becomes a `RUN` instruction). See [CUDA PyTorch note](#cuda-pytorch) |
+| `cmd`              | string   | `"python app.py"` | Container startup command (Docker `CMD`). Include `--queue` for Sprocket                                     |
+| `copy`             | string[] | `[]`              | Files and directories to include in container                                                                |
+| `auto_include_git` | bool     | `false`           | Auto-include git-tracked files (requires clean repo)                                                         |
 
 ### CUDA PyTorch
 
@@ -423,20 +430,20 @@ model = load_model(device=device)
 
 ### `[tool.jig.deploy]` -- Runtime Settings
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `description` | string | `""` | Human-readable description |
-| `gpu_type` | string | `"h100-80gb"` | `"h100-80gb"` or `"none"` (CPU-only) |
-| `gpu_count` | int | `1` | GPUs per replica |
-| `cpu` | float | `1.0` | CPU cores per replica (supports fractional, e.g. `0.1`) |
-| `memory` | float | `8.0` | Memory in GB (supports fractional, e.g. `0.5`) |
-| `storage` | int | `100` | Ephemeral disk in GB |
-| `min_replicas` | int | `1` | Min replicas (0 for scale-to-zero) |
-| `max_replicas` | int | `1` | Max replicas |
-| `port` | int | `8000` | Container listen port |
-| `health_check_path` | string | `"/health"` | Health endpoint (must return 200 when ready) |
-| `termination_grace_period_seconds` | int | `300` | Shutdown timeout for in-flight jobs |
-| `command` | string[] | `null` | Override startup command at deploy time (e.g., `["python", "app.py", "--queue"]`) |
+| Key                                | Type     | Default       | Description                                                                       |
+| ---------------------------------- | -------- | ------------- | --------------------------------------------------------------------------------- |
+| `description`                      | string   | `""`          | Human-readable description                                                        |
+| `gpu_type`                         | string   | `"h100-80gb"` | `"h100-80gb"` or `"none"` (CPU-only)                                              |
+| `gpu_count`                        | int      | `1`           | GPUs per replica                                                                  |
+| `cpu`                              | float    | `1.0`         | CPU cores per replica (supports fractional, e.g. `0.1`)                           |
+| `memory`                           | float    | `8.0`         | Memory in GB (supports fractional, e.g. `0.5`)                                    |
+| `storage`                          | int      | `100`         | Ephemeral disk in GB                                                              |
+| `min_replicas`                     | int      | `1`           | Min replicas (0 for scale-to-zero)                                                |
+| `max_replicas`                     | int      | `1`           | Max replicas                                                                      |
+| `port`                             | int      | `8000`        | Container listen port                                                             |
+| `health_check_path`                | string   | `"/health"`   | Health endpoint (must return 200 when ready)                                      |
+| `termination_grace_period_seconds` | int      | `300`         | Shutdown timeout for in-flight jobs                                               |
+| `command`                          | string[] | `null`        | Override startup command at deploy time (e.g., `["python", "app.py", "--queue"]`) |
 
 ### `[tool.jig.deploy.environment_variables]`
 

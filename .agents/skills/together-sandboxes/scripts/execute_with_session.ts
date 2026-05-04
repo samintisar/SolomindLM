@@ -21,7 +21,7 @@ async function executeCode(
   code: string,
   sessionId?: string,
   files?: { name: string; encoding: string; content: string }[]
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ sessionId: string | null; outputs: any[] }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params: any = { code, language: "python" };
@@ -43,8 +43,7 @@ async function executeCode(
     } else if (output.type === "error") {
       console.log(`  [error] ${output.data}`);
     } else if (output.type === "display_data" || output.type === "execute_result") {
-      const keys =
-        typeof output.data === "object" ? Object.keys(output.data) : [];
+      const keys = typeof output.data === "object" ? Object.keys(output.data) : [];
       console.log(`  [${output.type}] ${JSON.stringify(keys)}`);
     }
     outputs.push({ type: output.type, data: output.data });
@@ -65,9 +64,7 @@ async function listSessions() {
 async function main() {
   // --- Example 1: Single execution ---
   console.log("=== Single execution ===");
-  const result = await executeCode(
-    'print("Hello from Together Code Interpreter!")'
-  );
+  const result = await executeCode('print("Hello from Together Code Interpreter!")');
   const sessionId = result.sessionId!;
   console.log(`Session ID: ${sessionId}\n`);
 

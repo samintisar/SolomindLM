@@ -21,7 +21,7 @@ Introduce a first-run onboarding flow that orients new users to the four pillars
 
 A combination of two complementary surfaces:
 
-1. **Guided product tour** — auto-launches once on first sign-in. Five action-gated tooltip steps that walk the user from creating a notebook to generating their first Studio artifact. Each step advances when the user *does* the action (not when they click Next). Skippable.
+1. **Guided product tour** — auto-launches once on first sign-in. Five action-gated tooltip steps that walk the user from creating a notebook to generating their first Studio artifact. Each step advances when the user _does_ the action (not when they click Next). Skippable.
 2. **Persistent checklist** — bottom-right card with the same five items. Ticks derive from real data, not from tour progress, so it's honest even if the user took the tour but actions didn't persist. Dismissible. Auto-hides when all five complete.
 
 Tour completion ≠ checklist completion. The tour is ephemeral guidance; the checklist is the durable signal.
@@ -70,7 +70,7 @@ The tour and checklist read different shapes from the same backend.
 
 **Checklist** subscribes to `getChecklistProgress` — five booleans derived from app-wide row counts for the user (any notebook counts). This is the durable, honest "have you ever done this" view.
 
-**Tour** subscribes to `getTourProgress` — five booleans gated against a single tracked notebook (`userOnboarding.tourNotebookId`). Steps 2, 3, and 5 (`addSource`, `askQuestion`, `generateArtifact`) check counts *for that notebook only*. This prevents a bug where a user creates a second notebook, adds a source there, and the tour wrongly advances past `addSource` for the original tour notebook.
+**Tour** subscribes to `getTourProgress` — five booleans gated against a single tracked notebook (`userOnboarding.tourNotebookId`). Steps 2, 3, and 5 (`addSource`, `askQuestion`, `generateArtifact`) check counts _for that notebook only_. This prevents a bug where a user creates a second notebook, adds a source there, and the tour wrongly advances past `addSource` for the original tour notebook.
 
 When the boolean for `currentStepId` flips to `true` in `getTourProgress`, the provider calls `advanceTourStep` (which validates `expectedCurrentStepId` server-side) to move to the next step. The same shape includes a `tourNotebookId` field so the provider can navigate without a separate query.
 
@@ -133,17 +133,17 @@ Booleans like `hasCreatedNotebook` are inferable from existing tables (`notebook
 
 ### Convex functions (`convex/onboarding/index.ts`)
 
-| Name | Type | Purpose |
-|---|---|---|
-| `getOnboardingState` | query | Returns the user's row or the contextual default (see Bootstrap) |
-| `getChecklistProgress` | query | Returns five booleans derived from app-wide row counts for the calling user (any notebook) |
-| `getTourProgress` | query | Returns `{ tourNotebookId, createNotebook, addSource, askQuestion, openStudio, generateArtifact }` where steps 2/3/5 are scoped to `tourNotebookId` only. `openStudio` is always `false` server-side; the provider overlays its in-memory open state. |
-| `startTour` | mutation | Upserts row to `tourStatus: "active"`, `currentStepId: "createNotebook"`, `startedAt: Date.now()` only when current status is `pending`. No-op if existing status is `active`, `completed`, or `skipped`. Reopening a `completed`/`skipped` flow is exclusively the responsibility of `restartTour`. |
-| `advanceTourStep` | mutation | Args: `expectedCurrentStepId`, optional `tourNotebookId` (passed when advancing from `createNotebook`). Rejects if `expectedCurrentStepId` mismatch. Advances to next step or sets `completed` if last |
-| `skipTour` | mutation | Sets `tourStatus: "skipped"`, leaves `checklistDismissed` and `tourNotebookId` alone |
-| `completeTour` | mutation | Sets `tourStatus: "completed"`, `completedAt`. Called by the client when all checklist items true (see Edge cases for why client-driven) |
-| `dismissChecklist` | mutation | Sets `checklistDismissed: true` |
-| `restartTour` | mutation | Sets `tourStatus: "active"`, `currentStepId: "createNotebook"`, clears `tourNotebookId`, sets new `startedAt`. Deterministic — no `pending` round-trip. Triggered from avatar dropdown |
+| Name                   | Type     | Purpose                                                                                                                                                                                                                                                                                              |
+| ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getOnboardingState`   | query    | Returns the user's row or the contextual default (see Bootstrap)                                                                                                                                                                                                                                     |
+| `getChecklistProgress` | query    | Returns five booleans derived from app-wide row counts for the calling user (any notebook)                                                                                                                                                                                                           |
+| `getTourProgress`      | query    | Returns `{ tourNotebookId, createNotebook, addSource, askQuestion, openStudio, generateArtifact }` where steps 2/3/5 are scoped to `tourNotebookId` only. `openStudio` is always `false` server-side; the provider overlays its in-memory open state.                                                |
+| `startTour`            | mutation | Upserts row to `tourStatus: "active"`, `currentStepId: "createNotebook"`, `startedAt: Date.now()` only when current status is `pending`. No-op if existing status is `active`, `completed`, or `skipped`. Reopening a `completed`/`skipped` flow is exclusively the responsibility of `restartTour`. |
+| `advanceTourStep`      | mutation | Args: `expectedCurrentStepId`, optional `tourNotebookId` (passed when advancing from `createNotebook`). Rejects if `expectedCurrentStepId` mismatch. Advances to next step or sets `completed` if last                                                                                               |
+| `skipTour`             | mutation | Sets `tourStatus: "skipped"`, leaves `checklistDismissed` and `tourNotebookId` alone                                                                                                                                                                                                                 |
+| `completeTour`         | mutation | Sets `tourStatus: "completed"`, `completedAt`. Called by the client when all checklist items true (see Edge cases for why client-driven)                                                                                                                                                             |
+| `dismissChecklist`     | mutation | Sets `checklistDismissed: true`                                                                                                                                                                                                                                                                      |
+| `restartTour`          | mutation | Sets `tourStatus: "active"`, `currentStepId: "createNotebook"`, clears `tourNotebookId`, sets new `startedAt`. Deterministic — no `pending` round-trip. Triggered from avatar dropdown                                                                                                               |
 
 All mutations require an authenticated user. `getChecklistProgress` filters all counts by the calling user's `userId`.
 
@@ -153,13 +153,13 @@ All mutations require an authenticated user. `getChecklistProgress` filters all 
 
 All "for this notebook" gates below are scoped to `userOnboarding.tourNotebookId`, not global counts.
 
-| id | route | target selector | copy | advance gate |
-|---|---|---|---|---|
-| `createNotebook` | `/home` | `[data-onboarding="create-notebook-button"]` | "Notebooks are where your sources, chats, and study tools live. Create your first one." | latest-created notebook for the user appears since tour started → call `advanceTourStep({ expectedCurrentStepId: "createNotebook", tourNotebookId: <newId> })` → server stores `tourNotebookId` → provider auto-navigates to `/notebook/:tourNotebookId` |
-| `addSource` | `/notebook/:tourNotebookId` | `[data-onboarding="add-source-button"]` | "Add a PDF, URL, YouTube link, or pasted text. This is the knowledge your AI will work from." | `documents` where `notebookId === tourNotebookId` `.length >= 1` |
-| `askQuestion` | `/notebook/:tourNotebookId` | `[data-onboarding="chat-input"]` | "Ask anything about your sources. Answers come with citations." | `messages` where `notebookId === tourNotebookId` `.length >= 1` |
-| `openStudio` | `/notebook/:tourNotebookId` | `[data-onboarding="studio-panel-toggle"]` | "Studio turns your sources into reports, flashcards, quizzes, mind maps, audio, and more." | `OnboardingProvider` reads StudioPanel's open state via context (lifted from `StudioPanel`) — survives reload because open state is reconstructed from existing UI state on mount, not from a one-shot emitter |
-| `generateArtifact` | `/notebook/:tourNotebookId` | `[data-onboarding="studio-tool-grid"]` | "Pick any tool and generate your first artifact. We recommend a Report or Flashcards to start." | any of `reports`, `flashcards`, `quizzes`, `mindmaps`, `audioOverviews`, `slides`, `spreadsheets`, `writtenQuestions` where `notebookId === tourNotebookId` `.length >= 1` |
+| id                 | route                       | target selector                              | copy                                                                                            | advance gate                                                                                                                                                                                                                                             |
+| ------------------ | --------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createNotebook`   | `/home`                     | `[data-onboarding="create-notebook-button"]` | "Notebooks are where your sources, chats, and study tools live. Create your first one."         | latest-created notebook for the user appears since tour started → call `advanceTourStep({ expectedCurrentStepId: "createNotebook", tourNotebookId: <newId> })` → server stores `tourNotebookId` → provider auto-navigates to `/notebook/:tourNotebookId` |
+| `addSource`        | `/notebook/:tourNotebookId` | `[data-onboarding="add-source-button"]`      | "Add a PDF, URL, YouTube link, or pasted text. This is the knowledge your AI will work from."   | `documents` where `notebookId === tourNotebookId` `.length >= 1`                                                                                                                                                                                         |
+| `askQuestion`      | `/notebook/:tourNotebookId` | `[data-onboarding="chat-input"]`             | "Ask anything about your sources. Answers come with citations."                                 | `messages` where `notebookId === tourNotebookId` `.length >= 1`                                                                                                                                                                                          |
+| `openStudio`       | `/notebook/:tourNotebookId` | `[data-onboarding="studio-panel-toggle"]`    | "Studio turns your sources into reports, flashcards, quizzes, mind maps, audio, and more."      | `OnboardingProvider` reads StudioPanel's open state via context (lifted from `StudioPanel`) — survives reload because open state is reconstructed from existing UI state on mount, not from a one-shot emitter                                           |
+| `generateArtifact` | `/notebook/:tourNotebookId` | `[data-onboarding="studio-tool-grid"]`       | "Pick any tool and generate your first artifact. We recommend a Report or Flashcards to start." | any of `reports`, `flashcards`, `quizzes`, `mindmaps`, `audioOverviews`, `slides`, `spreadsheets`, `writtenQuestions` where `notebookId === tourNotebookId` `.length >= 1`                                                                               |
 
 ### Tooltip rendering
 
@@ -218,16 +218,16 @@ Tour disabled when `isNativeShell()` is true (tooltip positioning is fragile). C
 
 ## Edge cases
 
-| Case | Handling |
-|---|---|
-| User signs out mid-tour | State is server-side; resumes at `currentStepId` on next login |
-| User deletes `tourNotebookId` mid-tour | Provider detects `notebooks.find(n => n.id === tourNotebookId)` is undefined → calls `restartTour` → user re-enters at step 1. Their checklist progress (global) is unaffected if they had created sources/messages in other notebooks. |
-| Legacy user with zero notebooks | Backfill assigned `tourStatus: "completed"`. They never see the tour. They can opt in via "Restart tour" in the avatar dropdown. |
-| User on mobile / native shell | Tour disabled; checklist still shows |
-| User deletes `data-onboarding` attribute via DevTools | Tooltip hides silently per missing-target rule; advances when underlying action completes |
-| Two tabs open | Convex queries are reactive; second tab updates naturally. The dev-only duplicate-selector invariant still passes because each tab queries its own DOM. |
-| Studio Panel target hidden behind closed panel | `openStudio` step exists specifically to open it; no earlier step targets anything inside Studio |
-| Stale client calls `advanceTourStep` with wrong `expectedCurrentStepId` | Mutation rejects; client re-syncs from query |
+| Case                                                                          | Handling                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User signs out mid-tour                                                       | State is server-side; resumes at `currentStepId` on next login                                                                                                                                                                                                                                                                                                                              |
+| User deletes `tourNotebookId` mid-tour                                        | Provider detects `notebooks.find(n => n.id === tourNotebookId)` is undefined → calls `restartTour` → user re-enters at step 1. Their checklist progress (global) is unaffected if they had created sources/messages in other notebooks.                                                                                                                                                     |
+| Legacy user with zero notebooks                                               | Backfill assigned `tourStatus: "completed"`. They never see the tour. They can opt in via "Restart tour" in the avatar dropdown.                                                                                                                                                                                                                                                            |
+| User on mobile / native shell                                                 | Tour disabled; checklist still shows                                                                                                                                                                                                                                                                                                                                                        |
+| User deletes `data-onboarding` attribute via DevTools                         | Tooltip hides silently per missing-target rule; advances when underlying action completes                                                                                                                                                                                                                                                                                                   |
+| Two tabs open                                                                 | Convex queries are reactive; second tab updates naturally. The dev-only duplicate-selector invariant still passes because each tab queries its own DOM.                                                                                                                                                                                                                                     |
+| Studio Panel target hidden behind closed panel                                | `openStudio` step exists specifically to open it; no earlier step targets anything inside Studio                                                                                                                                                                                                                                                                                            |
+| Stale client calls `advanceTourStep` with wrong `expectedCurrentStepId`       | Mutation rejects; client re-syncs from query                                                                                                                                                                                                                                                                                                                                                |
 | All five checklist items become true (e.g. user already had data from before) | Client (in `OnboardingProvider`) detects all-true and calls `completeTour`. Note: this is client-driven, not a server-side trigger — Convex doesn't run code on row inserts to other tables. The trade-off is that a user who never opens the app after their data hits 5/5 won't have `tourStatus` flipped to `completed`. Acceptable; checklist hides via the visibility rule regardless. |
 
 ## File touch list
@@ -268,23 +268,23 @@ Repo has no formal test runner configured yet, but `apps/web/src/features/studio
 
 ### Backend (`convex/onboarding/index.test.ts`)
 
-| Test | Asserts |
-|---|---|
-| `getOnboardingState` contextual default — fresh user | No row + `users._creationTime > now - FRESH_USER_WINDOW_MS` → returns `{ tourStatus: "pending", checklistDismissed: false }` |
-| `getOnboardingState` contextual default — legacy user | No row + old `_creationTime` → returns `{ tourStatus: "completed", checklistDismissed: true }` |
-| `startTour` happy path | Sets `pending → active`, `currentStepId: "createNotebook"`, sets `startedAt` |
-| `startTour` only acts on `pending` | No-op when status is `active`, `completed`, or `skipped` (reopening flows is `restartTour`'s job) |
-| `advanceTourStep` linear walk | Walks all five steps; final advance sets `completed` and `completedAt` |
-| `advanceTourStep` stale-client rejection | Throws when `expectedCurrentStepId` doesn't match server state |
-| `skipTour` | Sets `tourStatus: "skipped"`, leaves `checklistDismissed` unchanged |
-| `dismissChecklist` independence | Sets only `checklistDismissed: true`; tour status unaffected |
-| `getChecklistProgress` derivation | Insert notebook → `createNotebook: true`. Insert document → `addSource: true`. Etc. |
-| `getChecklistProgress` auth scope | User A's data does not tick User B's checklist |
-| `getTourProgress` is notebook-scoped | Document inserted into a notebook other than `tourNotebookId` does not flip `addSource`. Same for messages and Studio artifacts. |
-| `getTourProgress` returns `tourNotebookId` | Provider can navigate without a separate query |
-| `restartTour` is deterministic | Sets `active` directly with `currentStepId: "createNotebook"`; no `pending` round-trip; clears `tourNotebookId` |
-| Backfill migration | After running, all existing users have a row with `tourStatus: "completed"`, `checklistDismissed: true` |
-| All mutations require auth | Unauthenticated calls throw |
+| Test                                                  | Asserts                                                                                                                          |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `getOnboardingState` contextual default — fresh user  | No row + `users._creationTime > now - FRESH_USER_WINDOW_MS` → returns `{ tourStatus: "pending", checklistDismissed: false }`     |
+| `getOnboardingState` contextual default — legacy user | No row + old `_creationTime` → returns `{ tourStatus: "completed", checklistDismissed: true }`                                   |
+| `startTour` happy path                                | Sets `pending → active`, `currentStepId: "createNotebook"`, sets `startedAt`                                                     |
+| `startTour` only acts on `pending`                    | No-op when status is `active`, `completed`, or `skipped` (reopening flows is `restartTour`'s job)                                |
+| `advanceTourStep` linear walk                         | Walks all five steps; final advance sets `completed` and `completedAt`                                                           |
+| `advanceTourStep` stale-client rejection              | Throws when `expectedCurrentStepId` doesn't match server state                                                                   |
+| `skipTour`                                            | Sets `tourStatus: "skipped"`, leaves `checklistDismissed` unchanged                                                              |
+| `dismissChecklist` independence                       | Sets only `checklistDismissed: true`; tour status unaffected                                                                     |
+| `getChecklistProgress` derivation                     | Insert notebook → `createNotebook: true`. Insert document → `addSource: true`. Etc.                                              |
+| `getChecklistProgress` auth scope                     | User A's data does not tick User B's checklist                                                                                   |
+| `getTourProgress` is notebook-scoped                  | Document inserted into a notebook other than `tourNotebookId` does not flip `addSource`. Same for messages and Studio artifacts. |
+| `getTourProgress` returns `tourNotebookId`            | Provider can navigate without a separate query                                                                                   |
+| `restartTour` is deterministic                        | Sets `active` directly with `currentStepId: "createNotebook"`; no `pending` round-trip; clears `tourNotebookId`                  |
+| Backfill migration                                    | After running, all existing users have a row with `tourStatus: "completed"`, `checklistDismissed: true`                          |
+| All mutations require auth                            | Unauthenticated calls throw                                                                                                      |
 
 ### Frontend unit (Vitest + RTL)
 

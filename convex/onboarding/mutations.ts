@@ -8,7 +8,7 @@ const stepIdValidator = v.union(
   v.literal("createNotebook"),
   v.literal("addSource"),
   v.literal("askQuestion"),
-  v.literal("generateArtifact"),
+  v.literal("generateArtifact")
 );
 
 /**
@@ -53,7 +53,7 @@ export const advanceTourStep = mutation({
     if (row.tourStatus !== "active") return null;
     if (row.currentStepId !== args.expectedCurrentStepId) {
       throw new Error(
-        `Step mismatch: expected ${args.expectedCurrentStepId}, got ${row.currentStepId ?? "undefined"}`,
+        `Step mismatch: expected ${args.expectedCurrentStepId}, got ${row.currentStepId ?? "undefined"}`
       );
     }
     const next = nextStepId(args.expectedCurrentStepId);

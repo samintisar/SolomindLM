@@ -20,7 +20,9 @@ describe("mapDatabaseNoteToNote", () => {
     expect(result.id).toBe("note123");
     expect(result.title).toBe("Test Note");
     expect((result as { content: string }).content).toBe("Report content here");
-    expect((result as { metadata: { reportType: string } }).metadata.reportType).toBe("study_guide");
+    expect((result as { metadata: { reportType: string } }).metadata.reportType).toBe(
+      "study_guide"
+    );
     expect(result.preview).toBeTruthy();
   });
 
@@ -179,9 +181,9 @@ describe("mapDatabaseNoteToNote", () => {
   });
 
   it("throws for unknown _type", () => {
-    expect(() =>
-      mapDatabaseNoteToNote({ ...baseNote, _type: "unknownType" })
-    ).toThrow("Unknown note type: unknownType");
+    expect(() => mapDatabaseNoteToNote({ ...baseNote, _type: "unknownType" })).toThrow(
+      "Unknown note type: unknownType"
+    );
   });
 
   it("defaults reportType to custom when missing", () => {

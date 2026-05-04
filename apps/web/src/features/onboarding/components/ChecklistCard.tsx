@@ -15,12 +15,7 @@ const ITEM_LABELS: Record<string, string> = {
   generateArtifact: "Generate your first artifact",
 };
 
-const ORDER = [
-  "createNotebook",
-  "addSource",
-  "askQuestion",
-  "generateArtifact",
-] as const;
+const ORDER = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 
 function logOnboardingError(action: string, error: unknown) {
   console.error(`[onboarding] ${action}`, error);

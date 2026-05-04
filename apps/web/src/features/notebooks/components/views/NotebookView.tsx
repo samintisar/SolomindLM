@@ -44,6 +44,7 @@ export function NotebookView() {
     title: string;
     transcript?: string;
     audioOverviewId?: string;
+    noteId?: string;
   } | null>(null);
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
@@ -70,7 +71,7 @@ export function NotebookView() {
       noteId?: string,
       audioOverviewId?: string
     ) => {
-      setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
+      setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId, noteId });
       setMiniPlayerVisible(true);
       if (noteId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,7 +106,13 @@ export function NotebookView() {
       onCloseMiniPlayer: handleCloseMiniPlayer,
       onExpandAudioPlayer: handleExpandAudioPlayer,
     }),
-    [miniPlayerVisible, miniPlayerData, handlePlayAudio, handleCloseMiniPlayer, handleExpandAudioPlayer]
+    [
+      miniPlayerVisible,
+      miniPlayerData,
+      handlePlayAudio,
+      handleCloseMiniPlayer,
+      handleExpandAudioPlayer,
+    ]
   );
 
   return (

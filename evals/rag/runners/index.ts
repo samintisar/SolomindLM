@@ -79,10 +79,7 @@ export async function runEval(
   }
   if (isStudioRunner(runner)) {
     results.push(
-      await runStudioEval(
-        { ...runnerOpts, kind: runner },
-        options?.studioInvokers?.[runner]
-      )
+      await runStudioEval({ ...runnerOpts, kind: runner }, options?.studioInvokers?.[runner])
     );
   }
 

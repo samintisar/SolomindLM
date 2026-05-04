@@ -194,8 +194,18 @@ describe("aggregateRetrievalSources", () => {
 
   it("uses title fallback when documentId missing", () => {
     const refs = [
-      { text: "t1", score: 0.9, sourceTitle: "My Source", documentId: "" } as unknown as ReferenceChunk,
-      { text: "t2", score: 0.8, sourceTitle: "My Source", documentId: "" } as unknown as ReferenceChunk,
+      {
+        text: "t1",
+        score: 0.9,
+        sourceTitle: "My Source",
+        documentId: "",
+      } as unknown as ReferenceChunk,
+      {
+        text: "t2",
+        score: 0.8,
+        sourceTitle: "My Source",
+        documentId: "",
+      } as unknown as ReferenceChunk,
     ];
     const result = aggregateRetrievalSources(refs);
     expect(result).toHaveLength(1);
@@ -216,7 +226,11 @@ describe("aggregateRetrievalSources", () => {
 
   it("uses sourceUrl for openUrl", () => {
     const refs = [
-      makeRef({ documentId: "d1", sourceTitle: "Article", sourceUrl: "https://example.com/article" }),
+      makeRef({
+        documentId: "d1",
+        sourceTitle: "Article",
+        sourceUrl: "https://example.com/article",
+      }),
     ];
     const result = aggregateRetrievalSources(refs);
     expect(result[0].openUrl).toBe("https://example.com/article");

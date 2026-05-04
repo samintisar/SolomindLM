@@ -63,10 +63,7 @@ const tools: ChatCompletionTool[] = [
 ];
 
 // --- 2. Implement your functions ---
-function getWeather(args: {
-  location: string;
-  unit?: string;
-}): Record<string, unknown> {
+function getWeather(args: { location: string; unit?: string }): Record<string, unknown> {
   // Replace with real API call
   return {
     location: args.location,

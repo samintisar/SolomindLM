@@ -89,7 +89,7 @@ function renderWith(authenticated = true, route = "/home") {
       <OnboardingProvider isAuthenticated={authenticated}>
         <ProbeStep />
       </OnboardingProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
@@ -153,7 +153,7 @@ describe("OnboardingProvider", () => {
         <OnboardingProvider isAuthenticated={true}>
           <ProbeStep />
         </OnboardingProvider>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     await flushEffects();
     expect(mockMutations.startTour).toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe("OnboardingProvider", () => {
         <OnboardingProvider isAuthenticated={true}>
           <ProbeStep />
         </OnboardingProvider>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     await flushEffects();
     expect(mockMutations.advanceTourStep).toHaveBeenCalledWith({
@@ -213,14 +213,14 @@ describe("OnboardingProvider", () => {
       tourNotebookId: "nb1",
     };
     mockMutations.advanceTourStep.mockRejectedValueOnce(
-      new Error("Step mismatch: expected createNotebook, got addSource"),
+      new Error("Step mismatch: expected createNotebook, got addSource")
     );
 
     renderWith();
     await flushEffects();
     expect(consoleErrorSpy).not.toHaveBeenCalledWith(
       "[onboarding] failed to advance tour step",
-      expect.anything(),
+      expect.anything()
     );
   });
 
@@ -242,7 +242,7 @@ describe("OnboardingProvider", () => {
     await flushEffects();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "[onboarding] failed to advance tour step",
-      failure,
+      failure
     );
   });
 

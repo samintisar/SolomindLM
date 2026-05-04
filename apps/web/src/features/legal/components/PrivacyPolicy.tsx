@@ -55,8 +55,8 @@ export const PrivacyPolicy: React.FC = () => {
             </li>
             <li>
               Chat messages, notes, and generated artifacts stored in your workspace (for example
-              reports, flashcards, quizzes, mind maps, infographics, spreadsheets, audio, and similar
-              outputs).
+              reports, flashcards, quizzes, mind maps, infographics, spreadsheets, audio, and
+              similar outputs).
             </li>
             <li>
               Notebook organization data (folders, titles, sharing or collaboration settings where

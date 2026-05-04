@@ -14,10 +14,7 @@ interface ProviderOptions {
  * By default, wraps with both ToastProvider and ThemeProvider.
  * Pass `{ withToast: false }` or `{ withTheme: false }` to opt out.
  */
-export function renderWithProviders(
-  ui: ReactNode,
-  options?: RenderOptions & ProviderOptions
-) {
+export function renderWithProviders(ui: ReactNode, options?: RenderOptions & ProviderOptions) {
   const { withToast = true, withTheme = true, ...renderOptions } = options ?? {};
 
   let wrapped = ui;

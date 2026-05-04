@@ -7,7 +7,11 @@ import { CACHE_TTL, withJitter } from "../cache/cache";
 import { internal } from "../../_generated/api";
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { createExternalServiceErrorFromResponse, ExternalServiceError, isRetryableHttpStatus } from "../../_lib/errors";
+import {
+  createExternalServiceErrorFromResponse,
+  ExternalServiceError,
+  isRetryableHttpStatus,
+} from "../../_lib/errors";
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 
 /**
@@ -66,7 +70,10 @@ export function extractAllTags(xml: string, tag: string): string[] {
 }
 
 export function stripXmlTags(text: string): string {
-  return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function extractAttribute(xmlFragment: string, attr: string): string | undefined {
@@ -94,19 +101,23 @@ export function delay(ms: number): Promise<void> {
 }
 
 export function normalizeTitle(title: string): string {
-  return title.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+  return title
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function calculateScore(paper: Omit<AcademicPaper, "score">): number {
   // Normalize citation score: sigmoid-like scaling so low-citation papers don't get crushed
   const rawCitations = paper.citationCount ?? 0;
   const citationScore = rawCitations > 0 ? Math.min(Math.log10(rawCitations + 1) / 3, 1) : 0.3;
-  
+
   const currentYear = new Date().getFullYear();
   const age = paper.year ? Math.max(0, currentYear - paper.year) : 5;
   // Recency: 1.0 for current year, decaying to 0.5 at 10 years
   const recencyScore = Math.max(0.5, 1 - age * 0.05);
-  
+
   return citationScore * 0.5 + recencyScore * 0.5;
 }
 
@@ -157,101 +168,98 @@ async function searchArxiv(
   const logger = createServiceLogger("academic_search", "searchArxiv");
   const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${maxResults}&sortBy=relevance&sortOrder=descending`;
 
-  return invokeWithHttpRetry(
-    async () => {
-      const t0 = Date.now();
-      logger.apiCall("arxiv", "/api/query", { query: query.substring(0, 50) });
+  return invokeWithHttpRetry(async () => {
+    const t0 = Date.now();
+    logger.apiCall("arxiv", "/api/query", { query: query.substring(0, 50) });
 
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
-        },
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.apiError("arxiv", "/api/query", new Error(`HTTP ${response.status}`), {
+        status: response.status,
       });
+      throw createExternalServiceErrorFromResponse(
+        "arxiv",
+        response.status,
+        "/api/query",
+        errorText.slice(0, 500)
+      );
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.apiError("arxiv", "/api/query", new Error(`HTTP ${response.status}`), {
-          status: response.status,
-        });
-        throw createExternalServiceErrorFromResponse(
-          "arxiv",
-          response.status,
-          "/api/query",
-          errorText.slice(0, 500)
-        );
+    const xml = await response.text();
+    logger.apiSuccess("arxiv", "/api/query", Date.now() - t0, { maxResults });
+
+    const entries = extractXmlBlocks(xml, "entry");
+    const papers: AcademicPaper[] = [];
+
+    for (const entry of entries) {
+      const title = stripXmlTags(extractTag(entry, "title") || "Untitled");
+      const summary = stripXmlTags(extractTag(entry, "summary") || "");
+      const published = extractTag(entry, "published");
+      let year = published ? parseInt(published.substring(0, 4), 10) : undefined;
+      if (year !== undefined && isNaN(year)) {
+        year = undefined;
       }
 
-      const xml = await response.text();
-      logger.apiSuccess("arxiv", "/api/query", Date.now() - t0, { maxResults });
+      // Extract authors from <author><name>...</name></author>
+      const authorNames = extractAllTags(entry, "name");
 
-      const entries = extractXmlBlocks(xml, "entry");
-      const papers: AcademicPaper[] = [];
+      // Extract links: prefer rel="alternate" for HTML, look for PDF
+      let articleUrl = "";
+      let pdfUrl: string | undefined;
 
-      for (const entry of entries) {
-        const title = stripXmlTags(extractTag(entry, "title") || "Untitled");
-        const summary = stripXmlTags(extractTag(entry, "summary") || "");
-        const published = extractTag(entry, "published");
-        let year = published ? parseInt(published.substring(0, 4), 10) : undefined;
-        if (year !== undefined && isNaN(year)) {
-          year = undefined;
-        }
+      const linkRegex = /<link\s+([^>]+)\/>/gi;
+      let linkMatch;
+      while ((linkMatch = linkRegex.exec(entry)) !== null) {
+        const attrs = linkMatch[1];
+        const href = extractAttribute(attrs, "href");
+        const rel = extractAttribute(attrs, "rel");
+        const type = extractAttribute(attrs, "type");
+        const linkTitle = extractAttribute(attrs, "title");
 
-        // Extract authors from <author><name>...</name></author>
-        const authorNames = extractAllTags(entry, "name");
-
-        // Extract links: prefer rel="alternate" for HTML, look for PDF
-        let articleUrl = "";
-        let pdfUrl: string | undefined;
-
-        const linkRegex = /<link\s+([^>]+)\/>/gi;
-        let linkMatch;
-        while ((linkMatch = linkRegex.exec(entry)) !== null) {
-          const attrs = linkMatch[1];
-          const href = extractAttribute(attrs, "href");
-          const rel = extractAttribute(attrs, "rel");
-          const type = extractAttribute(attrs, "type");
-          const linkTitle = extractAttribute(attrs, "title");
-
-          if (href) {
-            if (rel === "alternate" && !articleUrl) {
-              articleUrl = href;
-            }
-            if ((type === "application/pdf" || linkTitle === "pdf") && !pdfUrl) {
-              pdfUrl = href;
-            }
+        if (href) {
+          if (rel === "alternate" && !articleUrl) {
+            articleUrl = href;
+          }
+          if ((type === "application/pdf" || linkTitle === "pdf") && !pdfUrl) {
+            pdfUrl = href;
           }
         }
-
-        // Fallback: construct URL from arXiv ID if present
-        if (!articleUrl) {
-          const idMatch = entry.match(/<id>([^<]+)<\/id>/);
-          if (idMatch) {
-            articleUrl = idMatch[1].trim();
-          }
-        }
-
-        // arXiv entries don't have DOI or citation count in the basic API
-        const doi = extractTag(entry, "doi") || undefined;
-
-        const basePaper: Omit<AcademicPaper, "score"> = {
-          title,
-          authors: authorNames,
-          year,
-          abstract: summary,
-          url: articleUrl || `https://arxiv.org/search/?query=${encodeURIComponent(query)}`,
-          pdfUrl,
-          source: "arxiv",
-          citationCount: undefined,
-          doi,
-        };
-
-        papers.push({ ...basePaper, score: calculateScore(basePaper) });
       }
 
-      return papers;
-    },
-    "arxiv_search"
-  );
+      // Fallback: construct URL from arXiv ID if present
+      if (!articleUrl) {
+        const idMatch = entry.match(/<id>([^<]+)<\/id>/);
+        if (idMatch) {
+          articleUrl = idMatch[1].trim();
+        }
+      }
+
+      // arXiv entries don't have DOI or citation count in the basic API
+      const doi = extractTag(entry, "doi") || undefined;
+
+      const basePaper: Omit<AcademicPaper, "score"> = {
+        title,
+        authors: authorNames,
+        year,
+        abstract: summary,
+        url: articleUrl || `https://arxiv.org/search/?query=${encodeURIComponent(query)}`,
+        pdfUrl,
+        source: "arxiv",
+        citationCount: undefined,
+        doi,
+      };
+
+      papers.push({ ...basePaper, score: calculateScore(basePaper) });
+    }
+
+    return papers;
+  }, "arxiv_search");
 }
 
 // ============================================================
@@ -299,12 +307,9 @@ async function searchSemanticScholar(
         const errorText = await response.text();
         const status = response.status;
 
-        logger.apiError(
-          "semantic_scholar",
-          "/graph/v1/paper/search",
-          new Error(`HTTP ${status}`),
-          { status }
-        );
+        logger.apiError("semantic_scholar", "/graph/v1/paper/search", new Error(`HTTP ${status}`), {
+          status,
+        });
 
         // Check for Retry-After header on 429
         retryAfterMs = undefined;
@@ -421,42 +426,39 @@ async function searchPubMed(
   // Step 1: esearch to get PMC IDs
   const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${encodeURIComponent(query)}&retmax=${maxResults}&sort=relevance&retmode=json&email=${encodeURIComponent(email)}`;
 
-  const idList = await invokeWithHttpRetry(
-    async () => {
-      const t0 = Date.now();
-      logger.apiCall("pubmed", "esearch", { query: query.substring(0, 50) });
+  const idList = await invokeWithHttpRetry(async () => {
+    const t0 = Date.now();
+    logger.apiCall("pubmed", "esearch", { query: query.substring(0, 50) });
 
-      const response = await fetch(searchUrl, {
-        headers: {
-          "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
-        },
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.apiError("pubmed", "esearch", new Error(`HTTP ${response.status}`), {
+        status: response.status,
       });
+      throw createExternalServiceErrorFromResponse(
+        "pubmed",
+        response.status,
+        "esearch",
+        errorText.slice(0, 500)
+      );
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.apiError("pubmed", "esearch", new Error(`HTTP ${response.status}`), {
-          status: response.status,
-        });
-        throw createExternalServiceErrorFromResponse(
-          "pubmed",
-          response.status,
-          "esearch",
-          errorText.slice(0, 500)
-        );
-      }
+    const data = (await response.json()) as {
+      esearchresult?: { idlist?: string[] };
+    };
 
-      const data = (await response.json()) as {
-        esearchresult?: { idlist?: string[] };
-      };
+    logger.apiSuccess("pubmed", "esearch", Date.now() - t0, {
+      count: data.esearchresult?.idlist?.length ?? 0,
+    });
 
-      logger.apiSuccess("pubmed", "esearch", Date.now() - t0, {
-        count: data.esearchresult?.idlist?.length ?? 0,
-      });
-
-      return data.esearchresult?.idlist || [];
-    },
-    "pubmed_esearch"
-  );
+    return data.esearchresult?.idlist || [];
+  }, "pubmed_esearch");
 
   if (idList.length === 0) {
     return [];
@@ -466,150 +468,147 @@ async function searchPubMed(
   const ids = idList.join(",");
   const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=${ids}&retmode=xml&email=${encodeURIComponent(email)}`;
 
-  return invokeWithHttpRetry(
-    async () => {
-      const t0 = Date.now();
-      logger.apiCall("pubmed", "efetch", { idCount: idList.length });
+  return invokeWithHttpRetry(async () => {
+    const t0 = Date.now();
+    logger.apiCall("pubmed", "efetch", { idCount: idList.length });
 
-      const response = await fetch(fetchUrl, {
-        headers: {
-          "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
-        },
+    const response = await fetch(fetchUrl, {
+      headers: {
+        "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.apiError("pubmed", "efetch", new Error(`HTTP ${response.status}`), {
+        status: response.status,
       });
+      throw createExternalServiceErrorFromResponse(
+        "pubmed",
+        response.status,
+        "efetch",
+        errorText.slice(0, 500)
+      );
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.apiError("pubmed", "efetch", new Error(`HTTP ${response.status}`), {
-          status: response.status,
-        });
-        throw createExternalServiceErrorFromResponse(
-          "pubmed",
-          response.status,
-          "efetch",
-          errorText.slice(0, 500)
-        );
+    const xml = await response.text();
+    logger.apiSuccess("pubmed", "efetch", Date.now() - t0, { idCount: idList.length });
+
+    const articles = extractXmlBlocks(xml, "article");
+    const papers: AcademicPaper[] = [];
+
+    for (const article of articles) {
+      // Title from <article-title>
+      const title = stripXmlTags(extractTag(article, "article-title") || "Untitled");
+
+      // Abstract: extract all <p> inside <abstract> or just the abstract tag content
+      let abstractText: string;
+      const abstractBlocks = extractXmlBlocks(article, "abstract");
+      if (abstractBlocks.length > 0) {
+        abstractText = stripXmlTags(abstractBlocks[0]);
+      } else {
+        abstractText = stripXmlTags(extractTag(article, "abstract") || "");
       }
 
-      const xml = await response.text();
-      logger.apiSuccess("pubmed", "efetch", Date.now() - t0, { idCount: idList.length });
+      // Authors from <contrib contrib-type="author">
+      const authors: string[] = [];
+      const contribRegex = /<contrib[^>]*contrib-type=["']author["'][^>]*>([\s\S]*?)<\/contrib>/gi;
+      let contribMatch;
+      while ((contribMatch = contribRegex.exec(article)) !== null) {
+        const contribXml = contribMatch[1];
+        const surname = extractTag(contribXml, "surname");
+        const givenNames = extractTag(contribXml, "given-names");
+        const stringName = extractTag(contribXml, "string-name");
+        const collectiveName = extractTag(contribXml, "collective-name");
 
-      const articles = extractXmlBlocks(xml, "article");
-      const papers: AcademicPaper[] = [];
-
-      for (const article of articles) {
-        // Title from <article-title>
-        const title = stripXmlTags(extractTag(article, "article-title") || "Untitled");
-
-        // Abstract: extract all <p> inside <abstract> or just the abstract tag content
-        let abstractText: string;
-        const abstractBlocks = extractXmlBlocks(article, "abstract");
-        if (abstractBlocks.length > 0) {
-          abstractText = stripXmlTags(abstractBlocks[0]);
-        } else {
-          abstractText = stripXmlTags(extractTag(article, "abstract") || "");
+        if (surname && givenNames) {
+          authors.push(`${givenNames} ${surname}`);
+        } else if (stringName) {
+          authors.push(stringName);
+        } else if (collectiveName) {
+          authors.push(collectiveName);
+        } else if (surname) {
+          authors.push(surname);
         }
-
-        // Authors from <contrib contrib-type="author">
-        const authors: string[] = [];
-        const contribRegex = /<contrib[^>]*contrib-type=["']author["'][^>]*>([\s\S]*?)<\/contrib>/gi;
-        let contribMatch;
-        while ((contribMatch = contribRegex.exec(article)) !== null) {
-          const contribXml = contribMatch[1];
-          const surname = extractTag(contribXml, "surname");
-          const givenNames = extractTag(contribXml, "given-names");
-          const stringName = extractTag(contribXml, "string-name");
-          const collectiveName = extractTag(contribXml, "collective-name");
-
-          if (surname && givenNames) {
-            authors.push(`${givenNames} ${surname}`);
-          } else if (stringName) {
-            authors.push(stringName);
-          } else if (collectiveName) {
-            authors.push(collectiveName);
-          } else if (surname) {
-            authors.push(surname);
-          }
-        }
-
-        // Year from <pub-date>
-        let year: number | undefined;
-        const pubDateBlocks = extractXmlBlocks(article, "pub-date");
-        if (pubDateBlocks.length > 0) {
-          const yearStr = extractTag(pubDateBlocks[0], "year");
-          if (yearStr) {
-            year = parseInt(yearStr, 10);
-            if (isNaN(year)) {
-              year = undefined;
-            }
-          }
-        }
-        if (!year) {
-          const yearStr = extractTag(article, "year");
-          if (yearStr) {
-            year = parseInt(yearStr, 10);
-            if (isNaN(year)) {
-              year = undefined;
-            }
-          }
-        }
-
-        // DOI from <article-id pub-id-type="doi">
-        let doi: string | undefined;
-        const articleIdRegex = /<article-id[^>]*pub-id-type=["']doi["'][^>]*>([^<]*)<\/article-id>/gi;
-        let idMatch;
-        while ((idMatch = articleIdRegex.exec(article)) !== null) {
-          if (idMatch[1].trim()) {
-            doi = idMatch[1].trim();
-            break;
-          }
-        }
-
-        // Find PMC ID to build URL
-        let pmcId: string | undefined;
-        const pmcIdRegex = /<article-id[^>]*pub-id-type=["']pmc["'][^>]*>([^<]*)<\/article-id>/gi;
-        let pmcMatch;
-        while ((pmcMatch = pmcIdRegex.exec(article)) !== null) {
-          if (pmcMatch[1].trim()) {
-            pmcId = pmcMatch[1].trim();
-            break;
-          }
-        }
-
-        // Fallback: try to find any numeric article-id
-        if (!pmcId) {
-          const allIds = extractAllTags(article, "article-id");
-          const numericId = allIds.find((id) => /^\d+$/.test(id));
-          if (numericId) {
-            pmcId = numericId;
-          }
-        }
-
-        const url = pmcId
-          ? `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcId}/`
-          : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(query)}`;
-        const pdfUrl = pmcId
-          ? `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcId}/pdf/`
-          : undefined;
-
-        const basePaper: Omit<AcademicPaper, "score"> = {
-          title,
-          authors,
-          year,
-          abstract: abstractText,
-          url,
-          pdfUrl,
-          source: "pubmed",
-          citationCount: undefined,
-          doi,
-        };
-
-        papers.push({ ...basePaper, score: calculateScore(basePaper) });
       }
 
-      return papers;
-    },
-    "pubmed_efetch"
-  );
+      // Year from <pub-date>
+      let year: number | undefined;
+      const pubDateBlocks = extractXmlBlocks(article, "pub-date");
+      if (pubDateBlocks.length > 0) {
+        const yearStr = extractTag(pubDateBlocks[0], "year");
+        if (yearStr) {
+          year = parseInt(yearStr, 10);
+          if (isNaN(year)) {
+            year = undefined;
+          }
+        }
+      }
+      if (!year) {
+        const yearStr = extractTag(article, "year");
+        if (yearStr) {
+          year = parseInt(yearStr, 10);
+          if (isNaN(year)) {
+            year = undefined;
+          }
+        }
+      }
+
+      // DOI from <article-id pub-id-type="doi">
+      let doi: string | undefined;
+      const articleIdRegex = /<article-id[^>]*pub-id-type=["']doi["'][^>]*>([^<]*)<\/article-id>/gi;
+      let idMatch;
+      while ((idMatch = articleIdRegex.exec(article)) !== null) {
+        if (idMatch[1].trim()) {
+          doi = idMatch[1].trim();
+          break;
+        }
+      }
+
+      // Find PMC ID to build URL
+      let pmcId: string | undefined;
+      const pmcIdRegex = /<article-id[^>]*pub-id-type=["']pmc["'][^>]*>([^<]*)<\/article-id>/gi;
+      let pmcMatch;
+      while ((pmcMatch = pmcIdRegex.exec(article)) !== null) {
+        if (pmcMatch[1].trim()) {
+          pmcId = pmcMatch[1].trim();
+          break;
+        }
+      }
+
+      // Fallback: try to find any numeric article-id
+      if (!pmcId) {
+        const allIds = extractAllTags(article, "article-id");
+        const numericId = allIds.find((id) => /^\d+$/.test(id));
+        if (numericId) {
+          pmcId = numericId;
+        }
+      }
+
+      const url = pmcId
+        ? `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcId}/`
+        : `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(query)}`;
+      const pdfUrl = pmcId
+        ? `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${pmcId}/pdf/`
+        : undefined;
+
+      const basePaper: Omit<AcademicPaper, "score"> = {
+        title,
+        authors,
+        year,
+        abstract: abstractText,
+        url,
+        pdfUrl,
+        source: "pubmed",
+        citationCount: undefined,
+        doi,
+      };
+
+      papers.push({ ...basePaper, score: calculateScore(basePaper) });
+    }
+
+    return papers;
+  }, "pubmed_efetch");
 }
 
 // ============================================================
@@ -677,9 +676,7 @@ export interface SearchInternalArgs {
   sortBy?: string;
 }
 
-export async function searchInternalHandler(
-  args: SearchInternalArgs
-): Promise<AcademicPaper[]> {
+export async function searchInternalHandler(args: SearchInternalArgs): Promise<AcademicPaper[]> {
   const {
     query,
     maxResults,
@@ -824,7 +821,8 @@ export interface DiscoverAcademicPapersArgs {
 
 export async function discoverAcademicPapersInternalHandler(
   args: DiscoverAcademicPapersArgs,
-  fetchPapers: (args: SearchInternalArgs) => Promise<AcademicPaper[]> = (a) => searchInternalHandler(a)
+  fetchPapers: (args: SearchInternalArgs) => Promise<AcademicPaper[]> = (a) =>
+    searchInternalHandler(a)
 ): Promise<DiscoveredSource[]> {
   const logger = createServiceLogger("academic_search", "discoverAcademicPapersInternal");
   const startTime = Date.now();

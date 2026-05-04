@@ -1,4 +1,5 @@
 # Sandboxes API Reference
+
 ## Contents
 
 - [Endpoints](#endpoints)
@@ -8,13 +9,12 @@
 - [Pricing](#pricing)
 - [Alternative Access](#alternative-access)
 
-
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST /tci/execute` | Execute code | Run a code snippet in a sandboxed session |
-| `GET /tci/sessions` | List sessions | List all active sessions |
+| Method              | Path          | Description                               |
+| ------------------- | ------------- | ----------------------------------------- |
+| `POST /tci/execute` | Execute code  | Run a code snippet in a sandboxed session |
+| `GET /tci/sessions` | List sessions | List all active sessions                  |
 
 Base URL: `https://api.together.ai`
 Authentication: `Authorization: Bearer $TOGETHER_API_KEY`
@@ -23,56 +23,56 @@ Authentication: `Authorization: Bearer $TOGETHER_API_KEY`
 
 ### Request (ExecuteRequest)
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `language` | string | Yes | Programming language (`python`) |
-| `code` | string | Yes | Code snippet to execute |
-| `session_id` | string | No | Reuse an existing session for persistent state |
-| `files` | array | No | Files to upload before execution |
+| Field        | Type   | Required | Description                                    |
+| ------------ | ------ | -------- | ---------------------------------------------- |
+| `language`   | string | Yes      | Programming language (`python`)                |
+| `code`       | string | Yes      | Code snippet to execute                        |
+| `session_id` | string | No       | Reuse an existing session for persistent state |
+| `files`      | array  | No       | Files to upload before execution               |
 
 ### File Object
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | File name (e.g., `data.py`) |
-| `encoding` | string | Yes | `string` or `base64` |
-| `content` | string | Yes | File content |
+| Field      | Type   | Required | Description                 |
+| ---------- | ------ | -------- | --------------------------- |
+| `name`     | string | Yes      | File name (e.g., `data.py`) |
+| `encoding` | string | Yes      | `string` or `base64`        |
+| `content`  | string | Yes      | File content                |
 
 ### Response (ExecuteResponse)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `data.session_id` | string | Session ID for follow-up calls |
-| `data.status` | string | `success` |
-| `data.outputs` | array | Execution results (see Output Types) |
-| `errors` | array or null | Error details if execution failed |
+| Field             | Type          | Description                          |
+| ----------------- | ------------- | ------------------------------------ |
+| `data.session_id` | string        | Session ID for follow-up calls       |
+| `data.status`     | string        | `success`                            |
+| `data.outputs`    | array         | Execution results (see Output Types) |
+| `errors`          | array or null | Error details if execution failed    |
 
 ### Output Types
 
-| Type | Description | Data format |
-|------|-------------|-------------|
-| `stdout` | Standard output | string |
-| `stderr` | Standard error | string |
-| `error` | Exception/failure | string |
-| `display_data` | Rich output | object (see below) |
+| Type             | Description       | Data format        |
+| ---------------- | ----------------- | ------------------ |
+| `stdout`         | Standard output   | string             |
+| `stderr`         | Standard error    | string             |
+| `error`          | Exception/failure | string             |
+| `display_data`   | Rich output       | object (see below) |
 | `execute_result` | Expression result | object (see below) |
 
 **display_data / execute_result** data object may contain:
 
-| Key | Description |
-|-----|-------------|
-| `application/json` | JSON data |
-| `text/html` | HTML content |
-| `text/markdown` | Markdown content |
-| `text/latex` | LaTeX content |
-| `image/png` | Base64-encoded PNG |
-| `image/jpeg` | Base64-encoded JPEG |
-| `image/gif` | Base64-encoded GIF |
-| `image/svg+xml` | SVG content |
-| `application/pdf` | Base64-encoded PDF |
+| Key                                | Description             |
+| ---------------------------------- | ----------------------- |
+| `application/json`                 | JSON data               |
+| `text/html`                        | HTML content            |
+| `text/markdown`                    | Markdown content        |
+| `text/latex`                       | LaTeX content           |
+| `image/png`                        | Base64-encoded PNG      |
+| `image/jpeg`                       | Base64-encoded JPEG     |
+| `image/gif`                        | Base64-encoded GIF      |
+| `image/svg+xml`                    | SVG content             |
+| `application/pdf`                  | Base64-encoded PDF      |
 | `application/vnd.vegalite.v5+json` | Vega-Lite visualization |
-| `application/vnd.vega.v5+json` | Vega visualization |
-| `application/geo+json` | GeoJSON data |
+| `application/vnd.vega.v5+json`     | Vega visualization      |
+| `application/geo+json`             | GeoJSON data            |
 
 ### Examples
 
@@ -165,11 +165,13 @@ response = client.code_interpreter.execute(
 const response = await client.codeInterpreter.execute({
   code: "!python myscript.py",
   language: "python",
-  files: [{
-    name: "myscript.py",
-    encoding: "string",
-    content: "import sys\nprint(f'Hello from {sys.argv[0]}!')",
-  }],
+  files: [
+    {
+      name: "myscript.py",
+      encoding: "string",
+      content: "import sys\nprint(f'Hello from {sys.argv[0]}!')",
+    },
+  ],
 });
 ```
 
@@ -224,19 +226,19 @@ parsing. Check both paths for maximum reliability.
 
 ### Response (SessionListResponse)
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field           | Type  | Description                    |
+| --------------- | ----- | ------------------------------ |
 | `data.sessions` | array | List of active session objects |
 
 ### Session Object
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Session identifier (e.g., `ses_abcDEF123`) |
-| `execute_count` | integer | Number of executions in this session |
-| `started_at` | datetime | Session start timestamp |
-| `last_execute_at` | datetime | Most recent execution timestamp |
-| `expires_at` | datetime | Session expiration timestamp |
+| Field             | Type     | Description                                |
+| ----------------- | -------- | ------------------------------------------ |
+| `id`              | string   | Session identifier (e.g., `ses_abcDEF123`) |
+| `execute_count`   | integer  | Number of executions in this session       |
+| `started_at`      | datetime | Session start timestamp                    |
+| `last_execute_at` | datetime | Most recent execution timestamp            |
+| `expires_at`      | datetime | Session expiration timestamp               |
 
 ### Examples
 

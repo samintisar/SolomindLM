@@ -44,6 +44,7 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 ## Features
 
 ### Content Ingestion
+
 - **Documents** — Upload PDFs, Word docs, images, and audio files
 - **Web scraping** — Extract content from any web page
 - **Social media** — Import transcripts from YouTube, TikTok, Instagram, and X (Twitter)
@@ -51,12 +52,14 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 - **Google Drive** — Import files directly from Google Drive
 
 ### RAG Chat
+
 - **Streaming conversations** — Real-time AI responses with smooth streaming
 - **Citations** — Every answer includes references to source materials
 - **Deep research mode** — Iterative sub-question exploration for thorough research
 - **External search** — Augment responses with web, academic, and news search
 
 ### Content Generation (Studio)
+
 - **Reports** — Comprehensive research reports with structured sections
 - **Flashcards** — Study cards with questions and answers
 - **Quizzes** — Multiple-choice and open-ended questions
@@ -67,6 +70,7 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 - **Written questions** — Short answer and essay prompts
 
 ### Organization
+
 - **Notebooks** — Organize research into projects
 - **Folders** — Group notebooks hierarchically
 - **Sharing** — Collaborate via share links or fork-only links
@@ -126,20 +130,20 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | React 19, Vite 7, TypeScript 5.9, TailwindCSS 4, Radix UI |
-| **Mobile** | Expo 55, React Native 0.83 |
-| **Backend** | Convex 1.36, TypeScript |
-| **AI/ML** | LangChain, LangGraph, Together AI |
-| **Auth** | @convex-dev/auth (Google OAuth + Password/OTP) |
-| **Payments** | Stripe |
-| **Database** | Convex (Document + Vector search) |
-| **Search** | Tavily, ZeroEntropy reranking |
-| **OCR** | Mistral |
-| **Extraction** | Supadata |
-| **Audio** | Together AI TTS |
-| **Testing** | Vitest, Playwright, convex-test |
+| Layer          | Technology                                                |
+| -------------- | --------------------------------------------------------- |
+| **Frontend**   | React 19, Vite 7, TypeScript 5.9, TailwindCSS 4, Radix UI |
+| **Mobile**     | Expo 55, React Native 0.83                                |
+| **Backend**    | Convex 1.36, TypeScript                                   |
+| **AI/ML**      | LangChain, LangGraph, Together AI                         |
+| **Auth**       | @convex-dev/auth (Google OAuth + Password/OTP)            |
+| **Payments**   | Stripe                                                    |
+| **Database**   | Convex (Document + Vector search)                         |
+| **Search**     | Tavily, ZeroEntropy reranking                             |
+| **OCR**        | Mistral                                                   |
+| **Extraction** | Supadata                                                  |
+| **Audio**      | Together AI TTS                                           |
+| **Testing**    | Vitest, Playwright, convex-test                           |
 
 ---
 
@@ -148,6 +152,7 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 Before you begin, ensure you have:
 
 1. **[Bun](https://bun.sh)** v1.2.2 or higher
+
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
@@ -192,6 +197,7 @@ bun x convex dev
 ### 4. Configure Environment Variables
 
 **Backend (Convex):**
+
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -201,6 +207,7 @@ cp .env.example .env
 ```
 
 **Frontend (Web):**
+
 ```bash
 # Copy the web environment file
 cp apps/web/.env.local.example apps/web/.env.local
@@ -209,6 +216,7 @@ cp apps/web/.env.local.example apps/web/.env.local
 ```
 
 **Frontend (Mobile - optional):**
+
 ```bash
 # Copy the mobile environment file
 cp apps/mobile/.env.local.example apps/mobile/.env.local
@@ -223,16 +231,19 @@ bun run convex:env:push
 ### 6. Start the Development Servers
 
 **Terminal 1 — Convex backend:**
+
 ```bash
 bun x convex dev
 ```
 
 **Terminal 2 — Web frontend:**
+
 ```bash
 bun run dev:web
 ```
 
 **Terminal 3 — Mobile (optional):**
+
 ```bash
 bun run dev:mobile
 ```
@@ -249,43 +260,43 @@ Create a `.env` file in the project root. See `.env.example` for the template.
 
 #### Convex (Required)
 
-| Variable | Description | How to Get |
-|----------|-------------|------------|
+| Variable            | Description                 | How to Get                            |
+| ------------------- | --------------------------- | ------------------------------------- |
 | `CONVEX_DEPLOYMENT` | Your Convex deployment name | Created automatically by `convex dev` |
-| `CONVEX_URL` | Your Convex deployment URL | Found in Convex dashboard |
-| `CONVEX_SITE_URL` | Your Convex HTTP site URL | Found in Convex dashboard |
-| `SITE_URL` | Your production site URL | Your domain |
+| `CONVEX_URL`        | Your Convex deployment URL  | Found in Convex dashboard             |
+| `CONVEX_SITE_URL`   | Your Convex HTTP site URL   | Found in Convex dashboard             |
+| `SITE_URL`          | Your production site URL    | Your domain                           |
 
 #### Authentication (Required)
 
-| Variable | Description | How to Get |
-|----------|-------------|------------|
-| `BETTER_AUTH_SECRET` | Random secret for auth | Generate with `openssl rand -hex 32` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | [Google Cloud Console](https://console.cloud.google.com) |
+| Variable               | Description                | How to Get                                               |
+| ---------------------- | -------------------------- | -------------------------------------------------------- |
+| `BETTER_AUTH_SECRET`   | Random secret for auth     | Generate with `openssl rand -hex 32`                     |
+| `GOOGLE_CLIENT_ID`     | Google OAuth client ID     | [Google Cloud Console](https://console.cloud.google.com) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | [Google Cloud Console](https://console.cloud.google.com) |
 
 #### AI Services (Required for core functionality)
 
-| Variable | Description | How to Get |
-|----------|-------------|------------|
-| `TOGETHER_AI_API_KEY` | Together AI API key | [Together AI](https://api.together.xyz) |
-| `TAVILY_API_KEY` | Tavily search API key | [Tavily](https://tavily.com) |
-| `MISTRAL_API_KEY` | Mistral OCR API key | [Mistral](https://mistral.ai) |
-| `SUPADATA_API_KEY` | Supadata extraction API key | [Supadata](https://supadata.ai) |
-| `ZEROENTROPY_API_KEY` | ZeroEntropy reranking API key | [ZeroEntropy](https://zeroentropy.dev) |
+| Variable              | Description                   | How to Get                              |
+| --------------------- | ----------------------------- | --------------------------------------- |
+| `TOGETHER_AI_API_KEY` | Together AI API key           | [Together AI](https://api.together.xyz) |
+| `TAVILY_API_KEY`      | Tavily search API key         | [Tavily](https://tavily.com)            |
+| `MISTRAL_API_KEY`     | Mistral OCR API key           | [Mistral](https://mistral.ai)           |
+| `SUPADATA_API_KEY`    | Supadata extraction API key   | [Supadata](https://supadata.ai)         |
+| `ZEROENTROPY_API_KEY` | ZeroEntropy reranking API key | [ZeroEntropy](https://zeroentropy.dev)  |
 
 #### Optional Services
 
-| Variable | Description | Required For |
-|----------|-------------|--------------|
-| `STRIPE_SECRET_KEY` | Stripe secret key | Billing/subscriptions |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret | Billing webhooks |
-| `STRIPE_PRO_MONTHLY_PRICE_ID` | Stripe price ID | Pro plan (monthly) |
-| `STRIPE_PRO_YEARLY_PRICE_ID` | Stripe price ID | Pro plan (yearly) |
-| `RESEND_API_KEY` | Resend email API key | Email OTP/password reset |
-| `AUTH_RESEND_FROM` | From email address | Email sending |
-| `LANGCHAIN_API_KEY` | LangSmith API key | Tracing and monitoring |
-| `LANGCHAIN_PROJECT` | LangSmith project name | Tracing organization |
+| Variable                      | Description            | Required For             |
+| ----------------------------- | ---------------------- | ------------------------ |
+| `STRIPE_SECRET_KEY`           | Stripe secret key      | Billing/subscriptions    |
+| `STRIPE_WEBHOOK_SECRET`       | Stripe webhook secret  | Billing webhooks         |
+| `STRIPE_PRO_MONTHLY_PRICE_ID` | Stripe price ID        | Pro plan (monthly)       |
+| `STRIPE_PRO_YEARLY_PRICE_ID`  | Stripe price ID        | Pro plan (yearly)        |
+| `RESEND_API_KEY`              | Resend email API key   | Email OTP/password reset |
+| `AUTH_RESEND_FROM`            | From email address     | Email sending            |
+| `LANGCHAIN_API_KEY`           | LangSmith API key      | Tracing and monitoring   |
+| `LANGCHAIN_PROJECT`           | LangSmith project name | Tracing organization     |
 
 #### LLM Model Configuration
 
@@ -433,11 +444,13 @@ bun run test:coverage    # Run tests with coverage
 ### Unit Tests
 
 **Convex tests** (uses vitest + convex-test):
+
 ```bash
 bun run test:convex
 ```
 
 **Web tests** (uses vitest):
+
 ```bash
 bun run test:web
 ```
@@ -484,6 +497,7 @@ bun run eval:studio
 4. **Add `CONVEX_DEPLOY_KEY`** for production (from Convex dashboard)
 
 The `vercel.json` in `apps/web/` handles:
+
 - Building the project
 - Deploying Convex functions
 - Routing API requests to Convex
@@ -531,25 +545,30 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 ### Common Issues
 
 **Build fails with "Cannot find module '@convex/...'"**
+
 - Run `bun x convex dev` to regenerate the Convex client
 
 **Vite cache issues**
+
 ```bash
 rm -rf apps/web/node_modules/.vite
 ```
 
 **Port already in use**
+
 ```bash
 # The dev script automatically kills stale ports, but manually:
 bun run --cwd apps/web kill-port
 ```
 
 **Convex environment variables not updating**
+
 ```bash
 bun run convex:env:push
 ```
 
 **Type errors in generated files**
+
 ```bash
 # Regenerate Convex types
 bun x convex dev
@@ -569,8 +588,9 @@ bun x convex dev
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see [LICENSE](LICENSE).
 
 **What this means:**
+
 - **Free for personal use** ✅
-- **Free for self-hosting** ✅  
+- **Free for self-hosting** ✅
 - **Free for internal business use** ✅
 - **Must open-source modifications** if you provide it as a network service
 
@@ -580,13 +600,13 @@ If you want to use SolomindLM in a proprietary SaaS product without open-sourcin
 
 ### Open Source vs Commercial Use
 
-| Use Case | License Required |
-|----------|-----------------|
-| Personal/self-hosted | AGPL-3.0 (free) |
-| Internal business use | AGPL-3.0 (free) |
-| Academic/research | AGPL-3.0 (free) |
-| Open-source SaaS | AGPL-3.0 (free) |
-| **Proprietary SaaS** | **Commercial License** |
+| Use Case               | License Required       |
+| ---------------------- | ---------------------- |
+| Personal/self-hosted   | AGPL-3.0 (free)        |
+| Internal business use  | AGPL-3.0 (free)        |
+| Academic/research      | AGPL-3.0 (free)        |
+| Open-source SaaS       | AGPL-3.0 (free)        |
+| **Proprietary SaaS**   | **Commercial License** |
 | **White-label/resale** | **Commercial License** |
 
 Contact: sami@solo-mind.com for commercial licensing inquiries.

@@ -7,25 +7,27 @@ description: "INVOKE THIS SKILL when building ANY retrieval-augmented generation
 Retrieval Augmented Generation (RAG) enhances LLM responses by fetching relevant context from external knowledge sources.
 
 **Pipeline:**
+
 1. **Index**: Load → Split → Embed → Store
 2. **Retrieve**: Query → Embed → Search → Return docs
 3. **Generate**: Docs + Query → LLM → Response
 
 **Key Components:**
+
 - **Document Loaders**: Ingest data from files, web, databases
 - **Text Splitters**: Break documents into chunks
 - **Embeddings**: Convert text to vectors
 - **Vector Stores**: Store and search embeddings
-</overview>
+  </overview>
 
 <vectorstore-selection>
 
-| Vector Store | Use Case | Persistence |
-|--------------|----------|-------------|
-| **InMemory** | Testing | Memory only |
-| **FAISS** | Local, high performance | Disk |
-| **Chroma** | Development | Disk |
-| **Pinecone** | Production, managed | Cloud |
+| Vector Store | Use Case                | Persistence |
+| ------------ | ----------------------- | ----------- |
+| **InMemory** | Testing                 | Memory only |
+| **FAISS**    | Local, high performance | Disk        |
+| **Chroma**   | Development             | Disk        |
+| **Pinecone** | Production, managed     | Cloud       |
 
 </vectorstore-selection>
 
@@ -43,33 +45,39 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
 # 1. Load documents
+
 docs = [
-    Document(page_content="LangChain is a framework for LLM apps.", metadata={}),
-    Document(page_content="RAG = Retrieval Augmented Generation.", metadata={}),
+Document(page_content="LangChain is a framework for LLM apps.", metadata={}),
+Document(page_content="RAG = Retrieval Augmented Generation.", metadata={}),
 ]
 
 # 2. Split documents
+
 splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 splits = splitter.split_documents(docs)
 
 # 3. Create embeddings and store
+
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 vectorstore = InMemoryVectorStore.from_documents(splits, embeddings)
 
 # 4. Create retriever
+
 retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 
 # 5. Use in RAG
+
 model = ChatOpenAI(model="gpt-4.1")
 query = "What is RAG?"
 relevant_docs = retriever.invoke(query)
 
 context = "\n\n".join([doc.page_content for doc in relevant_docs])
 response = model.invoke([
-    {"role": "system", "content": f"Use this context:\n\n{context}"},
-    {"role": "user", "content": query},
+{"role": "system", "content": f"Use this context:\n\n{context}"},
+{"role": "user", "content": query},
 ])
-```
+
+````
 </python>
 <typescript>
 End-to-end RAG pipeline: load documents, split into chunks, embed, store, retrieve, and generate a response.
@@ -106,7 +114,8 @@ const response = await model.invoke([
   { role: "system", content: `Use this context:\n\n${context}` },
   { role: "user", content: query },
 ]);
-```
+````
+
 </typescript>
 </ex-basic-rag-setup>
 
@@ -123,7 +132,8 @@ from langchain_community.document_loaders import PyPDFLoader
 loader = PyPDFLoader("./document.pdf")
 docs = loader.load()
 print(f"Loaded {len(docs)} pages")
-```
+
+````
 </python>
 <typescript>
 Load a PDF file and extract each page as a separate document.
@@ -133,7 +143,8 @@ import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 const loader = new PDFLoader("./document.pdf");
 const docs = await loader.load();
 console.log(`Loaded ${docs.length} pages`);
-```
+````
+
 </typescript>
 </ex-loading-pdf>
 
@@ -145,7 +156,8 @@ from langchain_community.document_loaders import WebBaseLoader
 
 loader = WebBaseLoader("https://docs.langchain.com")
 docs = loader.load()
-```
+
+````
 </python>
 <typescript>
 Fetch and parse content from a web URL into a document using Cheerio.
@@ -154,7 +166,8 @@ import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/
 
 const loader = new CheerioWebBaseLoader("https://docs.langchain.com");
 const docs = await loader.load();
-```
+````
+
 </typescript>
 </ex-loading-web-pages>
 
@@ -165,13 +178,15 @@ Load all text files from a directory using a glob pattern.
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 
 # Load all text files from directory
+
 loader = DirectoryLoader(
-    "path/to/documents",
-    glob="**/*.txt",  # Pattern for files to load
-    loader_cls=TextLoader
+"path/to/documents",
+glob="\*_/_.txt", # Pattern for files to load
+loader_cls=TextLoader
 )
 docs = loader.load()
-```
+
+````
 </python>
 </ex-loading-directory>
 
@@ -192,7 +207,8 @@ splitter = RecursiveCharacterTextSplitter(
 )
 
 splits = splitter.split_documents(docs)
-```
+````
+
 </python>
 </ex-text-splitting>
 
@@ -208,19 +224,21 @@ from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 vectorstore = Chroma.from_documents(
-    documents=splits,
-    embedding=OpenAIEmbeddings(),
-    persist_directory="./chroma_db",
-    collection_name="my-collection",
+documents=splits,
+embedding=OpenAIEmbeddings(),
+persist_directory="./chroma_db",
+collection_name="my-collection",
 )
 
 # Load existing
+
 vectorstore = Chroma(
-    persist_directory="./chroma_db",
-    embedding_function=OpenAIEmbeddings(),
-    collection_name="my-collection",
+persist_directory="./chroma_db",
+embedding_function=OpenAIEmbeddings(),
+collection_name="my-collection",
 )
-```
+
+````
 </python>
 <typescript>
 Create a Chroma vector store connected to a running Chroma server.
@@ -233,7 +251,8 @@ const vectorstore = await Chroma.fromDocuments(
   new OpenAIEmbeddings(),
   { collectionName: "my-collection", url: "http://localhost:8000" }
 );
-```
+````
+
 </typescript>
 </ex-chroma-vectorstore>
 
@@ -247,12 +266,14 @@ vectorstore = FAISS.from_documents(splits, embeddings)
 vectorstore.save_local("./faiss_index")
 
 # Load (requires allow_dangerous_deserialization)
+
 loaded = FAISS.load_local(
-    "./faiss_index",
-    embeddings,
-    allow_dangerous_deserialization=True
+"./faiss_index",
+embeddings,
+allow_dangerous_deserialization=True
 )
-```
+
+````
 </python>
 <typescript>
 Create a FAISS vector store, save it to disk, and reload it.
@@ -263,7 +284,8 @@ const vectorstore = await FaissStore.fromDocuments(splits, embeddings);
 await vectorstore.save("./faiss_index");
 
 const loaded = await FaissStore.load("./faiss_index", embeddings);
-```
+````
+
 </typescript>
 </ex-faiss-vectorstore>
 
@@ -279,10 +301,12 @@ Perform similarity search and retrieve results with relevance scores.
 results = vectorstore.similarity_search(query, k=5)
 
 # With scores
+
 results_with_score = vectorstore.similarity_search_with_score(query, k=5)
 for doc, score in results_with_score:
-    print(f"Score: {score}, Content: {doc.page_content}")
-```
+print(f"Score: {score}, Content: {doc.page_content}")
+
+````
 </python>
 <typescript>
 Perform similarity search and retrieve results with relevance scores.
@@ -295,7 +319,8 @@ const resultsWithScore = await vectorstore.similaritySearchWithScore(query, 5);
 for (const [doc, score] of resultsWithScore) {
   console.log(`Score: ${score}, Content: ${doc.pageContent}`);
 }
-```
+````
+
 </typescript>
 </ex-similarity-search>
 
@@ -325,12 +350,14 @@ docs = [
 ]
 
 # Search with filter
+
 results = vectorstore.similarity_search(
-    "programming",
-    k=5,
-    filter={"language": "python"}  # Only Python docs
+"programming",
+k=5,
+filter={"language": "python"} # Only Python docs
 )
-```
+
+````
 </python>
 </ex-metadata-filtering>
 
@@ -355,7 +382,8 @@ agent = create_agent(
 result = agent.invoke({
     "messages": [{"role": "user", "content": "How do I create an agent?"}]
 })
-```
+````
+
 </python>
 <typescript>
 Create an agent that uses RAG as a tool for answering questions.
@@ -365,26 +393,27 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
 const searchDocs = tool(
-  async (input) => {
-    const docs = await retriever.invoke(input.query);
-    return docs.map(d => d.pageContent).join("\n\n");
-  },
-  {
-    name: "search_docs",
-    description: "Search documentation for relevant information.",
-    schema: z.object({ query: z.string() }),
-  }
+async (input) => {
+const docs = await retriever.invoke(input.query);
+return docs.map(d => d.pageContent).join("\n\n");
+},
+{
+name: "search_docs",
+description: "Search documentation for relevant information.",
+schema: z.object({ query: z.string() }),
+}
 );
 
 const agent = createAgent({
-  model: "gpt-4.1",
-  tools: [searchDocs],
+model: "gpt-4.1",
+tools: [searchDocs],
 });
 
 const result = await agent.invoke({
-  messages: [{ role: "user", content: "How do I create an agent?" }],
+messages: [{ role: "user", content: "How do I create an agent?" }],
 });
-```
+
+````
 </typescript>
 </ex-rag-with-agent>
 
@@ -413,7 +442,8 @@ splitter = RecursiveCharacterTextSplitter(chunk_size=10000)
 
 # CORRECT
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-```
+````
+
 </python>
 <typescript>
 Chunk size 500-1500 is typically good.
@@ -423,7 +453,8 @@ const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 50 });
 
 // CORRECT
 const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 200 });
-```
+
+````
 </typescript>
 </fix-chunk-size>
 
@@ -436,7 +467,8 @@ splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
 
 # CORRECT: 10-20% overlap
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-```
+````
+
 </python>
 </fix-chunk-overlap>
 
@@ -448,8 +480,10 @@ Use persistent vector store instead of in-memory to avoid data loss.
 vectorstore = InMemoryVectorStore.from_documents(docs, embeddings)
 
 # CORRECT
+
 vectorstore = Chroma.from_documents(docs, embeddings, persist_directory="./chroma_db")
-```
+
+````
 </python>
 <typescript>
 Use persistent vector store instead of in-memory to avoid data loss.
@@ -459,7 +493,8 @@ const vectorstore = await MemoryVectorStore.fromDocuments(docs, embeddings);
 
 // CORRECT
 const vectorstore = await Chroma.fromDocuments(docs, embeddings, { collectionName: "my-collection" });
-```
+````
+
 </typescript>
 </fix-persist-vectorstore>
 
@@ -472,10 +507,12 @@ vectorstore = Chroma.from_documents(docs, OpenAIEmbeddings(model="text-embedding
 retriever = vectorstore.as_retriever(embeddings=OpenAIEmbeddings(model="text-embedding-3-large"))
 
 # CORRECT: Same model
+
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 vectorstore = Chroma.from_documents(docs, embeddings)
-retriever = vectorstore.as_retriever()  # Uses same embeddings
-```
+retriever = vectorstore.as_retriever() # Uses same embeddings
+
+````
 </python>
 <typescript>
 Use the same embedding model for indexing and querying.
@@ -483,7 +520,8 @@ Use the same embedding model for indexing and querying.
 const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
 const vectorstore = await Chroma.fromDocuments(docs, embeddings);
 const retriever = vectorstore.asRetriever();  // Uses same embeddings
-```
+````
+
 </typescript>
 </fix-consistent-embeddings>
 
@@ -495,8 +533,10 @@ Explicitly allow deserialization when loading FAISS indexes.
 loaded_store = FAISS.load_local("./faiss_index", embeddings)
 
 # CORRECT
+
 loaded_store = FAISS.load_local("./faiss_index", embeddings, allow_dangerous_deserialization=True)
-```
+
+````
 </python>
 </fix-faiss-deserialization>
 
@@ -512,6 +552,7 @@ vectorstore = PineconeVectorStore.from_documents(
 
 # CORRECT: Match dimensions
 embeddings = OpenAIEmbeddings()  # Default 1536
-```
+````
+
 </python>
 </fix-dimension-mismatch>

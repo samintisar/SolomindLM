@@ -30,14 +30,10 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
       <Icon className="w-4 h-4 text-primary animate-pulse" />
       <span className="text-foreground font-medium">{config.label}</span>
       {sourcesFound !== undefined && (
-        <span className="text-muted-foreground text-xs">
-          {sourcesFound} sources found
-        </span>
+        <span className="text-muted-foreground text-xs">{sourcesFound} sources found</span>
       )}
       {iteration !== undefined && iteration > 0 && (
-        <span className="text-muted-foreground text-xs">
-          Pass {iteration + 1}
-        </span>
+        <span className="text-muted-foreground text-xs">Pass {iteration + 1}</span>
       )}
     </div>
   );

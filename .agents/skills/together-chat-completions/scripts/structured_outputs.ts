@@ -85,28 +85,26 @@ async function regexExample(): Promise<void> {
   console.log("=== regex (classification) ===");
 
   // The current TS SDK types do not yet expose regex response_format.
-  const response = await client.chat.completions.create(
-    {
-      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-      temperature: 0.2,
-      max_tokens: 10,
-      messages: [
-        {
-          role: "system",
-          content: "Classify the sentiment of the text as positive, neutral, or negative.",
-        },
-        {
-          role: "user",
-          content: "The food was absolutely amazing, best meal I've ever had!",
-        },
-      ],
-      response_format: {
-        type: "regex",
-        pattern: "(positive|neutral|negative)",
+  const response = await client.chat.completions.create({
+    model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    temperature: 0.2,
+    max_tokens: 10,
+    messages: [
+      {
+        role: "system",
+        content: "Classify the sentiment of the text as positive, neutral, or negative.",
       },
+      {
+        role: "user",
+        content: "The food was absolutely amazing, best meal I've ever had!",
+      },
+    ],
+    response_format: {
+      type: "regex",
+      pattern: "(positive|neutral|negative)",
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any
-  );
+  } as any);
 
   console.log(`Sentiment: ${response?.choices[0]?.message?.content}`);
   console.log();

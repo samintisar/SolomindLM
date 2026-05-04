@@ -18,9 +18,7 @@ function getConvexUrl(): string {
   const configured = readConfiguredConvexUrl();
   if (configured) return configured;
   if (__DEV__) {
-    console.warn(
-      "[SolomindLM] Set EXPO_PUBLIC_CONVEX_URL in apps/mobile/.env (see .env.example)."
-    );
+    console.warn("[SolomindLM] Set EXPO_PUBLIC_CONVEX_URL in apps/mobile/.env (see .env.example).");
     return DEV_MISSING_CONVEX_URL;
   }
   throw new Error(

@@ -38,9 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   const onboardingState = useQuery(api.onboarding.state.getOnboardingState, {});
-  const showChecklistMutation = useMutation(
-    api.onboarding.mutations.showChecklist,
-  );
+  const showChecklistMutation = useMutation(api.onboarding.mutations.showChecklist);
 
   const showChecklistDismissed =
     !!onboardingState &&

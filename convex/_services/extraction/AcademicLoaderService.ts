@@ -21,9 +21,7 @@ export class AcademicLoaderService {
   private mistralOCR: MistralOCRService;
   private loadWebPage: (url: string) => Promise<{ title: string; content: string }>;
 
-  constructor(
-    loadWebPage?: (url: string) => Promise<{ title: string; content: string }>
-  ) {
+  constructor(loadWebPage?: (url: string) => Promise<{ title: string; content: string }>) {
     this.mistralOCR = new MistralOCRService(env.MISTRAL_API_KEY);
     this.loadWebPage =
       loadWebPage ??

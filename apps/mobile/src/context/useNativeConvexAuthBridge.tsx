@@ -1,15 +1,11 @@
-import {
-  createContext,
-  useContext,
-} from "react";
+import { createContext, useContext } from "react";
 
 export type NativeConvexAuthBridgeContextValue = {
   onWebViewMessage: (raw: string) => void;
 };
 
-export const NativeConvexAuthBridgeContext = createContext<NativeConvexAuthBridgeContextValue | null>(
-  null
-);
+export const NativeConvexAuthBridgeContext =
+  createContext<NativeConvexAuthBridgeContextValue | null>(null);
 
 export function useNativeConvexAuthBridge(): NativeConvexAuthBridgeContextValue {
   const v = useContext(NativeConvexAuthBridgeContext);

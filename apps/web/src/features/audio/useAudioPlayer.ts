@@ -8,6 +8,8 @@ export interface AudioPlayerContextType {
     transcript?: string;
     /** When set (audio overview notes), URL is resolved server-side via `storage.getUrl`. */
     audioOverviewId?: string;
+    /** Studio note id — used to hide the docked mini player when that note is open in expanded view. */
+    noteId?: string;
   } | null;
   onPlayAudio: (
     audioUrl: string,

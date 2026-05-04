@@ -6,25 +6,16 @@ import { api } from "../_generated/api";
 
 // convex-test resolves function references via module keys relative to the
 // convex/ root. Use a root-absolute glob so keys are stable from any subdir.
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
-  string,
-  () => Promise<unknown>
->;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
   return t.withIdentity({ subject: `${userId}|session1` });
 }
 
-async function insertLegacyUser(
-  t: ReturnType<typeof convexTest>,
-  name: string,
-) {
+async function insertLegacyUser(t: ReturnType<typeof convexTest>, name: string) {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(Date.now() - 10 * 60_000));
   try {
@@ -43,33 +34,23 @@ describe("getOnboardingState", () => {
 
   test("returns row for authenticated user with row", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "Alice" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "Alice" }));
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
         userId,
         tourStatus: "active",
         currentStepId: "addSource",
         checklistDismissed: false,
-      }),
+      })
     );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.state.getOnboardingState,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.state.getOnboardingState, {});
     expect(result).toMatchObject({ tourStatus: "active", currentStepId: "addSource" });
   });
 
   test("contextual default: fresh user (recent _creationTime) → pending", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "Fresh" }),
-    );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.state.getOnboardingState,
-      {},
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "Fresh" }));
+    const result = await withAuth(t, userId).query(api.onboarding.state.getOnboardingState, {});
     expect(result).toMatchObject({
       tourStatus: "pending",
       checklistDismissed: false,
@@ -79,10 +60,7 @@ describe("getOnboardingState", () => {
   test("contextual default: user without row is pending regardless of age", async () => {
     const t = convexTest(schema, modules);
     const userId = await insertLegacyUser(t, "Legacy");
-    const result = await withAuth(t, userId).query(
-      api.onboarding.state.getOnboardingState,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.state.getOnboardingState, {});
     expect(result).toMatchObject({
       tourStatus: "pending",
       checklistDismissed: false,
@@ -93,16 +71,14 @@ describe("getOnboardingState", () => {
 describe("getOrCreateOnboardingRow", () => {
   test("creates pending row for fresh user", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "Fresh" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "Fresh" }));
     const auth = withAuth(t, userId);
     await auth.mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
     const row = await t.run(async (ctx) =>
       ctx.db
         .query("userOnboarding")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique(),
+        .unique()
     );
     expect(row).toMatchObject({
       tourStatus: "pending",
@@ -113,15 +89,12 @@ describe("getOrCreateOnboardingRow", () => {
   test("creates pending row for user without row regardless of age", async () => {
     const t = convexTest(schema, modules);
     const userId = await insertLegacyUser(t, "Legacy");
-    await withAuth(t, userId).mutation(
-      api.onboarding.state.getOrCreateOnboardingRow,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
     const row = await t.run(async (ctx) =>
       ctx.db
         .query("userOnboarding")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique(),
+        .unique()
     );
     expect(row).toMatchObject({
       tourStatus: "pending",
@@ -131,9 +104,7 @@ describe("getOrCreateOnboardingRow", () => {
 
   test("idempotent — does not duplicate row", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "X" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "X" }));
     const auth = withAuth(t, userId);
     await auth.mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
     await auth.mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
@@ -141,15 +112,13 @@ describe("getOrCreateOnboardingRow", () => {
       ctx.db
         .query("userOnboarding")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
+        .collect()
     );
     expect(rows).toHaveLength(1);
   });
 
   test("throws when not authenticated", async () => {
     const t = convexTest(schema, modules);
-    await expect(
-      t.mutation(api.onboarding.state.getOrCreateOnboardingRow, {}),
-    ).rejects.toThrow();
+    await expect(t.mutation(api.onboarding.state.getOrCreateOnboardingRow, {})).rejects.toThrow();
   });
 });

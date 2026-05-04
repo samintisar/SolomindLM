@@ -5,12 +5,7 @@
  * Runner-aware: studio runners produce no chunks/citations, so the
  * retrieval-only metrics are skipped and studio-specific scorers run instead.
  */
-import type {
-  EvalFixture,
-  EvalRunArtifact,
-  EvalBaseline,
-  MetricResult,
-} from "../types";
+import type { EvalFixture, EvalRunArtifact, EvalBaseline, MetricResult } from "../types";
 import {
   expectedItemRecall,
   retrievalItemRecall,
@@ -40,7 +35,7 @@ function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
 export async function scoreAllMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline,
+  baseline?: EvalBaseline
 ): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
 

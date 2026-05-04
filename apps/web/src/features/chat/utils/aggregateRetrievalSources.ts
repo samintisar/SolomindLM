@@ -192,10 +192,8 @@ export function aggregateRetrievalSources(
       const badgeFromTitle = inferSourceBadgeLabel(title);
       const openFromStored = navigableUrlFromStoredSource(sourceUrl);
       const openFromTitle = deriveWebOpenUrl(title);
-      const openUrl =
-        openFromStored ?? (badgeFromTitle === "WEB" ? openFromTitle : null);
-      const badgeLabel =
-        badgeFromTitle === "TEXT" && openFromStored ? "WEB" : badgeFromTitle;
+      const openUrl = openFromStored ?? (badgeFromTitle === "WEB" ? openFromTitle : null);
+      const badgeLabel = badgeFromTitle === "TEXT" && openFromStored ? "WEB" : badgeFromTitle;
       return {
         sourceId,
         title,

@@ -54,7 +54,9 @@ export function encodePcmWavToMp3(
   }
 
   if (format.numChannels !== 1 && format.numChannels !== 2) {
-    throw new Error(`Unsupported WAV channel count: expected mono or stereo, got ${format.numChannels}`);
+    throw new Error(
+      `Unsupported WAV channel count: expected mono or stereo, got ${format.numChannels}`
+    );
   }
 
   const bitrateKbps = options.bitrateKbps ?? DEFAULT_AUDIO_MP3_BITRATE_KBPS;
@@ -64,7 +66,9 @@ export function encodePcmWavToMp3(
 
   if (format.numChannels === 1) {
     for (let offset = 0; offset < samples.length; offset += MP3_SAMPLE_BLOCK_SIZE) {
-      const encoded = encoder.encodeBuffer(samples.subarray(offset, offset + MP3_SAMPLE_BLOCK_SIZE));
+      const encoded = encoder.encodeBuffer(
+        samples.subarray(offset, offset + MP3_SAMPLE_BLOCK_SIZE)
+      );
       if (encoded.length > 0) chunks.push(encoded);
     }
   } else {

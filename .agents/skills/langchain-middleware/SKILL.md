@@ -28,22 +28,23 @@ from langchain.tools import tool
 
 @tool
 def send_email(to: str, subject: str, body: str) -> str:
-    """Send an email."""
-    return f"Email sent to {to}"
+"""Send an email."""
+return f"Email sent to {to}"
 
 agent = create_agent(
-    model="gpt-4.1",
-    tools=[send_email],
-    checkpointer=MemorySaver(),  # Required for HITL
-    middleware=[
-        HumanInTheLoopMiddleware(
-            interrupt_on={
-                "send_email": {"allowed_decisions": ["approve", "edit", "reject"]},
-            }
-        )
-    ],
+model="gpt-4.1",
+tools=[send_email],
+checkpointer=MemorySaver(), # Required for HITL
+middleware=[
+HumanInTheLoopMiddleware(
+interrupt_on={
+"send_email": {"allowed_decisions": ["approve", "edit", "reject"]},
+}
 )
-```
+],
+)
+
+````
 </python>
 <typescript>
 Set up an agent with HITL that pauses before sending emails for human approval.
@@ -72,7 +73,8 @@ const agent = createAgent({
     }),
   ],
 });
-```
+````
+
 </typescript>
 </ex-basic-hitl-setup>
 
@@ -85,20 +87,24 @@ from langgraph.types import Command
 config = {"configurable": {"thread_id": "session-1"}}
 
 # Step 1: Agent runs until it needs to call tool
+
 result1 = agent.invoke({
-    "messages": [{"role": "user", "content": "Send email to john@example.com"}]
+"messages": [{"role": "user", "content": "Send email to john@example.com"}]
 }, config=config)
 
 # Check for interrupt
-if "__interrupt__" in result1:
-    print(f"Waiting for approval: {result1['__interrupt__']}")
+
+if "**interrupt**" in result1:
+print(f"Waiting for approval: {result1['__interrupt__']}")
 
 # Step 2: Human approves
+
 result2 = agent.invoke(
-    Command(resume={"decisions": [{"type": "approve"}]}),
-    config=config
+Command(resume={"decisions": [{"type": "approve"}]}),
+config=config
 )
-```
+
+````
 </python>
 <typescript>
 Run the agent, detect an interrupt, then resume execution after human approval.
@@ -122,7 +128,8 @@ const result2 = await agent.invoke(
   new Command({ resume: { decisions: [{ type: "approve" }] } }),
   config
 );
-```
+````
+
 </typescript>
 </ex-running-with-interrupts>
 
@@ -222,7 +229,7 @@ agent = create_agent(
 - Allowed decisions per tool (approve, edit, reject)
 - Custom middleware hooks: `before_model`, `after_model`, `wrap_tool_call`, `before_agent`, `after_agent`
 - Tool-specific middleware (apply only to certain tools)
-</boundaries>
+  </boundaries>
 
 ---
 
@@ -255,6 +262,7 @@ def guard_middleware(request, handler):
         return "This tool is disabled"  # short-circuit
     return handler(request)
 ```
+
 </python>
 <typescript>
 `createMiddleware({ wrapToolCall })` intercepts tool execution.
@@ -265,12 +273,16 @@ import { createMiddleware } from "langchain";
 const retryMiddleware = createMiddleware({
   wrapToolCall: async (request, handler) => {
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { return await handler(request); }
-      catch (e) { if (attempt === 2) throw e; }
+      try {
+        return await handler(request);
+      } catch (e) {
+        if (attempt === 2) throw e;
+      }
     }
   },
 });
 ```
+
 </typescript>
 </ex-wrap-tool-call>
 
@@ -289,6 +301,7 @@ def log_calls(state, runtime):
 def check_output(state, runtime):
     print(f"Model responded")
 ```
+
 </python>
 <typescript>
 All before/after hooks share the same `(state, runtime)` signature via `createMiddleware`.
@@ -305,6 +318,7 @@ const loggingMiddleware = createMiddleware({
   },
 });
 ```
+
 </typescript>
 </ex-before-after-hooks>
 
@@ -313,7 +327,7 @@ const loggingMiddleware = createMiddleware({
 
 - Interrupt after tool execution (must be before)
 - Skip checkpointer requirement for HITL
-</boundaries>
+  </boundaries>
 
 <fix-missing-checkpointer>
 <python>
@@ -323,12 +337,14 @@ HITL middleware requires a checkpointer to persist state.
 agent = create_agent(model="gpt-4.1", tools=[send_email], middleware=[HumanInTheLoopMiddleware({...})])
 
 # CORRECT
+
 agent = create_agent(
-    model="gpt-4.1", tools=[send_email],
-    checkpointer=MemorySaver(),  # Required
-    middleware=[HumanInTheLoopMiddleware({...})]
+model="gpt-4.1", tools=[send_email],
+checkpointer=MemorySaver(), # Required
+middleware=[HumanInTheLoopMiddleware({...})]
 )
-```
+
+````
 </python>
 <typescript>
 HITL requires a checkpointer to persist state.
@@ -345,7 +361,8 @@ const agent = createAgent({
   checkpointer: new MemorySaver(),
   middleware: [humanInTheLoopMiddleware({ interruptOn: { send_email: true } })],
 });
-```
+````
+
 </typescript>
 </fix-missing-checkpointer>
 
@@ -357,8 +374,10 @@ Always provide thread_id when using HITL to track conversation state.
 agent.invoke(input)  # No config!
 
 # CORRECT
+
 agent.invoke(input, config={"configurable": {"thread_id": "user-123"}})
-```
+
+````
 </python>
 </fix-no-thread-id>
 
@@ -372,7 +391,8 @@ agent.invoke({"resume": {"decisions": [...]}})
 # CORRECT
 from langgraph.types import Command
 agent.invoke(Command(resume={"decisions": [{"type": "approve"}]}), config=config)
-```
+````
+
 </python>
 <typescript>
 Use Command class to resume execution after an interrupt.
@@ -383,6 +403,8 @@ await agent.invoke({ resume: { decisions: [...] } });
 // CORRECT
 import { Command } from "@langchain/langgraph";
 await agent.invoke(new Command({ resume: { decisions: [{ type: "approve" }] } }), config);
+
 ```
 </typescript>
 </fix-wrong-resume-syntax>
+```

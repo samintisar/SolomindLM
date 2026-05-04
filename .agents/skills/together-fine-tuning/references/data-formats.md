@@ -1,4 +1,5 @@
 # Fine-tuning Data Formats Reference
+
 ## Contents
 
 - [Format Overview](#format-overview)
@@ -15,29 +16,28 @@
 - [Data Validation](#data-validation)
 - [Converting Image URLs to Base64](#converting-image-urls-to-base64)
 
-
 ## Format Overview
 
-| Format | Use Case | Key Field |
-|--------|----------|-----------|
-| Conversational | Multi-turn chat | `messages` |
-| Instruction | Prompt-completion pairs | `prompt` + `completion` |
-| Generic Text | Text completion / pretraining | `text` |
-| Preference/DPO | Preference learning | `input` + `preferred_output` + `non_preferred_output` |
-| Reasoning | Chain-of-thought training | `messages` with `reasoning` field on assistant |
-| Function Calling | Tool use training | `messages` + `tools` |
-| VLM | Vision + language | `messages` with image content |
+| Format           | Use Case                      | Key Field                                             |
+| ---------------- | ----------------------------- | ----------------------------------------------------- |
+| Conversational   | Multi-turn chat               | `messages`                                            |
+| Instruction      | Prompt-completion pairs       | `prompt` + `completion`                               |
+| Generic Text     | Text completion / pretraining | `text`                                                |
+| Preference/DPO   | Preference learning           | `input` + `preferred_output` + `non_preferred_output` |
+| Reasoning        | Chain-of-thought training     | `messages` with `reasoning` field on assistant        |
+| Function Calling | Tool use training             | `messages` + `tools`                                  |
+| VLM              | Vision + language             | `messages` with image content                         |
 
 ## Conversational Format
 
 ```json
 {
   "messages": [
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "Hello!"},
-    {"role": "assistant", "content": "Hi! How can I help?"},
-    {"role": "user", "content": "Explain ML", "weight": 0},
-    {"role": "assistant", "content": "Machine learning is...", "weight": 1}
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "Hello!" },
+    { "role": "assistant", "content": "Hi! How can I help?" },
+    { "role": "user", "content": "Explain ML", "weight": 0 },
+    { "role": "assistant", "content": "Machine learning is...", "weight": 1 }
   ]
 }
 ```
@@ -71,7 +71,7 @@ train_messages.to_json("coqa_prepared_train.jsonl")
 ## Instruction Format
 
 ```json
-{"prompt": "What is photosynthesis?", "completion": "Photosynthesis is..."}
+{ "prompt": "What is photosynthesis?", "completion": "Photosynthesis is..." }
 ```
 
 - By default, model not trained on prompt text
@@ -80,7 +80,7 @@ train_messages.to_json("coqa_prepared_train.jsonl")
 ## Generic Text Format
 
 ```json
-{"text": "The quick brown fox jumps over the lazy dog."}
+{ "text": "The quick brown fox jumps over the lazy dog." }
 ```
 
 ## Preference/DPO Format
@@ -88,16 +88,15 @@ train_messages.to_json("coqa_prepared_train.jsonl")
 ```json
 {
   "input": {
-    "messages": [
-      {"role": "user", "content": "What's open-source AI?"}
-    ]
+    "messages": [{ "role": "user", "content": "What's open-source AI?" }]
   },
   "preferred_output": [
-    {"role": "assistant", "content": "Open-source AI means models are free to use, modify, and share..."}
+    {
+      "role": "assistant",
+      "content": "Open-source AI means models are free to use, modify, and share..."
+    }
   ],
-  "non_preferred_output": [
-    {"role": "assistant", "content": "It means the code is public."}
-  ]
+  "non_preferred_output": [{ "role": "assistant", "content": "It means the code is public." }]
 }
 ```
 
@@ -111,7 +110,7 @@ field containing the chain of thought, alongside the `content` field for the fin
 ```json
 {
   "messages": [
-    {"role": "user", "content": "What is 15% of 240?"},
+    { "role": "user", "content": "What is 15% of 240?" },
     {
       "role": "assistant",
       "reasoning": "15% means 15/100 = 0.15\n0.15 * 240 = 36",
@@ -126,7 +125,7 @@ For preference fine-tuning with reasoning, include `reasoning` in both outputs:
 ```json
 {
   "input": {
-    "messages": [{"role": "user", "content": "What is 15% of 240?"}]
+    "messages": [{ "role": "user", "content": "What is 15% of 240?" }]
   },
   "preferred_output": [
     {
@@ -160,7 +159,7 @@ Supported models: Qwen3 family (0.6B-235B), Qwen3-Next-80B-A3B-Thinking, GLM-4.6
         "parameters": {
           "type": "object",
           "properties": {
-            "city": {"type": "string", "description": "City name"}
+            "city": { "type": "string", "description": "City name" }
           },
           "required": ["city"]
         }
@@ -168,19 +167,23 @@ Supported models: Qwen3 family (0.6B-235B), Qwen3-Next-80B-A3B-Thinking, GLM-4.6
     }
   ],
   "messages": [
-    {"role": "user", "content": "What's the weather in NYC?"},
+    { "role": "user", "content": "What's the weather in NYC?" },
     {
       "role": "assistant",
       "tool_calls": [
         {
           "id": "call_1",
           "type": "function",
-          "function": {"name": "get_weather", "arguments": "{\"city\": \"New York\"}"}
+          "function": { "name": "get_weather", "arguments": "{\"city\": \"New York\"}" }
         }
       ]
     },
-    {"role": "tool", "tool_call_id": "call_1", "content": "{\"temp\": 72, \"condition\": \"sunny\"}"},
-    {"role": "assistant", "content": "It's currently 72F and sunny in New York City."}
+    {
+      "role": "tool",
+      "tool_call_id": "call_1",
+      "content": "{\"temp\": 72, \"condition\": \"sunny\"}"
+    },
+    { "role": "assistant", "content": "It's currently 72F and sunny in New York City." }
   ]
 }
 ```
@@ -203,12 +206,15 @@ For preference fine-tuning with function calling, the `tools` field goes inside 
 ```json
 {
   "messages": [
-    {"role": "system", "content": [{"type": "text", "text": "Vision assistant."}]},
-    {"role": "user", "content": [
-      {"type": "text", "text": "How many oranges?"},
-      {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,iVBORw0KG..."}}
-    ]},
-    {"role": "assistant", "content": [{"type": "text", "text": "There are 7 oranges."}]}
+    { "role": "system", "content": [{ "type": "text", "text": "Vision assistant." }] },
+    {
+      "role": "user",
+      "content": [
+        { "type": "text", "text": "How many oranges?" },
+        { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,iVBORw0KG..." } }
+      ]
+    },
+    { "role": "assistant", "content": [{ "type": "text", "text": "There are 7 oranges." }] }
   ]
 }
 ```
@@ -223,21 +229,23 @@ For preference fine-tuning with function calling, the `tools` field goes inside 
 ```json
 {
   "prompt": [
-    {"type": "text", "text": "Describe this image."},
-    {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
+    { "type": "text", "text": "Describe this image." },
+    { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,..." } }
   ],
-  "completion": [{"type": "text", "text": "The image shows..."}]
+  "completion": [{ "type": "text", "text": "The image shows..." }]
 }
 ```
 
 ## File Formats
 
 ### JSONL (Default)
+
 - One JSON object per line
 - Automatic sample packing for efficient training
 - Max file size: 50GB
 
 ### Parquet (Advanced)
+
 - Pre-tokenized data
 - Required columns: `input_ids`, `attention_mask`
 - Optional: `labels` (use -100 to mask tokens from loss)

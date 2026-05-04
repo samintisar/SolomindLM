@@ -11,6 +11,7 @@ Guidance for AI agents working in this repository. **Serena + Superpowers is the
 Serena is the default for all code navigation, editing, and refactoring. **Prefer Serena tools over built-in Read/Edit/Write/Grep for `.ts` / `.tsx` files.**
 
 **Session start:**
+
 ```
 serena_get_current_config                    # Verify project activation
 serena_activate_project project="SolomindLM" # If not activated
@@ -19,6 +20,7 @@ serena_list_memories                         # Review existing memories
 ```
 
 **Code work:**
+
 - `serena_get_symbols_overview` — Understand file structure first
 - `serena_find_symbol` — Locate definitions by name path
 - `serena_find_referencing_symbols` — Check impact before changes
@@ -28,6 +30,7 @@ serena_list_memories                         # Review existing memories
 - `serena_safe_delete_symbol` — Delete if no references
 
 **Memory management (for continuity):**
+
 - `serena_read_memory` — Load context from prior sessions
 - `serena_write_memory` — Store new project knowledge
 - `serena_edit_memory` — Update existing memories (preferred over creating new)
@@ -39,33 +42,33 @@ serena_list_memories                         # Review existing memories
 
 **Invoke these skills at the start of the relevant phase. Do not skip.**
 
-| Skill | Trigger | When to Use |
-|---|---|---|
-| `superpowers:brainstorming` | Before any new feature, component, or behavior change | Required before planning |
-| `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
-| `superpowers:test-driven-development` | Deterministic logic: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new queries/mutations | vitest + `convex-test`; pattern `*.test.ts` next to source |
-| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Pair with subagent-driven-development |
-| `superpowers:subagent-driven-development` | Plan with independent tasks, current session | Use Explore subagent for >3-query searches |
-| `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior | Before proposing fixes |
-| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR | typecheck:web + typecheck:convex + lint + test:convex |
-| `superpowers:requesting-code-review` | Before merging significant work | — |
-| `superpowers:receiving-code-review` | When handling review feedback | — |
-| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
-| `superpowers:using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
+| Skill                                        | Trigger                                                                                                                | When to Use                                                |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `superpowers:brainstorming`                  | Before any new feature, component, or behavior change                                                                  | Required before planning                                   |
+| `superpowers:writing-plans`                  | Multi-step task, before touching code                                                                                  | Output goes in plan, not memory                            |
+| `superpowers:test-driven-development`        | Deterministic logic: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new queries/mutations | vitest + `convex-test`; pattern `*.test.ts` next to source |
+| `superpowers:dispatching-parallel-agents`    | 2+ independent tasks, no shared state                                                                                  | Pair with subagent-driven-development                      |
+| `superpowers:subagent-driven-development`    | Plan with independent tasks, current session                                                                           | Use Explore subagent for >3-query searches                 |
+| `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior                                                                          | Before proposing fixes                                     |
+| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR                                                                    | typecheck:web + typecheck:convex + lint + test:convex      |
+| `superpowers:requesting-code-review`         | Before merging significant work                                                                                        | —                                                          |
+| `superpowers:receiving-code-review`          | When handling review feedback                                                                                          | —                                                          |
+| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup                                                                     | —                                                          |
+| `superpowers:using-git-worktrees`            | Feature work needing isolation                                                                                         | Worktrees live under `.worktrees/`                         |
 
 **Skip TDD for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing.
 
 ### 3. Domain Skills (When Triggered)
 
-| Skill | Trigger |
-|---|---|
-| `convex-migration-helper` | Schema or table change (widen-migrate-narrow) |
-| `convex-performance-audit` | Read amplification, OCC conflicts, `npx convex insights` warnings |
-| `convex-create-component` | New isolated table-owning module |
-| `langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals` | Anything under `convex/_agents/` |
-| `together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video` | Modifying `convex/_services/ai/` or `convex/studio/audio/` |
-| `vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing` | Frontend work as triggers describe |
-| `serena-usage` | Memory management, cross-file refactors, code navigation |
+| Skill                                                                                                                                        | Trigger                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `convex-migration-helper`                                                                                                                    | Schema or table change (widen-migrate-narrow)                     |
+| `convex-performance-audit`                                                                                                                   | Read amplification, OCC conflicts, `npx convex insights` warnings |
+| `convex-create-component`                                                                                                                    | New isolated table-owning module                                  |
+| `langchain-fundamentals`, `langchain-rag`, `langgraph-fundamentals`                                                                          | Anything under `convex/_agents/`                                  |
+| `together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`            | Modifying `convex/_services/ai/` or `convex/studio/audio/`        |
+| `vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing` | Frontend work as triggers describe                                |
+| `serena-usage`                                                                                                                               | Memory management, cross-file refactors, code navigation          |
 
 ---
 
@@ -150,8 +153,8 @@ Bun workspaces monorepo:
 
 **Pipelines:**
 
-- *Content:* ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
-- *Generation:* user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
+- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
+- _Generation:_ user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
 
 ---
 
@@ -206,25 +209,25 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
 
 Plugin `superpowers@claude-plugins-official` is installed. **Invoke via `Skill` tool before touching code.** Project-specific triggers and overrides:
 
-| Skill | When | Project notes |
-|---|---|---|
-| `superpowers:brainstorming` | Before any new feature, component, or behavior change | **Required** before `EnterPlanMode` |
-| `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
-| `superpowers:executing-plans` | Executing a written plan in a separate session | — |
-| `superpowers:subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
-| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Use `Explore` subagent for >3-query codebase searches |
-| `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
-| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
-| `superpowers:requesting-code-review` | Before merging significant work | — |
-| `superpowers:receiving-code-review` | When handling review feedback | — |
-| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
-| `superpowers:using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
-| `superpowers:writing-skills` | Creating or editing a skill | Edit canonical copy under `.agents/skills/<name>/SKILL.md` |
-| `superpowers:test-driven-development` | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
+| Skill                                        | When                                                                                                                                                                                                                                                                                                         | Project notes                                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `superpowers:brainstorming`                  | Before any new feature, component, or behavior change                                                                                                                                                                                                                                                        | **Required** before `EnterPlanMode`                                                                                                         |
+| `superpowers:writing-plans`                  | Multi-step task, before touching code                                                                                                                                                                                                                                                                        | Output goes in plan, not memory                                                                                                             |
+| `superpowers:executing-plans`                | Executing a written plan in a separate session                                                                                                                                                                                                                                                               | —                                                                                                                                           |
+| `superpowers:subagent-driven-development`    | Plan with independent tasks, current session                                                                                                                                                                                                                                                                 | Pair with `dispatching-parallel-agents` for 2+ independent tasks                                                                            |
+| `superpowers:dispatching-parallel-agents`    | 2+ independent tasks, no shared state                                                                                                                                                                                                                                                                        | Use `Explore` subagent for >3-query codebase searches                                                                                       |
+| `superpowers:systematic-debugging`           | Any bug, test failure, or unexpected behavior, before proposing fixes                                                                                                                                                                                                                                        | —                                                                                                                                           |
+| `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR                                                                                                                                                                                                                                                          | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
+| `superpowers:requesting-code-review`         | Before merging significant work                                                                                                                                                                                                                                                                              | —                                                                                                                                           |
+| `superpowers:receiving-code-review`          | When handling review feedback                                                                                                                                                                                                                                                                                | —                                                                                                                                           |
+| `superpowers:finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup                                                                                                                                                                                                                                                           | —                                                                                                                                           |
+| `superpowers:using-git-worktrees`            | Feature work needing isolation                                                                                                                                                                                                                                                                               | Worktrees live under `.worktrees/`                                                                                                          |
+| `superpowers:writing-skills`                 | Creating or editing a skill                                                                                                                                                                                                                                                                                  | Edit canonical copy under `.agents/skills/<name>/SKILL.md`                                                                                  |
+| `superpowers:test-driven-development`        | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
 
 ## Project-Specific Skill Triggers
 
-Skill descriptions are loaded automatically; below are *project* triggers, not generic descriptions.
+Skill descriptions are loaded automatically; below are _project_ triggers, not generic descriptions.
 
 **Convex** (`convex-create-component`, `convex-migration-helper`, `convex-performance-audit`, `convex-quickstart`, `convex-setup-auth`):
 

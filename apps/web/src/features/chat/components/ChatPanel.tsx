@@ -167,44 +167,47 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const rejectPlanMutation = useMutation(api.research.index.rejectResearchPlan);
   const addExternalSourcesMutation = useMutation(api.documents.index.addExternalSources);
 
-  const handleApproveResearchPlan = useCallback(async (planId: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await approvePlanMutation({ planId: planId as any });
-      const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ planId }),
-      });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error || `Research failed to start (${response.status})`);
+  const handleApproveResearchPlan = useCallback(
+    async (planId: string) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await approvePlanMutation({ planId: planId as any });
+        const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({ planId }),
+        });
+        if (!response.ok) {
+          const data = (await response.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(data?.error || `Research failed to start (${response.status})`);
+        }
+        await consumeResearchExecuteStream(response);
+      } catch (err) {
+        console.error("[ResearchPlan] Approve failed:", err);
+        toastError(err instanceof Error ? err.message : "Failed to start research execution");
       }
-      await consumeResearchExecuteStream(response);
-    } catch (err) {
-      console.error("[ResearchPlan] Approve failed:", err);
-      toastError(
-        err instanceof Error ? err.message : "Failed to start research execution"
-      );
-    }
-  }, [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]);
+    },
+    [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]
+  );
 
-  const handleRejectResearchPlan = useCallback(async (planId: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await rejectPlanMutation({ planId: planId as any });
-    } catch (err) {
-      console.error("[ResearchPlan] Reject failed:", err);
-    }
-  }, [rejectPlanMutation]);
+  const handleRejectResearchPlan = useCallback(
+    async (planId: string) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await rejectPlanMutation({ planId: planId as any });
+      } catch (err) {
+        console.error("[ResearchPlan] Reject failed:", err);
+      }
+    },
+    [rejectPlanMutation]
+  );
 
   const chatInputDisabled = isSending || isLoading || remoteGenerationBlocksSend;
-  const waitingOnRemoteGeneration =
-    remoteGenerationBlocksSend && !isLoading && !isSending;
+  const waitingOnRemoteGeneration = remoteGenerationBlocksSend && !isLoading && !isSending;
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -406,13 +409,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     setIsSending(true);
     setInputMessage("");
-    onSendMessage(
-      trimmed,
-      deepResearchEnabled || undefined,
-      { channels: sourceFilters }
-    );
+    onSendMessage(trimmed, deepResearchEnabled || undefined, { channels: sourceFilters });
     setIsSending(false);
-  }, [inputMessage, chatInputDisabled, notebookId, onSendMessage, sources, toastError, deepResearchEnabled, sourceFilters]);
+  }, [
+    inputMessage,
+    chatInputDisabled,
+    notebookId,
+    onSendMessage,
+    sources,
+    toastError,
+    deepResearchEnabled,
+    sourceFilters,
+  ]);
 
   const handleSendChip = useCallback(
     (text: string) => {
@@ -448,7 +456,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // --- Tooltip position computation ---
 
   const tooltipContent = useMemo(() => {
-     
     // eslint-disable-next-line react-hooks/refs
     if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current)
       return null;
@@ -459,7 +466,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       hoveredRefId >= 1 && hoveredRefId <= refsArray.length
         ? refsArray[hoveredRefId - 1]
         : refsArray.find((r) => Number(r.id) === hoveredRefId);
-     
+
     // eslint-disable-next-line react-hooks/refs
     const containerRect = messagesContainerRef.current.getBoundingClientRect();
     if (!ref || !containerRect) return null;
@@ -639,142 +646,143 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Messages Area */}
         <div className="flex flex-1 min-h-0">
-        <div
-          ref={messagesContainerRef}
-          className={`flex min-h-0 w-full min-w-0 flex-1 relative chat-panel-graph-grid ${
-            messages.length === 0
-              ? "overflow-y-auto overflow-x-hidden"
-              : "overflow-x-hidden overflow-y-hidden"
-          }`}
-        >
-          {messages.length === 0 ? (
-            <ChatEmptyState
-              onSendMessage={handleSendChip}
-              disabled={chatInputDisabled}
-              sourceCount={sourceCount}
-              sourceSummary={sourceSummary}
-              suggestions={suggestions}
-              isLoadingSuggestions={isLoadingSuggestions}
-              notebookIcon={notebookIcon}
-              notebookCoverColor={notebookCoverColor}
-              notebookTitle={notebookTitle}
-            />
-          ) : (
-            <Virtuoso
-              ref={virtuosoRef}
-              className="min-h-0 w-full min-w-0"
-              style={{ height: "100%" }}
-              data={memoizedMessages}
-              itemContent={(_index, message) => (
-                <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
-                  {message.researchPlan ? (
-                    <ResearchPlanMessage
-                      planId={message.researchPlan.planId}
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      subQuestions={(message.researchPlan.subQuestions as any[]) ?? []}
-                      onApprove={handleApproveResearchPlan}
-                      onReject={handleRejectResearchPlan}
-                    />
-                  ) : (
-                  <>
-                  <MessageBubble
-                    message={message}
-                    isAssistantStreamActive={message.id === "__streaming__" ? isLoading : false}
-                    refHandlers={refHandlers}
-                    onCopyMessage={copyMessageAsMarkdown}
-                    copiedMessageId={copiedMessageId}
-                    onSetFeedback={onSetFeedback}
-                    onSendFollowUp={handleSendChip}
-                    onRetry={onRetry}
-                    externalSources={message.externalSources}
-                    onAddExternalSources={async (selectedSources) => {
-                      if (!notebookId) return;
-                      try {
-                        await addExternalSourcesMutation({
-                          notebookId: notebookId as Id<"notebooks">,
-                          sources: selectedSources.map((s) => ({
-                            title: s.title,
-                            url: s.url,
-                            snippet: s.snippet,
-                            sourceType: s.sourceType,
-                          })),
-                        });
-      } catch (e) {
-                        console.error("Failed to add external sources:", e);
-                      }
-                    }}
-                    showSourcesButton={
-                      message.role === "assistant" &&
-                      !!message.externalSources &&
-                      message.externalSources.length > 0
-                    }
-                  />
-                  </>
-                  )}
-                </div>
-              )}
-              components={{
-                Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
-              }}
-              defaultItemHeight={150}
-              increaseViewportBy={{ top: 200, bottom: 400 }}
-            />
-          )}
+          <div
+            ref={messagesContainerRef}
+            className={`flex min-h-0 w-full min-w-0 flex-1 relative chat-panel-graph-grid ${
+              messages.length === 0
+                ? "overflow-y-auto overflow-x-hidden"
+                : "overflow-x-hidden overflow-y-hidden"
+            }`}
+          >
+            {messages.length === 0 ? (
+              <ChatEmptyState
+                onSendMessage={handleSendChip}
+                disabled={chatInputDisabled}
+                sourceCount={sourceCount}
+                sourceSummary={sourceSummary}
+                suggestions={suggestions}
+                isLoadingSuggestions={isLoadingSuggestions}
+                notebookIcon={notebookIcon}
+                notebookCoverColor={notebookCoverColor}
+                notebookTitle={notebookTitle}
+              />
+            ) : (
+              <Virtuoso
+                ref={virtuosoRef}
+                className="min-h-0 w-full min-w-0"
+                style={{ height: "100%" }}
+                data={memoizedMessages}
+                itemContent={(_index, message) => (
+                  <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
+                    {message.researchPlan ? (
+                      <ResearchPlanMessage
+                        planId={message.researchPlan.planId}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        subQuestions={(message.researchPlan.subQuestions as any[]) ?? []}
+                        onApprove={handleApproveResearchPlan}
+                        onReject={handleRejectResearchPlan}
+                      />
+                    ) : (
+                      <>
+                        <MessageBubble
+                          message={message}
+                          isAssistantStreamActive={
+                            message.id === "__streaming__" ? isLoading : false
+                          }
+                          refHandlers={refHandlers}
+                          onCopyMessage={copyMessageAsMarkdown}
+                          copiedMessageId={copiedMessageId}
+                          onSetFeedback={onSetFeedback}
+                          onSendFollowUp={handleSendChip}
+                          onRetry={onRetry}
+                          externalSources={message.externalSources}
+                          onAddExternalSources={async (selectedSources) => {
+                            if (!notebookId) return;
+                            try {
+                              await addExternalSourcesMutation({
+                                notebookId: notebookId as Id<"notebooks">,
+                                sources: selectedSources.map((s) => ({
+                                  title: s.title,
+                                  url: s.url,
+                                  snippet: s.snippet,
+                                  sourceType: s.sourceType,
+                                })),
+                              });
+                            } catch (e) {
+                              console.error("Failed to add external sources:", e);
+                            }
+                          }}
+                          showSourcesButton={
+                            message.role === "assistant" &&
+                            !!message.externalSources &&
+                            message.externalSources.length > 0
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+                components={{
+                  Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
+                }}
+                defaultItemHeight={150}
+                increaseViewportBy={{ top: 200, bottom: 400 }}
+              />
+            )}
 
-          {/* Floating Reference Tooltip */}
-          {tooltipContent && (
-            <ReferenceTooltip
-              hoveredRefId={hoveredRefId!}
-              tooltipRef={tooltipRef}
-              reference={tooltipContent.ref}
-              position={{ x: tooltipContent.x, y: tooltipContent.y }}
-              onOpenInSources={(() => {
-                const docId = tooltipContent.ref.documentId?.trim();
-                if (
-                  !docId ||
-                  !onOpenNotebookSource ||
-                  !sources.some((s) => s.id === docId)
-                ) {
-                  return undefined;
-                }
-                // eslint-disable-next-line react-hooks/refs
-                return () => handleOpenReferenceInSources(tooltipContent.ref);
-              })()}
-              onAddToNotebook={(() => {
-                const isExternal = !tooltipContent.ref.documentId && !!tooltipContent.ref.sourceUrl;
-                if (!isExternal || !notebookId) return undefined;
-                return async () => {
-                  try {
-                    await addExternalSourcesMutation({
-                      notebookId: notebookId as Id<"notebooks">,
-                      sources: [{
-                        title: tooltipContent.ref.sourceTitle,
-                        url: tooltipContent.ref.sourceUrl!,
-                        snippet: tooltipContent.ref.content.slice(0, 500),
-                        sourceType: "web",
-                      }],
-                    });
-                  } catch (e) {
-                    console.error("Failed to add external source:", e);
+            {/* Floating Reference Tooltip */}
+            {tooltipContent && (
+              <ReferenceTooltip
+                hoveredRefId={hoveredRefId!}
+                tooltipRef={tooltipRef}
+                reference={tooltipContent.ref}
+                position={{ x: tooltipContent.x, y: tooltipContent.y }}
+                onOpenInSources={(() => {
+                  const docId = tooltipContent.ref.documentId?.trim();
+                  if (!docId || !onOpenNotebookSource || !sources.some((s) => s.id === docId)) {
+                    return undefined;
                   }
-                };
-              })()}
-              onMouseEnter={() => {
-                setIsTooltipHovered(true);
-                if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-              }}
-              onMouseLeave={() => {
-                setIsTooltipHovered(false);
-                hideTooltipTimeoutRef.current = setTimeout(() => {
-                  if (!isTooltipHovered) {
-                    setHoveredRefId(null);
-                    setHoveredMessageId(null);
-                  }
-                }, 100);
-              }}
-            />
-          )}
-        </div>
+                  // eslint-disable-next-line react-hooks/refs
+                  return () => handleOpenReferenceInSources(tooltipContent.ref);
+                })()}
+                onAddToNotebook={(() => {
+                  const isExternal =
+                    !tooltipContent.ref.documentId && !!tooltipContent.ref.sourceUrl;
+                  if (!isExternal || !notebookId) return undefined;
+                  return async () => {
+                    try {
+                      await addExternalSourcesMutation({
+                        notebookId: notebookId as Id<"notebooks">,
+                        sources: [
+                          {
+                            title: tooltipContent.ref.sourceTitle,
+                            url: tooltipContent.ref.sourceUrl!,
+                            snippet: tooltipContent.ref.content.slice(0, 500),
+                            sourceType: "web",
+                          },
+                        ],
+                      });
+                    } catch (e) {
+                      console.error("Failed to add external source:", e);
+                    }
+                  };
+                })()}
+                onMouseEnter={() => {
+                  setIsTooltipHovered(true);
+                  if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
+                }}
+                onMouseLeave={() => {
+                  setIsTooltipHovered(false);
+                  hideTooltipTimeoutRef.current = setTimeout(() => {
+                    if (!isTooltipHovered) {
+                      setHoveredRefId(null);
+                      setHoveredMessageId(null);
+                    }
+                  }, 100);
+                }}
+              />
+            )}
+          </div>
         </div>
 
         {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}

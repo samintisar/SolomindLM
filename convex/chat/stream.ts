@@ -88,7 +88,9 @@ async function runResearchPlanPhase(
       content: message,
     });
     if (!lookedUp) {
-      throw new Error("[ResearchPlan] No user message found for this conversation; cannot attach plan.");
+      throw new Error(
+        "[ResearchPlan] No user message found for this conversation; cannot attach plan."
+      );
     }
     resolvedUserMessageId = lookedUp;
   }
@@ -107,16 +109,21 @@ async function runResearchPlanPhase(
     const chunkIds = vectorResults.map((r: any) => r._id);
     if (chunkIds.length === 0) return [];
     const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
-     
-     
-     
-     
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chunkMap = new Map<any, any>(fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any]));
+    const chunkMap = new Map<any, any>(
+      fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any])
+    );
+
      
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const docIds_unique = [...new Set(vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean))];
-    const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, { documentIds: docIds_unique });
+    const docIds_unique = [
+      ...new Set(
+        vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean)
+      ),
+    ];
+    const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, {
+      documentIds: docIds_unique,
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const titleMap = new Map(docRows.map((d: any) => [d._id, d.fileName]));
     const sourceUrlMap = new Map<string, string>();
@@ -125,24 +132,26 @@ async function runResearchPlanPhase(
         sourceUrlMap.set(d._id, d.fileUrl);
       }
     }
-    return vectorResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((r: any) => {
+    return (
+      vectorResults
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chunk = chunkMap.get(r._id) as any;
-        if (!chunk) return null;
-        return {
-          sourceId: String(r._id),
-          documentId: String(chunk.documentId),
-          sourceTitle: titleMap.get(chunk.documentId) ?? "Document",
-          sourceUrl: sourceUrlMap.get(String(chunk.documentId)),
-          content: chunk.content as string,
-          chunkIndex: chunk.chunkIndex as number,
-          similarity: r._score ?? 0,
-        };
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((x: any) => x !== null);
+        .map((r: any) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chunk = chunkMap.get(r._id) as any;
+          if (!chunk) return null;
+          return {
+            sourceId: String(r._id),
+            documentId: String(chunk.documentId),
+            sourceTitle: titleMap.get(chunk.documentId) ?? "Document",
+            sourceUrl: sourceUrlMap.get(String(chunk.documentId)),
+            content: chunk.content as string,
+            chunkIndex: chunk.chunkIndex as number,
+            similarity: r._score ?? 0,
+          };
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((x: any) => x !== null)
+    );
   };
 
   const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
@@ -201,29 +210,36 @@ async function runResearchPlanPhase(
       if (webChannels.length > 0) {
         for (const channel of webChannels) {
           promises.push(
-            ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
-              query,
-              maxResults: maxResults ?? 2,
-              topic: channel === "web" ? "general" : channel,
-              searchDepth: "basic",
-              includeRawContent: false,
-            }).catch((e: unknown) => {
-              researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
-              return [];
-            })
+            ctx
+              .runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+                query,
+                maxResults: maxResults ?? 2,
+                topic: channel === "web" ? "general" : channel,
+                searchDepth: "basic",
+                includeRawContent: false,
+              })
+              .catch((e: unknown) => {
+                researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
+                return [];
+              })
           );
         }
       }
 
       if (academicChannels.length > 0) {
         promises.push(
-          ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
-            query,
-            maxResults: maxResults ?? 2,
-          }).catch((e: unknown) => {
-            researchLog.warn("research_academic_discovery_failed", { error: String(e) });
-            return [];
-          })
+          ctx
+            .runAction(
+              internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+              {
+                query,
+                maxResults: maxResults ?? 2,
+              }
+            )
+            .catch((e: unknown) => {
+              researchLog.warn("research_academic_discovery_failed", { error: String(e) });
+              return [];
+            })
         );
       }
 
@@ -245,13 +261,11 @@ async function runResearchPlanPhase(
       }));
     },
     loadWebPage: async (url: string) => {
-      return ctx.runAction(
-        internal._services.extractors.scrapeWebPageInternal,
-        { url }
-      );
+      return ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url });
     },
     loadPaper: async (paper) => {
-      const { AcademicLoaderService } = await import("../_services/extraction/AcademicLoaderService.js");
+      const { AcademicLoaderService } =
+        await import("../_services/extraction/AcademicLoaderService.js");
       const loader = new AcademicLoaderService();
       return loader.loadPaper(paper);
     },
@@ -505,19 +519,22 @@ export async function streamChatResponse(
   const historyBudget = parseInt(env.CHAT_HISTORY_TOKEN_BUDGET ?? "4000", 10);
   const conversationHistory = budgetConversationHistory(fullHistory, historyBudget);
 
-  const notebookChatSettings = notebookDoc?.chatSettings as {
-    instructionMode: "default" | "learningGuide" | "custom";
-    customInstructions?: string;
-    responseLength: "default" | "longer" | "shorter";
-    smartModel?: string;
-  } | undefined;
+  const notebookChatSettings = notebookDoc?.chatSettings as
+    | {
+        instructionMode: "default" | "learningGuide" | "custom";
+        customInstructions?: string;
+        responseLength: "default" | "longer" | "shorter";
+        smartModel?: string;
+      }
+    | undefined;
 
   // Validate model ID against whitelist, fall back to env default
   const validModelIds = new Set(AVAILABLE_SMART_MODEL_IDS);
   const resolvedSmartModel =
-    notebookChatSettings?.smartModel && validModelIds.has(notebookChatSettings.smartModel as SmartModelId)
-      ? notebookChatSettings.smartModel as SmartModelId
-      : (env.SMART_LLM ?? "openai/gpt-oss-120b") as SmartModelId;
+    notebookChatSettings?.smartModel &&
+    validModelIds.has(notebookChatSettings.smartModel as SmartModelId)
+      ? (notebookChatSettings.smartModel as SmartModelId)
+      : ((env.SMART_LLM ?? "openai/gpt-oss-120b") as SmartModelId);
 
   // Merge chat settings: default/learningGuide follow the notebook (Configure chat).
   // Conversations only lock instruction mode for custom instructions once created as custom.
@@ -525,8 +542,10 @@ export async function streamChatResponse(
   const conversationDoc = await ctx.runQuery(internal.chat.conversations.getInternal, {
     conversationId,
   });
-  const notebookInstructionMode = (notebookChatSettings?.instructionMode ??
-    "default") as "default" | "learningGuide" | "custom";
+  const notebookInstructionMode = (notebookChatSettings?.instructionMode ?? "default") as
+    | "default"
+    | "learningGuide"
+    | "custom";
   const conversationInstructionMode = conversationDoc?.instructionMode as
     | "default"
     | "learningGuide"
@@ -750,7 +769,7 @@ export async function streamChatResponse(
     query: string,
     limit: number,
     docIds?: string[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any[]> => {
     chatStreamLog.debug("keyword_search_runner", { phase: "start" });
 
@@ -804,10 +823,13 @@ export async function streamChatResponse(
     userPrefs = await ctx.runQuery(
       internal.userPreferences.index.getPreferencesByUserId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { userId: userId as any },
+      { userId: userId as any }
     );
   } catch (e) {
-    console.warn("[chat] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+    console.warn(
+      "[chat] user preference fetch failed, using default language",
+      e instanceof Error ? e.message : String(e)
+    );
   }
 
   const agent = new ChatAgent({
@@ -824,7 +846,7 @@ export async function streamChatResponse(
       if (!chunks || chunks.length === 0) return null;
 
       // Sort by chunk index and join content
-       
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sortedChunks = chunks.sort((a: any, b: any) => a.chunkIndex - b.chunkIndex);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -856,9 +878,7 @@ export async function streamChatResponse(
     const maxPerChannel = Math.ceil(10 / externalChannels.length);
 
     // Web/News channels via Tavily
-    const webChannels = externalChannels.filter((ch) =>
-      ["web", "news", "finance"].includes(ch)
-    );
+    const webChannels = externalChannels.filter((ch) => ["web", "news", "finance"].includes(ch));
     // Academic channel via AcademicSearchService
     const academicChannels = externalChannels.filter((ch) => ch === "academic");
 
@@ -873,7 +893,7 @@ export async function streamChatResponse(
 
     if (webChannels.length > 0) {
       const channelToTopic = (ch: string) => (ch === "web" ? "general" : ch);
-      const searchPromises: Promise<Array<typeof allResults[number]>>[] = [];
+      const searchPromises: Promise<Array<(typeof allResults)[number]>>[] = [];
 
       // Refine the user message into a search-optimized query to improve result relevance.
       const refinedQuery = await refineWebSearchQuery(message);
@@ -881,25 +901,28 @@ export async function streamChatResponse(
       for (const channel of webChannels) {
         const topic = channelToTopic(channel);
         searchPromises.push(
-          ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
-            query: refinedQuery,
-            maxResults: maxPerChannel,
-            topic,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          }).then((results: any[]) =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            results.map((r: any) => ({
-              title: r.title ?? "Untitled",
-              url: r.url ?? "",
-              snippet: r.snippet ?? r.content ?? "",
-              sourceType: channel,
-              score: r.score,
-              rawContent: r.rawContent ?? undefined,
-            }))
-          ).catch((e: unknown) => {
-            chatStreamLog.warn("web_search_failed", { channel, topic, error: String(e) });
-            return [];
-          })
+          ctx
+            .runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
+              query: refinedQuery,
+              maxResults: maxPerChannel,
+              topic,
+               
+            })
+            .then((results: any[]) =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              results.map((r: any) => ({
+                title: r.title ?? "Untitled",
+                url: r.url ?? "",
+                snippet: r.snippet ?? r.content ?? "",
+                sourceType: channel,
+                score: r.score,
+                rawContent: r.rawContent ?? undefined,
+              }))
+            )
+            .catch((e: unknown) => {
+              chatStreamLog.warn("web_search_failed", { channel, topic, error: String(e) });
+              return [];
+            })
         );
       }
 
@@ -961,7 +984,7 @@ export async function streamChatResponse(
         // Prefer rawContent when available, fallback to snippet
         const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
         const raw = hasRawContent ? r.rawContent!.trim() : r.snippet.trim();
-        
+
         // Chunk content into ~3000 char pieces to fit within token budget
         const CHUNK_SIZE = 3000;
         const pieces: string[] = [];
@@ -1340,20 +1363,26 @@ export const runResearchExecute = internalAction({
         const chunkIds = vectorResults.map((r: any) => r._id);
         if (chunkIds.length === 0) return [];
         const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
-         
-         
-         
-         
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chunkMap = new Map<any, any>(fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any]));
+        const chunkMap = new Map<any, any>(
+          fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any])
+        );
+
          
+        const docIds_unique = [
+          ...new Set(
+            vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean)
+          ),
+        ];
+        const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, {
+          documentIds: docIds_unique,
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const docIds_unique = [...new Set(vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean))];
-        const docRows = await ctx.runQuery(internal.documents.index.getDocumentsByIds, { documentIds: docIds_unique });
-         
-         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const titleMap = new Map<any, string>(docRows.map((d: any) => [d._id, d.fileName] as [any, string]));
+        const titleMap = new Map<any, string>(
+          docRows.map((d: any) => [d._id, d.fileName] as [any, string])
+        );
         const sourceUrlMap = new Map<string, string>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const d of docRows as any[]) {
@@ -1361,25 +1390,27 @@ export const runResearchExecute = internalAction({
             sourceUrlMap.set(d._id, d.fileUrl);
           }
         }
-        return vectorResults
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((r: any) => {
+        return (
+          vectorResults
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const chunk = chunkMap.get(r._id) as any;
-            if (!chunk) return null;
-            return {
-              sourceId: String(r._id),
-              documentId: String(chunk.documentId),
-              sourceTitle: titleMap.get(chunk.documentId) ?? "Document",
-              sourceUrl: sourceUrlMap.get(String(chunk.documentId)),
-              content: chunk.content as string,
-              chunkIndex: chunk.chunkIndex as number,
-              similarity: r._score ?? 0,
-            };
-          })
-           
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .filter((x: any) => x !== null) as any[];
+            .map((r: any) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const chunk = chunkMap.get(r._id) as any;
+              if (!chunk) return null;
+              return {
+                sourceId: String(r._id),
+                documentId: String(chunk.documentId),
+                sourceTitle: titleMap.get(chunk.documentId) ?? "Document",
+                sourceUrl: sourceUrlMap.get(String(chunk.documentId)),
+                content: chunk.content as string,
+                chunkIndex: chunk.chunkIndex as number,
+                similarity: r._score ?? 0,
+              };
+            })
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .filter((x: any) => x !== null) as any[]
+        );
       };
 
       const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
@@ -1423,11 +1454,19 @@ export const runResearchExecute = internalAction({
         smartModel,
         runHybridSearch: async (query, docIds) => {
           const embedding = await embeddingService.embedText(query);
-          return hybridSearch.search(args.userId, String(notebookIdTyped), query, docIds, embedding, undefined, {
-            skipRerank: true,
-            allowEmpty: true,
-            quiet: true,
-          });
+          return hybridSearch.search(
+            args.userId,
+            String(notebookIdTyped),
+            query,
+            docIds,
+            embedding,
+            undefined,
+            {
+              skipRerank: true,
+              allowEmpty: true,
+              quiet: true,
+            }
+          );
         },
         discoverSources: async (query, channels, maxResults) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1438,27 +1477,40 @@ export const runResearchExecute = internalAction({
           if (webChannels.length > 0) {
             for (const channel of webChannels) {
               promises.push(
-                ctx.runAction(internal._services.search.TavilySearchService.discoverSourcesInternal, {
-                  query,
-                  maxResults: maxResults ?? 5,
-                  topic: channel === "web" ? "general" : channel,
-                }).catch((e: unknown) => {
-                  researchLog.warn("research_web_discovery_failed", { channel, error: String(e) });
-                  return [];
-                })
+                ctx
+                  .runAction(
+                    internal._services.search.TavilySearchService.discoverSourcesInternal,
+                    {
+                      query,
+                      maxResults: maxResults ?? 5,
+                      topic: channel === "web" ? "general" : channel,
+                    }
+                  )
+                  .catch((e: unknown) => {
+                    researchLog.warn("research_web_discovery_failed", {
+                      channel,
+                      error: String(e),
+                    });
+                    return [];
+                  })
               );
             }
           }
 
           if (academicChannels.length > 0) {
             promises.push(
-              ctx.runAction(internal._services.search.AcademicSearchService.discoverAcademicPapersInternal, {
-                query,
-                maxResults: maxResults ?? 5,
-              }).catch((e: unknown) => {
-                researchLog.warn("research_academic_discovery_failed", { error: String(e) });
-                return [];
-              })
+              ctx
+                .runAction(
+                  internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+                  {
+                    query,
+                    maxResults: maxResults ?? 5,
+                  }
+                )
+                .catch((e: unknown) => {
+                  researchLog.warn("research_academic_discovery_failed", { error: String(e) });
+                  return [];
+                })
             );
           }
 
@@ -1480,13 +1532,11 @@ export const runResearchExecute = internalAction({
           }));
         },
         loadWebPage: async (url: string) => {
-          return ctx.runAction(
-            internal._services.extractors.scrapeWebPageInternal,
-            { url }
-          );
+          return ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url });
         },
         loadPaper: async (paper) => {
-          const { AcademicLoaderService } = await import("../_services/extraction/AcademicLoaderService.js");
+          const { AcademicLoaderService } =
+            await import("../_services/extraction/AcademicLoaderService.js");
           const loader = new AcademicLoaderService();
           return loader.loadPaper(paper);
         },
@@ -1572,9 +1622,7 @@ export const runResearchExecute = internalAction({
       // message; without this, the client only sees `final: true` (no error
       // marker) and reload shows no record of why the run stopped.
       try {
-        await chunkAppender(
-          `\n__ERROR:${JSON.stringify({ message: errorMessage })}\n`
-        );
+        await chunkAppender(`\n__ERROR:${JSON.stringify({ message: errorMessage })}\n`);
       } catch (streamErr) {
         failLog.warn("research_error_stream_failed", { error: String(streamErr) });
       }

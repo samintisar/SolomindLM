@@ -26,17 +26,17 @@ Hard-cut replacement of Tavily + Supadata-web + OpenAlex with Firecrawl for web 
 
 ### New Services
 
-| Service | File | Backed By | Responsibility |
-|---------|------|-----------|----------------|
-| `FirecrawlSearchService` | `convex/_services/search/FirecrawlSearchService.ts` | Firecrawl `/search` | Web/news/finance search with inline markdown extraction. Replaces `TavilySearchService`. |
-| `AcademicSearchService` | `convex/_services/search/AcademicSearchService.ts` | arXiv API + Semantic Scholar API + PubMed E-utilities | Full academic paper discovery with open-access PDF URLs. Replaces `OpenAlexSearchService`. |
-| `WebLoaderService` | `convex/_services/extraction/WebLoaderService.ts` | Firecrawl (`/scrape`, `/crawl`, `/map`) + Supadata (`transcript` API) | Web page scrape/crawl/map + social media transcripts. Replaces `SupadataLoaderService`. |
-| `AcademicLoaderService` | `convex/_services/extraction/AcademicLoaderService.ts` | HTTP fetch + Mistral OCR + Firecrawl fallback | Download open-access PDFs → OCR → text. Scrape abstracts when no PDF. |
+| Service                  | File                                                   | Backed By                                                             | Responsibility                                                                             |
+| ------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `FirecrawlSearchService` | `convex/_services/search/FirecrawlSearchService.ts`    | Firecrawl `/search`                                                   | Web/news/finance search with inline markdown extraction. Replaces `TavilySearchService`.   |
+| `AcademicSearchService`  | `convex/_services/search/AcademicSearchService.ts`     | arXiv API + Semantic Scholar API + PubMed E-utilities                 | Full academic paper discovery with open-access PDF URLs. Replaces `OpenAlexSearchService`. |
+| `WebLoaderService`       | `convex/_services/extraction/WebLoaderService.ts`      | Firecrawl (`/scrape`, `/crawl`, `/map`) + Supadata (`transcript` API) | Web page scrape/crawl/map + social media transcripts. Replaces `SupadataLoaderService`.    |
+| `AcademicLoaderService`  | `convex/_services/extraction/AcademicLoaderService.ts` | HTTP fetch + Mistral OCR + Firecrawl fallback                         | Download open-access PDFs → OCR → text. Scrape abstracts when no PDF.                      |
 
 ### Kept / Orchestrator
 
-| Service | File | Responsibility |
-|---------|------|----------------|
+| Service            | File                                          | Responsibility                                                                                         |
+| ------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `DiscoveryService` | `convex/_services/search/DiscoveryService.ts` | Parallel dispatch to `FirecrawlSearchService` + `AcademicSearchService`, result distribution, sorting. |
 
 ### Deleted
@@ -117,6 +117,7 @@ interface AcademicPaper {
 **Args:** `query`, `maxResults`, `scoreThreshold`, `excludeDomains`, `includeDomains`, `topic`, `timeRange`, `searchDepth`
 
 **Behavior:**
+
 1. Init Firecrawl client with `env.FIRECRAWL_API_KEY`.
 2. Map `topic`:
    - `"general"` / `"web"` → no source filter
@@ -145,6 +146,7 @@ Same caching logic (`searchCache`) as today, delegates to `searchInternal`.
 **Args:** `query`, `maxResults`, `publicationYearFrom?`, `publicationYearTo?`, `minCitations?`, `openAccessOnly?`, `sortBy?`
 
 **Behavior:**
+
 1. **arXiv search:** Call `export.arxiv.org/api/query?search_query=all:${query}&start=0&max_results=${maxResults}&sortBy=relevance&sortOrder=descending`. Parse Atom XML → title, authors, summary, pdf_url, published year.
 2. **Semantic Scholar search:** Call `api.semanticscholar.org/graph/v1/paper/search?query=${query}&fields=title,authors,year,abstract,openAccessPdf,citationCount,externalIds,url&limit=${maxResults}`. Parse JSON → title, authors, year, abstract, openAccessPdf.url, citationCount, DOI.
 3. **PubMed search (biomed queries):** Call `eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${query}&retmax=${maxResults}&sort=relevance`. Get PMC IDs, then `efetch` for metadata. Extract title, authors, abstract, PDF URL (PMC open-access).
@@ -169,40 +171,47 @@ Same caching logic (`searchCache`) as today, delegates to `searchInternal`.
 ```ts
 class WebLoaderService {
   // Firecrawl-backed
-  async loadWebPage(url: string): Promise<string>
-  async loadWebPageWithMeta(url: string): Promise<WebPageMeta>
-  async startCrawl(url: string, limit?: number): Promise<{ jobId: string }>
-  async checkCrawlStatus(jobId: string): Promise<{ status: string; pages?: Array<{ url: string; content: string }> }>
-  async mapWebsite(url: string): Promise<{ urls: string[] }>
+  async loadWebPage(url: string): Promise<string>;
+  async loadWebPageWithMeta(url: string): Promise<WebPageMeta>;
+  async startCrawl(url: string, limit?: number): Promise<{ jobId: string }>;
+  async checkCrawlStatus(
+    jobId: string
+  ): Promise<{ status: string; pages?: Array<{ url: string; content: string }> }>;
+  async mapWebsite(url: string): Promise<{ urls: string[] }>;
 
   // Supadata-backed
-  async loadSocialTranscript(url: string, lang?: string): Promise<string>
-  async loadSocialTranscriptWithMeta(url: string, lang?: string): Promise<TranscriptMeta>
-  isSocialPlatform(url: string): boolean
+  async loadSocialTranscript(url: string, lang?: string): Promise<string>;
+  async loadSocialTranscriptWithMeta(url: string, lang?: string): Promise<TranscriptMeta>;
+  isSocialPlatform(url: string): boolean;
 }
 ```
 
 **`loadWebPageWithMeta`:**
+
 - Validate URL.
 - `firecrawl.scrape(url, { formats: ["markdown"], proxy: "auto", parsers: [] })`.
 - Apply `stripMedia` + `stripCookieConsentNoise`.
 - Return `{ title, content }`.
 
 **`startCrawl`:**
+
 - `firecrawl.crawl(url, { limit, scrapeOptions: { formats: ["markdown"], proxy: "auto" } })`.
 - Returns `{ jobId }` immediately. Does **not** poll or block.
 - Caller (e.g. `crawlJobs` mutation) stores `jobId` and schedules a follow-up.
 
 **Crawl completion handling (async):**
+
 - Firecrawl webhook → Convex HTTP action that writes crawl results to a `crawlJobs` table.
 - Fallback: scheduled Convex action polls `firecrawl.checkCrawlStatus(jobId)` every 10s until `completed` / `failed` / timeout.
 - Embedding pipeline queues crawl jobs and resumes when webhook/scheduled action marks done.
 
 **`mapWebsite`:**
+
 - `firecrawl.map(url)`.
 - Return URLs.
 
 **`loadSocialTranscriptWithMeta`:**
+
 - Validate URL.
 - `supadata.transcript({ url, lang, text: true, mode: "auto" })`.
 - Poll async jobs.
@@ -216,10 +225,13 @@ class WebLoaderService {
 ### Method: `loadPaper`
 
 ```ts
-async function loadPaper(paper: AcademicPaper): Promise<{ title: string; content: string; source: string }>
+async function loadPaper(
+  paper: AcademicPaper
+): Promise<{ title: string; content: string; source: string }>;
 ```
 
 **Behavior:**
+
 1. If `paper.pdfUrl` exists:
    - Download PDF via `fetch`.
    - Pass to `MistralOCRService.processDocument(pdfUrl)` (existing service).

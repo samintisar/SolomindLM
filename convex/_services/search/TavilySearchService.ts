@@ -52,9 +52,7 @@ export interface SearchInternalArgs {
   includeDomains?: string[];
 }
 
-export async function searchInternalHandler(
-  args: SearchInternalArgs
-): Promise<DiscoveredSource[]> {
+export async function searchInternalHandler(args: SearchInternalArgs): Promise<DiscoveredSource[]> {
   const {
     query,
     maxResults,
@@ -103,12 +101,8 @@ export async function searchInternalHandler(
         includeImages: false,
         includeImageDescriptions: false,
         includeFavicon: false,
-        ...(excludeDomains && excludeDomains.length > 0
-          ? { excludeDomains }
-          : {}),
-        ...(includeDomains && includeDomains.length > 0
-          ? { includeDomains }
-          : {}),
+        ...(excludeDomains && excludeDomains.length > 0 ? { excludeDomains } : {}),
+        ...(includeDomains && includeDomains.length > 0 ? { includeDomains } : {}),
       });
 
       logger.apiSuccess("tavily", "/search", Date.now() - t0, { maxResults });
@@ -293,9 +287,7 @@ export interface DeepResearchResult {
   sources?: Array<{ url: string; title: string }>;
 }
 
-export async function deepResearchHandler(
-  args: DeepResearchArgs
-): Promise<DeepResearchResult> {
+export async function deepResearchHandler(args: DeepResearchArgs): Promise<DeepResearchResult> {
   const { input, model = "auto" } = args;
   const logger = createServiceLogger("tavily", "deepResearch");
   logger.operationStart({ inputPreview: input.substring(0, 100), model });
@@ -352,11 +344,9 @@ export async function deepResearchHandler(
     }
 
     if (attempts >= maxAttempts) {
-      logger.error(
-        "Deep research timed out",
-        new Error("Max polling attempts exceeded"),
-        { requestId }
-      );
+      logger.error("Deep research timed out", new Error("Max polling attempts exceeded"), {
+        requestId,
+      });
       throw new Error("Deep research timed out after 8 minutes");
     }
 
@@ -366,9 +356,7 @@ export async function deepResearchHandler(
         new Error(`Unexpected status: ${response.status}`),
         { requestId, status: response.status }
       );
-      throw new Error(
-        `Deep research ended with unexpected status: ${response.status}`
-      );
+      throw new Error(`Deep research ended with unexpected status: ${response.status}`);
     }
 
     const completedResponse = response as {
@@ -389,8 +377,7 @@ export async function deepResearchHandler(
       sources: completedResponse.sources,
     };
   } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : String(error);
+    const msg = error instanceof Error ? error.message : String(error);
     const contextual = requestId
       ? `Deep research polling failed (requestId: ${requestId}): ${msg}`
       : msg;

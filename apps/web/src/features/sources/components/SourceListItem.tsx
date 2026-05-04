@@ -12,6 +12,7 @@ import {
   Trash2,
   RefreshCw,
   GraduationCap,
+  Youtube,
 } from "lucide-react";
 import { Source } from "@/shared/types";
 import { Favicon } from "@/shared/components/Favicon";
@@ -59,6 +60,9 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
   };
 
   const getIcon = () => {
+    if (source.type === "YOUTUBE") {
+      return <Youtube className="w-5 h-5 text-destructive" aria-hidden />;
+    }
     if (source.type === "WEB") {
       return (
         <Favicon
@@ -134,7 +138,11 @@ export const SourceListItem: React.FC<SourceListItemProps> = ({
             className="text-xs text-muted-foreground font-sans leading-snug truncate"
             title={paperHint ?? undefined}
           >
-            <span className="uppercase tracking-wide">{source.type}</span>
+            <span
+              className={source.type === "YOUTUBE" ? "tracking-wide" : "uppercase tracking-wide"}
+            >
+              {source.type === "YOUTUBE" ? "YouTube" : source.type}
+            </span>
             <span> • {source.date}</span>
             {paperHint && status === "completed" && (
               <span className="font-normal normal-case tracking-normal text-muted-foreground/85">

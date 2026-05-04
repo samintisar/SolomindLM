@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { StudioTool, Note, isAudioOverviewNote, isInfographicNote } from "@/shared/types/index";
+import {
+  StudioTool,
+  Note,
+  isAudioNote,
+  isAudioOverviewNote,
+  isInfographicNote,
+} from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { CreateReportModal } from "./CreateReportModal";
 import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
@@ -18,6 +24,16 @@ import { useAudioPlayerContext } from "@/features/audio/useAudioPlayer";
 import { useStudioHandlers } from "../hooks/useStudioHandlers";
 import { useNoteActions } from "../hooks/useNoteActions";
 import type { InfographicViewControls } from "./views/InfographicView";
+
+function isShowingExpandedAudioPlayer(note: Note): boolean {
+  if (isAudioOverviewNote(note) && note.status === "completed") {
+    return Boolean(note.audioUrl?.trim());
+  }
+  if (isAudioNote(note) && note.status === "completed") {
+    return Boolean(note.metadata.audioUrl);
+  }
+  return false;
+}
 
 interface StudioPanelProps {
   isOpen: boolean;
@@ -61,6 +77,15 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   // Derived state
   const activeNote = notes.find((n) => n.id === activeNoteId) || null;
+
+  const expandedSameNoteHidesMini =
+    isOpen &&
+    !!activeNote &&
+    !!miniPlayerData?.noteId &&
+    miniPlayerData.noteId === activeNote.id &&
+    isShowingExpandedAudioPlayer(activeNote);
+
+  const showDockedMiniPlayer = !!(miniPlayerVisible && miniPlayerData && !expandedSameNoteHidesMini);
 
   const canDownloadInfographic =
     !!activeNote &&
@@ -226,7 +251,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   if (!isOpen) {
     return (
       <>
-        {miniPlayerVisible && miniPlayerData && (
+        {showDockedMiniPlayer && (
           <MiniAudioPlayer
             audioUrl={miniPlayerData.audioUrl}
             audioOverviewId={miniPlayerData.audioOverviewId}
@@ -276,9 +301,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
           onCopyUserNote={noteActions.handleCopyUserNote}
           onDownloadUserNote={noteActions.handleDownloadUserNote}
           onDownloadInfographic={() => infographicControlsRef.current?.download()}
-          onToggleInfographicFullscreen={() =>
-            infographicControlsRef.current?.toggleFullscreen()
-          }
+          onToggleInfographicFullscreen={() => infographicControlsRef.current?.toggleFullscreen()}
           canDownloadInfographic={canDownloadInfographic}
           isInfographicFullscreen={isInfographicFullscreen}
           canCopyOrDownload={noteActions.canCopyOrDownloadReport}
@@ -291,7 +314,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
         {/* Main Content */}
         <div
-          className={`flex-1 w-full relative ${miniPlayerVisible ? "overflow-hidden" : "overflow-y-auto"}`}
+          className={`flex-1 w-full relative ${showDockedMiniPlayer ? "overflow-hidden" : "overflow-y-auto"}`}
         >
           {activeNote ? (
             <ActiveNoteView
@@ -329,7 +352,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         </div>
 
         {/* Mini Audio Player */}
-        {miniPlayerVisible && miniPlayerData && (
+        {showDockedMiniPlayer && (
           <MiniAudioPlayer
             audioUrl={miniPlayerData.audioUrl}
             audioOverviewId={miniPlayerData.audioOverviewId}

@@ -67,6 +67,7 @@ apps/web/src/features/auth/components/AvatarDropdown.tsx            "Restart tou
 ## Task 1: Add `userOnboarding` to Convex schema
 
 **Files:**
+
 - Modify: `convex/schema.ts` (after `notebooks` block, before `notebookShareLinks`)
 
 - [ ] **Step 1: Add the table definition**
@@ -115,6 +116,7 @@ git commit -m "feat(onboarding): add userOnboarding table"
 ## Task 2: Onboarding constants
 
 **Files:**
+
 - Create: `convex/onboarding/constants.ts`
 
 - [ ] **Step 1: Create the constants file**
@@ -169,6 +171,7 @@ git commit -m "feat(onboarding): add step constants and fresh-user window"
 ## Task 3: `getOnboardingState` query + `getOrCreateOnboardingRow` mutation (TDD)
 
 **Files:**
+
 - Create: `convex/onboarding/state.ts`
 - Create: `convex/onboarding/state.test.ts`
 
@@ -197,33 +200,23 @@ describe("getOnboardingState", () => {
 
   test("returns row for authenticated user with row", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "Alice" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "Alice" }));
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
         userId,
         tourStatus: "active",
         currentStepId: "addSource",
         checklistDismissed: false,
-      }),
+      })
     );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.state.getOnboardingState,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.state.getOnboardingState, {});
     expect(result).toMatchObject({ tourStatus: "active", currentStepId: "addSource" });
   });
 
   test("contextual default: fresh user (recent _creationTime) → pending", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "Fresh" }),
-    );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.state.getOnboardingState,
-      {},
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "Fresh" }));
+    const result = await withAuth(t, userId).query(api.onboarding.state.getOnboardingState, {});
     expect(result).toMatchObject({
       tourStatus: "pending",
       checklistDismissed: false,
@@ -240,10 +233,7 @@ describe("getOnboardingState", () => {
       } as never);
       return id;
     });
-    const result = await withAuth(t, userId).query(
-      api.onboarding.state.getOnboardingState,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.state.getOnboardingState, {});
     expect(result).toMatchObject({
       tourStatus: "completed",
       checklistDismissed: true,
@@ -254,16 +244,14 @@ describe("getOnboardingState", () => {
 describe("getOrCreateOnboardingRow", () => {
   test("creates pending row for fresh user", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "Fresh" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "Fresh" }));
     const auth = withAuth(t, userId);
     await auth.mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
     const row = await t.run(async (ctx) =>
       ctx.db
         .query("userOnboarding")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique(),
+        .unique()
     );
     expect(row).toMatchObject({
       tourStatus: "pending",
@@ -280,15 +268,12 @@ describe("getOrCreateOnboardingRow", () => {
       } as never);
       return id;
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.state.getOrCreateOnboardingRow,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
     const row = await t.run(async (ctx) =>
       ctx.db
         .query("userOnboarding")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique(),
+        .unique()
     );
     expect(row).toMatchObject({
       tourStatus: "completed",
@@ -298,9 +283,7 @@ describe("getOrCreateOnboardingRow", () => {
 
   test("idempotent — does not duplicate row", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "X" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "X" }));
     const auth = withAuth(t, userId);
     await auth.mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
     await auth.mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
@@ -308,16 +291,14 @@ describe("getOrCreateOnboardingRow", () => {
       ctx.db
         .query("userOnboarding")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
+        .collect()
     );
     expect(rows).toHaveLength(1);
   });
 
   test("throws when not authenticated", async () => {
     const t = convexTest(schema, modules);
-    await expect(
-      t.mutation(api.onboarding.state.getOrCreateOnboardingRow, {}),
-    ).rejects.toThrow();
+    await expect(t.mutation(api.onboarding.state.getOrCreateOnboardingRow, {})).rejects.toThrow();
   });
 });
 ```
@@ -344,7 +325,7 @@ const onboardingRowValidator = v.object({
     v.literal("pending"),
     v.literal("active"),
     v.literal("skipped"),
-    v.literal("completed"),
+    v.literal("completed")
   ),
   currentStepId: v.optional(
     v.union(
@@ -352,8 +333,8 @@ const onboardingRowValidator = v.object({
       v.literal("addSource"),
       v.literal("askQuestion"),
       v.literal("openStudio"),
-      v.literal("generateArtifact"),
-    ),
+      v.literal("generateArtifact")
+    )
   ),
   tourNotebookId: v.optional(v.id("notebooks")),
   checklistDismissed: v.boolean(),
@@ -432,6 +413,7 @@ git commit -m "feat(onboarding): add getOnboardingState query and getOrCreateOnb
 ## Task 4: `getChecklistProgress` and `getTourProgress` queries (TDD)
 
 **Files:**
+
 - Create: `convex/onboarding/progress.ts`
 - Create: `convex/onboarding/progress.test.ts`
 
@@ -469,7 +451,7 @@ describe("getChecklistProgress", () => {
     const userId = await makeUserAndOnboarding(t);
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result).toEqual({
       createNotebook: false,
@@ -483,12 +465,10 @@ describe("getChecklistProgress", () => {
   test("createNotebook=true after inserting any notebook", async () => {
     const t = convexTest(schema, modules);
     const userId = await makeUserAndOnboarding(t);
-    await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId, title: "N1" }),
-    );
+    await t.run(async (ctx) => ctx.db.insert("notebooks", { userId, title: "N1" }));
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.createNotebook).toBe(true);
   });
@@ -496,19 +476,17 @@ describe("getChecklistProgress", () => {
   test("addSource=true after inserting a document for any of user's notebooks", async () => {
     const t = convexTest(schema, modules);
     const userId = await makeUserAndOnboarding(t);
-    const nbId = await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId, title: "N1" }),
-    );
+    const nbId = await t.run(async (ctx) => ctx.db.insert("notebooks", { userId, title: "N1" }));
     await t.run(async (ctx) =>
       ctx.db.insert("documents", {
         userId,
         notebookId: nbId,
         title: "doc",
-      } as never),
+      } as never)
     );
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.addSource).toBe(true);
   });
@@ -516,16 +494,9 @@ describe("getChecklistProgress", () => {
   test("auth-scoped: another user's notebooks do not tick this user's checklist", async () => {
     const t = convexTest(schema, modules);
     const userA = await makeUserAndOnboarding(t);
-    const userB = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "B" }),
-    );
-    await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId: userB, title: "B's" }),
-    );
-    const result = await withAuth(t, userA).query(
-      api.onboarding.progress.getChecklistProgress,
-      {},
-    );
+    const userB = await t.run(async (ctx) => ctx.db.insert("users", { name: "B" }));
+    await t.run(async (ctx) => ctx.db.insert("notebooks", { userId: userB, title: "B's" }));
+    const result = await withAuth(t, userA).query(api.onboarding.progress.getChecklistProgress, {});
     expect(result.createNotebook).toBe(false);
   });
 });
@@ -533,12 +504,8 @@ describe("getChecklistProgress", () => {
 describe("getTourProgress", () => {
   test("returns tourNotebookId from row", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
-    const nbId = await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId, title: "Tour" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
+    const nbId = await t.run(async (ctx) => ctx.db.insert("notebooks", { userId, title: "Tour" }));
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
         userId,
@@ -546,25 +513,20 @@ describe("getTourProgress", () => {
         currentStepId: "addSource",
         tourNotebookId: nbId,
         checklistDismissed: false,
-      }),
+      })
     );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.tourNotebookId).toBe(nbId);
   });
 
   test("addSource=true only when document is in tourNotebookId", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     const tourNb = await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId, title: "Tour" }),
+      ctx.db.insert("notebooks", { userId, title: "Tour" })
     );
     const otherNb = await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId, title: "Other" }),
+      ctx.db.insert("notebooks", { userId, title: "Other" })
     );
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
@@ -573,7 +535,7 @@ describe("getTourProgress", () => {
         currentStepId: "addSource",
         tourNotebookId: tourNb,
         checklistDismissed: false,
-      }),
+      })
     );
     // Document in OTHER notebook should not flip the tour gate.
     await t.run(async (ctx) =>
@@ -581,12 +543,9 @@ describe("getTourProgress", () => {
         userId,
         notebookId: otherNb,
         title: "doc",
-      } as never),
+      } as never)
     );
-    let result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    let result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.addSource).toBe(false);
 
     // Now insert in the tour notebook.
@@ -595,32 +554,24 @@ describe("getTourProgress", () => {
         userId,
         notebookId: tourNb,
         title: "doc2",
-      } as never),
+      } as never)
     );
-    result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.addSource).toBe(true);
   });
 
   test("openStudio is always false from server (provider overlays its own state)", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
         userId,
         tourStatus: "active",
         currentStepId: "openStudio",
         checklistDismissed: false,
-      }),
+      })
     );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.openStudio).toBe(false);
   });
 });
@@ -668,7 +619,7 @@ const ARTIFACT_TABLES = [
 async function userHasAny(
   ctx: QueryCtx,
   table: (typeof ARTIFACT_TABLES)[number] | "notebooks" | "documents" | "messages",
-  userId: Id<"users">,
+  userId: Id<"users">
 ): Promise<boolean> {
   const first = await ctx.db
     .query(table as never)
@@ -680,13 +631,11 @@ async function userHasAny(
 async function notebookHasAny(
   ctx: QueryCtx,
   table: (typeof ARTIFACT_TABLES)[number] | "documents" | "messages",
-  notebookId: Id<"notebooks">,
+  notebookId: Id<"notebooks">
 ): Promise<boolean> {
   const first = await ctx.db
     .query(table as never)
-    .withIndex("by_notebook" as never, (q: never) =>
-      (q as never).eq("notebookId", notebookId),
-    )
+    .withIndex("by_notebook" as never, (q: never) => (q as never).eq("notebookId", notebookId))
     .first();
   return first !== null;
 }
@@ -796,6 +745,7 @@ git commit -m "feat(onboarding): add checklist and tour progress queries"
 ## Task 5: Tour mutations (TDD)
 
 **Files:**
+
 - Create: `convex/onboarding/mutations.ts`
 - Create: `convex/onboarding/mutations.test.ts`
 
@@ -821,7 +771,7 @@ async function seedRow(
     currentStepId: string;
     tourNotebookId: string;
     checklistDismissed: boolean;
-  }> = {},
+  }> = {}
 ) {
   return await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { name: "U" });
@@ -841,7 +791,7 @@ async function readRow(t: ReturnType<typeof convexTest>, userId: string) {
     ctx.db
       .query("userOnboarding")
       .withIndex("by_user", (q) => q.eq("userId", userId as never))
-      .unique(),
+      .unique()
   );
 }
 
@@ -895,7 +845,7 @@ describe("advanceTourStep", () => {
     });
     const auth = withAuth(t, userId);
     const nbId = await t.run(async (ctx) =>
-      ctx.db.insert("notebooks", { userId, title: "Tour" } as never),
+      ctx.db.insert("notebooks", { userId, title: "Tour" } as never)
     );
     await auth.mutation(api.onboarding.mutations.advanceTourStep, {
       expectedCurrentStepId: "createNotebook",
@@ -931,7 +881,7 @@ describe("advanceTourStep", () => {
     await expect(
       withAuth(t, userId).mutation(api.onboarding.mutations.advanceTourStep, {
         expectedCurrentStepId: "addSource",
-      }),
+      })
     ).rejects.toThrow();
   });
 });
@@ -958,10 +908,7 @@ describe("completeTour", () => {
       tourStatus: "active",
       currentStepId: "openStudio",
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.completeTour,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.completeTour, {});
     const row = await readRow(t, userId);
     expect(row?.tourStatus).toBe("completed");
     expect(row?.completedAt).toBeTypeOf("number");
@@ -976,10 +923,7 @@ describe("dismissChecklist", () => {
       currentStepId: "addSource",
       checklistDismissed: false,
     });
-    await withAuth(t, userId).mutation(
-      api.onboarding.mutations.dismissChecklist,
-      {},
-    );
+    await withAuth(t, userId).mutation(api.onboarding.mutations.dismissChecklist, {});
     const row = await readRow(t, userId);
     expect(row?.checklistDismissed).toBe(true);
     expect(row?.tourStatus).toBe("active");
@@ -1003,25 +947,20 @@ describe("restartTour", () => {
 });
 
 describe("auth requirement", () => {
-  test.each([
-    "startTour",
-    "skipTour",
-    "completeTour",
-    "dismissChecklist",
-    "restartTour",
-  ] as const)("%s throws when unauthenticated", async (name) => {
-    const t = convexTest(schema, modules);
-    await expect(
-      t.mutation(api.onboarding.mutations[name], {}),
-    ).rejects.toThrow();
-  });
+  test.each(["startTour", "skipTour", "completeTour", "dismissChecklist", "restartTour"] as const)(
+    "%s throws when unauthenticated",
+    async (name) => {
+      const t = convexTest(schema, modules);
+      await expect(t.mutation(api.onboarding.mutations[name], {})).rejects.toThrow();
+    }
+  );
 
   test("advanceTourStep throws when unauthenticated", async () => {
     const t = convexTest(schema, modules);
     await expect(
       t.mutation(api.onboarding.mutations.advanceTourStep, {
         expectedCurrentStepId: "createNotebook",
-      }),
+      })
     ).rejects.toThrow();
   });
 });
@@ -1047,13 +986,19 @@ const stepIdValidator = v.union(
   v.literal("addSource"),
   v.literal("askQuestion"),
   v.literal("openStudio"),
-  v.literal("generateArtifact"),
+  v.literal("generateArtifact")
 );
 
-async function getRowOrThrow(ctx: {
-  db: { query: typeof globalThis extends never ? never : never };
-  auth: typeof globalThis extends never ? never : never;
-} | Parameters<typeof mutation>[0] extends never ? never : never): never {
+async function getRowOrThrow(
+  ctx:
+    | {
+        db: { query: typeof globalThis extends never ? never : never };
+        auth: typeof globalThis extends never ? never : never;
+      }
+    | Parameters<typeof mutation>[0] extends never
+    ? never
+    : never
+): never {
   // Helper used inline below; kept inline rather than via shared util to keep the
   // file flat. See each mutation handler.
   throw new Error("inline helper");
@@ -1095,7 +1040,7 @@ export const advanceTourStep = mutation({
     const row = await loadRow(ctx);
     if (row.currentStepId !== args.expectedCurrentStepId) {
       throw new Error(
-        `Step mismatch: expected ${args.expectedCurrentStepId}, server has ${row.currentStepId ?? "none"}`,
+        `Step mismatch: expected ${args.expectedCurrentStepId}, server has ${row.currentStepId ?? "none"}`
       );
     }
     const next = nextStepId(args.expectedCurrentStepId);
@@ -1186,6 +1131,7 @@ git commit -m "feat(onboarding): add tour state mutations"
 ## Task 6: Backfill mutation for legacy users (TDD)
 
 **Files:**
+
 - Create: `convex/onboarding/backfill.ts`
 - Create: `convex/onboarding/backfill.test.ts`
 
@@ -1203,37 +1149,25 @@ const modules = import.meta.glob("../**/*.ts");
 describe("backfillLegacyOnboarding", () => {
   test("inserts completed row for every user without one; idempotent on re-run", async () => {
     const t = convexTest(schema, modules);
-    const u1 = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "A" }),
-    );
-    const u2 = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "B" }),
-    );
+    const u1 = await t.run(async (ctx) => ctx.db.insert("users", { name: "A" }));
+    const u2 = await t.run(async (ctx) => ctx.db.insert("users", { name: "B" }));
     // u3 already has a row; backfill must skip it
-    const u3 = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "C" }),
-    );
+    const u3 = await t.run(async (ctx) => ctx.db.insert("users", { name: "C" }));
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
         userId: u3,
         tourStatus: "active",
         currentStepId: "addSource",
         checklistDismissed: false,
-      }),
+      })
     );
 
-    const result1 = await t.mutation(
-      api.onboarding.backfill.backfillLegacyOnboarding,
-      {},
-    );
+    const result1 = await t.mutation(api.onboarding.backfill.backfillLegacyOnboarding, {});
     expect(result1.created).toBe(2);
     expect(result1.skipped).toBe(1);
 
     // Re-run is a no-op
-    const result2 = await t.mutation(
-      api.onboarding.backfill.backfillLegacyOnboarding,
-      {},
-    );
+    const result2 = await t.mutation(api.onboarding.backfill.backfillLegacyOnboarding, {});
     expect(result2.created).toBe(0);
     expect(result2.skipped).toBe(3);
 
@@ -1242,7 +1176,7 @@ describe("backfillLegacyOnboarding", () => {
         ctx.db
           .query("userOnboarding")
           .withIndex("by_user", (q) => q.eq("userId", userId))
-          .unique(),
+          .unique()
       );
       expect(row).toMatchObject({
         tourStatus: "completed",
@@ -1318,6 +1252,7 @@ git commit -m "feat(onboarding): add legacy-user backfill mutation"
 ## Task 7: Frontend feature scaffold and step definitions (TDD)
 
 **Files:**
+
 - Create: `apps/web/src/features/onboarding/steps.ts`
 - Create: `apps/web/src/features/onboarding/steps.test.ts`
 
@@ -1390,16 +1325,14 @@ export const STEP_DEFINITIONS: readonly StepDefinition[] = [
     id: "createNotebook",
     route: "home",
     targetSelector: '[data-onboarding="create-notebook-button"]',
-    copy:
-      "Notebooks are where your sources, chats, and study tools live. Create your first one.",
+    copy: "Notebooks are where your sources, chats, and study tools live. Create your first one.",
     side: "right",
   },
   {
     id: "addSource",
     route: "notebook",
     targetSelector: '[data-onboarding="add-source-button"]',
-    copy:
-      "Add a PDF, URL, YouTube link, or pasted text. This is the knowledge your AI will work from.",
+    copy: "Add a PDF, URL, YouTube link, or pasted text. This is the knowledge your AI will work from.",
     side: "right",
   },
   {
@@ -1413,16 +1346,14 @@ export const STEP_DEFINITIONS: readonly StepDefinition[] = [
     id: "openStudio",
     route: "notebook",
     targetSelector: '[data-onboarding="studio-panel-toggle"]',
-    copy:
-      "Studio turns your sources into reports, flashcards, quizzes, mind maps, audio, and more.",
+    copy: "Studio turns your sources into reports, flashcards, quizzes, mind maps, audio, and more.",
     side: "left",
   },
   {
     id: "generateArtifact",
     route: "notebook",
     targetSelector: '[data-onboarding="studio-tool-grid"]',
-    copy:
-      "Pick any tool and generate your first artifact. We recommend a Report or Flashcards to start.",
+    copy: "Pick any tool and generate your first artifact. We recommend a Report or Flashcards to start.",
     side: "left",
   },
 ];
@@ -1459,6 +1390,7 @@ git commit -m "feat(onboarding): add step definitions"
 ## Task 8: Onboarding context + hooks
 
 **Files:**
+
 - Create: `apps/web/src/features/onboarding/OnboardingContext.tsx`
 - Create: `apps/web/src/features/onboarding/hooks/useChecklistProgress.ts`
 - Create: `apps/web/src/features/onboarding/hooks/useTourProgress.ts`
@@ -1569,6 +1501,7 @@ git commit -m "feat(onboarding): add context and progress hooks"
 ## Task 9: OnboardingProvider (TDD)
 
 **Files:**
+
 - Create: `apps/web/src/features/onboarding/OnboardingProvider.tsx`
 - Create: `apps/web/src/features/onboarding/OnboardingProvider.test.tsx`
 
@@ -1640,7 +1573,11 @@ vi.mock("@convex/_generated/api", () => ({
 
 function ProbeStep() {
   const { currentStepId, tourStatus } = useOnboarding();
-  return <div data-testid="probe">{tourStatus}:{currentStepId ?? "none"}</div>;
+  return (
+    <div data-testid="probe">
+      {tourStatus}:{currentStepId ?? "none"}
+    </div>
+  );
 }
 
 function renderWith(authenticated = true) {
@@ -1649,7 +1586,7 @@ function renderWith(authenticated = true) {
       <OnboardingProvider isAuthenticated={authenticated}>
         <ProbeStep />
       </OnboardingProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
@@ -1693,7 +1630,7 @@ describe("OnboardingProvider", () => {
         <OnboardingProvider isAuthenticated={true}>
           <ProbeStep />
         </OnboardingProvider>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     await act(() => Promise.resolve());
     expect(mockMutations.advanceTourStep).toHaveBeenCalledWith({
@@ -1713,14 +1650,7 @@ Expected: FAIL — module not found.
 
 ```tsx
 // apps/web/src/features/onboarding/OnboardingProvider.tsx
-import React, {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -1736,29 +1666,24 @@ interface Props {
   children: ReactNode;
 }
 
-export const OnboardingProvider: React.FC<Props> = ({
-  isAuthenticated,
-  children,
-}) => {
+export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const onboardingState = useQuery(
     api.onboarding.state.getOnboardingState,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   );
   const tourProgress = useQuery(
     api.onboarding.progress.getTourProgress,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   );
   const checklist = useQuery(
     api.onboarding.progress.getChecklistProgress,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   );
 
-  const getOrCreateOnboardingRow = useMutation(
-    api.onboarding.state.getOrCreateOnboardingRow,
-  );
+  const getOrCreateOnboardingRow = useMutation(api.onboarding.state.getOrCreateOnboardingRow);
   const startTour = useMutation(api.onboarding.mutations.startTour);
   const advanceTourStep = useMutation(api.onboarding.mutations.advanceTourStep);
   const skipTourMutation = useMutation(api.onboarding.mutations.skipTour);
@@ -1772,13 +1697,13 @@ export const OnboardingProvider: React.FC<Props> = ({
   const completedAllRef = useRef(false);
 
   const tourStatus: TourStatus =
-    (onboardingState && "tourStatus" in onboardingState
+    onboardingState && "tourStatus" in onboardingState
       ? (onboardingState.tourStatus as TourStatus)
-      : "completed");
+      : "completed";
   const currentStepId: StepId | null =
-    (onboardingState && "currentStepId" in onboardingState
+    onboardingState && "currentStepId" in onboardingState
       ? ((onboardingState.currentStepId as StepId | undefined) ?? null)
-      : null);
+      : null;
 
   // 1. Ensure a userOnboarding row exists.
   useEffect(() => {
@@ -1805,9 +1730,7 @@ export const OnboardingProvider: React.FC<Props> = ({
     if (advancingRef.current) return;
     if (tourStatus !== "active") return;
     if (!currentStepId || !tourProgress) return;
-    const gate = currentStepId === "openStudio"
-      ? studioOpen
-      : tourProgress[currentStepId];
+    const gate = currentStepId === "openStudio" ? studioOpen : tourProgress[currentStepId];
     if (!gate) return;
 
     advancingRef.current = true;
@@ -1818,7 +1741,9 @@ export const OnboardingProvider: React.FC<Props> = ({
       args.tourNotebookId = tourProgress.tourNotebookId;
     }
     void advanceTourStep(args)
-      .catch(() => {/* stale step — server will re-sync on next query */})
+      .catch(() => {
+        /* stale step — server will re-sync on next query */
+      })
       .finally(() => {
         advancingRef.current = false;
       });
@@ -1861,14 +1786,10 @@ export const OnboardingProvider: React.FC<Props> = ({
 
   const value = useMemo<OnboardingContextValue>(
     () => ({ tourStatus, currentStepId, notifyStudioOpen, skip }),
-    [tourStatus, currentStepId, notifyStudioOpen, skip],
+    [tourStatus, currentStepId, notifyStudioOpen, skip]
   );
 
-  return (
-    <OnboardingContext.Provider value={value}>
-      {children}
-    </OnboardingContext.Provider>
-  );
+  return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 };
 ```
 
@@ -1891,6 +1812,7 @@ git commit -m "feat(onboarding): add OnboardingProvider with auto-launch and ste
 ## Task 10: TourTooltip component (TDD)
 
 **Files:**
+
 - Create: `apps/web/src/features/onboarding/components/TourTooltip.tsx`
 - Create: `apps/web/src/features/onboarding/components/TourTooltip.test.tsx`
 
@@ -2010,13 +1932,11 @@ function logSelectorInvariants(step: StepDefinition) {
   if (!import.meta.env.DEV) return;
   const matches = document.querySelectorAll(step.targetSelector);
   if (matches.length === 0) {
-    console.error(
-      `[onboarding] step "${step.id}" has no element matching ${step.targetSelector}`,
-    );
+    console.error(`[onboarding] step "${step.id}" has no element matching ${step.targetSelector}`);
   } else if (matches.length > 1) {
     console.error(
       `[onboarding] step "${step.id}" matches ${matches.length} elements:`,
-      Array.from(matches),
+      Array.from(matches)
     );
   }
 }
@@ -2111,7 +2031,9 @@ export const TourTooltip: React.FC = () => {
       >
         <p className="text-sm">{step.copy}</p>
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-          <span>{stepNumber} of {TOTAL_STEPS}</span>
+          <span>
+            {stepNumber} of {TOTAL_STEPS}
+          </span>
           <button
             type="button"
             onClick={() => void skip()}
@@ -2122,7 +2044,7 @@ export const TourTooltip: React.FC = () => {
         </div>
       </div>
     </>,
-    document.body,
+    document.body
   );
 };
 
@@ -2150,7 +2072,17 @@ Expected: PASS, 5 tests.
 ```ts
 // In beforeEach for tests that need a measured rect:
 target.getBoundingClientRect = () =>
-  ({ top: 10, left: 10, right: 50, bottom: 30, width: 40, height: 20, x: 10, y: 10, toJSON() {} }) as DOMRect;
+  ({
+    top: 10,
+    left: 10,
+    right: 50,
+    bottom: 30,
+    width: 40,
+    height: 20,
+    x: 10,
+    y: 10,
+    toJSON() {},
+  }) as DOMRect;
 ```
 
 - [ ] **Step 5: Commit**
@@ -2165,6 +2097,7 @@ git commit -m "feat(onboarding): add TourTooltip with portal, overlay, and remea
 ## Task 11: ChecklistCard + ChecklistItem (TDD)
 
 **Files:**
+
 - Create: `apps/web/src/features/onboarding/components/ChecklistItem.tsx`
 - Create: `apps/web/src/features/onboarding/components/ChecklistCard.tsx`
 - Create: `apps/web/src/features/onboarding/components/ChecklistCard.test.tsx`
@@ -2216,7 +2149,7 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <ChecklistCard />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
@@ -2281,9 +2214,7 @@ export const ChecklistItem: React.FC<Props> = ({ label, done }) => (
     ) : (
       <Circle className="w-4 h-4 text-muted-foreground shrink-0" />
     )}
-    <span
-      className={`text-sm ${done ? "line-through text-muted-foreground" : "text-foreground"}`}
-    >
+    <span className={`text-sm ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
       {label}
     </span>
   </li>
@@ -2400,6 +2331,7 @@ git commit -m "feat(onboarding): add ChecklistCard with auto-hide and dismiss"
 ## Task 12: Wire `data-onboarding` selectors to existing components
 
 **Files:**
+
 - Modify: `apps/web/src/features/notebooks/components/views/RecentSection.tsx:79-89`
 - Modify: `apps/web/src/features/notebooks/components/views/RecentSection.tsx:147-159` (the list-mode duplicate)
 - Modify: `apps/web/src/features/sources/components/SourcesPanel.tsx` (the AddSource trigger button)
@@ -2426,11 +2358,7 @@ The list-mode duplicate (around line 147) should NOT also get the attribute — 
 In `apps/web/src/features/sources/components/SourcesPanel.tsx`, locate the button or call site that triggers `setIsAddModalOpen(true)` (around line 444 / 524). Add `data-onboarding="add-source-button"` to whichever element the user clicks to open the AddSource flow. If the call site is a callback rather than a JSX element, add it to the `<button>` rendered in the empty-state of the list (the most prominent affordance).
 
 ```tsx
-<button
-  data-onboarding="add-source-button"
-  onClick={() => setIsAddModalOpen(true)}
-  className="..."
->
+<button data-onboarding="add-source-button" onClick={() => setIsAddModalOpen(true)} className="...">
   Add source
 </button>
 ```
@@ -2490,6 +2418,7 @@ git commit -m "feat(onboarding): add data-onboarding anchor selectors to existin
 ## Task 13: Mount `OnboardingProvider` and overlays in `App.tsx`
 
 **Files:**
+
 - Modify: `apps/web/src/App.tsx`
 
 - [ ] **Step 1: Import the new modules**
@@ -2541,6 +2470,7 @@ Expected: `0 errors`.
 Run: `bun run dev:web` (in one terminal) and `bun x convex dev` (in another).
 
 In the browser:
+
 1. Sign up with a brand-new email.
 2. Verify the tour tooltip appears anchored to the "Create new notebook" tile.
 3. Click "Skip tour" — verify the tooltip disappears but the checklist card remains.
@@ -2561,6 +2491,7 @@ git commit -m "feat(onboarding): mount OnboardingProvider and overlay components
 ## Task 14: AvatarDropdown — Restart tour + Show checklist
 
 **Files:**
+
 - Modify: `apps/web/src/features/auth/components/AvatarDropdown.tsx`
 
 - [ ] **Step 1: Add menu items**
@@ -2579,26 +2510,30 @@ interface AvatarDropdownProps {
 Add these menu items between Theme Toggle and Login/Logout, only when `isAuthenticated`:
 
 ```tsx
-        {isAuthenticated && onRestartTour && (
-          <button
-            onClick={onRestartTour}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <RotateCcw className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Restart tour</span>
-          </button>
-        )}
-        {isAuthenticated && showChecklistDismissed && onShowChecklist && (
-          <button
-            onClick={onShowChecklist}
-            className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-            role="menuitem"
-          >
-            <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Show getting-started checklist</span>
-          </button>
-        )}
+{
+  isAuthenticated && onRestartTour && (
+    <button
+      onClick={onRestartTour}
+      className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+      role="menuitem"
+    >
+      <RotateCcw className="w-4 h-4 text-muted-foreground shrink-0" />
+      <span>Restart tour</span>
+    </button>
+  );
+}
+{
+  isAuthenticated && showChecklistDismissed && onShowChecklist && (
+    <button
+      onClick={onShowChecklist}
+      className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+      role="menuitem"
+    >
+      <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
+      <span>Show getting-started checklist</span>
+    </button>
+  );
+}
 ```
 
 Add the new icon imports at the top:
@@ -2627,9 +2562,11 @@ const showChecklist = useMutation(api.onboarding.mutations.dismissChecklist);
   onRestartTour={() => void restartTour({})}
   onShowChecklist={() => void showChecklistMutation({})}
   showChecklistDismissed={
-    !!onboardingState && "checklistDismissed" in onboardingState && onboardingState.checklistDismissed
+    !!onboardingState &&
+    "checklistDismissed" in onboardingState &&
+    onboardingState.checklistDismissed
   }
-/>
+/>;
 ```
 
 - [ ] **Step 3: Add `showChecklist` mutation**
@@ -2676,6 +2613,7 @@ Expected: `0 errors`.
 - [ ] **Step 5: Smoke test the new menu items**
 
 Boot dev (`bun run dev:web` + `bun x convex dev`), sign in, click the avatar:
+
 1. "Restart tour" → tour reappears at step 1.
 2. Dismiss the checklist → "Show getting-started checklist" appears in the menu.
 3. Click "Show getting-started checklist" → it reappears.
@@ -2694,6 +2632,7 @@ git commit -m "feat(onboarding): add Restart tour and Show checklist menu items"
 ## Task 15: Integration test — full happy path
 
 **Files:**
+
 - Create: `apps/web/src/features/onboarding/OnboardingFlow.integration.test.tsx`
 
 - [ ] **Step 1: Write the integration test**
@@ -2724,13 +2663,17 @@ let checklist = { ...tour };
 delete (checklist as { tourNotebookId?: unknown }).tourNotebookId;
 
 const subscribers = new Set<() => void>();
-function notify() { subscribers.forEach((fn) => fn()); }
+function notify() {
+  subscribers.forEach((fn) => fn());
+}
 
 vi.mock("convex/react", () => ({
   useQuery: (fn: { name?: string }) => {
     const [, force] = (() => {
       const ref = { v: 0 };
-      const setter = () => { ref.v++; };
+      const setter = () => {
+        ref.v++;
+      };
       return [ref, setter] as const;
     })();
     // Re-render hook on notify()
@@ -2749,7 +2692,13 @@ vi.mock("convex/react", () => ({
         state = { ...state, tourStatus: "active", currentStepId: "createNotebook" };
         notify();
       } else if (name.includes("advanceTourStep")) {
-        const order = ["createNotebook", "addSource", "askQuestion", "openStudio", "generateArtifact"];
+        const order = [
+          "createNotebook",
+          "addSource",
+          "askQuestion",
+          "openStudio",
+          "generateArtifact",
+        ];
         const idx = order.indexOf(state.currentStepId ?? "");
         const next = order[idx + 1];
         if (idx === order.length - 1) {
@@ -2792,7 +2741,17 @@ function setupTarget(attr: string) {
   const el = document.createElement("button");
   el.setAttribute("data-onboarding", attr);
   el.getBoundingClientRect = () =>
-    ({ top: 50, left: 50, right: 100, bottom: 80, width: 50, height: 30, x: 50, y: 50, toJSON() {} }) as DOMRect;
+    ({
+      top: 50,
+      left: 50,
+      right: 100,
+      bottom: 80,
+      width: 50,
+      height: 30,
+      x: 50,
+      y: 50,
+      toJSON() {},
+    }) as DOMRect;
   document.body.appendChild(el);
   return el;
 }
@@ -2801,8 +2760,21 @@ beforeEach(() => {
   document.body.innerHTML = "";
   subscribers.clear();
   state = { tourStatus: "pending", checklistDismissed: false };
-  tour = { createNotebook: false, addSource: false, askQuestion: false, openStudio: false, generateArtifact: false, tourNotebookId: undefined };
-  checklist = { createNotebook: false, addSource: false, askQuestion: false, openStudio: false, generateArtifact: false };
+  tour = {
+    createNotebook: false,
+    addSource: false,
+    askQuestion: false,
+    openStudio: false,
+    generateArtifact: false,
+    tourNotebookId: undefined,
+  };
+  checklist = {
+    createNotebook: false,
+    addSource: false,
+    askQuestion: false,
+    openStudio: false,
+    generateArtifact: false,
+  };
 });
 
 describe("Onboarding integration — happy path", () => {
@@ -2814,7 +2786,7 @@ describe("Onboarding integration — happy path", () => {
           <TourTooltip />
           <ChecklistCard />
         </OnboardingProvider>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
     // Auto-launch fired startTour → state moved to active/createNotebook.
     await waitFor(() => expect(screen.getByText(/Create your first one/)).toBeInTheDocument());
@@ -2835,7 +2807,9 @@ describe("Onboarding integration — happy path", () => {
       checklist = { ...checklist, addSource: true };
       notify();
     });
-    await waitFor(() => expect(screen.getByText(/Ask anything about your sources/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Ask anything about your sources/)).toBeInTheDocument()
+    );
 
     // User asks a question.
     setupTarget("studio-panel-toggle");
@@ -2997,6 +2971,7 @@ After implementing all tasks, verify against the spec:
 - [x] **All test categories from spec covered** — Tasks 3, 4, 5, 6, 7, 9, 10, 11, 15
 
 **Type consistency check:**
+
 - `StepId` is the same type in `convex/onboarding/constants.ts` and `apps/web/src/features/onboarding/steps.ts`. They're independent definitions; verified to use the same string literals.
 - `ChecklistProgress` and `TourProgress` shapes match the server-side validators.
 - `tourStatus` literal union is consistent across schema, validators, frontend types.

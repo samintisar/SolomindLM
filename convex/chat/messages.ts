@@ -3,10 +3,7 @@ import { query, mutation, internalAction, internalMutation } from "../_generated
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { assertCanReadNotebook, assertCanEditNotebook } from "../_lib/notebookAccess";
-import {
-  getConversationIfReadable,
-  assertCanEditConversation,
-} from "../_lib/conversationAccess";
+import { getConversationIfReadable, assertCanEditConversation } from "../_lib/conversationAccess";
 import * as ConvModel from "../_model/conversations";
 import type { Id } from "../_generated/dataModel";
 import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
@@ -88,10 +85,12 @@ export const createConversation = mutation({
 
     // Snapshot the notebook's instruction mode onto the conversation (locked at creation)
     const notebook = await ctx.db.get(args.notebookId);
-    const chatSettings = notebook?.chatSettings as {
-      instructionMode?: "default" | "learningGuide" | "custom";
-      customInstructions?: string;
-    } | undefined;
+    const chatSettings = notebook?.chatSettings as
+      | {
+          instructionMode?: "default" | "learningGuide" | "custom";
+          customInstructions?: string;
+        }
+      | undefined;
 
     const now = Date.now();
 
@@ -177,7 +176,13 @@ export const sendMessageOptimistic = mutation({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    let conversation: { _id: Id<"conversations">; chatGenerationInFlight?: number; title?: string; userId?: Id<"users">; notebookId?: Id<"notebooks"> } | null;
+    let conversation: {
+      _id: Id<"conversations">;
+      chatGenerationInFlight?: number;
+      title?: string;
+      userId?: Id<"users">;
+      notebookId?: Id<"notebooks">;
+    } | null;
     if (args.conversationId) {
       const c = await getConversationIfReadable(ctx, args.conversationId, userId);
       if (!c || c.notebookId !== args.notebookId) {
@@ -459,10 +464,9 @@ export const generateAndSetTitle = internalAction({
     content: v.string(),
   },
   handler: async (ctx, args) => {
-    const title: string = await ctx.runAction(
-      internal._services.ai.titleGenerator.generateTitle,
-      { chunk: args.content }
-    );
+    const title: string = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
+      chunk: args.content,
+    });
     await ctx.runMutation(internal.chat.messages.setTitleInternal, {
       conversationId: args.conversationId,
       title,

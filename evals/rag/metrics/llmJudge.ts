@@ -6,11 +6,7 @@
  * comparisons, multi-hop reasoning).
  */
 
-import type {
-  EvalFixture,
-  EvalRunArtifact,
-  MetricResult,
-} from "../types";
+import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -125,7 +121,7 @@ function baseMetric(
   status: "pass" | "warn" | "fail",
   score: number,
   detail: string,
-  breakdown?: Record<string, unknown>,
+  breakdown?: Record<string, unknown>
 ): MetricResult {
   return {
     metric,
@@ -211,7 +207,7 @@ async function defaultLlmInvoke(prompt: string, model: string = "gpt-oss-20b"): 
   } catch {
     throw new Error(
       "LLM judge integration not available. Provide an `invoke` function in LlmJudgeOptions " +
-      "or ensure TOGETHER_AI_API_KEY is set."
+        "or ensure TOGETHER_AI_API_KEY is set."
     );
   }
 }
@@ -227,7 +223,7 @@ async function defaultLlmInvoke(prompt: string, model: string = "gpt-oss-20b"): 
 export async function llmJudgeCorrectness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  options: LlmJudgeOptions = {},
+  options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   if (!fixture.expectedAnswer) {
     return baseMetric(
@@ -236,7 +232,7 @@ export async function llmJudgeCorrectness(
       artifact,
       "info",
       0,
-      "Skipped: fixture.expectedAnswer not set. Use expectedItemRecall for list-based fixtures.",
+      "Skipped: fixture.expectedAnswer not set. Use expectedItemRecall for list-based fixtures."
     );
   }
 
@@ -245,12 +241,14 @@ export async function llmJudgeCorrectness(
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   try {
-    const response = await invoke(CORRECTNESS_PROMPT({
-      question: fixture.question,
-      expectedAnswer: fixture.expectedAnswer,
-      actualAnswer: artifact.answer,
-      retrievedContext,
-    }));
+    const response = await invoke(
+      CORRECTNESS_PROMPT({
+        question: fixture.question,
+        expectedAnswer: fixture.expectedAnswer,
+        actualAnswer: artifact.answer,
+        retrievedContext,
+      })
+    );
 
     const result = parseJsonResponse(response) as {
       score?: number;
@@ -270,19 +268,11 @@ export async function llmJudgeCorrectness(
       detail += `\nHallucinations: ${result.hallucinations.join(", ")}`;
     }
 
-    return baseMetric(
-      "llm_judge_correctness",
-      fixture,
-      artifact,
-      status,
-      score,
-      detail,
-      {
-        model,
-        hallucinations: result.hallucinations ?? [],
-        missing: result.missing ?? [],
-      },
-    );
+    return baseMetric("llm_judge_correctness", fixture, artifact, status, score, detail, {
+      model,
+      hallucinations: result.hallucinations ?? [],
+      missing: result.missing ?? [],
+    });
   } catch (err) {
     return baseMetric(
       "llm_judge_correctness",
@@ -290,7 +280,7 @@ export async function llmJudgeCorrectness(
       artifact,
       "fail",
       0,
-      `LLM judge failed: ${err instanceof Error ? err.message : String(err)}`,
+      `LLM judge failed: ${err instanceof Error ? err.message : String(err)}`
     );
   }
 }
@@ -304,7 +294,7 @@ export async function llmJudgeCorrectness(
 export async function llmJudgeFaithfulness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  options: LlmJudgeOptions = {},
+  options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   const invoke = options.invoke ?? defaultLlmInvoke;
   const model = options.model ?? "gpt-oss-20b";
@@ -317,16 +307,18 @@ export async function llmJudgeFaithfulness(
       artifact,
       "info",
       0,
-      "Skipped: insufficient retrieved context to evaluate faithfulness.",
+      "Skipped: insufficient retrieved context to evaluate faithfulness."
     );
   }
 
   try {
-    const response = await invoke(FAITHFULNESS_PROMPT({
-      question: fixture.question,
-      answer: artifact.answer,
-      retrievedContext,
-    }));
+    const response = await invoke(
+      FAITHFULNESS_PROMPT({
+        question: fixture.question,
+        answer: artifact.answer,
+        retrievedContext,
+      })
+    );
 
     const result = parseJsonResponse(response) as {
       score?: number;
@@ -343,19 +335,11 @@ export async function llmJudgeFaithfulness(
       detail += `\nUnsupported claims: ${result.hallucinations.join(", ")}`;
     }
 
-    return baseMetric(
-      "llm_judge_faithfulness",
-      fixture,
-      artifact,
-      status,
-      score,
-      detail,
-      {
-        model,
-        hallucinations: result.hallucinations ?? [],
-        supportedClaims: result.supported_claims?.length ?? 0,
-      },
-    );
+    return baseMetric("llm_judge_faithfulness", fixture, artifact, status, score, detail, {
+      model,
+      hallucinations: result.hallucinations ?? [],
+      supportedClaims: result.supported_claims?.length ?? 0,
+    });
   } catch (err) {
     return baseMetric(
       "llm_judge_faithfulness",
@@ -363,7 +347,7 @@ export async function llmJudgeFaithfulness(
       artifact,
       "fail",
       0,
-      `LLM judge failed: ${err instanceof Error ? err.message : String(err)}`,
+      `LLM judge failed: ${err instanceof Error ? err.message : String(err)}`
     );
   }
 }
@@ -377,19 +361,21 @@ export async function llmJudgeFaithfulness(
 export async function llmJudgeCompleteness(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  options: LlmJudgeOptions = {},
+  options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   const invoke = options.invoke ?? defaultLlmInvoke;
   const model = options.model ?? "gpt-oss-20b";
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   try {
-    const response = await invoke(COMPLETENESS_PROMPT({
-      question: fixture.question,
-      answer: artifact.answer,
-      expectedBehavior: fixture.expectedBehavior,
-      retrievedContext,
-    }));
+    const response = await invoke(
+      COMPLETENESS_PROMPT({
+        question: fixture.question,
+        answer: artifact.answer,
+        expectedBehavior: fixture.expectedBehavior,
+        retrievedContext,
+      })
+    );
 
     const result = parseJsonResponse(response) as {
       score?: number;
@@ -405,18 +391,10 @@ export async function llmJudgeCompleteness(
       detail += `\nMissing aspects: ${result.missing_aspects.join(", ")}`;
     }
 
-    return baseMetric(
-      "llm_judge_completeness",
-      fixture,
-      artifact,
-      status,
-      score,
-      detail,
-      {
-        model,
-        missingAspects: result.missing_aspects ?? [],
-      },
-    );
+    return baseMetric("llm_judge_completeness", fixture, artifact, status, score, detail, {
+      model,
+      missingAspects: result.missing_aspects ?? [],
+    });
   } catch (err) {
     return baseMetric(
       "llm_judge_completeness",
@@ -424,7 +402,7 @@ export async function llmJudgeCompleteness(
       artifact,
       "fail",
       0,
-      `LLM judge failed: ${err instanceof Error ? err.message : String(err)}`,
+      `LLM judge failed: ${err instanceof Error ? err.message : String(err)}`
     );
   }
 }
@@ -435,7 +413,7 @@ export async function llmJudgeCompleteness(
 export async function scoreAllLlmJudgeMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  options: LlmJudgeOptions = {},
+  options: LlmJudgeOptions = {}
 ): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
 

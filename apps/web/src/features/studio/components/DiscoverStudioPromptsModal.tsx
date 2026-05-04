@@ -105,12 +105,8 @@ export const DiscoverStudioPromptsModal: React.FC<DiscoverStudioPromptsModalProp
           <div className="flex min-w-0 items-center gap-3">
             <Compass className="h-5 w-5 shrink-0 text-primary" />
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">
-                {TOOL_LABELS[studioTool]}
-              </p>
-              <h2 className="text-lg font-bold leading-snug tracking-tight">
-                Prompt library
-              </h2>
+              <p className="text-xs text-muted-foreground">{TOOL_LABELS[studioTool]}</p>
+              <h2 className="text-lg font-bold leading-snug tracking-tight">Prompt library</h2>
             </div>
           </div>
           <button

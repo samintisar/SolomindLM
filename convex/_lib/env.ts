@@ -16,7 +16,8 @@ export const env = {
   QUIZ_LLM: process.env.QUIZ_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   MINDMAP_LLM: process.env.MINDMAP_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   SPREADSHEET_LLM: process.env.SPREADSHEET_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  WRITTEN_QUESTIONS_LLM: process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
+  WRITTEN_QUESTIONS_LLM:
+    process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   AUDIO_LLM: process.env.AUDIO_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   /** Together AI TTS model (e.g. Kokoro). */
   AUDIO_TTS_MODEL: process.env.AUDIO_TTS_MODEL || "hexgrad/Kokoro-82M",

@@ -12,8 +12,7 @@ export const recordCacheHit = internalMutation({
       .withIndex("by_type", (q) => q.eq("cacheType", cacheType))
       .collect();
     const existing = candidates.find(
-      (m) =>
-        (agentType === undefined && m.agentType === undefined) || m.agentType === agentType
+      (m) => (agentType === undefined && m.agentType === undefined) || m.agentType === agentType
     );
 
     if (existing) {
@@ -47,8 +46,7 @@ export const recordCacheMiss = internalMutation({
       .withIndex("by_type", (q) => q.eq("cacheType", cacheType))
       .collect();
     const existing = candidates.find(
-      (m) =>
-        (agentType === undefined && m.agentType === undefined) || m.agentType === agentType
+      (m) => (agentType === undefined && m.agentType === undefined) || m.agentType === agentType
     );
 
     if (existing) {
@@ -83,10 +81,7 @@ export const getCacheStats = internalQuery({
         .query("cacheMetrics")
         .withIndex("by_type", (q) => q.eq("cacheType", cacheType))
         .collect();
-      metrics =
-        agentType === undefined
-          ? rows
-          : rows.filter((m) => m.agentType === agentType);
+      metrics = agentType === undefined ? rows : rows.filter((m) => m.agentType === agentType);
     } else {
       metrics = await ctx.db.query("cacheMetrics").collect();
     }

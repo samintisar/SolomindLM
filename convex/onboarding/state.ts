@@ -10,15 +10,15 @@ const onboardingRowValidator = v.object({
     v.literal("pending"),
     v.literal("active"),
     v.literal("skipped"),
-    v.literal("completed"),
+    v.literal("completed")
   ),
   currentStepId: v.optional(
     v.union(
       v.literal("createNotebook"),
       v.literal("addSource"),
       v.literal("askQuestion"),
-      v.literal("generateArtifact"),
-    ),
+      v.literal("generateArtifact")
+    )
   ),
   tourNotebookId: v.optional(v.id("notebooks")),
   checklistDismissed: v.boolean(),

@@ -10,9 +10,14 @@ import type { Page } from "@playwright/test";
  */
 export async function deleteNotebookByTitleFromHome(page: Page, title: string): Promise<void> {
   await page.goto("/home", { waitUntil: "load" });
-  await page.getByRole("button", { name: "All" }).click().catch(() => {});
+  await page
+    .getByRole("button", { name: "All" })
+    .click()
+    .catch(() => {});
 
-  await page.getByRole("heading", { name: "My Notebooks" }).waitFor({ state: "visible", timeout: 20_000 });
+  await page
+    .getByRole("heading", { name: "My Notebooks" })
+    .waitFor({ state: "visible", timeout: 20_000 });
 
   const titleEl = page.getByText(title, { exact: true }).first();
   const visible = await titleEl.isVisible({ timeout: 12_000 }).catch(() => false);
@@ -35,16 +40,16 @@ export async function deleteNotebookByTitleFromHome(page: Page, title: string): 
     .click({ timeout: 5_000 });
 
   // Confirm dialog (title is "Delete Notebook" from the app)
-  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click({ timeout: 5_000 });
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Delete" })
+    .click({ timeout: 5_000 });
 }
 
 /**
  * Best-effort cleanup for notebook teardowns (do not fail the test on errors).
  */
-export async function tryDeleteNotebookByTitleFromHome(
-  page: Page,
-  title: string
-): Promise<void> {
+export async function tryDeleteNotebookByTitleFromHome(page: Page, title: string): Promise<void> {
   try {
     await deleteNotebookByTitleFromHome(page, title);
   } catch {

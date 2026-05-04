@@ -105,8 +105,6 @@ export const generateSuggestionsInternal = internalAction({
       }
     );
 
-     
-     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
 

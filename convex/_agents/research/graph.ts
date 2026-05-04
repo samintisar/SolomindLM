@@ -123,7 +123,10 @@ export async function runExecuteGraph(
     const totalEvidence = state.evidence.length;
     const hasMinimumCoverage = gaps.length === 0 && totalEvidence >= state.subQuestions.length * 2;
     if (hasMinimumCoverage) {
-      graphLog.info("early_stop_sufficient_evidence", { totalEvidence, subQuestionCount: state.subQuestions.length });
+      graphLog.info("early_stop_sufficient_evidence", {
+        totalEvidence,
+        subQuestionCount: state.subQuestions.length,
+      });
       break;
     }
 

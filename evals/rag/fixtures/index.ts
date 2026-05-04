@@ -61,9 +61,7 @@ export const FIXTURES: Record<string, EvalFixture> = {
 export function getFixture(id: string): EvalFixture {
   const fixture = FIXTURES[id];
   if (!fixture) {
-    throw new Error(
-      `Unknown fixture: "${id}". Available: ${Object.keys(FIXTURES).join(", ")}`
-    );
+    throw new Error(`Unknown fixture: "${id}". Available: ${Object.keys(FIXTURES).join(", ")}`);
   }
   return fixture;
 }

@@ -39,10 +39,15 @@ export async function addPasteTextSource(page: Page, text: string) {
   await textarea.pressSequentially(text, { delay: 2 });
 
   // Submit
-  await page.getByRole("button", { name: "Add Source" }).last().evaluate((el) => (el as HTMLElement).click());
+  await page
+    .getByRole("button", { name: "Add Source" })
+    .last()
+    .evaluate((el) => (el as HTMLElement).click());
 
   // Wait for modal to close (confirms submission succeeded)
-  await expect(page.getByPlaceholder("Paste your text here...")).not.toBeVisible({ timeout: 5_000 });
+  await expect(page.getByPlaceholder("Paste your text here...")).not.toBeVisible({
+    timeout: 5_000,
+  });
 }
 
 /**
@@ -112,7 +117,10 @@ export async function selectSource(page: Page, sourceTitle: string | RegExp) {
 export async function deleteSource(page: Page, sourceTitle: string | RegExp) {
   await openSourceKebab(page, sourceTitle);
   // Click "Delete" in the kebab dropdown (evaluate bypasses ChatEmptyState overlay)
-  await page.getByText("Delete").first().evaluate((el) => (el as HTMLElement).click());
+  await page
+    .getByText("Delete")
+    .first()
+    .evaluate((el) => (el as HTMLElement).click());
 
   // Confirmation dialog appears — click the dialog's "Delete" button
   const dialog = page.getByRole("alertdialog");

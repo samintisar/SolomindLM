@@ -565,10 +565,7 @@ http.route({
       return response;
     } catch (error) {
       console.error("[Research Execute route] Unexpected error:", error);
-      return errorResponse(
-        error instanceof Error ? error.message : "Internal server error",
-        500
-      );
+      return errorResponse(error instanceof Error ? error.message : "Internal server error", 500);
     }
   }),
 });

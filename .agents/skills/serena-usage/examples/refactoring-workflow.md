@@ -58,7 +58,7 @@ Response:
         create (line 48)
         update (line 62)
         delete (line 78)
-  
+
   Interfaces:
     RecipeFilters (lines 1-6)
 ```
@@ -78,7 +78,7 @@ Parameters:
 Response:
   Symbol: RecipeService (class)
   Path: src/services/RecipeService.ts:8-95
-  
+
   Children:
     constructor(db: Database)
     getAll(filters?: RecipeFilters): Promise<Recipe[]>
@@ -173,12 +173,12 @@ Response:
 
 Based on reference analysis, the change set is:
 
-| File | Change |
-|------|--------|
-| `src/services/RecipeService.ts` | Rename class to `RecipeRepository`, method `getAll` → `findAll` |
-| `src/controllers/RecipeController.ts` | Update import, type annotation, and `getAll` call |
-| `src/routes/recipes.ts` | Update import, constructor call, and `getAll` call |
-| `src/tests/recipe.test.ts` | Update import, instantiation, and `getAll` call |
+| File                                  | Change                                                          |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `src/services/RecipeService.ts`       | Rename class to `RecipeRepository`, method `getAll` → `findAll` |
+| `src/controllers/RecipeController.ts` | Update import, type annotation, and `getAll` call               |
+| `src/routes/recipes.ts`               | Update import, constructor call, and `getAll` call              |
+| `src/tests/recipe.test.ts`            | Update import, instantiation, and `getAll` call                 |
 
 Also rename the file: `RecipeService.ts` → `RecipeRepository.ts`
 
@@ -223,16 +223,19 @@ Response:
 Update each reference file (using standard file edit tools):
 
 **src/controllers/RecipeController.ts:**
+
 - `import { RecipeService }` → `import { RecipeRepository }`
 - `private recipeService: RecipeService` → `private recipeRepo: RecipeRepository`
 - `this.recipeService.getAll(` → `this.recipeRepo.findAll(`
 
 **src/routes/recipes.ts:**
+
 - `import { RecipeService }` → `import { RecipeRepository }`
 - `new RecipeService(db)` → `new RecipeRepository(db)`
 - `service.getAll(` → `service.findAll(`
 
 **src/tests/recipe.test.ts:**
+
 - `import { RecipeService }` → `import { RecipeRepository }`
 - `new RecipeService(` → `new RecipeRepository(`
 - `service.getAll()` → `service.findAll()`
@@ -316,17 +319,17 @@ Parameters:
 
 ## Summary
 
-| Step | Tool | Purpose |
-|------|------|---------|
-| 1 | `check_onboarding_performed` | Ensure Serena is ready |
-| 2 | `read_memory` | Load current context |
-| 3 | `get_symbols_overview` | Map file structure |
-| 4-5 | `find_symbol` | Read class and method details |
-| 6-7 | `find_referencing_symbols` | Identify all references |
-| 8 | (planning) | Determine full change set |
-| 9 | `replace_symbol_body` | Execute class rename |
-| 10 | file edit tools | Update all references |
-| 11-12 | `find_referencing_symbols` + `search_for_pattern` | Verify completeness |
-| 13 | `edit_memory` | Document the decision |
+| Step  | Tool                                              | Purpose                       |
+| ----- | ------------------------------------------------- | ----------------------------- |
+| 1     | `check_onboarding_performed`                      | Ensure Serena is ready        |
+| 2     | `read_memory`                                     | Load current context          |
+| 3     | `get_symbols_overview`                            | Map file structure            |
+| 4-5   | `find_symbol`                                     | Read class and method details |
+| 6-7   | `find_referencing_symbols`                        | Identify all references       |
+| 8     | (planning)                                        | Determine full change set     |
+| 9     | `replace_symbol_body`                             | Execute class rename          |
+| 10    | file edit tools                                   | Update all references         |
+| 11-12 | `find_referencing_symbols` + `search_for_pattern` | Verify completeness           |
+| 13    | `edit_memory`                                     | Document the decision         |
 
 **Key principle**: Use symbolic tools to understand impact before editing, then verify after editing. Always update memories so the next session knows what happened.

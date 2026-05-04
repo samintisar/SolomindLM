@@ -74,7 +74,18 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
         alertError(error, "Failed to update note");
       }
     },
-    [notes, updateReport, renameFlashcards, renameQuiz, renameMindMap, updateAudioOverview, renameWrittenQuestions, renameInfographic, renameSpreadsheet, updateUserNote]
+    [
+      notes,
+      updateReport,
+      renameFlashcards,
+      renameQuiz,
+      renameMindMap,
+      updateAudioOverview,
+      renameWrittenQuestions,
+      renameInfographic,
+      renameSpreadsheet,
+      updateUserNote,
+    ]
   );
 
   const handleDeleteNote = useCallback(
@@ -103,7 +114,18 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
         alertError(error, "Failed to delete note");
       }
     },
-    [notes, deleteReport, deleteFlashcards, deleteQuiz, deleteMindMap, deleteAudioOverview, deleteWrittenQuestions, deleteInfographic, deleteSpreadsheet, deleteUserNote]
+    [
+      notes,
+      deleteReport,
+      deleteFlashcards,
+      deleteQuiz,
+      deleteMindMap,
+      deleteAudioOverview,
+      deleteWrittenQuestions,
+      deleteInfographic,
+      deleteSpreadsheet,
+      deleteUserNote,
+    ]
   );
 
   const handleSaveReportContent = useCallback(

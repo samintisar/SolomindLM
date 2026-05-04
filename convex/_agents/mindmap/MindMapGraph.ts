@@ -137,7 +137,6 @@ export class MindMapGraph {
 
     builder.addConditionalEdges(START, createMapTasks);
 
-     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge(NODES.MAP_PROCESS as any, NODES.REDUCE_NODE as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -34,6 +34,31 @@ function katexFonts() {
   };
 }
 
+/** Copy PDF.js worker to public so it is served locally (avoids unpkg CDN round-trip). */
+function pdfjsWorker() {
+  return {
+    name: "pdfjs-worker",
+    enforce: "pre" as const,
+    buildStart() {
+      const workerFile = "pdf.worker.min.mjs";
+      const src = path.resolve(__dirname, "node_modules/pdfjs-dist/build", workerFile);
+      const dest = path.resolve(__dirname, "public", workerFile);
+      if (!fs.existsSync(src)) {
+        const rootSrc = path.resolve(__dirname, "../../node_modules/pdfjs-dist/build", workerFile);
+        if (fs.existsSync(rootSrc)) {
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.copyFileSync(rootSrc, dest);
+          return;
+        }
+      }
+      if (fs.existsSync(src)) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(src, dest);
+      }
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   // Load env from monorepo root and app dir so VITE_CONVEX_* are available
   const rootDir = path.resolve(__dirname, "..", "..");
@@ -44,9 +69,9 @@ export default defineConfig(({ mode }) => {
     "";
 
   return {
-    plugins: [react(), katexFonts()],
+    plugins: [react(), katexFonts(), pdfjsWorker()],
     optimizeDeps: {
-      include: ["streamdown", "@streamdown/code", "@streamdown/math"],
+      include: ["streamdown", "@streamdown/code", "@streamdown/math", "pdfjs-dist"],
     },
     server: {
       port: 5173,
@@ -154,6 +179,11 @@ export default defineConfig(({ mode }) => {
             }
 
             // Don't put zod in its own chunk - it can become empty (tree-shaken) and trigger useless requests
+
+            // PDF.js (heavy — keep separate from main bundle)
+            if (id.includes("node_modules/pdfjs-dist") || id.includes("node_modules/react-pdf")) {
+              return "pdfjs";
+            }
 
             // Analytics (Vercel)
             if (id.includes("node_modules/@vercel")) {
