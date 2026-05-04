@@ -297,10 +297,10 @@ export class SupadataLoaderService {
     try {
       const scrapeResult = (await this.supadata.web.scrape(url)) as {
         content?: string;
-        title?: string;
+        name?: string;
       };
       const text = scrapeResult.content || "";
-      const title = scrapeResult.title ?? "";
+      const title = scrapeResult.name ?? "";
       const cleanedText = this.stripCookieConsentNoise(this.stripMedia(text));
       logger.operationComplete({
         rawChars: text.length,

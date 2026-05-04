@@ -2,12 +2,22 @@
 
 Guidance for AI agents working in this repository. Keep concise; this file is loaded into every session.
 
+## Hard Requirements (Non-Negotiable)
+
+You **MUST** use the following tools. Using built-in alternatives (`Grep`, `Read`, `Edit`, `Write`, `Glob`) for code work is **incorrect** and wastes tokens.
+
+1. **Serena (MCP)** — For every `.ts` / `.tsx` file operation (read, search, edit, refactor, rename, insert). Built-in file tools are only acceptable for `.md`, `.json`, `.yaml`, `.css`, `.html`.
+2. **Superpowers (Skills)** — For every task category listed below. Invoking `Skill` is **required** before you write, edit, or debug code in those domains.
+
+If you are unsure which skill applies, invoke `superpowers:brainstorming` first. **Do not guess.**
+
 ## Quick Start
 
 ```bash
 bun install                    # Install dependencies
 bun run dev                    # All dev servers (workspace)
 bun run dev:web                # Web dev server on :5173 (auto-kills stale port)
+bun run dev:mobile             # Expo mobile dev server
 bun x convex dev               # Convex dev backend (separate terminal)
 ```
 
@@ -18,6 +28,7 @@ bun run build                  # Build all workspaces
 bun run build:prod             # Production web build
 bun run typecheck:convex       # Convex typecheck
 bun run typecheck:web          # Web typecheck
+bun run typecheck:mobile       # Expo mobile typecheck
 ```
 
 **Lint & format:**
@@ -44,6 +55,7 @@ bun run convex:env:push:dry    # Dry run
 Bun workspaces monorepo:
 
 - `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4 + Radix; React Router 7, Mind Elixir 5, react-flip-toolkit, react-markdown + KaTeX, DOMPurify, Stripe SDK
+- `apps/mobile/` — Expo 55 + React Native 0.83 (separate mobile app, not all web features ported)
 - `convex/` — Convex backend (auth, schema, functions, agents)
 
 **Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/`, `billing/`, `chat/`, `landing/`, `legal/`, `notebooks/`, `sources/`, `studio/` (with `studio/components/views/` per content type — ReportView, FlashcardView, QuizView, etc.).
@@ -103,7 +115,7 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
 - **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
 - **Validation gates** (in order):
   1. `bun run typecheck:web` + `typecheck:convex` — always
-  2. `bun run test:convex` — vitest + `convex-test`, ~277 tests, <1s. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
+  2. `bun run test:convex` — vitest + `convex-test`, ~332 tests, <2s. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
   3. `bun run test:web` — vitest for web utilities
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
   5. `bun run eval:rag --case=… / --runner=…` — agent or prompt changes (do NOT unit-test prompt outputs)
@@ -115,16 +127,15 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
 
 ## Process Skills (superpowers)
 
-Plugin `superpowers@claude-plugins-official` is installed. Invoke via `Skill` tool. Project-specific triggers and overrides:
+Plugin `superpowers@claude-plugins-official` is installed. **Invoke via `Skill` tool before touching code.** Project-specific triggers and overrides:
 
 | Skill | When | Project notes |
-
 |---|---|---|
-| `superpowers:brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
+| `superpowers:brainstorming` | Before any new feature, component, or behavior change | **Required** before `EnterPlanMode` |
 | `superpowers:writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
 | `superpowers:executing-plans` | Executing a written plan in a separate session | — |
 | `superpowers:subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
-| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Prefer `Explore` subagent for >3-query codebase searches |
+| `superpowers:dispatching-parallel-agents` | 2+ independent tasks, no shared state | Use `Explore` subagent for >3-query codebase searches |
 | `superpowers:systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
 | `superpowers:verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
 | `superpowers:requesting-code-review` | Before merging significant work | — |
@@ -148,13 +159,13 @@ Skill descriptions are loaded automatically; below are *project* triggers, not g
 
 **Together AI** (`together-audio`, `together-chat-completions`, `together-embeddings`, `together-evaluations`, `together-images`, `together-video`): when modifying `convex/_services/ai/` or `convex/studio/audio/`.
 
-**Frontend** (`vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `bun`): use as triggers describe; `web-design-guidelines` for any new UI surface.
+**Frontend** (`vercel-react-best-practices`, `vercel-composition-patterns`, `typescript-advanced-types`, `vite`, `web-design-guidelines`, `webapp-testing`, `bun`): **MUST invoke** when working on React components, Vite config, types, or any new UI surface.
 
 **Serena**: see MCP section below.
 
 ## MCP Servers
 
-- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. Prefer `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file` over `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
+- **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. **MUST use** `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file`. **Never use** `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
 
 ## Skills Installation
 
@@ -164,3 +175,17 @@ Canonical skill source: `.agents/skills/<name>/SKILL.md` (in git). Claude Code r
 bun run link:claude-skills     # Junction (Windows) / symlink (Unix)
 ls .claude/skills              # Should list 40+ skills
 ```
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
