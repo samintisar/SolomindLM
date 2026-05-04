@@ -38,7 +38,7 @@ export const updateInfographicTitle = internalMutation({
 export const updateInfographicStatus = internalMutation({
   args: {
     infographicId: v.id("infographics"),
-    status: v.string(),
+    status: v.union(v.literal("draft"), v.literal("generating"), v.literal("completed"), v.literal("failed")),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {

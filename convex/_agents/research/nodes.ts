@@ -176,70 +176,83 @@ export async function retrieverNode(
     // ── Web/News retrieval ──
     const webChannels = sq.sourceChannels.filter((ch) => ch === "web" || ch === "news");
     if (webChannels.length > 0 && deps.discoverSources && deps.loadWebPage) {
-      await deps.onProgress("retrieving_web", sq.id, 0);
-
-      // Use only 1 best query per sub-question to minimize search cost
       const webQuery = sq.searchQueries[0];
       if (!webQuery) {
         await deps.onProgress("retrieving_web", sq.id, 0);
-        continue;
-      }
+      } else {
+        await deps.onProgress("retrieving_web", sq.id, 0);
 
-      const discoveredSources: Array<{
-        title: string;
-        url: string;
-        snippet: string;
-        sourceType: string;
-        score?: number;
-        rawContent?: string;
-      }> = [];
+        const discoveredSources: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+          sourceType: string;
+          score?: number;
+          rawContent?: string;
+        }> = [];
 
-      // Pick the single best channel: news only if explicitly requested, otherwise web
-      const primaryChannel = webChannels.includes("news") && sq.sourceChannels.includes("news")
-        ? "news"
-        : "web";
+        // news takes priority when explicitly requested; otherwise fall back to web
+        const primaryChannel = webChannels.includes("news") ? "news" : "web";
 
-      try {
-        const sources = await deps.discoverSources(
-          webQuery,
-          [primaryChannel],
-          externalMaxResults
-        );
-        discoveredSources.push(...sources);
-      } catch (_err) {
-        console.error(`[ResearchRetriever] Web discovery failed for "${webQuery}":`, _err);
-      }
-
-      // Sort by score and take top results
-      discoveredSources.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-      const topSources = discoveredSources.slice(0, externalMaxResults);
-
-      // Scrape top sources for full content with timeout
-      for (const source of topSources) {
         try {
-          let content: string;
-          if (source.rawContent && source.rawContent.trim().length > 200) {
-            content = source.rawContent;
-          } else {
-            const page = await withTimeout(deps.loadWebPage(source.url), 10_000, `loadWebPage(${source.url})`);
-            content = page.content;
-          }
+          const sources = await deps.discoverSources(
+            webQuery,
+            [primaryChannel],
+            externalMaxResults
+          );
+          discoveredSources.push(...sources);
+        } catch (_err) {
+          console.error(`[ResearchRetriever] Web discovery failed for "${webQuery}":`, _err);
+        }
 
-          // Chunk content into ~4000 char pieces
-          const CHUNK_SIZE = 4000;
-          const pieces: string[] = [];
-          for (let start = 0; start < content.length; start += CHUNK_SIZE) {
-            pieces.push(content.slice(start, start + CHUNK_SIZE));
-          }
+        // Sort by score and take top results
+        discoveredSources.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        const topSources = discoveredSources.slice(0, externalMaxResults);
 
-          // Take first chunk only to stay within token budget
-          for (let i = 0; i < Math.min(pieces.length, 1); i++) {
+        // Scrape top sources for full content with timeout
+        for (const source of topSources) {
+          try {
+            let content: string;
+            if (source.rawContent && source.rawContent.trim().length > 200) {
+              content = source.rawContent;
+            } else {
+              const page = await withTimeout(deps.loadWebPage(source.url), 10_000, `loadWebPage(${source.url})`);
+              content = page.content;
+            }
+
+            // Chunk content into ~4000 char pieces
+            const CHUNK_SIZE = 4000;
+            const pieces: string[] = [];
+            for (let start = 0; start < content.length; start += CHUNK_SIZE) {
+              pieces.push(content.slice(start, start + CHUNK_SIZE));
+            }
+
+            // Take first chunk only to stay within token budget
+            for (let i = 0; i < Math.min(pieces.length, 1); i++) {
+              allChunks.push({
+                subQuestionId: sq.id,
+                sourceType: source.sourceType as SourceChannel,
+                sourceTitle: source.title,
+                sourceUrl: source.url,
+                content: truncateEvidenceContent(pieces[i]!, MAX_EVIDENCE_CONTENT_LENGTH),
+                relevanceScore: source.score,
+                iteration,
+                metadata: {
+                  domain: safeGetDomain(source.url),
+                },
+              });
+            }
+          } catch (_err) {
+            console.warn(
+              `[ResearchRetriever] Scrape failed for "${source.url}", using snippet fallback:`,
+              _err instanceof Error ? _err.message : _err
+            );
             allChunks.push({
               subQuestionId: sq.id,
               sourceType: source.sourceType as SourceChannel,
               sourceTitle: source.title,
               sourceUrl: source.url,
-              content: truncateEvidenceContent(pieces[i]!, MAX_EVIDENCE_CONTENT_LENGTH),
+              content: truncateEvidenceContent(source.snippet, MAX_EVIDENCE_CONTENT_LENGTH),
               relevanceScore: source.score,
               iteration,
               metadata: {
@@ -247,115 +260,99 @@ export async function retrieverNode(
               },
             });
           }
-        } catch (_err) {
-          // If scraping fails, use snippet as fallback
-          allChunks.push({
-            subQuestionId: sq.id,
-            sourceType: source.sourceType as SourceChannel,
-            sourceTitle: source.title,
-            sourceUrl: source.url,
-            content: truncateEvidenceContent(source.snippet, MAX_EVIDENCE_CONTENT_LENGTH),
-            relevanceScore: source.score,
-            iteration,
-            metadata: {
-              domain: safeGetDomain(source.url),
-            },
-          });
         }
-      }
 
-      await deps.onProgress("retrieving_web", sq.id, topSources.length);
+        await deps.onProgress("retrieving_web", sq.id, topSources.length);
+      }
     }
 
     // ── Academic retrieval ──
     if (sq.sourceChannels.includes("academic") && deps.discoverSources && deps.loadPaper) {
-      await deps.onProgress("retrieving_web", sq.id, 0); // Reuse web phase for academic
-
-      // Use only 1 best query per sub-question to minimize search cost
       const academicQuery = sq.searchQueries[0];
       if (!academicQuery) {
         await deps.onProgress("retrieving_web", sq.id, 0);
-        continue;
-      }
+      } else {
+        await deps.onProgress("retrieving_web", sq.id, 0); // Reuse web phase for academic
 
-      const discoveredPapers: Array<{
-        title: string;
-        url: string;
-        snippet: string;
-        sourceType: string;
-        score?: number;
-        rawContent?: string;
-        metadata?: {
-          pdfUrl?: string;
-          doi?: string;
-          citationCount?: number;
-          sourceApi?: "arxiv" | "semantic_scholar" | "pubmed";
-        };
-      }> = [];
+        const discoveredPapers: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+          sourceType: string;
+          score?: number;
+          rawContent?: string;
+          metadata?: {
+            pdfUrl?: string;
+            doi?: string;
+            citationCount?: number;
+            sourceApi?: "arxiv" | "semantic_scholar" | "pubmed";
+          };
+        }> = [];
 
-      try {
-        const sources = await deps.discoverSources(
-          academicQuery,
-          ["academic"],
-          externalMaxResults
-        );
-        discoveredPapers.push(...sources);
-      } catch (_err) {
-        console.error(`[ResearchRetriever] Academic discovery failed for "${academicQuery}":`, _err);
-      }
-
-      // Sort by score and take top results
-      discoveredPapers.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-      const topPapers = discoveredPapers.slice(0, externalMaxResults);
-
-      // ── Abstract-first loading: use snippets by default, escalate to full text selectively ──
-
-      // Step 1: Add all top papers using abstract/snippet (fast, no OCR)
-      const academicChunks: EvidenceEntry[] = topPapers.map((paper) => ({
-        subQuestionId: sq.id,
-        sourceType: "academic",
-        sourceTitle: paper.title,
-        sourceUrl: paper.url,
-        content: truncateEvidenceContent(paper.snippet, MAX_EVIDENCE_CONTENT_LENGTH),
-        relevanceScore: paper.score,
-        iteration,
-        metadata: {
-          doi: paper.metadata?.doi,
-          citationCount: paper.metadata?.citationCount,
-        },
-      }));
-
-      // Step 2: Lazy full-text load — only for top 1-2 papers, with timeout
-      const FULL_TEXT_LOAD_LIMIT = 2;
-      const papersToLoad = topPapers.slice(0, FULL_TEXT_LOAD_LIMIT);
-
-      for (let i = 0; i < papersToLoad.length; i++) {
-        const paper = papersToLoad[i];
         try {
-          const loaded = await withTimeout(
-            deps.loadPaper({
-              title: paper.title,
-              authors: [],
-              abstract: paper.snippet,
-              url: paper.url,
-              pdfUrl: paper.metadata?.pdfUrl,
-              source: paper.metadata?.sourceApi ?? "arxiv",
-              citationCount: paper.metadata?.citationCount,
-              doi: paper.metadata?.doi,
-            }),
-            10_000,
-            `loadPaper(${paper.title.slice(0, 30)})`
+          const sources = await deps.discoverSources(
+            academicQuery,
+            ["academic"],
+            externalMaxResults
           );
-
-          // Replace the snippet with full content for this paper
-          academicChunks[i].content = truncateEvidenceContent(loaded.content, MAX_EVIDENCE_CONTENT_LENGTH);
+          discoveredPapers.push(...sources);
         } catch (_err) {
-          // Keep the abstract/snippet fallback — no action needed
-          console.warn(`[ResearchRetriever] Full-text load failed for "${paper.title.slice(0, 40)}", using abstract fallback`);
+          console.error(`[ResearchRetriever] Academic discovery failed for "${academicQuery}":`, _err);
         }
-      }
 
-      allChunks.push(...academicChunks);
+        // Sort by score and take top results
+        discoveredPapers.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        const topPapers = discoveredPapers.slice(0, externalMaxResults);
+
+        // ── Abstract-first loading: use snippets by default, escalate to full text selectively ──
+
+        // Step 1: Add all top papers using abstract/snippet (fast, no OCR)
+        const academicChunks: EvidenceEntry[] = topPapers.map((paper) => ({
+          subQuestionId: sq.id,
+          sourceType: "academic",
+          sourceTitle: paper.title,
+          sourceUrl: paper.url,
+          content: truncateEvidenceContent(paper.snippet, MAX_EVIDENCE_CONTENT_LENGTH),
+          relevanceScore: paper.score,
+          iteration,
+          metadata: {
+            doi: paper.metadata?.doi,
+            citationCount: paper.metadata?.citationCount,
+          },
+        }));
+
+        // Step 2: Lazy full-text load — only for top 1-2 papers, with timeout
+        const FULL_TEXT_LOAD_LIMIT = 2;
+        const papersToLoad = topPapers.slice(0, FULL_TEXT_LOAD_LIMIT);
+
+        for (let i = 0; i < papersToLoad.length; i++) {
+          const paper = papersToLoad[i];
+          try {
+            const loaded = await withTimeout(
+              deps.loadPaper({
+                title: paper.title,
+                authors: [],
+                abstract: paper.snippet,
+                url: paper.url,
+                pdfUrl: paper.metadata?.pdfUrl,
+                source: paper.metadata?.sourceApi ?? "arxiv",
+                citationCount: paper.metadata?.citationCount,
+                doi: paper.metadata?.doi,
+              }),
+              10_000,
+              `loadPaper(${paper.title.slice(0, 30)})`
+            );
+
+            // Replace the snippet with full content for this paper
+            academicChunks[i].content = truncateEvidenceContent(loaded.content, MAX_EVIDENCE_CONTENT_LENGTH);
+          } catch (_err) {
+            // Keep the abstract/snippet fallback — no action needed
+            console.warn(`[ResearchRetriever] Full-text load failed for "${paper.title.slice(0, 40)}", using abstract fallback`);
+          }
+        }
+
+        allChunks.push(...academicChunks);
+      }
     }
 
     // Deduplicate by content similarity (simple exact match on first 200 chars)

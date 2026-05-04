@@ -117,7 +117,7 @@ export const generateInfographicImage = internalAction({
     customPrompt: v.optional(v.string()),
     orientation: v.optional(v.union(v.literal("landscape"), v.literal("portrait"), v.literal("square"))),
     visualStyle: v.optional(v.string()),
-    detailLevel: v.optional(v.union(v.literal("concise"), v.literal("standard"))),
+    detailLevel: v.optional(v.union(v.literal("concise"), v.literal("standard"), v.literal("detailed"))),
   },
   handler: async (ctx, args) => {
     const { infographicId, userId, notebookId, documentIds, customPrompt, orientation, visualStyle, detailLevel } = args;
@@ -240,10 +240,13 @@ Return JSON: {
       const designContent = designResponse.choices[0]?.message?.content || "{}";
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const design = parseLlmJson(designContent) as Record<string, any>;
-      logger.phaseComplete("content_analysis", { 
-        title: design.title, 
+      if (!design.image_prompt && !design.title) {
+        throw new Error("LLM design step returned empty content — cannot generate a meaningful infographic");
+      }
+      logger.phaseComplete("content_analysis", {
+        title: design.title,
         layout: design.layout_type,
-        sections: design.sections?.length || 0 
+        sections: design.sections?.length || 0
       });
 
       // Use the LLM-generated image prompt
@@ -387,4 +390,4 @@ Return JSON: {
       throw error;
     }
   },
-});;;
+});

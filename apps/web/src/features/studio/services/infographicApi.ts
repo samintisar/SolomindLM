@@ -128,10 +128,10 @@ export function useCreateInfographic() {
 
     return {
       infographicId: result,
-      status: "pending",
+      status: "generating",
       infographic: mapInfographicToNote({
         _id: result,
-        status: "pending",
+        status: "generating",
         title: params.title || "Infographic",
       }),
     };

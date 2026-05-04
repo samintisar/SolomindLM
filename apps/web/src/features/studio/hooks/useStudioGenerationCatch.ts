@@ -23,9 +23,7 @@ export function useStudioGenerationCatch() {
     async (error: unknown, options: StudioGenerationCatchOptions) => {
       const { isLimitError } = await handleLimitError(error);
       if (!isLimitError) {
-        if (import.meta.env.DEV) {
-          console.error(options.devLabel ?? options.toastMessage, error);
-        }
+        console.error(options.devLabel ?? options.toastMessage, error);
         showErrorToast(options.toastMessage);
       }
       options.onDeleteNote(options.placeholderId);

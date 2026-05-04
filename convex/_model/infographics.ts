@@ -34,12 +34,14 @@ export async function listByNotebook(
   return await query.order("desc").collect();
 }
 
+export type InfographicStatus = "draft" | "generating" | "completed" | "failed";
+
 export type InfographicCreate = {
   userId: Id<"users">;
   notebookId: Id<"notebooks">;
   title: string;
   data?: unknown;
-  status?: string;
+  status?: InfographicStatus;
   metadata?: unknown;
 };
 
@@ -75,7 +77,7 @@ export async function createInfographicAndFetch(
 
 export type InfographicUpdate = {
   title?: string;
-  status?: string;
+  status?: InfographicStatus;
   data?: unknown;
   metadata?: unknown;
 };
@@ -94,7 +96,7 @@ export async function updateInfographic(
 export async function updateInfographicStatus(
   ctx: MutationCtx,
   infographicId: Id<"infographics">,
-  status: string
+  status: InfographicStatus
 ): Promise<void> {
   await ctx.db.patch("infographics", infographicId, {
     status,

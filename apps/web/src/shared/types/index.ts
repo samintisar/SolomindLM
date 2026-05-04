@@ -302,16 +302,16 @@ export interface WrittenQuestionsNote extends BaseNote {
 // Infographic note - single AI-generated infographic image
 export interface InfographicNote extends BaseNote {
   type: "infographic";
-  imageUrl: string;
+  imageUrl?: string;
   title: string;
   prompt?: string;
   metadata: {
     sourceDocumentIds: string[];
-    generatedAt: number;
+    generatedAt?: number;
     customPrompt?: string;
     orientation?: "landscape" | "portrait" | "square";
     visualStyle?: string;
-    detailLevel?: "concise" | "standard";
+    detailLevel?: "concise" | "standard" | "detailed";
     error?: string;
   } & StudioGenerationMetadata;
 }

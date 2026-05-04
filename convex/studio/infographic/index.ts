@@ -102,7 +102,7 @@ export const generateInfographic = mutation({
     customPrompt: v.optional(v.string()),
     orientation: v.optional(v.union(v.literal("landscape"), v.literal("portrait"), v.literal("square"))),
     visualStyle: v.optional(v.string()),
-    detailLevel: v.optional(v.union(v.literal("concise"), v.literal("standard"))),
+    detailLevel: v.optional(v.union(v.literal("concise"), v.literal("standard"), v.literal("detailed"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -145,7 +145,7 @@ export const generateInfographic = mutation({
 
 // Internal mutations delegate to model
 export const updateStatus = internalMutation({
-  args: { infographicId: v.id("infographics"), status: v.string() },
+  args: { infographicId: v.id("infographics"), status: v.union(v.literal("draft"), v.literal("generating"), v.literal("completed"), v.literal("failed")) },
   handler: async (ctx, args) => {
     await Infographics.updateInfographicStatus(ctx, args.infographicId, args.status);
   },

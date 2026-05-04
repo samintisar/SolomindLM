@@ -12,7 +12,13 @@ import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
 
 import { tavily } from "@tavily/core";
 
-const tavilyClient = tavily({ apiKey: env.TAVILY_API_KEY });
+let _tavilyClient: ReturnType<typeof tavily> | null = null;
+function getTavilyClient(): ReturnType<typeof tavily> {
+  if (!_tavilyClient) {
+    _tavilyClient = tavily({ apiKey: env.TAVILY_API_KEY });
+  }
+  return _tavilyClient;
+}
 
 /**
  * Source discovery result from Tavily
@@ -82,7 +88,7 @@ export async function searchInternalHandler(
         maxResults,
       });
 
-      const response = await tavilyClient.search(query, {
+      const response = await getTavilyClient().search(query, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         searchDepth: (searchDepth || "basic") as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,9 +135,11 @@ export async function searchInternalHandler(
   } catch (error) {
     logger.operationError(error);
     if (error instanceof Error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const httpStatus = (error as any).status ?? (error as any).statusCode ?? 0;
       throw createExternalServiceErrorFromResponse(
         "tavily",
-        0,
+        typeof httpStatus === "number" ? httpStatus : 0,
         "/search",
         error.message
       );
@@ -301,7 +309,7 @@ export async function deepResearchHandler(
 
   try {
       // Step 1: Start research task
-      const startResult = await tavilyClient.research(input, {
+      const startResult = await getTavilyClient().research(input, {
       model,
       ...(args.outputSchema ? { outputSchema: args.outputSchema } : {}),
     });
@@ -316,7 +324,7 @@ export async function deepResearchHandler(
     logger.info("Deep research started", { requestId, model });
 
     // Step 2: Poll until completed
-      let response = await tavilyClient.getResearch(requestId);
+      let response = await getTavilyClient().getResearch(requestId);
     let attempts = 0;
     const maxAttempts = 120; // 10 minutes at 5s intervals
 
@@ -326,7 +334,7 @@ export async function deepResearchHandler(
       attempts < maxAttempts
     ) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      response = await tavilyClient.getResearch(requestId);
+      response = await getTavilyClient().getResearch(requestId);
       attempts++;
       logger.debug("Polling research", {
         requestId,
@@ -351,6 +359,15 @@ export async function deepResearchHandler(
         { requestId }
       );
       throw new Error("Deep research timed out after 10 minutes");
+    }
+
+    if (response.status !== "completed") {
+      logger.error(
+        "Deep research ended with unexpected status",
+        new Error(`Unexpected status: ${response.status}`),
+        { requestId, status: response.status }
+      );
+      throw new Error(`Deep research ended with unexpected status: ${response.status}`);
     }
 
     const completedResponse = response as { content?: string; sources?: Array<{ title: string; url: string }> };

@@ -284,7 +284,7 @@ export default defineSchema({
     notebookId: v.id("notebooks"),
     title: v.string(),
     data: v.any(), // Infographic data
-    status: v.string(), // 'draft' | 'generating' | 'completed' | 'failed'
+    status: v.union(v.literal("draft"), v.literal("generating"), v.literal("completed"), v.literal("failed")),
     metadata: v.optional(v.any()),
     createdAt: v.number(),
     updatedAt: v.number(),
