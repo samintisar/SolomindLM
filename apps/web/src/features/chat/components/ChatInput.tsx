@@ -323,13 +323,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {mentionDropdownOpen && filteredSources.length > 0 && (
           <div
             ref={mentionDropdownRef}
-            className="absolute left-3 z-50 w-64 max-h-60 overflow-y-auto bg-card border-2 border-border rounded-xl shadow-lg"
-            style={{
-              top: `${Math.min(
-                (textareaRef.current?.scrollHeight ?? 44) + 8,
-                160
-              )}px`,
-            }}
+            className="absolute left-3 bottom-full mb-2 z-50 w-64 max-h-60 overflow-y-auto bg-card border-2 border-border rounded-xl shadow-lg"
           >
             {filteredSources.map((source, index) => (
               <button
@@ -351,13 +345,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {mentionDropdownOpen && filteredSources.length === 0 && (
           <div
             ref={mentionDropdownRef}
-            className="absolute left-3 z-50 w-64 bg-card border-2 border-border rounded-xl shadow-lg px-3 py-2.5 text-sm text-muted-foreground"
-            style={{
-              top: `${Math.min(
-                (textareaRef.current?.scrollHeight ?? 44) + 8,
-                160
-              )}px`,
-            }}
+            className="absolute left-3 bottom-full mb-2 z-50 w-64 bg-card border-2 border-border rounded-xl shadow-lg px-3 py-2.5 text-sm text-muted-foreground"
           >
             No sources found
           </div>
