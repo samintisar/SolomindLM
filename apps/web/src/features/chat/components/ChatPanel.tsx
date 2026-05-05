@@ -28,6 +28,8 @@ import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput } from "./ChatInput";
 import { ConversationList } from "./ConversationList";
 import { ConfigureChatModal } from "./ConfigureChatModal";
+import { AcademicFilterState } from "@/features/sources/components/AcademicFilters.types";
+import { DEFAULT_ACADEMIC_FILTERS } from "@/features/sources/components/AcademicFilters.utils";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
@@ -106,6 +108,7 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
   const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
+  const [academicFilters, setAcademicFilters] = useState<AcademicFilterState>(DEFAULT_ACADEMIC_FILTERS);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -883,6 +886,8 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
             onToggleDeepResearch={() => setDeepResearchEnabled((prev) => !prev)}
             sourceFilters={sourceFilters}
             onSourceFilterChange={setSourceFilters}
+            academicFilters={academicFilters}
+            onAcademicFiltersChange={setAcademicFilters}
             chatSettings={chatSettings}
             onModelChange={(modelId) =>
               handleSaveChatConfig(
