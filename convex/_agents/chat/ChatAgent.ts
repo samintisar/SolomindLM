@@ -480,6 +480,12 @@ export class ChatAgent {
       });
     }
 
+    // Exclude attached documents from RAG search since their full content
+    // is already injected above — avoids misleading "3 relevant sections" UI
+    const attachedSet = new Set(context.attachedDocumentIds ?? []);
+    const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
+    const ragContext = { ...context, documentIds: ragDocumentIds };
+
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
 
@@ -499,7 +505,7 @@ export class ChatAgent {
       yield { type: "status", status: "retrieving", message: "Searching your materials…" };
 
       const settled = await Promise.allSettled(
-        subqueries.map((sq) => this.runSubqueryRetrieval(sq, context, logger, isListQuery))
+        subqueries.map((sq) => this.runSubqueryRetrieval(sq, ragContext, logger, isListQuery))
       );
 
       for (let i = 0; i < settled.length; i++) {
