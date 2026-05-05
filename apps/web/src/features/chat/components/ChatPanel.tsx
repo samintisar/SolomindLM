@@ -33,7 +33,7 @@ import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { MentionedSource } from "@/shared/types/index";
-import { combineDocumentIds, getDocumentIdsFromMentions } from "../utils/mentions";
+import { getDocumentIdsFromMentions } from "../utils/mentions";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -456,6 +456,12 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
     // Separate mentioned sources (full content) from sidebar-selected sources (RAG)
     const attachedDocumentIds = getDocumentIdsFromMentions(mentionedSources);
     const selectedIds = sources?.filter((s) => s.selected).map((s) => s.id) ?? [];
+
+    console.log("[Chat] Sending message:", {
+      attachedDocumentIds,
+      selectedIds,
+      messageText: messageWithQuotes.slice(0, 100),
+    });
 
     setIsSending(true);
     setInputMessage("");

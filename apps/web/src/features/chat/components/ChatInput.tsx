@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import React, { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import {
   ArrowUp,
   Loader2,
@@ -177,7 +177,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     };
   }, []);
 
-  const filteredSources = filterSourcesByQuery(sources ?? [], mentionQuery);
+  const filteredSources = useMemo(
+    () => filterSourcesByQuery(sources ?? [], mentionQuery),
+    [sources, mentionQuery]
+  );
 
   const selectMention = useCallback(
     (source: Source) => {
@@ -200,6 +203,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         startIndex: mentionInfo.startIndex,
         endIndex: mentionInfo.startIndex + mentionText.length,
       };
+
+      console.log("[Mention] Selected source:", {
+        title: source.title,
+        documentId: source.id,
+        allMentions: [...mentionedSources, newMention].map((m) => ({
+          title: m.title,
+          documentId: m.documentId,
+        })),
+      });
 
       onMentionedSourcesChange([...mentionedSources, newMention]);
       setMentionDropdownOpen(false);

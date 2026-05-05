@@ -457,6 +457,12 @@ export class ChatAgent {
       for (const docId of context.attachedDocumentIds) {
         const fullContent = await this.fetchFullDocumentContent(docId);
         if (fullContent) {
+          // Log first 200 chars to identify which doc was fetched
+          logger.info("Attached document fetched", {
+            documentId: docId,
+            contentPreview: fullContent.slice(0, 200).replace(/\n/g, " "),
+            contentLength: fullContent.length,
+          });
           allChunks.push({
             id: `full-${docId}`,
             sourceId: String(docId),
@@ -473,6 +479,8 @@ export class ChatAgent {
               sentenceCount: fullContent.split(/[.!?]+/).length,
             },
           });
+        } else {
+          logger.warn("Failed to fetch attached document", { documentId: docId });
         }
       }
       logger.info("Attached documents loaded", {

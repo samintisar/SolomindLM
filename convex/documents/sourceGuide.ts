@@ -6,9 +6,10 @@
  * Falls back to smart LLM on parse failure.
  */
 
-import { internalAction } from "../_generated/server";
+import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import { getAuthUserId } from "../auth";
 import { uncachedLlmCall } from "../_agents/_shared/cachedLlm";
 import { env } from "../_lib/env";
 
@@ -86,17 +87,22 @@ async function generateSourceGuideWithModel(
   return parsed;
 }
 
-export const generateSourceGuide = internalAction({
+export const generateSourceGuide = action({
   args: {
     documentId: v.id("documents"),
-    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      console.warn("[sourceGuide] Unauthenticated");
+      return;
+    }
+
     // Verify document exists and is completed
-    const document = await ctx.runQuery(internal.documents.index.getDocumentInternal, {
-      documentId: args.documentId,
-      userId: args.userId,
-    });
+    const document = await ctx.runQuery(
+      internal.documents.index.getDocumentInternal,
+      { documentId: args.documentId, userId }
+    );
 
     if (!document) {
       console.warn("[sourceGuide] Document not found:", args.documentId);
@@ -117,10 +123,10 @@ export const generateSourceGuide = internalAction({
     let content = document.extractedMarkdown || "";
     if (!content) {
       // Fallback: stitch chunks
-      const chunks = await ctx.runQuery(internal.documents.index.getDocumentChunksInternal, {
-        documentId: args.documentId,
-        userId: args.userId,
-      });
+      const chunks = await ctx.runQuery(
+        internal.documents.index.getDocumentChunksInternal,
+        { documentId: args.documentId, userId }
+      );
       content = chunks.map((c: { content: string }) => c.content).join("\n\n");
     }
 
@@ -147,7 +153,10 @@ Output ONLY a single JSON object. No markdown fences, no explanation.`;
         parsed = await generateSourceGuideWithModel(env.FAST_LLM, prompt);
       } catch (firstError) {
         if (env.SMART_LLM !== env.FAST_LLM) {
-          console.warn("[sourceGuide] fast model failed, retrying with smart model:", firstError);
+          console.warn(
+            "[sourceGuide] fast model failed, retrying with smart model:",
+            firstError
+          );
           parsed = await generateSourceGuideWithModel(env.SMART_LLM, prompt);
         } else {
           throw firstError;

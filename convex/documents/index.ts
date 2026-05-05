@@ -1072,11 +1072,11 @@ export const getSourceGuide = query({
     documentId: v.id("documents"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
     const document = await ctx.db.get(args.documentId);
-    if (!document || document.userId !== identity.subject) return null;
+    if (!document || document.userId !== userId) return null;
 
     if (document.sourceGuide) {
       return {
