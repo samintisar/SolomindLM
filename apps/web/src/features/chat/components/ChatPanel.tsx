@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   PanelLeftOpen,
   PanelRightOpen,
@@ -17,6 +24,8 @@ import { Virtuoso } from "react-virtuoso";
 import { Message, Note, ReferenceChunk, ChatSettings } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
 import { useChatStreamingContext } from "../useChatStreaming";
+import { SelectionQuoteProvider, useSelectionQuotes } from "../contexts/SelectionQuoteContext";
+import { SelectionTooltip } from "./SelectionTooltip";
 import { exportAsMarkdown } from "../utils/exportChat";
 import { useSaveChat } from "../services/userNotesApi";
 import { RefHandlers } from "../utils/messageRendering.utils";
@@ -30,10 +39,23 @@ import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
 import { CONVEX_SITE_URL } from "../services/chatApi";
+import { MentionedSource } from "@/shared/types/index";
+import {
+  syncMentions,
+  combineDocumentIds,
+  getDocumentIdsFromMentions,
+} from "../utils/mentions";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+
+/** Tailwind `bottom-3` on the floating composer wrapper */
+const CHAT_COMPOSER_BOTTOM_INSET_PX = 12;
+/** Extra scroll past last message so content isn't hidden under the composer */
+const CHAT_COMPOSER_SCROLL_END_GAP_PX = 16;
+/** Floor so short composers still clear the old fixed footer (~md:h-56) */
+const CHAT_COMPOSER_SCROLL_PADDING_MIN_PX = 240;
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -49,7 +71,7 @@ interface ChatPanelProps {
   onOpenNotebookSource?: (documentId: string) => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({
+const ChatPanelInner: React.FC<ChatPanelProps> = ({
   isLeftOpen,
   isRightOpen,
   toggleLeft,
@@ -83,12 +105,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     consumeResearchExecuteStream,
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
+  const { quotes, clearQuotes } = useSelectionQuotes();
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<"top" | "bottom">("top");
   const [tooltipStyle, setTooltipStyle] = useState<{ top?: number; left?: number }>({});
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
+  const [mentionedSources, setMentionedSources] = useState<MentionedSource[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
@@ -214,6 +238,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const hideTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const virtuosoRef = useRef<any>(null);
+  const composerRootRef = useRef<HTMLDivElement>(null);
+  const [composerScrollPaddingPx, setComposerScrollPaddingPx] = useState(288);
+
+  useLayoutEffect(() => {
+    const el = composerRootRef.current;
+    if (!el) return;
+    const update = () => {
+      const h = el.getBoundingClientRect().height;
+      setComposerScrollPaddingPx(
+        Math.max(
+          CHAT_COMPOSER_SCROLL_PADDING_MIN_PX,
+          Math.ceil(h + CHAT_COMPOSER_BOTTOM_INSET_PX + CHAT_COMPOSER_SCROLL_END_GAP_PX)
+        )
+      );
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // --- Chat action handlers ---
 
@@ -407,9 +451,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
     }
 
+    // Prepend quotes to the message
+    let messageWithQuotes = trimmed;
+    if (quotes.length > 0) {
+      const quoteBlocks = quotes.map((q) => {
+        const sourceLabel = q.sourceTitle ? `From ${q.sourceTitle}:\n` : "";
+        return `> ${sourceLabel}${q.text.split("\n").join("\n> ")}`;
+      }).join("\n\n");
+      messageWithQuotes = `${quoteBlocks}\n\n${trimmed}`;
+      clearQuotes();
+    }
+
+    // Combine mentioned sources with sidebar-selected sources
+    const mentionedIds = getDocumentIdsFromMentions(mentionedSources);
+    const selectedIds = sources?.filter((s) => s.selected).map((s) => s.id) ?? [];
+    const combinedDocumentIds = combineDocumentIds(mentionedIds, selectedIds);
+
     setIsSending(true);
     setInputMessage("");
-    onSendMessage(trimmed, deepResearchEnabled || undefined, { channels: sourceFilters });
+    setMentionedSources([]);
+    onSendMessage(
+      messageWithQuotes,
+      deepResearchEnabled || undefined,
+      { channels: sourceFilters },
+      combinedDocumentIds
+    );
     setIsSending(false);
   }, [
     inputMessage,
@@ -420,6 +486,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     toastError,
     deepResearchEnabled,
     sourceFilters,
+    quotes,
+    clearQuotes,
+    mentionedSources,
   ]);
 
   const handleSendChip = useCallback(
@@ -434,9 +503,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
       }
 
-      onSendMessage(text, undefined, { channels: sourceFilters });
+      const mentionedIds = getDocumentIdsFromMentions(mentionedSources);
+      const selectedIds = sources?.filter((s) => s.selected).map((s) => s.id) ?? [];
+      const combinedDocumentIds = combineDocumentIds(mentionedIds, selectedIds);
+
+      onSendMessage(text, undefined, { channels: sourceFilters }, combinedDocumentIds);
     },
-    [chatInputDisabled, notebookId, onSendMessage, sources, toastError, sourceFilters]
+    [chatInputDisabled, notebookId, onSendMessage, sources, toastError, sourceFilters, mentionedSources]
   );
 
   // --- Scroll to bottom ---
@@ -632,6 +705,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   return (
     <>
+      <SelectionTooltip />
       <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
         {/* Panel header: visible on mobile (z-20) like Sources/Studio; desktop uses md:z-10 */}
         <div className="flex items-center justify-between gap-2 border-b border-border bg-background/80 p-4 backdrop-blur-sm sticky top-0 z-20 h-14 shrink-0 md:z-10">
@@ -723,7 +797,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   </div>
                 )}
                 components={{
-                  Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
+                  Footer: () => (
+                    <div
+                      className="shrink-0"
+                      style={{ height: composerScrollPaddingPx }}
+                      aria-hidden
+                    />
+                  ),
                 }}
                 defaultItemHeight={150}
                 increaseViewportBy={{ top: 200, bottom: 400 }}
@@ -788,6 +868,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
         <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex min-w-0 justify-center px-3 sm:px-4">
           <ChatInput
+            rootRef={composerRootRef}
             value={inputMessage}
             onChange={setInputMessage}
             onSend={handleSendMessage}
@@ -825,6 +906,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               });
             }}
             onVoiceError={toastError}
+            quotes={quotes}
+            sources={sources ?? []}
+            mentionedSources={mentionedSources}
+            onMentionedSourcesChange={setMentionedSources}
           />
         </div>
       </div>
@@ -838,5 +923,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         instructionModeLocked={messages.length > 0}
       />
     </>
+  );
+};
+
+export const ChatPanel: React.FC<ChatPanelProps> = (props) => {
+  return (
+    <SelectionQuoteProvider>
+      <ChatPanelInner {...props} />
+    </SelectionQuoteProvider>
   );
 };
