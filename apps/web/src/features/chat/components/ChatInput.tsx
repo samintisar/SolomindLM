@@ -17,6 +17,7 @@ import {
   Square,
   FileText,
   X,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
@@ -26,6 +27,9 @@ import type { ChatSettings } from "@/shared/types";
 import { Source, MentionedSource } from "@/shared/types/index";
 import { filterSourcesByQuery } from "../utils/mentions";
 import { QuoteBlocks } from "./QuoteBlocks";
+import { AcademicFilters } from "@/features/sources/components/AcademicFilters";
+import { AcademicFilterState } from "@/features/sources/components/AcademicFilters.types";
+import { DEFAULT_ACADEMIC_FILTERS } from "@/features/sources/components/AcademicFilters.utils";
 
 const SOURCE_FILTERS = [
   { id: "notebook", label: "Notebook sources", icon: BookOpen },
@@ -53,6 +57,8 @@ interface ChatInputProps {
   onToggleDeepResearch?: () => void;
   sourceFilters?: string[];
   onSourceFilterChange?: (filters: string[]) => void;
+  academicFilters?: AcademicFilterState;
+  onAcademicFiltersChange?: (filters: AcademicFilterState) => void;
   chatSettings?: ChatSettings;
   onModelChange?: (modelId: string) => void;
   quotes?: Array<{ id: string; text: string }>;
@@ -77,6 +83,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onToggleDeepResearch,
   sourceFilters,
   onSourceFilterChange,
+  academicFilters,
+  onAcademicFiltersChange,
   chatSettings,
   onModelChange,
   quotes,
@@ -94,6 +102,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [mentionQuery, setMentionQuery] = useState("");
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const mentionDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [academicFiltersOpen, setAcademicFiltersOpen] = useState(false);
+  const academicFiltersRef = useRef<HTMLDivElement>(null);
 
   const currentModel = findSmartModelById(chatSettings?.smartModel);
 
@@ -156,6 +167,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [mentionDropdownOpen]);
+
+  // Close academic filters dropdown on outside click
+  useEffect(() => {
+    if (!academicFiltersOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        academicFiltersRef.current &&
+        !academicFiltersRef.current.contains(e.target as Node)
+      ) {
+        setAcademicFiltersOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [academicFiltersOpen]);
 
   const detectMention = useCallback((text: string, cursorPos: number) => {
     // Find the last @ before cursor
@@ -439,6 +465,49 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       );
                     })}
                   </div>
+
+                  {/* Academic Filters */}
+                  {activeFilters.includes("academic") && onAcademicFiltersChange && (
+                    <div className="mt-2 pt-2 border-t border-border">
+                      <div className="relative" ref={academicFiltersRef}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAcademicFiltersOpen((prev) => !prev)
+                          }
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${
+                            academicFiltersOpen
+                              ? "bg-primary/10 text-primary"
+                              : "hover:bg-muted/80 text-foreground"
+                          }`}
+                        >
+                          <SlidersHorizontal className="w-4 h-4 shrink-0" />
+                          <span>Academic Filters</span>
+                          {academicFilters &&
+                            academicFilters.database !== "all" && (
+                              <span className="ml-auto text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
+                                Active
+                              </span>
+                            )}
+                        </button>
+
+                        {academicFiltersOpen && (
+                          <div className="absolute bottom-full left-0 mb-2 z-50">
+                            <AcademicFilters
+                              filters={
+                                academicFilters || DEFAULT_ACADEMIC_FILTERS
+                              }
+                              onChange={(filters) => {
+                                onAcademicFiltersChange(filters);
+                              }}
+                              variant="dropdown"
+                              onApply={() => setAcademicFiltersOpen(false)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
