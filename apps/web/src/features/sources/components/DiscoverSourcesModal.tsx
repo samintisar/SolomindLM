@@ -23,6 +23,9 @@ import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi
 import { useToast } from "@/shared/contexts/useToast";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import { Favicon } from "@/shared/components/Favicon";
+import { AcademicFilters } from "./AcademicFilters";
+import { AcademicFilterState } from "./AcademicFilters.types";
+import { DEFAULT_ACADEMIC_FILTERS } from "./AcademicFilters.utils";
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
@@ -45,6 +48,7 @@ interface FilterState {
     minCitations?: number;
     openAccessOnly?: boolean;
     hasFullText?: boolean;
+    advancedFilters?: AcademicFilterState;
   };
   sortBy: "relevance" | "date" | "citations";
   maxResults: number;
@@ -54,7 +58,9 @@ const DEFAULT_FILTERS: FilterState = {
   sourceTypes: ["web"],
   sortBy: "relevance",
   maxResults: 20,
-  academic: {},
+  academic: {
+    advancedFilters: DEFAULT_ACADEMIC_FILTERS,
+  },
 };
 
 /** Discovery total budget ceiling (Tavily caps `max_results` at 20). */
@@ -242,6 +248,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showAcademicFilters, setShowAcademicFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [filters, setFilters] = useSessionStorage<FilterState>(
     "discovery-filters",
@@ -528,284 +535,6 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                   <FileStack className="w-4 h-4 shrink-0" />
                   Add sources
                 </button>
-              )}
-            </div>
-
-            <div className="border border-border/50 rounded-xl p-5 bg-card shadow-sm">
-              <form onSubmit={handleSearch} className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  ref={inputRef}
-                  autoFocus
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search for articles, papers, or websites..."
-                  className="w-full pl-10 pr-28 py-3 bg-secondary/20 border border-border rounded-lg text-sm focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground/50"
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading || !query.trim()}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all inline-flex items-center gap-1.5"
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
-                </button>
-              </form>
-            </div>
-
-            <div className="border border-border/50 rounded-xl p-4 bg-card shadow-sm flex flex-wrap items-center gap-2">
-              {(
-                Object.entries(SOURCE_TYPE_CONFIG) as [
-                  SourceType,
-                  (typeof SOURCE_TYPE_CONFIG)[SourceType],
-                ][]
-              ).map(([key, config]) => {
-                const Icon = config.icon;
-                const isActive = filters.sourceTypes.includes(key);
-                const pastel = SOURCE_TYPE_STYLES[key];
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleSourceType(key)}
-                    className={`inline-flex h-9 items-center gap-1.5 px-3.5 rounded-lg border text-sm font-medium transition-all ${
-                      isActive ? pastel.filterActive : pastel.filterInactive
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    {config.label}
-                  </button>
-                );
-              })}
-
-              <div className="flex-1 min-w-[1rem]" />
-
-              <div ref={filterRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`inline-flex h-9 items-center gap-2 px-3 rounded-lg border text-sm font-medium transition-all ${
-                    showFilters
-                      ? "border-border bg-secondary/50 text-foreground"
-                      : "border-transparent bg-secondary/30 text-muted-foreground hover:bg-secondary/50 hover:border-border"
-                  }`}
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-                  Filters
-                </button>
-                {showFilters && (
-                  <div className="absolute right-0 top-full mt-2 bg-card border border-border rounded-xl shadow-lg p-4 w-56 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
-                    {/* Time range */}
-                    <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Time range
-                    </label>
-                    <select
-                      value={filters.timeRange || ""}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          timeRange: (e.target.value || undefined) as FilterState["timeRange"],
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-3 focus:outline-none focus:border-primary"
-                    >
-                      <option value="">All time</option>
-                      <option value="day">Past day</option>
-                      <option value="week">Past week</option>
-                      <option value="month">Past month</option>
-                      <option value="year">Past year</option>
-                    </select>
-
-                    {/* Sort */}
-                    <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Sort by
-                    </label>
-                    <select
-                      value={filters.sortBy}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          sortBy: e.target.value as FilterState["sortBy"],
-                        }))
-                      }
-                      className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-3 focus:outline-none focus:border-primary"
-                    >
-                      <option value="relevance">Relevance</option>
-                      <option value="date">Date</option>
-                      <option value="citations">Citations</option>
-                    </select>
-
-                    {/* Total result budget, split across selected source types */}
-                    <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Total results: {filters.maxResults}
-                    </label>
-                    <input
-                      type="range"
-                      min="5"
-                      max={MAX_DISCOVERY_TOTAL_RESULTS}
-                      step="5"
-                      value={filters.maxResults}
-                      onChange={(e) =>
-                        setFilters((prev) => ({ ...prev, maxResults: parseInt(e.target.value) }))
-                      }
-                      className="w-full"
-                    />
-
-                    {/* Academic filters */}
-                    {filters.sourceTypes.includes("academic") && (
-                      <>
-                        <div className="border-t border-border/50 my-3" />
-                        <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                          Academic
-                        </label>
-                        <select
-                          value={filters.academic.minCitations || ""}
-                          onChange={(e) =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              academic: {
-                                ...prev.academic,
-                                minCitations: e.target.value ? parseInt(e.target.value) : undefined,
-                              },
-                            }))
-                          }
-                          className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-2 focus:outline-none focus:border-primary"
-                        >
-                          <option value="">Any citations</option>
-                          <option value="10">10+</option>
-                          <option value="50">50+</option>
-                          <option value="100">100+</option>
-                          <option value="500">500+</option>
-                        </select>
-                        <label className="flex items-center gap-2 cursor-pointer text-sm mb-1">
-                          <input
-                            type="checkbox"
-                            checked={filters.academic.openAccessOnly || false}
-                            onChange={(e) =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                academic: {
-                                  ...prev.academic,
-                                  openAccessOnly: e.target.checked || undefined,
-                                },
-                              }))
-                            }
-                            className="w-3.5 h-3.5 rounded border-border"
-                          />
-                          Open access only
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer text-sm">
-                          <input
-                            type="checkbox"
-                            checked={filters.academic.hasFullText || false}
-                            onChange={(e) =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                academic: {
-                                  ...prev.academic,
-                                  hasFullText: e.target.checked || undefined,
-                                },
-                              }))
-                            }
-                            className="w-3.5 h-3.5 rounded border-border"
-                          />
-                          Has full text
-                        </label>
-                      </>
-                    )}
-
-                    {/* Reset */}
-                    <button
-                      type="button"
-                      onClick={() => setFilters(DEFAULT_FILTERS)}
-                      className="w-full mt-3 px-3 py-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors border border-border rounded-md hover:border-destructive/30"
-                    >
-                      Reset filters
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setViewMode((v) => (v === "list" ? "grid" : "list"))}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-secondary/30 text-muted-foreground hover:bg-secondary/50 hover:border-border transition-colors shrink-0"
-                title={viewMode === "list" ? "Grid view" : "List view"}
-              >
-                {viewMode === "list" ? (
-                  <LayoutGrid className="w-4 h-4" />
-                ) : (
-                  <List className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {results.length > 0 && (
-            <div className="flex-shrink-0 flex items-center justify-between px-6 md:px-10 py-2 border-b border-border/40 text-xs text-muted-foreground bg-card/50">
-              <span>
-                {results.length} result{results.length !== 1 ? "s" : ""} &middot;{" "}
-                {filters.sourceTypes.map((t) => SOURCE_TYPE_CONFIG[t].label).join(", ")}
-              </span>
-              <span>{selectedCount} selected</span>
-            </div>
-          )}
-
-          <div
-            className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-card/50 px-6 md:px-10 ${selectedCount > 0 ? "pb-0" : "pb-6"}`}
-          >
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center min-h-80 text-center space-y-3">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                <div>
-                  <p className="font-medium text-sm">Searching across sources...</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Finding the most relevant sources for you.
-                  </p>
-                </div>
-              </div>
-            ) : error ? (
-              <div className="flex flex-col items-center justify-center min-h-80 text-center p-6">
-                <p className="text-destructive font-medium text-sm mb-0.5">
-                  Search encountered an issue
-                </p>
-                <p className="text-muted-foreground text-xs">{error}</p>
-              </div>
-            ) : results.length > 0 ? (
-              viewMode === "list" ? (
-                <div className="space-y-2 py-1">
-                  {results.map((result) => (
-                    <ResultRow
-                      key={result.id}
-                      result={result}
-                      isSelected={selectedIds.has(result.id)}
-                      isAdding={addingIds.has(result.id)}
-                      isAdded={isDiscoveryResultInNotebook(result)}
-                      isAtLimit={isAtLimit}
-                      onToggleSelect={() => toggleSelect(result.id)}
-                      onAdd={() => handleAddSingle(result)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 py-4">
-                  {results.map((result) => (
-                    <ResultCard
-                      key={result.id}
-                      result={result}
-                      isAdding={addingIds.has(result.id)}
-                      isAdded={isDiscoveryResultInNotebook(result)}
-                      isAtLimit={isAtLimit}
-                      onAdd={() => handleAddSingle(result)}
-                    />
-                  ))}
-                </div>
-              )
-            ) : (
-              <div className="flex flex-col items-center justify-center min-h-80 text-center opacity-40">
-                <Search className="w-8 h-8 mb-3" />
-                <p className="text-sm italic">Enter a topic to discover related sources</p>
-              </div>
             )}
           </div>
         </div>
