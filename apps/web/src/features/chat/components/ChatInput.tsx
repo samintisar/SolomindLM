@@ -15,12 +15,16 @@ import {
   ChevronDown,
   Check,
   Square,
+  FileText,
 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
 import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
 import type { ChatSettings } from "@/shared/types";
+import { Source, MentionedSource } from "@/shared/types/index";
+import { filterSourcesByQuery, syncMentions } from "../utils/mentions";
+import { QuoteBlocks } from "./QuoteBlocks";
 
 const SOURCE_FILTERS = [
   { id: "notebook", label: "Notebook sources", icon: BookOpen },
@@ -34,6 +38,8 @@ interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  /** Outermost wrapper (card + disclaimer) — use to measure floating composer height for scroll padding. */
+  rootRef?: React.Ref<HTMLDivElement>;
   disabled?: boolean;
   /** True when Convex reports in-flight generation for this conversation but this session is not the one consuming the stream (another tab/device). */
   waitingOnRemoteGeneration?: boolean;
@@ -48,12 +54,17 @@ interface ChatInputProps {
   onSourceFilterChange?: (filters: string[]) => void;
   chatSettings?: ChatSettings;
   onModelChange?: (modelId: string) => void;
+  quotes?: Array<{ id: string; text: string }>;
+  sources?: Source[];
+  mentionedSources?: MentionedSource[];
+  onMentionedSourcesChange?: (mentions: MentionedSource[]) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   value,
   onChange,
   onSend,
+  rootRef,
   disabled,
   waitingOnRemoteGeneration = false,
   isStreaming = false,
@@ -67,12 +78,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onSourceFilterChange,
   chatSettings,
   onModelChange,
+  quotes,
+  sources,
+  mentionedSources,
+  onMentionedSourcesChange,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  const mentionDropdownRef = useRef<HTMLDivElement>(null);
 
   const currentModel = findSmartModelById(chatSettings?.smartModel);
 
@@ -120,14 +140,124 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [modelDropdownOpen]);
 
+  // Close mention dropdown on outside click
+  useEffect(() => {
+    if (!mentionDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        mentionDropdownRef.current &&
+        !mentionDropdownRef.current.contains(e.target as Node) &&
+        textareaRef.current !== e.target
+      ) {
+        setMentionDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [mentionDropdownOpen]);
+
+  const detectMention = useCallback(
+    (text: string, cursorPos: number) => {
+      // Find the last @ before cursor
+      const textBeforeCursor = text.slice(0, cursorPos);
+      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+      if (lastAtIndex === -1) return null;
+
+      // Check if there's a space between @ and cursor (which means we're not in a mention)
+      const textBetweenAtAndCursor = textBeforeCursor.slice(lastAtIndex + 1);
+      if (textBetweenAtAndCursor.includes(" ")) return null;
+
+      // Make sure @ is at the start of the word (preceded by space or start of string)
+      const charBeforeAt = textBeforeCursor[lastAtIndex - 1];
+      if (charBeforeAt && charBeforeAt !== " " && charBeforeAt !== "\n") return null;
+
+      return {
+        query: textBetweenAtAndCursor,
+        startIndex: lastAtIndex,
+      };
+    },
+    []
+  );
+
+  const filteredSources = filterSourcesByQuery(sources ?? [], mentionQuery);
+
+  const selectMention = useCallback(
+    (source: Source) => {
+      if (!textareaRef.current || !onMentionedSourcesChange || !mentionedSources) return;
+
+      const cursorPos = textareaRef.current.selectionStart;
+      const text = value;
+      const mentionInfo = detectMention(text, cursorPos);
+
+      if (!mentionInfo) return;
+
+      const mentionText = `@${source.title}`;
+      const newText =
+        text.slice(0, mentionInfo.startIndex) +
+        mentionText +
+        text.slice(cursorPos);
+
+      onChange(newText);
+
+      const newMention: MentionedSource = {
+        documentId: source.id,
+        title: source.title,
+        startIndex: mentionInfo.startIndex,
+        endIndex: mentionInfo.startIndex + mentionText.length,
+      };
+
+      onMentionedSourcesChange([...mentionedSources, newMention]);
+      setMentionDropdownOpen(false);
+      setMentionQuery("");
+
+      // Focus textarea and position cursor after the mention
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          const newCursorPos = mentionInfo.startIndex + mentionText.length;
+          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+          textareaRef.current.focus();
+        }
+      });
+    },
+    [value, onChange, mentionedSources, onMentionedSourcesChange, detectMention]
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (mentionDropdownOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setHighlightedMentionIndex((prev) =>
+            prev < filteredSources.length - 1 ? prev + 1 : prev
+          );
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setHighlightedMentionIndex((prev) => (prev > 0 ? prev - 1 : 0));
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (filteredSources.length > 0) {
+            selectMention(filteredSources[highlightedMentionIndex]);
+          }
+          return;
+        }
+        if (e.key === "Escape" || e.key === "Tab") {
+          setMentionDropdownOpen(false);
+          if (e.key === "Escape") e.preventDefault();
+          return;
+        }
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         onSend();
       }
     },
-    [onSend]
+    [onSend, mentionDropdownOpen, filteredSources, highlightedMentionIndex, selectMention]
   );
 
   const toggleFilter = (id: string) => {
@@ -142,11 +272,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className="flex w-full min-w-0 max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
+    <div
+      ref={rootRef}
+      className="flex w-full min-w-0 max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl"
+    >
       <div
         data-onboarding="chat-input"
         className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
       >
+        {quotes && quotes.length > 0 && <QuoteBlocks />}
         <textarea
           ref={textareaRef}
           placeholder={
@@ -157,10 +291,78 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           className="w-full min-w-0 bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-base @min-[400px]/chat-input:text-lg"
           rows={1}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const newValue = e.target.value;
+            const cursorPos = e.target.selectionStart;
+            onChange(newValue);
+
+            // Sync mentions with new text
+            if (mentionedSources && onMentionedSourcesChange) {
+              const synced = syncMentions(newValue, mentionedSources);
+              if (synced.length !== mentionedSources.length ||
+                  synced.some((m, i) => m.startIndex !== mentionedSources[i].startIndex)) {
+                onMentionedSourcesChange(synced);
+              }
+            }
+
+            // Detect if we're in a mention
+            const mentionInfo = detectMention(newValue, cursorPos);
+            if (mentionInfo) {
+              setMentionQuery(mentionInfo.query);
+              setMentionDropdownOpen(true);
+              setHighlightedMentionIndex(0);
+            } else {
+              setMentionDropdownOpen(false);
+            }
+          }}
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
+
+        {/* Mention dropdown */}
+        {mentionDropdownOpen && filteredSources.length > 0 && (
+          <div
+            ref={mentionDropdownRef}
+            className="absolute left-3 z-50 w-64 max-h-60 overflow-y-auto bg-card border-2 border-border rounded-xl shadow-lg"
+            style={{
+              top: `${Math.min(
+                (textareaRef.current?.scrollHeight ?? 44) + 8,
+                160
+              )}px`,
+            }}
+          >
+            {filteredSources.map((source, index) => (
+              <button
+                key={source.id}
+                type="button"
+                onClick={() => selectMention(source)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
+                  index === highlightedMentionIndex
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground hover:bg-muted/80"
+                }`}
+              >
+                <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{source.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {mentionDropdownOpen && filteredSources.length === 0 && (
+          <div
+            ref={mentionDropdownRef}
+            className="absolute left-3 z-50 w-64 bg-card border-2 border-border rounded-xl shadow-lg px-3 py-2.5 text-sm text-muted-foreground"
+            style={{
+              top: `${Math.min(
+                (textareaRef.current?.scrollHeight ?? 44) + 8,
+                160
+              )}px`,
+            }}
+          >
+            No sources found
+          </div>
+        )}
+
         <div className="flex w-full min-w-0 flex-col gap-2 px-1.5 pb-0.5 @min-[400px]/chat-input:flex-row @min-[400px]/chat-input:items-center @min-[400px]/chat-input:justify-between @min-[400px]/chat-input:gap-2">
           <div className="flex shrink-0 items-center gap-1.5 min-h-10">
             {/* "+" button with dropup menu */}
