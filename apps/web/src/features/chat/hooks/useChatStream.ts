@@ -189,7 +189,8 @@ export function useChatStream({
       messageText: string,
       deepResearch?: boolean,
       sourcePolicy?: { channels: string[] },
-      documentIds?: string[]
+      documentIds?: string[],
+      attachedDocumentIds?: string[]
     ) => {
       if (!activeNotebookId || isChatStreaming) return;
       if (chatRemoteGenerating) {
@@ -210,11 +211,10 @@ export function useChatStream({
       setStreamingReferences(null);
       const hasNotebookSearch = sourcePolicy?.channels?.includes("notebook") ?? true;
       const selectedDocumentIds =
-        documentIds ?? (
-          hasNotebookSearch
-            ? sourcesRef.current.filter((source) => source.selected).map((source) => source.id)
-            : []
-        );
+        documentIds ??
+        (hasNotebookSearch
+          ? sourcesRef.current.filter((source) => source.selected).map((source) => source.id)
+          : []);
 
       setStreamingToolCalls([]);
       setStreamingTracePhases([]);
@@ -317,7 +317,8 @@ export function useChatStream({
           selectedDocumentIds.length > 0 ? selectedDocumentIds : [],
           deepResearch,
           sourcePolicy,
-          activeConversationId ?? undefined
+          activeConversationId ?? undefined,
+          attachedDocumentIds
         );
       } catch {
         resetStreamingState();

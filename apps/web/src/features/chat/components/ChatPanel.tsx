@@ -1,11 +1,4 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useLayoutEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import {
   PanelLeftOpen,
   PanelRightOpen,
@@ -40,11 +33,7 @@ import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { MentionedSource } from "@/shared/types/index";
-import {
-  syncMentions,
-  combineDocumentIds,
-  getDocumentIdsFromMentions,
-} from "../utils/mentions";
+import { combineDocumentIds, getDocumentIdsFromMentions } from "../utils/mentions";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -454,18 +443,19 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
     // Prepend quotes to the message
     let messageWithQuotes = trimmed;
     if (quotes.length > 0) {
-      const quoteBlocks = quotes.map((q) => {
-        const sourceLabel = q.sourceTitle ? `From ${q.sourceTitle}:\n` : "";
-        return `> ${sourceLabel}${q.text.split("\n").join("\n> ")}`;
-      }).join("\n\n");
+      const quoteBlocks = quotes
+        .map((q) => {
+          const sourceLabel = q.sourceTitle ? `From ${q.sourceTitle}:\n` : "";
+          return `> ${sourceLabel}${q.text.split("\n").join("\n> ")}`;
+        })
+        .join("\n\n");
       messageWithQuotes = `${quoteBlocks}\n\n${trimmed}`;
       clearQuotes();
     }
 
-    // Combine mentioned sources with sidebar-selected sources
-    const mentionedIds = getDocumentIdsFromMentions(mentionedSources);
+    // Separate mentioned sources (full content) from sidebar-selected sources (RAG)
+    const attachedDocumentIds = getDocumentIdsFromMentions(mentionedSources);
     const selectedIds = sources?.filter((s) => s.selected).map((s) => s.id) ?? [];
-    const combinedDocumentIds = combineDocumentIds(mentionedIds, selectedIds);
 
     setIsSending(true);
     setInputMessage("");
@@ -474,7 +464,8 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
       messageWithQuotes,
       deepResearchEnabled || undefined,
       { channels: sourceFilters },
-      combinedDocumentIds
+      selectedIds,
+      attachedDocumentIds
     );
     setIsSending(false);
   }, [
@@ -503,13 +494,20 @@ const ChatPanelInner: React.FC<ChatPanelProps> = ({
         }
       }
 
-      const mentionedIds = getDocumentIdsFromMentions(mentionedSources);
+      const attachedDocumentIds = getDocumentIdsFromMentions(mentionedSources);
       const selectedIds = sources?.filter((s) => s.selected).map((s) => s.id) ?? [];
-      const combinedDocumentIds = combineDocumentIds(mentionedIds, selectedIds);
 
-      onSendMessage(text, undefined, { channels: sourceFilters }, combinedDocumentIds);
+      onSendMessage(text, undefined, { channels: sourceFilters }, selectedIds, attachedDocumentIds);
     },
-    [chatInputDisabled, notebookId, onSendMessage, sources, toastError, sourceFilters, mentionedSources]
+    [
+      chatInputDisabled,
+      notebookId,
+      onSendMessage,
+      sources,
+      toastError,
+      sourceFilters,
+      mentionedSources,
+    ]
   );
 
   // --- Scroll to bottom ---

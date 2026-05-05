@@ -13,17 +13,12 @@ export function filterSourcesByQuery(sources: Source[], query: string): Source[]
  * Sync mentioned sources with current text.
  * Removes mentions whose text no longer matches, updates indices for valid ones.
  */
-export function syncMentions(
-  text: string,
-  mentions: MentionedSource[]
-): MentionedSource[] {
+export function syncMentions(text: string, mentions: MentionedSource[]): MentionedSource[] {
   return mentions
     .map((mention) => {
       const expectedText = `@${mention.title}`;
       // Check if mention still exists at recorded position
-      if (
-        text.slice(mention.startIndex, mention.endIndex) === expectedText
-      ) {
+      if (text.slice(mention.startIndex, mention.endIndex) === expectedText) {
         return mention;
       }
       // Try to find it elsewhere in the text
@@ -44,10 +39,7 @@ export function syncMentions(
 /**
  * Combine mentioned document IDs with sidebar-selected IDs, deduplicated
  */
-export function combineDocumentIds(
-  mentionedIds: string[],
-  selectedIds: string[]
-): string[] {
+export function combineDocumentIds(mentionedIds: string[], selectedIds: string[]): string[] {
   return [...new Set([...mentionedIds, ...selectedIds])];
 }
 

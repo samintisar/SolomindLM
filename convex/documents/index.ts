@@ -1037,3 +1037,83 @@ export const addExternalSources = mutation({
     return createdIds;
   },
 });
+
+// ── Source Guide (lazy-generated AI summary + topic chips) ──────────
+
+export const getDocumentInternal = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const document = await ctx.db.get(args.documentId);
+    if (!document || document.userId !== args.userId) return null;
+    return document;
+  },
+});
+
+export const getDocumentChunksInternal = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const chunks = await ctx.db
+      .query("documentChunks")
+      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+      .order("asc")
+      .take(100);
+    return chunks.filter((c) => c.userId === args.userId);
+  },
+});
+
+export const getSourceGuide = query({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document || document.userId !== identity.subject) return null;
+
+    if (document.sourceGuide) {
+      return {
+        summary: document.sourceGuide.summary,
+        topics: document.sourceGuide.topics,
+        isGenerating: false,
+      };
+    }
+
+    // Signal that generation should start
+    if (document.status === "completed") {
+      return { summary: null, topics: null, isGenerating: true };
+    }
+
+    return { summary: null, topics: null, isGenerating: false };
+  },
+});
+
+export const setSourceGuide = internalMutation({
+  args: {
+    documentId: v.id("documents"),
+    summary: v.string(),
+    topics: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const document = await ctx.db.get(args.documentId);
+    if (!document) return;
+
+    // Idempotent: skip if already set
+    if (document.sourceGuide) return;
+
+    await ctx.db.patch(args.documentId, {
+      sourceGuide: {
+        summary: args.summary,
+        topics: args.topics,
+        generatedAt: Date.now(),
+      },
+    });
+  },
+});

@@ -3,6 +3,7 @@ import { CheckSquare, Square, XCircle, Loader2, FileText, FileType } from "lucid
 import { Source } from "@/shared/types";
 import { sanitizeMarkdown, extractYouTubeVideoId, youTubeEmbedSrc } from "@/shared/utils";
 import { useGetSignedUrl } from "../services/documentsApi";
+import { SourceGuide } from "./SourceGuide";
 const PdfViewer = lazy(() => import("./PdfViewer").then((m) => ({ default: m.PdfViewer })));
 
 const MarkdownRenderer = lazy(() =>
@@ -19,6 +20,7 @@ interface SourceViewerProps {
   pdfStorageId?: string | null;
   isLoading: boolean;
   error: string | undefined;
+  onTopicClick: (topic: string) => void;
 }
 
 export const SourceViewer: React.FC<SourceViewerProps> = ({
@@ -28,6 +30,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   pdfStorageId,
   isLoading,
   error,
+  onTopicClick,
 }) => {
   const isPdfSource = source.type === "PDF";
   const canShowPdf = isPdfSource && pdfStorageId;
@@ -36,8 +39,7 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   const [pdfUrlLoading, setPdfUrlLoading] = useState(false);
   const getSignedUrl = useGetSignedUrl();
 
-  const youTubeVideoId =
-    source.type === "YOUTUBE" ? extractYouTubeVideoId(source.url) : null;
+  const youTubeVideoId = source.type === "YOUTUBE" ? extractYouTubeVideoId(source.url) : null;
   const youTubeEmbed = youTubeVideoId ? youTubeEmbedSrc(youTubeVideoId) : null;
 
   // Fetch PDF signed URL only when user switches to Original PDF tab (avoids loading PDF until needed)
@@ -63,7 +65,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     <div
       className={`flex min-h-0 flex-1 flex-col p-6 animate-in fade-in slide-in-from-right-4 duration-200 ${isPdfLayout ? "space-y-3 overflow-hidden" : "space-y-4 overflow-y-auto"}`}
     >
-      <div className={`flex shrink-0 items-center justify-between border-b border-border/50 pb-4 ${isPdfLayout ? "mb-0" : "mb-4"}`}>
+      <div
+        className={`flex shrink-0 items-center justify-between border-b border-border/50 pb-4 ${isPdfLayout ? "mb-0" : "mb-4"}`}
+      >
         <span
           className={`text-xs tracking-widest text-muted-foreground font-mono bg-sidebar-accent/50 px-2 py-1 rounded-sm ${
             source.type === "YOUTUBE" ? "normal-case" : "uppercase"
@@ -89,6 +93,11 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
           <span>Included</span>
         </button>
       </div>
+
+      {/* Source Guide */}
+      {source.status === "completed" && (
+        <SourceGuide documentId={source.id} onTopicClick={onTopicClick} />
+      )}
 
       {/* Error State */}
       {source.status === "failed" && (
@@ -174,7 +183,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                   fallback={
                     <div className="flex flex-1 items-center justify-center py-12">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <span className="ml-2 text-sm text-muted-foreground">Loading PDF viewer…</span>
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        Loading PDF viewer…
+                      </span>
                     </div>
                   }
                 >
@@ -198,7 +209,12 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                   />
                 </div>
               )}
-              <div className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text">
+              <div
+                className="prose prose-sm prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground/90 select-text"
+                data-quotable="source"
+                data-quotable-id={source.id}
+                data-quotable-title={source.title}
+              >
                 <Suspense
                   fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}
                 >
@@ -214,7 +230,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
                           {children}
                         </table>
                       ),
-                      thead: ({ children }) => <thead className="bg-secondary/50">{children}</thead>,
+                      thead: ({ children }) => (
+                        <thead className="bg-secondary/50">{children}</thead>
+                      ),
                       tbody: ({ children }) => <tbody>{children}</tbody>,
                       tr: ({ children }) => <tr className="border-b border-border">{children}</tr>,
                       th: ({ children }) => (

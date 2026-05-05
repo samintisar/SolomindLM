@@ -13,7 +13,8 @@ export interface ChatStreamingContextType {
     messageText: string,
     deepResearch?: boolean,
     sourcePolicy?: { channels: string[] },
-    documentIds?: string[]
+    documentIds?: string[],
+    attachedDocumentIds?: string[]
   ) => void;
   /** Stop the current streaming response */
   onStopChat: () => void;

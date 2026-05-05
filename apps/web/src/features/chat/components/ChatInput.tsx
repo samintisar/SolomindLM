@@ -156,29 +156,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [mentionDropdownOpen]);
 
-  const detectMention = useCallback(
-    (text: string, cursorPos: number) => {
-      // Find the last @ before cursor
-      const textBeforeCursor = text.slice(0, cursorPos);
-      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+  const detectMention = useCallback((text: string, cursorPos: number) => {
+    // Find the last @ before cursor
+    const textBeforeCursor = text.slice(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
-      if (lastAtIndex === -1) return null;
+    if (lastAtIndex === -1) return null;
 
-      // Check if there's a space between @ and cursor (which means we're not in a mention)
-      const textBetweenAtAndCursor = textBeforeCursor.slice(lastAtIndex + 1);
-      if (textBetweenAtAndCursor.includes(" ")) return null;
+    // Check if there's a space between @ and cursor (which means we're not in a mention)
+    const textBetweenAtAndCursor = textBeforeCursor.slice(lastAtIndex + 1);
+    if (textBetweenAtAndCursor.includes(" ")) return null;
 
-      // Make sure @ is at the start of the word (preceded by space or start of string)
-      const charBeforeAt = textBeforeCursor[lastAtIndex - 1];
-      if (charBeforeAt && charBeforeAt !== " " && charBeforeAt !== "\n") return null;
+    // Make sure @ is at the start of the word (preceded by space or start of string)
+    const charBeforeAt = textBeforeCursor[lastAtIndex - 1];
+    if (charBeforeAt && charBeforeAt !== " " && charBeforeAt !== "\n") return null;
 
-      return {
-        query: textBetweenAtAndCursor,
-        startIndex: lastAtIndex,
-      };
-    },
-    []
-  );
+    return {
+      query: textBetweenAtAndCursor,
+      startIndex: lastAtIndex,
+    };
+  }, []);
 
   const filteredSources = filterSourcesByQuery(sources ?? [], mentionQuery);
 
@@ -193,10 +190,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       if (!mentionInfo) return;
 
       const mentionText = `@${source.title}`;
-      const newText =
-        text.slice(0, mentionInfo.startIndex) +
-        mentionText +
-        text.slice(cursorPos);
+      const newText = text.slice(0, mentionInfo.startIndex) + mentionText + text.slice(cursorPos);
 
       onChange(newText);
 
@@ -299,8 +293,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             // Sync mentions with new text
             if (mentionedSources && onMentionedSourcesChange) {
               const synced = syncMentions(newValue, mentionedSources);
-              if (synced.length !== mentionedSources.length ||
-                  synced.some((m, i) => m.startIndex !== mentionedSources[i].startIndex)) {
+              if (
+                synced.length !== mentionedSources.length ||
+                synced.some((m, i) => m.startIndex !== mentionedSources[i].startIndex)
+              ) {
                 onMentionedSourcesChange(synced);
               }
             }

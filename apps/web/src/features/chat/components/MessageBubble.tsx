@@ -357,7 +357,12 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
             <div className="shrink-0 pt-4">
               <ActionBar />
             </div>
-            <div className="p-4 rounded-xl font-serif text-lg leading-relaxed text-foreground shadow-sm bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))]">
+            <div
+              className="p-4 rounded-xl font-serif text-lg leading-relaxed text-foreground shadow-sm bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))]"
+              data-quotable="message"
+              data-quotable-id={message.id}
+              data-quotable-title="Your message"
+            >
               {renderMessageWithReferences(
                 message.id,
                 message.content,
@@ -391,7 +396,12 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
               <ThinkingIndicator status={message.status} />
             )}
             {message.content && (
-              <div className="w-full min-w-0 max-w-4xl font-serif text-lg leading-relaxed text-foreground">
+              <div
+                className="w-full min-w-0 max-w-4xl font-serif text-lg leading-relaxed text-foreground"
+                data-quotable="message"
+                data-quotable-id={message.id}
+                data-quotable-title={message.role === "assistant" ? "AI Response" : "Your message"}
+              >
                 {renderMessageWithReferences(
                   message.id,
                   message.content,

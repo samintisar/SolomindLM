@@ -296,6 +296,7 @@ http.route({
           notebookId: string;
           message: string;
           documentIds?: string[];
+          attachedDocumentIds?: string[];
           conversationId?: string;
           /** Id of the user row from sendMessageOptimistic (required for research plan linkage). */
           userMessageId?: string;
@@ -319,6 +320,7 @@ http.route({
         notebookId,
         message,
         documentIds,
+        attachedDocumentIds,
         conversationId: bodyConversationId,
         userMessageId: bodyUserMessageId,
         deepResearch,
@@ -376,6 +378,7 @@ http.route({
         notebookId,
         message,
         documentIds: documentIds ?? undefined,
+        attachedDocumentIds: attachedDocumentIds ?? undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

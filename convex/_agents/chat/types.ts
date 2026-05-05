@@ -8,6 +8,8 @@ export interface ChatAgentContext {
   noteId: string;
   conversationHistory: Array<{ role: string; content: string; metadata?: unknown }>;
   documentIds?: string[];
+  /** Document IDs whose full content should be attached to the LLM prompt (not just RAG chunks) */
+  attachedDocumentIds?: string[];
   /** When false, skip HyDE, sub-queries, and hybrid/vector search over notebook chunks (e.g. web-only). Default true. */
   enableNotebookSearch?: boolean;
   /** Overrides env CHAT_GROUNDING_MODE when set */

@@ -448,6 +448,38 @@ export class ChatAgent {
     const allChunks: ReferenceChunk[] = [];
     let rerankQueryOpt: string | undefined;
 
+    // Fetch full content for attached documents (via @mentions) and add them as chunks
+    if (context.attachedDocumentIds && context.attachedDocumentIds.length > 0) {
+      logger.info("Fetching full content for attached documents", {
+        count: context.attachedDocumentIds.length,
+        documentIds: context.attachedDocumentIds,
+      });
+      for (const docId of context.attachedDocumentIds) {
+        const fullContent = await this.fetchFullDocumentContent(docId);
+        if (fullContent) {
+          allChunks.push({
+            id: `full-${docId}`,
+            sourceId: String(docId),
+            documentId: docId,
+            sourceTitle: "Attached Document",
+            content: fullContent,
+            chunkIndex: -1,
+            similarity: 1.0,
+            metadata: {
+              totalChunks: 1,
+              relativePosition: 0.5,
+              chunkLengthChars: fullContent.length,
+              wordCount: fullContent.split(/\s+/).length,
+              sentenceCount: fullContent.split(/[.!?]+/).length,
+            },
+          });
+        }
+      }
+      logger.info("Attached documents loaded", {
+        loadedCount: allChunks.length,
+      });
+    }
+
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
 
