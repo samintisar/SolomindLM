@@ -847,6 +847,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             )}
           </div>
         </div>
+      </div>
 
         {selectedCount > 0 && (
           <div className="flex items-center justify-between p-4 bg-secondary/10 border-t border-border gap-3 shrink-0 rounded-b-xl animate-in slide-in-from-bottom-2 duration-200">
