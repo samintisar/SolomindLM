@@ -30,6 +30,8 @@ export interface ChunkMetadata {
   hasTable?: boolean;
   hasBulletList?: boolean;
   hasNumberedList?: boolean;
+  /** User @-mentioned this notebook document — keep in context; do not demote via query reranking */
+  userAttached?: boolean;
 }
 
 export interface ReferenceChunk {

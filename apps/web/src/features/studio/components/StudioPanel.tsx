@@ -85,7 +85,11 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     miniPlayerData.noteId === activeNote.id &&
     isShowingExpandedAudioPlayer(activeNote);
 
-  const showDockedMiniPlayer = !!(miniPlayerVisible && miniPlayerData && !expandedSameNoteHidesMini);
+  const showDockedMiniPlayer = !!(
+    miniPlayerVisible &&
+    miniPlayerData &&
+    !expandedSameNoteHidesMini
+  );
 
   const canDownloadInfographic =
     !!activeNote &&

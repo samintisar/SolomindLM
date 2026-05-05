@@ -155,14 +155,13 @@ export const runResearchEval = action({
         // Merge and deduplicate (simplified)
         const merged = [...vectorResults, ...keywordResults];
         const seen = new Set<string>();
-         
+
         return merged
           .filter((r: any) => {
             const id = r._id || r.sourceId || String(r.documentId) + ":" + r.chunkIndex;
             if (seen.has(id)) return false;
             seen.add(id);
             return true;
-             
           })
           .map((r: any) => ({
             sourceId: r._id

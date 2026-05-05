@@ -18,10 +18,13 @@ import { budgetConversationHistory } from "./chatHistoryBudget.js";
 import { routeChatMessage } from "./chatRouter.js";
 
 import type { ChatAgentContext, ChatAgentOptions, GlobalRerankFn, StreamChunk } from "./types.js";
+import { countTokens } from "../_shared/tokenizer";
 import {
+  CONTEXT_TOKEN_BUDGET,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
   LIST_QUERY_CONTEXT_TOKEN_BUDGET,
   LIST_QUERY_MAX_SELECTED_CHUNKS,
+  MAX_CHUNKS_HARD_LIMIT,
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
@@ -33,7 +36,6 @@ import {
   selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext.js";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
-import {} from "./chatConfig.js";
 /**
 
  * Threshold for when to use full-document mode.
@@ -49,7 +51,7 @@ export class ChatAgent {
   private vectorSearch: VectorSearchHandler;
   private embeddingService: EmbeddingService;
   private globalRerankFn?: GlobalRerankFn;
-  private fetchDocumentFn?: (documentId: string) => Promise<{ content: string } | null>;
+  private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
 
   constructor(options?: ChatAgentOptions) {
     const smartModel = options?.smartModel || env.SMART_LLM || "openai/gpt-oss-120b";
@@ -80,11 +82,18 @@ export class ChatAgent {
   /**
    * Fetch full document content
    */
-  private async fetchFullDocumentContent(documentId: string): Promise<string | null> {
+  private async fetchFullDocumentContent(
+    documentId: string
+  ): Promise<{ content: string; title?: string; sourceUrl?: string } | null> {
     if (!this.fetchDocumentFn) return null;
     try {
       const result = await this.fetchDocumentFn(documentId);
-      return result?.content ?? null;
+      if (!result?.content?.trim()) return null;
+      return {
+        content: result.content,
+        title: result.title,
+        sourceUrl: result.sourceUrl,
+      };
     } catch {
       return null;
     }
@@ -154,23 +163,23 @@ export class ChatAgent {
       if (docId && expandedDocIds.has(docId)) {
         // Only add full document once per document
         if (!expandedChunks.some((c) => c.documentId === docId && c.chunkIndex === -1)) {
-          const fullContent = await this.fetchFullDocumentContent(docId);
-          if (fullContent) {
+          const loaded = await this.fetchFullDocumentContent(docId);
+          if (loaded) {
             expandedChunks.push({
               id: `full-${docId}`,
               sourceId: String(docId),
               documentId: docId,
               sourceTitle: chunk.sourceTitle,
               sourceUrl: chunk.sourceUrl,
-              content: fullContent,
+              content: loaded.content,
               chunkIndex: -1, // Special index to indicate full document
               similarity: 1.0,
               metadata: {
                 totalChunks: chunksByDocument.get(docId)!.length,
                 relativePosition: 0.5,
-                chunkLengthChars: fullContent.length,
-                wordCount: fullContent.split(/\s+/).length,
-                sentenceCount: fullContent.split(/[.!?]+/).length,
+                chunkLengthChars: loaded.content.length,
+                wordCount: loaded.content.split(/\s+/).length,
+                sentenceCount: loaded.content.split(/[.!?]+/).length,
               },
             });
           }
@@ -448,6 +457,56 @@ export class ChatAgent {
     const allChunks: ReferenceChunk[] = [];
     let rerankQueryOpt: string | undefined;
 
+    // Fetch full content for attached documents (via @mentions) and add them as chunks
+    if (context.attachedDocumentIds && context.attachedDocumentIds.length > 0) {
+      logger.info("Fetching full content for attached documents", {
+        count: context.attachedDocumentIds.length,
+        documentIds: context.attachedDocumentIds,
+      });
+      for (const docId of context.attachedDocumentIds) {
+        const loaded = await this.fetchFullDocumentContent(docId);
+        if (loaded) {
+          const { content: fullText, title: docTitle, sourceUrl: docUrl } = loaded;
+          // Log first 200 chars to identify which doc was fetched
+          logger.info("Attached document fetched", {
+            documentId: docId,
+            contentPreview: fullText.slice(0, 200).replace(/\n/g, " "),
+            contentLength: fullText.length,
+          });
+          const displayTitle = (docTitle ?? "").trim() || "Attached document";
+          allChunks.push({
+            id: `full-${docId}`,
+            sourceId: String(docId),
+            documentId: docId,
+            sourceTitle: displayTitle,
+            ...(docUrl ? { sourceUrl: docUrl } : {}),
+            content: fullText,
+            chunkIndex: -1,
+            similarity: 1.0,
+            metadata: {
+              totalChunks: 1,
+              relativePosition: 0.5,
+              chunkLengthChars: fullText.length,
+              wordCount: fullText.split(/\s+/).length,
+              sentenceCount: fullText.split(/[.!?]+/).length,
+              userAttached: true,
+            },
+          });
+        } else {
+          logger.warn("Failed to fetch attached document", { documentId: docId });
+        }
+      }
+      logger.info("Attached documents loaded", {
+        loadedCount: allChunks.length,
+      });
+    }
+
+    // Exclude attached documents from RAG search since their full content
+    // is already injected above — avoids misleading "3 relevant sections" UI
+    const attachedSet = new Set(context.attachedDocumentIds ?? []);
+    const ragDocumentIds = context.documentIds?.filter((id) => !attachedSet.has(id));
+    const ragContext = { ...context, documentIds: ragDocumentIds };
+
     if (enableNotebookSearch) {
       yield { type: "status", status: "planning", message: "Planning searches…" };
 
@@ -467,7 +526,7 @@ export class ChatAgent {
       yield { type: "status", status: "retrieving", message: "Searching your materials…" };
 
       const settled = await Promise.allSettled(
-        subqueries.map((sq) => this.runSubqueryRetrieval(sq, context, logger, isListQuery))
+        subqueries.map((sq) => this.runSubqueryRetrieval(sq, ragContext, logger, isListQuery))
       );
 
       for (let i = 0; i < settled.length; i++) {
@@ -521,10 +580,19 @@ export class ChatAgent {
       });
     }
 
+    // User @-attached full documents must not be re-scored by query reranking — a long attached
+    // doc often loses to a short snippet from another source, so citations point at the wrong file.
+    const pinnedForRerank = merged.filter((c) => c.metadata?.userAttached === true);
+    const poolForRerank = merged.filter((c) => !c.metadata?.userAttached);
     try {
-      merged = await this.applyGlobalRerank(merged, rerankQueryOpt, userMessage, logger);
+      const rerankedPool =
+        poolForRerank.length > 0
+          ? await this.applyGlobalRerank(poolForRerank, rerankQueryOpt, userMessage, logger)
+          : [];
+      merged = [...pinnedForRerank, ...rerankedPool];
     } catch (e) {
       logger.warn("Global rerank failed, using merged hybrid scores", { error: String(e) });
+      merged = [...pinnedForRerank, ...poolForRerank];
     }
 
     // GENERAL MULTI-SECTION DOCUMENT RETRIEVAL:
@@ -536,19 +604,31 @@ export class ChatAgent {
     const notebookChunks = merged.filter((c) => !externalChunkKeys.has(chunkDedupKey(c)));
     const externalChunks = merged.filter((c) => externalChunkKeys.has(chunkDedupKey(c)));
 
-    const rankedChunks = selectChunksByTokenBudgetWithReservation(
-      notebookChunks,
-      externalChunks,
-      logger,
-      undefined,
-      isListQuery
-        ? {
-            maxSelectedChunks: LIST_QUERY_MAX_SELECTED_CHUNKS,
-            maxContextTokens: LIST_QUERY_CONTEXT_TOKEN_BUDGET,
-            lexicalQuery: userMessage,
-          }
-        : undefined
-    );
+    const userAttachedNotebook = notebookChunks.filter((c) => c.metadata?.userAttached === true);
+    const restNotebook = notebookChunks.filter((c) => !c.metadata?.userAttached);
+    const pinnedTokens = userAttachedNotebook.reduce((sum, c) => sum + countTokens(c.content), 0);
+    const chunkCapTotal = isListQuery ? LIST_QUERY_MAX_SELECTED_CHUNKS : MAX_CHUNKS_HARD_LIMIT;
+    const maxForRest = Math.max(0, chunkCapTotal - userAttachedNotebook.length);
+
+    const rankedChunks = [
+      ...userAttachedNotebook,
+      ...selectChunksByTokenBudgetWithReservation(
+        restNotebook,
+        externalChunks,
+        logger,
+        undefined,
+        isListQuery
+          ? {
+              maxSelectedChunks: maxForRest,
+              maxContextTokens: Math.max(LIST_QUERY_CONTEXT_TOKEN_BUDGET - pinnedTokens, 800),
+              lexicalQuery: userMessage,
+            }
+          : {
+              maxSelectedChunks: maxForRest,
+              maxContextTokens: Math.max(CONTEXT_TOKEN_BUDGET - pinnedTokens, 800),
+            }
+      ),
+    ];
 
     if (rankedChunks.length === 0) {
       logger.info("No chunks found — streaming direct response");

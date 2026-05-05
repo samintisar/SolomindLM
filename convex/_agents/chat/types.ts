@@ -8,6 +8,8 @@ export interface ChatAgentContext {
   noteId: string;
   conversationHistory: Array<{ role: string; content: string; metadata?: unknown }>;
   documentIds?: string[];
+  /** Document IDs whose full content should be attached to the LLM prompt (not just RAG chunks) */
+  attachedDocumentIds?: string[];
   /** When false, skip HyDE, sub-queries, and hybrid/vector search over notebook chunks (e.g. web-only). Default true. */
   enableNotebookSearch?: boolean;
   /** Overrides env CHAT_GROUNDING_MODE when set */
@@ -60,7 +62,11 @@ export interface ChatAgentOptions {
   /** Override the smart model (instead of using env.SMART_LLM) */
   smartModel?: string;
   /** Fetch full document content for single-document list queries */
-  fetchDocumentFn?: (documentId: string) => Promise<{ content: string } | null>;
+  fetchDocumentFn?: (documentId: string) => Promise<{
+    content: string;
+    title?: string;
+    sourceUrl?: string;
+  } | null>;
   /** BCP-47 language code to pass to the LLM wrapper for system prompt language injection. */
   outputLanguage?: string;
 }

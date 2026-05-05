@@ -23,6 +23,7 @@ import {
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { useToast } from "@/shared/contexts/useToast";
+import { useChatStreamingContext } from "../../chat/useChatStreaming";
 
 export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
@@ -79,6 +80,16 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const refreshNotebookRemote = useRefreshNotebookRemoteSources();
   const refreshRemoteSource = useRefreshRemoteSource();
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+
+  const chatContext = useChatStreamingContext();
+
+  const handleTopicClick = useCallback(
+    (topic: string) => {
+      if (!chatContext.onSendMessage) return;
+      chatContext.onSendMessage(`Discuss ${topic}`);
+    },
+    [chatContext]
+  );
 
   const handleGoogleDriveFiles = useCallback(
     async (files: PickedFile[], accessToken: string) => {
@@ -429,6 +440,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               error={
                 sourceContent.hasError(viewingSourceId ?? "") ? "Failed to load content" : undefined
               }
+              onTopicClick={handleTopicClick}
             />
           ) : (
             <SourceList

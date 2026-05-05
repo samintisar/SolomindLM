@@ -129,7 +129,7 @@ describe("consumePersistentTextStream", () => {
     await consumePersistentTextStream(response, callbacks);
 
     expect(callbacks.calls.onToolCalls.length).toBeGreaterThan(0);
-     
+
     const lastToolCalls = callbacks.calls.onToolCalls[
       callbacks.calls.onToolCalls.length - 1
     ][0] as any[];

@@ -35,6 +35,12 @@ export interface Source {
   };
 }
 
+/** Attached notebook documents shown as chips; IDs are sent separately (`attachedDocumentIds`). */
+export interface MentionedSource {
+  documentId: string;
+  title: string;
+}
+
 export interface ReferenceChunk {
   id: number;
   sourceId: string;

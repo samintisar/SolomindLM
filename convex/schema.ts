@@ -141,6 +141,14 @@ export default defineSchema({
     fulltextStatus: v.optional(fulltextStatusValidator),
     /** Ingest pipeline outcome for paper_record (orthogonal to `status` processing flag) */
     ingestionStatus: v.optional(ingestionStatusValidator),
+    /** AI-generated source guide (lazy-cached): summary + topic chips */
+    sourceGuide: v.optional(
+      v.object({
+        summary: v.string(),
+        topics: v.array(v.string()),
+        generatedAt: v.number(),
+      })
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

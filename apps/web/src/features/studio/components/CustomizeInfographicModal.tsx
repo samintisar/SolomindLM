@@ -1,27 +1,191 @@
 import React, { useState, useRef } from "react";
-import { X, Image, Bookmark, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Image, Bookmark } from "lucide-react";
 import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
 
 interface VisualStyle {
   id: string;
   label: string;
-  icon: React.ReactNode;
+  hint: string;
 }
 
 const VISUAL_STYLES: VisualStyle[] = [
-  { id: "auto", label: "Auto-select", icon: <span className="text-lg">✨</span> },
-  { id: "sketch_note", label: "Sketch Note", icon: <span className="text-lg">✏️</span> },
-  { id: "kawaii", label: "Kawaii", icon: <span className="text-lg">🎀</span> },
-  { id: "professional", label: "Professional", icon: <span className="text-lg">💼</span> },
-  { id: "scientific", label: "Scientific", icon: <span className="text-lg">🔬</span> },
-  { id: "anime", label: "Anime", icon: <span className="text-lg">🎌</span> },
-  { id: "clay", label: "Clay", icon: <span className="text-lg">🏺</span> },
-  { id: "editorial", label: "Editorial", icon: <span className="text-lg">📰</span> },
-  { id: "instructional", label: "Instructional", icon: <span className="text-lg">📋</span> },
-  { id: "bento_grid", label: "Bento Grid", icon: <span className="text-lg">🍱</span> },
-  { id: "bricks", label: "Bricks", icon: <span className="text-lg">🧱</span> },
+  { id: "auto", label: "Auto-select", hint: "Balanced layout and palette from your content" },
+  { id: "sketch_note", label: "Sketch Note", hint: "Loose lines, markers, and handwritten labels" },
+  { id: "kawaii", label: "Kawaii", hint: "Soft pastels, rounded shapes, friendly emphasis" },
+  {
+    id: "professional",
+    label: "Professional",
+    hint: "Clean grids, restrained color, crisp hierarchy",
+  },
+  { id: "scientific", label: "Scientific", hint: "Diagrams, scales, and precise annotations" },
+  { id: "anime", label: "Anime", hint: "Bold color blocks, expressive outlines, motion cues" },
+  { id: "clay", label: "Clay", hint: "Soft volumes, gentle shadows, tactile surfaces" },
+  { id: "editorial", label: "Editorial", hint: "Magazine rhythm, strong headline, column flow" },
+  {
+    id: "instructional",
+    label: "Instructional",
+    hint: "Numbered flow, clear steps, minimal decoration",
+  },
+  { id: "bento_grid", label: "Bento Grid", hint: "Modular tiles with varied weights and spacing" },
+  { id: "bricks", label: "Bricks", hint: "Stacked blocks with mortar rhythm and repetition" },
 ];
+
+function VisualStylePreview({ styleId }: { styleId: string }) {
+  const frame =
+    "relative h-16 w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30";
+
+  switch (styleId) {
+    case "auto":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-0 bg-linear-to-br from-muted via-background to-primary/20" />
+          <div className="absolute inset-x-2 bottom-2 h-2 rounded-sm bg-linear-to-r from-transparent via-primary/35 to-transparent" />
+          <div className="absolute left-2 top-2 h-1.5 w-8 rounded-full bg-foreground/15" />
+          <div className="absolute right-3 top-4 h-1 w-10 rounded-full bg-foreground/10" />
+        </div>
+      );
+    case "sketch_note":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-2 rounded-md border border-dashed border-foreground/25 bg-background/40" />
+          <div className="absolute left-3 top-3 h-px w-12 rotate-[-8deg] bg-foreground/30" />
+          <div className="absolute bottom-3 right-3 h-6 w-10 rotate-3 rounded-sm border border-foreground/20 bg-secondary/40" />
+        </div>
+      );
+    case "kawaii":
+      return (
+        <div className={frame}>
+          <div className="absolute -left-2 bottom-1 h-10 w-14 rounded-full bg-pink-300/35 blur-[2px]" />
+          <div className="absolute right-0 top-2 h-9 w-16 rounded-full bg-violet-300/30 blur-[2px]" />
+          <div className="absolute left-1/3 top-4 h-7 w-12 rounded-2xl bg-rose-200/50" />
+          <div className="absolute bottom-2 left-4 h-5 w-16 rounded-full bg-amber-100/60" />
+        </div>
+      );
+    case "professional":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-x-0 top-0 h-2 bg-foreground/80" />
+          <div className="absolute left-2 top-4 h-1 w-14 bg-foreground/20" />
+          <div className="absolute left-2 top-7 grid w-[calc(100%-1rem)] grid-cols-3 gap-1">
+            <div className="col-span-2 h-6 rounded-sm bg-foreground/10" />
+            <div className="h-6 rounded-sm bg-foreground/15" />
+            <div className="col-span-3 h-4 rounded-sm bg-foreground/8" />
+          </div>
+        </div>
+      );
+    case "scientific":
+      return (
+        <div className={frame}>
+          <div
+            className="absolute inset-0 opacity-[0.45]"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, color-mix(in oklch, var(--foreground) 14%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 14%, transparent) 1px, transparent 1px)",
+              backgroundSize: "10px 10px",
+            }}
+          />
+          <div className="absolute left-2 top-2 h-8 w-px bg-primary/50" />
+          <div className="absolute left-2 bottom-2 right-2 top-8 border-l border-b border-primary/40" />
+          <div className="absolute bottom-2 left-3 right-5 h-px bg-primary/35" />
+        </div>
+      );
+    case "anime":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-0 bg-linear-to-br from-cyan-400/25 via-background to-fuchsia-500/25" />
+          <div className="absolute -right-1 top-1 h-10 w-14 -skew-x-12 rounded-sm bg-blue-500/35" />
+          <div className="absolute bottom-2 left-2 h-8 w-20 rounded-md border-2 border-foreground/45 bg-background/30" />
+        </div>
+      );
+    case "clay":
+      return (
+        <div className={frame}>
+          <div className="absolute left-3 top-3 h-10 w-14 rounded-2xl bg-orange-200/45 shadow-[inset_0_-4px_0_rgba(0,0,0,0.06)]" />
+          <div className="absolute bottom-2 right-4 h-9 w-11 rounded-xl bg-emerald-200/40 shadow-[inset_0_-3px_0_rgba(0,0,0,0.05)]" />
+          <div className="absolute left-10 top-8 h-6 w-16 rounded-full bg-sky-200/35 shadow-[inset_0_-2px_0_rgba(0,0,0,0.05)]" />
+        </div>
+      );
+    case "editorial":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-x-2 top-2 space-y-1">
+            <div className="h-2 w-[85%] rounded-sm bg-foreground/75" />
+            <div className="h-1 w-full rounded-full bg-foreground/15" />
+            <div className="h-1 w-[92%] rounded-full bg-foreground/12" />
+          </div>
+          <div className="absolute bottom-2 left-2 right-2 grid grid-cols-3 gap-1.5">
+            <div className="col-span-2 space-y-1">
+              <div className="h-1 rounded-full bg-foreground/12" />
+              <div className="h-1 rounded-full bg-foreground/10" />
+              <div className="h-1 rounded-full bg-foreground/10" />
+            </div>
+            <div className="space-y-1 border-l border-border/60 pl-1.5">
+              <div className="h-1 rounded-full bg-foreground/15" />
+              <div className="h-1 rounded-full bg-foreground/12" />
+            </div>
+          </div>
+        </div>
+      );
+    case "instructional":
+      return (
+        <div className={frame}>
+          <div className="absolute left-2 top-2 flex items-start gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+              1
+            </span>
+            <div className="mt-0.5 space-y-1">
+              <div className="h-1 w-20 rounded-full bg-foreground/18" />
+              <div className="h-1 w-14 rounded-full bg-foreground/12" />
+            </div>
+          </div>
+          <div className="absolute left-2 top-9 flex items-start gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[10px] font-semibold text-foreground">
+              2
+            </span>
+            <div className="mt-0.5 space-y-1">
+              <div className="h-1 w-16 rounded-full bg-foreground/14" />
+              <div className="h-1 w-20 rounded-full bg-foreground/10" />
+            </div>
+          </div>
+        </div>
+      );
+    case "bento_grid":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-2 grid grid-cols-4 grid-rows-3 gap-1">
+            <div className="col-span-2 row-span-2 rounded-md bg-foreground/12" />
+            <div className="rounded-md bg-foreground/10" />
+            <div className="rounded-md bg-foreground/10" />
+            <div className="col-span-2 rounded-md bg-foreground/8" />
+            <div className="rounded-md bg-foreground/14" />
+            <div className="rounded-md bg-foreground/10" />
+          </div>
+        </div>
+      );
+    case "bricks":
+      return (
+        <div className={frame}>
+          <div className="absolute inset-2 space-y-1">
+            <div className="flex gap-1">
+              <div className="h-5 flex-1 rounded-sm bg-foreground/14" />
+              <div className="h-5 flex-1 rounded-sm bg-foreground/14" />
+            </div>
+            <div className="flex gap-1 pl-3">
+              <div className="h-5 flex-1 rounded-sm bg-foreground/12" />
+              <div className="h-5 flex-1 rounded-sm bg-foreground/12" />
+            </div>
+            <div className="flex gap-1">
+              <div className="h-5 flex-1 rounded-sm bg-foreground/16" />
+              <div className="h-5 flex-1 rounded-sm bg-foreground/14" />
+            </div>
+          </div>
+        </div>
+      );
+    default:
+      return <div className={frame} />;
+  }
+}
 
 interface CustomizeInfographicModalProps {
   isOpen: boolean;
@@ -146,62 +310,82 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
             </div>
           </div>
 
-          {/* Visual Style Carousel */}
+          {/* Visual style */}
           <div className="space-y-4">
             <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground font-sans">
               Choose visual style
             </label>
-            <div className="relative group">
+            <div className="flex min-h-0 items-stretch gap-2 sm:gap-3">
               <button
+                type="button"
                 onClick={() => scroll("left")}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-card border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="hidden shrink-0 self-center rounded-lg border border-border/60 bg-card px-2 py-6 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/40 hover:text-foreground sm:block"
               >
-                <ChevronLeft className="w-4 h-4" />
+                Prev
               </button>
               <div
                 ref={scrollRef}
-                className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide scroll-smooth"
+                className="flex min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto pb-1 scrollbar-hide scroll-smooth"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
-                {VISUAL_STYLES.map((style) => (
-                  <button
-                    key={style.id}
-                    onClick={() => setVisualStyle(style.id)}
-                    className={`
-                      relative flex-shrink-0 flex flex-col items-center gap-2 p-3 rounded-xl border text-left transition-all w-[110px]
-                      ${
-                        visualStyle === style.id
-                          ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20"
-                          : "bg-card border-border/50 hover:border-primary/40 hover:bg-secondary/30"
-                      }
-                    `}
-                  >
-                    <div
+                {VISUAL_STYLES.map((style) => {
+                  const selected = visualStyle === style.id;
+                  return (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => setVisualStyle(style.id)}
                       className={`
-                      w-full aspect-square rounded-lg flex items-center justify-center text-2xl
-                      ${visualStyle === style.id ? "bg-primary/10" : "bg-secondary/50"}
-                    `}
+                        relative flex min-w-[148px] max-w-[168px] shrink-0 flex-col gap-2.5 rounded-xl border p-3 text-left transition-all
+                        ${
+                          selected
+                            ? "border-primary bg-primary/5 shadow-sm ring-2 ring-primary/25"
+                            : "border-border/50 bg-card hover:border-primary/35 hover:bg-secondary/25"
+                        }
+                      `}
                     >
-                      {style.icon}
-                    </div>
-                    <span
-                      className={`text-[11px] font-medium text-center leading-tight ${visualStyle === style.id ? "text-primary" : "text-foreground"}`}
-                    >
-                      {style.label}
-                    </span>
-                    {visualStyle === style.id && (
-                      <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                      <VisualStylePreview styleId={style.id} />
+                      <div className="min-w-0 space-y-1">
+                        <span
+                          className={`block text-xs font-semibold leading-snug ${selected ? "text-primary" : "text-foreground"}`}
+                        >
+                          {style.label}
+                        </span>
+                        <span className="block text-[10px] leading-snug text-muted-foreground line-clamp-2">
+                          {style.hint}
+                        </span>
                       </div>
-                    )}
-                  </button>
-                ))}
+                      {selected && (
+                        <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary-foreground">
+                          On
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
               <button
+                type="button"
                 onClick={() => scroll("right")}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-card border border-border shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="hidden shrink-0 self-center rounded-lg border border-border/60 bg-card px-2 py-6 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/40 hover:text-foreground sm:block"
               >
-                <ChevronRight className="w-4 h-4" />
+                Next
+              </button>
+            </div>
+            <div className="flex justify-center gap-4 sm:hidden">
+              <button
+                type="button"
+                onClick={() => scroll("left")}
+                className="rounded-lg border border-border/60 bg-card px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => scroll("right")}
+                className="rounded-lg border border-border/60 bg-card px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+              >
+                Next
               </button>
             </div>
           </div>

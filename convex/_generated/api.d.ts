@@ -233,6 +233,7 @@ import type * as documents_embeddings from "../documents/embeddings.js";
 import type * as documents_index from "../documents/index.js";
 import type * as documents_paperRecord from "../documents/paperRecord.js";
 import type * as documents_refreshRemote from "../documents/refreshRemote.js";
+import type * as documents_sourceGuide from "../documents/sourceGuide.js";
 import type * as eval__gate from "../eval/_gate.js";
 import type * as eval__studioRowCreators from "../eval/_studioRowCreators.js";
 import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
@@ -536,6 +537,7 @@ declare const fullApi: ApiFromModules<{
   "documents/index": typeof documents_index;
   "documents/paperRecord": typeof documents_paperRecord;
   "documents/refreshRemote": typeof documents_refreshRemote;
+  "documents/sourceGuide": typeof documents_sourceGuide;
   "eval/_gate": typeof eval__gate;
   "eval/_studioRowCreators": typeof eval__studioRowCreators;
   "eval/chatEvalAction": typeof eval_chatEvalAction;

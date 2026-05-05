@@ -115,7 +115,6 @@ async function runResearchPlanPhase(
       fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any])
     );
 
-     
     const docIds_unique = [
       ...new Set(
         vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean)
@@ -321,6 +320,7 @@ export const runWithStreamId = internalAction({
     notebookId: v.string(),
     message: v.string(),
     documentIds: v.optional(v.array(v.string())),
+    attachedDocumentIds: v.optional(v.array(v.string())),
     conversationId: v.optional(v.id("conversations")),
     deepResearch: v.optional(v.boolean()),
     sourcePolicy: v.optional(
@@ -421,7 +421,8 @@ export const runWithStreamId = internalAction({
           args.documentIds,
           chunkAppender,
           conversationId,
-          args.sourcePolicy ?? { channels: ["notebook"] }
+          args.sourcePolicy ?? { channels: ["notebook"] },
+          args.attachedDocumentIds
         );
       }
 
@@ -489,7 +490,8 @@ export async function streamChatResponse(
   documentIds: string[] | undefined,
   chunkAppender: (text: string) => Promise<void>,
   conversationId: Id<"conversations">,
-  sourcePolicy?: { channels: string[] }
+  sourcePolicy?: { channels: string[] },
+  attachedDocumentIds?: string[]
 ): Promise<{ fullResponse: string; references: unknown[]; hasError: boolean }> {
   const notebookIdTyped = notebookId as Id<"notebooks">;
 
@@ -845,6 +847,13 @@ export async function streamChatResponse(
       });
       if (!chunks || chunks.length === 0) return null;
 
+      const doc = await ctx.runQuery(internal.documents.index.getDocumentInternal, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        documentId: documentId as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        userId: userId as any,
+      });
+
       // Sort by chunk index and join content
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -857,6 +866,8 @@ export async function streamChatResponse(
         documentId: documentId as any,
         content,
         chunkCount: chunks.length,
+        title: doc?.fileName,
+        sourceUrl: doc?.fileUrl?.trim() ? doc.fileUrl : undefined,
       };
     },
   });
@@ -906,7 +917,6 @@ export async function streamChatResponse(
               query: refinedQuery,
               maxResults: maxPerChannel,
               topic,
-               
             })
             .then((results: any[]) =>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1075,6 +1085,7 @@ export async function streamChatResponse(
         noteId: notebookId,
         conversationHistory,
         documentIds: includeNotebook ? documentIds : [],
+        attachedDocumentIds,
         enableNotebookSearch: includeNotebook,
         groundingMode: notebookGrounding,
         externalChunks: externalChunks.length > 0 ? externalChunks : undefined,
@@ -1369,7 +1380,6 @@ export const runResearchExecute = internalAction({
           fullChunks.filter(Boolean).map((c: any) => [c._id, c] as [any, any])
         );
 
-         
         const docIds_unique = [
           ...new Set(
             vectorResults.map((r: any) => (chunkMap.get(r._id) as any)?.documentId).filter(Boolean)
