@@ -16,6 +16,7 @@ import {
   Check,
   Square,
   FileText,
+  X,
 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
@@ -251,9 +252,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           }
           return;
         }
-        if (e.key === "Escape" || e.key === "Tab") {
+        if (e.key === "Escape") {
           setMentionDropdownOpen(false);
-          if (e.key === "Escape") e.preventDefault();
+          e.preventDefault();
+          return;
+        }
+        if (e.key === "Tab") {
+          e.preventDefault();
+          if (filteredSources.length > 0) {
+            selectMention(filteredSources[highlightedMentionIndex]);
+          }
           return;
         }
       }
@@ -287,6 +295,51 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
       >
         {quotes && quotes.length > 0 && <QuoteBlocks />}
+
+        {/* Attached file tags */}
+        {mentionedSources && mentionedSources.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 pt-1">
+            {mentionedSources.map((mention, index) => (
+              <div
+                key={`${mention.documentId}-${index}`}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 border border-primary/20 px-2 py-1 text-xs font-medium text-primary"
+              >
+                <FileText className="w-3 h-3 shrink-0" />
+                <span className="truncate max-w-[150px]">{mention.title}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Remove the mention text from the textarea
+                    const before = value.slice(0, mention.startIndex);
+                    const after = value.slice(mention.endIndex);
+                    const newValue = before + after;
+                    onChange(newValue);
+
+                    // Remove from mentioned sources
+                    const newMentions = mentionedSources.filter((_, i) => i !== index);
+                    // Update indices for remaining mentions
+                    const removedLength = mention.endIndex - mention.startIndex;
+                    const adjustedMentions = newMentions.map((m) =>
+                      m.startIndex > mention.startIndex
+                        ? {
+                            ...m,
+                            startIndex: m.startIndex - removedLength,
+                            endIndex: m.endIndex - removedLength,
+                          }
+                        : m
+                    );
+                    onMentionedSourcesChange?.(adjustedMentions);
+                  }}
+                  className="shrink-0 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                  title="Remove attachment"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           placeholder={
