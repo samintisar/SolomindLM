@@ -14,7 +14,16 @@ export interface ChatStreamingContextType {
     deepResearch?: boolean,
     sourcePolicy?: { channels: string[] },
     documentIds?: string[],
-    attachedDocumentIds?: string[]
+    attachedDocumentIds?: string[],
+    academicFilters?: {
+      provider?: "all" | "pubmed" | "arxiv";
+      fieldsOfStudy?: string[];
+      publicationYearFrom?: number;
+      publicationYearTo?: number;
+      minCitations?: number;
+      openAccessOnly?: boolean;
+      hasFullText?: boolean;
+    }
   ) => void;
   /** Stop the current streaming response */
   onStopChat: () => void;

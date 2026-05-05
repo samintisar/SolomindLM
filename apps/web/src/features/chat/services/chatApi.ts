@@ -100,7 +100,7 @@ export interface SendMessageCallbacks {
     subQuestionId?: string;
     sourcesFound?: number;
   }) => void;
-  /** External sources discovered from web/academic/news/finance search */
+  /** External sources discovered from web/academic/news search */
   onExternalSources?: (
     sources: Array<{
       title: string;
@@ -507,7 +507,16 @@ export function useSendMessage() {
       deepResearch?: boolean,
       sourcePolicy?: { channels: string[] },
       conversationId?: string,
-      attachedDocumentIds?: string[]
+      attachedDocumentIds?: string[],
+      academicFilters?: {
+        provider?: "all" | "pubmed" | "arxiv";
+        fieldsOfStudy?: string[];
+        publicationYearFrom?: number;
+        publicationYearTo?: number;
+        minCitations?: number;
+        openAccessOnly?: boolean;
+        hasFullText?: boolean;
+      }
     ) => {
       let tempMessageId: string | null;
 
@@ -574,6 +583,7 @@ export function useSendMessage() {
             deepResearch: deepResearch || undefined,
             sourcePolicy: sourcePolicy ?? undefined,
             attachedDocumentIds: attachedDocumentIds ?? undefined,
+            academicFilters: academicFilters ?? undefined,
           }),
         });
 

@@ -311,6 +311,15 @@ http.route({
             recencyDays?: number;
             dedupeStrategy?: string;
           };
+          academicFilters?: {
+            provider?: string;
+            fieldsOfStudy?: string[];
+            publicationYearFrom?: number;
+            publicationYearTo?: number;
+            minCitations?: number;
+            openAccessOnly?: boolean;
+            hasFullText?: boolean;
+          };
         };
       } catch (_error) {
         return errorResponse("Invalid JSON body", 400);
@@ -325,6 +334,7 @@ http.route({
         userMessageId: bodyUserMessageId,
         deepResearch,
         sourcePolicy,
+        academicFilters,
       } = body;
 
       // Validate request
@@ -383,6 +393,8 @@ http.route({
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ...(sourcePolicy != null ? { sourcePolicy: sourcePolicy as any } : {}),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(academicFilters != null ? { academicFilters: academicFilters as any } : {}),
         ...(deepResearch === true
           ? {
               deepResearch: true,

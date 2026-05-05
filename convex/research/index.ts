@@ -136,6 +136,17 @@ export const createResearchPlan = internalMutation({
       recencyDays: v.optional(v.number()),
       dedupeStrategy: v.optional(v.string()),
     }),
+    academicFilters: v.optional(
+      v.object({
+        provider: v.optional(v.string()),
+        fieldsOfStudy: v.optional(v.array(v.string())),
+        publicationYearFrom: v.optional(v.number()),
+        publicationYearTo: v.optional(v.number()),
+        minCitations: v.optional(v.number()),
+        openAccessOnly: v.optional(v.boolean()),
+        hasFullText: v.optional(v.boolean()),
+      })
+    ),
     subQuestions: v.array(
       v.object({
         id: v.string(),
@@ -158,6 +169,7 @@ export const createResearchPlan = internalMutation({
         status: "pending" as const,
       })),
       sourcePolicy: args.sourcePolicy,
+      academicFilters: args.academicFilters,
       status: "draft",
       createdAt: now,
       updatedAt: now,

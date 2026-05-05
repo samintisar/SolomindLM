@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Globe, GraduationCap, Newspaper, TrendingUp, Plus, X, ExternalLink } from "lucide-react";
+import { Globe, GraduationCap, Newspaper, Plus, X, ExternalLink } from "lucide-react";
 import { Favicon } from "@/shared/components/Favicon";
 
 export interface ExternalSource {
@@ -14,7 +14,7 @@ const SOURCE_TYPE_ICON: Record<string, React.ElementType> = {
   web: Globe,
   academic: GraduationCap,
   news: Newspaper,
-  finance: TrendingUp,
+
 };
 
 interface ExternalSourcesModalProps {

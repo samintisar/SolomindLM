@@ -126,34 +126,34 @@ bun run convex:env:push:dry    # Dry run
 
 Bun workspaces monorepo:
 
-- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4 + Radix; React Router 7, Mind Elixir 5, react-flip-toolkit, react-markdown + KaTeX, DOMPurify, Stripe SDK
+- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4 + Radix; React Router 7, Mind Elixir 5, react-markdown + KaTeX, DOMPurify, Stripe SDK
 - `apps/mobile/` — Expo 55 + React Native 0.83 (separate mobile app, not all web features ported)
 - `convex/` — Convex backend (auth, schema, functions, agents)
 
-**Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/`, `billing/`, `chat/`, `landing/`, `legal/`, `notebooks/`, `sources/`, `studio/` (with `studio/components/views/` per content type — ReportView, FlashcardView, QuizView, etc.).
+**Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/`, `billing/`, `chat/`, `landing/`, `legal/`, `notebooks/`, `onboarding/`, `sources/`, `studio/` (with `studio/components/views/` per content type — ReportView, FlashcardView, QuizView, etc.).
 
 **Path aliases** (`tsconfig.json`): `@/*` → `./src/*`, `@convex/*` → `../../convex/*`.
 
 **Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workpool`.
 
-**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors), `reports`, `audioOverviews`, `flashcards`, `quizzes`, `slides`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `stripeSubscriptions`, `stripePaymentHistory`, `cacheVersions`, `cacheMetrics`.
+**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1024-dim vectors), `reports`, `audioOverviews`, `flashcards`, `quizzes`, `mindmaps`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `stripeSubscriptions`, `stripePaymentHistory`, `cacheVersions`, `cacheMetrics`.
 
 **Convex directory layout** (`_` prefix = excluded from generated API):
 
 - `_agents/` — LangGraph agents per type (`chat/`, `report/`, `flashcard/`, …); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization
 - `_lib/` — errors, limits, env helpers
+- `_migration/` — data migration scripts
 - `_model/` — data models
 - `_services/` — `ai/`, `search/`, `extraction/`, `processing/`, `grading/`, `cache/`
-- `auth/`, `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/` — domain functions
-- `studio/` — content generation per type
-- `storage/` — vector store, chat history
+- `_shared/` — shared utilities
+- `auth/`, `billing/`, `chat/`, `documents/`, `folders/`, `notebooks/`, `notes/`, `onboarding/`, `push/`, `research/`, `storage/`, `studio/`, `userPreferences/` — domain functions
 - root `*.ts` — schema, auth config, http actions
 
 **AI services:** LLMs `openai/gpt-oss-120b` (smart) / `openai/gpt-oss-20b` (fast). Embeddings via LangChain (Together AI compatible). Reranking: ZeroEntropy. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
 
 **Pipelines:**
 
-- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
+- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1024-dim) → ZeroEntropy rerank
 - _Generation:_ user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
 
 ---
@@ -195,7 +195,7 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
 - **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
 - **Validation gates** (in order):
   1. `bun run typecheck:web` + `typecheck:convex` — always
-  2. `bun run test:convex` — vitest + `convex-test`, ~332 tests, <2s. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
+  2. `bun run test:convex` — vitest + `convex-test`, ~450+ tests, ~70s. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
   3. `bun run test:web` — vitest for web utilities
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
   5. `bun run eval:rag --case=… / --runner=…` — agent or prompt changes (do NOT unit-test prompt outputs)
@@ -247,14 +247,7 @@ Skill descriptions are loaded automatically; below are _project_ triggers, not g
 
 - **serena** — Code navigation & symbol-aware editing for `.ts` / `.tsx`. At session start, call `initial_instructions`; `list_memories` for prior context. **MUST use** `find_symbol`, `get_symbols_overview`, `find_referencing_symbols`, `replace_symbol_body`, `insert_before_symbol`, `insert_after_symbol`, `rename_symbol`, `create_text_file`. **Never use** `Grep` / `Read` / `Edit` / `Write` for code files. Built-in tools are fine for `.md`, `.json`, `.yaml`, `.css`, `.html`. If Serena seems out-of-sync after a built-in edit, call `restart_language_server`. Use the `serena-usage` skill for memory management and cross-file refactors.
 
-## Skills Installation
-
-Canonical skill source: `.agents/skills/<name>/SKILL.md` (in git). Claude Code reads from `.claude/skills/` (gitignored). After cloning, run **once**:
-
-```bash
-bun run link:claude-skills     # Junction (Windows) / symlink (Unix)
-ls .claude/skills              # Should list 40+ skills
-```
+- **context7** — Always use the `context7` MCP to fetch up-to-date documentation when working with any external library, framework, or API (e.g. React, Next.js, Convex, LangChain, OpenAI SDK, etc.). Before writing code that uses a third-party library, resolve its Context7 library ID first, then fetch relevant docs. Never rely on training data for library APIs — always verify with context7.
 
 <!-- convex-ai-start -->
 

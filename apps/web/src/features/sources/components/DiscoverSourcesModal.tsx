@@ -8,7 +8,6 @@ import {
   ExternalLink,
   Newspaper,
   GraduationCap,
-  TrendingUp,
   SlidersHorizontal,
   List,
   LayoutGrid,
@@ -23,6 +22,9 @@ import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi
 import { useToast } from "@/shared/contexts/useToast";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import { Favicon } from "@/shared/components/Favicon";
+import { AcademicFilters } from "./AcademicFilters";
+import { AcademicFilterState } from "./AcademicFilters.types";
+import { DEFAULT_ACADEMIC_FILTERS } from "./AcademicFilters.utils";
 
 interface DiscoverSourcesModalProps {
   isOpen: boolean;
@@ -39,12 +41,13 @@ interface DiscoverSourcesModalProps {
 }
 
 interface FilterState {
-  sourceTypes: ("web" | "news" | "academic" | "finance")[];
+  sourceTypes: ("web" | "news" | "academic")[];
   timeRange?: "day" | "week" | "month" | "year";
   academic: {
     minCitations?: number;
     openAccessOnly?: boolean;
     hasFullText?: boolean;
+    advancedFilters?: AcademicFilterState;
   };
   sortBy: "relevance" | "date" | "citations";
   maxResults: number;
@@ -54,15 +57,50 @@ const DEFAULT_FILTERS: FilterState = {
   sourceTypes: ["web"],
   sortBy: "relevance",
   maxResults: 20,
-  academic: {},
+  academic: {
+    advancedFilters: DEFAULT_ACADEMIC_FILTERS,
+  },
 };
+
+/** Maps persisted UI state to Convex `DiscoveryService` args (strips `advancedFilters`). */
+function academicFiltersToConvexPayload(academic: FilterState["academic"]): {
+  publicationYearFrom?: number;
+  publicationYearTo?: number;
+  minCitations?: number;
+  openAccessOnly?: boolean;
+  hasFullText?: boolean;
+  provider?: "all" | "pubmed" | "arxiv";
+  fieldsOfStudy?: string[];
+} {
+  const adv = academic.advancedFilters ?? DEFAULT_ACADEMIC_FILTERS;
+  const currentYear = new Date().getFullYear();
+  let publicationYearFrom: number | undefined;
+  let publicationYearTo: number | undefined;
+  if (adv.yearFilter === "last-n") {
+    publicationYearFrom = currentYear - adv.yearCount + 1;
+    publicationYearTo = currentYear;
+  } else if (adv.yearFilter === "custom") {
+    publicationYearFrom = adv.yearStart;
+    publicationYearTo = adv.yearEnd;
+  }
+
+  return {
+    publicationYearFrom,
+    publicationYearTo,
+    minCitations: adv.minCitations,
+    openAccessOnly: adv.openAccess ? true : undefined,
+    hasFullText: adv.hasPdf ? true : undefined,
+    provider: adv.database !== "all" ? adv.database : undefined,
+    fieldsOfStudy: adv.fieldsOfStudy.length > 0 ? adv.fieldsOfStudy : undefined,
+  };
+}
 
 /** Discovery total budget ceiling (Tavily caps `max_results` at 20). */
 const MAX_DISCOVERY_TOTAL_RESULTS = 20;
 
 /** One pastel system per type: filters, list border, icons, and grid labels stay aligned */
 const SOURCE_TYPE_STYLES: Record<
-  "web" | "news" | "academic" | "finance",
+  "web" | "news" | "academic",
   {
     filterActive: string;
     filterInactive: string;
@@ -97,22 +135,14 @@ const SOURCE_TYPE_STYLES: Record<
     icon: "text-violet-800/90",
     typeChip: "border border-violet-200/60 bg-violet-100/80 text-violet-950",
   },
-  finance: {
-    filterActive:
-      "bg-emerald-100/90 text-emerald-950 border-emerald-300/80 shadow-sm ring-1 ring-emerald-200/50",
-    filterInactive:
-      "border-transparent bg-emerald-50/50 text-emerald-900/80 hover:bg-emerald-100/80 hover:border-emerald-200/50",
-    listAccent: "border-l-emerald-400/85",
-    icon: "text-emerald-800/90",
-    typeChip: "border border-emerald-200/60 bg-emerald-100/80 text-emerald-950",
-  },
+
 };
 
 const SOURCE_TYPE_CONFIG = {
   web: { label: "Web", icon: Globe },
   news: { label: "News", icon: Newspaper },
   academic: { label: "Academic", icon: GraduationCap },
-  finance: { label: "Finance", icon: TrendingUp },
+
 } as const;
 
 type SourceType = keyof typeof SOURCE_TYPE_CONFIG;
@@ -333,7 +363,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
         query: query.trim(),
         sourceTypes: filters.sourceTypes,
         timeRange: filters.timeRange,
-        academicFilters: filters.academic,
+        academicFilters: academicFiltersToConvexPayload(filters.academic),
         maxResults: filters.maxResults,
         sortBy: filters.sortBy,
       });
@@ -594,7 +624,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                   Filters
                 </button>
                 {showFilters && (
-                  <div className="absolute right-0 top-full mt-2 bg-card border border-border rounded-xl shadow-lg p-4 w-56 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="absolute right-0 top-full mt-2 bg-card border border-border rounded-xl shadow-lg p-4 w-[min(22rem,calc(100vw-2rem))] max-h-[min(85vh,40rem)] overflow-y-auto z-20 animate-in fade-in slide-in-from-top-2 duration-150">
                     {/* Time range */}
                     <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
                       Time range
@@ -651,66 +681,22 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                       className="w-full"
                     />
 
-                    {/* Academic filters */}
                     {filters.sourceTypes.includes("academic") && (
                       <>
                         <div className="border-t border-border/50 my-3" />
-                        <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                          Academic
+                        <label className="block text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                          Academic filters
                         </label>
-                        <select
-                          value={filters.academic.minCitations || ""}
-                          onChange={(e) =>
+                        <AcademicFilters
+                          variant="embedded"
+                          filters={filters.academic.advancedFilters ?? DEFAULT_ACADEMIC_FILTERS}
+                          onChange={(advancedFilters) =>
                             setFilters((prev) => ({
                               ...prev,
-                              academic: {
-                                ...prev.academic,
-                                minCitations: e.target.value ? parseInt(e.target.value) : undefined,
-                              },
+                              academic: { ...prev.academic, advancedFilters },
                             }))
                           }
-                          className="w-full px-2.5 py-1.5 bg-background border border-border rounded-md text-sm mb-2 focus:outline-none focus:border-primary"
-                        >
-                          <option value="">Any citations</option>
-                          <option value="10">10+</option>
-                          <option value="50">50+</option>
-                          <option value="100">100+</option>
-                          <option value="500">500+</option>
-                        </select>
-                        <label className="flex items-center gap-2 cursor-pointer text-sm mb-1">
-                          <input
-                            type="checkbox"
-                            checked={filters.academic.openAccessOnly || false}
-                            onChange={(e) =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                academic: {
-                                  ...prev.academic,
-                                  openAccessOnly: e.target.checked || undefined,
-                                },
-                              }))
-                            }
-                            className="w-3.5 h-3.5 rounded border-border"
-                          />
-                          Open access only
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer text-sm">
-                          <input
-                            type="checkbox"
-                            checked={filters.academic.hasFullText || false}
-                            onChange={(e) =>
-                              setFilters((prev) => ({
-                                ...prev,
-                                academic: {
-                                  ...prev.academic,
-                                  hasFullText: e.target.checked || undefined,
-                                },
-                              }))
-                            }
-                            className="w-3.5 h-3.5 rounded border-border"
-                          />
-                          Has full text
-                        </label>
+                        />
                       </>
                     )}
 
@@ -751,9 +737,10 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             </div>
           )}
 
-          <div
-            className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-card/50 px-6 md:px-10 ${selectedCount > 0 ? "pb-0" : "pb-6"}`}
-          >
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <div
+              className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-card/50 px-6 md:px-10 ${selectedCount > 0 ? "pb-0" : "pb-6"}`}
+            >
             {isLoading ? (
               <div className="flex flex-col items-center justify-center min-h-80 text-center space-y-3">
                 <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -809,6 +796,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
             )}
           </div>
         </div>
+      </div>
 
         {selectedCount > 0 && (
           <div className="flex items-center justify-between p-4 bg-secondary/10 border-t border-border gap-3 shrink-0 rounded-b-xl animate-in slide-in-from-bottom-2 duration-200">

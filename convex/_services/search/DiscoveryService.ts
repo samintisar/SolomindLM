@@ -16,7 +16,7 @@ export interface UnifiedDiscoveryResult {
   url: string;
   snippet: string;
   score: number;
-  sourceType: "web" | "news" | "academic" | "finance";
+  sourceType: "web" | "news" | "academic";
   publishedDate?: string;
   metadata: {
     // Academic-specific
@@ -44,7 +44,7 @@ export interface UnifiedDiscoveryResult {
  */
 export interface DiscoveryRequest {
   query: string;
-  sourceTypes: ("web" | "news" | "academic" | "finance")[];
+  sourceTypes: ("web" | "news" | "academic")[];
   timeRange?: "day" | "week" | "month" | "year";
   filters: {
     academic?: {
@@ -84,7 +84,7 @@ export function getRelevanceLabel(score: number): "high" | "medium" | "low" {
 export function transformWebResult(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
-  sourceType: "web" | "news" | "finance"
+  sourceType: "web" | "news"
 ): UnifiedDiscoveryResult {
   return {
     id: `web-${sourceType}-${result.url}`,
@@ -197,6 +197,8 @@ export interface DiscoverArgs {
     minCitations?: number;
     openAccessOnly?: boolean;
     hasFullText?: boolean;
+    provider?: string;
+    fieldsOfStudy?: string[];
   };
   maxResults: number;
   sortBy?: string;
@@ -226,13 +228,10 @@ export async function discoverHandler(
   // Determine which source types to search
   const searchWeb = sourceTypes.includes("web");
   const searchNews = sourceTypes.includes("news");
-  const searchFinance = sourceTypes.includes("finance");
   const searchAcademic = sourceTypes.includes("academic");
-
-  const webTopics: Array<"web" | "news" | "finance"> = [];
+  const webTopics: Array<"web" | "news"> = [];
   if (searchWeb) webTopics.push("web");
   if (searchNews) webTopics.push("news");
-  if (searchFinance) webTopics.push("finance");
 
   const numSearchChannels = webTopics.length + (searchAcademic ? 1 : 0);
   const maxPerChannel =
@@ -303,7 +302,7 @@ export async function discoverHandler(
     const academicStartTime = Date.now();
 
     const promise = runAction(
-      internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+      internal._services.search.academic.AcademicSearchService.discoverAcademicPapersInternal,
       {
         query,
         maxResults: maxPerChannel,
@@ -312,6 +311,8 @@ export async function discoverHandler(
         minCitations: academicFilters?.minCitations,
         openAccessOnly: academicFilters?.openAccessOnly,
         hasFullText: academicFilters?.hasFullText,
+        provider: academicFilters?.provider,
+        fieldsOfStudy: academicFilters?.fieldsOfStudy,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sortBy: sortBy as any,
       }
@@ -390,7 +391,7 @@ export async function discoverHandler(
 
 /**
  * Unified discovery service that searches across multiple source types
- * Routes to Tavily for web/news/finance and Academic APIs for academic papers
+ * Routes to Tavily for web/news and Academic APIs for academic papers
  * Results are normalized, merged, and sorted according to preferences
  */
 export const discover = action({
@@ -405,6 +406,8 @@ export const discover = action({
         minCitations: v.optional(v.number()),
         openAccessOnly: v.optional(v.boolean()),
         hasFullText: v.optional(v.boolean()),
+        provider: v.optional(v.string()),
+        fieldsOfStudy: v.optional(v.array(v.string())),
       })
     ),
     maxResults: v.number(),

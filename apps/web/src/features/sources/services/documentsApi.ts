@@ -215,7 +215,7 @@ export function useGetSignedUrl() {
 
 /**
  * Unified discovery service that searches across multiple source types
- * Supports web, news, academic, and finance sources with advanced filtering
+ * Supports web, news, and academic sources with advanced filtering
  *
  * `maxResults` is a total cap across all selected types (split evenly per channel, e.g. 20 with web + academic → 10 each).
  */
@@ -224,7 +224,7 @@ export function useUnifiedDiscovery() {
 
   return async (request: {
     query: string;
-    sourceTypes: ("web" | "news" | "academic" | "finance")[];
+    sourceTypes: ("web" | "news" | "academic")[];
     timeRange?: "day" | "week" | "month" | "year";
     academicFilters?: {
       publicationYearFrom?: number;
@@ -232,6 +232,8 @@ export function useUnifiedDiscovery() {
       minCitations?: number;
       openAccessOnly?: boolean;
       hasFullText?: boolean;
+      provider?: "all" | "pubmed" | "arxiv";
+      fieldsOfStudy?: string[];
     };
     maxResults: number;
     sortBy?: "relevance" | "date" | "citations";

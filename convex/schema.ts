@@ -355,7 +355,7 @@ export default defineSchema({
     externalSearchSourceTypes: v.optional(
       v.object({
         academic: v.boolean(),
-        finance: v.boolean(),
+        finance: v.optional(v.boolean()),
         news: v.boolean(),
         web: v.boolean(),
       })
@@ -500,7 +500,7 @@ export default defineSchema({
   searchAnalytics: defineTable({
     userId: v.id("users"),
     query: v.string(), // Normalized query
-    sourceTypes: v.array(v.string()), // ['web', 'news', 'academic', 'finance']
+    sourceTypes: v.array(v.string()), // ['web', 'news', 'academic']
     filters: v.optional(v.any()), // { timeRange, academicFilters, sortBy }
     resultsCount: v.number(), // Total results returned
     sourceTypeCounts: v.optional(v.any()), // { web: 5, academic: 10 }
@@ -540,6 +540,17 @@ export default defineSchema({
       recencyDays: v.optional(v.number()),
       dedupeStrategy: v.optional(v.string()), // "strict" | "semantic" | "off"
     }),
+    academicFilters: v.optional(
+      v.object({
+        provider: v.optional(v.string()),
+        fieldsOfStudy: v.optional(v.array(v.string())),
+        publicationYearFrom: v.optional(v.number()),
+        publicationYearTo: v.optional(v.number()),
+        minCitations: v.optional(v.number()),
+        openAccessOnly: v.optional(v.boolean()),
+        hasFullText: v.optional(v.boolean()),
+      })
+    ),
     status: v.string(), // "draft" | "approved" | "rejected"
     createdAt: v.number(),
     updatedAt: v.number(),

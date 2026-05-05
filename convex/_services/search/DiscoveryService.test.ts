@@ -12,7 +12,7 @@ import {
 } from "./DiscoveryService";
 import type { UnifiedDiscoveryResult } from "./DiscoveryService";
 import { discoverSourcesInternalHandler } from "./TavilySearchService";
-import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
+import { discoverAcademicPapersInternalHandler } from "./academic/AcademicSearchService";
 import { env } from "../../_lib/env";
 
 describe("DiscoveryService", () => {
@@ -85,19 +85,6 @@ describe("DiscoveryService", () => {
       expect(transformed.metadata.relevanceLabel).toBe("medium");
     });
 
-    it("transforms finance result correctly", () => {
-      const result = {
-        title: "Market Report",
-        url: "https://finance.example.com/report",
-        snippet: "Stocks up",
-        score: 0.5,
-      };
-
-      const transformed = transformWebResult(result, "finance");
-
-      expect(transformed.sourceType).toBe("finance");
-      expect(transformed.metadata.relevanceLabel).toBe("low");
-    });
   });
 
   describe("transformAcademicResult", () => {
@@ -338,6 +325,59 @@ describe("DiscoveryService", () => {
       expect(distributed.map((r) => r.id)).toEqual(["w1", "w2", "a1", "a2"]);
     });
   });
+
+  describe("discoverHandler - academic filter passthrough", () => {
+    it("passes provider and fieldsOfStudy to academic search", async () => {
+      const mockRunAction = vi.fn().mockResolvedValue([]);
+
+      await discoverHandler(
+        {
+          query: "neural networks",
+          sourceTypes: ["academic"],
+          maxResults: 10,
+          academicFilters: {
+            provider: "pubmed",
+            fieldsOfStudy: ["Computer Science", "Neuroscience"],
+            publicationYearFrom: 2020,
+            minCitations: 10,
+          },
+        },
+        mockRunAction
+      );
+
+      expect(mockRunAction).toHaveBeenCalledTimes(1);
+      const academicCall = mockRunAction.mock.calls[0][1];
+      expect(academicCall.provider).toBe("pubmed");
+      expect(academicCall.fieldsOfStudy).toEqual(["Computer Science", "Neuroscience"]);
+      expect(academicCall.publicationYearFrom).toBe(2020);
+      expect(academicCall.minCitations).toBe(10);
+    });
+
+    it("omits undefined academic filter fields", async () => {
+      const mockRunAction = vi.fn().mockResolvedValue([]);
+
+      await discoverHandler(
+        {
+          query: "test",
+          sourceTypes: ["academic"],
+          maxResults: 5,
+          academicFilters: {
+            provider: "arxiv",
+          },
+        },
+        mockRunAction
+      );
+
+      const academicCall = mockRunAction.mock.calls[0][1];
+      expect(academicCall.provider).toBe("arxiv");
+      expect(academicCall.fieldsOfStudy).toBeUndefined();
+      expect(academicCall.publicationYearFrom).toBeUndefined();
+      expect(academicCall.publicationYearTo).toBeUndefined();
+      expect(academicCall.minCitations).toBeUndefined();
+      expect(academicCall.openAccessOnly).toBeUndefined();
+      expect(academicCall.hasFullText).toBeUndefined();
+    });
+  });
 });
 
 // ============================================================
@@ -354,7 +394,7 @@ function isRateLimitOrCreditError(error: unknown): boolean {
 // Create a real runAction that calls the actual handlers
 const createRealRunAction = (): RunActionFn => {
   return async (_action, args) => {
-    // Route to Tavily if topic is present (web/news/finance)
+    // Route to Tavily if topic is present (web/news)
     if (args.topic !== undefined) {
       return discoverSourcesInternalHandler(args);
     }

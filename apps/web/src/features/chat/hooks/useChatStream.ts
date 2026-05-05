@@ -190,7 +190,16 @@ export function useChatStream({
       deepResearch?: boolean,
       sourcePolicy?: { channels: string[] },
       documentIds?: string[],
-      attachedDocumentIds?: string[]
+      attachedDocumentIds?: string[],
+      academicFilters?: {
+        provider?: "all" | "pubmed" | "arxiv";
+        fieldsOfStudy?: string[];
+        publicationYearFrom?: number;
+        publicationYearTo?: number;
+        minCitations?: number;
+        openAccessOnly?: boolean;
+        hasFullText?: boolean;
+      }
     ) => {
       if (!activeNotebookId || isChatStreaming) return;
       if (chatRemoteGenerating) {
@@ -318,7 +327,8 @@ export function useChatStream({
           deepResearch,
           sourcePolicy,
           activeConversationId ?? undefined,
-          attachedDocumentIds
+          attachedDocumentIds,
+          academicFilters
         );
       } catch {
         resetStreamingState();

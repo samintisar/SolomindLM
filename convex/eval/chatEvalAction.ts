@@ -228,7 +228,7 @@ export const runChatEval = action({
         rawContent?: string;
       }> = [];
 
-      const webChannels = externalChannels.filter((ch) => ["web", "news", "finance"].includes(ch));
+      const webChannels = externalChannels.filter((ch) => ["web", "news"].includes(ch));
       const academicChannels = externalChannels.filter((ch) => ch === "academic");
 
       if (webChannels.length > 0) {
@@ -267,7 +267,7 @@ export const runChatEval = action({
         const academicQuery = await refineWebSearchQuery(args.question);
         try {
           const academicResults = await ctx.runAction(
-            internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+            internal._services.search.academic.AcademicSearchService.discoverAcademicPapersInternal,
             {
               query: academicQuery,
               maxResults: maxPerChannel,

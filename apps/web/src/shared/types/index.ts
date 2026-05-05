@@ -501,7 +501,7 @@ export interface UnifiedDiscoveryResult {
   url: string;
   snippet: string;
   score: number;
-  sourceType: "web" | "news" | "academic" | "finance";
+  sourceType: "web" | "news" | "academic";
   publishedDate?: string;
   metadata: {
     // Academic-specific
@@ -538,7 +538,7 @@ export interface DiscoveryResponse {
  */
 export interface DiscoveryRequest {
   query: string;
-  sourceTypes: ("web" | "news" | "academic" | "finance")[];
+  sourceTypes: ("web" | "news" | "academic")[];
   timeRange?: "day" | "week" | "month" | "year";
   filters: {
     academic?: {

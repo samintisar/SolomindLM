@@ -198,7 +198,7 @@ export const runResearchEval = action({
           if (channel === "academic") {
             try {
               const results = await ctx.runAction(
-                internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+                internal._services.search.academic.AcademicSearchService.discoverAcademicPapersInternal,
                 { query: refinedQuery, maxResults: maxPerChannel }
               );
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
