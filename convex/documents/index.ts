@@ -1062,7 +1062,7 @@ export const getDocumentChunksInternal = internalQuery({
       .query("documentChunks")
       .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
       .order("asc")
-      .take(100);
+      .take(100); // MAX_SOURCE_GUIDE_CHUNKS — enough for ~8000 chars of content
     return chunks.filter((c) => c.userId === args.userId);
   },
 });

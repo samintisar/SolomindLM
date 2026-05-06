@@ -1,11 +1,37 @@
 import React, { useId, useState } from "react";
 import { Loader2, Compass, ChevronUp, ChevronDown } from "lucide-react";
 import { useSourceGuide } from "../hooks/useSourceGuide";
-import { sanitizeHtml } from "@/shared/utils";
 
 interface SourceGuideProps {
   documentId: string;
   onTopicClick: (topic: string) => void;
+}
+
+/** Render a source-guide summary: **bold** → <strong>, \n → <br />. No raw HTML. */
+function SummaryText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="font-serif text-sm leading-relaxed text-foreground/95">
+      {lines.map((line, lineIndex) => {
+        const parts = line.split(/(\*\*.*?\*\*)/g);
+        return (
+          <React.Fragment key={lineIndex}>
+            {lineIndex > 0 && <br />}
+            {parts.map((part, partIndex) => {
+              if (part.startsWith("**") && part.endsWith("**")) {
+                return (
+                  <strong key={partIndex} className="font-semibold text-foreground">
+                    {part.slice(2, -2)}
+                  </strong>
+                );
+              }
+              return <span key={partIndex}>{part}</span>;
+            })}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
 }
 
 export const SourceGuide: React.FC<SourceGuideProps> = ({ documentId, onTopicClick }) => {
@@ -71,18 +97,7 @@ export const SourceGuide: React.FC<SourceGuideProps> = ({ documentId, onTopicCli
             </div>
           ) : (
             <>
-              {summary && (
-                <div
-                  className="font-serif text-sm leading-relaxed text-foreground/95 [&_strong]:font-semibold [&_strong]:text-foreground"
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeHtml(
-                      summary
-                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                        .replace(/\n/g, "<br/>")
-                    ),
-                  }}
-                />
-              )}
+              {summary && <SummaryText text={summary} />}
               {topics && topics.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {topics.map((topic: string) => (
