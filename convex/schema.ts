@@ -694,4 +694,123 @@ export default defineSchema({
   })
     .index("by_prompt", ["promptId"])
     .index("by_prompt_and_reporter", ["promptId", "reporterUserId"]),
+
+  // ── Literature Review & Citation tables ─────────────────────────────
+
+  citations: defineTable({
+    paperId: v.string(),
+    title: v.string(),
+    authors: v.array(v.string()),
+    year: v.optional(v.number()),
+    doi: v.optional(v.string()),
+    url: v.string(),
+    pdfUrl: v.optional(v.string()),
+    sourceApi: v.union(v.literal("arxiv"), v.literal("semantic_scholar"), v.literal("pubmed")),
+    citationCount: v.optional(v.number()),
+    abstract: v.optional(v.string()),
+    citationKey: v.string(),
+  })
+    .index("by_paperId", ["paperId"])
+    .index("by_citationKey", ["citationKey"]),
+
+  literatureTables: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+    columns: v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      type: v.union(v.literal("paper_title"), v.literal("authors"), v.literal("year"), v.literal("study_type"), v.literal("custom")),
+      instructions: v.optional(v.string()),
+      isVisible: v.boolean(),
+      isSystem: v.boolean(),
+      order: v.number(),
+    })),
+    papers: v.array(v.object({
+      citationId: v.id("citations"),
+      rowData: v.record(v.string(), v.string()),
+      includeReason: v.optional(v.string()),
+      isIncluded: v.boolean(),
+    })),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_user", ["userId"]),
+
+  literatureReports: defineTable({
+    title: v.string(),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+    content: v.string(),
+    citationStyle: v.string(),
+    sections: v.array(v.object({
+      heading: v.string(),
+      content: v.string(),
+    })),
+    citationIds: v.array(v.id("citations")),
+    tableId: v.optional(v.id("literatureTables")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_table", ["tableId"]),
+
+  researchSteps: defineTable({
+    researchId: v.string(),
+    agentType: v.union(v.literal("research"), v.literal("literature_review")),
+    stepType: v.union(
+      v.literal("searching"), v.literal("deduplicating"), v.literal("ranking"),
+      v.literal("screening"), v.literal("extracting"), v.literal("populating"),
+      v.literal("generating_report"), v.literal("awaiting_user_input")
+    ),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed")),
+    details: v.optional(v.string()),
+    metadata: v.optional(v.object({
+      queryCount: v.optional(v.number()),
+      paperCount: v.optional(v.number()),
+      includedCount: v.optional(v.number()),
+      excludedCount: v.optional(v.number()),
+    })),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    order: v.number(),
+  })
+    .index("by_research", ["researchId"]),
+
+  literatureReviewSessions: defineTable({
+    query: v.string(),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    workflowId: v.string(),
+    status: v.union(v.literal("planning"), v.literal("awaiting_columns"), v.literal("searching"), v.literal("processing"), v.literal("completed"), v.literal("failed")),
+    suggestedColumns: v.optional(v.array(v.object({
+      id: v.string(), name: v.string(), instructions: v.optional(v.string()),
+    }))),
+    confirmedColumns: v.optional(v.array(v.object({
+      id: v.string(), name: v.string(), instructions: v.optional(v.string()), isVisible: v.boolean(),
+    }))),
+    error: v.optional(v.string()),
+    tableId: v.optional(v.id("literatureTables")),
+    reportId: v.optional(v.id("literatureReports")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_user", ["userId"]),
+
+  literatureTableDrafts: defineTable({
+    sessionId: v.id("literatureReviewSessions"),
+    citationId: v.id("citations"),
+    rowData: v.record(v.string(), v.string()),
+    includeReason: v.optional(v.string()),
+    isIncluded: v.boolean(),
+    batchNumber: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_batch", ["sessionId", "batchNumber"]),
 });
