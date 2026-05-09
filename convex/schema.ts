@@ -763,23 +763,20 @@ export default defineSchema({
     researchId: v.string(),
     agentType: v.union(v.literal("research"), v.literal("literature_review")),
     stepType: v.union(
+      v.literal("planning"),
       v.literal("searching"), v.literal("deduplicating"), v.literal("ranking"),
       v.literal("screening"), v.literal("extracting"), v.literal("populating"),
       v.literal("generating_report"), v.literal("awaiting_user_input")
     ),
     status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed")),
     details: v.optional(v.string()),
-    metadata: v.optional(v.object({
-      queryCount: v.optional(v.number()),
-      paperCount: v.optional(v.number()),
-      includedCount: v.optional(v.number()),
-      excludedCount: v.optional(v.number()),
-    })),
+    metadata: v.optional(v.any()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     order: v.number(),
   })
-    .index("by_research", ["researchId"]),
+    .index("by_research", ["researchId"])
+    .index("by_research_step", ["researchId", "stepType"]),
 
   literatureReviewSessions: defineTable({
     query: v.string(),
