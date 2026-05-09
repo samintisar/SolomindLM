@@ -1419,6 +1419,8 @@ export const runResearchExecute = internalAction({
       );
 
       const agent = new ResearchAgent({
+        ctx,
+        researchId: String(runId),
         apiKey,
         smartModel,
         runHybridSearch: async (query, docIds) => {
