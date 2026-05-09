@@ -223,10 +223,12 @@ describe("useSelectionTooltip", () => {
         removeAllRanges: vi.fn(),
       } as unknown as Selection;
 
-      vi.spyOn(window, "getSelection").mockReturnValue(mockSelection);
+      const spy = vi.spyOn(window, "getSelection").mockReturnValue(mockSelection);
 
       // Trigger mouseup
       document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+      spy.mockRestore();
     });
 
     // The tooltip should be visible after mouseup

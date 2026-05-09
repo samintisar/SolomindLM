@@ -8,7 +8,7 @@ export const SelectionTooltip: React.FC = () => {
 
   return (
     <div
-      className="fixed z-100 pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150 motion-reduce:animate-none"
+      className="fixed z-[100] pointer-events-auto motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150 motion-reduce:animate-none"
       style={{
         left: tooltip.x,
         top: tooltip.y - 6,

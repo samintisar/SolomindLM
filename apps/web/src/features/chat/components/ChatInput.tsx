@@ -248,10 +248,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           return;
         }
         if (e.key === "Tab") {
-          e.preventDefault();
-          if (filteredSources.length > 0) {
-            selectMention(filteredSources[highlightedMentionIndex]);
-          }
+          setMentionDropdownOpen(false);
           return;
         }
       }
