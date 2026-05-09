@@ -79,6 +79,7 @@
     "@convex-dev/persistent-text-streaming": "^0.3.2",
     "@convex-dev/rate-limiter": "^0.3.2",
     "@convex-dev/stripe": "^0.1.4",
+    "@convex-dev/workflow": "^0.3.12",
     "@convex-dev/workpool": "^0.3.2",
     "@langchain/community": "^1.1.27",
     "@langchain/core": "^1.1.44",
