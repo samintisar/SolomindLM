@@ -129,15 +129,37 @@ export class DoiResolverService {
       const crossrefData = await this.queryCrossrefBatch(dois);
       const semanticScholarData = await this.querySemanticScholarBatch(dois);
 
+      // Identify DOIs with Crossref data but without PDF from Semantic Scholar for OpenAlex fallback
+      const doisWithCrossrefData = dois.filter((doi) => crossrefData[doi.toLowerCase()]);
+      const doisWithoutPdf = doisWithCrossrefData.filter((doi) => {
+        const paper = semanticScholarData[doi.toLowerCase()];
+        return !paper?.openAccessPdf?.url;
+      });
+
+      let openAlexData: Record<string, OpenAlexWork> = {};
+      if (doisWithoutPdf.length > 0) {
+        openAlexData = await this.queryOpenAlexBatch(doisWithoutPdf);
+      }
+
       const results = dois.map((doi) => {
-        const crossrefWork = crossrefData[doi];
+        const crossrefWork = crossrefData[doi.toLowerCase()];
         if (!crossrefWork) {
           return null;
         }
 
-        const semanticScholarPaper = semanticScholarData[doi];
-        const pdfUrl = semanticScholarPaper?.openAccessPdf?.url;
-        const openAlexId = semanticScholarPaper?.externalIds?.OpenAlex;
+        const semanticScholarPaper = semanticScholarData[doi.toLowerCase()];
+        let pdfUrl = semanticScholarPaper?.openAccessPdf?.url;
+        let openAlexId = semanticScholarPaper?.externalIds?.OpenAlex;
+
+        if (!pdfUrl) {
+          const openAlexWork = openAlexData[doi.toLowerCase()];
+          if (openAlexWork) {
+            pdfUrl = openAlexWork.open_access?.oa_url;
+            if (!openAlexId) {
+              openAlexId = openAlexWork.ids?.openalex;
+            }
+          }
+        }
 
         return this.buildPaperRecord(crossrefWork, pdfUrl, openAlexId);
       });
@@ -293,6 +315,44 @@ export class DoiResolverService {
         return (await response.json()) as OpenAlexWork;
       },
       "openalex_fallback"
+    );
+  }
+
+  private async queryOpenAlexBatch(dois: string[]): Promise<Record<string, OpenAlexWork>> {
+    if (dois.length === 0) return {};
+
+    return invokeWithHttpRetry(
+      async () => {
+        const filter = dois.map((doi) => `doi:${encodeURIComponent(doi)}`).join("|");
+        this.logger.apiCall("openalex", `/works?filter=${filter}`);
+        const response = await fetch(
+          `https://api.openalex.org/works?filter=${filter}&per_page=${dois.length}`,
+          {
+            headers: {
+              "User-Agent": "mailto:team@solomind.ai",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`OpenAlex batch API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const works = data.results ?? [];
+        const map: Record<string, OpenAlexWork> = {};
+
+        for (const work of works) {
+          if (work.doi) {
+            // OpenAlex returns DOI as https://doi.org/10.1234/...
+            const normalizedDoi = work.doi.replace(/^https?:\/\/doi\.org\//i, "").toLowerCase();
+            map[normalizedDoi] = work;
+          }
+        }
+
+        return map;
+      },
+      "openalex_batch"
     );
   }
 

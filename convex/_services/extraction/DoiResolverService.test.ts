@@ -309,5 +309,98 @@ describe("DoiResolverService", () => {
       expect(results).toEqual([]);
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+
+    it("handles case-insensitive DOI lookups in batch", async () => {
+      const mockCrossrefBatchResponse = {
+        message: {
+          items: [
+            {
+              title: ["Mixed Case Paper"],
+              author: [{ given: "Case", family: "Sensitive" }],
+              abstract: "Testing case insensitivity.",
+              DOI: "10.1234/MixedCase",
+            },
+          ],
+        },
+      };
+
+      const mockSemanticScholarBatchResponse = [
+        { openAccessPdf: { url: "https://example.com/mixed.pdf" }, externalIds: { OpenAlex: "W1" } },
+      ];
+
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => mockCrossrefBatchResponse,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => mockSemanticScholarBatchResponse,
+        });
+
+      const results = await service.resolveBatch(["10.1234/mixedcase"]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).not.toBeNull();
+      expect(results[0]?.title).toBe("Mixed Case Paper");
+      expect(results[0]?.pdfUrl).toBe("https://example.com/mixed.pdf");
+    });
+
+    it("falls back to OpenAlex for papers without PDFs in batch", async () => {
+      const mockCrossrefBatchResponse = {
+        message: {
+          items: [
+            {
+              title: ["Paper Without PDF"],
+              author: [{ given: "No", family: "PDF" }],
+              abstract: "No PDF from Semantic Scholar.",
+              DOI: "10.1234/nopdf",
+            },
+          ],
+        },
+      };
+
+      const mockSemanticScholarBatchResponse = [
+        { openAccessPdf: null, externalIds: {} },
+      ];
+
+      const mockOpenAlexBatchResponse = {
+        results: [
+          {
+            title: "Paper Without PDF",
+            open_access: { oa_url: "https://openalex.org/pdf.pdf" },
+            ids: { openalex: "W987654321" },
+            doi: "https://doi.org/10.1234/nopdf",
+          },
+        ],
+      };
+
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => mockCrossrefBatchResponse,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => mockSemanticScholarBatchResponse,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => mockOpenAlexBatchResponse,
+        });
+
+      const results = await service.resolveBatch(["10.1234/nopdf"]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).not.toBeNull();
+      expect(results[0]?.pdfUrl).toBe("https://openalex.org/pdf.pdf");
+      expect(results[0]?.openAlexId).toBe("W987654321");
+      expect(results[0]?.isOa).toBe(true);
+    });
   });
 });
