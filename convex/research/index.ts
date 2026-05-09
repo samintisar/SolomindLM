@@ -271,6 +271,66 @@ export const updateRunProgress = internalMutation({
   },
 });
 
+export const upsertResearchStep = internalMutation({
+  args: {
+    researchId: v.string(),
+    agentType: v.union(v.literal("research"), v.literal("literature_review")),
+    stepType: v.union(
+      v.literal("searching"),
+      v.literal("deduplicating"),
+      v.literal("ranking"),
+      v.literal("screening"),
+      v.literal("extracting"),
+      v.literal("populating"),
+      v.literal("generating_report"),
+      v.literal("awaiting_user_input")
+    ),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed")),
+    details: v.optional(v.string()),
+    metadata: v.optional(
+      v.object({
+        queryCount: v.optional(v.number()),
+        paperCount: v.optional(v.number()),
+        includedCount: v.optional(v.number()),
+        excludedCount: v.optional(v.number()),
+      })
+    ),
+    order: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("researchSteps")
+      .withIndex("by_research", (q) => q.eq("researchId", args.researchId))
+      .filter((q) => q.eq(q.field("stepType"), args.stepType))
+      .first();
+
+    const now = Date.now();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: args.status,
+        details: args.details,
+        metadata: args.metadata,
+        order: args.order,
+        ...(args.status === "in_progress" && !existing.startedAt ? { startedAt: now } : {}),
+        ...(args.status === "completed" || args.status === "failed" ? { completedAt: now } : {}),
+      });
+    } else {
+      await ctx.db.insert("researchSteps", {
+        researchId: args.researchId,
+        agentType: args.agentType,
+        stepType: args.stepType,
+        status: args.status,
+        details: args.details,
+        metadata: args.metadata,
+        order: args.order,
+        startedAt: args.status === "in_progress" ? now : undefined,
+        completedAt: args.status === "completed" || args.status === "failed" ? now : undefined,
+      });
+    }
+  },
+});
+
 export const saveEvidence = internalMutation({
   args: {
     runId: v.id("researchRuns"),
