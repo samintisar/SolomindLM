@@ -29,11 +29,24 @@ import { ConfigureChatModal } from "./ConfigureChatModal";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
+import { ResearchSteps, ResearchStep } from "./ResearchSteps";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+
+const stepConfig: Record<string, { title: string; description: string }> = {
+  planning: { title: "Planning Research", description: "Defining search strategy and sub-questions..." },
+  searching: { title: "Searching Sources", description: "Finding academic papers and relevant sources..." },
+  deduplicating: { title: "Removing Duplicates", description: "Consolidating results across searches..." },
+  ranking: { title: "Ranking Papers", description: "Sorting by relevance and credibility..." },
+  screening: { title: "Screening Papers", description: "Applying inclusion criteria..." },
+  extracting: { title: "Extracting Data", description: "Pulling key information from sources..." },
+  populating: { title: "Building Table", description: "Organizing findings into structured data..." },
+  generating_report: { title: "Generating Report", description: "Writing literature review and synthesis..." },
+  awaiting_user_input: { title: "Awaiting Input", description: "Waiting for user approval or guidance..." },
+};
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -92,6 +105,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
+  const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
   const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
@@ -171,6 +185,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await approvePlanMutation({ planId: planId as any });
+      // TODO: Query for the actual run ID and use that as the research ID
+      setActiveResearchId(planId);
       const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
         method: "POST",
         credentials: "include",
@@ -190,6 +206,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       toastError(
         err instanceof Error ? err.message : "Failed to start research execution"
       );
+      setActiveResearchId(null);
     }
   }, [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]);
 
@@ -497,6 +514,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const memoizedMessages = useMemo(() => messages, [messages]);
 
+  // TODO: Wire up Convex query for research steps once endpoint is available
+  // const researchStepsData = useQuery(
+  //   api.research.index.getResearchSteps,
+  //   activeResearchId ? { researchId: activeResearchId } : "skip"
+  // );
+
+  const researchSteps: ResearchStep[] = useMemo(() => {
+    // TODO: Replace rawSteps with actual query results from researchStepsData
+    // const rawSteps = researchStepsData ?? [];
+    const rawSteps: Array<{ stepType: string; status: string; details?: string }> = [];
+    return rawSteps.map((step) => ({
+      type: step.stepType,
+      status: step.status as ResearchStep["status"],
+      title: stepConfig[step.stepType]?.title || step.stepType,
+      description: stepConfig[step.stepType]?.description || "",
+      details: step.details,
+    }));
+  }, []);
+
+  const showResearchSteps = deepResearchEnabled && activeResearchId != null;
+
   const chatHeaderToolbar = (
     <div className="flex items-center gap-2 shrink-0">
       <div className="hidden md:flex items-center gap-2">
@@ -776,6 +814,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           )}
         </div>
         </div>
+
+        {/* Research Steps Panel */}
+        {showResearchSteps && (
+          <div className="pointer-events-none absolute bottom-24 left-0 right-0 z-10 flex min-w-0 justify-center px-3 sm:px-4">
+            <div className="pointer-events-auto w-full min-w-0 max-w-3xl rounded-xl border border-border bg-card p-4 shadow-lg xl:max-w-4xl 2xl:max-w-5xl">
+              <ResearchSteps steps={researchSteps} />
+            </div>
+          </div>
+        )}
 
         {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
         <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex min-w-0 justify-center px-3 sm:px-4">
