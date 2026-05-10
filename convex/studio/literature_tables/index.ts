@@ -1,4 +1,4 @@
-import { mutation } from "../../_generated/server";
+import { mutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { v } from "convex/values";
 import { getAuthUserId } from "../../auth";
@@ -7,6 +7,18 @@ import { assertCanEditNotebook } from "../../_lib/notebookAccess";
 function generateWorkflowId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
 }
+
+/**
+ * Internal query: fetch a literature review session by ID.
+ */
+export const getSessionInternal = internalQuery({
+  args: {
+    sessionId: v.id("literatureReviewSessions"),
+  },
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.sessionId);
+  },
+});
 
 /**
  * Start a new literature review workflow.

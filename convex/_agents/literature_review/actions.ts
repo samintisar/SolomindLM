@@ -1,10 +1,10 @@
 "use node";
 
 import { internalAction } from "../../_generated/server";
+import { internal } from "../../_generated/api";
 import { v } from "convex/values";
 import { env } from "../../_lib/env";
-import type { LiteratureReviewStateType } from "./state";
-import type { ActionCtx } from "../../_generated/server";
+
 import { planReviewNode } from "./nodes/planReview";
 import { searchPapersNode } from "./nodes/searchPapers";
 import { deduplicatePapersNode } from "./nodes/deduplicatePapers";
@@ -14,7 +14,18 @@ import { extractDataNode } from "./nodes/extractData";
 import { generateTableNode } from "./nodes/generateTable";
 import { generateReportNode } from "./nodes/generateReport";
 
-function createState(partial: Partial<LiteratureReviewStateType> = {}): LiteratureReviewStateType {
+import type { LiteratureReviewStateType } from "./state";
+import type { LiteratureReviewNodeDeps } from "./types";
+
+function buildDeps(ctx: any): LiteratureReviewNodeDeps {
+  return {
+    ctx,
+    apiKey: env.OPENAI_API_KEY,
+    smartModel: env.SMART_LLM,
+  };
+}
+
+function defaultState(): LiteratureReviewStateType {
   return {
     query: "",
     searchQueries: [],
@@ -28,131 +39,193 @@ function createState(partial: Partial<LiteratureReviewStateType> = {}): Literatu
     citations: [],
     tableId: undefined,
     reportId: undefined,
-    progress: { phase: "planning", percentage: 0, message: "Starting literature review..." },
+    progress: { phase: "planning", percentage: 0, message: "Starting..." },
     error: undefined,
     sessionId: "",
     notebookId: "",
     userId: "",
-    ...partial,
   };
 }
 
-function createDeps(ctx: ActionCtx, sessionId?: string) {
-  return {
-    ctx,
-    sessionId,
-    apiKey: env.TOGETHER_AI_API_KEY,
-    smartModel: env.SMART_LLM || "openai/gpt-oss-120b",
-  };
-}
-
+/**
+ * planReview action: LLM plans search strategy and suggests comparison table columns.
+ */
 export const planReview = internalAction({
-  args: { query: v.string() },
+  args: {
+    query: v.string(),
+  },
   handler: async (ctx, args) => {
-    const state = createState({ query: args.query });
-    return planReviewNode(state, createDeps(ctx));
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
+      query: args.query,
+    };
+    const result = await planReviewNode(state, buildDeps(ctx));
+    return result;
   },
 });
 
+/**
+ * searchPapers action: Search academic sources (arXiv, Semantic Scholar, PubMed).
+ */
 export const searchPapers = internalAction({
-  args: { query: v.string(), searchQueries: v.array(v.string()) },
+  args: {
+    query: v.string(),
+    searchQueries: v.array(v.string()),
+  },
   handler: async (ctx, args) => {
-    const state = createState({
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
       query: args.query,
       searchQueries: args.searchQueries,
-    });
-    return searchPapersNode(state, createDeps(ctx));
+    };
+    const result = await searchPapersNode(state, buildDeps(ctx));
+    return result;
   },
 });
 
+/**
+ * deduplicatePapers action: Remove duplicate papers from multiple sources.
+ */
 export const deduplicatePapers = internalAction({
-  args: { papers: v.array(v.any()) },
+  args: {
+    papers: v.array(v.any()),
+  },
   handler: async (ctx, args) => {
-    const state = createState({ papers: args.papers });
-    return deduplicatePapersNode(state, createDeps(ctx));
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
+      papers: args.papers,
+    };
+    const result = await deduplicatePapersNode(state, buildDeps(ctx));
+    return result;
   },
 });
 
+/**
+ * rankPapers action: Rank papers by relevance to the research question.
+ */
 export const rankPapers = internalAction({
-  args: { papers: v.array(v.any()), query: v.string() },
+  args: {
+    papers: v.array(v.any()),
+    query: v.string(),
+  },
   handler: async (ctx, args) => {
-    const state = createState({
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
       papers: args.papers,
       query: args.query,
-    });
-    return rankPapersNode(state, createDeps(ctx));
+    };
+    const result = await rankPapersNode(state, buildDeps(ctx));
+    return result;
   },
 });
 
+/**
+ * screenPapers action: PRISMA-style eligibility screening.
+ */
 export const screenPapers = internalAction({
-  args: { papers: v.array(v.any()), query: v.string() },
+  args: {
+    papers: v.array(v.any()),
+    query: v.string(),
+  },
   handler: async (ctx, args) => {
-    const state = createState({
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
       rankedPapers: args.papers,
       query: args.query,
-    });
-    return screenPapersNode(state, createDeps(ctx));
+    };
+    const result = await screenPapersNode(state, buildDeps(ctx));
+    return result;
   },
 });
 
+/**
+ * extractData action: Batched data extraction for confirmed columns.
+ */
 export const extractData = internalAction({
   args: {
     papers: v.array(v.any()),
     columns: v.array(v.any()),
     sessionId: v.id("literatureReviewSessions"),
-    query: v.string(),
   },
   handler: async (ctx, args) => {
-    const state = createState({
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
       screenedPapers: args.papers,
       confirmedColumns: args.columns,
-      query: args.query,
       sessionId: args.sessionId,
-    });
-    return extractDataNode(state, createDeps(ctx, args.sessionId));
+    };
+    const deps = buildDeps(ctx);
+    deps.sessionId = args.sessionId;
+    const result = await extractDataNode(state, deps);
+    return result;
   },
 });
 
+/**
+ * generateTable action: Create literatureTables row from extracted data.
+ */
 export const generateTable = internalAction({
   args: {
     sessionId: v.id("literatureReviewSessions"),
     columns: v.array(v.any()),
-    query: v.string(),
-    notebookId: v.string(),
-    userId: v.string(),
-    extractedData: v.record(v.string(), v.record(v.string(), v.string())),
-    screenedPapers: v.array(v.any()),
   },
   handler: async (ctx, args) => {
-    const state = createState({
+    const session = await ctx.runQuery(
+      internal.studio.literature_tables.index.getSessionInternal,
+      { sessionId: args.sessionId }
+    );
+    if (!session) {
+      throw new Error(`Session ${args.sessionId} not found`);
+    }
+
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
       sessionId: args.sessionId,
+      notebookId: session.notebookId,
+      userId: session.userId,
+      query: session.query,
       confirmedColumns: args.columns,
-      query: args.query,
-      notebookId: args.notebookId,
-      userId: args.userId,
-      extractedData: args.extractedData,
-      screenedPapers: args.screenedPapers,
-    });
-    return generateTableNode(state, createDeps(ctx, args.sessionId));
+      screenedPapers: [],
+      extractedData: {},
+    };
+    const deps = buildDeps(ctx);
+    deps.sessionId = args.sessionId;
+    const result = await generateTableNode(state, deps);
+    return result;
   },
 });
 
+/**
+ * generateReport action: Generate formal academic report section-by-section.
+ */
 export const generateReport = internalAction({
   args: {
     sessionId: v.id("literatureReviewSessions"),
     tableId: v.optional(v.id("literatureTables")),
     query: v.string(),
-    extractedData: v.record(v.string(), v.record(v.string(), v.string())),
-    screenedPapers: v.array(v.any()),
   },
   handler: async (ctx, args) => {
-    const state = createState({
+    const session = await ctx.runQuery(
+      internal.studio.literature_tables.index.getSessionInternal,
+      { sessionId: args.sessionId }
+    );
+    if (!session) {
+      throw new Error(`Session ${args.sessionId} not found`);
+    }
+
+    const state: LiteratureReviewStateType = {
+      ...defaultState(),
       sessionId: args.sessionId,
-      tableId: args.tableId,
+      notebookId: session.notebookId,
+      userId: session.userId,
       query: args.query,
-      extractedData: args.extractedData,
-      screenedPapers: args.screenedPapers,
-    });
-    return generateReportNode(state, createDeps(ctx, args.sessionId));
+      tableId: args.tableId,
+      screenedPapers: [],
+      extractedData: {},
+    };
+    const deps = buildDeps(ctx);
+    deps.sessionId = args.sessionId;
+    const result = await generateReportNode(state, deps);
+    return result;
   },
 });
