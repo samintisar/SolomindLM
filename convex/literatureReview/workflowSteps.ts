@@ -12,6 +12,9 @@ import {
   PLAN_REVIEW_SYSTEM_PROMPT,
   PLAN_REVIEW_PROMPT,
   PlanReviewOutputSchema,
+  SCREEN_PAPERS_SYSTEM_PROMPT,
+  SCREEN_PAPERS_PROMPT,
+  ScreenPapersOutputSchema,
 } from "../_agents/literature_review/prompts.js";
 
 const literaturePaperFields = {
@@ -237,14 +240,105 @@ export const screenPapers = internalAction({
   },
   returns: v.object({ papers: v.array(literaturePaperValidator) }),
   handler: async (_ctx, args) => {
-    void args.query;
-    const top = args.papers.slice(0, 30);
-    const papers = top.map((p, i) => ({
-      ...p,
-      isIncluded: i < 30,
-      includeReason: i < 30 ? "Included in top 30 by relevance score." : undefined,
-    }));
-    return { papers };
+    const logger = createServiceLogger("literatureReview", "screenPapers");
+
+    if (args.papers.length === 0) {
+      return { papers: [] };
+    }
+
+    try {
+      const llm = createLLM({
+        apiKey: env.TOGETHER_AI_API_KEY,
+        mapModel: env.SMART_LLM || env.FAST_LLM,
+        temperatures: 0.3,
+        maxTokens: 2000,
+        phase: "smart",
+      });
+
+      const structuredLlm = llm.withStructuredOutput(ScreenPapersOutputSchema, {
+        name: "screen_papers",
+      });
+
+      const batchSize = 5;
+      const decisions = new Map<number, { isIncluded: boolean; reason: string }>();
+
+      for (let i = 0; i < args.papers.length; i += batchSize) {
+        const batch = args.papers.slice(i, i + batchSize);
+
+        const papersText = batch
+          .map(
+            (p, idx) =>
+              `Paper ${idx + 1}:
+Title: ${p.title}
+Abstract: ${p.abstract}
+---`
+          )
+          .join("\n");
+
+        const prompt = SCREEN_PAPERS_PROMPT.replace(/{query}/g, args.query).replace(
+          /{papers}/g,
+          papersText
+        );
+
+        try {
+          const response = await invokeWithHttpRetry(
+            () =>
+              structuredLlm.invoke([
+                new SystemMessage(SCREEN_PAPERS_SYSTEM_PROMPT),
+                new HumanMessage(prompt),
+              ]),
+            "screenPapers"
+          );
+
+          for (const decision of response.decisions) {
+            const match = decision.paperId.match(/paper_(\d+)/);
+            if (match) {
+              const batchIndex = parseInt(match[1], 10) - 1;
+              if (batchIndex >= 0 && batchIndex < batch.length) {
+                decisions.set(i + batchIndex, {
+                  isIncluded: decision.isIncluded,
+                  reason: decision.reason,
+                });
+              }
+            }
+          }
+        } catch (error) {
+          logger.error(
+            `Batch starting at index ${i} failed, including all papers conservatively`,
+            error,
+            {
+              batchStart: i,
+              batchSize: batch.length,
+            }
+          );
+          for (let j = 0; j < batch.length; j++) {
+            decisions.set(i + j, {
+              isIncluded: true,
+              reason: "Included by conservative fallback due to screening error.",
+            });
+          }
+        }
+      }
+
+      const screenedPapers = args.papers.map((p, i) => ({
+        ...p,
+        isIncluded: decisions.get(i)?.isIncluded ?? true,
+        includeReason:
+          decisions.get(i)?.reason ?? "No screening decision available.",
+      }));
+
+      return { papers: screenedPapers };
+    } catch (error) {
+      logger.error("Screening failed entirely, including all papers conservatively", error);
+
+      const fallbackPapers = args.papers.map((p) => ({
+        ...p,
+        isIncluded: true,
+        includeReason: "Included by conservative fallback due to screening error.",
+      }));
+
+      return { papers: fallbackPapers };
+    }
   },
 });
 
