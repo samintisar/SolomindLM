@@ -296,6 +296,7 @@ import type * as studio_jobMutations_quizzes from "../studio/jobMutations/quizze
 import type * as studio_jobMutations_reports from "../studio/jobMutations/reports.js";
 import type * as studio_jobMutations_spreadsheets from "../studio/jobMutations/spreadsheets.js";
 import type * as studio_jobMutations_writtenQuestions from "../studio/jobMutations/writtenQuestions.js";
+import type * as studio_literature_reports_index from "../studio/literature_reports/index.js";
 import type * as studio_literature_review_index from "../studio/literature_review/index.js";
 import type * as studio_literature_tables_index from "../studio/literature_tables/index.js";
 import type * as studio_mindmaps_index from "../studio/mindmaps/index.js";
@@ -618,6 +619,7 @@ declare const fullApi: ApiFromModules<{
   "studio/jobMutations/reports": typeof studio_jobMutations_reports;
   "studio/jobMutations/spreadsheets": typeof studio_jobMutations_spreadsheets;
   "studio/jobMutations/writtenQuestions": typeof studio_jobMutations_writtenQuestions;
+  "studio/literature_reports/index": typeof studio_literature_reports_index;
   "studio/literature_review/index": typeof studio_literature_review_index;
   "studio/literature_tables/index": typeof studio_literature_tables_index;
   "studio/mindmaps/index": typeof studio_mindmaps_index;

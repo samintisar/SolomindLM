@@ -6,6 +6,7 @@ import { buildReportSectionPrompt, ReportSectionSchema } from "../prompts";
 import { createLLM } from "../../_shared/llm_factory";
 import { trackResearchStep } from "../../research/steps";
 import { createServiceLogger } from "../../../_lib/logging/serviceLogger";
+import { internal } from "../../../_generated/api";
 
 const SECTIONS = ["abstract", "introduction", "methods", "results", "discussion", "conclusion"];
 
@@ -22,7 +23,7 @@ export async function generateReportNode(
   state: LiteratureReviewStateType,
   deps: LiteratureReviewNodeDeps
 ): Promise<Partial<LiteratureReviewStateType>> {
-  const { extractedData, screenedPapers, query } = state;
+  const { extractedData, screenedPapers, query, notebookId, userId, tableId } = state;
 
   if (deps.ctx && deps.sessionId) {
     await trackResearchStep(
@@ -116,12 +117,21 @@ export async function generateReportNode(
 
   let reportId: string | undefined;
 
-  // TODO: Create literatureReports row in database
-  // This requires studio/literature_reports module (Task 9)
-  // For now, reportId remains undefined until the module is implemented
-  if (deps.ctx) {
-    // Placeholder: will call internal.studio.literature_reports.create when available
-    reportId = undefined;
+  // Persist literature report to database
+  if (deps.ctx && notebookId && userId) {
+    reportId = await deps.ctx.runMutation(
+      internal.studio.literature_reports.index.createLiteratureReport,
+      {
+        title: query ? `Literature Review: ${query}` : "Literature Review Report",
+        notebookId: notebookId as any,
+        userId: userId as any,
+        content: fullContent,
+        citationStyle: "apa",
+        sections,
+        citationIds: [],
+        tableId: tableId as any,
+      }
+    );
   }
 
   if (deps.ctx && deps.sessionId) {

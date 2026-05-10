@@ -3,6 +3,7 @@
 import type { LiteratureReviewStateType } from "../state";
 import type { LiteratureReviewNodeDeps } from "../types";
 import { trackResearchStep } from "../../research/steps";
+import { internal } from "../../../_generated/api";
 
 /**
  * generateTable node: Create literatureTables row from extracted data.
@@ -69,6 +70,36 @@ export async function generateTableNode(
 
   // Build papers array for the table
   const includedPapers = screenedPapers.filter((p) => p.isIncluded);
+
+  // Create or get citations for each included paper
+  const citationIdMap: Record<string, string> = {};
+  if (deps.ctx) {
+    for (const paper of includedPapers) {
+      const paperId = paper.doi || paper.title;
+      const citationKey = paper.authors.length > 0
+        ? `${paper.authors[0].split(" ").pop()}${paper.year || ""}`
+        : `${paper.title.slice(0, 3)}${paper.year || ""}`;
+
+      const citationId = await deps.ctx.runMutation(
+        internal.studio.literature_tables.index.createCitation,
+        {
+          paperId,
+          title: paper.title,
+          authors: paper.authors,
+          year: paper.year,
+          doi: paper.doi,
+          url: paper.url,
+          pdfUrl: paper.pdfUrl,
+          sourceApi: paper.source,
+          citationCount: paper.citationCount,
+          abstract: paper.abstract,
+          citationKey,
+        }
+      );
+      citationIdMap[paperId] = citationId;
+    }
+  }
+
   const tablePapers = includedPapers.map((paper) => {
     const paperId = paper.doi || paper.title;
     const rowData = extractedData[paperId] || {};
@@ -79,7 +110,7 @@ export async function generateTableNode(
     rowData["year"] = paper.year?.toString() || "n.d.";
 
     return {
-      citationId: paperId, // TODO: Map to actual citations table ID
+      citationId: citationIdMap[paperId] as any,
       rowData,
       includeReason: paper.includeReason,
       isIncluded: paper.isIncluded,
@@ -88,12 +119,27 @@ export async function generateTableNode(
 
   let tableId: string | undefined;
 
-  // TODO: Create literatureTables row in database
-  // This requires studio/literature_tables module (Task 8)
-  // For now, tableId remains undefined until the module is implemented
-  if (deps.ctx) {
-    // Placeholder: will call internal.studio.literature_tables.create when available
-    tableId = undefined;
+  // Persist literature table to database
+  if (deps.ctx && notebookId && userId) {
+    tableId = await deps.ctx.runMutation(
+      internal.studio.literature_tables.index.createLiteratureTable,
+      {
+        title: query || "Literature Review Table",
+        description: `Literature comparison table for: ${query}`,
+        notebookId: notebookId as any,
+        userId: userId as any,
+        columns: tableColumns.map((col) => ({
+          id: col.id,
+          name: col.name,
+          type: col.type,
+          instructions: (col as any).instructions,
+          isVisible: col.isVisible,
+          isSystem: col.isSystem,
+          order: col.order,
+        })),
+        papers: tablePapers,
+      }
+    );
   }
 
   if (deps.ctx && deps.sessionId) {

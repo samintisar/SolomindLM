@@ -226,16 +226,31 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             )}
           </div>
 
-          {deepResearchEnabled && onToggleDeepResearch && (
-            <button
-              type="button"
-              onClick={() => onToggleDeepResearch()}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border-2 border-border bg-muted/60 px-2.5 py-1.5 text-sm font-medium text-foreground/90 hover:bg-muted/80 transition-colors"
-              title="Deep research on — click to turn off"
-            >
-              <Telescope className="w-4 h-4 shrink-0 text-muted-foreground" />
-              <span>Deep research</span>
-            </button>
+          {onToggleDeepResearch && (
+            <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => deepResearchEnabled && onToggleDeepResearch()}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  !deepResearchEnabled
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => !deepResearchEnabled && onToggleDeepResearch()}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  deepResearchEnabled
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Research
+              </button>
+            </div>
           )}
         </div>
         <div className="flex min-h-10 min-w-0 w-full items-center justify-between gap-2 @min-[400px]/chat-input:w-auto @min-[400px]/chat-input:justify-end">
