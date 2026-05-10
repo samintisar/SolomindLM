@@ -1,6 +1,53 @@
 // TypeScript type definitions for the literature review agent.
 // Pure TypeScript — no "use node" directive.
 
+import { z } from "zod";
+
+// ============================================================
+// ZOD SCHEMAS (for structured LLM output validation)
+// ============================================================
+
+/**
+ * Schema for screening decisions output.
+ */
+export const ScreenPapersOutputSchema = z.object({
+  decisions: z.array(
+    z.object({
+      paperId: z.string(),
+      isIncluded: z.boolean(),
+      reason: z.string(),
+    })
+  ),
+});
+
+export type ScreenPapersOutput = z.infer<typeof ScreenPapersOutputSchema>;
+
+/**
+ * Schema for data extraction output.
+ */
+export const ExtractDataOutputSchema = z.object({
+  extractedData: z.record(z.string(), z.string()),
+});
+
+export type ExtractDataOutput = z.infer<typeof ExtractDataOutputSchema>;
+
+/**
+ * Schema for plan review output (search queries + suggested columns).
+ */
+export const PlanReviewOutputSchema = z.object({
+  searchQueries: z.array(z.string()),
+  suggestedColumns: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      instructions: z.string().optional(),
+      isVisible: z.boolean(),
+    })
+  ),
+});
+
+export type PlanReviewOutput = z.infer<typeof PlanReviewOutputSchema>;
+
 // ============================================================
 // CORE TYPES
 // ============================================================

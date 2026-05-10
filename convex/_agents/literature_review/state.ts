@@ -8,35 +8,31 @@
  */
 
 import { Annotation } from "@langchain/langgraph";
+import { mapOutputsMergeReducer } from "../_shared/stateUpdateHelpers.js";
 import type {
   AcademicPaper,
   ScreenedPaper,
   TableColumn,
   LiteratureReviewProgress,
   LiteratureCitation,
+  ExtractedData,
 } from "./types";
 
 // ============================================================
 // REDUCER HELPERS
 // ============================================================
 
-function mergeArrayReducer<T>(x: T[], y?: T[] | null): T[] {
-  if (y === null) return [];
-  if (y === undefined) return x;
-  return x.concat(y);
-}
-
 function overwriteReducer<T>(x: T, y?: T): T {
   return y !== undefined ? y : x;
 }
 
 function mergeExtractedDataReducer(
-  x: Record<string, Record<string, string>>,
-  y?: Record<string, Record<string, string>> | null
-): Record<string, Record<string, string>> {
+  x: ExtractedData,
+  y?: ExtractedData | null
+): ExtractedData {
   if (y === null) return {};
   if (y === undefined) return x;
-  const merged: Record<string, Record<string, string>> = { ...x };
+  const merged: ExtractedData = { ...x };
   for (const [paperId, columns] of Object.entries(y)) {
     merged[paperId] = { ...merged[paperId], ...columns };
   }
@@ -54,7 +50,7 @@ export const LiteratureReviewState = Annotation.Root({
   }),
 
   suggestedColumns: Annotation<TableColumn[]>({
-    reducer: mergeArrayReducer,
+    reducer: mapOutputsMergeReducer,
     default: () => [],
   }),
 
@@ -64,7 +60,7 @@ export const LiteratureReviewState = Annotation.Root({
   }),
 
   papers: Annotation<AcademicPaper[]>({
-    reducer: mergeArrayReducer,
+    reducer: mapOutputsMergeReducer,
     default: () => [],
   }),
 
@@ -78,7 +74,7 @@ export const LiteratureReviewState = Annotation.Root({
     default: () => [],
   }),
 
-  extractedData: Annotation<Record<string, Record<string, string>>>({
+  extractedData: Annotation<ExtractedData>({
     reducer: mergeExtractedDataReducer,
     default: () => ({}),
   }),
@@ -89,7 +85,7 @@ export const LiteratureReviewState = Annotation.Root({
   }),
 
   citations: Annotation<LiteratureCitation[]>({
-    reducer: mergeArrayReducer,
+    reducer: mapOutputsMergeReducer,
     default: () => [],
   }),
 
