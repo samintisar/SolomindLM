@@ -19,7 +19,7 @@ if (test1Match) {
 }
 
 // Extract test 2 string
-const test2Match = content.match(/const bibtex = "@article\{allaccents,\\n" \+\s*"  title = \{\{([\s\S]*?)\}\},\\n" \+\s*"  year = \{2023\}\\n" \+\s*"";/);
+const test2Match = content.match(/const bibtex = "@article\{allaccents,\\n" \+\s*" {2}title = \{\{([\s\S]*?)\}\},\\n" \+\s*" {2}year = \{2023\}\\n" \+\s*"";/);
 if (test2Match) {
   const bibtex = "@article{allaccents,\n" +
     "  title = {{" + test2Match[1] + "}},\n" +

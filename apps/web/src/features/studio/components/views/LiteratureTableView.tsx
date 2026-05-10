@@ -316,6 +316,39 @@ const ColumnSidebar: React.FC<{
 
 // ── Main Component ───────────────────────────────────────────────────────
 
+function exportToCSV(table: LiteratureTable, filename: string) {
+  const visibleColumns = table.columns.filter((c) => c.isVisible).sort((a, b) => a.order - b.order);
+  const headers = ["Paper", ...visibleColumns.filter((c) => c.type !== "paper_title").map((c) => c.name)];
+
+  const rows = table.papers.map((paper) => {
+    const titleCol = table.columns.find((c) => c.type === "paper_title");
+    const title = titleCol ? paper.rowData[titleCol.id] || "Untitled Paper" : "Untitled Paper";
+    const values = visibleColumns
+      .filter((c) => c.type !== "paper_title")
+      .map((col) => paper.rowData[col.id] || "");
+    return [title, ...values];
+  });
+
+  const escapeCSV = (value: string) => {
+    if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  };
+
+  const csvContent = [headers.map(escapeCSV).join(","), ...rows.map((row) => row.map(escapeCSV).join(","))].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   table: initialTable,
   onBack,
@@ -446,7 +479,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
             <span className="hidden sm:inline">Save</span>
           </button>
           <button
-            onClick={() => onExport?.("csv")}
+            onClick={() => onExport ? onExport("csv") : exportToCSV(table, `${table.title.replace(/\s+/g, "_")}.csv`)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-md hover:bg-secondary transition-colors text-foreground"
           >
             <Download className="w-4 h-4" />

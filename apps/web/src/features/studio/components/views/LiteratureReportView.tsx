@@ -2,8 +2,7 @@ import React, { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { ArrowLeft, Download, FileText, BookOpen } from "lucide-react";
 import { CitationStylePicker, CitationStyle } from "../CitationStylePicker";
 
-// TODO: Import CitationEngine once it's fully implemented with all styles
-// import { createCitationEngine, Citation } from "@convex/_utils/CitationEngine";
+
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -28,7 +27,6 @@ export interface LiteratureReportViewProps {
   report: LiteratureReport;
   onBack?: () => void;
   onExport?: () => void;
-  // TODO: Pass actual citation data from parent
   citations?: Record<string, { title: string; authors: string[]; year?: number; url: string }>;
 }
 
@@ -158,7 +156,6 @@ interface ReferencesSectionProps {
 }
 
 const ReferencesSection: React.FC<ReferencesSectionProps> = ({ citations, style }) => {
-  // TODO: Use CitationEngine.formatReference when fully implemented
   const formatReference = useCallback(
     (citation: { title: string; authors: string[]; year?: number; url: string }): string => {
       const authors = citation.authors.join(", ");
@@ -213,6 +210,28 @@ const ReferencesSection: React.FC<ReferencesSectionProps> = ({ citations, style 
 
 // ── Main Component ───────────────────────────────────────────────────────
 
+function exportToMarkdown(report: LiteratureReport, filename: string) {
+  let content = `# ${report.title}\n\n`;
+  
+  if (report.sections.length > 0) {
+    for (const section of report.sections) {
+      content += `## ${section.heading}\n\n${section.content}\n\n`;
+    }
+  } else if (report.content) {
+    content += report.content + "\n\n";
+  }
+  
+  const blob = new Blob([content], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
   report,
   onBack,
@@ -266,7 +285,7 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
             />
           </div>
           <button
-            onClick={onExport}
+            onClick={() => onExport ? onExport() : exportToMarkdown(report, `${report.title.replace(/\s+/g, "_")}.md`)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-md hover:bg-secondary transition-colors text-foreground"
           >
             <Download className="w-4 h-4" />

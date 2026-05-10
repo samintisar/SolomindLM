@@ -65,6 +65,20 @@ export const getRunStatus = query({
   },
 });
 
+export const getResearchSteps = query({
+  args: {
+    researchId: v.string(),
+  },
+  returns: v.array(v.any()),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("researchSteps")
+      .withIndex("by_research", (q) => q.eq("researchId", args.researchId))
+      .order("asc")
+      .take(100);
+  },
+});
+
 export const getRunEvidence = query({
   args: { runId: v.id("researchRuns") },
   returns: v.array(v.any()),

@@ -32,7 +32,7 @@ import { ResearchPlanMessage } from "./ResearchPlanMessage";
 import { ResearchSteps, ResearchStep } from "./ResearchSteps";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useAuthToken } from "@convex-dev/auth/react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 
@@ -105,7 +105,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
-  const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
@@ -185,8 +185,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await approvePlanMutation({ planId: planId as any });
-      // TODO: Query for the actual run ID and use that as the research ID
-      setActiveResearchId(planId);
+      setActivePlanId(planId);
       const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
         method: "POST",
         credentials: "include",
@@ -206,7 +205,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       toastError(
         err instanceof Error ? err.message : "Failed to start research execution"
       );
-      setActiveResearchId(null);
+      setActivePlanId(null);
     }
   }, [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]);
 
@@ -514,24 +513,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const memoizedMessages = useMemo(() => messages, [messages]);
 
-  // TODO: Wire up Convex query for research steps once endpoint is available
-  // const researchStepsData = useQuery(
-  //   api.research.index.getResearchSteps,
-  //   activeResearchId ? { researchId: activeResearchId } : "skip"
-  // );
+  // Query latest run for the active plan to get the actual run ID
+  const latestRun = useQuery(
+    api.research.index.getLatestRunForPlan,
+    activePlanId ? { planId: activePlanId as Id<"researchPlans"> } : "skip"
+  );
+
+  // Use actual run ID for research steps
+  const activeResearchId = latestRun?._id ?? null;
+
+  const researchStepsData = useQuery(
+    api.research.index.getResearchSteps,
+    activeResearchId ? { researchId: activeResearchId } : "skip"
+  );
 
   const researchSteps: ResearchStep[] = useMemo(() => {
-    // TODO: Replace rawSteps with actual query results from researchStepsData
-    // const rawSteps = researchStepsData ?? [];
-    const rawSteps: Array<{ stepType: string; status: string; details?: string }> = [];
-    return rawSteps.map((step) => ({
+    const rawSteps = researchStepsData ?? [];
+    return rawSteps.map((step: { stepType: string; status: string; details?: string }) => ({
       type: step.stepType,
       status: step.status as ResearchStep["status"],
       title: stepConfig[step.stepType]?.title || step.stepType,
       description: stepConfig[step.stepType]?.description || "",
       details: step.details,
     }));
-  }, []);
+  }, [researchStepsData]);
 
   const showResearchSteps = deepResearchEnabled && activeResearchId != null;
 
