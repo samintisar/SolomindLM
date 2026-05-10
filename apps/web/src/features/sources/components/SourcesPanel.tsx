@@ -520,7 +520,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onClose={() => setIsDiscoverOpen(false)}
         onAddSource={onAddSource}
         notebookSources={sources}
-        isAtLimit={sources.length >= 100}
+        isAtLimit={sources.length >= 200}
         userId={userId}
         noteId={noteId}
         onDocumentUploaded={onDocumentUploaded}

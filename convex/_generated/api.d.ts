@@ -89,6 +89,10 @@ import type * as _agents_flashcard_routing from "../_agents/flashcard/routing.js
 import type * as _agents_flashcard_state from "../_agents/flashcard/state.js";
 import type * as _agents_flashcard_structuredLlm from "../_agents/flashcard/structuredLlm.js";
 import type * as _agents_flashcard_textCleanup from "../_agents/flashcard/textCleanup.js";
+import type * as _agents_literature_review_LiteratureReviewGraph from "../_agents/literature_review/LiteratureReviewGraph.js";
+import type * as _agents_literature_review_prompts from "../_agents/literature_review/prompts.js";
+import type * as _agents_literature_review_state from "../_agents/literature_review/state.js";
+import type * as _agents_literature_review_types from "../_agents/literature_review/types.js";
 import type * as _agents_mindmap_MindMapGraph from "../_agents/mindmap/MindMapGraph.js";
 import type * as _agents_mindmap_chunkHelpers from "../_agents/mindmap/chunkHelpers.js";
 import type * as _agents_mindmap_config from "../_agents/mindmap/config.js";
@@ -249,6 +253,8 @@ import type * as eval_studioEvalAction from "../eval/studioEvalAction.js";
 import type * as folders_index from "../folders/index.js";
 import type * as googleDrive from "../googleDrive.js";
 import type * as http from "../http.js";
+import type * as literatureReview_db from "../literatureReview/db.js";
+import type * as literatureReview_workflowSteps from "../literatureReview/workflowSteps.js";
 import type * as notebooks__forkNotebook from "../notebooks/_forkNotebook.js";
 import type * as notebooks_index from "../notebooks/index.js";
 import type * as notebooks_sharing from "../notebooks/sharing.js";
@@ -287,6 +293,7 @@ import type * as studio_jobMutations_quizzes from "../studio/jobMutations/quizze
 import type * as studio_jobMutations_reports from "../studio/jobMutations/reports.js";
 import type * as studio_jobMutations_spreadsheets from "../studio/jobMutations/spreadsheets.js";
 import type * as studio_jobMutations_writtenQuestions from "../studio/jobMutations/writtenQuestions.js";
+import type * as studio_literature_tables_index from "../studio/literature_tables/index.js";
 import type * as studio_mindmaps_index from "../studio/mindmaps/index.js";
 import type * as studio_mindmaps_job from "../studio/mindmaps/job.js";
 import type * as studio_mindmaps_mindmapJobPhases from "../studio/mindmaps/mindmapJobPhases.js";
@@ -400,6 +407,10 @@ declare const fullApi: ApiFromModules<{
   "_agents/flashcard/state": typeof _agents_flashcard_state;
   "_agents/flashcard/structuredLlm": typeof _agents_flashcard_structuredLlm;
   "_agents/flashcard/textCleanup": typeof _agents_flashcard_textCleanup;
+  "_agents/literature_review/LiteratureReviewGraph": typeof _agents_literature_review_LiteratureReviewGraph;
+  "_agents/literature_review/prompts": typeof _agents_literature_review_prompts;
+  "_agents/literature_review/state": typeof _agents_literature_review_state;
+  "_agents/literature_review/types": typeof _agents_literature_review_types;
   "_agents/mindmap/MindMapGraph": typeof _agents_mindmap_MindMapGraph;
   "_agents/mindmap/chunkHelpers": typeof _agents_mindmap_chunkHelpers;
   "_agents/mindmap/config": typeof _agents_mindmap_config;
@@ -560,6 +571,8 @@ declare const fullApi: ApiFromModules<{
   "folders/index": typeof folders_index;
   googleDrive: typeof googleDrive;
   http: typeof http;
+  "literatureReview/db": typeof literatureReview_db;
+  "literatureReview/workflowSteps": typeof literatureReview_workflowSteps;
   "notebooks/_forkNotebook": typeof notebooks__forkNotebook;
   "notebooks/index": typeof notebooks_index;
   "notebooks/sharing": typeof notebooks_sharing;
@@ -598,6 +611,7 @@ declare const fullApi: ApiFromModules<{
   "studio/jobMutations/reports": typeof studio_jobMutations_reports;
   "studio/jobMutations/spreadsheets": typeof studio_jobMutations_spreadsheets;
   "studio/jobMutations/writtenQuestions": typeof studio_jobMutations_writtenQuestions;
+  "studio/literature_tables/index": typeof studio_literature_tables_index;
   "studio/mindmaps/index": typeof studio_mindmaps_index;
   "studio/mindmaps/job": typeof studio_mindmaps_job;
   "studio/mindmaps/mindmapJobPhases": typeof studio_mindmaps_mindmapJobPhases;
@@ -655,4 +669,5 @@ export declare const components: {
   persistentTextStreaming: import("@convex-dev/persistent-text-streaming/_generated/component.js").ComponentApi<"persistentTextStreaming">;
   actionCache: import("@convex-dev/action-cache/_generated/component.js").ComponentApi<"actionCache">;
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
 };

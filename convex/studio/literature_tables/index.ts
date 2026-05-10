@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
 import { sendEvent, type WorkflowId } from "@convex-dev/workflow";
 import { components } from "../../_generated/api";
+import { getAuthUserId } from "../../auth";
+import { assertCanEditNotebook } from "../../_lib/notebookAccess";
 
 /**
  * Confirm literature review columns and resume the workflow.
@@ -21,12 +23,21 @@ export const confirmLiteratureReviewColumns = mutation({
       })
     ),
   },
+  returns: v.null(),
   handler: async (ctx, args) => {
-    // Fetch the session to get the workflowId
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
     const session = await ctx.db.get(args.sessionId);
     if (!session) {
       throw new Error(`Literature review session not found: ${args.sessionId}`);
     }
+
+    if (session.userId !== userId) {
+      throw new Error("Not authorized to update this literature review session");
+    }
+
+    await assertCanEditNotebook(ctx, session.notebookId, userId);
 
     if (!session.workflowId) {
       throw new Error(
@@ -34,18 +45,19 @@ export const confirmLiteratureReviewColumns = mutation({
       );
     }
 
-    // Update session with confirmed columns and new status
     await ctx.db.patch(args.sessionId, {
       confirmedColumns: args.confirmedColumns,
       status: "searching",
+      updatedAt: Date.now(),
     });
 
-    // Send event to resume the workflow
-    await sendEvent(ctx, (components as any).workflow, {
+    await sendEvent(ctx, components.workflow, {
       name: "columnsConfirmed",
-      workflowId: session.workflowId as unknown as WorkflowId,
+      workflowId: session.workflowId as WorkflowId,
       value: { confirmedColumns: args.confirmedColumns },
     });
+
+    return null;
   },
 });
 

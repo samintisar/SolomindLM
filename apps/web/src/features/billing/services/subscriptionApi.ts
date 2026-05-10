@@ -17,7 +17,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
       hasSubscription: false,
       plan: "free",
       notebookLimit: 5,
-      sourceLimit: 20,
+      sourceLimit: 200,
       currentPeriodEnd: undefined,
       cancelAtPeriodEnd: false,
     };
@@ -63,7 +63,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
     status: subscription.status as any,
     plan: subscription.status === "active" ? "premium" : "free",
     notebookLimit: subscription.status === "active" ? 100 : 5,
-    sourceLimit: subscription.status === "active" ? 500 : 20,
+    sourceLimit: 200,
     currentPeriodEnd: currentPeriodEndIso ?? undefined,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     interval: subscription.interval as SubscriptionInterval,
@@ -146,14 +146,14 @@ export function useUserLimits() {
   if (subscription?.status === "active") {
     return {
       notebookLimit: 100,
-      sourceLimit: 500,
+      sourceLimit: 200,
       isPremium: true,
     };
   }
 
   return {
     notebookLimit: 5,
-    sourceLimit: 20,
+    sourceLimit: 200,
     isPremium: false,
   };
 }

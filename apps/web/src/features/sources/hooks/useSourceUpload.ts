@@ -106,11 +106,11 @@ export function useSourceUpload({
     if (sourcesCount >= maxSources) {
       await handleLimitError(
         new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
         ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
+          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
         }
       );
       return;
@@ -152,11 +152,11 @@ export function useSourceUpload({
     if (sourcesCount >= maxSources) {
       await handleLimitError(
         new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
         ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
+          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
         }
       );
       return;
@@ -214,11 +214,11 @@ export function useSourceUpload({
     if (sourcesCount >= maxSources) {
       await handleLimitError(
         new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
         ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
+          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
         }
       );
       return;
@@ -276,11 +276,11 @@ export function useSourceUpload({
     if (sourcesCount >= maxSources) {
       await handleLimitError(
         new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Please upgrade to add more sources.`
+          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
         ),
         {
           errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: "Upgrade for up to 500 sources per notebook.",
+          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
         }
       );
       return;

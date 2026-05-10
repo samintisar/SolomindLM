@@ -52,8 +52,9 @@ export const bulkUpload = mutation({
     // Get existing papers for deduplication
     const existingDocs = await ctx.db
       .query("documents")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .filter((q) => q.neq(q.field("paperRecord"), null))
+      .withIndex("by_notebook_and_fileType", (q) =>
+        q.eq("notebookId", args.notebookId).eq("fileType", "paper_record")
+      )
       .collect();
 
     const existingDois = new Set<string>();

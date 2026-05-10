@@ -145,10 +145,19 @@ export default defineSchema({
     fulltextStatus: v.optional(fulltextStatusValidator),
     /** Ingest pipeline outcome for paper_record (orthogonal to `status` processing flag) */
     ingestionStatus: v.optional(ingestionStatusValidator),
+    /** Ingestion-time source digest for chat/RAG (structured). */
+    sourceGuide: v.optional(
+      v.object({
+        summary: v.string(),
+        topics: v.array(v.string()),
+        generatedAt: v.number(),
+      })
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_fileType", ["notebookId", "fileType"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
     .index("by_notebook_and_status", ["notebookId", "status"])
@@ -719,6 +728,7 @@ export default defineSchema({
     notebookId: v.id("notebooks"),
     userId: v.id("users"),
     status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+    /** Column definitions; `papers` can grow large — prefer `literatureTableDrafts` for very wide tables in future. */
     columns: v.array(v.object({
       id: v.string(),
       name: v.string(),
@@ -761,6 +771,8 @@ export default defineSchema({
 
   researchSteps: defineTable({
     researchId: v.string(),
+    /** Optional owner for ACL when exposing steps publicly (backfill as needed). */
+    userId: v.optional(v.id("users")),
     agentType: v.union(v.literal("research"), v.literal("literature_review")),
     stepType: v.union(
       v.literal("planning"),
@@ -776,7 +788,8 @@ export default defineSchema({
     order: v.number(),
   })
     .index("by_research", ["researchId"])
-    .index("by_research_step", ["researchId", "stepType"]),
+    .index("by_research_step", ["researchId", "stepType"])
+    .index("by_research_and_user", ["researchId", "userId"]),
 
   literatureReviewSessions: defineTable({
     query: v.string(),

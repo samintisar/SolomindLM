@@ -23,7 +23,7 @@ const pricingPlans: PricingPlan[] = [
     price: "$0",
     description: "Get started with core tools",
     features: [
-      "20 notebooks · 20 sources each",
+      "20 notebooks · 200 sources each",
       "50 chat messages / day",
       "5 flashcards, quizzes, reports / day",
       "5 audio overviews / day",
@@ -40,7 +40,7 @@ const pricingPlans: PricingPlan[] = [
     period: "/mo, billed yearly",
     description: "For serious learners",
     features: [
-      "200 notebooks · 100 sources each",
+      "200 notebooks · 200 sources each",
       "500 chat messages / day",
       "100 flashcards, quizzes, reports / day",
       "100 audio overviews / day",
@@ -57,7 +57,7 @@ const pricingPlans: PricingPlan[] = [
     period: "/mo",
     description: "Same as yearly, billed monthly",
     features: [
-      "200 notebooks · 100 sources each",
+      "200 notebooks · 200 sources each",
       "500 chat messages / day",
       "100 flashcards, quizzes, reports / day",
       "100 audio overviews / day",

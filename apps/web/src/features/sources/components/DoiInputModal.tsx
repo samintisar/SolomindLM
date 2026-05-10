@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { X, Search, BookOpen, Loader2, AlertCircle } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 
@@ -36,8 +36,8 @@ export const DoiInputModal: React.FC<DoiInputModalProps> = ({
   const [preview, setPreview] = useState<ResolvedPaper | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const resolveDoi = useMutation(api.documents.resolveDoi);
-  const upload = useMutation(api.documents.upload);
+  const resolveDoi = useAction(api.documents.index.resolveDoi);
+  const upload = useMutation(api.documents.index.upload);
 
   const handleResolve = useCallback(async () => {
     if (!doi.trim()) return;

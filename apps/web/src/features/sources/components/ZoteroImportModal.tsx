@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo } from "react";
 import { X, Upload, Loader2, AlertCircle, BookOpen } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 
@@ -35,9 +35,11 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseBibliography = useMutation(api.documents.parseBibliography);
-  const bulkUpload = useMutation(api.documents.bulkUpload);
-  const existingPapers = useQuery(api.documents.getExistingPapers, { notebookId });
+  const parseBibliography = useAction(api.documents.index.parseBibliography);
+  const bulkUpload = useMutation(api.documents.index.bulkUpload);
+  const existingPapers = useQuery(api.documents.index.getExistingPapers, {
+    notebookId,
+  });
 
   const newPapers = useMemo(() => {
     if (!existingPapers) return papers;

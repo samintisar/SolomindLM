@@ -46,8 +46,8 @@ export async function checkNotebookLimit(ctx: MutationCtx): Promise<void> {
 }
 
 /**
- * Check if user has reached their source (document) limit
- * @throws LimitError if limit is reached
+ * Check if user has reached their source (document) limit.
+ * Per-notebook cap is currently the same for free and Pro (see `limit` below); `isPro` only affects error copy.
  */
 export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Promise<void> {
   const userId = await getAuthUserId(ctx);
@@ -60,7 +60,7 @@ export async function checkSourceLimit(ctx: MutationCtx, notebookId: string): Pr
     .first();
 
   const isPro = !!subscription;
-  const limit = isPro ? 500 : 20;
+  const limit = 200;
 
   const cap = limit + 1;
   const documents = await ctx.db

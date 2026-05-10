@@ -298,7 +298,7 @@ ER  -`;
     it("converts basic LaTeX accents", () => {
       const bibtex = `@article{accents,
         title = {The {\\"u}mlaut Paper},
-        author = {M{\\"u}ller, Hans and Jos{\\'e} Garc{'{i}}a},
+        author = {M{\\"u}ller, Hans and Jos{\\'e} Garc{\\'{i}}a},
         year = {2023}
       }`;
 
@@ -311,7 +311,7 @@ ER  -`;
 
     it("converts various accent types", () => {
       const bibtex = "@article{allaccents,\n" +
-        "  title = {{\\\\`a}{\\\\^e}{\\\\~n}{\\\\c{c}}},\n" +
+        "  title = {{\\`a}{\\^e}{\\~n}{\\c{c}}},\n" +
         "  year = {2023}\n" +
         "}";
 

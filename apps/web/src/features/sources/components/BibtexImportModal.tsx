@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from "react";
 import { X, FileText, Upload, Loader2, AlertCircle, CheckSquare, Square } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 
@@ -42,8 +42,8 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseBibliography = useMutation(api.documents.parseBibliography);
-  const bulkUpload = useMutation(api.documents.bulkUpload);
+  const parseBibliography = useAction(api.documents.index.parseBibliography);
+  const bulkUpload = useMutation(api.documents.index.bulkUpload);
 
   const handleParse = useCallback(async (content: string) => {
     if (!content.trim()) return;

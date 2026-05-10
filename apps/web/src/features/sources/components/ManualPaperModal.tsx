@@ -27,7 +27,7 @@ export const ManualPaperModal: React.FC<ManualPaperModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const upload = useMutation(api.documents.upload);
+  const upload = useMutation(api.documents.index.upload);
 
   const isValid = title.trim() && authors.trim();
 

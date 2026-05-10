@@ -15,7 +15,10 @@ import {
   SCREEN_PAPERS_SYSTEM_PROMPT,
   SCREEN_PAPERS_PROMPT,
   ScreenPapersOutputSchema,
+  GENERATE_REPORT_SECTION_SYSTEM_PROMPT,
+  GENERATE_REPORT_SECTION_PROMPT,
 } from "../_agents/literature_review/prompts.js";
+import { generateCitationKey } from "../_utils/CitationEngine.js";
 
 const literaturePaperFields = {
   title: v.string(),
@@ -387,10 +390,167 @@ export const generateReport = internalAction({
   },
   returns: v.object({ reportId: v.id("literatureReports") }),
   handler: async (ctx, args): Promise<{ reportId: Id<"literatureReports"> }> => {
-    return await ctx.runMutation(internal.literatureReview.db.persistReport, {
-      sessionId: args.sessionId,
-      tableId: args.tableId,
-      query: args.query,
-    });
+    const logger = createServiceLogger("literatureReview", "generateReport");
+
+    try {
+      // Step 1: Read table data and drafts
+      const table = await ctx.runQuery(internal.literatureReview.db.getTableById, {
+        tableId: args.tableId,
+      });
+
+      if (!table) {
+        throw new Error(`Literature table not found: ${args.tableId}`);
+      }
+
+      const drafts = await ctx.runQuery(internal.literatureReview.db.getDraftsBySession, {
+        sessionId: args.sessionId,
+      });
+
+      // Step 2: Get citation info for all papers
+      const citationIds = [...new Set(drafts.map((d) => d.citationId))];
+      const citations = await ctx.runQuery(internal.literatureReview.db.getCitationsByIds, {
+        citationIds,
+      });
+
+      const citationMap = new Map(citations.map((c) => [c._id, c]));
+
+      // Generate citation keys
+      const existingKeys = new Set<string>();
+      const citationKeyMap = new Map<Id<"citations">, string>();
+
+      for (const citation of citations) {
+        const key = generateCitationKey(
+          {
+            paperId: citation.doi ?? citation.url,
+            title: citation.title,
+            authors: citation.authors,
+            year: citation.year,
+            doi: citation.doi,
+            url: citation.url,
+            sourceApi: "semantic_scholar", // Default since we don't have it stored
+          },
+          existingKeys
+        );
+        existingKeys.add(key);
+        citationKeyMap.set(citation._id, key);
+      }
+
+      // Step 3: Build context string
+      const contextParts: string[] = [];
+      for (let i = 0; i < drafts.length; i++) {
+        const draft = drafts[i];
+        const citation = citationMap.get(draft.citationId);
+        if (!citation) continue;
+
+        const citationKey = citationKeyMap.get(draft.citationId) ?? `Paper${i + 1}`;
+        const lines = [
+          `Paper ${i + 1}: [${citationKey}]`,
+          `- Title: ${citation.title}`,
+          `- Authors: ${citation.authors.join(", ")}`,
+          `- Year: ${citation.year ?? "N/A"}`,
+          `- Extracted Data:`,
+        ];
+
+        for (const [colId, value] of Object.entries(draft.rowData)) {
+          const column = table.columns.find((c) => c.id === colId);
+          const colName = column?.name ?? colId;
+          lines.push(`  - ${colName}: ${value}`);
+        }
+
+        contextParts.push(lines.join("\n"));
+      }
+
+      const context = contextParts.join("\n\n");
+
+      logger.info("Starting report generation", {
+        paperCount: drafts.length,
+        sectionCount: 6,
+      });
+
+      // Step 4: Generate each section
+      const sections = ["Abstract", "Introduction", "Methods", "Results", "Discussion", "Conclusion"];
+      const generatedSections: Array<{ heading: string; content: string }> = [];
+
+      const llm = createLLM({
+        apiKey: env.TOGETHER_AI_API_KEY,
+        mapModel: env.SMART_LLM || env.FAST_LLM,
+        temperatures: 0.3,
+        maxTokens: 2000,
+        phase: "smart",
+      });
+
+      for (const sectionName of sections) {
+        try {
+          const prompt = GENERATE_REPORT_SECTION_PROMPT
+            .replace(/{section}/g, sectionName)
+            .replace(/{query}/g, args.query)
+            .replace(/{extractedData}/g, context)
+            .replace(/{citations}/g, Array.from(citationKeyMap.entries())
+              .map(([id, key]) => {
+                const c = citationMap.get(id);
+                return c ? `[${key}] ${c.title} (${c.year ?? "N/A"})` : "";
+              })
+              .filter(Boolean)
+              .join("\n"));
+
+          const response = await invokeWithHttpRetry(
+            () =>
+              llm.invoke([
+                new SystemMessage(GENERATE_REPORT_SECTION_SYSTEM_PROMPT),
+                new HumanMessage(prompt),
+              ]),
+            `generateReport_${sectionName}`
+          );
+
+          const content = typeof response.content === "string"
+            ? response.content
+            : JSON.stringify(response.content);
+
+          generatedSections.push({
+            heading: sectionName,
+            content,
+          });
+
+          logger.info(`Generated section: ${sectionName}`, {
+            sectionName,
+            contentLength: content.length,
+          });
+        } catch (error) {
+          logger.error(`Failed to generate section: ${sectionName}`, error);
+          generatedSections.push({
+            heading: sectionName,
+            content: "[Section generation failed]",
+          });
+        }
+      }
+
+      // Step 5: Combine sections into full markdown report
+      const fullContent = generatedSections
+        .map((s) => `## ${s.heading}\n\n${s.content}`)
+        .join("\n\n");
+
+      logger.info("Report generation complete", {
+        sectionCount: generatedSections.length,
+        totalLength: fullContent.length,
+      });
+
+      // Step 6: Persist report
+      return await ctx.runMutation(internal.literatureReview.db.persistReport, {
+        sessionId: args.sessionId,
+        tableId: args.tableId,
+        query: args.query,
+        content: fullContent,
+        sections: generatedSections,
+        citationIds: Array.from(citationKeyMap.keys()),
+      });
+    } catch (error) {
+      logger.error("Report generation failed", error);
+      // Fallback to placeholder report
+      return await ctx.runMutation(internal.literatureReview.db.persistReport, {
+        sessionId: args.sessionId,
+        tableId: args.tableId,
+        query: args.query,
+      });
+    }
   },
 });

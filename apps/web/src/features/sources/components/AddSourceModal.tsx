@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Id } from "../../../../convex/_generated/dataModel";
+import { Id } from "@convex/_generated/dataModel";
 import {
   X,
   FileStack,
@@ -22,7 +22,7 @@ import { ZoteroImportModal } from "./ZoteroImportModal";
 import { MendeleyImportModal } from "./MendeleyImportModal";
 import { ManualPaperModal } from "./ManualPaperModal";
 
-const MAX_SOURCES = 100;
+const MAX_SOURCES = 200;
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -245,51 +245,69 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               </div>
             </div>
 
-            <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow md:col-span-2 xl:col-span-1">
+            <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow md:col-span-2 xl:col-span-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                 <BookOpen className="w-4 h-4" />
                 Research Papers
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
                 <button
                   onClick={() => setActiveModal("doi")}
                   disabled={!canUpload}
-                  className="h-11 flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Globe className="w-4 h-4 text-chart-3 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="text-sm font-medium">Upload URL or DOI</span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <Globe className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">
+                    Import from DOI
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveModal("bibtex")}
                   disabled={!canUpload}
-                  className="h-11 flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <FileText className="w-4 h-4 text-chart-4 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="text-sm font-medium">Import BibTeX or RIS</span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <FileText className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">
+                    Import BibTeX or RIS
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveModal("zotero")}
                   disabled={!canUpload}
-                  className="h-11 flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Library className="w-4 h-4 text-chart-2 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="text-sm font-medium">Import from Zotero</span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <Library className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">
+                    Import from Zotero
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveModal("mendeley")}
                   disabled={!canUpload}
-                  className="h-11 flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <BookMarked className="w-4 h-4 text-chart-1 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="text-sm font-medium">Import from Mendeley</span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <BookMarked className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">
+                    Import from Mendeley
+                  </span>
                 </button>
                 <button
                   onClick={() => setActiveModal("manual")}
                   disabled={!canUpload}
-                  className="h-11 col-span-2 flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
                 >
-                  <PenLine className="w-4 h-4 text-chart-5 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="text-sm font-medium">Add Manually</span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <PenLine className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">Add manually</span>
                 </button>
               </div>
             </div>
