@@ -1,9 +1,10 @@
 import { v } from "convex/values";
 import { mutation } from "../../_generated/server";
 import { sendEvent, type WorkflowId } from "@convex-dev/workflow";
-import { components } from "../../_generated/api";
+import { components, internal } from "../../_generated/api";
 import { getAuthUserId } from "../../auth";
 import { assertCanEditNotebook } from "../../_lib/notebookAccess";
+import { workflow } from "../../_agents/literature_review/LiteratureReviewGraph.js";
 
 /**
  * Confirm literature review columns and resume the workflow.
@@ -72,28 +73,44 @@ export const startLiteratureReview = mutation({
     query: v.string(),
     notebookId: v.id("notebooks"),
   },
-  handler: async (_ctx, _args) => {
-    // TODO: Implement session creation and workflow.start()
-    // Example:
-    // const sessionId = await ctx.db.insert("literatureReviewSessions", {
-    //   query: args.query,
-    //   notebookId: args.notebookId,
-    //   userId: ctx.userId, // or from auth
-    //   workflowId: "", // populated after workflow.start()
-    //   status: "planning",
-    //   createdAt: Date.now(),
-    //   updatedAt: Date.now(),
-    // });
-    //
-    // const workflowId = await workflow.start(ctx, internal._agents.literature_review.LiteratureReviewGraph.literatureReviewWorkflow, {
-    //   query: args.query,
-    //   notebookId: args.notebookId,
-    //   userId: ctx.userId,
-    //   sessionId,
-    // });
-    //
-    // await ctx.db.patch(sessionId, { workflowId });
-    // return { sessionId, workflowId };
-    throw new Error("Not yet implemented");
+  returns: v.object({
+    sessionId: v.id("literatureReviewSessions"),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    await assertCanEditNotebook(ctx, args.notebookId, userId);
+
+    // Create session record
+    const sessionId = await ctx.db.insert("literatureReviewSessions", {
+      query: args.query,
+      notebookId: args.notebookId,
+      userId,
+      workflowId: "", // Will be updated after workflow starts
+      status: "planning",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Start workflow
+    const workflowId = await workflow.start(
+      ctx,
+      internal._agents.literature_review.LiteratureReviewGraph.literatureReviewWorkflow,
+      {
+        query: args.query,
+        notebookId: args.notebookId,
+        userId,
+        sessionId,
+      }
+    );
+
+    // Update session with workflowId
+    await ctx.db.patch(sessionId, {
+      workflowId,
+      updatedAt: Date.now(),
+    });
+
+    return { sessionId };
   },
 });
