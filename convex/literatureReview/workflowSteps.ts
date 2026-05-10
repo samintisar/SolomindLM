@@ -4,6 +4,8 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createLLM } from "../_agents/_shared/llm_factory.js";
+import { invokeWithHttpRetry } from "../_agents/_shared/retry.js";
+import { createServiceLogger } from "../_lib/logging/serviceLogger.js";
 import { env } from "../_lib/env.js";
 import {
   PLAN_REVIEW_SYSTEM_PROMPT,
@@ -69,6 +71,7 @@ export const planReview = internalAction({
         id: v.string(),
         name: v.string(),
         instructions: v.optional(v.string()),
+        isVisible: v.boolean(),
       })
     ),
   }),
@@ -78,12 +81,15 @@ export const planReview = internalAction({
       return { searchQueries: [], suggestedColumns: [] };
     }
 
+    const logger = createServiceLogger("literatureReview", "planReview");
+
     try {
       const llm = createLLM({
         apiKey: env.TOGETHER_AI_API_KEY,
         mapModel: env.SMART_LLM || env.FAST_LLM,
         temperatures: 0.3,
         maxTokens: 2000,
+        phase: "smart",
       });
 
       const structuredLlm = llm.withStructuredOutput(PlanReviewOutputSchema, {
@@ -92,21 +98,21 @@ export const planReview = internalAction({
 
       const prompt = PLAN_REVIEW_PROMPT.replace(/{query}/g, args.query);
 
-      const response = await structuredLlm.invoke([
-        new SystemMessage(PLAN_REVIEW_SYSTEM_PROMPT),
-        new HumanMessage(prompt),
-      ]);
+      const response = await invokeWithHttpRetry(
+        () =>
+          structuredLlm.invoke([
+            new SystemMessage(PLAN_REVIEW_SYSTEM_PROMPT),
+            new HumanMessage(prompt),
+          ]),
+        "planReview"
+      );
 
       return {
         searchQueries: response.searchQueries,
-        suggestedColumns: response.suggestedColumns.map((col) => ({
-          id: col.id,
-          name: col.name,
-          instructions: col.instructions,
-        })),
+        suggestedColumns: response.suggestedColumns,
       };
     } catch (error) {
-      console.error("[planReview] LLM call failed:", error);
+      logger.error("LLM call failed", error);
       return {
         searchQueries: [q],
         suggestedColumns: [],
