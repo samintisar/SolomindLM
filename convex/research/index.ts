@@ -48,6 +48,21 @@ export const getLatestRunForPlan = query({
   },
 });
 
+/** Get research steps for a research ID (plan ID or run ID). */
+export const getResearchSteps = query({
+  args: { researchId: v.string() },
+  returns: v.array(v.any()),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return await ctx.db
+      .query("researchSteps")
+      .withIndex("by_research", (q) => q.eq("researchId", args.researchId))
+      .order("asc")
+      .take(100);
+  },
+});
+
 export const getRunStatus = query({
   args: { runId: v.id("researchRuns") },
   returns: v.union(v.null(), v.any()),

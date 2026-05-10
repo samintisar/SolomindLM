@@ -2,9 +2,6 @@ import React, { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { ArrowLeft, Download, FileText, BookOpen } from "lucide-react";
 import { CitationStylePicker, CitationStyle } from "../CitationStylePicker";
 
-// TODO: Import CitationEngine once it's fully implemented with all styles
-// import { createCitationEngine, Citation } from "@convex/_utils/CitationEngine";
-
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
@@ -28,7 +25,7 @@ export interface LiteratureReportViewProps {
   report: LiteratureReport;
   onBack?: () => void;
   onExport?: () => void;
-  // TODO: Pass actual citation data from parent
+  // Citation data from parent (optional)
   citations?: Record<string, { title: string; authors: string[]; year?: number; url: string }>;
 }
 
@@ -158,7 +155,6 @@ interface ReferencesSectionProps {
 }
 
 const ReferencesSection: React.FC<ReferencesSectionProps> = ({ citations, style }) => {
-  // TODO: Use CitationEngine.formatReference when fully implemented
   const formatReference = useCallback(
     (citation: { title: string; authors: string[]; year?: number; url: string }): string => {
       const authors = citation.authors.join(", ");
