@@ -1040,3 +1040,8 @@ export const addExternalSources = mutation({
     return createdIds;
   },
 });
+
+export { resolveDoi } from "./resolveDoi";
+export { parseBibliography } from "./parseBibliography";
+export { getExistingPapers } from "./getExistingPapers";
+export { bulkUpload } from "./bulkUpload";

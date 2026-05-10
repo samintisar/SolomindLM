@@ -6,6 +6,7 @@ import { buildPlanPrompt, buildWriterPrompt, PlannerOutputSchema } from "./promp
 import { createLLM } from "../_shared/llm_factory";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { trackResearchStep } from "./steps";
+import type { ActionCtx } from "../../_generated/server";
 
 const retrieverLog = createServiceLogger("research", "retrieverNode");
 
@@ -46,7 +47,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 // Dependencies injected from the Convex action that runs the agent.
 export interface ResearchNodeDeps {
-  ctx?: any;
+  ctx?: ActionCtx;
   researchId?: string;
   apiKey: string;
   smartModel: string;

@@ -276,6 +276,7 @@ export const upsertResearchStep = internalMutation({
     researchId: v.string(),
     agentType: v.union(v.literal("research"), v.literal("literature_review")),
     stepType: v.union(
+      v.literal("planning"),
       v.literal("searching"),
       v.literal("deduplicating"),
       v.literal("ranking"),
@@ -287,14 +288,7 @@ export const upsertResearchStep = internalMutation({
     ),
     status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed")),
     details: v.optional(v.string()),
-    metadata: v.optional(
-      v.object({
-        queryCount: v.optional(v.number()),
-        paperCount: v.optional(v.number()),
-        includedCount: v.optional(v.number()),
-        excludedCount: v.optional(v.number()),
-      })
-    ),
+    metadata: v.optional(v.any()),
     order: v.number(),
   },
   handler: async (ctx, args) => {
@@ -311,7 +305,6 @@ export const upsertResearchStep = internalMutation({
         status: args.status,
         details: args.details,
         metadata: args.metadata,
-        order: args.order,
         ...(args.status === "in_progress" && !existing.startedAt ? { startedAt: now } : {}),
         ...(args.status === "completed" || args.status === "failed" ? { completedAt: now } : {}),
       });
