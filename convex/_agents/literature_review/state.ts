@@ -1,6 +1,8 @@
 "use node";
 
 import { Annotation } from "@langchain/langgraph";
+import type { SuggestedColumn, ConfirmedColumn, ScreenedPaper, RankedPaper, TableColumn } from "./types";
+import type { AcademicPaper } from "../../_services/search/AcademicSearchService";
 
 /**
  * LangGraph Annotation state for the literature review agent.
@@ -21,26 +23,26 @@ export const LiteratureReviewState = Annotation.Root({
   }),
 
   // Column configuration (from planReview → user confirmation)
-  suggestedColumns: Annotation<any[]>({
-    reducer: (_x: any[], y?: any[]) => y ?? _x,
+  suggestedColumns: Annotation<SuggestedColumn[]>({
+    reducer: (_x: SuggestedColumn[], y?: SuggestedColumn[]) => y ?? _x,
     default: () => [],
   }),
-  confirmedColumns: Annotation<any[]>({
-    reducer: (_x: any[], y?: any[]) => y ?? _x,
+  confirmedColumns: Annotation<ConfirmedColumn[]>({
+    reducer: (_x: ConfirmedColumn[], y?: ConfirmedColumn[]) => y ?? _x,
     default: () => [],
   }),
 
   // Paper pipeline
-  papers: Annotation<any[]>({
-    reducer: (_x: any[], y?: any[]) => y ?? _x,
+  papers: Annotation<AcademicPaper[]>({
+    reducer: (_x: AcademicPaper[], y?: AcademicPaper[]) => y ?? _x,
     default: () => [],
   }),
-  rankedPapers: Annotation<any[]>({
-    reducer: (_x: any[], y?: any[]) => y ?? _x,
+  rankedPapers: Annotation<RankedPaper[]>({
+    reducer: (_x: RankedPaper[], y?: RankedPaper[]) => y ?? _x,
     default: () => [],
   }),
-  screenedPapers: Annotation<any[]>({
-    reducer: (_x: any[], y?: any[]) => y ?? _x,
+  screenedPapers: Annotation<ScreenedPaper[]>({
+    reducer: (_x: ScreenedPaper[], y?: ScreenedPaper[]) => y ?? _x,
     default: () => [],
   }),
 
@@ -51,8 +53,8 @@ export const LiteratureReviewState = Annotation.Root({
   }),
 
   // Output
-  tableColumns: Annotation<any[]>({
-    reducer: (_x: any[], y?: any[]) => y ?? _x,
+  tableColumns: Annotation<TableColumn[]>({
+    reducer: (_x: TableColumn[], y?: TableColumn[]) => y ?? _x,
     default: () => [],
   }),
   citations: Annotation<any[]>({

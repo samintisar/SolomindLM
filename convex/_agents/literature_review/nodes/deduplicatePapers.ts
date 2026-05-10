@@ -4,7 +4,6 @@ import type { LiteratureReviewStateType } from "../state";
 import type { LiteratureReviewNodeDeps } from "../types";
 import { trackResearchStep } from "../../research/steps";
 import { deduplicatePapers as deduplicatePapersService, normalizeTitle } from "../../../_services/search/AcademicSearchService";
-import type { AcademicPaper } from "../../../_services/search/AcademicSearchService";
 
 /**
  * deduplicatePapers node: Remove duplicate papers from multiple sources.
@@ -36,7 +35,7 @@ export async function deduplicatePapersNode(
   }
 
   // Step 1: Exact DOI deduplication (using existing service function)
-  let deduped = deduplicatePapersService(papers as AcademicPaper[]);
+  let deduped = deduplicatePapersService(papers);
 
   // Step 2: Fuzzy title matching for remaining duplicates
   // Track seen papers by normalized title to enable score-based deduplication
@@ -66,8 +65,8 @@ export async function deduplicatePapersNode(
     } else {
       // Duplicate found — keep the higher-scoring paper
       const existing = seenPapers[duplicateIndex].paper;
-      const currentScore = (paper as AcademicPaper).score ?? 0;
-      const existingScore = (existing as AcademicPaper).score ?? 0;
+      const currentScore = paper.score ?? 0;
+      const existingScore = existing.score ?? 0;
 
       if (currentScore > existingScore) {
         // Replace with higher-scoring duplicate

@@ -4,7 +4,7 @@ import type { LiteratureReviewStateType } from "../state";
 import type { LiteratureReviewNodeDeps, RankedPaper } from "../types";
 import { trackResearchStep } from "../../research/steps";
 import { cachedRerank } from "../../chat/rerankCache";
-import type { AcademicPaper } from "../../../_services/search/AcademicSearchService";
+
 
 /**
  * rankPapers node: Rank papers by relevance to the research question using ZeroEntropy reranking.
@@ -33,7 +33,7 @@ export async function rankPapersNode(
 
   if (deps.rerankPapers) {
     // Use injected rerank function (e.g., from workflow or test)
-    rankedPapers = await deps.rerankPapers(query, papers as AcademicPaper[]);
+    rankedPapers = await deps.rerankPapers(query, papers);
   } else if (deps.ctx) {
     // Use ZeroEntropy reranking via cachedRerank
     const documents = papers.map((paper) => ({
@@ -52,7 +52,7 @@ export async function rankPapersNode(
     // Map reranked results back to papers
     const paperMap = new Map(papers.map((p) => [p.doi || p.title, p]));
     rankedPapers = reranked
-      .map((r, index) => {
+      .map((r, index): RankedPaper | null => {
         const paper = paperMap.get(r.id);
         if (!paper) return null;
         return {
