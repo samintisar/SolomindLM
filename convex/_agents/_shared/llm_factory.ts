@@ -159,8 +159,7 @@ export function createLLMs(config: LLMConfig): LLMInstances {
  * ```
  */
 export function createLLM(
-  config: Omit<LLMConfig, "reduceModel" | "temperatures" | "maxTokens"> & {
-    temperatures?: number;
+  config: Omit<LLMConfig, "reduceModel" | "maxTokens"> & {
     maxTokens?: number;
     /** Default `fast` when omitted. */
     phase?: TogetherModelPhase;
@@ -171,7 +170,7 @@ export function createLLM(
   return new ChatTogetherAI({
     apiKey: config.apiKey,
     model: config.mapModel,
-    temperature: config.temperatures ?? 0.3,
+    temperature: config.temperatures?.map ?? 0.3,
     maxTokens: config.maxTokens,
     modelKwargs,
   });

@@ -5,6 +5,7 @@ import type { LiteratureReviewNodeDeps, PaperExtraction } from "../types";
 import { buildExtractionPrompt, ExtractionOutputSchema } from "../prompts";
 import { createLLM } from "../../_shared/llm_factory";
 import { trackResearchStep } from "../../research/steps";
+import { createServiceLogger } from "../../../_lib/logging/serviceLogger";
 
 const BATCH_SIZE = 5;
 
@@ -41,7 +42,7 @@ export async function extractDataNode(
     apiKey: deps.apiKey,
     mapModel: deps.smartModel,
     phase: "smart",
-    temperatures: 0.2,
+    temperatures: { map: 0.2 },
     maxTokens: 3000,
   });
 
@@ -91,20 +92,13 @@ export async function extractDataNode(
         };
       });
 
-      // Write batch to literatureTableDrafts (if ctx available)
-      if (deps.ctx && sessionId) {
-        for (const extraction of batchExtractions) {
-          // TODO: Create citation first, then draft row
-          // For now, accumulate in memory
-          extractedData[extraction.paperId] = extraction.rowData;
-        }
-      }
-
-      // Merge into extractedData
+      // Merge batch into extractedData
       for (const extraction of batchExtractions) {
         extractedData[extraction.paperId] = extraction.rowData;
       }
     } catch (err) {
+      const logger = createServiceLogger("literature_review", "extractData");
+      logger.error("Extraction batch failed", err, { batchSize: batch.length });
       // On failure, mark all columns as "Extraction failed" for this batch
       for (const paper of batch) {
         const paperId = paper.doi || paper.title;

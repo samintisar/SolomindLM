@@ -39,27 +39,44 @@ export async function deduplicatePapersNode(
   let deduped = deduplicatePapersService(papers as AcademicPaper[]);
 
   // Step 2: Fuzzy title matching for remaining duplicates
-  const seenTitles: string[] = [];
+  // Track seen papers by normalized title to enable score-based deduplication
+  const seenPapers: Array<{ normalized: string; paper: (typeof deduped)[number] }> = [];
   const fuzzyDeduped: typeof deduped = [];
 
   for (const paper of deduped) {
     const normalized = normalizeTitle(paper.title);
-    let isDuplicate = false;
+    let duplicateIndex = -1;
 
-    for (const seen of seenTitles) {
-      const distance = levenshteinDistance(normalized, seen);
-      const maxLen = Math.max(normalized.length, seen.length);
+    for (let i = 0; i < seenPapers.length; i++) {
+      const seen = seenPapers[i];
+      const distance = levenshteinDistance(normalized, seen.normalized);
+      const maxLen = Math.max(normalized.length, seen.normalized.length);
       const similarity = maxLen > 0 ? distance / maxLen : 0;
 
       if (similarity < 0.15) {
-        isDuplicate = true;
+        duplicateIndex = i;
         break;
       }
     }
 
-    if (!isDuplicate) {
-      seenTitles.push(normalized);
+    if (duplicateIndex === -1) {
+      // New unique paper
+      seenPapers.push({ normalized, paper });
       fuzzyDeduped.push(paper);
+    } else {
+      // Duplicate found — keep the higher-scoring paper
+      const existing = seenPapers[duplicateIndex].paper;
+      const currentScore = (paper as AcademicPaper).score ?? 0;
+      const existingScore = (existing as AcademicPaper).score ?? 0;
+
+      if (currentScore > existingScore) {
+        // Replace with higher-scoring duplicate
+        seenPapers[duplicateIndex] = { normalized, paper };
+        const idx = fuzzyDeduped.findIndex((p) => p.title === existing.title);
+        if (idx !== -1) {
+          fuzzyDeduped[idx] = paper;
+        }
+      }
     }
   }
 

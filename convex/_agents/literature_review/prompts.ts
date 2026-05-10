@@ -1,6 +1,7 @@
 "use node";
 
 import { z } from "zod";
+import { truncateToTokens } from "../_shared/tokenizer";
 
 // ============================================================
 // Zod Schemas
@@ -98,7 +99,7 @@ export function buildScreeningPrompt(
       (p, i) => `--- Paper ${i + 1} ---
 ID: ${p.paperId}
 Title: ${p.title}
-Abstract: ${p.abstract.substring(0, 800)}`
+Abstract: ${truncateToTokens(p.abstract, 200)}`
     )
     .join("\n\n");
 
@@ -151,7 +152,7 @@ export function buildExtractionPrompt(
       (p, i) => `--- Paper ${i + 1} ---
 ID: ${p.paperId}
 Title: ${p.title}
-Abstract: ${p.abstract.substring(0, 1200)}`
+Abstract: ${truncateToTokens(p.abstract, 300)}`
     )
     .join("\n\n");
 

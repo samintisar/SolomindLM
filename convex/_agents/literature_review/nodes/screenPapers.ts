@@ -5,6 +5,7 @@ import type { LiteratureReviewNodeDeps, ScreenedPaper } from "../types";
 import { buildScreeningPrompt, ScreeningOutputSchema } from "../prompts";
 import { createLLM } from "../../_shared/llm_factory";
 import { trackResearchStep } from "../../research/steps";
+import { createServiceLogger } from "../../../_lib/logging/serviceLogger";
 
 const BATCH_SIZE = 5;
 
@@ -38,7 +39,7 @@ export async function screenPapersNode(
     apiKey: deps.apiKey,
     mapModel: deps.smartModel,
     phase: "smart",
-    temperatures: 0.2,
+    temperatures: { map: 0.2 },
     maxTokens: 2000,
   });
 
@@ -71,12 +72,14 @@ export async function screenPapersNode(
         });
       }
     } catch (err) {
-      // On failure, include all papers in batch (fail-open)
+      const logger = createServiceLogger("literature_review", "screenPapers");
+      logger.error("Screening batch failed", err, { batchSize: batch.length });
+      // On failure, exclude all papers in batch (fail-closed)
       for (const paper of batch) {
         screenedPapers.push({
           ...paper,
-          isIncluded: true,
-          includeReason: "Screening failed — included by default",
+          isIncluded: false,
+          includeReason: "Screening failed — excluded by default",
         });
       }
     }

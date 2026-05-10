@@ -121,7 +121,7 @@ export async function plannerNode(
     apiKey: deps.apiKey,
     mapModel: deps.smartModel,
     phase: "smart",
-    temperatures: 0.3,
+    temperatures: { map: 0.3 },
     maxTokens: 2000,
   });
 
@@ -518,7 +518,7 @@ export async function writerNode(
     apiKey: deps.apiKey,
     mapModel: deps.smartModel,
     phase: "smart",
-    temperatures: 0.4,
+    temperatures: { map: 0.4 },
     maxTokens: 4000,
   });
 

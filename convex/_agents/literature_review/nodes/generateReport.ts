@@ -5,6 +5,7 @@ import type { LiteratureReviewNodeDeps, ReportSection } from "../types";
 import { buildReportSectionPrompt, ReportSectionSchema } from "../prompts";
 import { createLLM } from "../../_shared/llm_factory";
 import { trackResearchStep } from "../../research/steps";
+import { createServiceLogger } from "../../../_lib/logging/serviceLogger";
 
 const SECTIONS = ["abstract", "introduction", "methods", "results", "discussion", "conclusion"];
 
@@ -21,7 +22,7 @@ export async function generateReportNode(
   state: LiteratureReviewStateType,
   deps: LiteratureReviewNodeDeps
 ): Promise<Partial<LiteratureReviewStateType>> {
-  const { extractedData, screenedPapers, query, notebookId, userId, tableId } = state;
+  const { extractedData, screenedPapers, query } = state;
 
   if (deps.ctx && deps.sessionId) {
     await trackResearchStep(
@@ -38,7 +39,7 @@ export async function generateReportNode(
     apiKey: deps.apiKey,
     mapModel: deps.smartModel,
     phase: "smart",
-    temperatures: 0.3,
+    temperatures: { map: 0.3 },
     maxTokens: 2000,
   });
 
@@ -103,6 +104,8 @@ export async function generateReportNode(
 
       fullContent += `## ${parsed.heading}\n\n${parsed.content}\n\n`;
     } catch (err) {
+      const logger = createServiceLogger("literature_review", "generateReport");
+      logger.error("Report section generation failed", err, { section: sectionName });
       // On failure, add placeholder section
       sections.push({
         heading: sectionName.charAt(0).toUpperCase() + sectionName.slice(1),

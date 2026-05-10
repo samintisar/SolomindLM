@@ -33,7 +33,7 @@ export async function planReviewNode(
     apiKey: deps.apiKey,
     mapModel: deps.smartModel,
     phase: "smart",
-    temperatures: 0.3,
+    temperatures: { map: 0.3 },
     maxTokens: 2000,
   });
 
