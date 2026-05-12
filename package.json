@@ -29,6 +29,7 @@
     "convex:env:push": "node scripts/push-convex-env.js",
     "convex:env:push:prod": "node scripts/push-convex-env.js --prod",
     "convex:env:push:dry": "node scripts/push-convex-env.js --dry-run",
+    "staging:cleanup": "bun run scripts/cleanup-staging.ts",
     "link:claude-skills": "node scripts/link-claude-skills.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
