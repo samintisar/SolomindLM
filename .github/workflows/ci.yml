@@ -60,8 +60,11 @@ jobs:
             exit 1
           fi
           if ! grep -qF 'preview' apps/web/vercel.json; then
-            echo "::error::buildCommand should keep preview on build-only to avoid preview overwriting prod Convex"
+            echo "::error::buildCommand should handle preview environment"
             exit 1
+          fi
+          if ! grep -qF 'CONVEX_DEPLOY_KEY_STAGING' apps/web/vercel.json; then
+            echo "::warning::buildCommand doesn't reference CONVEX_DEPLOY_KEY_STAGING — preview builds may deploy to production"
           fi
 
       - name: Setup Bun
@@ -160,8 +163,29 @@ jobs:
 
       - name: Build Web
         env:
-          VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud"
-        run: bun run --filter @solomindlm/web build
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL_STAGING }}
+        run: |
+          if [ -z "${VITE_CONVEX_URL}" ]; then
+            echo "::notice::VITE_CONVEX_URL_STAGING not set, using placeholder"
+            VITE_CONVEX_URL="https://ci-placeholder.convex.cloud"
+          fi
+          bun run --filter @solomindlm/web build
+
+      - name: Verify staging deployment health
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL_STAGING }}
+        run: |
+          if [ -n "${VITE_CONVEX_URL}" ]; then
+            echo "Checking staging deployment health..."
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${VITE_CONVEX_URL}/api/health/check" || echo "000")
+            if [ "$HEALTH_STATUS" != "200" ]; then
+              echo "::warning::Staging health check failed with status $HEALTH_STATUS"
+            else
+              echo "Staging health check passed ✓"
+            fi
+          else
+            echo "::notice::VITE_CONVEX_URL_STAGING not set, skipping health check"
+          fi
 
   build-web-main:
     name: Build web (main, prod Convex URL — no deploy)
