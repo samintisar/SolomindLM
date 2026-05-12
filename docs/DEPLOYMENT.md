@@ -9,13 +9,19 @@ frontend builds with the correct `VITE_CONVEX_URL`.
 ## Architecture
 
 ```
-Git push → Vercel Build → convex deploy → Vite build → Production
-                ↓
-        GitHub Actions (CI)
-        - Typecheck
-        - Unit tests
-        - E2E tests (PR only)
-        - Build verification
+PR push → Vercel Preview → convex deploy (staging) → Vite build → Preview URL
+                                              ↓
+                                    GitHub Actions (CI)
+                                    - Typecheck
+                                    - Build against staging URL
+                                    - Health check staging
+
+main push → Vercel Production → convex deploy (prod) → Vite build → Production URL
+                                              ↓
+                                    GitHub Actions (CI)
+                                    - Typecheck
+                                    - Build against prod URL
+                                    - Health check production
 ```
 
 ## Environment Setup
@@ -33,6 +39,68 @@ Git push → Vercel Build → convex deploy → Vite build → Production
 | Variable | Description |
 |----------|-------------|
 | `VITE_CONVEX_URL` | Same production Convex URL for CI build verification |
+
+## Staging Deployment
+
+We maintain a separate staging Convex deployment for preview builds.
+This allows PRs with backend changes to be fully tested end-to-end.
+
+### Required Staging Variables
+
+**Vercel (Preview Environment Only):**
+| Variable | Description |
+|----------|-------------|
+| `CONVEX_DEPLOY_KEY_STAGING` | Deploy key from staging deployment in Convex Dashboard |
+| `VITE_CONVEX_URL_STAGING` | Staging deployment URL (e.g., `https://xxx.convex.cloud`) |
+
+**GitHub Repository Variables:**
+| Variable | Description |
+|----------|-------------|
+| `VITE_CONVEX_URL_STAGING` | Same staging URL for CI build verification |
+
+### Setup Steps
+
+1. **Create staging deployment in Convex Dashboard**
+   - Go to https://dashboard.convex.dev
+   - Create a new deployment (e.g., `solomindlm-staging`)
+   - Generate a deploy key for staging
+
+2. **Configure Vercel**
+   - Go to Project Settings → Environment Variables
+   - Add `CONVEX_DEPLOY_KEY_STAGING` and `VITE_CONVEX_URL_STAGING` to **Preview** environment only
+   - Keep production variables unchanged
+
+3. **Configure GitHub**
+   - Add `VITE_CONVEX_URL_STAGING` as a repository variable
+
+### How Preview Builds Work
+
+**Preview (PR) builds:**
+- Use `CONVEX_DEPLOY_KEY_STAGING` to deploy backend to staging
+- Set `VITE_CONVEX_URL` to staging URL for frontend
+- Frontend connects to staging backend
+- CI verifies staging health
+
+**Production (main) builds:**
+- Use `CONVEX_DEPLOY_KEY` to deploy to production
+- Set `VITE_CONVEX_URL` to production URL
+- Frontend connects to production backend
+- CI verifies production health
+
+### Limitations
+
+- **Shared staging:** All preview builds use the same staging deployment
+- **Data isolation:** Staging data is shared across all previews
+- **Concurrent previews:** Multiple active PRs may overwrite staging data
+- **Best practice:** Use test accounts and seed data in staging
+
+### Staging Cleanup
+
+Reset staging data periodically:
+```bash
+# Reset staging database
+bun run staging:cleanup
+```
 
 ## Deployment Flow
 
