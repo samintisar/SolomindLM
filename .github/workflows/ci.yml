@@ -167,6 +167,19 @@ jobs:
           fi
           bun run build:prod
 
+      - name: Verify deployment health
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          VITE_CONVEX_URL: ${{ vars.VITE_CONVEX_URL }}
+        run: |
+          echo "Checking Convex deployment health..."
+          HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${VITE_CONVEX_URL}/api/health/check" || echo "000")
+          if [ "$HEALTH_STATUS" != "200" ]; then
+            echo "::error::Health check failed with status $HEALTH_STATUS"
+            exit 1
+          fi
+          echo "Health check passed ✓"
+
   test-e2e:
     name: E2E Tests (${{ matrix.shard }}/${{ strategy.matrix.total }})
     if: github.event_name == 'pull_request'
