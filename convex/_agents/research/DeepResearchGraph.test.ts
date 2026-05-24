@@ -15,18 +15,18 @@ describe("DeepResearchGraph", () => {
 
   it("planApprovedEvent has correct validator shape", () => {
     expect(planApprovedEvent.validator).toBeDefined();
-    expect((planApprovedEvent.validator as any).fields).toBeDefined();
-    expect((planApprovedEvent.validator as any).fields).toHaveProperty("planId");
-    expect((planApprovedEvent.validator as any).fields).toHaveProperty("modifiedSubQuestions");
+    expect((planApprovedEvent.validator as Record<string, unknown>).fields).toBeDefined();
+    expect((planApprovedEvent.validator as Record<string, unknown>).fields).toHaveProperty("planId");
+    expect((planApprovedEvent.validator as Record<string, unknown>).fields).toHaveProperty(
+      "modifiedSubQuestions"
+    );
   });
 
   it("workflow is a function", () => {
     expect(typeof deepResearchWorkflow).toBe("function");
   });
 
-  it("workflow has correct number of actions and events", () => {
-    const source = (deepResearchWorkflow as any).toString?.() ?? "";
-    // We can't easily introspect the handler, but we can verify exports
+  it("workflow and event are both exported", () => {
     expect(deepResearchWorkflow).toBeDefined();
     expect(planApprovedEvent).toBeDefined();
   });

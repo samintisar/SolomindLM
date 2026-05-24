@@ -4,7 +4,6 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { createResearchAgent } from "../chat/_streamResearch";
 import { runResearchExecuteImpl } from "../chat/_researchExecuteImpl";
-import type { Id } from "../_generated/dataModel";
 
 export const planReview = internalAction({
   args: {

@@ -381,8 +381,6 @@ http.route({
         documentIds: documentIds ?? undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ...(sourcePolicy != null ? { sourcePolicy: sourcePolicy as any } : {}),
       });
 
