@@ -297,9 +297,6 @@ http.route({
           message: string;
           documentIds?: string[];
           conversationId?: string;
-          /** Id of the user row from sendMessageOptimistic (required for research plan linkage). */
-          userMessageId?: string;
-          deepResearch?: boolean;
           sourcePolicy?: {
             channels: string[];
             domainAllowlist?: string[];
@@ -328,8 +325,6 @@ http.route({
         message,
         documentIds,
         conversationId: bodyConversationId,
-        userMessageId: bodyUserMessageId,
-        deepResearch,
         sourcePolicy,
       } = body;
 
@@ -387,14 +382,8 @@ http.route({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         conversationId: bodyConversationId ? (bodyConversationId as any) : undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ...(sourcePolicy != null ? { sourcePolicy: sourcePolicy as any } : {}),
-        ...(deepResearch === true
-          ? {
-              deepResearch: true,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ...(bodyUserMessageId ? { userMessageId: bodyUserMessageId as any } : {}),
-            }
-          : {}),
       });
 
       const { readable, writable } = new TransformStream();
@@ -508,36 +497,11 @@ http.route({
         planId: planId as any,
       });
 
-      const reusable =
-        latestRun &&
-        latestRun.streamId &&
-        latestRun.status !== "failed" &&
-        latestRun.status !== "cancelled";
-
-      let streamId: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let runId: any;
-
-      if (reusable) {
-        streamId = latestRun.streamId as string;
-        runId = latestRun._id;
-      } else {
-        streamId = await streaming.createStream(ctx);
-        runId = await ctx.runMutation(internal.research.index.createResearchRun, {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          planId: planId as any,
-          userId,
-          notebookId: plan.notebookId,
-          conversationId: plan.conversationId,
-          streamId,
-        });
-
-        await ctx.scheduler.runAfter(0, internal.research.workflowSteps.executeResearch, {
-          runId,
-          streamId,
-          userId,
-        });
+      if (!latestRun || !latestRun.streamId) {
+        return errorResponse("Research run not found or not ready yet", 404);
       }
+
+      const streamId = latestRun.streamId as string;
 
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
