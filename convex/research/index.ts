@@ -6,7 +6,8 @@ import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
 import { getAuthUserId } from "../auth";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { workflow } from "../_agents/research/DeepResearchGraph.js";
-import { sendEvent, type WorkflowId } from "@convex-dev/workflow";
+import { sendEvent, restart, type WorkflowId } from "@convex-dev/workflow";
+import type { FunctionReference } from "convex/server";
 export { createResearchArtifacts } from "./artifacts";
 
 // ============================================================
@@ -582,5 +583,57 @@ export const startDeepResearch = mutation({
     await ctx.db.patch(planId, { workflowId, updatedAt: Date.now() });
 
     return { planId, conversationId };
+  },
+});
+
+export const retryDeepResearch = mutation({
+  args: {
+    planId: v.id("researchPlans"),
+    fromStep: v.optional(v.union(v.literal("planning"), v.literal("execution"))),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new ConvexError({ code: "UNAUTHENTICATED", message: "Sign in required" });
+    }
+
+    const plan = await ctx.db.get(args.planId);
+    if (!plan) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Plan not found" });
+    }
+    if (plan.userId !== userId) {
+      throw new ConvexError({ code: "FORBIDDEN", message: "Not authorized" });
+    }
+    await assertCanEditNotebook(ctx, plan.notebookId, userId);
+
+    if (!plan.workflowId) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "This plan does not support workflow retry",
+      });
+    }
+
+    const stepMap: Record<string, FunctionReference<"action", "internal">> = {
+      planning: internal.research.workflowSteps.planReview,
+      execution: internal.research.workflowSteps.executeResearch,
+    };
+
+    const fromStep = args.fromStep ?? "execution";
+    const fromAction = stepMap[fromStep];
+    if (!fromAction) {
+      throw new ConvexError({ code: "BAD_REQUEST", message: `Invalid step: ${fromStep}` });
+    }
+
+    await ctx.db.patch(args.planId, {
+      status: fromStep === "planning" ? "planning" : "running",
+      updatedAt: Date.now(),
+    });
+
+    await restart(ctx, components.workflow, plan.workflowId as WorkflowId, {
+      from: fromAction,
+    });
+
+    return null;
   },
 });
