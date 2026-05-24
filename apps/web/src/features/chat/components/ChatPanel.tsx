@@ -23,43 +23,43 @@ import { RefHandlers } from "../utils/messageRendering.utils";
 import { MessageBubble } from "./MessageBubble";
 import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ChatEmptyState } from "./ChatEmptyState";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, type ChatComposerMode, type ResearchDatabaseOption } from "./ChatInput";
 import { ConversationList } from "./ConversationList";
 import { ConfigureChatModal } from "./ConfigureChatModal";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
-import { ResearchSteps, ResearchStep } from "./ResearchSteps";
+import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useAuthToken } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-
-const stepConfig: Record<string, { title: string; description: string }> = {
-  planning: { title: "Planning Research", description: "Defining search strategy and sub-questions..." },
-  searching: { title: "Searching Sources", description: "Finding academic papers and relevant sources..." },
-  deduplicating: { title: "Removing Duplicates", description: "Consolidating results across searches..." },
-  ranking: { title: "Ranking Papers", description: "Sorting by relevance and credibility..." },
-  screening: { title: "Screening Papers", description: "Applying inclusion criteria..." },
-  extracting: { title: "Extracting Data", description: "Pulling key information from sources..." },
-  populating: { title: "Building Table", description: "Organizing findings into structured data..." },
-  generating_report: { title: "Generating Report", description: "Writing literature review and synthesis..." },
-  awaiting_user_input: { title: "Awaiting Input", description: "Waiting for user approval or guidance..." },
-};
+import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
+import { useApproveResearchPlan, useRejectResearchPlan } from "../services/researchApi";
+import { useLiteratureReviewSession } from "../services/literatureReviewApi";
+import { useAddExternalSources } from "../../sources/services/documentsApi";
+import { useSessionStorage } from "@/hooks/useSessionStorage";
+import {
+  buildAcademicDiscoveryApiFilters,
+  type DiscoveryAcademicFilterState,
+} from "@/features/sources/components/AcademicDiscoveryFiltersSection";
+import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
   isRightOpen: boolean;
   toggleLeft: () => void;
   toggleRight: () => void;
-  notebookId?: string | null;
+  notebookId?: Id<"notebooks"> | null;
   notebookTitle?: string;
   notebookIcon?: string | null;
   notebookCoverColor?: string | null;
   chatSettings?: ChatSettings;
   /** Open a notebook document in the sources panel (citation / reference tooltip) */
   onOpenNotebookSource?: (documentId: string) => void;
+  onOpenLiteratureTable?: (tableId: Id<"literatureTables">) => void;
+  onOpenLiteratureReport?: (reportId: Id<"literatureReports">) => void;
+  onOpenRankedPapers?: (sessionId: Id<"literatureReviewSessions">) => void;
+  onOpenScreeningDecisions?: (sessionId: Id<"literatureReviewSessions">) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -73,6 +73,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   notebookCoverColor,
   chatSettings,
   onOpenNotebookSource,
+  onOpenLiteratureTable,
+  onOpenLiteratureReport,
+  onOpenRankedPapers,
+  onOpenScreeningDecisions,
 }) => {
   const {
     messages,
@@ -96,6 +100,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     consumeResearchExecuteStream,
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
+  const notebookDocumentIds = useMemo(
+    () => new Set(sources.map((s) => s.id)),
+    [sources]
+  );
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<"top" | "bottom">("top");
@@ -104,9 +112,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
-  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [composerMode, setComposerMode] = useState<ChatComposerMode>("chat");
+  const [researchDatabase, setResearchDatabase] = useState<ResearchDatabaseOption>("all");
+  const [activeLiteratureSessionId, setActiveLiteratureSessionId] =
+    useState<Id<"literatureReviewSessions"> | null>(null);
   const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
+  const [chatAcademicFilters, setChatAcademicFilters] =
+    useSessionStorage<DiscoveryAcademicFilterState>("chat-academic-filters", {});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -120,6 +132,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       return new Set();
     }
   });
+
+  /** Chat / deep research: PubMed or arXiv corpus implies academic web search; literature workflow ignores this. */
+  const channelsForChatSend = useMemo(() => {
+    if (composerMode === "literatureReview") return sourceFilters;
+    const ch = [...sourceFilters];
+    if (researchDatabase === "pubmed" || researchDatabase === "arxiv") {
+      if (!ch.includes("academic")) ch.push("academic");
+    }
+    return ch;
+  }, [composerMode, sourceFilters, researchDatabase]);
+
+  const chatSourcePolicy = useMemo((): ChatStreamSourcePolicy => {
+    const policy: ChatStreamSourcePolicy = { channels: channelsForChatSend };
+    if (composerMode === "deepResearch") {
+      policy.maxResultsPerChannel = 8;
+    }
+    if (channelsForChatSend.includes("academic")) {
+      const api = buildAcademicDiscoveryApiFilters(chatAcademicFilters);
+      if (Object.keys(api).length > 0) {
+        policy.academicFilters = api;
+      }
+    }
+    return policy;
+  }, [channelsForChatSend, chatAcademicFilters, composerMode]);
 
   const historyContainerRef = useRef<HTMLDivElement>(null);
 
@@ -177,50 +213,55 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     handleTogglePin(activeConversationId);
   }, [activeConversationId, handleTogglePin]);
 
-  const approvePlanMutation = useMutation(api.research.index.approveResearchPlan);
-  const rejectPlanMutation = useMutation(api.research.index.rejectResearchPlan);
-  const addExternalSourcesMutation = useMutation(api.documents.index.addExternalSources);
+  const approvePlanMutation = useApproveResearchPlan();
+  const rejectPlanMutation = useRejectResearchPlan();
+  const addExternalSourcesMutation = useAddExternalSources();
+  const { startLiteratureReview, isStarting: isStartingLiteratureReview } =
+    useStartLiteratureReview();
 
-  const handleApproveResearchPlan = useCallback(async (planId: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await approvePlanMutation({ planId: planId as any });
-      setActivePlanId(planId);
-      const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({ planId }),
-      });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error || `Research failed to start (${response.status})`);
+  const handleApproveResearchPlan = useCallback(
+    async (planId: Id<"researchPlans">) => {
+      try {
+        await approvePlanMutation({ planId });
+        const response = await fetch(`${CONVEX_SITE_URL}/research/execute`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
+          body: JSON.stringify({ planId }),
+        });
+        if (!response.ok) {
+          if (response.status === 404) {
+            toastError("Research is starting. Please retry in a moment.");
+            return;
+          }
+          const data = (await response.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(data?.error || `Research failed to start (${response.status})`);
+        }
+        await consumeResearchExecuteStream(response);
+      } catch (err) {
+        console.error("[ResearchPlan] Approve failed:", err);
+        toastError(err instanceof Error ? err.message : "Failed to start research execution");
       }
-      await consumeResearchExecuteStream(response);
-    } catch (err) {
-      console.error("[ResearchPlan] Approve failed:", err);
-      toastError(
-        err instanceof Error ? err.message : "Failed to start research execution"
-      );
-      setActivePlanId(null);
-    }
-  }, [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]);
+    },
+    [approvePlanMutation, authToken, consumeResearchExecuteStream, toastError]
+  );
 
-  const handleRejectResearchPlan = useCallback(async (planId: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await rejectPlanMutation({ planId: planId as any });
-    } catch (err) {
-      console.error("[ResearchPlan] Reject failed:", err);
-    }
-  }, [rejectPlanMutation]);
+  const handleRejectResearchPlan = useCallback(
+    async (planId: Id<"researchPlans">) => {
+      try {
+        await rejectPlanMutation({ planId });
+      } catch (err) {
+        console.error("[ResearchPlan] Reject failed:", err);
+      }
+    },
+    [rejectPlanMutation]
+  );
 
   const chatInputDisabled = isSending || isLoading || remoteGenerationBlocksSend;
-  const waitingOnRemoteGeneration =
-    remoteGenerationBlocksSend && !isLoading && !isSending;
+  const waitingOnRemoteGeneration = remoteGenerationBlocksSend && !isLoading && !isSending;
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -252,7 +293,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const placeholderNote: Note = {
       id: `pending-save-${Date.now()}`,
       title: "Saved chat",
-      preview: "Note · Saved Chat",
+      preview: "Note Â· Saved Chat",
       type: "note",
       noteType: "chat",
       status: "generating",
@@ -375,25 +416,45 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleNewConversation = useCallback(async () => {
     if (!onCreateConversation) return;
+
+    // Already on an empty thread â€” avoid creating duplicate blank conversations.
+    if (messages.length === 0) {
+      setActiveLiteratureSessionId(null);
+      setComposerMode("chat");
+      closeTooltip();
+      setHistoryOpen(false);
+      return;
+    }
+
     setIsCreatingConversation(true);
     try {
       const id = await onCreateConversation();
       if (id) {
+        // New thread has no messages; stale session ids would keep showing LiteratureReviewChatFlow
+        // (or research overlays) from the previous conversation instead of a fresh empty chat.
+        setActiveLiteratureSessionId(null);
+        setComposerMode("chat");
+        setInputMessage("");
+        closeTooltip();
         onSelectConversation?.(id);
         setHistoryOpen(false);
+      } else {
+        toastError(
+          "Could not start a new chat. Wait for the notebook to finish loading, then try again."
+        );
       }
     } catch {
       toastError("Failed to create conversation");
     } finally {
       setIsCreatingConversation(false);
     }
-  }, [onCreateConversation, onSelectConversation, toastError]);
+  }, [messages.length, onCreateConversation, onSelectConversation, toastError, closeTooltip]);
 
   // --- Message handlers ---
 
   const copyMessageAsMarkdown = useCallback(async (message: Message) => {
     const stripRefs = (c: string) => {
-      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s.,\-:–—]*$/i);
+      const m = c.match(/\n?(?:References|Reference):\s*\n?[\d\s.,\-:â€“â€”]*$/i);
       return m ? c.substring(0, m.index).trim() : c;
     };
     try {
@@ -407,44 +468,107 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, []);
 
+  const validateNotebookSourcesForSend = useCallback(() => {
+    if (composerMode === "literatureReview") return true;
+    if (!channelsForChatSend.includes("notebook")) return true;
+    const completed = sources?.filter((s) => s.status === "completed") ?? [];
+    const selectedCompleted = completed.filter((s) => s.selected);
+    if (selectedCompleted.length === 0) {
+      toastError("Please select at least one source before asking a question");
+      return false;
+    }
+    return true;
+  }, [composerMode, channelsForChatSend, sources, toastError]);
+
+  const handleComposerModeChange = useCallback(
+    (next: ChatComposerMode) => {
+      if (composerMode === "literatureReview" && next !== "literatureReview") {
+        setActiveLiteratureSessionId(null);
+      }
+      setComposerMode(next);
+    },
+    [composerMode]
+  );
+
   const handleSendMessage = useCallback(async () => {
     const trimmed = inputMessage.trim();
     if (!trimmed || chatInputDisabled || !notebookId || !onSendMessage) return;
 
-    // Require selected sources when notebook RAG is enabled
-    if (!deepResearchEnabled && sourceFilters.includes("notebook")) {
-      const selectedSources = sources?.filter((s) => s.selected) ?? [];
-      if (selectedSources.length === 0) {
-        toastError("Please select at least one source before asking a question");
-        return;
-      }
-    }
+    if (!validateNotebookSourcesForSend()) return;
 
     setIsSending(true);
     setInputMessage("");
-    onSendMessage(
-      trimmed,
-      deepResearchEnabled || undefined,
-      { channels: sourceFilters }
-    );
+
+    if (composerMode === "literatureReview") {
+      try {
+        let conversationId = activeConversationId ?? undefined;
+        if (messages.length > 0 && onCreateConversation) {
+          const newId = await onCreateConversation();
+          if (newId) {
+            conversationId = newId as Id<"conversations">;
+            onSelectConversation?.(conversationId);
+          }
+        }
+
+        const api = buildAcademicDiscoveryApiFilters(chatAcademicFilters);
+        const { sessionId, conversationId: reviewConversationId } = await startLiteratureReview(
+          trimmed,
+          notebookId as Id<"notebooks">,
+          {
+            researchDatabase,
+            ...(Object.keys(api).length > 0 ? { academicFilters: api } : {}),
+          },
+          conversationId,
+          chatSettings?.smartModel
+        );
+        if (reviewConversationId !== activeConversationId) {
+          onSelectConversation?.(reviewConversationId);
+        }
+        setActiveLiteratureSessionId(sessionId);
+      } catch {
+        toastError("Failed to start literature review. Please try again.");
+      }
+    } else {
+      onSendMessage(trimmed, composerMode === "deepResearch" ? true : undefined, chatSourcePolicy);
+    }
+
     setIsSending(false);
-  }, [inputMessage, chatInputDisabled, notebookId, onSendMessage, sources, toastError, deepResearchEnabled, sourceFilters]);
+  }, [
+    inputMessage,
+    chatInputDisabled,
+    notebookId,
+    onSendMessage,
+    toastError,
+    composerMode,
+    chatSourcePolicy,
+    startLiteratureReview,
+    validateNotebookSourcesForSend,
+    researchDatabase,
+    chatAcademicFilters,
+    chatSettings?.smartModel,
+    activeConversationId,
+    messages.length,
+    onCreateConversation,
+    onSelectConversation,
+  ]);
 
   const handleSendChip = useCallback(
-    (text: string) => {
-      if (chatInputDisabled || !notebookId || !onSendMessage) return;
+    (text: string): boolean => {
+      if (chatInputDisabled || !notebookId || !onSendMessage) return false;
+      if (composerMode !== "chat") return false;
+      if (!validateNotebookSourcesForSend()) return false;
 
-      if (sourceFilters.includes("notebook")) {
-        const selectedSources = sources?.filter((s) => s.selected) ?? [];
-        if (selectedSources.length === 0) {
-          toastError("Please select at least one source before asking a question");
-          return;
-        }
-      }
-
-      onSendMessage(text, undefined, { channels: sourceFilters });
+      onSendMessage(text, undefined, chatSourcePolicy);
+      return true;
     },
-    [chatInputDisabled, notebookId, onSendMessage, sources, toastError, sourceFilters]
+    [
+      chatInputDisabled,
+      notebookId,
+      onSendMessage,
+      composerMode,
+      chatSourcePolicy,
+      validateNotebookSourcesForSend,
+    ]
   );
 
   // --- Scroll to bottom ---
@@ -464,7 +588,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // --- Tooltip position computation ---
 
   const tooltipContent = useMemo(() => {
-     
     // eslint-disable-next-line react-hooks/refs
     if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current)
       return null;
@@ -475,7 +598,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       hoveredRefId >= 1 && hoveredRefId <= refsArray.length
         ? refsArray[hoveredRefId - 1]
         : refsArray.find((r) => Number(r.id) === hoveredRefId);
-     
+
     // eslint-disable-next-line react-hooks/refs
     const containerRect = messagesContainerRef.current.getBoundingClientRect();
     if (!ref || !containerRect) return null;
@@ -513,32 +636,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const memoizedMessages = useMemo(() => messages, [messages]);
 
-  // Query latest run for the active plan to get the actual run ID
-  const latestRun = useQuery(
-    api.research.index.getLatestRunForPlan,
-    activePlanId ? { planId: activePlanId as Id<"researchPlans"> } : "skip"
-  );
+  // Literature review session polling
+  const literatureSession = useLiteratureReviewSession(activeLiteratureSessionId);
 
-  // Use actual run ID for research steps
-  const activeResearchId = latestRun?._id ?? null;
+  const isLiteratureReviewActive =
+    activeLiteratureSessionId != null &&
+    literatureSession?.status != null &&
+    literatureSession.status !== "completed" &&
+    literatureSession.status !== "failed";
 
-  const researchStepsData = useQuery(
-    api.research.index.getResearchSteps,
-    activeResearchId ? { researchId: activeResearchId } : "skip"
-  );
-
-  const researchSteps: ResearchStep[] = useMemo(() => {
-    const rawSteps = researchStepsData ?? [];
-    return rawSteps.map((step: { stepType: string; status: string; details?: string }) => ({
-      type: step.stepType,
-      status: step.status as ResearchStep["status"],
-      title: stepConfig[step.stepType]?.title || step.stepType,
-      description: stepConfig[step.stepType]?.description || "",
-      details: step.details,
-    }));
-  }, [researchStepsData]);
-
-  const showResearchSteps = deepResearchEnabled && activeResearchId != null;
+  const isInputDisabled =
+    chatInputDisabled || isLiteratureReviewActive || isStartingLiteratureReview;
 
   const chatHeaderToolbar = (
     <div className="flex items-center gap-2 shrink-0">
@@ -606,8 +714,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         onClick={handleNewConversation}
         disabled={isCreatingConversation}
         className="p-2 bg-card border border-border rounded-lg shadow-sm hover:bg-accent text-foreground transition-colors shrink-0 disabled:opacity-50 disabled:pointer-events-none"
-        title="New chat"
-        aria-label={isCreatingConversation ? "Creating…" : "New chat"}
+        title={messages.length === 0 ? "Already in a new chat" : "New chat"}
+        aria-label={
+          isCreatingConversation
+            ? "Creatingâ€¦"
+            : messages.length === 0
+              ? "Already in a new chat"
+              : "New chat"
+        }
       >
         <Plus className="w-4 h-4" />
       </button>
@@ -682,168 +796,180 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Messages Area */}
         <div className="flex flex-1 min-h-0">
-        <div
-          ref={messagesContainerRef}
-          className={`flex min-h-0 w-full min-w-0 flex-1 relative chat-panel-graph-grid ${
-            messages.length === 0
-              ? "overflow-y-auto overflow-x-hidden"
-              : "overflow-x-hidden overflow-y-hidden"
-          }`}
-        >
-          {messages.length === 0 ? (
-            <ChatEmptyState
-              onSendMessage={handleSendChip}
-              disabled={chatInputDisabled}
-              sourceCount={sourceCount}
-              sourceSummary={sourceSummary}
-              suggestions={suggestions}
-              isLoadingSuggestions={isLoadingSuggestions}
-              notebookIcon={notebookIcon}
-              notebookCoverColor={notebookCoverColor}
-              notebookTitle={notebookTitle}
-            />
-          ) : (
-            <Virtuoso
-              ref={virtuosoRef}
-              className="min-h-0 w-full min-w-0"
-              style={{ height: "100%" }}
-              data={memoizedMessages}
-              itemContent={(_index, message) => (
-                <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
-                  {message.researchPlan ? (
-                    <ResearchPlanMessage
-                      planId={message.researchPlan.planId}
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      subQuestions={(message.researchPlan.subQuestions as any[]) ?? []}
-                      onApprove={handleApproveResearchPlan}
-                      onReject={handleRejectResearchPlan}
-                    />
-                  ) : (
-                  <>
-                  <MessageBubble
-                    message={message}
-                    isAssistantStreamActive={message.id === "__streaming__" ? isLoading : false}
-                    refHandlers={refHandlers}
-                    onCopyMessage={copyMessageAsMarkdown}
-                    copiedMessageId={copiedMessageId}
-                    onSetFeedback={onSetFeedback}
-                    onSendFollowUp={handleSendChip}
-                    onRetry={onRetry}
-                    externalSources={message.externalSources}
-                    onAddExternalSources={async (selectedSources) => {
-                      if (!notebookId) return;
-                      try {
-                        await addExternalSourcesMutation({
-                          notebookId: notebookId as Id<"notebooks">,
-                          sources: selectedSources.map((s) => ({
-                            title: s.title,
-                            url: s.url,
-                            snippet: s.snippet,
-                            sourceType: s.sourceType,
-                          })),
-                        });
-      } catch (e) {
-                        console.error("Failed to add external sources:", e);
-                      }
-                    }}
-                    showSourcesButton={
-                      message.role === "assistant" &&
-                      !!message.externalSources &&
-                      message.externalSources.length > 0
+          <div
+            ref={messagesContainerRef}
+            className={`flex min-h-0 w-full min-w-0 flex-1 relative chat-panel-graph-grid ${
+              messages.length === 0
+                ? "overflow-y-auto overflow-x-hidden"
+                : "overflow-x-hidden overflow-y-hidden"
+            }`}
+          >
+            {messages.length === 0 ? (
+              <ChatEmptyState
+                onSendMessage={handleSendChip}
+                disabled={chatInputDisabled}
+                sourceCount={sourceCount}
+                sourceSummary={sourceSummary}
+                suggestions={suggestions}
+                isLoadingSuggestions={isLoadingSuggestions}
+                notebookIcon={notebookIcon}
+                notebookCoverColor={notebookCoverColor}
+                notebookTitle={notebookTitle}
+              />
+            ) : (
+              <Virtuoso
+                ref={virtuosoRef}
+                className="min-h-0 w-full min-w-0"
+                style={{ height: "100%" }}
+                data={memoizedMessages}
+                itemContent={(_index, message) => (
+                  <div className="max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-4 md:px-6">
+                    {message.researchPlan ? (
+                      <ResearchPlanMessage
+                        planId={message.researchPlan.planId}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        subQuestions={(message.researchPlan.subQuestions as any[]) ?? []}
+                        onApprove={handleApproveResearchPlan}
+                        onReject={handleRejectResearchPlan}
+                        onOpenTable={onOpenLiteratureTable}
+                        onOpenReport={onOpenLiteratureReport}
+                      />
+                    ) : message.literatureReview ? (
+                      <LiteratureReviewMessage
+                        message={message}
+                        onOpenTable={onOpenLiteratureTable}
+                        onOpenReport={onOpenLiteratureReport}
+                        onOpenRankedPapers={onOpenRankedPapers}
+                        onOpenScreeningDecisions={onOpenScreeningDecisions}
+                      />
+                    ) : (
+                      <>
+                        <MessageBubble
+                          message={message}
+                          isAssistantStreamActive={
+                            message.id === "__streaming__" ? isLoading : false
+                          }
+                          refHandlers={refHandlers}
+                          onCopyMessage={copyMessageAsMarkdown}
+                          copiedMessageId={copiedMessageId}
+                          onSetFeedback={onSetFeedback}
+                          onSendFollowUp={handleSendChip}
+                          onRetry={onRetry}
+                          externalSources={message.externalSources}
+                          onAddExternalSources={async (selectedSources) => {
+                            if (!notebookId) return;
+                            try {
+                              await addExternalSourcesMutation({
+                                notebookId: notebookId as Id<"notebooks">,
+                                sources: selectedSources.map((s) => ({
+                                  title: s.title,
+                                  url: s.url,
+                                  snippet: s.snippet,
+                                  sourceType: s.sourceType,
+                                })),
+                              });
+                            } catch (e) {
+                              console.error("Failed to add external sources:", e);
+                            }
+                          }}
+                          showSourcesButton={
+                            message.role === "assistant" &&
+                            !!message.externalSources &&
+                            message.externalSources.length > 0
+                          }
+                          notebookId={notebookId ?? undefined}
+                          onOpenNotebookSource={onOpenNotebookSource}
+                          notebookDocumentIds={notebookDocumentIds}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+                components={{
+                  Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
+                }}
+                defaultItemHeight={150}
+                increaseViewportBy={{ top: 200, bottom: 400 }}
+              />
+            )}
+
+            {/* Floating Reference Tooltip */}
+            {tooltipContent && (
+              <ReferenceTooltip
+                hoveredRefId={hoveredRefId!}
+                tooltipRef={tooltipRef}
+                reference={tooltipContent.ref}
+                position={{ x: tooltipContent.x, y: tooltipContent.y }}
+                onOpenInSources={(() => {
+                  const docId = tooltipContent.ref.documentId?.trim();
+                  if (!docId || !onOpenNotebookSource || !sources.some((s) => s.id === docId)) {
+                    return undefined;
+                  }
+                  // eslint-disable-next-line react-hooks/refs
+                  return () => handleOpenReferenceInSources(tooltipContent.ref);
+                })()}
+                onAddToNotebook={(() => {
+                  const isExternal =
+                    !tooltipContent.ref.documentId && !!tooltipContent.ref.sourceUrl;
+                  if (!isExternal || !notebookId) return undefined;
+                  return async () => {
+                    try {
+                      await addExternalSourcesMutation({
+                        notebookId: notebookId as Id<"notebooks">,
+                        sources: [
+                          {
+                            title: tooltipContent.ref.sourceTitle,
+                            url: tooltipContent.ref.sourceUrl!,
+                            snippet: tooltipContent.ref.content.slice(0, 500),
+                            sourceType: "web",
+                          },
+                        ],
+                      });
+                    } catch (e) {
+                      console.error("Failed to add external source:", e);
                     }
-                  />
-                  </>
-                  )}
-                </div>
-              )}
-              components={{
-                Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
-              }}
-              defaultItemHeight={150}
-              increaseViewportBy={{ top: 200, bottom: 400 }}
-            />
-          )}
-
-          {/* Floating Reference Tooltip */}
-          {tooltipContent && (
-            <ReferenceTooltip
-              hoveredRefId={hoveredRefId!}
-              tooltipRef={tooltipRef}
-              reference={tooltipContent.ref}
-              position={{ x: tooltipContent.x, y: tooltipContent.y }}
-              onOpenInSources={(() => {
-                const docId = tooltipContent.ref.documentId?.trim();
-                if (
-                  !docId ||
-                  !onOpenNotebookSource ||
-                  !sources.some((s) => s.id === docId)
-                ) {
-                  return undefined;
-                }
-                // eslint-disable-next-line react-hooks/refs
-                return () => handleOpenReferenceInSources(tooltipContent.ref);
-              })()}
-              onAddToNotebook={(() => {
-                const isExternal = !tooltipContent.ref.documentId && !!tooltipContent.ref.sourceUrl;
-                if (!isExternal || !notebookId) return undefined;
-                return async () => {
-                  try {
-                    await addExternalSourcesMutation({
-                      notebookId: notebookId as Id<"notebooks">,
-                      sources: [{
-                        title: tooltipContent.ref.sourceTitle,
-                        url: tooltipContent.ref.sourceUrl!,
-                        snippet: tooltipContent.ref.content.slice(0, 500),
-                        sourceType: "web",
-                      }],
-                    });
-                  } catch (e) {
-                    console.error("Failed to add external source:", e);
-                  }
-                };
-              })()}
-              onMouseEnter={() => {
-                setIsTooltipHovered(true);
-                if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
-              }}
-              onMouseLeave={() => {
-                setIsTooltipHovered(false);
-                hideTooltipTimeoutRef.current = setTimeout(() => {
-                  if (!isTooltipHovered) {
-                    setHoveredRefId(null);
-                    setHoveredMessageId(null);
-                  }
-                }, 100);
-              }}
-            />
-          )}
-        </div>
-        </div>
-
-        {/* Research Steps Panel */}
-        {showResearchSteps && (
-          <div className="pointer-events-none absolute bottom-24 left-0 right-0 z-10 flex min-w-0 justify-center px-3 sm:px-4">
-            <div className="pointer-events-auto w-full min-w-0 max-w-3xl rounded-xl border border-border bg-card p-4 shadow-lg xl:max-w-4xl 2xl:max-w-5xl">
-              <ResearchSteps steps={researchSteps} />
-            </div>
+                  };
+                })()}
+                onMouseEnter={() => {
+                  setIsTooltipHovered(true);
+                  if (hideTooltipTimeoutRef.current) clearTimeout(hideTooltipTimeoutRef.current);
+                }}
+                onMouseLeave={() => {
+                  setIsTooltipHovered(false);
+                  hideTooltipTimeoutRef.current = setTimeout(() => {
+                    if (!isTooltipHovered) {
+                      setHoveredRefId(null);
+                      setHoveredMessageId(null);
+                    }
+                  }, 100);
+                }}
+              />
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Input Area — wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
+
+        {/* Input Area â€” wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
         <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex min-w-0 justify-center px-3 sm:px-4">
           <ChatInput
             value={inputMessage}
             onChange={setInputMessage}
             onSend={handleSendMessage}
-            disabled={chatInputDisabled}
-            isStreaming={isLoading}
+            disabled={isInputDisabled}
+            isStreaming={isLoading || isLiteratureReviewActive || isStartingLiteratureReview}
             waitingOnRemoteGeneration={waitingOnRemoteGeneration}
             onStop={onStopChat}
             notebookId={notebookId}
-            deepResearchEnabled={deepResearchEnabled}
-            onToggleDeepResearch={() => setDeepResearchEnabled((prev) => !prev)}
+            mode={composerMode}
+            onModeChange={handleComposerModeChange}
+            researchDatabase={researchDatabase}
+            onResearchDatabaseChange={setResearchDatabase}
             sourceFilters={sourceFilters}
             onSourceFilterChange={setSourceFilters}
+            academicDiscoveryFilters={chatAcademicFilters}
+            onAcademicDiscoveryFiltersChange={(patch) =>
+              setChatAcademicFilters((prev) => ({ ...prev, ...patch }))
+            }
             chatSettings={chatSettings}
             onModelChange={(modelId) =>
               handleSaveChatConfig(
