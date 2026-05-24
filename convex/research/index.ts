@@ -1,8 +1,11 @@
 import { v, ConvexError } from "convex/values";
-import { query, mutation, internalMutation, internalQuery } from "../_generated/server";
+import { query, mutation, internalMutation, internalQuery, internalAction } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { components } from "../_generated/api";
+import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
 import { getAuthUserId } from "../auth";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
+export { createResearchArtifacts } from "./artifacts";
 
 // ============================================================
 // QUERIES
@@ -68,9 +71,17 @@ export const getRunStatus = query({
 export const getResearchSteps = query({
   args: {
     researchId: v.string(),
+    notebookId: v.id("notebooks"),
   },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    try {
+      await assertCanReadNotebook(ctx, args.notebookId, userId);
+    } catch {
+      return [];
+    }
     return await ctx.db
       .query("researchSteps")
       .withIndex("by_research", (q) => q.eq("researchId", args.researchId))
@@ -149,6 +160,16 @@ export const createResearchPlan = internalMutation({
       requirePrimarySources: v.optional(v.boolean()),
       recencyDays: v.optional(v.number()),
       dedupeStrategy: v.optional(v.string()),
+      academicFilters: v.optional(
+        v.object({
+          publicationYearFrom: v.optional(v.number()),
+          publicationYearTo: v.optional(v.number()),
+          minCitations: v.optional(v.number()),
+          openAccessOnly: v.optional(v.boolean()),
+          hasFullText: v.optional(v.boolean()),
+          fieldOfStudyTerms: v.optional(v.array(v.string())),
+        })
+      ),
     }),
     subQuestions: v.array(
       v.object({
@@ -285,6 +306,21 @@ export const updateRunProgress = internalMutation({
   },
 });
 
+export const updateRunArtifacts = internalMutation({
+  args: {
+    runId: v.id("researchRuns"),
+    tableId: v.id("literatureTables"),
+    reportId: v.id("literatureReports"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.runId, {
+      tableId: args.tableId,
+      reportId: args.reportId,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const upsertResearchStep = internalMutation({
   args: {
     researchId: v.string(),
@@ -300,7 +336,12 @@ export const upsertResearchStep = internalMutation({
       v.literal("generating_report"),
       v.literal("awaiting_user_input")
     ),
-    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
     details: v.optional(v.string()),
     metadata: v.optional(v.any()),
     order: v.number(),
@@ -371,5 +412,55 @@ export const saveEvidence = internalMutation({
         createdAt: now,
       });
     }
+  },
+});
+
+// ── Artifact generation exported from ./artifacts ───────────────────────
+
+// ============================================================
+// INTERNAL HELPERS
+// ============================================================
+
+export const createStreamInternal = internalAction({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    const streaming = new PersistentTextStreaming(components.persistentTextStreaming);
+    return await streaming.createStream(ctx);
+  },
+});
+
+export const patchResearchPlanInternal = internalMutation({
+  args: {
+    planId: v.id("researchPlans"),
+    patch: v.object({
+      subQuestions: v.optional(
+        v.array(
+          v.object({
+            id: v.string(),
+            question: v.string(),
+            searchQueries: v.array(v.string()),
+            sourceChannels: v.array(v.string()),
+            status: v.union(v.literal("pending"), v.literal("researching"), v.literal("completed")),
+          })
+        )
+      ),
+      status: v.optional(
+        v.union(
+          v.literal("planning"),
+          v.literal("draft"),
+          v.literal("approved"),
+          v.literal("rejected"),
+          v.literal("running"),
+          v.literal("completed"),
+          v.literal("failed")
+        )
+      ),
+      query: v.optional(v.string()),
+      sourcePolicy: v.optional(v.any()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.planId, args.patch);
   },
 });
