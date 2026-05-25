@@ -901,11 +901,15 @@ export interface SearchInternalResult {
   papers: AcademicPaper[];
   /** True when one or more APIs returned HTTP 429 or arXiv global throttle skipped. */
   rateLimited: boolean;
+  /** Per-provider failure descriptions for observability. */
+  providerErrors?: Array<{ provider: string; error: string }>;
 }
 
 export interface DiscoverAcademicPapersResult {
   sources: DiscoveredSource[];
   rateLimited: boolean;
+  /** Per-provider failure descriptions for observability. */
+  providerErrors?: Array<{ provider: string; error: string }>;
 }
 
 /** Normalize discover action result (array legacy shape or { sources, rateLimited }). */
@@ -987,6 +991,7 @@ export async function searchInternalHandler(
     let pubmedResults: AcademicPaper[] = [];
     let arxivSlotUsed = false;
     let rateLimited = false;
+    const providerErrors: Array<{ provider: string; error: string }> = [];
 
     for (let i = 0; i < orderedSources.length; i++) {
       const source = orderedSources[i];
@@ -1008,8 +1013,10 @@ export async function searchInternalHandler(
           ),
         ]);
         semanticResults = await semanticPromise.catch((error) => {
-          logger.warn("Semantic Scholar search failed", { message: (error as Error).message });
+          const message = (error as Error).message;
+          logger.warn("Semantic Scholar search failed", { message });
           if (isHttp429Error(error)) rateLimited = true;
+          providerErrors.push({ provider: "semantic_scholar", error: message });
           return [] as AcademicPaper[];
         });
         const next = orderedSources[i + 1];
@@ -1018,12 +1025,16 @@ export async function searchInternalHandler(
         }
       } else if (source === "openalex") {
         openAlexResults = await searchOpenAlex(effectiveQuery, perSourceMax).catch((error) => {
-          logger.warn("OpenAlex search failed", { message: (error as Error).message });
+          const message = (error as Error).message;
+          logger.warn("OpenAlex search failed", { message });
+          providerErrors.push({ provider: "openalex", error: message });
           return [] as AcademicPaper[];
         });
       } else if (source === "pubmed") {
         pubmedResults = await searchPubMed(effectiveQuery, perSourceMax, filters).catch((error) => {
-          logger.warn("PubMed search failed", { message: (error as Error).message });
+          const message = (error as Error).message;
+          logger.warn("PubMed search failed", { message });
+          providerErrors.push({ provider: "pubmed", error: message });
           return [] as AcademicPaper[];
         });
       } else if (source === "arxiv") {
@@ -1033,7 +1044,9 @@ export async function searchInternalHandler(
           arxivSlotUsed = arxiv.slotUsed;
           if (arxiv.rateLimited) rateLimited = true;
         } catch (error) {
-          logger.warn("arXiv search failed", { message: (error as Error).message });
+          const message = (error as Error).message;
+          logger.warn("arXiv search failed", { message });
+          providerErrors.push({ provider: "arxiv", error: message });
           arxivResults = [];
         }
       }
@@ -1060,10 +1073,11 @@ export async function searchInternalHandler(
       openAlexCount: openAlexResults.length,
       pubmedCount: pubmedResults.length,
       rateLimited,
+      providerErrorCount: providerErrors.length,
       durationMs: Date.now() - startTime,
     });
 
-    return { papers, rateLimited };
+    return { papers, rateLimited, providerErrors };
   } catch (error) {
     logger.operationError(error);
     throw error;
@@ -1196,7 +1210,7 @@ export async function discoverAcademicPapersInternalHandler(
   });
 
   try {
-    const { papers, rateLimited } = await fetchSearch({
+    const { papers, rateLimited, providerErrors } = await fetchSearch({
       query: normalizedQuery,
       maxResults: args.maxResults ?? 20,
       publicationYearFrom: args.publicationYearFrom,
@@ -1213,10 +1227,11 @@ export async function discoverAcademicPapersInternalHandler(
     logger.operationComplete({
       count: sources.length,
       rateLimited,
+      providerErrorCount: providerErrors?.length ?? 0,
       durationMs: Date.now() - startTime,
     });
 
-    return { sources, rateLimited };
+    return { sources, rateLimited, providerErrors };
   } catch (error) {
     logger.operationError(error);
     throw error;

@@ -101,6 +101,15 @@ export function useChatStream({
   const streamStartedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
+
   const [optimisticSaveNote, setOptimisticSaveNote] = useState<{
     notebookId: string;
     note: Note;

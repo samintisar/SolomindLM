@@ -68,12 +68,29 @@ export async function runResearchPlanPhase(
     conversationId,
     messageId: resolvedUserMessageId,
     query: message,
-    sourcePolicy,
+    sourcePolicy: sourcePolicy as {
+      channels: ("notebook" | "web" | "academic" | "news")[];
+      domainAllowlist?: string[];
+      dateRange?: { start: number; end: number };
+      maxResultsPerChannel?: number;
+      credibilityTier?: "primary" | "secondary" | "any";
+      requirePrimarySources?: boolean;
+      recencyDays?: number;
+      dedupeStrategy?: "strict" | "semantic" | "off";
+      academicFilters?: {
+        publicationYearFrom?: number;
+        publicationYearTo?: number;
+        minCitations?: number;
+        openAccessOnly?: boolean;
+        hasFullText?: boolean;
+        fieldOfStudyTerms?: string[];
+      };
+    },
     subQuestions: subQuestions.map((sq) => ({
       id: sq.id,
       question: sq.question,
       searchQueries: sq.searchQueries,
-      sourceChannels: sq.sourceChannels,
+      sourceChannels: sq.sourceChannels as ("notebook" | "web" | "academic" | "news")[],
     })),
   });
 

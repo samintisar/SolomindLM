@@ -334,7 +334,7 @@ export async function retrieverNode(
       if (!academicQuery) {
         await deps.onProgress("retrieving_web", sq.id, 0);
       } else {
-        await deps.onProgress("retrieving_web", sq.id, 0); // Reuse web phase for academic
+        await deps.onProgress("retrieving_web", sq.id, 0); // Report academic progress under web phase to simplify frontend progress UI
 
         const discoveredPapers: Array<{
           title: string;
@@ -423,10 +423,10 @@ export async function retrieverNode(
       }
     }
 
-    // Deduplicate by content similarity (simple exact match on first 200 chars)
+    // Deduplicate by source + content similarity to avoid over-aggressive dedup
     const seen = new Set<string>();
     const deduped = allChunks.filter((e) => {
-      const key = e.content.slice(0, 200);
+      const key = `${e.sourceUrl || e.sourceTitle}:${e.content.slice(0, 200)}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

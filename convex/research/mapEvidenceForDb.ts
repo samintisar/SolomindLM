@@ -1,14 +1,17 @@
 import type { Id } from "../_generated/dataModel";
 
+type SourceChannel = "notebook" | "web" | "academic" | "news";
+type CredibilityTier = "primary" | "secondary" | "any";
+
 /** Shape accepted by `internal.research.index.saveEvidence` */
 export type SaveEvidenceItem = {
   subQuestionId: string;
-  sourceType: string;
+  sourceType: SourceChannel;
   sourceTitle: string;
   sourceUrl?: string;
   content: string;
   relevanceScore?: number;
-  credibilityTier?: string;
+  credibilityTier?: CredibilityTier;
   iteration: number;
   metadata?: {
     documentId?: Id<"documents">;
@@ -25,12 +28,12 @@ export type SaveEvidenceItem = {
 export function mapAgentEvidenceForSave(
   evidence: Array<{
     subQuestionId: string;
-    sourceType: string;
+    sourceType: SourceChannel;
     sourceTitle: string;
     sourceUrl?: string;
     content: string;
     relevanceScore?: number;
-    credibilityTier?: string;
+    credibilityTier?: CredibilityTier;
     iteration: number;
     metadata?: {
       documentId?: string;

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Infer } from "convex/values";
 
 /** Bibliographic + OA resolver fields for discovery-added papers (OpenAlex-first). */
 export const paperRecordValidator = v.object({
@@ -13,7 +14,16 @@ export const paperRecordValidator = v.object({
   pdfUrl: v.optional(v.string()),
   landingPageUrl: v.optional(v.string()),
   license: v.optional(v.string()),
-  sourceType: v.optional(v.string()),
+  sourceType: v.optional(
+    v.union(
+      v.literal("doi"),
+      v.literal("bibtex"),
+      v.literal("ris"),
+      v.literal("zotero"),
+      v.literal("mendeley"),
+      v.literal("manual")
+    )
+  ),
 });
 
 export const fulltextStatusValidator = v.union(
@@ -29,20 +39,7 @@ export const ingestionStatusValidator = v.union(
   v.literal("failed")
 );
 
-export type PaperRecord = {
-  abstract: string;
-  authors: string[];
-  doi?: string;
-  venue?: string;
-  publicationYear?: number;
-  openAlexId?: string;
-  semanticScholarId?: string;
-  isOa: boolean;
-  pdfUrl?: string;
-  landingPageUrl?: string;
-  license?: string;
-  sourceType?: string;
-};
+export type PaperRecord = Infer<typeof paperRecordValidator>;
 
 export function normalizeDoi(doi: string | undefined): string | undefined {
   if (!doi) return undefined;

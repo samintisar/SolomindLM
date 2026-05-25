@@ -203,11 +203,13 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
 
   const handleConfirmColumns = useCallback(async () => {
     if (!suggestedColumns) return;
+    const validColumns = suggestedColumns.filter((c: { id: string; name: string; instructions?: string; isVisible: boolean }) => c.name.trim().length > 0);
+    if (validColumns.length === 0) return;
     setIsConfirmingColumns(true);
     try {
       await confirmColumnsMutation({
         sessionId: sessionId!,
-        confirmedColumns: suggestedColumns,
+        confirmedColumns: validColumns,
       });
       setEditingColumns(null);
     } catch {

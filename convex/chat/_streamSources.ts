@@ -90,7 +90,9 @@ export function createDiscoverSources(
               }))
             )
             .catch((e: unknown) => {
-              log?.warn("web_search_failed", { channel, topic, error: String(e) });
+              const err = String(e);
+              log?.warn("web_search_failed", { channel, topic, error: err });
+              console.warn("[streamSources] web_search_failed", { channel, topic, error: err });
               return [];
             })
         );
@@ -127,7 +129,9 @@ export function createDiscoverSources(
             }))
           )
           .catch((e: unknown) => {
-            log?.warn("academic_search_failed", { error: String(e) });
+            const err = String(e);
+            log?.warn("academic_search_failed", { error: err });
+            console.warn("[streamSources] academic_search_failed", { error: err });
             return [];
           })
       );

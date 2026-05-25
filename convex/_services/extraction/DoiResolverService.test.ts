@@ -148,6 +148,75 @@ describe("DoiResolverService", () => {
       expect(result?.title).toBe("Paper Title");
       expect(result?.isOa).toBe(false);
     });
+
+    it("throws on Crossref 500 errors (non-404)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => "Internal Server Error",
+      });
+
+      await expect(service.resolve("10.1234/server-error")).rejects.toThrow();
+    });
+
+    it("gracefully falls back to Crossref when Semantic Scholar fails with 500", async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: "ok",
+            message: {
+              title: ["Paper Title"],
+              author: [{ given: "Alice", family: "Wonder" }],
+              DOI: "10.1234/ss-error",
+              URL: "https://doi.org/10.1234/ss-error",
+            },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          text: async () => "Service Unavailable",
+        });
+
+      const result = await service.resolve("10.1234/ss-error");
+
+      expect(result).not.toBeNull();
+      expect(result?.title).toBe("Paper Title");
+      expect(result?.isOa).toBe(false);
+    });
+
+    it("returns partial record with [Untitled] when Crossref has no title", async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: "ok",
+            message: {
+              author: [{ given: "Alice", family: "Wonder" }],
+              abstract: "Abstract.",
+              DOI: "10.1234/no-title",
+              URL: "https://doi.org/10.1234/no-title",
+            },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            paperId: "p123",
+            isOpenAccess: false,
+          }),
+        });
+
+      const result = await service.resolve("10.1234/no-title");
+
+      expect(result).not.toBeNull();
+      expect(result?.title).toBe("[Untitled]");
+      expect(result?.authors).toEqual(["Wonder, Alice"]);
+    });
   });
 
   describe("resolveBatch", () => {

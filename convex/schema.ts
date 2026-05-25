@@ -527,19 +527,19 @@ export default defineSchema({
         id: v.string(),
         question: v.string(),
         searchQueries: v.array(v.string()),
-        sourceChannels: v.array(v.string()), // "notebook" | "web" | "academic" | "news"
+        sourceChannels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
         status: v.union(v.literal("pending"), v.literal("researching"), v.literal("completed")),
       })
     ),
     sourcePolicy: v.object({
-      channels: v.array(v.string()),
+      channels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
       domainAllowlist: v.optional(v.array(v.string())),
       dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
       maxResultsPerChannel: v.optional(v.number()),
-      credibilityTier: v.optional(v.string()), // "primary" | "secondary" | "any"
+      credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))), // "primary" | "secondary" | "any"
       requirePrimarySources: v.optional(v.boolean()),
       recencyDays: v.optional(v.number()),
-      dedupeStrategy: v.optional(v.string()), // "strict" | "semantic" | "off"
+      dedupeStrategy: v.optional(v.union(v.literal("strict"), v.literal("semantic"), v.literal("off"))),
       academicFilters: v.optional(
         v.object({
           publicationYearFrom: v.optional(v.number()),
@@ -574,7 +574,7 @@ export default defineSchema({
     userId: v.id("users"),
     notebookId: v.id("notebooks"),
     conversationId: v.id("conversations"),
-    status: v.string(), // "pending" | "running" | "completed" | "failed" | "cancelled"
+    status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
     currentIteration: v.number(),
     maxIterations: v.number(), // hard cap, default 2
     streamId: v.optional(v.string()),
@@ -597,12 +597,12 @@ export default defineSchema({
   researchEvidence: defineTable({
     runId: v.id("researchRuns"),
     subQuestionId: v.string(),
-    sourceType: v.string(), // "notebook" | "web" | "academic" | "news"
+    sourceType: v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news")),
     sourceTitle: v.string(),
     sourceUrl: v.optional(v.string()),
     content: v.string(),
     relevanceScore: v.optional(v.number()),
-    credibilityTier: v.optional(v.string()),
+    credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))),
     iteration: v.number(), // which pass found this evidence
     metadata: v.optional(
       v.object({

@@ -21,7 +21,16 @@ const bulkUploadPaperValidator = v.object({
   pdfUrl: v.optional(v.string()),
   landingPageUrl: v.optional(v.string()),
   license: v.optional(v.string()),
-  sourceType: v.optional(v.string()),
+  sourceType: v.optional(
+    v.union(
+      v.literal("doi"),
+      v.literal("bibtex"),
+      v.literal("ris"),
+      v.literal("zotero"),
+      v.literal("mendeley"),
+      v.literal("manual")
+    )
+  ),
   title: v.string(),
 });
 

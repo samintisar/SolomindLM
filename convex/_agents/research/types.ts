@@ -31,7 +31,7 @@ export interface EvidenceEntry {
   sourceUrl?: string;
   content: string;
   relevanceScore?: number;
-  credibilityTier?: string;
+  credibilityTier?: "primary" | "secondary" | "any";
   iteration: number;
   metadata?: {
     documentId?: string;

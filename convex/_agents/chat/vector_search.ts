@@ -151,7 +151,8 @@ export class VectorSearchHandler {
       log.debug("raw_results", { count: raw.length });
     }
 
-    // No fallback: respect the user's document selection strictly
+    // Weak fallback: if no chunks meet the global threshold, still use the best-scoring
+    // chunks to avoid returning empty results to the user.
 
     const withScore = raw.map((r) => ({
       ...r,

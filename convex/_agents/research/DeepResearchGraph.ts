@@ -49,15 +49,19 @@ async function trackStep(
     searching: 2,
   };
 
-  await step.runMutation(internal.research.index.upsertResearchStep, {
-    researchId,
-    agentType: "research",
-    stepType,
-    status,
-    details,
-    metadata,
-    order: orderMap[stepType],
-  });
+  try {
+    await step.runMutation(internal.research.index.upsertResearchStep, {
+      researchId,
+      agentType: "research",
+      stepType,
+      status,
+      details,
+      metadata,
+      order: orderMap[stepType],
+    });
+  } catch {
+    // Best-effort tracking — don't fail the workflow if step tracking fails
+  }
 }
 
 export const deepResearchWorkflow = workflow
@@ -70,14 +74,14 @@ export const deepResearchWorkflow = workflow
       assistantMessageId: v.id("messages"),
       planId: v.id("researchPlans"),
       sourcePolicy: v.object({
-        channels: v.array(v.string()),
+        channels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
         domainAllowlist: v.optional(v.array(v.string())),
         dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
         maxResultsPerChannel: v.optional(v.number()),
-        credibilityTier: v.optional(v.string()),
+        credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))),
         requirePrimarySources: v.optional(v.boolean()),
         recencyDays: v.optional(v.number()),
-        dedupeStrategy: v.optional(v.string()),
+        dedupeStrategy: v.optional(v.union(v.literal("strict"), v.literal("semantic"), v.literal("off"))),
         academicFilters: v.optional(
           v.object({
             publicationYearFrom: v.optional(v.number()),
@@ -158,8 +162,16 @@ export const deepResearchWorkflow = workflow
         planId: args.planId,
         patch: {
           subQuestions:
-            modifiedSubQuestions?.map((sq) => ({ ...sq, status: "pending" as const })) ??
-            planResult.subQuestions.map((sq) => ({ ...sq, status: "pending" as const })),
+            modifiedSubQuestions?.map((sq) => ({
+              ...sq,
+              status: "pending" as const,
+              sourceChannels: sq.sourceChannels as ("notebook" | "web" | "academic" | "news")[],
+            })) ??
+            planResult.subQuestions.map((sq) => ({
+              ...sq,
+              status: "pending" as const,
+              sourceChannels: sq.sourceChannels as ("notebook" | "web" | "academic" | "news")[],
+            })),
           status: "approved",
         },
       });
@@ -183,10 +195,14 @@ export const deepResearchWorkflow = workflow
       return { planId: args.planId, runId };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await step.runMutation(internal.research.index.patchResearchPlanInternal, {
-        planId: args.planId,
-        patch: { status: "failed" },
-      });
+      try {
+        await step.runMutation(internal.research.index.patchResearchPlanInternal, {
+          planId: args.planId,
+          patch: { status: "failed" },
+        });
+      } catch {
+        // Best-effort status update — original error takes precedence
+      }
       await trackStep(step, args.planId, "searching", "failed", errorMessage);
       throw error;
     }

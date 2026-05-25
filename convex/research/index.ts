@@ -155,14 +155,14 @@ export const createResearchPlan = internalMutation({
     messageId: v.id("messages"),
     query: v.string(),
     sourcePolicy: v.object({
-      channels: v.array(v.string()),
+      channels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
       domainAllowlist: v.optional(v.array(v.string())),
       dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
       maxResultsPerChannel: v.optional(v.number()),
-      credibilityTier: v.optional(v.string()),
+      credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))),
       requirePrimarySources: v.optional(v.boolean()),
       recencyDays: v.optional(v.number()),
-      dedupeStrategy: v.optional(v.string()),
+      dedupeStrategy: v.optional(v.union(v.literal("strict"), v.literal("semantic"), v.literal("off"))),
       academicFilters: v.optional(
         v.object({
           publicationYearFrom: v.optional(v.number()),
@@ -179,7 +179,7 @@ export const createResearchPlan = internalMutation({
         id: v.string(),
         question: v.string(),
         searchQueries: v.array(v.string()),
-        sourceChannels: v.array(v.string()),
+        sourceChannels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
       })
     ),
   },
@@ -212,7 +212,7 @@ export const approveResearchPlan = mutation({
           id: v.string(),
           question: v.string(),
           searchQueries: v.array(v.string()),
-          sourceChannels: v.array(v.string()),
+          sourceChannels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
         })
       )
     ),
@@ -228,6 +228,13 @@ export const approveResearchPlan = mutation({
       throw new ConvexError({ code: "NOT_FOUND", message: "Plan not found" });
     }
     await assertCanEditNotebook(ctx, plan.notebookId, userId);
+
+    if (plan.status !== "draft" && plan.status !== "planning") {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: `Plan cannot be approved from status: ${plan.status}`,
+      });
+    }
 
     const subQuestions = args.modifiedSubQuestions
       ? args.modifiedSubQuestions.map((sq) => ({ ...sq, status: "pending" as const }))
@@ -253,7 +260,7 @@ export const approveResearchPlan = mutation({
 
     return args.planId;
   },
-});
+});;
 
 export const rejectResearchPlan = mutation({
   args: { planId: v.id("researchPlans") },
@@ -400,12 +407,12 @@ export const saveEvidence = internalMutation({
     evidence: v.array(
       v.object({
         subQuestionId: v.string(),
-        sourceType: v.string(),
+        sourceType: v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news")),
         sourceTitle: v.string(),
         sourceUrl: v.optional(v.string()),
         content: v.string(),
         relevanceScore: v.optional(v.number()),
-        credibilityTier: v.optional(v.string()),
+        credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))),
         iteration: v.number(),
         metadata: v.optional(
           v.object({
@@ -455,7 +462,7 @@ export const patchResearchPlanInternal = internalMutation({
             id: v.string(),
             question: v.string(),
             searchQueries: v.array(v.string()),
-            sourceChannels: v.array(v.string()),
+            sourceChannels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
             status: v.union(v.literal("pending"), v.literal("researching"), v.literal("completed")),
           })
         )
@@ -472,7 +479,28 @@ export const patchResearchPlanInternal = internalMutation({
         )
       ),
       query: v.optional(v.string()),
-      sourcePolicy: v.optional(v.any()),
+      sourcePolicy: v.optional(
+        v.object({
+          channels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
+          domainAllowlist: v.optional(v.array(v.string())),
+          dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
+          maxResultsPerChannel: v.optional(v.number()),
+          credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))),
+          requirePrimarySources: v.optional(v.boolean()),
+          recencyDays: v.optional(v.number()),
+          dedupeStrategy: v.optional(v.union(v.literal("strict"), v.literal("semantic"), v.literal("off"))),
+          academicFilters: v.optional(
+            v.object({
+              publicationYearFrom: v.optional(v.number()),
+              publicationYearTo: v.optional(v.number()),
+              minCitations: v.optional(v.number()),
+              openAccessOnly: v.optional(v.boolean()),
+              hasFullText: v.optional(v.boolean()),
+              fieldOfStudyTerms: v.optional(v.array(v.string())),
+            })
+          ),
+        })
+      ),
     }),
   },
   handler: async (ctx, args) => {
@@ -487,14 +515,14 @@ export const startDeepResearch = mutation({
     query: v.string(),
     sourcePolicy: v.optional(
       v.object({
-        channels: v.array(v.string()),
+        channels: v.array(v.union(v.literal("notebook"), v.literal("web"), v.literal("academic"), v.literal("news"))),
         domainAllowlist: v.optional(v.array(v.string())),
         dateRange: v.optional(v.object({ start: v.number(), end: v.number() })),
         maxResultsPerChannel: v.optional(v.number()),
-        credibilityTier: v.optional(v.string()),
+        credibilityTier: v.optional(v.union(v.literal("primary"), v.literal("secondary"), v.literal("any"))),
         requirePrimarySources: v.optional(v.boolean()),
         recencyDays: v.optional(v.number()),
-        dedupeStrategy: v.optional(v.string()),
+        dedupeStrategy: v.optional(v.union(v.literal("strict"), v.literal("semantic"), v.literal("off"))),
         academicFilters: v.optional(
           v.object({
             publicationYearFrom: v.optional(v.number()),
@@ -521,7 +549,7 @@ export const startDeepResearch = mutation({
 
     await assertCanEditNotebook(ctx, args.notebookId, userId);
 
-    // Ensure conversation exists
+    // Prevent duplicate active research plans for this conversation
     const conversationId: Id<"conversations"> = await ctx.runMutation(
       internal.chat.index.ensureConversation,
       {
@@ -530,6 +558,25 @@ export const startDeepResearch = mutation({
         conversationId: args.conversationId,
       }
     );
+
+    const existingActivePlan = await ctx.db
+      .query("researchPlans")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "planning"),
+          q.eq(q.field("status"), "draft"),
+          q.eq(q.field("status"), "running")
+        )
+      )
+      .first();
+
+    if (existingActivePlan) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Research already in progress for this conversation",
+      });
+    }
 
     // Insert user message
     const userMessageId: Id<"messages"> = await ctx.runMutation(internal.chat.index.addMessage, {

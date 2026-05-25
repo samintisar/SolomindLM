@@ -207,7 +207,7 @@ export class HybridSearchHandler extends VectorSearchHandler {
       });
     }
 
-    // No fallback: respect the user's document selection strictly
+    // Two-stage fallback: RRF threshold first, then keyword-only fallback if empty.
 
     // RRF fusion
     const fused = reciprocalRankFusion(

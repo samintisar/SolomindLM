@@ -63,13 +63,20 @@ export class DoiResolverService {
       return null;
     }
 
-    // Fetch Semantic Scholar for PDF and OpenAlex ID
-    const ssPaper = await this.fetchSemanticScholarPaper(doi);
+    // Fetch Semantic Scholar for PDF and OpenAlex ID (best-effort)
+    const ssPaper = await this.fetchSemanticScholarPaper(doi).catch((error) => {
+      this.logger.warn("Semantic Scholar fetch failed during DOI resolution, continuing with Crossref data", {
+        doi,
+        error: (error as Error).message,
+      });
+      return null;
+    });
 
     const title = this.extractTitle(crossrefWork);
     if (!title) {
       this.logger.warn("Crossref work has no title", { doi });
-      return null;
+      // Return a partial record so the DOI is at least tracked
+      return this.buildPartialRecord(crossrefWork, doi, ssPaper);
     }
 
     const authors = this.extractAuthors(crossrefWork);
@@ -88,6 +95,42 @@ export class DoiResolverService {
 
     return {
       title,
+      authors,
+      abstract,
+      doi,
+      venue,
+      publicationYear: year,
+      pdfUrl: pdfUrl || undefined,
+      landingPageUrl,
+      openAlexId,
+      semanticScholarId,
+      isOa,
+      license,
+      sourceType: "doi",
+    };
+  }
+
+
+  private buildPartialRecord(
+    work: CrossrefWork,
+    doi: string,
+    ssPaper: SemanticScholarPaper | null
+  ): PaperRecord {
+    const authors = this.extractAuthors(work);
+    const abstract = this.cleanAbstract(work.abstract ?? "");
+    const venue = this.extractVenue(work);
+    const year = this.extractYear(work);
+    const pdfUrl = ssPaper?.openAccessPdf?.url || this.findPdfLink(work);
+    const landingPageUrl = work.URL || `https://doi.org/${doi}`;
+    const openAlexId = ssPaper?.externalIds?.OpenAlex
+      ? `https://openalex.org/${ssPaper.externalIds.OpenAlex}`
+      : undefined;
+    const semanticScholarId = ssPaper?.paperId;
+    const isOa = Boolean(pdfUrl) || Boolean(ssPaper?.isOpenAccess);
+    const license = work.license?.[0]?.URL;
+
+    return {
+      title: "[Untitled]",
       authors,
       abstract,
       doi,
@@ -171,7 +214,10 @@ export class DoiResolverService {
       }, "crossref_doi_resolution");
     } catch (error) {
       this.logger.error("Crossref resolution failed", { doi, error: (error as Error).message });
-      return null;
+      if (error instanceof ExternalServiceError && error.statusCode === 404) {
+        return null;
+      }
+      throw error;
     }
   }
 
@@ -223,7 +269,10 @@ export class DoiResolverService {
         doi,
         error: (error as Error).message,
       });
-      return null;
+      if (error instanceof ExternalServiceError && error.statusCode === 404) {
+        return null;
+      }
+      throw error;
     }
   }
 

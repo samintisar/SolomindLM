@@ -134,8 +134,8 @@ function mergeToolCallsFromLines(lines: string[]): MessageToolCall[] {
         keyToIndex.set(key, toolCalls.length);
         toolCalls.push(entry);
       }
-    } catch {
-      // ignore malformed JSON
+    } catch (parseError) {
+      console.warn("[chatStream] Failed to parse __TOOL_CALL line:", parseError, "Raw:", line.slice(0, 200));
     }
   }
   return toolCalls;
@@ -190,8 +190,8 @@ export function parseStreamBody(body: string): ParsedStreamData {
       try {
         const jsonStr = line.slice("__REFERENCES:".length);
         result.references = JSON.parse(jsonStr);
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __REFERENCES:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__STATUS:")) {
       try {
@@ -199,8 +199,8 @@ export function parseStreamBody(body: string): ParsedStreamData {
         if (parsed) {
           result.status = parsed;
         }
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __STATUS:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__GROUNDING:") || line.startsWith("__GROUNDING_WARN:")) {
       // Collected into result.groundingChecks after the loop
@@ -209,41 +209,41 @@ export function parseStreamBody(body: string): ParsedStreamData {
     } else if (line.startsWith("__FOLLOWUPS:")) {
       try {
         result.followUps = JSON.parse(line.slice("__FOLLOWUPS:".length));
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __FOLLOWUPS:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__CLARIFICATION:")) {
       try {
         result.clarification = JSON.parse(line.slice("__CLARIFICATION:".length));
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __CLARIFICATION:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__ERROR:")) {
       try {
         const jsonStr = line.slice("__ERROR:".length);
         result.error = JSON.parse(jsonStr);
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __ERROR:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__RESEARCH_PLAN:")) {
       try {
         result.researchPlan = JSON.parse(line.slice("__RESEARCH_PLAN:".length));
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __RESEARCH_PLAN:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__RESEARCH_PROGRESS:")) {
       try {
         result.researchProgress = JSON.parse(line.slice("__RESEARCH_PROGRESS:".length));
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __RESEARCH_PROGRESS:", parseError, "Raw:", line.slice(0, 200));
       }
     } else if (line.startsWith("__DONE")) {
       result.isDone = true;
     } else if (line.startsWith("__EXTERNAL_SOURCES:")) {
       try {
         result.externalSources = JSON.parse(line.slice("__EXTERNAL_SOURCES:".length));
-      } catch {
-        // Ignore parse errors
+      } catch (parseError) {
+        console.warn("[chatStream] Failed to parse __EXTERNAL_SOURCES:", parseError, "Raw:", line.slice(0, 200));
       }
     } else {
       // Regular text content

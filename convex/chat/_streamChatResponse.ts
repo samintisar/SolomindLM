@@ -19,7 +19,7 @@ import {
   loadHybridSearchConfig,
   createHybridSearch,
 } from "./_streamSearch";
-import { discoverChatExternalSources } from "./_streamSources";
+import { discoverChatExternalSources, type DiscoveredSource, type ExternalChunk } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
 
 const CHAT_HISTORY_FETCH_LIMIT = 80;
@@ -189,12 +189,23 @@ export async function streamChatResponse(
 
   // External search
   const includeNotebook = (sourcePolicy?.channels ?? ["notebook"]).includes("notebook");
-  const { sources: externalSources, chunks: externalChunks } = await discoverChatExternalSources(
-    ctx,
-    message,
-    sourcePolicy ?? { channels: ["notebook"] },
-    chatStreamLog
-  );
+  let externalSources: DiscoveredSource[] = [];
+  let externalChunks: ExternalChunk[] = [];
+  try {
+    const discovered = await discoverChatExternalSources(
+      ctx,
+      message,
+      sourcePolicy ?? { channels: ["notebook"] },
+      chatStreamLog
+    );
+    externalSources = discovered.sources;
+    externalChunks = discovered.chunks;
+  } catch (discoveryError) {
+    chatStreamLog.error("external_source_discovery_failed", {
+      error: discoveryError instanceof Error ? discoveryError.message : String(discoveryError),
+    });
+    // Continue without external sources — notebook search still available
+  }
 
   let fullResponse = "";
   let references: unknown[] = [];

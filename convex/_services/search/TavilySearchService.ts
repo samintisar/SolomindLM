@@ -116,7 +116,14 @@ export async function searchInternalHandler(args: SearchInternalArgs): Promise<D
       snippet: result.content || "",
       score: result.score || 0,
       publishedDate: result.published_date,
-      domain: result.url ? new URL(result.url).hostname : undefined,
+      domain: (() => {
+        if (!result.url) return undefined;
+        try {
+          return new URL(result.url).hostname;
+        } catch {
+          return undefined;
+        }
+      })(),
       rawContent: result.rawContent || undefined,
     }));
 
