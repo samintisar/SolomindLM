@@ -3,12 +3,7 @@ import { STEP_DEFINITIONS, STEP_IDS } from "./steps";
 
 describe("step definitions", () => {
   test("ids are in the documented order", () => {
-    expect(STEP_IDS).toEqual([
-      "createNotebook",
-      "addSource",
-      "askQuestion",
-      "generateArtifact",
-    ]);
+    expect(STEP_IDS).toEqual(["createNotebook", "addSource", "askQuestion", "generateArtifact"]);
   });
 
   test("every step has selector and copy", () => {

@@ -81,10 +81,7 @@ describe("TourTooltip", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(withCtx({ tourStatus: "active", currentStepId: "askQuestion", skip }));
     await userEvent.click(screen.getByRole("button", { name: /skip tour/i }));
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "[onboarding] failed to skip tour",
-      failure,
-    );
+    expect(consoleSpy).toHaveBeenCalledWith("[onboarding] failed to skip tour", failure);
     consoleSpy.mockRestore();
   });
 

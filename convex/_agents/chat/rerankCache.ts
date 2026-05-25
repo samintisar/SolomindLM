@@ -68,8 +68,8 @@ export const rerankInternal = internalAction({
 
       // Return results with indices for mapping back to original documents
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const results = (response.results || []).map((item: any, index: number) => ({
-        index,
+      const results = (response.results || []).map((item: any) => ({
+        index: item.index ?? item.document_index ?? 0,
         text: item.text ?? item.document,
         relevance_score: item.relevance_score,
       }));
@@ -89,7 +89,7 @@ export const rerankInternal = internalAction({
 
 const rerankCache = createCachedAction(internal._agents.chat.rerankCache.rerankInternal, {
   ttl: withJitter(CACHE_TTL.rerank, 0.2),
-  name: "rerank",
+  name: "rerank-v2",
 });
 
 // ============================================================
@@ -140,8 +140,8 @@ export async function cachedRerank(
 
   // Build cache key components (for logging/debugging)
   const docIds = sortedDocs.map((d) => d.id).join(",");
-  const _contentHash = hashInput(sortedDocs.map((d) => d.content).join("|"));
-  const queryHash = hashInput(normalizedQuery);
+  const _contentHash = await hashInput(sortedDocs.map((d) => d.content).join("|"));
+  const queryHash = await hashInput(normalizedQuery);
   console.log(
     `[RerankCache] key: model=${model}, queryHash=${queryHash}, docs=${docIds.slice(0, 50)}...`
   );

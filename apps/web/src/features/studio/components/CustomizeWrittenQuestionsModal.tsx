@@ -51,7 +51,10 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
             </h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="writtenQuestions" onApplyPrompt={setFocus} />
+            <StudioModalDiscoverPromptsButton
+              studioTool="writtenQuestions"
+              onApplyPrompt={setFocus}
+            />
             <button
               type="button"
               onClick={onClose}

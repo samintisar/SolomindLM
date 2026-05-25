@@ -18,4 +18,14 @@ describe("buildWriterPrompt", () => {
     expect(prompt).toContain("[2]");
     expect(prompt.indexOf("[1]")).toBeLessThan(prompt.indexOf("[2]"));
   });
+
+  test("requests chat-native answer with inline citations", () => {
+    const prompt = buildWriterPrompt("Q?", [{ id: "sq1", question: "A?" }], {
+      sq1: [{ sourceType: "web", sourceTitle: "T1", content: "c1" }],
+    });
+    expect(prompt).toContain("chat-native");
+    expect(prompt).toContain("[N]");
+    expect(prompt).not.toContain("Learning Roadmap");
+    expect(prompt).not.toContain("## Abstract");
+  });
 });

@@ -24,6 +24,7 @@
 ### Problem
 
 Users need a dedicated research mode that:
+
 - Searches external academic sources (arXiv, Semantic Scholar, PubMed)
 - Produces structured comparison tables with configurable columns
 - Generates formal academic reports with proper citations
@@ -33,10 +34,12 @@ Users need a dedicated research mode that:
 ### Solution
 
 Build two complementary systems:
+
 1. **Enhanced Research Agent** — Add step tracking + artifact generation to existing `convex/_agents/research/`
 2. **Literature Review Agent** — New `convex/_agents/literature_review/` with systematic review workflow
 
 Both agents produce:
+
 - `literatureTables` — Structured comparison tables
 - `literatureReports` — Formal academic reports with citations
 
@@ -92,15 +95,15 @@ Both agents produce:
 
 ### Component Responsibilities
 
-| Component | Responsibility |
-|-----------|---------------|
-| **Research Agent** | External search, sub-question planning, source discovery. Enhanced with step tracking and artifact generation. |
-| **Literature Review Agent** | Systematic review workflow: plan → search → dedup → rank → screen → extract → table → report |
-| **Citation Engine** | Format citations in multiple styles. Generate inline markers and reference lists. Pure utility, no external calls. |
-| **AcademicSearchService** | Search arXiv, Semantic Scholar, PubMed. Already exists at `convex/_services/search/AcademicSearchService.ts`. |
-| **DiscoveryService** | Unified source discovery (web, news, academic). Already exists at `convex/_services/search/DiscoveryService.ts`. |
-| **ZeroEntropy** | Rerank search results by relevance. Already integrated. |
-| **Workflow** | `@convex-dev/workflow` — durable orchestration for long-running multi-step agents with checkpoints, retry, and crash recovery. |
+| Component                   | Responsibility                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Research Agent**          | External search, sub-question planning, source discovery. Enhanced with step tracking and artifact generation.                 |
+| **Literature Review Agent** | Systematic review workflow: plan → search → dedup → rank → screen → extract → table → report                                   |
+| **Citation Engine**         | Format citations in multiple styles. Generate inline markers and reference lists. Pure utility, no external calls.             |
+| **AcademicSearchService**   | Search arXiv, Semantic Scholar, PubMed. Already exists at `convex/_services/search/AcademicSearchService.ts`.                  |
+| **DiscoveryService**        | Unified source discovery (web, news, academic). Already exists at `convex/_services/search/DiscoveryService.ts`.               |
+| **ZeroEntropy**             | Rerank search results by relevance. Already integrated.                                                                        |
+| **Workflow**                | `@convex-dev/workflow` — durable orchestration for long-running multi-step agents with checkpoints, retry, and crash recovery. |
 
 ### Orchestration: `@convex-dev/workflow`
 
@@ -108,14 +111,14 @@ The official `@convex-dev/workflow` component is the **primary orchestration lay
 
 **Key primitives used:**
 
-| Primitive | Purpose | Replaces |
-|-----------|---------|----------|
-| `step.runAction()` | Execute non-deterministic work (LLM calls, API searches) | Direct action calls |
-| `step.awaitEvent()` | Pause indefinitely for user input (column confirmation) | `literatureReviewSessions` + `ctx.scheduler` |
-| `restart({ from: stepName })` | Resume from a specific step after failure | Manual `currentNode` tracking + resume action |
-| `step.runAction(..., { retry })` | Per-step retry with backoff | Manual `Promise.allSettled()` + retry logic |
-| `Promise.all([...])` | Parallel execution with automatic limit | Manual batching |
-| `getStatus()` | Reactive progress querying | `researchSteps` polling (coarser granularity) |
+| Primitive                        | Purpose                                                  | Replaces                                      |
+| -------------------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| `step.runAction()`               | Execute non-deterministic work (LLM calls, API searches) | Direct action calls                           |
+| `step.awaitEvent()`              | Pause indefinitely for user input (column confirmation)  | `literatureReviewSessions` + `ctx.scheduler`  |
+| `restart({ from: stepName })`    | Resume from a specific step after failure                | Manual `currentNode` tracking + resume action |
+| `step.runAction(..., { retry })` | Per-step retry with backoff                              | Manual `Promise.allSettled()` + retry logic   |
+| `Promise.all([...])`             | Parallel execution with automatic limit                  | Manual batching                               |
+| `getStatus()`                    | Reactive progress querying                               | `researchSteps` polling (coarser granularity) |
 
 **Workflow handler structure:**
 
@@ -128,21 +131,21 @@ export const literatureReviewWorkflow = workflow.defineHandler({
       internal.agents.literature_review.planReview,
       { query: args.query }
     );
-    
+
     // Checkpoint: await user column confirmation
     const columnsEvent = defineEvent({
       name: "columnsConfirmed",
       validator: v.object({ confirmedColumns: v.array(columnValidator) }),
     });
     const { confirmedColumns } = await step.awaitEvent(columnsEvent);
-    
+
     // searchPapers: parallel search across sources
     const [arxiv, semantic, pubmed] = await Promise.all([
       step.runAction(internal.search.searchArxiv, { query: args.query }),
       step.runAction(internal.search.searchSemanticScholar, { query: args.query }),
       step.runAction(internal.search.searchPubmed, { query: args.query }),
     ]);
-    
+
     // ... remaining nodes
   },
 });
@@ -186,21 +189,17 @@ Deduplicated, reusable paper metadata. Referenced by both `literatureTables` and
 
 ```typescript
 citations: defineTable({
-  paperId: v.string(),           // External ID: arXiv ID, DOI, etc.
+  paperId: v.string(), // External ID: arXiv ID, DOI, etc.
   title: v.string(),
   authors: v.array(v.string()),
   year: v.optional(v.number()),
   doi: v.optional(v.string()),
   url: v.string(),
   pdfUrl: v.optional(v.string()),
-  sourceApi: v.union(
-    v.literal("arxiv"),
-    v.literal("semantic_scholar"),
-    v.literal("pubmed")
-  ),
+  sourceApi: v.union(v.literal("arxiv"), v.literal("semantic_scholar"), v.literal("pubmed")),
   citationCount: v.optional(v.number()),
   abstract: v.optional(v.string()),
-  citationKey: v.string(),       // e.g., "Smith2024" for inline refs
+  citationKey: v.string(), // e.g., "Smith2024" for inline refs
 })
   .index("by_paperId", ["paperId"])
   .index("by_citationKey", ["citationKey"]);
@@ -209,6 +208,7 @@ citations: defineTable({
 **Rationale:** Citations are first-class data. A paper found in multiple research sessions gets one row. Enables future features: citation networks, bibliometrics, cross-reference validation.
 
 **Citation key generation:** `citationKey` must be unique. Strategy:
+
 1. Base key: `FirstAuthorLastName + Year` (e.g., "Smith2024")
 2. On collision, append lowercase letter suffix: "Smith2024a", "Smith2024b", etc.
 3. Enforce uniqueness at write time via index check, not at query time
@@ -220,36 +220,36 @@ Structured comparison tables with configurable columns and extracted cell data.
 
 ```typescript
 literatureTables: defineTable({
-  title: v.string(),             // e.g., "Reliability of LLM Evaluation Benchmarks"
+  title: v.string(), // e.g., "Reliability of LLM Evaluation Benchmarks"
   description: v.optional(v.string()),
   notebookId: v.id("notebooks"),
   userId: v.id("users"),
-  status: v.union(
-    v.literal("generating"),
-    v.literal("completed"),
-    v.literal("failed")
+  status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+  columns: v.array(
+    v.object({
+      id: v.string(),
+      name: v.string(),
+      type: v.union(
+        v.literal("paper_title"), // System column: paper title
+        v.literal("authors"), // System column: authors
+        v.literal("year"), // System column: publication year
+        v.literal("study_type"), // System column: study design/type
+        v.literal("custom") // User-defined column
+      ),
+      instructions: v.optional(v.string()), // For custom columns: LLM extraction prompt
+      isVisible: v.boolean(),
+      isSystem: v.boolean(), // true for paper_title, authors, year (non-removable)
+      order: v.number(),
+    })
   ),
-  columns: v.array(v.object({
-    id: v.string(),
-    name: v.string(),
-    type: v.union(
-      v.literal("paper_title"),   // System column: paper title
-      v.literal("authors"),       // System column: authors
-      v.literal("year"),          // System column: publication year
-      v.literal("study_type"),    // System column: study design/type
-      v.literal("custom")         // User-defined column
-    ),
-    instructions: v.optional(v.string()),  // For custom columns: LLM extraction prompt
-    isVisible: v.boolean(),
-    isSystem: v.boolean(),         // true for paper_title, authors, year (non-removable)
-    order: v.number(),
-  })),
-  papers: v.array(v.object({
-    citationId: v.id("citations"),
-    rowData: v.record(v.string(), v.string()),  // columnId -> extracted content
-    includeReason: v.optional(v.string()),     // Screening decision reasoning
-    isIncluded: v.boolean(),
-  })),
+  papers: v.array(
+    v.object({
+      citationId: v.id("citations"),
+      rowData: v.record(v.string(), v.string()), // columnId -> extracted content
+      includeReason: v.optional(v.string()), // Screening decision reasoning
+      isIncluded: v.boolean(),
+    })
+  ),
   createdAt: v.number(),
   updatedAt: v.number(),
 })
@@ -270,19 +270,17 @@ literatureReports: defineTable({
   title: v.string(),
   notebookId: v.id("notebooks"),
   userId: v.id("users"),
-  status: v.union(
-    v.literal("generating"),
-    v.literal("completed"),
-    v.literal("failed")
+  status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+  content: v.string(), // Markdown with inline citation markers [Smith2024]
+  citationStyle: v.string(), // "apa7", "apa6", "mla9", "chicago17", etc.
+  sections: v.array(
+    v.object({
+      heading: v.string(),
+      content: v.string(),
+    })
   ),
-  content: v.string(),             // Markdown with inline citation markers [Smith2024]
-  citationStyle: v.string(),       // "apa7", "apa6", "mla9", "chicago17", etc.
-  sections: v.array(v.object({
-    heading: v.string(),
-    content: v.string(),
-  })),
-  citationIds: v.array(v.id("citations")),  // Referenced citations
-  tableId: v.optional(v.id("literatureTables")),  // Link to companion table
+  citationIds: v.array(v.id("citations")), // Referenced citations
+  tableId: v.optional(v.id("literatureTables")), // Link to companion table
   createdAt: v.number(),
   updatedAt: v.number(),
 })
@@ -298,10 +296,10 @@ Track agent progress for step display UI. Used by both Research Agent and Litera
 
 ```typescript
 researchSteps: defineTable({
-  researchId: v.string(),           // Generic ID: workflow ID, conversation ID, etc.
+  researchId: v.string(), // Generic ID: workflow ID, conversation ID, etc.
   agentType: v.union(
-    v.literal("research"),           // Enhanced research agent
-    v.literal("literature_review")   // Literature review agent
+    v.literal("research"), // Enhanced research agent
+    v.literal("literature_review") // Literature review agent
   ),
   stepType: v.union(
     v.literal("searching"),
@@ -311,7 +309,7 @@ researchSteps: defineTable({
     v.literal("extracting"),
     v.literal("populating"),
     v.literal("generating_report"),
-    v.literal("awaiting_user_input")  // For checkpoint: user confirms columns
+    v.literal("awaiting_user_input") // For checkpoint: user confirms columns
   ),
   status: v.union(
     v.literal("pending"),
@@ -319,18 +317,19 @@ researchSteps: defineTable({
     v.literal("completed"),
     v.literal("failed")
   ),
-  details: v.optional(v.string()),  // e.g., "Found 100 papers", "Ranked by relevance"
-  metadata: v.optional(v.object({
-    queryCount: v.optional(v.number()),
-    paperCount: v.optional(v.number()),
-    includedCount: v.optional(v.number()),
-    excludedCount: v.optional(v.number()),
-  })),
+  details: v.optional(v.string()), // e.g., "Found 100 papers", "Ranked by relevance"
+  metadata: v.optional(
+    v.object({
+      queryCount: v.optional(v.number()),
+      paperCount: v.optional(v.number()),
+      includedCount: v.optional(v.number()),
+      excludedCount: v.optional(v.number()),
+    })
+  ),
   startedAt: v.optional(v.number()),
   completedAt: v.optional(v.number()),
   order: v.number(),
-})
-  .index("by_research", ["researchId"]);
+}).index("by_research", ["researchId"]);
 ```
 
 **Rationale:** Enables real-time progress display for both agents. `agentType` discriminator allows both Research Agent and Literature Review Agent to use the same table. Metadata captures counts for UI summaries. `awaiting_user_input` status supports the checkpoint pattern.
@@ -344,7 +343,7 @@ literatureReviewSessions: defineTable({
   query: v.string(),
   notebookId: v.id("notebooks"),
   userId: v.id("users"),
-  workflowId: v.string(),            // Links to @convex-dev/workflow instance
+  workflowId: v.string(), // Links to @convex-dev/workflow instance
   status: v.union(
     v.literal("planning"),
     v.literal("awaiting_columns"),
@@ -353,17 +352,25 @@ literatureReviewSessions: defineTable({
     v.literal("completed"),
     v.literal("failed")
   ),
-  suggestedColumns: v.optional(v.array(v.object({
-    id: v.string(),
-    name: v.string(),
-    instructions: v.optional(v.string()),
-  }))),
-  confirmedColumns: v.optional(v.array(v.object({
-    id: v.string(),
-    name: v.string(),
-    instructions: v.optional(v.string()),
-    isVisible: v.boolean(),
-  }))),
+  suggestedColumns: v.optional(
+    v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        instructions: v.optional(v.string()),
+      })
+    )
+  ),
+  confirmedColumns: v.optional(
+    v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        instructions: v.optional(v.string()),
+        isVisible: v.boolean(),
+      })
+    )
+  ),
   error: v.optional(v.string()),
   tableId: v.optional(v.id("literatureTables")),
   reportId: v.optional(v.id("literatureReports")),
@@ -384,10 +391,10 @@ Stores extracted data incrementally as batches complete. One row per paper.
 literatureTableDrafts: defineTable({
   sessionId: v.id("literatureReviewSessions"),
   citationId: v.id("citations"),
-  rowData: v.record(v.string(), v.string()),  // columnId -> extracted content
+  rowData: v.record(v.string(), v.string()), // columnId -> extracted content
   includeReason: v.optional(v.string()),
   isIncluded: v.boolean(),
-  batchNumber: v.number(),  // For ordering and resumption
+  batchNumber: v.number(), // For ordering and resumption
   createdAt: v.number(),
 })
   .index("by_session", ["sessionId"])
@@ -420,7 +427,7 @@ literatureTableDrafts: defineTable({
 **Updated node flow:**
 
 ```
-START → planResearch → discoverSources → gatherEvidence → 
+START → planResearch → discoverSources → gatherEvidence →
   synthesizeFindings → generateArtifacts → END
 ```
 
@@ -438,7 +445,7 @@ interface LiteratureReviewState {
   papers: AcademicPaper[];
   rankedPapers: AcademicPaper[];
   screenedPapers: ScreenedPaper[];
-  extractedData: Record<string, Record<string, string>>;  // paperId -> columnId -> content
+  extractedData: Record<string, Record<string, string>>; // paperId -> columnId -> content
   tableColumns: TableColumn[];
   tableId: Id<"literatureTables"> | null;
   reportId: Id<"literatureReports"> | null;
@@ -453,13 +460,14 @@ interface LiteratureReviewState {
 **Node Flow:**
 
 ```
-START → planReview → [checkpoint] → searchPapers → deduplicatePapers → 
+START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
   rankPapers → screenPapers → extractData → generateTable → generateReport → END
 ```
 
 #### Node Details
 
 **`planReview`**
+
 - **Purpose:** LLM plans search strategy and suggests column definitions
 - **Input:** User research question
 - **Output:** Search queries, suggested columns with names and extraction instructions
@@ -467,14 +475,16 @@ START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
 - **Next:** Human-in-the-loop checkpoint
 
 **`searchPapers`**
+
 - **Purpose:** Search external academic sources
 - **Implementation:** Parallel calls to `AcademicSearchService` (arXiv, Semantic Scholar, PubMed)
 - **Output:** Array of `AcademicPaper` objects
 - **Step tracking:** Update `researchSteps` with "searching" status + paper count
 
 **`deduplicatePapers`**
+
 - **Purpose:** Remove duplicate papers from multiple sources
-- **Implementation:** 
+- **Implementation:**
   1. Match by DOI (exact)
   2. Fuzzy match by normalized title (Levenshtein distance < 0.15)
   3. Keep highest-scoring duplicate
@@ -482,6 +492,7 @@ START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
 - **Step tracking:** Update with dedup count
 
 **`rankPapers`**
+
 - **Purpose:** Rank papers by relevance to research question
 - **Implementation:** ZeroEntropy reranking (NOT LLM scoring)
 - **Why ZeroEntropy:** LLM scoring 50+ papers is expensive and slow. ZeroEntropy is already integrated and optimized for this.
@@ -489,10 +500,13 @@ START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
 - **Step tracking:** Update with ranking complete
 
 **`screenPapers`**
+
 - **Purpose:** PRISMA-style eligibility screening
 - **Implementation:** Batch 5 papers per LLM call with structured output:
   ```typescript
-  { decisions: [{ paperId, isIncluded, reason }] }
+  {
+    decisions: [{ paperId, isIncluded, reason }];
+  }
   ```
   This cuts calls by 5× vs. one call per paper with minimal quality loss since each decision is independent.
 - **Threshold:** Screen top 30 ranked papers (not a score cutoff — score distributions vary too much across queries)
@@ -501,12 +515,13 @@ START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
 - **UI:** Show screening results with include/exclude badges
 
 **`extractData`**
+
 - **Purpose:** Extract data for each column per paper
 - **Implementation:** Batched parallel extraction via Workflow's built-in parallelism
   - Each batch is a `step.runAction()` call with per-step retry config:
     ```typescript
     await step.runAction(internal.agents.literature_review.extractBatch, args, {
-      retry: { maxAttempts: 3, initialBackoffMs: 500, base: 2 }
+      retry: { maxAttempts: 3, initialBackoffMs: 500, base: 2 },
     });
     ```
   - Workflow automatically caps parallelism at `maxParallelism` (default 10)
@@ -518,6 +533,7 @@ START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
 - **Note:** `extractedData` exists in memory during a single workflow run. It is **NOT persisted to `literatureReviewSessions`** — that document stores only UI state. On resume, rebuilt from `literatureTableDrafts`.
 
 **`generateTable`**
+
 - **Purpose:** Create `literatureTables` row
 - **Implementation:** Pure DB write, NO LLM inference
 - **Read path:** Read extracted data from `literatureTableDrafts` by `sessionId`, NOT from in-memory state (state doesn't survive checkpoint boundaries)
@@ -529,6 +545,7 @@ START → planReview → [checkpoint] → searchPapers → deduplicatePapers →
 - **Output:** `tableId`
 
 **`generateReport`**
+
 - **Purpose:** Synthesize formal academic report
 - **Implementation:** Section-by-section generation (400-600 words per section)
   - Generate each section as a separate LLM call: Abstract → Introduction → Methods → Results → Discussion → Conclusion
@@ -577,6 +594,7 @@ The literature review workflow is long (6+ nodes, many LLM calls). If `extractDa
 5. The restarted step reads already-extracted data from `literatureTableDrafts` to avoid re-processing
 
 **Example:** If `extractData` fails on batch 3:
+
 - `literatureTableDrafts`: contains batches 1-2
 - User clicks "Retry from last step"
 - `restart({ from: extractData })` restarts the workflow from the `extractData` step
@@ -586,9 +604,10 @@ The literature review workflow is long (6+ nodes, many LLM calls). If `extractDa
 **UI:** Show "Retry from last step" button in the step tracker when a step fails. Don't force the user to start over.
 
 **Per-step retry config:** Each `extractData` batch uses Workflow's built-in retry:
+
 ```typescript
 await step.runAction(internal.agents.literature_review.extractBatch, args, {
-  retry: { maxAttempts: 3, initialBackoffMs: 500, base: 2 }
+  retry: { maxAttempts: 3, initialBackoffMs: 500, base: 2 },
 });
 ```
 
@@ -618,13 +637,13 @@ interface Citation {
 interface CitationEngine {
   // Format inline citation: (Smith et al., 2024) or [1]
   formatInline(citation: Citation, style: string): string;
-  
+
   // Format full reference for bibliography
   formatReference(citation: Citation, style: string): string;
-  
+
   // Generate sorted reference list
   generateReferenceList(citations: Citation[], style: string): string;
-  
+
   // Parse raw citation string into structured Citation
   // SCOPE: Only parses citations generated by this engine (your own format).
   // Parsing arbitrary user-input citations (BibTeX, RIS, etc.) is out of scope for v1.
@@ -634,16 +653,18 @@ interface CitationEngine {
 
 ### Supported Styles (v1)
 
-| Style | Inline Example | Reference Example |
-|-------|---------------|-------------------|
-| APA 7 | (Smith et al., 2024) | Smith, J., Jones, A., & Brown, K. (2024). Title of paper. *Journal Name*, 10(2), 123-145. https://doi.org/10.xxxx |
-| MLA 9 | (Smith 45) | Smith, John, et al. "Title of Paper." *Journal Name*, vol. 10, no. 2, 2024, pp. 123-145. |
-| Chicago 17 | (Smith 2024, 45) | Smith, John, Alice Jones, and Kevin Brown. 2024. "Title of Paper." *Journal Name* 10, no. 2: 123-145. |
+| Style      | Inline Example       | Reference Example                                                                                                 |
+| ---------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| APA 7      | (Smith et al., 2024) | Smith, J., Jones, A., & Brown, K. (2024). Title of paper. _Journal Name_, 10(2), 123-145. https://doi.org/10.xxxx |
+| MLA 9      | (Smith 45)           | Smith, John, et al. "Title of Paper." _Journal Name_, vol. 10, no. 2, 2024, pp. 123-145.                          |
+| Chicago 17 | (Smith 2024, 45)     | Smith, John, Alice Jones, and Kevin Brown. 2024. "Title of Paper." _Journal Name_ 10, no. 2: 123-145.             |
 
 **Source-aware formatting:** `formatReference` must branch on `sourceApi`, not just style. For example, APA 7 for arXiv preprints:
+
 ```
 Smith, J. (2024). Title. arXiv. https://arxiv.org/abs/2401.12345
 ```
+
 This differs from journal article format. Since primary sources are arXiv/Semantic Scholar/PubMed, this branching matters immediately.
 
 **Extensibility:** New styles added by implementing format functions. No schema changes needed.
@@ -654,14 +675,14 @@ This differs from journal article format. Since primary sources are arXiv/Semant
 
 ### Component Overview
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| `ResearchModeToggle` | `features/chat/components/ResearchModeToggle.tsx` | Toggle Chat / Deep Research mode |
-| `ResearchSteps` | `features/chat/components/ResearchSteps.tsx` | Paperguide-style step tracker |
-| `LiteratureTableView` | `features/studio/components/views/LiteratureTableView.tsx` | Table with column management |
-| `LiteratureReportView` | `features/studio/components/views/LiteratureReportView.tsx` | Report with citations |
-| `CitationStylePicker` | `features/studio/components/CitationStylePicker.tsx` | Dropdown for citation styles |
-| `ColumnManager` | `features/studio/components/ColumnManager.tsx` | Sidebar for column toggles + custom columns |
+| Component              | File                                                        | Purpose                                     |
+| ---------------------- | ----------------------------------------------------------- | ------------------------------------------- |
+| `ResearchModeToggle`   | `features/chat/components/ResearchModeToggle.tsx`           | Toggle Chat / Deep Research mode            |
+| `ResearchSteps`        | `features/chat/components/ResearchSteps.tsx`                | Paperguide-style step tracker               |
+| `LiteratureTableView`  | `features/studio/components/views/LiteratureTableView.tsx`  | Table with column management                |
+| `LiteratureReportView` | `features/studio/components/views/LiteratureReportView.tsx` | Report with citations                       |
+| `CitationStylePicker`  | `features/studio/components/CitationStylePicker.tsx`        | Dropdown for citation styles                |
+| `ColumnManager`        | `features/studio/components/ColumnManager.tsx`              | Sidebar for column toggles + custom columns |
 
 ### ResearchSteps Component
 
@@ -669,24 +690,32 @@ Paperguide-style collapsible step tracker:
 
 ```typescript
 interface ResearchStepUI {
-  type: "searching" | "deduplicating" | "ranking" | "screening" | 
-        "extracting" | "populating" | "generating_report" | "awaiting_user_input";
+  type:
+    | "searching"
+    | "deduplicating"
+    | "ranking"
+    | "screening"
+    | "extracting"
+    | "populating"
+    | "generating_report"
+    | "awaiting_user_input";
   status: "pending" | "in_progress" | "completed" | "failed";
-  title: string;           // e.g., "Searching relevant studies"
-  description: string;     // e.g., "Run structured searches based on the question"
-  details?: string;        // e.g., "Found 100 papers"
+  title: string; // e.g., "Searching relevant studies"
+  description: string; // e.g., "Run structured searches based on the question"
+  details?: string; // e.g., "Found 100 papers"
   metadata?: {
     queryCount?: number;
     paperCount?: number;
     includedCount?: number;
     excludedCount?: number;
   };
-  papers?: ScreenedPaperPreview[];  // For screening step
-  columns?: ColumnSuggestion[];     // For awaiting_user_input step
+  papers?: ScreenedPaperPreview[]; // For screening step
+  columns?: ColumnSuggestion[]; // For awaiting_user_input step
 }
 ```
 
 **UI Behavior:**
+
 - Steps shown as vertical timeline with connecting line
 - Completed: green checkmark, expandable for details
 - In-progress: spinner, live-updating details
@@ -701,11 +730,13 @@ interface ResearchStepUI {
 ### LiteratureTableView Component
 
 **Layout:**
+
 - **Desktop:** Left panel (paper list) + right scrollable table
 - **Mobile/Tablet:** Horizontal scroll with sticky first column (paper title). Collapsed sidebar accessed via "Manage Columns" button. Table is inherently wide — horizontal scroll is unavoidable, but sticky first column preserves context.
 - Top bar: Title, Add Papers, Manage Columns, Save, Export
 
 **Column Management Sidebar:**
+
 - **Suggested Columns** (AI-generated, toggle on/off):
   - Predictive Validity
   - Benchmark Limitations
@@ -717,11 +748,13 @@ interface ResearchStepUI {
 - **Saved Columns**: Save current config as preset
 
 **Cell Content:**
+
 - Text extracted by LLM (may be long)
 - Expandable/collapsible
 - Editable inline
 
 **Actions:**
+
 - Add Papers: Search dialog to find and add more papers
 - Manage Columns: Open sidebar
 - Save Table: Save to `literatureTables`
@@ -730,10 +763,12 @@ interface ResearchStepUI {
 ### LiteratureReportView Component
 
 **Layout:**
+
 - Full-width document view
 - Top bar: Title, Citation Style picker, Copy with citations, Export PDF, Save & Edit
 
 **Features:**
+
 - Render markdown with inline citations
 - Citation style picker dropdown (APA 7, MLA 9, Chicago 17, etc.)
 - Inline citation hover: Show paper preview popup
@@ -741,6 +776,7 @@ interface ResearchStepUI {
 - Export: PDF (reuse existing export infrastructure)
 
 **Citation Rendering:**
+
 - Parse markdown for citation markers: `[Smith2024]` or `(Smith et al., 2024)`
 - Replace with styled links
 - On hover: Show tooltip with paper title, authors, year
@@ -749,6 +785,7 @@ interface ResearchStepUI {
 ### Research Mode Toggle
 
 **Integration with Chat UI:**
+
 - Toggle button in chat input area
 - When "Deep Research" is active:
   - Input placeholder: "Ask a research question..."
@@ -761,6 +798,7 @@ interface ResearchStepUI {
 ## Implementation Phases
 
 ### Phase 1: Foundation
+
 - [ ] Create database schema (`citations`, `literatureTables`, `literatureReports`, `researchSteps`, `literatureReviewSessions`, `literatureTableDrafts`)
 - [ ] **Install and configure `@convex-dev/workflow`** component
 - [ ] Build `CitationEngine` utility (`convex/_utils/CitationEngine.ts`)
@@ -768,12 +806,14 @@ interface ResearchStepUI {
 - [ ] **Write comprehensive unit tests for CitationEngine** — this is load-bearing. The engine is shared across both agents and the report view. If formatting is buggy, it corrupts every downstream artifact. Invest time here before Phase 2.
 
 ### Phase 2: Research Agent Enhancement
+
 - [ ] Add step tracking to existing research agent
 - [ ] Create `ResearchSteps` frontend component
 - [ ] Add artifact generation (table + report) to research agent completion
 - [ ] Integrate with chat UI (ResearchModeToggle)
 
 ### Phase 3: Literature Review Agent
+
 - [ ] Build `LiteratureReviewGraph` LangGraph agent
 - [ ] Wrap agent in `@convex-dev/workflow` handler (`literatureReviewWorkflow`)
 - [ ] Implement nodes: planReview, searchPapers, deduplicatePapers, rankPapers, screenPapers
@@ -787,6 +827,7 @@ interface ResearchStepUI {
 - [ ] Write agent tests
 
 ### Phase 4: Frontend Artifacts
+
 - [ ] Build `LiteratureTableView` component
 - [ ] Build `LiteratureReportView` component
 - [ ] Build `ColumnManager` sidebar
@@ -795,6 +836,7 @@ interface ResearchStepUI {
 - [ ] Integrate with studio navigation
 
 ### Phase 5: Integration & Polish
+
 - [ ] End-to-end testing
 - [ ] Performance optimization (batch sizes, caching)
 - [ ] Error handling and retry logic
@@ -824,12 +866,12 @@ interface ResearchStepUI {
 
 ## Open Questions — Answered
 
-| Question | Decision |
-|---|---|
-| **Batch size for extraction** | Start at **5** papers per batch. Validate with performance spike (test 3, 5, 10) before full implementation. Workflow's built-in retry handles transient failures automatically. |
-| **Screening threshold** | Screen **top 30 ranked papers**. Do not use a score cutoff — score distributions vary too much across queries for a fixed threshold to be reliable. |
-| **Column suggestion quality** | Instrument acceptance rate from day 1. Log which suggested columns users delete vs. keep. This is the primary feedback signal for iterative refinement. |
-| **Report length** | **Section-by-section generation**, 400-600 words per section (Abstract → Introduction → Methods → Results → Discussion → Conclusion). Better quality and easier to retry individual failed sections. |
+| Question                            | Decision                                                                                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Batch size for extraction**       | Start at **5** papers per batch. Validate with performance spike (test 3, 5, 10) before full implementation. Workflow's built-in retry handles transient failures automatically.                             |
+| **Screening threshold**             | Screen **top 30 ranked papers**. Do not use a score cutoff — score distributions vary too much across queries for a fixed threshold to be reliable.                                                          |
+| **Column suggestion quality**       | Instrument acceptance rate from day 1. Log which suggested columns users delete vs. keep. This is the primary feedback signal for iterative refinement.                                                      |
+| **Report length**                   | **Section-by-section generation**, 400-600 words per section (Abstract → Introduction → Methods → Results → Discussion → Conclusion). Better quality and easier to retry individual failed sections.         |
 | **Checkpoint/resumption mechanism** | Use `@convex-dev/workflow` with `step.awaitEvent()` for human-in-the-loop pauses and `restart({ from: stepName })` for partial resumption. Replaces hand-rolled `literatureReviewSessions` durability layer. |
 
 ---

@@ -42,7 +42,10 @@ export const generateEmbeddingInternal = internalAction({
     try {
       const embedding = await invokeWithHttpRetry(async () => {
         const t0 = Date.now();
-        logger.apiCall("together-ai", "/v1/embeddings", { model: E5_EMBEDDING_MODEL, inputType: mode });
+        logger.apiCall("together-ai", "/v1/embeddings", {
+          model: E5_EMBEDDING_MODEL,
+          inputType: mode,
+        });
         const response = await fetch("https://api.together.xyz/v1/embeddings", {
           method: "POST",
           headers: {
@@ -109,58 +112,53 @@ export const generateEmbeddingsBatchInternal = internalAction({
     });
 
     try {
-      const vectors = await invokeWithHttpRetry(
-        async () => {
-          const t0 = Date.now();
-          logger.apiCall("together-ai", "/v1/embeddings", {
+      const vectors = await invokeWithHttpRetry(async () => {
+        const t0 = Date.now();
+        logger.apiCall("together-ai", "/v1/embeddings", {
+          model: E5_EMBEDDING_MODEL,
+          inputType: mode,
+          batchSize: inputs.length,
+        });
+        const response = await fetch("https://api.together.xyz/v1/embeddings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
             model: E5_EMBEDDING_MODEL,
-            inputType: mode,
-            batchSize: inputs.length,
-          });
-          const response = await fetch("https://api.together.xyz/v1/embeddings", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model: E5_EMBEDDING_MODEL,
-              input: inputs,
-            }),
-          });
+            input: inputs,
+          }),
+        });
 
-          if (!response.ok) {
-            const errBody = await response.text();
-            logger.apiError("together-ai", "/v1/embeddings", new Error(`HTTP ${response.status}`));
-            throw createExternalServiceErrorFromResponse(
-              "together-ai",
-              response.status,
-              "/v1/embeddings",
-              errBody.slice(0, 400)
-            );
-          }
+        if (!response.ok) {
+          const errBody = await response.text();
+          logger.apiError("together-ai", "/v1/embeddings", new Error(`HTTP ${response.status}`));
+          throw createExternalServiceErrorFromResponse(
+            "together-ai",
+            response.status,
+            "/v1/embeddings",
+            errBody.slice(0, 400)
+          );
+        }
 
-          const data = (await response.json()) as {
-            data: Array<{ index: number; embedding: number[] }>;
-          };
-          const items = data.data;
-          if (!Array.isArray(items) || items.length !== inputs.length) {
-            throw new Error(
-              `embeddings API returned ${items?.length ?? 0} vectors, expected ${inputs.length}`
-            );
-          }
-          const hasIndex = items.every((d) => typeof d.index === "number");
-          const ordered = hasIndex
-            ? [...items].sort((a, b) => a.index - b.index)
-            : items;
-          const embeddings = ordered.map((d) => d.embedding);
-          logger.apiSuccess("together-ai", "/v1/embeddings", Date.now() - t0, {
-            batchSize: inputs.length,
-          });
-          return embeddings;
-        },
-        "together_ai_embedding"
-      );
+        const data = (await response.json()) as {
+          data: Array<{ index: number; embedding: number[] }>;
+        };
+        const items = data.data;
+        if (!Array.isArray(items) || items.length !== inputs.length) {
+          throw new Error(
+            `embeddings API returned ${items?.length ?? 0} vectors, expected ${inputs.length}`
+          );
+        }
+        const hasIndex = items.every((d) => typeof d.index === "number");
+        const ordered = hasIndex ? [...items].sort((a, b) => a.index - b.index) : items;
+        const embeddings = ordered.map((d) => d.embedding);
+        logger.apiSuccess("together-ai", "/v1/embeddings", Date.now() - t0, {
+          batchSize: inputs.length,
+        });
+        return embeddings;
+      }, "together_ai_embedding");
 
       logger.operationComplete({ count: vectors.length, dims: vectors[0]?.length });
       return vectors;

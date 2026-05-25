@@ -25,4 +25,5 @@ declare module "react-router-dom" {
     key: string;
   };
   export function useNavigate(): (to: string | number, options?: { replace?: boolean }) => void;
+  export function useParams(): Record<string, string | undefined>;
 }

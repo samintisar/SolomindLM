@@ -7,7 +7,6 @@ import {
   invokeWithTimeout,
   invokeWithRetry,
   clearStateKeys,
-  createLangSmithRunConfig,
   withoutMapOutputs,
 } from "../_shared/index.js";
 
@@ -72,17 +71,10 @@ export async function reduce(
         invokeWithTimeout(
           () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (deps.smartLlm as any).invoke(
-              [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "SpreadsheetGraph.Reduce",
-                tags: ["agent", "spreadsheet", "reduce"],
-                metadata: {
-                  spreadsheetType: state.spreadsheetType,
-                  collapsedOutputsCount,
-                },
-              })
-            ),
+            (deps.smartLlm as any).invoke([
+              new SystemMessage(REDUCE_SYSTEM_PROMPT),
+              new HumanMessage(prompt),
+            ]),
           GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
           "Reduce"
         ),

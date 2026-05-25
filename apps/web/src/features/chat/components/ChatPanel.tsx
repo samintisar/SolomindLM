@@ -23,7 +23,13 @@ import { RefHandlers } from "../utils/messageRendering.utils";
 import { MessageBubble } from "./MessageBubble";
 import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ChatEmptyState } from "./ChatEmptyState";
-import { ChatInput, type ChatComposerMode, type ResearchDatabaseOption } from "./ChatInput";
+import {
+  ChatInput,
+  CHAT_DEFAULT_SOURCE_FILTERS,
+  DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
+  type ChatComposerMode,
+  type ResearchDatabaseOption,
+} from "./ChatInput";
 import { ConversationList } from "./ConversationList";
 import { ConfigureChatModal } from "./ConfigureChatModal";
 import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
@@ -116,7 +122,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [researchDatabase, setResearchDatabase] = useState<ResearchDatabaseOption>("all");
   const [activeLiteratureSessionId, setActiveLiteratureSessionId] =
     useState<Id<"literatureReviewSessions"> | null>(null);
-  const [sourceFilters, setSourceFilters] = useState<string[]>(["notebook"]);
+  const [sourceFilters, setSourceFilters] = useState<string[]>([...CHAT_DEFAULT_SOURCE_FILTERS]);
   const [chatAcademicFilters, setChatAcademicFilters] =
     useSessionStorage<DiscoveryAcademicFilterState>("chat-academic-filters", {});
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -484,6 +490,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     (next: ChatComposerMode) => {
       if (composerMode === "literatureReview" && next !== "literatureReview") {
         setActiveLiteratureSessionId(null);
+      }
+      if (next === "deepResearch") {
+        setSourceFilters((prev) => {
+          const merged = new Set([...prev, ...DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS]);
+          return [...merged];
+        });
+      } else if (next === "chat") {
+        setSourceFilters([...CHAT_DEFAULT_SOURCE_FILTERS]);
       }
       setComposerMode(next);
     },

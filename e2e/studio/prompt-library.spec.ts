@@ -123,7 +123,9 @@ test.describe("Prompt Library", () => {
       await expect(page.getByText(/Anyone can discover and use this prompt/)).toBeVisible();
 
       // Public hint should appear
-      await expect(page.getByText(/Your prompt will be visible in the public library/)).toBeVisible();
+      await expect(
+        page.getByText(/Your prompt will be visible in the public library/)
+      ).toBeVisible();
     });
 
     test("closes modal when Cancel is clicked", async ({ notebookPage }) => {
@@ -234,7 +236,7 @@ test.describe("Prompt Library", () => {
       await expect(myPromptsTab).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("discover-prompts-tab-public")).toHaveAttribute(
         "aria-selected",
-        "false",
+        "false"
       );
 
       // Search/sort should not be visible in My Prompts
@@ -260,7 +262,9 @@ test.describe("Prompt Library", () => {
       await expect(saveAsPromptButton).toBeDisabled();
     });
 
-    test("Save as Prompt button becomes enabled when topic is entered", async ({ notebookPage }) => {
+    test("Save as Prompt button becomes enabled when topic is entered", async ({
+      notebookPage,
+    }) => {
       const page = notebookPage;
 
       await openStudioTool(page, "Flashcards");

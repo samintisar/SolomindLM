@@ -2,7 +2,13 @@
  * Source-aware metrics for evaluating retrieval and answer quality
  * across different source channel configurations.
  */
-import type { EvalFixture, EvalRunArtifact, EvalBaseline, MetricResult, MetricStatus } from "../types";
+import type {
+  EvalFixture,
+  EvalRunArtifact,
+  EvalBaseline,
+  MetricResult,
+  MetricStatus,
+} from "../types";
 
 function baseMetric(
   metric: string,
@@ -11,7 +17,7 @@ function baseMetric(
   status: MetricStatus,
   score: number,
   detail: string,
-  breakdown?: Record<string, unknown>,
+  breakdown?: Record<string, unknown>
 ): MetricResult {
   return {
     metric,
@@ -37,7 +43,7 @@ function baseMetric(
 export function sourceDiversityScore(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
   const evidence = artifact.sourceEvidence ?? [];
@@ -50,7 +56,7 @@ export function sourceDiversityScore(
       "pass",
       1,
       "Single channel mode — diversity not applicable.",
-      { channels, evidenceCount: evidence.length },
+      { channels, evidenceCount: evidence.length }
     );
   }
 
@@ -65,7 +71,7 @@ export function sourceDiversityScore(
     status,
     score,
     `${activeChannels.size}/${channels.length} enabled channels produced evidence. Active: ${Array.from(activeChannels).join(", ")}`,
-    { channels, activeChannels: Array.from(activeChannels), evidence },
+    { channels, activeChannels: Array.from(activeChannels), evidence }
   );
 }
 
@@ -79,7 +85,7 @@ export function sourceDiversityScore(
 export function sourceRecallByChannel(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult[] {
   const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
 
@@ -92,7 +98,7 @@ export function sourceRecallByChannel(
         "pass",
         1,
         "No expected items — per-channel recall not applicable.",
-        { channels },
+        { channels }
       ),
     ];
   }
@@ -115,7 +121,8 @@ export function sourceRecallByChannel(
         matched.push(item);
       }
     }
-    const score = fixture.expectedItems.length > 0 ? matched.length / fixture.expectedItems.length : 1;
+    const score =
+      fixture.expectedItems.length > 0 ? matched.length / fixture.expectedItems.length : 1;
 
     return baseMetric(
       `source_recall_${channel}`,
@@ -124,7 +131,7 @@ export function sourceRecallByChannel(
       score >= 0.5 ? "pass" : score > 0 ? "warn" : "fail",
       score,
       `${matched.length}/${fixture.expectedItems.length} items found in ${channel} (${channelChunks.length} chunks).`,
-      { channel, matched, chunkCount: channelChunks.length },
+      { channel, matched, chunkCount: channelChunks.length }
     );
   });
 }
@@ -141,7 +148,16 @@ export function inferSourceChannel(sourceUrl?: string): string {
   if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
   if (url.includes("tiktok.com")) return "social";
   if (url.includes("news") || url.includes("bbc") || url.includes("reuters")) return "news";
-  if (url.includes("bloomberg") || url.includes("wsj.com") || url.includes("marketwatch") || url.includes("investopedia") || url.includes("ft.com") || url.includes("yahoo.com/finance") || url.includes("money")) return "finance";
+  if (
+    url.includes("bloomberg") ||
+    url.includes("wsj.com") ||
+    url.includes("marketwatch") ||
+    url.includes("investopedia") ||
+    url.includes("ft.com") ||
+    url.includes("yahoo.com/finance") ||
+    url.includes("money")
+  )
+    return "finance";
   return "web";
 }
 
@@ -156,7 +172,7 @@ export function inferSourceChannel(sourceUrl?: string): string {
 export function externalSourceUtilization(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
   const hasExternal = channels.some((c) => c !== "notebook");
@@ -169,7 +185,7 @@ export function externalSourceUtilization(
       "pass",
       1,
       "Notebook-only mode — external utilization not applicable.",
-      { channels },
+      { channels }
     );
   }
 
@@ -193,6 +209,88 @@ export function externalSourceUtilization(
     status,
     score,
     `${externalChunks.length}/${total} selected chunks from external sources (${(score * 100).toFixed(1)}%).`,
-    { externalChunks: externalChunks.length, total, channels },
+    { externalChunks: externalChunks.length, total, channels }
+  );
+}
+
+function uniqueSourceKey(sourceUrl?: string, sourceTitle?: string): string {
+  const url = sourceUrl?.trim();
+  if (url) return `url:${url}`;
+  return `title:${(sourceTitle ?? "").trim().toLowerCase()}`;
+}
+
+/** Minimum unique sources for Deep Research when external channels are enabled. */
+const DEEP_RESEARCH_MIN_UNIQUE_SOURCES_PASS = 8;
+const DEEP_RESEARCH_MIN_UNIQUE_SOURCES_WARN = 4;
+
+/**
+ * Research Source Breadth
+ * Regression guard for thin retrieval (e.g. only 3 unique URLs).
+ * Research runner only; skipped for notebook-only policies.
+ */
+export function researchSourceBreadth(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  _baseline?: EvalBaseline
+): MetricResult {
+  if (artifact.runner !== "research") {
+    return baseMetric(
+      "research_source_breadth",
+      fixture,
+      artifact,
+      "pass",
+      1,
+      "Not a research runner — breadth check not applicable.",
+      { runner: artifact.runner }
+    );
+  }
+
+  const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
+  const hasExternal = channels.some((c) => c !== "notebook");
+
+  if (!hasExternal) {
+    return baseMetric(
+      "research_source_breadth",
+      fixture,
+      artifact,
+      "pass",
+      1,
+      "Notebook-only — external source breadth not applicable.",
+      { channels }
+    );
+  }
+
+  const uniqueKeys = new Set<string>();
+  for (const chunk of artifact.selectedChunks) {
+    uniqueKeys.add(uniqueSourceKey(chunk.sourceUrl, chunk.sourceTitle));
+  }
+  const uniqueCount = uniqueKeys.size;
+
+  let status: MetricStatus;
+  if (uniqueCount >= DEEP_RESEARCH_MIN_UNIQUE_SOURCES_PASS) status = "pass";
+  else if (uniqueCount >= DEEP_RESEARCH_MIN_UNIQUE_SOURCES_WARN) status = "warn";
+  else status = "fail";
+
+  const score =
+    uniqueCount >= DEEP_RESEARCH_MIN_UNIQUE_SOURCES_PASS
+      ? 1
+      : uniqueCount >= DEEP_RESEARCH_MIN_UNIQUE_SOURCES_WARN
+        ? 0.5
+        : 0;
+
+  return baseMetric(
+    "research_source_breadth",
+    fixture,
+    artifact,
+    status,
+    score,
+    `${uniqueCount} unique sources (pass ≥${DEEP_RESEARCH_MIN_UNIQUE_SOURCES_PASS}, warn ≥${DEEP_RESEARCH_MIN_UNIQUE_SOURCES_WARN}).`,
+    {
+      uniqueCount,
+      evidenceChunks: artifact.selectedChunks.length,
+      channels,
+      passThreshold: DEEP_RESEARCH_MIN_UNIQUE_SOURCES_PASS,
+      warnThreshold: DEEP_RESEARCH_MIN_UNIQUE_SOURCES_WARN,
+    }
   );
 }

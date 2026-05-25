@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { isNativeShell } from "@/utils/platformDetection";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useForkNotebookFromToken, usePeekShareToken } from "../../services/notebooksApi";
 
 /**
  * Landing page for fork-only share links: /share/fork/:token
@@ -14,11 +13,11 @@ export function ForkNotebookPage() {
     const m = location.pathname.match(/^\/share\/fork\/([^/]+)\/?$/);
     return m?.[1] ?? null;
   }, [location.pathname]);
-  const fork = useMutation(api.notebooks.sharing.forkNotebookFromToken);
+  const fork = useForkNotebookFromToken();
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
-  const preview = useQuery(api.notebooks.sharing.peekShareToken, token ? { token } : "skip");
+  const preview = usePeekShareToken(token);
 
   const handleFork = async () => {
     if (!token) return;

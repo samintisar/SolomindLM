@@ -34,7 +34,7 @@ import {
 import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // CONFIGURATION
@@ -121,7 +121,8 @@ export async function runFlashcardGenerationPhase(
 ): Promise<void> {
   "use node";
 
-  const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic, smartLlm } = args;
+  const { flashcardId, userId, notebookId, documentIds, cardCount, difficulty, topic, smartLlm } =
+    args;
 
   // Initialize structured logger
   const logger = createJobLogger({
@@ -165,7 +166,7 @@ export async function runFlashcardGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -306,10 +307,13 @@ export async function runProcessFlashcardMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[flashcard] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[flashcard] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -332,19 +336,10 @@ export async function runProcessFlashcardMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
-          createLangSmithRunConfig({
-            runName: "FlashcardJob.MapProcess",
-            tags: ["agent", "flashcard", "map"],
-            metadata: {
-              chunkIndex,
-              cardCount,
-              difficulty,
-              topic: topic || "none",
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "FlashcardMap",
       onRetry: (attempt, error) => {
@@ -440,8 +435,8 @@ export async function runProcessFlashcardMapChunkPhase(
       : 0;
     const totalMaps = flashcard.metadata?.totalMapTasks || totalChunks;
     const failedMaps = flashcard.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(flashcard.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(flashcard.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -517,10 +512,13 @@ export async function runFinalizeFlashcardPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[flashcard] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[flashcard] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 

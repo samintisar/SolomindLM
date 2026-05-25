@@ -5,15 +5,9 @@ import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
-  string,
-  () => Promise<unknown>
->;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {

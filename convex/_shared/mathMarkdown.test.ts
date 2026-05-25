@@ -149,6 +149,32 @@ describe("normalizeMathMarkdown", () => {
     const result = normalizeMathMarkdown(input);
     expect(result).toContain("x < 1");
   });
+
+  it("replaces narrow no-break space (U+202F) inside math with ASCII space", () => {
+    const nnbsp = "\u202F";
+    const result = normalizeMathMarkdown(`$x${nnbsp}+${nnbsp}y$`);
+    expect(result).toBe("$x + y$");
+  });
+
+  it("replaces exotic spaces after \\(...\\) is converted to $...$", () => {
+    const nnbsp = "\u202F";
+    const result = normalizeMathMarkdown(`\\(x${nnbsp}+${nnbsp}y\\)`);
+    expect(result).toBe("$x + y$");
+    expect(result).not.toContain(nnbsp);
+  });
+
+  it("replaces exotic Unicode spaces in display math", () => {
+    const nnbsp = "\u202F";
+    const result = normalizeMathMarkdown(`$$a${nnbsp}=${nnbsp}b$$`);
+    expect(result).toBe("$$a = b$$");
+    expect(result).not.toContain(nnbsp);
+  });
+
+  it("does not alter narrow no-break space in plain text", () => {
+    const nnbsp = "\u202F";
+    const input = `value${nnbsp}here`;
+    expect(normalizeMathMarkdown(input)).toBe(input);
+  });
 });
 
 describe("normalizeMathMarkdownDeep", () => {

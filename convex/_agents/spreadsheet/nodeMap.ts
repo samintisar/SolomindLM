@@ -3,7 +3,7 @@
 import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { invokeWithTimeout, invokeWithRetry, createLangSmithRunConfig } from "../_shared/index.js";
+import { invokeWithTimeout, invokeWithRetry } from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { getMessageContent } from "./csvHelpers.js";
@@ -62,18 +62,10 @@ export async function mapProcess(
         invokeWithTimeout(
           () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (deps.fastLlm as any).invoke(
-              [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "SpreadsheetGraph.MapProcess",
-                tags: ["agent", "spreadsheet", "map"],
-                metadata: {
-                  chunkIndex,
-                  spreadsheetType,
-                  chunkLength: chunk.length,
-                },
-              })
-            ),
+            (deps.fastLlm as any).invoke([
+              new SystemMessage(MAP_SYSTEM_PROMPT),
+              new HumanMessage(prompt),
+            ]),
           GRAPH_CONFIG.MAP_TIMEOUT_MS,
           "Map"
         ),

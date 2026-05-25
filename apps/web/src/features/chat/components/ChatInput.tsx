@@ -3,7 +3,6 @@ import {
   ArrowUp,
   Loader2,
   Mic,
-  Plus,
   Search,
   Telescope,
   Monitor,
@@ -15,20 +14,76 @@ import {
   ChevronDown,
   Check,
   Square,
+  MessageCircle,
+  FileText,
+  BriefcaseMedical,
+  Atom,
+  ListFilter,
 } from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
 import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
 import type { ChatSettings } from "@/shared/types";
+import {
+  AcademicDiscoveryFiltersSection,
+  buildAcademicDiscoveryApiFilters,
+  type DiscoveryAcademicFilterState,
+} from "@/features/sources/components/AcademicDiscoveryFiltersSection";
 
 const SOURCE_FILTERS = [
   { id: "notebook", label: "Notebook sources", icon: BookOpen },
+  { id: "academic", label: "Academic", icon: GraduationCap },
   { id: "web", label: "Web", icon: Globe },
   { id: "news", label: "News", icon: Newspaper },
   { id: "finance", label: "Finance", icon: TrendingUp },
-  { id: "academic", label: "Academic", icon: GraduationCap },
 ] as const;
+
+/** Default source channels when the composer is in Chat mode. */
+export const CHAT_DEFAULT_SOURCE_FILTERS = ["notebook"] as const;
+
+/** Default source channels when the composer is in Deep Research mode. */
+export const DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS = ["notebook", "web", "academic"] as const;
+
+export type ChatComposerMode = "chat" | "deepResearch" | "literatureReview";
+
+export type ResearchDatabaseOption = "all" | "pubmed" | "arxiv";
+
+const COMPOSER_MODES: {
+  id: ChatComposerMode;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "deepResearch", label: "Deep Research", icon: Telescope },
+  { id: "literatureReview", label: "Literature Review", icon: FileText },
+];
+
+const RESEARCH_DATABASES: {
+  id: ResearchDatabaseOption;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  {
+    id: "all",
+    title: "All Papers",
+    description: "Search from 200M+ research papers",
+    icon: BookOpen,
+  },
+  {
+    id: "pubmed",
+    title: "PubMed",
+    description: "39M+ biomedical and life-science literature",
+    icon: BriefcaseMedical,
+  },
+  {
+    id: "arxiv",
+    title: "ArXiv",
+    description: "Explore research preprints from arXiv",
+    icon: Atom,
+  },
+];
 
 interface ChatInputProps {
   value: string;
@@ -42,13 +97,20 @@ interface ChatInputProps {
   notebookId?: string | null;
   onAppendTranscription?: (text: string) => void;
   onVoiceError?: (message: string) => void;
-  deepResearchEnabled?: boolean;
-  onToggleDeepResearch?: () => void;
+  mode: ChatComposerMode;
+  onModeChange: (mode: ChatComposerMode) => void;
+  researchDatabase: ResearchDatabaseOption;
+  onResearchDatabaseChange: (db: ResearchDatabaseOption) => void;
   sourceFilters?: string[];
   onSourceFilterChange?: (filters: string[]) => void;
+  /** Academic sub-filters when the Academic channel is enabled (persisted in session). */
+  academicDiscoveryFilters?: DiscoveryAcademicFilterState;
+  onAcademicDiscoveryFiltersChange?: (patch: Partial<DiscoveryAcademicFilterState>) => void;
   chatSettings?: ChatSettings;
   onModelChange?: (modelId: string) => void;
 }
+
+type OpenComposerMenu = "none" | "mode" | "corpus" | "filters" | "model";
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   value,
@@ -61,22 +123,45 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   notebookId,
   onAppendTranscription,
   onVoiceError,
-  deepResearchEnabled,
-  onToggleDeepResearch,
+  mode,
+  onModeChange,
+  researchDatabase,
+  onResearchDatabaseChange,
   sourceFilters,
   onSourceFilterChange,
+  academicDiscoveryFilters,
+  onAcademicDiscoveryFiltersChange,
   chatSettings,
   onModelChange,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
+  const corpusMenuRef = useRef<HTMLDivElement>(null);
+  const filtersMenuRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const [openMenu, setOpenMenu] = useState<OpenComposerMenu>("none");
 
-  const currentModel = findSmartModelById(chatSettings?.smartModel);
+  const openMenuRef = (menu: OpenComposerMenu): React.RefObject<HTMLDivElement | null> | null => {
+    switch (menu) {
+      case "mode":
+        return modeMenuRef;
+      case "corpus":
+        return corpusMenuRef;
+      case "filters":
+        return filtersMenuRef;
+      case "model":
+        return modelMenuRef;
+      default:
+        return null;
+    }
+  };
 
-  const activeFilters = sourceFilters ?? ["notebook"];
+  const activeFilters =
+    sourceFilters ??
+    (mode === "deepResearch"
+      ? [...DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS]
+      : [...CHAT_DEFAULT_SOURCE_FILTERS]);
 
   const voice = useChatVoiceTranscription({
     notebookId: (notebookId ?? null) as Id<"notebooks"> | null,
@@ -88,6 +173,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     onError: (message) => onVoiceError?.(message) ?? console.error(message),
   });
 
+  const currentModel = findSmartModelById(chatSettings?.smartModel);
+  const modeMeta = COMPOSER_MODES.find((m) => m.id === mode) ?? COMPOSER_MODES[0];
+  const ModeIcon = modeMeta.icon;
+
+  const showResearchDatabases =
+    Boolean(notebookId) &&
+    (mode === "literatureReview" ||
+      ((mode === "chat" || mode === "deepResearch") && activeFilters.includes("academic")));
+  const showSourceChannelFilters =
+    Boolean(onSourceFilterChange) && (mode === "chat" || mode === "deepResearch");
+  const showLiteratureAcademicFilters =
+    mode === "literatureReview" && Boolean(onAcademicDiscoveryFiltersChange);
+  const academicFiltersActive =
+    Object.keys(buildAcademicDiscoveryApiFilters(academicDiscoveryFilters ?? {})).length > 0;
+  const showModelRow = Boolean(onModelChange);
+
+  const placeholder =
+    mode === "literatureReview"
+      ? "Describe the topic, research question, and requirements to generate a literature review..."
+      : mode === "deepResearch"
+        ? "Ask a complex research question with multi-step investigation..."
+        : "Ask a question about your sources...";
+
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -96,29 +204,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [value]);
 
-  // Close menu on outside click
   useEffect(() => {
-    if (!menuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+    if (openMenu === "none") return;
+    const menuRef = openMenuRef(openMenu);
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef?.current?.contains(target)) return;
+      setOpenMenu("none");
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenMenu("none");
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [openMenu]);
 
-  // Close model dropdown on outside click
   useEffect(() => {
-    if (!modelDropdownOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
-        setModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [modelDropdownOpen]);
+    if (!showResearchDatabases && openMenu === "corpus") {
+      setOpenMenu("none");
+    }
+  }, [showResearchDatabases, openMenu]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -141,304 +250,448 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const filtersButtonClass = (hasActiveFilters: boolean) =>
+    [
+      "inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium font-sans transition-colors",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+      "disabled:opacity-50 disabled:cursor-not-allowed",
+      hasActiveFilters
+        ? "text-primary hover:bg-muted/50"
+        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+    ].join(" ");
+
+  const dbMeta = RESEARCH_DATABASES.find((d) => d.id === researchDatabase) ?? RESEARCH_DATABASES[0];
+  const DbButtonIcon = dbMeta.icon;
+
   return (
     <div className="flex w-full min-w-0 max-w-3xl flex-col items-stretch gap-3 xl:max-w-4xl 2xl:max-w-5xl">
       <div
+        ref={shellRef}
         data-onboarding="chat-input"
-        className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-1 rounded-2xl border-2 border-border bg-card px-2 py-1.5 shadow-lg"
+        className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-1 rounded-2xl border border-border/80 bg-card px-3 py-2 shadow-lg"
       >
         <textarea
           ref={textareaRef}
-          placeholder={deepResearchEnabled ? "Ask a complex research question with multi-step investigation..." : "Ask a question about your sources..."}
-          className="w-full min-w-0 bg-transparent border-none py-2 px-3 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[44px] max-h-[160px] font-serif text-base @min-[400px]/chat-input:text-lg"
+          placeholder={placeholder}
+          className="w-full min-w-0 bg-transparent border-none py-2.5 px-1 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[52px] max-h-[160px] font-serif text-base @min-[400px]/chat-input:text-lg"
           rows={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
         />
-        <div className="flex w-full min-w-0 flex-col gap-2 px-1.5 pb-0.5 @min-[400px]/chat-input:flex-row @min-[400px]/chat-input:items-center @min-[400px]/chat-input:justify-between @min-[400px]/chat-input:gap-2">
-        <div className="flex shrink-0 items-center gap-1.5 min-h-10">
-          {/* "+" button with dropup menu */}
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              disabled={Boolean(disabled)}
-              className={`shrink-0 size-8 rounded-full border-2 border-border bg-background flex items-center justify-center hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                deepResearchEnabled && !onToggleDeepResearch
-                  ? "ring-2 ring-primary/40 border-primary"
-                  : ""
-              }`}
-              title="Research options"
-            >
-              <Plus className={`w-4 h-4 transition-transform ${menuOpen ? "rotate-45" : ""}`} />
-            </button>
 
-            {/* Dropup menu */}
-            {menuOpen && (
-              <div className="absolute bottom-full left-0 mb-2 w-64 bg-card border-2 border-border rounded-xl shadow-lg p-3 z-50">
-                {/* Deep Research toggle */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleDeepResearch?.();
-                    setMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                    deepResearchEnabled
-                      ? "bg-primary/10 text-primary"
-                      : "hover:bg-muted/80 text-foreground"
-                  }`}
-                >
-                  <Telescope className="w-4 h-4 shrink-0" />
-                  <span>Deep Research</span>
-                </button>
-
-                {/* Source filters */}
-                <div className="mt-2 pt-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground font-medium px-3 mb-1.5">Sources</p>
-                  {SOURCE_FILTERS.map(({ id, label, icon: Icon }) => {
-                    const isActive = activeFilters.includes(id);
-                    return (
-                      <label
-                        key={id}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm cursor-pointer select-none ${
-                          isActive
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        } ${!onSourceFilterChange ? "opacity-50 pointer-events-none" : ""}`}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <span className="flex-1 min-w-0 text-left">{label}</span>
-                        <input
-                          type="checkbox"
-                          checked={isActive}
-                          disabled={!onSourceFilterChange}
-                          onChange={() => toggleFilter(id)}
-                          className="h-4 w-4 shrink-0 rounded border-2 border-border bg-background text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {onToggleDeepResearch && (
-            <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
+        <div className="flex w-full min-w-0 flex-col gap-2 pb-0.5 @min-[440px]/chat-input:flex-row @min-[440px]/chat-input:items-center @min-[440px]/chat-input:justify-between @min-[440px]/chat-input:gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {/* Mode */}
+            <div className="relative" ref={modeMenuRef}>
               <button
                 type="button"
-                onClick={() => deepResearchEnabled && onToggleDeepResearch()}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  !deepResearchEnabled
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Chat
-              </button>
-              <button
-                type="button"
-                onClick={() => !deepResearchEnabled && onToggleDeepResearch()}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  deepResearchEnabled
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Research
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="flex min-h-10 min-w-0 w-full items-center justify-between gap-2 @min-[400px]/chat-input:w-auto @min-[400px]/chat-input:justify-end">
-          <div className="flex min-w-0 flex-1 items-center @min-[400px]/chat-input:flex-initial">
-          {/* Model selector */}
-          {onModelChange && (
-            <div className="relative max-w-full min-w-0" ref={modelDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setModelDropdownOpen((prev) => !prev)}
                 disabled={Boolean(disabled)}
-                aria-expanded={modelDropdownOpen}
                 aria-haspopup="listbox"
+                aria-expanded={openMenu === "mode"}
+                aria-label={`Composer mode: ${modeMeta.label}`}
+                onClick={() => setOpenMenu((o) => (o === "mode" ? "none" : "mode"))}
                 className={[
-                  "group h-8 max-w-full min-w-0 inline-flex items-center gap-1.5 rounded-md border border-transparent bg-transparent px-1.5 font-sans text-sm font-medium tabular-nums text-muted-foreground",
-                  "transition-[color,background-color,transform] duration-150",
-                  "hover:bg-muted/45 hover:text-foreground",
+                  "inline-flex h-9 max-w-full min-w-0 items-center gap-2 rounded-full border border-transparent px-3 text-sm font-medium font-sans transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-                  "disabled:cursor-not-allowed disabled:opacity-50",
-                  modelDropdownOpen && "bg-muted/40 text-foreground",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  mode === "literatureReview"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted/50 text-foreground hover:bg-muted/80",
                 ].join(" ")}
-                title={currentModel?.name ?? "Choose model"}
               >
-                <ModelBrandIcon brand={currentModel?.brand ?? "openai"} />
-                <span className="min-w-0 max-w-[min(10rem,45vw)] truncate @max-[340px]/chat-input:sr-only @min-[400px]/chat-input:max-w-[10rem] @min-[520px]/chat-input:max-w-[14rem]">
-                  {currentModel?.name ?? "GPT-OSS 120B"}
-                </span>
+                <ModeIcon className="size-4 shrink-0 opacity-90" aria-hidden />
+                <span className="min-w-0 truncate">{modeMeta.label}</span>
                 <ChevronDown
-                  className={[
-                    "size-3.5 shrink-0 opacity-50 transition-transform duration-200",
-                    "group-hover:opacity-70",
-                    modelDropdownOpen && "-rotate-180 opacity-70",
-                  ].join(" ")}
+                  className="size-3.5 shrink-0 opacity-60"
                   strokeWidth={2.25}
                   aria-hidden
                 />
               </button>
-
-              {modelDropdownOpen && (
+              {openMenu === "mode" && (
                 <div
-                  className="absolute bottom-full right-0 z-50 mb-2 min-w-[13.5rem] max-w-[min(18rem,calc(100vw-2rem))] max-h-[min(70vh,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
+                  className="absolute bottom-full left-0 z-50 mb-2 w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-border bg-card py-2 shadow-xl font-sans"
                   role="listbox"
-                  aria-label="Choose model"
+                  aria-label="Choose chat mode"
                 >
-                  <div className="border-b border-border/50 px-3 py-2">
-                    <p className="text-[11px] font-medium leading-none text-muted-foreground">Model</p>
-                  </div>
-                  <div className="p-1">
-                    {AVAILABLE_SMART_MODELS.map((model) => {
-                      const isActive = chatSettings?.smartModel === model.id;
-                      return (
-                        <button
-                          key={model.id}
-                          type="button"
-                          role="option"
-                          aria-selected={isActive}
-                          onClick={() => {
-                            onModelChange(model.id);
-                            setModelDropdownOpen(false);
-                          }}
-                          className={[
-                            "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
-                            isActive
-                              ? "bg-primary/12 font-medium text-primary"
-                              : "text-foreground/90 hover:bg-muted/80",
-                          ].join(" ")}
-                        >
-                          <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
-                            <ModelBrandIcon brand={model.brand} />
-                            <span className="min-w-0 flex-1 truncate">{model.name}</span>
-                          </span>
-                          {isActive && (
-                            <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.75} aria-hidden />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Mode
+                  </p>
+                  {COMPOSER_MODES.map(({ id, label, icon: Icon }) => {
+                    const active = mode === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        className={[
+                          "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
+                          active ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/70",
+                        ].join(" ")}
+                        onClick={() => {
+                          onModeChange(id);
+                          setOpenMenu("none");
+                        }}
+                      >
+                        <Icon className="size-4 shrink-0 opacity-90" />
+                        <span className="flex-1 min-w-0">{label}</span>
+                        {active ? <Check className="size-3.5 shrink-0" strokeWidth={2.5} /> : null}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          )}
+
+            {/* Research paper corpus: literature review always; chat/deep research when Academic filter is on */}
+            {showResearchDatabases && (
+              <div className="relative" ref={corpusMenuRef}>
+                <button
+                  type="button"
+                  disabled={Boolean(disabled)}
+                  aria-haspopup="listbox"
+                  aria-expanded={openMenu === "corpus"}
+                  aria-label="Research databases"
+                  onClick={() => setOpenMenu((o) => (o === "corpus" ? "none" : "corpus"))}
+                  className="inline-flex h-9 max-w-[min(13rem,52vw)] min-w-0 items-center gap-2 rounded-full bg-muted/50 px-3 text-sm font-medium font-sans text-foreground hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50"
+                >
+                  <DbButtonIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+                  <span className="min-w-0 truncate">{dbMeta.title}</span>
+                  <ChevronDown
+                    className="size-3.5 shrink-0 opacity-60"
+                    strokeWidth={2.25}
+                    aria-hidden
+                  />
+                </button>
+                {openMenu === "corpus" && (
+                  <div
+                    className="absolute bottom-full left-0 z-50 mb-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border/80 bg-popover py-3 font-sans text-popover-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/10"
+                    role="listbox"
+                    aria-label="Choose research database"
+                  >
+                    <p className="px-3 pb-2.5 text-sm font-medium text-muted-foreground">
+                      Research Databases:
+                    </p>
+                    <div className="flex flex-col gap-0.5 px-1.5">
+                      {RESEARCH_DATABASES.map(({ id, title, description, icon: Icon }) => {
+                        const selected = researchDatabase === id;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            className={[
+                              "grid w-full grid-cols-[auto_auto_1fr] grid-rows-[auto_auto] items-start gap-x-3 gap-y-0.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors",
+                              selected ? "bg-primary/5" : "hover:bg-muted/60",
+                            ].join(" ")}
+                            onClick={() => {
+                              onResearchDatabaseChange(id);
+                              setOpenMenu("none");
+                            }}
+                          >
+                            <span
+                              className={[
+                                "col-start-1 row-span-2 row-start-1 flex size-4 shrink-0 items-center justify-center justify-self-center self-center rounded-full border-2",
+                                selected
+                                  ? "border-primary bg-primary"
+                                  : "border-muted-foreground/35 bg-transparent",
+                              ].join(" ")}
+                              aria-hidden
+                            >
+                              {selected ? (
+                                <span className="size-1.5 rounded-full bg-primary-foreground" />
+                              ) : null}
+                            </span>
+                            <Icon
+                              className="col-start-2 row-span-2 row-start-1 size-4 shrink-0 self-center text-foreground/85"
+                              aria-hidden
+                            />
+                            <span className="col-start-3 row-start-1 min-w-0 font-semibold leading-tight text-foreground">
+                              {title}
+                            </span>
+                            <span className="col-start-3 row-start-2 min-w-0 text-xs font-normal leading-snug text-muted-foreground">
+                              {description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Literature review: academic paper filters */}
+            {showLiteratureAcademicFilters && (
+              <div className="relative" ref={filtersMenuRef}>
+                <button
+                  type="button"
+                  disabled={Boolean(disabled)}
+                  aria-expanded={openMenu === "filters"}
+                  aria-label="Filters"
+                  onClick={() => setOpenMenu((o) => (o === "filters" ? "none" : "filters"))}
+                  className={filtersButtonClass(academicFiltersActive)}
+                >
+                  <ListFilter className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+                  Filters
+                </button>
+                {openMenu === "filters" && (
+                  <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <AcademicDiscoveryFiltersSection
+                      academic={academicDiscoveryFilters ?? {}}
+                      setAcademic={onAcademicDiscoveryFiltersChange!}
+                      showTopDivider={false}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Chat / deep research: source channels + academic filters */}
+            {showSourceChannelFilters && (
+              <div className="relative" ref={filtersMenuRef}>
+                <button
+                  type="button"
+                  disabled={Boolean(disabled)}
+                  aria-expanded={openMenu === "filters"}
+                  aria-label="Filters"
+                  onClick={() => setOpenMenu((o) => (o === "filters" ? "none" : "filters"))}
+                  className={filtersButtonClass(
+                    activeFilters.includes("academic") && academicFiltersActive
+                  )}
+                >
+                  <ListFilter className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+                  Filters
+                </button>
+                {openMenu === "filters" && (
+                  <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <p className="text-xs font-semibold text-foreground">Source channels</p>
+                    <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
+                      {SOURCE_FILTERS.map(({ id, label, icon: Icon }) => {
+                        const isActive = activeFilters.includes(id);
+                        return (
+                          <label
+                            key={id}
+                            className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm select-none transition-colors ${
+                              isActive
+                                ? "text-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <Icon className="size-4 shrink-0" />
+                            <span className="flex-1 min-w-0">{label}</span>
+                            <input
+                              type="checkbox"
+                              checked={isActive}
+                              disabled={!onSourceFilterChange}
+                              onChange={() => toggleFilter(id)}
+                              className="h-4 w-4 shrink-0 rounded border-2 border-border bg-background text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {activeFilters.includes("academic") && onAcademicDiscoveryFiltersChange && (
+                      <AcademicDiscoveryFiltersSection
+                        academic={academicDiscoveryFilters ?? {}}
+                        setAcademic={onAcademicDiscoveryFiltersChange}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-          {onAppendTranscription && (
-            <div
-              className={
-                voice.voiceState === "recording"
-                  ? "flex items-center gap-2"
-                  : "contents"
+
+          <div className="flex min-h-10 min-w-0 shrink-0 items-center justify-end gap-2 @min-[440px]/chat-input:pl-2">
+            {showModelRow && (
+              <div className="relative max-w-full min-w-0" ref={modelMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setOpenMenu((o) => (o === "model" ? "none" : "model"))}
+                  disabled={Boolean(disabled)}
+                  aria-expanded={openMenu === "model"}
+                  aria-haspopup="listbox"
+                  className={[
+                    "group h-9 max-w-full min-w-0 inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-transparent px-1.5 font-sans text-sm font-medium tabular-nums text-muted-foreground",
+                    "transition-[color,background-color,transform] duration-150",
+                    "hover:bg-muted/45 hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                    "disabled:cursor-not-allowed disabled:opacity-50",
+                    openMenu === "model" && "bg-muted/40 text-foreground",
+                  ].join(" ")}
+                  title={currentModel?.name ?? "Choose model"}
+                >
+                  <ModelBrandIcon brand={currentModel?.brand ?? "openai"} />
+                  <span className="min-w-0 max-w-[min(10rem,40vw)] truncate @max-[380px]/chat-input:sr-only @min-[440px]/chat-input:max-w-[9rem]">
+                    {currentModel?.name ?? "GPT-OSS 120B"}
+                  </span>
+                  <ChevronDown
+                    className={[
+                      "size-3.5 shrink-0 opacity-50 transition-transform duration-200",
+                      "group-hover:opacity-70",
+                      openMenu === "model" && "-rotate-180 opacity-70",
+                    ].join(" ")}
+                    strokeWidth={2.25}
+                    aria-hidden
+                  />
+                </button>
+                {openMenu === "model" && onModelChange && (
+                  <div
+                    className="absolute bottom-full right-0 z-50 mb-2 min-w-[13.5rem] max-w-[min(18rem,calc(100vw-2rem))] max-h-[min(70vh,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
+                    role="listbox"
+                    aria-label="Choose model"
+                  >
+                    <div className="border-b border-border/50 px-3 py-2">
+                      <p className="text-[11px] font-medium leading-none text-muted-foreground">
+                        Model
+                      </p>
+                    </div>
+                    <div className="p-1">
+                      {AVAILABLE_SMART_MODELS.map((model) => {
+                        const isActive = chatSettings?.smartModel === model.id;
+                        return (
+                          <button
+                            key={model.id}
+                            type="button"
+                            role="option"
+                            aria-selected={isActive}
+                            onClick={() => {
+                              onModelChange(model.id);
+                              setOpenMenu("none");
+                            }}
+                            className={[
+                              "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+                              isActive
+                                ? "bg-primary/12 font-medium text-primary"
+                                : "text-foreground/90 hover:bg-muted/80",
+                            ].join(" ")}
+                          >
+                            <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+                              <ModelBrandIcon brand={model.brand} />
+                              <span className="min-w-0 flex-1 truncate">{model.name}</span>
+                            </span>
+                            {isActive && (
+                              <Check
+                                className="size-3.5 shrink-0 text-primary"
+                                strokeWidth={2.75}
+                                aria-hidden
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {onAppendTranscription && (
+              <div
+                className={
+                  voice.voiceState === "recording" ? "flex items-center gap-2" : "contents"
+                }
+              >
+                {voice.voiceState === "recording" && (
+                  <>
+                    <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive/45 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive shadow-sm" />
+                    </span>
+                    <span
+                      className="text-xs tabular-nums font-medium text-muted-foreground min-w-11"
+                      aria-live="polite"
+                    >
+                      {voice.formatElapsed}
+                    </span>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void voice.toggleRecording()}
+                  disabled={Boolean(disabled) || !notebookId || voice.voiceState === "transcribing"}
+                  className={[
+                    "group relative shrink-0 inline-flex items-center justify-center rounded-md",
+                    "transition-all duration-200 ease-out",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    voice.voiceState === "transcribing" &&
+                      "size-8 bg-primary/12 ring-1 ring-inset ring-primary/25 text-primary shadow-sm",
+                    voice.voiceState === "recording" &&
+                      "size-8 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:translate-y-px",
+                    voice.voiceState !== "recording" &&
+                      voice.voiceState !== "transcribing" &&
+                      "p-1.5 min-h-9 min-w-9 text-muted-foreground hover:text-primary active:scale-[0.98]",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  title={
+                    voice.voiceState === "recording"
+                      ? "Stop and transcribe"
+                      : voice.voiceState === "transcribing"
+                        ? "Transcribing…"
+                        : "Dictate (microphone)"
+                  }
+                  aria-pressed={voice.voiceState === "recording" ? "true" : "false"}
+                >
+                  {voice.voiceState === "transcribing" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Mic
+                      className={[
+                        "w-4 h-4 transition-transform duration-200",
+                        voice.voiceState !== "recording" && "group-hover:scale-105",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    />
+                  )}
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={isStreaming ? onStop : onSend}
+              disabled={!isStreaming && (!value.trim() || disabled || !notebookId)}
+              className={`inline-flex size-8 shrink-0 items-center justify-center rounded-lg p-0 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
+                isStreaming
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : waitingOnRemoteGeneration
+                    ? "border border-border bg-muted text-muted-foreground shadow-none"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+              }`}
+              title={
+                isStreaming
+                  ? "Stop generating"
+                  : waitingOnRemoteGeneration
+                    ? "A response is generating in another tab or device. Switch there to stop, or wait for it to finish."
+                    : value.trim()
+                      ? mode === "literatureReview"
+                        ? "Start literature review (Enter)"
+                        : mode === "deepResearch"
+                          ? "Start deep research (Enter)"
+                          : "Send message (Enter)"
+                      : "Type a message to send"
               }
             >
-              {voice.voiceState === "recording" && (
-                <>
-                  <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive/45 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive shadow-sm" />
-                  </span>
-                  <span
-                    className="text-xs tabular-nums font-medium text-muted-foreground min-w-11"
-                    aria-live="polite"
-                  >
-                    {voice.formatElapsed}
-                  </span>
-                </>
+              {isStreaming ? (
+                <Square className="w-4 h-4 fill-current" />
+              ) : waitingOnRemoteGeneration ? (
+                <Monitor className="w-5 h-5 animate-pulse" aria-hidden />
+              ) : disabled ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : mode === "literatureReview" || mode === "deepResearch" ? (
+                <Search className="w-5 h-5" />
+              ) : (
+                <ArrowUp className="w-5 h-5" />
               )}
-              <button
-                type="button"
-                onClick={() => void voice.toggleRecording()}
-                disabled={Boolean(disabled) || !notebookId || voice.voiceState === "transcribing"}
-                className={[
-                  "group relative shrink-0 inline-flex items-center justify-center rounded-md",
-                  "transition-all duration-200 ease-out",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
-                  "disabled:opacity-50 disabled:cursor-not-allowed",
-                  voice.voiceState === "transcribing" &&
-                    "size-8 bg-primary/12 ring-1 ring-inset ring-primary/25 text-primary shadow-sm",
-                  voice.voiceState === "recording" &&
-                    "size-8 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:translate-y-px",
-                  voice.voiceState !== "recording" &&
-                    voice.voiceState !== "transcribing" &&
-                    "p-1.5 min-h-9 min-w-9 text-muted-foreground hover:text-primary active:scale-[0.98]",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                title={
-                  voice.voiceState === "recording"
-                    ? "Stop and transcribe"
-                    : voice.voiceState === "transcribing"
-                      ? "Transcribing…"
-                      : "Dictate (microphone)"
-                }
-                aria-pressed={voice.voiceState === "recording" ? "true" : "false"}
-              >
-                {voice.voiceState === "transcribing" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Mic
-                    className={[
-                      "w-4 h-4 transition-transform duration-200",
-                      voice.voiceState !== "recording" && "group-hover:scale-105",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  />
-                )}
-              </button>
-            </div>
-          )}
-        <button
-          onClick={isStreaming ? onStop : onSend}
-          disabled={(!isStreaming && (!value.trim() || disabled || !notebookId))}
-          className={`inline-flex size-8 shrink-0 items-center justify-center rounded-lg p-0 transition-all shadow-md active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
-            isStreaming
-              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              : waitingOnRemoteGeneration
-                ? "border border-border bg-muted text-muted-foreground shadow-none"
-                : deepResearchEnabled
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90"
-          }`}
-          title={
-            isStreaming
-              ? "Stop generating"
-              : waitingOnRemoteGeneration
-                ? "A response is generating in another tab or device. Switch there to stop, or wait for it to finish."
-              : value.trim()
-                ? deepResearchEnabled
-                  ? "Start deep research (Enter)"
-                  : "Send message (Enter)"
-                : "Type a message to send"
-          }
-        >
-          {isStreaming ? (
-            <Square className="w-4 h-4 fill-current" />
-          ) : waitingOnRemoteGeneration ? (
-            <Monitor className="w-5 h-5 animate-pulse" aria-hidden />
-          ) : disabled ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : deepResearchEnabled ? (
-            <Search className="w-5 h-5" />
-          ) : (
-            <ArrowUp className="w-5 h-5" />
-          )}
-        </button>
+            </button>
           </div>
-        </div>
         </div>
       </div>
       <p className="pointer-events-none text-center text-[11px] leading-snug text-muted-foreground px-1">

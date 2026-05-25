@@ -83,5 +83,3 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return createPortal(content, document.body);
 };
-
-

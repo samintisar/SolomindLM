@@ -22,13 +22,13 @@ const nlmOutput = `
 // Convert directly to fixtures (using your ML notebook ID)
 const fixtures = convertNotebookLM(
   nlmOutput,
-  "jd72h9qsq5zap11ede5k8rqkx585djmc",  // Your ML notebook ID
-  "ml-"  // ID prefix for generated fixtures
+  "jd72h9qsq5zap11ede5k8rqkx585djmc", // Your ML notebook ID
+  "ml-" // ID prefix for generated fixtures
 );
 
 // Register in fixtures/index.ts
 export const FIXTURES = {
-  ...Object.fromEntries(fixtures.map(f => [f.id, f])),
+  ...Object.fromEntries(fixtures.map((f) => [f.id, f])),
 };
 ```
 
@@ -69,7 +69,8 @@ export const mlBasicsFixtures = createFixtureBatch({
     },
     {
       question: "What is the difference between classification and regression?",
-      expectedAnswer: "Classification predicts discrete labels while regression predicts continuous values...",
+      expectedAnswer:
+        "Classification predicts discrete labels while regression predicts continuous values...",
     },
   ],
 });
@@ -85,18 +86,18 @@ export const mlBasicsFixtures = createFixtureBatch({
 
 Use these tags to classify your fixtures (auto-inferred if not specified):
 
-| Category | Description | Example Questions |
-|----------|-------------|-------------------|
-| `factoid` | Single-fact QA | "What is the activation function in transformers?" |
-| `list-enumeration` | Structured list | "What are the 20 agentic patterns?" |
-| `comparison` | Cross-source synthesis | "Compare SGD and Adam optimizers." |
-| `causality` | Multi-hop reasoning | "Why does batch norm stabilize training?" |
-| `temporal` | Time/sequence queries | "What were the key milestones in deep learning?" |
-| `ambiguous` | Disambiguation testing | "What is attention?" (could be many types) |
-| `multi-doc` | Across sources | "What do all sources agree on regarding X?" |
-| `technical` | Domain-specific | "Derive the backprop equations." |
-| `summarization` | Long-form condense | "Summarize the key ideas from this transcript." |
-| `explanation` | "How does X work?" | "How does self-attention work?" |
+| Category           | Description            | Example Questions                                  |
+| ------------------ | ---------------------- | -------------------------------------------------- |
+| `factoid`          | Single-fact QA         | "What is the activation function in transformers?" |
+| `list-enumeration` | Structured list        | "What are the 20 agentic patterns?"                |
+| `comparison`       | Cross-source synthesis | "Compare SGD and Adam optimizers."                 |
+| `causality`        | Multi-hop reasoning    | "Why does batch norm stabilize training?"          |
+| `temporal`         | Time/sequence queries  | "What were the key milestones in deep learning?"   |
+| `ambiguous`        | Disambiguation testing | "What is attention?" (could be many types)         |
+| `multi-doc`        | Across sources         | "What do all sources agree on regarding X?"        |
+| `technical`        | Domain-specific        | "Derive the backprop equations."                   |
+| `summarization`    | Long-form condense     | "Summarize the key ideas from this transcript."    |
+| `explanation`      | "How does X work?"     | "How does self-attention work?"                    |
 
 ## Registering Fixtures
 
@@ -109,20 +110,20 @@ import { myMlFixture, mlBasicsFixtures } from "./myFixtures";
 export const FIXTURES: Record<string, EvalFixture> = {
   [agenticPatterns20.id]: agenticPatterns20,
   [myMlFixture.id]: myMlFixture,
-  ...Object.fromEntries(mlBasicsFixtures.map(f => [f.id, f])),
+  ...Object.fromEntries(mlBasicsFixtures.map((f) => [f.id, f])),
 };
 ```
 
 ## Metrics Per Scenario
 
-| Scenario | Deterministic Metrics | LLM Judge Metrics |
-|----------|----------------------|-------------------|
-| `list-enumeration` | expectedItemRecall ✓ | - |
-| `factoid` | expectedItemRecall | correctness ✓ |
-| `comparison` | - | correctness, faithfulness ✓ |
-| `causality` | - | correctness, faithfulness, completeness ✓ |
-| `explanation` | - | correctness, faithfulness, completeness ✓ |
-| `summarization` | - | completeness, faithfulness ✓ |
+| Scenario           | Deterministic Metrics | LLM Judge Metrics                         |
+| ------------------ | --------------------- | ----------------------------------------- |
+| `list-enumeration` | expectedItemRecall ✓  | -                                         |
+| `factoid`          | expectedItemRecall    | correctness ✓                             |
+| `comparison`       | -                     | correctness, faithfulness ✓               |
+| `causality`        | -                     | correctness, faithfulness, completeness ✓ |
+| `explanation`      | -                     | correctness, faithfulness, completeness ✓ |
+| `summarization`    | -                     | completeness, faithfulness ✓              |
 
 ## Running Evaluations
 
@@ -154,6 +155,9 @@ bun run eval:rag
 
 # Run one fixture
 bun run eval:rag -- --case agentic-patterns-20
+
+# Run only literature review fixtures
+bun run eval:literature-review
 ```
 
 ## Suggested Fixtures for Machine Learning Notebook

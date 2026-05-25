@@ -5,12 +5,10 @@ import { Header } from "./Header";
 
 const mockUseQuery = vi.fn();
 const mockShowChecklist = vi.fn(async () => {});
-let capturedAvatarProps:
-  | {
-      onShowChecklist?: () => void;
-      showChecklistDismissed?: boolean;
-    }
-  | null = null;
+let capturedAvatarProps: {
+  onShowChecklist?: () => void;
+  showChecklistDismissed?: boolean;
+} | null = null;
 
 vi.mock("react-router-dom", () => ({
   useNavigate: () => vi.fn(),
@@ -56,10 +54,7 @@ vi.mock("./DropdownMenu", () => ({
 }));
 
 vi.mock("../../features/auth/components/AvatarDropdown", () => ({
-  AvatarDropdown: (props: {
-    onShowChecklist?: () => void;
-    showChecklistDismissed?: boolean;
-  }) => {
+  AvatarDropdown: (props: { onShowChecklist?: () => void; showChecklistDismissed?: boolean }) => {
     capturedAvatarProps = props;
     return <div data-testid="avatar-dropdown" />;
   },
@@ -82,14 +77,7 @@ describe("Header onboarding action wiring", () => {
       checklistDismissed: true,
       tourStatus: "active",
     });
-    render(
-      <Header
-        title="Notebook"
-        onRename={vi.fn()}
-        isHome={true}
-        onLogoClick={vi.fn()}
-      />,
-    );
+    render(<Header title="Notebook" onRename={vi.fn()} isHome={true} onLogoClick={vi.fn()} />);
     expect(capturedAvatarProps?.showChecklistDismissed).toBe(true);
   });
 
@@ -99,14 +87,7 @@ describe("Header onboarding action wiring", () => {
       checklistDismissed: true,
       tourStatus: "completed",
     });
-    render(
-      <Header
-        title="Notebook"
-        onRename={vi.fn()}
-        isHome={true}
-        onLogoClick={vi.fn()}
-      />,
-    );
+    render(<Header title="Notebook" onRename={vi.fn()} isHome={true} onLogoClick={vi.fn()} />);
     expect(capturedAvatarProps?.showChecklistDismissed).toBe(false);
   });
 
@@ -116,14 +97,7 @@ describe("Header onboarding action wiring", () => {
       checklistDismissed: true,
       tourStatus: "active",
     });
-    render(
-      <Header
-        title="Notebook"
-        onRename={vi.fn()}
-        isHome={true}
-        onLogoClick={vi.fn()}
-      />,
-    );
+    render(<Header title="Notebook" onRename={vi.fn()} isHome={true} onLogoClick={vi.fn()} />);
 
     await capturedAvatarProps?.onShowChecklist?.();
 

@@ -14,7 +14,10 @@ export function chunkDedupKey(c: ReferenceChunk): string {
   return `${c.sourceId}:${c.chunkIndex}`;
 }
 
-export function mergeChunkScores(existing: ReferenceChunk, incoming: ReferenceChunk): ReferenceChunk {
+export function mergeChunkScores(
+  existing: ReferenceChunk,
+  incoming: ReferenceChunk
+): ReferenceChunk {
   const pickMax = (a?: number, b?: number): number | undefined => {
     const hasA = a != null && !Number.isNaN(a);
     const hasB = b != null && !Number.isNaN(b);
@@ -38,7 +41,12 @@ export function chunkRankingScore(c: ReferenceChunk): number {
 type ContextLogger = {
   warn: (msg: string, meta?: Record<string, unknown>) => void;
   info: (msg: string, meta?: Record<string, unknown>) => void;
-  performance: (metric: string, value: number, unit: string, meta?: Record<string, unknown>) => void;
+  performance: (
+    metric: string,
+    value: number,
+    unit: string,
+    meta?: Record<string, unknown>
+  ) => void;
 };
 
 export type SelectChunksOptions = {
@@ -56,9 +64,7 @@ function lexicalOverlapScore(chunk: ReferenceChunk, query: string): number {
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const tokens = normalized
-    .split(" ")
-    .filter((w) => w.length > 2);
+  const tokens = normalized.split(" ").filter((w) => w.length > 2);
   if (tokens.length === 0) return 0;
   const text = chunk.content.toLowerCase();
   let hit = 0;
@@ -89,9 +95,7 @@ export function selectChunksByTokenBudget(
   options?: SelectChunksOptions
 ): ReferenceChunk[] {
   const threshold = relevanceThreshold ?? MIN_RELEVANCE_THRESHOLD;
-  let relevantChunks = chunks.filter(
-    (chunk) => chunkRankingScore(chunk) >= threshold
-  );
+  let relevantChunks = chunks.filter((chunk) => chunkRankingScore(chunk) >= threshold);
 
   // If retrieval returned candidates but the relevance floor filtered everything,
   // relax monotonically then fall back to top-by-score (production RAG pattern:
@@ -101,9 +105,7 @@ export function selectChunksByTokenBudget(
     let relaxed = threshold;
     while (relevantChunks.length === 0 && relaxed > MIN_FALLBACK_FLOOR) {
       relaxed *= 0.72;
-      relevantChunks = chunks.filter(
-        (chunk) => chunkRankingScore(chunk) >= relaxed
-      );
+      relevantChunks = chunks.filter((chunk) => chunkRankingScore(chunk) >= relaxed);
     }
     if (relevantChunks.length === 0) {
       const topN = Math.min(5, chunks.length);
@@ -132,10 +134,8 @@ export function selectChunksByTokenBudget(
       return chunkRankingScore(b) - chunkRankingScore(a);
     }
     const overlapWeight = 0.04;
-    const ca =
-      chunkRankingScore(a) + overlapWeight * lexicalOverlapScore(a, lexQ);
-    const cb =
-      chunkRankingScore(b) + overlapWeight * lexicalOverlapScore(b, lexQ);
+    const ca = chunkRankingScore(a) + overlapWeight * lexicalOverlapScore(a, lexQ);
+    const cb = chunkRankingScore(b) + overlapWeight * lexicalOverlapScore(b, lexQ);
     return cb - ca;
   });
 
@@ -210,14 +210,13 @@ export function selectChunksByTokenBudgetWithReservation(
     .sort((a, b) => chunkRankingScore(b) - chunkRankingScore(a))
     .slice(0, EXTERNAL_TOP_N);
 
-  const reducedBudget = (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) - EXTERNAL_RESERVED_TOKENS;
+  const reducedBudget =
+    (options?.maxContextTokens ?? CONTEXT_TOKEN_BUDGET) - EXTERNAL_RESERVED_TOKENS;
 
-  const notebookSelected = selectChunksByTokenBudget(
-    notebookChunks,
-    logger,
-    relevanceThreshold,
-    { ...options, maxContextTokens: Math.max(reducedBudget, 1000) }
-  );
+  const notebookSelected = selectChunksByTokenBudget(notebookChunks, logger, relevanceThreshold, {
+    ...options,
+    maxContextTokens: Math.max(reducedBudget, 1000),
+  });
 
   logger?.info("Chunk selection with reservation", {
     notebookSelected: notebookSelected.length,

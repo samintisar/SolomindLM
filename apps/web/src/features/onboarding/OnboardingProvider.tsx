@@ -1,11 +1,4 @@
-import React, {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -35,29 +28,24 @@ function logOnboardingError(action: string, error: unknown) {
   console.error(`[onboarding] ${action}`, error);
 }
 
-export const OnboardingProvider: React.FC<Props> = ({
-  isAuthenticated,
-  children,
-}) => {
+export const OnboardingProvider: React.FC<Props> = ({ isAuthenticated, children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const onboardingState = useQuery(
     api.onboarding.state.getOnboardingState,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   );
   const tourProgress = useQuery(
     api.onboarding.progress.getTourProgress,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   ) as TourProgress | undefined;
   const checklist = useQuery(
     api.onboarding.progress.getChecklistProgress,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   );
 
-  const getOrCreateOnboardingRow = useMutation(
-    api.onboarding.state.getOrCreateOnboardingRow,
-  );
+  const getOrCreateOnboardingRow = useMutation(api.onboarding.state.getOrCreateOnboardingRow);
   const startTour = useMutation(api.onboarding.mutations.startTour);
   const advanceTourStep = useMutation(api.onboarding.mutations.advanceTourStep);
   const skipTourMutation = useMutation(api.onboarding.mutations.skipTour);
@@ -225,12 +213,8 @@ export const OnboardingProvider: React.FC<Props> = ({
 
   const value = useMemo<OnboardingContextValue>(
     () => ({ tourStatus, currentStepId, initFailed, skip }),
-    [tourStatus, currentStepId, initFailed, skip],
+    [tourStatus, currentStepId, initFailed, skip]
   );
 
-  return (
-    <OnboardingContext.Provider value={value}>
-      {children}
-    </OnboardingContext.Provider>
-  );
+  return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 };

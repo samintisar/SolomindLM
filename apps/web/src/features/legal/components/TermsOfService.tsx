@@ -29,9 +29,9 @@ export const TermsOfService: React.FC = () => {
         <p className="text-muted-foreground">
           SolomindLM helps you organize research in notebooks, add sources (files, links, and
           optional Google Drive imports where enabled), chat with retrieval over your materials, and
-          generate study-style outputs (for example reports, flashcards, quizzes, mind maps, infographics,
-          spreadsheets, audio overviews, and similar tools). Features may change, and we may suspend
-          or discontinue parts of the Service.
+          generate study-style outputs (for example reports, flashcards, quizzes, mind maps,
+          infographics, spreadsheets, audio overviews, and similar tools). Features may change, and
+          we may suspend or discontinue parts of the Service.
         </p>
         <p className="text-muted-foreground">
           Where we offer collaboration or sharing, you are responsible for only sharing content you

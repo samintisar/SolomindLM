@@ -4,7 +4,7 @@ import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { z } from "zod";
 
-import { invokeWithTimeout, createLangSmithRunConfig } from "../_shared/index.js";
+import { invokeWithTimeout } from "../_shared/index.js";
 
 import { GRAPH_CONFIG } from "./config.js";
 import { MAP_PROMPT, MAP_SYSTEM_PROMPT } from "./prompts.js";
@@ -30,19 +30,10 @@ export async function extractConcepts(
   return await invokeWithTimeout(
     () =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (structuredLlm as any).invoke(
-        [
-          new SystemMessage(MAP_SYSTEM_PROMPT),
-          new HumanMessage(MAP_PROMPT.replace("{content}", content)),
-        ],
-        createLangSmithRunConfig({
-          runName: "MindMapGraph.MapProcess",
-          tags: ["agent", "mindmap", "map"],
-          metadata: {
-            contentLength: content.length,
-          },
-        })
-      ),
+      (structuredLlm as any).invoke([
+        new SystemMessage(MAP_SYSTEM_PROMPT),
+        new HumanMessage(MAP_PROMPT.replace("{content}", content)),
+      ]),
     GRAPH_CONFIG.MAP_TIMEOUT_MS,
     "MindMapMap"
   );

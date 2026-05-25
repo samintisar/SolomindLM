@@ -310,7 +310,8 @@ ER  -`;
     });
 
     it("converts various accent types", () => {
-      const bibtex = "@article{allaccents,\n" +
+      const bibtex =
+        "@article{allaccents,\n" +
         "  title = {{\\`a}{\\^e}{\\~n}{\\c{c}}},\n" +
         "  year = {2023}\n" +
         "}";

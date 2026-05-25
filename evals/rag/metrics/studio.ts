@@ -104,10 +104,13 @@ interface SpreadsheetPayload {
   data?: string | { rows?: unknown[]; columns?: unknown[]; headers?: unknown[] };
 }
 
-function flashcardCountMatch(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+interface LiteratureReviewPayload {
+  counts?: { extractedRows?: number; included?: number };
+  table?: { papers?: unknown[] };
+  report?: { sections?: unknown[] };
+}
+
+function flashcardCountMatch(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const cards = (artifact.studioOutput?.raw as ItemArrayPayload | undefined)?.cards ?? [];
   return countGate(
     "flashcard_count_match",
@@ -131,10 +134,7 @@ function quizCountMatch(fixture: EvalFixture, artifact: EvalRunArtifact): Metric
   );
 }
 
-function writtenQuestionsCountMatch(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function writtenQuestionsCountMatch(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const qs = (artifact.studioOutput?.raw as ItemArrayPayload | undefined)?.questions ?? [];
   return countGate(
     "written_questions_count_match",
@@ -160,10 +160,7 @@ function mindmapNodeCount(fixture: EvalFixture, artifact: EvalRunArtifact): Metr
   const wrapped = data as
     | { nodeData?: { children?: unknown[] }; root?: { children?: unknown[] } }
     | undefined;
-  const root =
-    wrapped?.nodeData ??
-    wrapped?.root ??
-    (data as { children?: unknown[] } | undefined);
+  const root = wrapped?.nodeData ?? wrapped?.root ?? (data as { children?: unknown[] } | undefined);
   const total = countMindmapNodes(root as { children?: unknown[] });
   return countGate(
     "mindmap_node_count",
@@ -193,10 +190,7 @@ function infographicHasImage(fixture: EvalFixture, artifact: EvalRunArtifact): M
   );
 }
 
-function spreadsheetRowCount(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function spreadsheetRowCount(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const data = (artifact.studioOutput?.raw as SpreadsheetPayload | undefined)?.data;
   let rowCount = 0;
   if (typeof data === "string") {
@@ -216,12 +210,38 @@ function spreadsheetRowCount(
   );
 }
 
-// ─── Report: required-section presence ───────────────────────
+function literatureReviewTableRows(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
+  const raw = artifact.studioOutput?.raw as LiteratureReviewPayload | undefined;
+  const rowCount = raw?.counts?.extractedRows ?? raw?.table?.papers?.length ?? 0;
+  return countGate(
+    "literature_review_table_rows",
+    fixture,
+    artifact,
+    rowCount,
+    fixture.expectedStructure?.minItems,
+    "Literature review table rows"
+  );
+}
 
-function reportSectionPresence(
+function literatureReviewReportSections(
   fixture: EvalFixture,
   artifact: EvalRunArtifact
 ): MetricResult {
+  const raw = artifact.studioOutput?.raw as LiteratureReviewPayload | undefined;
+  const sections = raw?.report?.sections ?? [];
+  return countGate(
+    "literature_review_report_sections",
+    fixture,
+    artifact,
+    sections.length,
+    fixture.expectedStructure?.requiredSections?.length,
+    "Literature review report sections"
+  );
+}
+
+// ─── Report: required-section presence ───────────────────────
+
+function reportSectionPresence(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const required = fixture.expectedStructure?.requiredSections;
   if (!required || required.length === 0) {
     return baseMetric(
@@ -263,10 +283,7 @@ const AUDIO_TARGET_WORDS: Record<string, number> = {
   long: 7000,
 };
 
-function audioScriptLength(
-  fixture: EvalFixture,
-  artifact: EvalRunArtifact
-): MetricResult {
+function audioScriptLength(fixture: EvalFixture, artifact: EvalRunArtifact): MetricResult {
   const transcript =
     (artifact.studioOutput?.raw as { transcript?: string } | undefined)?.transcript ?? "";
   const wordCount = transcript.trim().split(/\s+/).filter(Boolean).length;
@@ -329,6 +346,17 @@ export async function scoreStudioMetrics(
     case "spreadsheet":
       results.push(spreadsheetRowCount(fixture, artifact));
       break;
+    case "literatureReview": {
+      results.push(literatureReviewTableRows(fixture, artifact));
+      results.push(literatureReviewReportSections(fixture, artifact));
+      // Stage-specific quality metrics
+      const { scoreLiteratureReviewMetrics, scoreLiteratureReviewLlmJudgeMetrics } =
+        await import("./literatureReview");
+      results.push(...scoreLiteratureReviewMetrics(fixture, artifact, _baseline));
+      const judgeResults = await scoreLiteratureReviewLlmJudgeMetrics(fixture, artifact, _baseline);
+      results.push(...judgeResults);
+      break;
+    }
     case "audioScript":
     case "audioScriptOnly":
       results.push(audioScriptLength(fixture, artifact));

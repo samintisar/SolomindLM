@@ -119,21 +119,6 @@
       "sourceType": "github",
       "computedHash": "41777ec7edc4504e45564917459202021245f3cdf90157e4a65dd6641cd0c1d7"
     },
-    "langsmith-dataset": {
-      "source": "langchain-ai/langsmith-skills",
-      "sourceType": "github",
-      "computedHash": "b18bc199f25a2519678ecdc8a7f6a6eb118c4332b6ad2e6f65f7e5a75bcec2bc"
-    },
-    "langsmith-evaluator": {
-      "source": "langchain-ai/langsmith-skills",
-      "sourceType": "github",
-      "computedHash": "69d3bb64f4300051c046929ae040272e26eceb995fe01b5ebdde01240fafcaaf"
-    },
-    "langsmith-trace": {
-      "source": "langchain-ai/langsmith-skills",
-      "sourceType": "github",
-      "computedHash": "3ef4abf90e1d7fab5faeefd27cbf4b44ed57e10f321e174afab294fd86bc7e1b"
-    },
     "serena-usage": {
       "source": "practicalswan/agent-skills",
       "sourceType": "github",

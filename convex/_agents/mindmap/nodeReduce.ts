@@ -3,11 +3,7 @@
 import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
 
-import {
-  invokeWithTimeout,
-  validateWithPreset,
-  createLangSmithRunConfig,
-} from "../_shared/index.js";
+import { invokeWithTimeout, validateWithPreset } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
@@ -81,20 +77,10 @@ export async function reduceNode(
     const response = await invokeWithTimeout(
       () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (smartLlm as any).invoke(
-          [
-            new SystemMessage(REDUCE_SYSTEM_PROMPT),
-            new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
-          ],
-          createLangSmithRunConfig({
-            runName: "MindMapGraph.Reduce",
-            tags: ["agent", "mindmap", "reduce"],
-            metadata: {
-              extractionCount: extractions.length,
-              inputSize: safeInput.length,
-            },
-          })
-        ),
+        (smartLlm as any).invoke([
+          new SystemMessage(REDUCE_SYSTEM_PROMPT),
+          new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
+        ]),
       GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
       "MindMapReduce"
     );

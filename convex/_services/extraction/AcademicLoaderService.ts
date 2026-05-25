@@ -12,7 +12,7 @@ export interface AcademicPaper {
   abstract: string;
   url: string;
   pdfUrl?: string;
-  source: "arxiv" | "semantic_scholar" | "pubmed";
+  source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
   citationCount?: number;
   doi?: string;
 }
@@ -21,9 +21,7 @@ export class AcademicLoaderService {
   private mistralOCR: MistralOCRService;
   private loadWebPage: (url: string) => Promise<{ title: string; content: string }>;
 
-  constructor(
-    loadWebPage?: (url: string) => Promise<{ title: string; content: string }>
-  ) {
+  constructor(loadWebPage?: (url: string) => Promise<{ title: string; content: string }>) {
     this.mistralOCR = new MistralOCRService(env.MISTRAL_API_KEY);
     this.loadWebPage =
       loadWebPage ??

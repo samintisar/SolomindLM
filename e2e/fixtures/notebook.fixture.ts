@@ -37,7 +37,10 @@ export const test = authTest.extend<NotebookFixtures>({
     await expect(titleInput).toHaveValue(title);
 
     // Submit
-    await page.getByRole("button", { name: "Create" }).click();
+    const createBtn = page.getByRole("button", { name: "Create" });
+    await createBtn.waitFor({ state: "visible" });
+    await expect(createBtn).toBeEnabled();
+    await createBtn.click({ force: true });
 
     // Modal should close on success; then the new card appears on the grid/list
     await expect(page.getByRole("heading", { name: "Create notebook" })).not.toBeVisible({

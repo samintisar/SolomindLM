@@ -5,15 +5,9 @@ import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
-  string,
-  () => Promise<unknown>
->;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
@@ -35,7 +29,7 @@ describe("setOutputLanguage", () => {
       ctx.db
         .query("userPreferences")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique(),
+        .unique()
     );
     expect(prefs?.outputLanguage).toBe("es");
   });
@@ -50,7 +44,7 @@ describe("setOutputLanguage", () => {
       ctx.db
         .query("userPreferences")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
+        .collect()
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].outputLanguage).toBe("ja");
@@ -62,7 +56,7 @@ describe("setOutputLanguage", () => {
     await expect(
       withAuth(t, userId).mutation(api.userPreferences.index.setOutputLanguage, {
         outputLanguage: "xx",
-      }),
+      })
     ).rejects.toThrow();
   });
 
@@ -71,7 +65,7 @@ describe("setOutputLanguage", () => {
     await expect(
       t.mutation(api.userPreferences.index.setOutputLanguage, {
         outputLanguage: "en",
-      }),
+      })
     ).rejects.toThrow();
   });
 });

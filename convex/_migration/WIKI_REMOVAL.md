@@ -8,12 +8,12 @@ The `wikis` / `wikiArticles` tables are **removed from the schema** in this code
 - There is **no Convex function** in this repo that can delete rows from tables that are not in `schema.ts`.
 - If production still has wiki tables from an older schema version, use one of these approaches:
 
-1. **Two-step deploy (safest)**  
-   - Deploy a temporary branch that still includes `wikis` / `wikiArticles` in `schema.ts`.  
-   - Run a batched internal mutation (or dashboard script) to delete all rows.  
+1. **Two-step deploy (safest)**
+   - Deploy a temporary branch that still includes `wikis` / `wikiArticles` in `schema.ts`.
+   - Run a batched internal mutation (or dashboard script) to delete all rows.
    - Deploy this branch that removes the tables from `schema.ts`.
 
-2. **Convex dashboard / support**  
+2. **Convex dashboard / support**
    - For one-off cleanup, coordinate with your team’s operational process for deleting orphaned data.
 
 ## Confirmation

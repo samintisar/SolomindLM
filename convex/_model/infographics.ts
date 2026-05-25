@@ -25,9 +25,7 @@ export async function listByNotebook(
   if (userId) {
     return await ctx.db
       .query("infographics")
-      .withIndex("by_notebook_and_user", (q) =>
-        q.eq("notebookId", notebookId).eq("userId", userId)
-      )
+      .withIndex("by_notebook_and_user", (q) => q.eq("notebookId", notebookId).eq("userId", userId))
       .order("desc")
       .collect();
   }
@@ -127,6 +125,9 @@ export async function patchInfographic(
   });
 }
 
-export async function deleteInfographic(ctx: MutationCtx, infographicId: Id<"infographics">): Promise<void> {
+export async function deleteInfographic(
+  ctx: MutationCtx,
+  infographicId: Id<"infographics">
+): Promise<void> {
   await ctx.db.delete("infographics", infographicId);
 }

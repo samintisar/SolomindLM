@@ -3,12 +3,7 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { randomUUID } from "crypto";
 
-import {
-  createLangSmithRunConfig,
-  invokeWithRetry,
-  invokeWithTimeout,
-  sanitizeUserInput,
-} from "../_shared/index.js";
+import { invokeWithRetry, invokeWithTimeout, sanitizeUserInput } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
@@ -89,20 +84,10 @@ export async function mapProcess(
         invokeWithTimeout(
           () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (fastLlmStructured as any).invoke(
-              [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "WrittenQuestionsGraph.MapProcess",
-                tags: ["agent", "written-questions", "map"],
-                metadata: {
-                  chunkIndex,
-                  questionCount,
-                  difficulty,
-                  questionType,
-                  focus: focus || "none",
-                },
-              })
-            ),
+            (fastLlmStructured as any).invoke([
+              new SystemMessage(MAP_SYSTEM_PROMPT),
+              new HumanMessage(prompt),
+            ]),
           GRAPH_CONFIG.MAP_TIMEOUT_MS,
           "WrittenQuestionsMap"
         ),

@@ -20,6 +20,7 @@ Parameters:
 **Return format**: Symbols grouped by kind (classes, functions, variables, interfaces) in compact JSON.
 
 **depth parameter**:
+
 - `0` — Top-level symbols only (class names, standalone functions)
 - `1` — One level deep (class + its methods)
 - `2` — Two levels deep (class + methods + nested items)
@@ -40,17 +41,18 @@ Parameters:
 
 **Name path patterns**:
 
-| Pattern | Matches |
-|---|---|
-| `AuthService` | The class/module `AuthService` |
-| `AuthService/login` | The `login` method inside `AuthService` |
-| `AuthService/__init__` | Python constructor of `AuthService` |
-| `AuthService/constructor` | TypeScript/JS constructor |
-| `*Service` | Any symbol ending in `Service` (substring match) |
-| `Auth*` | Any symbol starting with `Auth` |
-| `*/login` | Method named `login` in any class |
+| Pattern                   | Matches                                          |
+| ------------------------- | ------------------------------------------------ |
+| `AuthService`             | The class/module `AuthService`                   |
+| `AuthService/login`       | The `login` method inside `AuthService`          |
+| `AuthService/__init__`    | Python constructor of `AuthService`              |
+| `AuthService/constructor` | TypeScript/JS constructor                        |
+| `*Service`                | Any symbol ending in `Service` (substring match) |
+| `Auth*`                   | Any symbol starting with `Auth`                  |
+| `*/login`                 | Method named `login` in any class                |
 
 **Key parameters**:
+
 - `include_body: false` — Returns signature/declaration only (saves tokens)
 - `include_body: true` — Returns full implementation
 - `depth: 1` — Also returns immediate children (methods of a class)
@@ -68,6 +70,7 @@ Parameters:
 ```
 
 Returns:
+
 - File paths where the symbol is referenced
 - Code snippets around each reference
 - Symbolic context (which function/class contains the reference)
@@ -196,6 +199,7 @@ Parameters:
 ```
 
 **Tips**:
+
 - Use non-greedy quantifiers: `.*?` instead of `.*`
 - Scope with `relative_path` to avoid huge result sets
 - Set `restrict_search_to_code_files: true` to skip config/data files

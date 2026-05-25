@@ -39,7 +39,11 @@ export const listPublicPrompts = query({
       const results = await ctx.db
         .query("studioPrompts")
         .withSearchIndex("search_title", (q) =>
-          q.search("title", query).eq("studioTool", args.studioTool).eq("visibility", "public").eq("status", "active"),
+          q
+            .search("title", query)
+            .eq("studioTool", args.studioTool)
+            .eq("visibility", "public")
+            .eq("status", "active")
         )
         .paginate(args.paginationOpts);
       return results;
@@ -52,7 +56,7 @@ export const listPublicPrompts = query({
       return await ctx.db
         .query("studioPrompts")
         .withIndex("by_visibility_and_status_and_studioTool_and_saveCount", (q) =>
-          q.eq("visibility", "public").eq("status", "active").eq("studioTool", args.studioTool),
+          q.eq("visibility", "public").eq("status", "active").eq("studioTool", args.studioTool)
         )
         .order(order)
         .paginate(args.paginationOpts);
@@ -62,7 +66,7 @@ export const listPublicPrompts = query({
       return await ctx.db
         .query("studioPrompts")
         .withIndex("by_visibility_and_status_and_studioTool_and_bayesianRating", (q) =>
-          q.eq("visibility", "public").eq("status", "active").eq("studioTool", args.studioTool),
+          q.eq("visibility", "public").eq("status", "active").eq("studioTool", args.studioTool)
         )
         .order(order)
         .paginate(args.paginationOpts);
@@ -72,7 +76,7 @@ export const listPublicPrompts = query({
     return await ctx.db
       .query("studioPrompts")
       .withIndex("by_visibility_and_status_and_studioTool_and_createdAt", (q) =>
-        q.eq("visibility", "public").eq("status", "active").eq("studioTool", args.studioTool),
+        q.eq("visibility", "public").eq("status", "active").eq("studioTool", args.studioTool)
       )
       .order(order)
       .paginate(args.paginationOpts);
@@ -92,7 +96,9 @@ export const listMyPrompts = query({
     if (args.studioTool) {
       return await ctx.db
         .query("studioPrompts")
-        .withIndex("by_user_and_studioTool", (q) => q.eq("userId", userId).eq("studioTool", args.studioTool!))
+        .withIndex("by_user_and_studioTool", (q) =>
+          q.eq("userId", userId).eq("studioTool", args.studioTool!)
+        )
         .order("desc")
         .paginate(args.paginationOpts);
     }
@@ -133,7 +139,9 @@ export const hasSavedPrompt = query({
 
     const existing = await ctx.db
       .query("studioPromptSaves")
-      .withIndex("by_user_and_public_prompt", (q) => q.eq("userId", userId).eq("publicPromptId", args.publicPromptId))
+      .withIndex("by_user_and_public_prompt", (q) =>
+        q.eq("userId", userId).eq("publicPromptId", args.publicPromptId)
+      )
       .unique();
     return existing !== null;
   },
@@ -148,7 +156,9 @@ export const getMyRating = query({
 
     const existing = await ctx.db
       .query("studioPromptRatings")
-      .withIndex("by_user_and_public_prompt", (q) => q.eq("userId", userId).eq("publicPromptId", args.publicPromptId))
+      .withIndex("by_user_and_public_prompt", (q) =>
+        q.eq("userId", userId).eq("publicPromptId", args.publicPromptId)
+      )
       .unique();
     return existing?.rating ?? null;
   },
@@ -259,7 +269,9 @@ export const savePublicPrompt = mutation({
     // Check for existing save to avoid double-counting
     const existingSave = await ctx.db
       .query("studioPromptSaves")
-      .withIndex("by_user_and_public_prompt", (q) => q.eq("userId", userId).eq("publicPromptId", args.publicPromptId))
+      .withIndex("by_user_and_public_prompt", (q) =>
+        q.eq("userId", userId).eq("publicPromptId", args.publicPromptId)
+      )
       .unique();
 
     if (existingSave) {
@@ -330,7 +342,9 @@ export const ratePrompt = mutation({
     const now = Date.now();
     const existing = await ctx.db
       .query("studioPromptRatings")
-      .withIndex("by_user_and_public_prompt", (q) => q.eq("userId", userId).eq("publicPromptId", args.publicPromptId))
+      .withIndex("by_user_and_public_prompt", (q) =>
+        q.eq("userId", userId).eq("publicPromptId", args.publicPromptId)
+      )
       .unique();
 
     let ratingSum = prompt.ratingSum ?? 0;
@@ -445,7 +459,9 @@ export const reportPrompt = mutation({
     // Check for duplicate report from same user
     const existingReport = await ctx.db
       .query("studioPromptReports")
-      .withIndex("by_prompt_and_reporter", (q) => q.eq("promptId", args.promptId).eq("reporterUserId", userId))
+      .withIndex("by_prompt_and_reporter", (q) =>
+        q.eq("promptId", args.promptId).eq("reporterUserId", userId)
+      )
       .unique();
     if (existingReport) throw new Error("Already reported");
 

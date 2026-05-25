@@ -66,11 +66,13 @@ Save: patch DB record with imageUrl, title, status: "completed"
 **Location**: `convex/_services/ai/togetherImages.ts`
 
 **Responsibilities**:
+
 - Generate images using Together AI API
 - Handle rate limiting and retries
 - Upload images to Convex storage
 
 **Interface**:
+
 ```typescript
 export async function generateInfographicImage(
   client: Together,
@@ -80,7 +82,7 @@ export async function generateInfographicImage(
     quality?: string;
     timeoutMs?: number;
   }
-): Promise<{ imageUrl: string; storageId: string }>
+): Promise<{ imageUrl: string; storageId: string }>;
 ```
 
 ### Component: InfographicGenerationService
@@ -88,11 +90,13 @@ export async function generateInfographicImage(
 **Location**: `convex/studio/infographic/`
 
 **Responsibilities**:
+
 - Orchestrate map-reduce pipeline
 - Generate infographic prompt from document content
 - Call TogetherImageService for image generation
 
 **Key Files**:
+
 - `convex/studio/infographic/index.ts` — Mutation + queries
 - `convex/studio/infographic/generate.ts` — Main generation action
 - `convex/studio/infographic/prompts.ts` — LLM prompts for map/reduce
@@ -100,6 +104,7 @@ export async function generateInfographicImage(
 ### Map Phase Prompt
 
 Extract key elements from each chunk that would appear in an infographic:
+
 - Statistics / data points
 - Key concepts / definitions
 - Timeline events
@@ -112,6 +117,7 @@ Output schema: `InfographicElementArraySchema`
 ### Reduce Phase Prompt
 
 Synthesize all extracted elements into a single detailed gpt-image-1.5 prompt:
+
 - Design a cohesive infographic layout
 - Specify typography, colors, visual hierarchy
 - Include all key data points
@@ -122,14 +128,14 @@ Output schema: `{ title: string, infographicPrompt: string }`
 
 ## Configuration
 
-| Parameter   | Value                    | Rationale                                       |
-| ----------- | ------------------------ | ----------------------------------------------- |
-| Model       | `openai/gpt-image-1.5`   | Together AI hosted OpenAI image model           |
-| Size        | `1536x1024`              | 16:9 landscape, optimal for infographics        |
-| Quality     | `medium`                 | Balanced quality and cost                       |
-| Format      | base64 (default)         | Together AI returns base64 for this model       |
-| Map LLM     | `openai/gpt-oss-20b`     | FAST_LLM for parallel chunk processing          |
-| Reduce LLM  | `openai/gpt-oss-120b`    | SMART_LLM for prompt synthesis                  |
+| Parameter  | Value                  | Rationale                                 |
+| ---------- | ---------------------- | ----------------------------------------- |
+| Model      | `openai/gpt-image-1.5` | Together AI hosted OpenAI image model     |
+| Size       | `1536x1024`            | 16:9 landscape, optimal for infographics  |
+| Quality    | `medium`               | Balanced quality and cost                 |
+| Format     | base64 (default)       | Together AI returns base64 for this model |
+| Map LLM    | `openai/gpt-oss-20b`   | FAST_LLM for parallel chunk processing    |
+| Reduce LLM | `openai/gpt-oss-120b`  | SMART_LLM for prompt synthesis            |
 
 ## Database Schema
 
@@ -140,15 +146,16 @@ slides: defineTable({
   userId: v.id("users"),
   notebookId: v.id("notebooks"),
   title: v.string(),
-  data: v.any(),           // { imageUrl, prompt, metadata }
-  status: v.string(),      // 'generating' | 'completed' | 'failed'
+  data: v.any(), // { imageUrl, prompt, metadata }
+  status: v.string(), // 'generating' | 'completed' | 'failed'
   metadata: v.optional(v.any()),
   createdAt: v.number(),
   updatedAt: v.number(),
-})
+});
 ```
 
 **Data shape** (stored in `data` field):
+
 ```typescript
 {
   imageUrl: string,        // Convex storage public URL
@@ -170,6 +177,7 @@ slides: defineTable({
 **Location**: `apps/web/src/features/studio/components/views/InfographicView.tsx`
 
 **Features**:
+
 - Single image display in card container
 - Responsive sizing (max-width with maintained aspect ratio)
 - Zoom controls (+/− buttons, scroll zoom)
@@ -181,6 +189,7 @@ slides: defineTable({
 - Error state with retry
 
 **Design**:
+
 - Card: `bg-card border-border rounded-xl shadow-md`
 - Image container: `bg-black rounded-lg overflow-hidden`
 - Controls: `bg-secondary hover:bg-secondary/80 rounded-xl`
@@ -189,11 +198,13 @@ slides: defineTable({
 ### 2. Studio Integration
 
 **Rename** "Slides" → "Infographic":
+
 - `apps/web/src/features/studio/hooks/useStudioHandlers.ts`
 - `apps/web/src/features/studio/components/CustomizeSlidesModal.tsx` → `CustomizeInfographicModal.tsx`
 - `apps/web/src/features/studio/hooks/flows/useCreateSlidesFlow.ts` → `useCreateInfographicFlow.ts`
 
 **Simplify modal**:
+
 - Remove `slideType` and `deckLength` options
 - Keep `customPrompt` for style guidance
 - Single "Generate Infographic" button
@@ -203,11 +214,11 @@ slides: defineTable({
 **Location**: `apps/web/src/features/studio/services/infographicApi.ts`
 
 ```typescript
-useInfographics(notebookId)     // List infographics
-useInfographic(infographicId)   // Get single infographic
-useCreateInfographic()          // Create + generate
-useRenameInfographic()          // Rename
-useDeleteInfographic()          // Delete
+useInfographics(notebookId); // List infographics
+useInfographic(infographicId); // Get single infographic
+useCreateInfographic(); // Create + generate
+useRenameInfographic(); // Rename
+useDeleteInfographic(); // Delete
 ```
 
 ### 4. Type Updates
@@ -231,6 +242,7 @@ export interface InfographicNote extends BaseNote {
 ## Removed Code
 
 **Delete**:
+
 - `convex/studio/slides/job.ts`
 - `convex/studio/slides/slideDeckJobPhases.ts`
 - `convex/studio/slides/index.ts` (replace with new version)
@@ -241,32 +253,36 @@ export interface InfographicNote extends BaseNote {
 - `apps/web/src/features/studio/components/CustomizeSlidesModal.tsx`
 
 **Update references**:
+
 - Studio panel tool list
 - Note type routing
 - Type definitions
 
 ## Error Handling
 
-| Error Code | Meaning         | Handling                                |
-| ---------- | --------------- | --------------------------------------- |
-| 400        | Invalid request | Fail fast, log error, abort             |
-| 429        | Rate limit      | Exponential backoff: 2s → 4s → 8s       |
-| 500        | Server error    | Retry up to 2 times with backoff        |
-| Timeout    | >3 minutes      | Fail, store error in metadata           |
+| Error Code | Meaning         | Handling                          |
+| ---------- | --------------- | --------------------------------- |
+| 400        | Invalid request | Fail fast, log error, abort       |
+| 429        | Rate limit      | Exponential backoff: 2s → 4s → 8s |
+| 500        | Server error    | Retry up to 2 times with backoff  |
+| Timeout    | >3 minutes      | Fail, store error in metadata     |
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - Mock Together AI API responses
 - Test error handling
 - Verify request formatting
 
 ### Integration Tests
+
 - Generate infographic from sample document
 - Verify text rendering quality
 - Test with large documents (map-reduce)
 
 ### Manual Testing
+
 - Verify warm vintage aesthetic
 - Test zoom/scroll interactions
 - Test fullscreen and download
@@ -291,12 +307,12 @@ export interface InfographicNote extends BaseNote {
 
 ## Risks & Mitigations
 
-| Risk                             | Impact | Mitigation                                              |
-| -------------------------------- | ------ | ------------------------------------------------------- |
-| Together AI rate limits          | Medium | Implement exponential backoff, monitor usage            |
-| Image quality issues             | High   | Test extensively, can tune prompt or switch to `high`   |
-| Large document handling          | Medium | Map-reduce preserved, test with 50+ page documents      |
-| UI responsiveness with large img | Low    | Implement lazy loading, zoom limits                     |
+| Risk                             | Impact | Mitigation                                            |
+| -------------------------------- | ------ | ----------------------------------------------------- |
+| Together AI rate limits          | Medium | Implement exponential backoff, monitor usage          |
+| Image quality issues             | High   | Test extensively, can tune prompt or switch to `high` |
+| Large document handling          | Medium | Map-reduce preserved, test with 50+ page documents    |
+| UI responsiveness with large img | Low    | Implement lazy loading, zoom limits                   |
 
 ## References
 

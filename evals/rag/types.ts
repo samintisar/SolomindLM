@@ -21,11 +21,22 @@ export type StudioRunnerKind =
   | "audioScript"
   | "audioScriptOnly";
 
+export type LiteratureReviewRunnerKind = "literatureReview";
+
 /** All runner kinds (RAG + studio). `"both"` is a fixture-side directive that expands into multiple runs. */
-export type RunnerKind = "chat" | "research" | "both" | StudioRunnerKind;
+export type RunnerKind =
+  | "chat"
+  | "research"
+  | "both"
+  | StudioRunnerKind
+  | LiteratureReviewRunnerKind;
 
 /** Concrete runner emitted on artifacts/metrics (no `"both"`). */
-export type ConcreteRunnerKind = "chat" | "research" | StudioRunnerKind;
+export type ConcreteRunnerKind =
+  | "chat"
+  | "research"
+  | StudioRunnerKind
+  | LiteratureReviewRunnerKind;
 
 /**
  * Optional studio-specific generation parameters threaded through to the
@@ -136,7 +147,7 @@ export interface ChunkSnapshot {
  * recall/judge metrics work unchanged.
  */
 export interface StudioOutput {
-  kind: StudioRunnerKind;
+  kind: StudioRunnerKind | LiteratureReviewRunnerKind;
   raw: unknown;
 }
 
@@ -217,7 +228,11 @@ export type FailureCategory =
   | "prompt_answering"
   | "citation"
   | "research_planning"
-  | "latency_cost";
+  | "latency_cost"
+  | "literature_review_search"
+  | "literature_review_screening"
+  | "literature_review_extraction"
+  | "literature_review_report";
 
 export interface FailureGroup {
   category: FailureCategory;

@@ -12,9 +12,7 @@ type TooltipNodeProps = { children?: React.ReactNode };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tooltipMarkdownComponents: any = {
   img: () => null,
-  a: ({ children }: TooltipNodeProps) => (
-    <span className="text-foreground">{children}</span>
-  ),
+  a: ({ children }: TooltipNodeProps) => <span className="text-foreground">{children}</span>,
   video: () => null,
   audio: () => null,
   iframe: () => null,
@@ -28,8 +26,7 @@ const tooltipMarkdownComponents: any = {
     ),
   thead: ({ children }: TooltipNodeProps) =>
     React.createElement("thead", { className: "bg-secondary/50" }, children),
-  tbody: ({ children }: TooltipNodeProps) =>
-    React.createElement("tbody", null, children),
+  tbody: ({ children }: TooltipNodeProps) => React.createElement("tbody", null, children),
   tr: ({ children }: TooltipNodeProps) =>
     React.createElement("tr", { className: "border-b border-border" }, children),
   th: ({ children }: TooltipNodeProps) =>
@@ -249,9 +246,7 @@ export const ReferenceTooltip: React.FC<ReferenceTooltipProps> = ({
         </div>
         <div className="border-t border-border/60 pt-3 font-sans text-sm leading-relaxed max-w-none text-popover-foreground wrap-break-word min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
           <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
-            <MarkdownRenderer components={tooltipMarkdownComponents}>
-              {sanitized}
-            </MarkdownRenderer>
+            <MarkdownRenderer components={tooltipMarkdownComponents}>{sanitized}</MarkdownRenderer>
           </Suspense>
         </div>
         {isExternalSource && onAddToNotebook && (

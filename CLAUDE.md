@@ -69,8 +69,8 @@ Bun workspaces monorepo:
 
 **Pipelines:**
 
-- *Content:* ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
-- *Generation:* user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
+- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
+- _Generation:_ user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
 
 ## Observability
 
@@ -117,25 +117,25 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
 
 Plugin `superpowers@claude-plugins-official` is installed. Invoke via `Skill` tool. Project-specific triggers and overrides:
 
-| Skill | When | Project notes |
-|---|---|---|
-| `brainstorming` | Before any new feature, component, or behavior change | Required before `EnterPlanMode` |
-| `writing-plans` | Multi-step task, before touching code | Output goes in plan, not memory |
-| `executing-plans` | Executing a written plan in a separate session | — |
-| `subagent-driven-development` | Plan with independent tasks, current session | Pair with `dispatching-parallel-agents` for 2+ independent tasks |
-| `dispatching-parallel-agents` | 2+ independent tasks, no shared state | Prefer `Explore` subagent for >3-query codebase searches |
-| `systematic-debugging` | Any bug, test failure, or unexpected behavior, before proposing fixes | — |
-| `verification-before-completion` | Before claiming work done / committing / opening PR | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
-| `requesting-code-review` | Before merging significant work | — |
-| `receiving-code-review` | When handling review feedback | — |
-| `finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup | — |
-| `using-git-worktrees` | Feature work needing isolation | Worktrees live under `.worktrees/` |
-| `writing-skills` | Creating or editing a skill | Edit canonical copy under `.agents/skills/<name>/SKILL.md` |
-| `test-driven-development` | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
+| Skill                            | When                                                                                                                                                                                                                                                                                                         | Project notes                                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brainstorming`                  | Before any new feature, component, or behavior change                                                                                                                                                                                                                                                        | Required before `EnterPlanMode`                                                                                                             |
+| `writing-plans`                  | Multi-step task, before touching code                                                                                                                                                                                                                                                                        | Output goes in plan, not memory                                                                                                             |
+| `executing-plans`                | Executing a written plan in a separate session                                                                                                                                                                                                                                                               | —                                                                                                                                           |
+| `subagent-driven-development`    | Plan with independent tasks, current session                                                                                                                                                                                                                                                                 | Pair with `dispatching-parallel-agents` for 2+ independent tasks                                                                            |
+| `dispatching-parallel-agents`    | 2+ independent tasks, no shared state                                                                                                                                                                                                                                                                        | Prefer `Explore` subagent for >3-query codebase searches                                                                                    |
+| `systematic-debugging`           | Any bug, test failure, or unexpected behavior, before proposing fixes                                                                                                                                                                                                                                        | —                                                                                                                                           |
+| `verification-before-completion` | Before claiming work done / committing / opening PR                                                                                                                                                                                                                                                          | Verification = `typecheck:web` + `typecheck:convex` + `lint` + `test:convex` (add `test:web` / `test:e2e` / `eval:rag` when scope warrants) |
+| `requesting-code-review`         | Before merging significant work                                                                                                                                                                                                                                                                              | —                                                                                                                                           |
+| `receiving-code-review`          | When handling review feedback                                                                                                                                                                                                                                                                                | —                                                                                                                                           |
+| `finishing-a-development-branch` | Implementation complete, deciding merge/PR/cleanup                                                                                                                                                                                                                                                           | —                                                                                                                                           |
+| `using-git-worktrees`            | Feature work needing isolation                                                                                                                                                                                                                                                                               | Worktrees live under `.worktrees/`                                                                                                          |
+| `writing-skills`                 | Creating or editing a skill                                                                                                                                                                                                                                                                                  | Edit canonical copy under `.agents/skills/<name>/SKILL.md`                                                                                  |
+| `test-driven-development`        | Deterministic logic only: `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, web utilities, new Convex queries/mutations (vitest + `convex-test`; pattern `*.test.ts` next to source). **Skip for:** LLM prompt outputs (use RAG evals), UI surfaces (use Playwright), streaming/scheduler timing. |
 
 ## Project-Specific Skill Triggers
 
-Skill descriptions are loaded automatically; below are *project* triggers, not generic descriptions.
+Skill descriptions are loaded automatically; below are _project_ triggers, not generic descriptions.
 
 **Convex** (`convex-create-component`, `convex-migration-helper`, `convex-performance-audit`, `convex-quickstart`, `convex-setup-auth`):
 

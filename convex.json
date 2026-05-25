@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/get-convex/convex/main/npm-packages/convex/schemas/convex.schema.json",
   "functions": "convex/",
   "typescriptCompiler": "tsgo",
   "node": {

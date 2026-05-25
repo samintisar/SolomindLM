@@ -9,13 +9,13 @@ Add a language selector to the avatar dropdown menu that controls the language o
 
 ## Decisions
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Scope | Chat + all Studio agents | Models support multilingual output; embeddings are already multilingual |
-| Persistence | Convex `userPreferences` table | Cross-device sync; clean semantic home for future per-user settings |
-| Language list | Curated 15 languages | Covers ~80% of global internet users; avoids unwieldy picker |
-| Prompt injection | `withLanguageInstruction()` helper, fetched at job runtime | DRY; no graph state changes; `userId` already present in every job |
-| Default | English (`"en"`) | No prompt overhead for the majority of users |
+| Decision         | Choice                                                     | Rationale                                                               |
+| ---------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Scope            | Chat + all Studio agents                                   | Models support multilingual output; embeddings are already multilingual |
+| Persistence      | Convex `userPreferences` table                             | Cross-device sync; clean semantic home for future per-user settings     |
+| Language list    | Curated 15 languages                                       | Covers ~80% of global internet users; avoids unwieldy picker            |
+| Prompt injection | `withLanguageInstruction()` helper, fetched at job runtime | DRY; no graph state changes; `userId` already present in every job      |
+| Default          | English (`"en"`)                                           | No prompt overhead for the majority of users                            |
 
 ## 1. Data Layer
 
@@ -45,24 +45,24 @@ Language definitions live in **two separate files** due to the Convex/frontend b
 
 ```typescript
 export const SUPPORTED_LANGUAGES = [
-  { code: "en",    label: "English" },
-  { code: "ar",    label: "Arabic" },
+  { code: "en", label: "English" },
+  { code: "ar", label: "Arabic" },
   { code: "zh-CN", label: "Chinese (Simplified)" },
-  { code: "fr",    label: "French" },
-  { code: "de",    label: "German" },
-  { code: "hi",    label: "Hindi" },
-  { code: "id",    label: "Indonesian" },
-  { code: "ja",    label: "Japanese" },
-  { code: "ko",    label: "Korean" },
-  { code: "pt",    label: "Portuguese" },
-  { code: "ru",    label: "Russian" },
-  { code: "es",    label: "Spanish" },
-  { code: "tr",    label: "Turkish" },
-  { code: "ur",    label: "Urdu" },
-  { code: "vi",    label: "Vietnamese" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "hi", label: "Hindi" },
+  { code: "id", label: "Indonesian" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "es", label: "Spanish" },
+  { code: "tr", label: "Turkish" },
+  { code: "ur", label: "Urdu" },
+  { code: "vi", label: "Vietnamese" },
 ] as const;
 
-export type LanguageCode = typeof SUPPORTED_LANGUAGES[number]["code"];
+export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
 ```
 
 ### Backend helper (`convex/_agents/_shared/languageInstruction.ts`)
@@ -72,7 +72,7 @@ Contains its own copy of the language list (these are plain string constants —
 ```typescript
 export function withLanguageInstruction(systemPrompt: string, language?: string): string {
   if (!language || language === "en") return systemPrompt;
-  const lang = SUPPORTED_LANGUAGES.find(l => l.code === language);
+  const lang = SUPPORTED_LANGUAGES.find((l) => l.code === language);
   if (!lang) return systemPrompt;
   return `${systemPrompt}\n\nIMPORTANT: You must respond entirely in ${lang.label}. All output text must be in ${lang.label}.`;
 }
@@ -98,6 +98,7 @@ Each of the following job files already receives `userId` and `ctx`. They fetch 
 - `convex/studio/audio/job.ts` — applies to transcript generation step only. Note: TTS will speak in the target language since it reads the translated transcript; this is intentional and desirable behavior.
 
 Pattern per job:
+
 ```typescript
 const prefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, { userId });
 const language = prefs?.outputLanguage;
@@ -107,14 +108,17 @@ const language = prefs?.outputLanguage;
 ### Chat agent
 
 `ChatAgentContext` (`convex/_agents/chat/types.ts`) gains one optional field:
+
 ```typescript
 outputLanguage?: string;
 ```
 
 The HTTP action handler (`convex/http.ts`) that builds `ChatAgentContext` fetches the preference via `getPreferencesByUserId` and sets this field. Inside `llm_wrapper.ts`, the language instruction is applied exactly once at system message construction:
+
 ```typescript
-withLanguageInstruction(CORE_SYSTEM_PROMPT, context.outputLanguage)
+withLanguageInstruction(CORE_SYSTEM_PROMPT, context.outputLanguage);
 ```
+
 `CORE_SYSTEM_PROMPT` is a module-level constant used in one place in `llm_wrapper.ts`. Confirm it is not re-constructed mid-request before applying the wrap — if any sub-call rebuilds the system prompt independently, it must also receive `context.outputLanguage`.
 
 ## 4. UI
@@ -138,6 +142,7 @@ export function useOutputLanguage() {
 ### Component (`apps/web/src/features/auth/components/LanguageSelector.tsx`)
 
 A self-contained row styled to match the existing `AvatarDropdown` button rows:
+
 - Owns `useOutputLanguage()` internally — no props needed from `AvatarDropdown`
 - Globe icon (Lucide `Globe`) + current language label as the trigger
 - Uses **Radix `Select`** (`@radix-ui/react-select`) for consistent cross-OS styling, matching the rest of the app's UI primitives
@@ -154,19 +159,19 @@ No new hook calls needed. `Header` passes `isAuthenticated` to `AvatarDropdown` 
 
 ## 5. Files Changed
 
-| File | Change |
-|---|---|
-| `convex/schema.ts` | Add `userPreferences` table |
-| `convex/userPreferences/index.ts` | **New** — `getMyPreferences`, `getPreferencesByUserId`, `setOutputLanguage` |
-| `convex/_agents/_shared/languageInstruction.ts` | **New** — `withLanguageInstruction()` helper + backend language list |
-| `convex/_agents/chat/types.ts` | Add `outputLanguage?: string` to `ChatAgentContext` |
-| `convex/_agents/chat/llm_wrapper.ts` | Wrap `CORE_SYSTEM_PROMPT` with `withLanguageInstruction` |
-| `convex/http.ts` | Fetch preference via `getPreferencesByUserId`, set `context.outputLanguage` |
-| `convex/studio/*/job.ts` (×8) | Fetch preference, pass to `withLanguageInstruction` at prompt sites |
-| `apps/web/src/features/auth/constants/languages.ts` | **New** — frontend language list + `LanguageCode` type |
-| `apps/web/src/features/auth/hooks/useOutputLanguage.ts` | **New** — React hook with `language`, `isLoading`, `setLanguage` |
-| `apps/web/src/features/auth/components/LanguageSelector.tsx` | **New** — self-contained Radix Select component |
-| `apps/web/src/features/auth/components/AvatarDropdown.tsx` | Render `<LanguageSelector />` guarded by `isAuthenticated` |
+| File                                                         | Change                                                                      |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `convex/schema.ts`                                           | Add `userPreferences` table                                                 |
+| `convex/userPreferences/index.ts`                            | **New** — `getMyPreferences`, `getPreferencesByUserId`, `setOutputLanguage` |
+| `convex/_agents/_shared/languageInstruction.ts`              | **New** — `withLanguageInstruction()` helper + backend language list        |
+| `convex/_agents/chat/types.ts`                               | Add `outputLanguage?: string` to `ChatAgentContext`                         |
+| `convex/_agents/chat/llm_wrapper.ts`                         | Wrap `CORE_SYSTEM_PROMPT` with `withLanguageInstruction`                    |
+| `convex/http.ts`                                             | Fetch preference via `getPreferencesByUserId`, set `context.outputLanguage` |
+| `convex/studio/*/job.ts` (×8)                                | Fetch preference, pass to `withLanguageInstruction` at prompt sites         |
+| `apps/web/src/features/auth/constants/languages.ts`          | **New** — frontend language list + `LanguageCode` type                      |
+| `apps/web/src/features/auth/hooks/useOutputLanguage.ts`      | **New** — React hook with `language`, `isLoading`, `setLanguage`            |
+| `apps/web/src/features/auth/components/LanguageSelector.tsx` | **New** — self-contained Radix Select component                             |
+| `apps/web/src/features/auth/components/AvatarDropdown.tsx`   | Render `<LanguageSelector />` guarded by `isAuthenticated`                  |
 
 `Header.tsx` requires no changes — `LanguageSelector` is self-contained.
 

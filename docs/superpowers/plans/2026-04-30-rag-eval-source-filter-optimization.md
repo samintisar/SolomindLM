@@ -12,23 +12,24 @@
 
 ## File Map
 
-| File | Action | Responsibility |
-|------|--------|----------------|
-| `evals/rag/types.ts` | **Modify** | Add `sourcePolicy` to `EvalFixture` and `EvalRunArtifact` |
-| `convex/eval/chatEvalAction.ts` | **Modify** | Accept `sourcePolicy` in args, pass to ChatAgent |
-| `evals/rag/runners/convexChatInvoker.ts` | **Modify** | Forward `sourcePolicy` from fixture to Convex action |
-| `evals/rag/runners/chatRunner.ts` | **Modify** | Include `sourcePolicy` in `ChatAgentContext` |
-| `evals/rag/metrics/sourceAware.ts` | **Create** | Source diversity, per-channel recall, cross-run comparison metrics |
-| `evals/rag/metrics/scorers.ts` | **Modify** | Wire in new source-aware metrics |
-| `evals/rag/fixtures/sourceFilterVariants.ts` | **Create** | Helper to generate source-filtered fixture variants |
-| `evals/rag/cli.ts` | **Modify** | Add `--source-matrix` CLI option and batching logic |
-| `evals/rag/reports/reportGenerator.ts` | **Modify** | Group results by `(fixtureId, sourcePolicy)` in report |
+| File                                         | Action     | Responsibility                                                     |
+| -------------------------------------------- | ---------- | ------------------------------------------------------------------ |
+| `evals/rag/types.ts`                         | **Modify** | Add `sourcePolicy` to `EvalFixture` and `EvalRunArtifact`          |
+| `convex/eval/chatEvalAction.ts`              | **Modify** | Accept `sourcePolicy` in args, pass to ChatAgent                   |
+| `evals/rag/runners/convexChatInvoker.ts`     | **Modify** | Forward `sourcePolicy` from fixture to Convex action               |
+| `evals/rag/runners/chatRunner.ts`            | **Modify** | Include `sourcePolicy` in `ChatAgentContext`                       |
+| `evals/rag/metrics/sourceAware.ts`           | **Create** | Source diversity, per-channel recall, cross-run comparison metrics |
+| `evals/rag/metrics/scorers.ts`               | **Modify** | Wire in new source-aware metrics                                   |
+| `evals/rag/fixtures/sourceFilterVariants.ts` | **Create** | Helper to generate source-filtered fixture variants                |
+| `evals/rag/cli.ts`                           | **Modify** | Add `--source-matrix` CLI option and batching logic                |
+| `evals/rag/reports/reportGenerator.ts`       | **Modify** | Group results by `(fixtureId, sourcePolicy)` in report             |
 
 ---
 
 ## Task 1: Extend Eval Types with Source Policy
 
 **Files:**
+
 - Modify: `evals/rag/types.ts`
 - Modify: `evals/rag/runners/types.ts`
 
@@ -87,6 +88,7 @@ git commit -m "feat(eval): add sourcePolicy to fixture and artifact types"
 ## Task 2: Update Convex Eval Action to Accept Source Policy
 
 **Files:**
+
 - Modify: `convex/eval/chatEvalAction.ts`
 
 - [ ] **Step 1: Add `sourcePolicy` to action args**
@@ -185,6 +187,7 @@ git commit -m "feat(eval): accept sourcePolicy in chatEvalAction"
 ## Task 3: Thread Source Policy Through Eval Invoker Chain
 
 **Files:**
+
 - Modify: `evals/rag/runners/convexChatInvoker.ts`
 - Modify: `evals/rag/runners/chatRunner.ts`
 
@@ -193,13 +196,13 @@ git commit -m "feat(eval): accept sourcePolicy in chatEvalAction"
 In `evals/rag/runners/chatRunner.ts`, update the `ChatAgentContext` interface (around line 120):
 
 ```typescript
-  const agentContext: ChatAgentContext = {
-    userId: "__eval_unused__",
-    noteId: fixture.notebookId ?? "",
-    conversationHistory: [{ role: "user", content: fixture.question }],
-    documentIds: fixture.documentIds,
-    sourcePolicy: fixture.sourcePolicy,
-  };
+const agentContext: ChatAgentContext = {
+  userId: "__eval_unused__",
+  noteId: fixture.notebookId ?? "",
+  conversationHistory: [{ role: "user", content: fixture.question }],
+  documentIds: fixture.documentIds,
+  sourcePolicy: fixture.sourcePolicy,
+};
 ```
 
 - [ ] **Step 2: Update `ChatAgentInvoker` interface to accept sourcePolicy**
@@ -208,7 +211,9 @@ In `evals/rag/runners/chatRunner.ts`, update the `ChatAgentInvoker` interface (a
 
 ```typescript
 export interface ChatAgentInvoker {
-  invoke(context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }): Promise<{
+  invoke(
+    context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }
+  ): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -227,13 +232,13 @@ export interface ChatAgentInvoker {
 In `evals/rag/runners/convexChatInvoker.ts`, update the `invoke` method (around line 32):
 
 ```typescript
-      const result = await client.action(api.eval.chatEvalAction.runChatEval, {
-        evalSecret: options.evalSecret,
-        question: lastMessage.content,
-        notebookId: context.noteId as Id<"notebooks">,
-        documentIds: context.documentIds as Id<"documents">[] | undefined,
-        sourcePolicy: context.sourcePolicy,
-      });
+const result = await client.action(api.eval.chatEvalAction.runChatEval, {
+  evalSecret: options.evalSecret,
+  question: lastMessage.content,
+  notebookId: context.noteId as Id<"notebooks">,
+  documentIds: context.documentIds as Id<"documents">[] | undefined,
+  sourcePolicy: context.sourcePolicy,
+});
 ```
 
 And update the return to include:
@@ -270,6 +275,7 @@ git commit -m "feat(eval): thread sourcePolicy through invoker chain"
 ## Task 4: Create Source-Aware Metrics
 
 **Files:**
+
 - Create: `evals/rag/metrics/sourceAware.ts`
 - Modify: `evals/rag/metrics/scorers.ts`
 
@@ -280,7 +286,13 @@ git commit -m "feat(eval): thread sourcePolicy through invoker chain"
  * Source-aware metrics for evaluating retrieval and answer quality
  * across different source channel configurations.
  */
-import type { EvalFixture, EvalRunArtifact, EvalBaseline, MetricResult, MetricStatus } from "../types";
+import type {
+  EvalFixture,
+  EvalRunArtifact,
+  EvalBaseline,
+  MetricResult,
+  MetricStatus,
+} from "../types";
 
 function baseMetric(
   metric: string,
@@ -289,7 +301,7 @@ function baseMetric(
   status: MetricStatus,
   score: number,
   detail: string,
-  breakdown?: Record<string, unknown>,
+  breakdown?: Record<string, unknown>
 ): MetricResult {
   return {
     metric,
@@ -315,7 +327,7 @@ function baseMetric(
 export function sourceDiversityScore(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
   const evidence = artifact.sourceEvidence ?? [];
@@ -328,7 +340,7 @@ export function sourceDiversityScore(
       "pass",
       1,
       "Single channel mode — diversity not applicable.",
-      { channels, evidenceCount: evidence.length },
+      { channels, evidenceCount: evidence.length }
     );
   }
 
@@ -343,7 +355,7 @@ export function sourceDiversityScore(
     status,
     score,
     `${activeChannels.size}/${channels.length} enabled channels produced evidence. Active: ${Array.from(activeChannels).join(", ")}`,
-    { channels, activeChannels: Array.from(activeChannels), evidence },
+    { channels, activeChannels: Array.from(activeChannels), evidence }
   );
 }
 
@@ -357,7 +369,7 @@ export function sourceDiversityScore(
 export function sourceRecallByChannel(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult[] {
   const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
 
@@ -370,7 +382,7 @@ export function sourceRecallByChannel(
         "pass",
         1,
         "No expected items — per-channel recall not applicable.",
-        { channels },
+        { channels }
       ),
     ];
   }
@@ -393,7 +405,8 @@ export function sourceRecallByChannel(
         matched.push(item);
       }
     }
-    const score = fixture.expectedItems.length > 0 ? matched.length / fixture.expectedItems.length : 1;
+    const score =
+      fixture.expectedItems.length > 0 ? matched.length / fixture.expectedItems.length : 1;
 
     return baseMetric(
       `source_recall_${channel}`,
@@ -402,7 +415,7 @@ export function sourceRecallByChannel(
       score >= 0.5 ? "pass" : score > 0 ? "warn" : "fail",
       score,
       `${matched.length}/${fixture.expectedItems.length} items found in ${channel} (${channelChunks.length} chunks).`,
-      { channel, matched, chunkCount: channelChunks.length },
+      { channel, matched, chunkCount: channelChunks.length }
     );
   });
 }
@@ -433,7 +446,7 @@ function inferSourceChannel(sourceUrl?: string): string {
 export function externalSourceUtilization(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  _baseline?: EvalBaseline,
+  _baseline?: EvalBaseline
 ): MetricResult {
   const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
   const hasExternal = channels.some((c) => c !== "notebook");
@@ -446,7 +459,7 @@ export function externalSourceUtilization(
       "pass",
       1,
       "Notebook-only mode — external utilization not applicable.",
-      { channels },
+      { channels }
     );
   }
 
@@ -470,7 +483,7 @@ export function externalSourceUtilization(
     status,
     score,
     `${externalChunks.length}/${total} selected chunks from external sources (${(score * 100).toFixed(1)}%).`,
-    { externalChunks: externalChunks.length, total, channels },
+    { externalChunks: externalChunks.length, total, channels }
   );
 }
 ```
@@ -490,12 +503,12 @@ import {
 Then in `scoreAllMetrics` (around line 46), add after the existing RAG metrics:
 
 ```typescript
-    // Source-aware metrics (only for runs with sourcePolicy configured)
-    if (artifact.sourcePolicy) {
-      results.push(sourceDiversityScore(fixture, artifact, baseline));
-      results.push(...sourceRecallByChannel(fixture, artifact, baseline));
-      results.push(externalSourceUtilization(fixture, artifact, baseline));
-    }
+// Source-aware metrics (only for runs with sourcePolicy configured)
+if (artifact.sourcePolicy) {
+  results.push(sourceDiversityScore(fixture, artifact, baseline));
+  results.push(...sourceRecallByChannel(fixture, artifact, baseline));
+  results.push(externalSourceUtilization(fixture, artifact, baseline));
+}
 ```
 
 - [ ] **Step 3: Run typecheck**
@@ -518,6 +531,7 @@ git commit -m "feat(eval): add source-aware metrics for channel diversity and re
 ## Task 5: Add Source Matrix Fixture Variants Helper
 
 **Files:**
+
 - Create: `evals/rag/fixtures/sourceFilterVariants.ts`
 
 - [ ] **Step 1: Create helper to generate fixture variants**
@@ -549,7 +563,7 @@ export const DEFAULT_SOURCE_MATRIX: SourcePolicyConfig[] = [
  */
 export function withSourceMatrix(
   base: EvalFixture,
-  matrix: SourcePolicyConfig[] = DEFAULT_SOURCE_MATRIX,
+  matrix: SourcePolicyConfig[] = DEFAULT_SOURCE_MATRIX
 ): EvalFixture[] {
   return matrix.map((policy, index) => ({
     ...base,
@@ -617,6 +631,7 @@ git commit -m "feat(eval): add source matrix fixture variant helpers"
 ## Task 6: Add `--source-matrix` CLI Option
 
 **Files:**
+
 - Modify: `evals/rag/cli.ts`
 
 - [ ] **Step 1: Add CLI parsing for `--source-matrix`**
@@ -647,19 +662,19 @@ In `printHelp` (around line 122), add:
 Before the main fixture loop (around line 261), add:
 
 ```typescript
-  // Expand fixtures for source matrix testing
-  let expandedFixtures: EvalFixture[] = [];
-  for (const fixture of fixtureIds.map((id) => getFixture(id))) {
-    if (opts.sourceMatrix) {
-      const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
-      const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
-        channels: combo.split("+"),
-      }));
-      expandedFixtures.push(...withSourceMatrix(fixture, matrix));
-    } else {
-      expandedFixtures.push(fixture);
-    }
+// Expand fixtures for source matrix testing
+let expandedFixtures: EvalFixture[] = [];
+for (const fixture of fixtureIds.map((id) => getFixture(id))) {
+  if (opts.sourceMatrix) {
+    const combos = opts.sourceMatrix.split(",").map((s) => s.trim());
+    const matrix: SourcePolicyConfig[] = combos.map((combo) => ({
+      channels: combo.split("+"),
+    }));
+    expandedFixtures.push(...withSourceMatrix(fixture, matrix));
+  } else {
+    expandedFixtures.push(fixture);
   }
+}
 ```
 
 Then change the loop to use `expandedFixtures` instead of `fixtureIds`:
@@ -673,11 +688,11 @@ Then change the loop to use `expandedFixtures` instead of `fixtureIds`:
 In `generateReport` call (around line 317), pass the source matrix flag:
 
 ```typescript
-  const report = generateReport(allMetrics, {
-    commitSha,
-    includeWarnings: true,
-    groupBySourcePolicy: !!opts.sourceMatrix,
-  });
+const report = generateReport(allMetrics, {
+  commitSha,
+  includeWarnings: true,
+  groupBySourcePolicy: !!opts.sourceMatrix,
+});
 ```
 
 - [ ] **Step 4: Run typecheck**
@@ -700,6 +715,7 @@ git commit -m "feat(eval): add --source-matrix CLI option for A/B testing source
 ## Task 7: Update Report Generation for Source Grouping
 
 **Files:**
+
 - Modify: `evals/rag/reports/reportGenerator.ts`
 
 - [ ] **Step 1: Add source comparison to `formatReport`**
@@ -743,7 +759,7 @@ export function formatReport(report: EvalReport): string {
   if (sourcePolicyMetrics.length > 0) {
     lines.push("  Source Policy Comparison:");
     lines.push("  " + "-".repeat(50));
-    
+
     // Group by base case ID
     const byBaseCase = new Map<string, typeof sourcePolicyMetrics>();
     for (const m of sourcePolicyMetrics) {
@@ -806,6 +822,7 @@ git commit -m "feat(eval): group report results by source policy for A/B compari
 ## Task 8: Final Verification
 
 **Files:**
+
 - All modified files
 
 - [ ] **Step 1: Run full typecheck**
@@ -852,16 +869,19 @@ git commit -m "style: lint fixes" || echo "No fixes needed"
 ## Example Usage After Implementation
 
 **Test a single fixture with multiple source configs:**
+
 ```bash
 bun run eval:rag -- --case my-fixture --source-matrix notebook,web+academic,all
 ```
 
 **Test academic vs web for a research query:**
+
 ```bash
 bun run eval:rag -- --case research-fixture --source-matrix notebook,notebook+academic,notebook+web
 ```
 
 **Add source-matrix fixtures to the registry:**
+
 ```typescript
 import { agenticPatterns20 } from "./agentic-patterns-20";
 import { withSourceMatrix } from "./sourceFilterVariants";
@@ -869,9 +889,7 @@ import { withSourceMatrix } from "./sourceFilterVariants";
 export const FIXTURES: Record<string, EvalFixture> = {
   [agenticPatterns20.id]: agenticPatterns20,
   // Generate 5 source-filtered variants automatically
-  ...Object.fromEntries(
-    withSourceMatrix(agenticPatterns20).map((f) => [f.id, f])
-  ),
+  ...Object.fromEntries(withSourceMatrix(agenticPatterns20).map((f) => [f.id, f])),
 };
 ```
 
@@ -879,18 +897,18 @@ export const FIXTURES: Record<string, EvalFixture> = {
 
 ## Spec Coverage Checklist
 
-| Requirement | Task |
-|-------------|------|
-| Extend fixture types with sourcePolicy | Task 1 |
+| Requirement                             | Task   |
+| --------------------------------------- | ------ |
+| Extend fixture types with sourcePolicy  | Task 1 |
 | Convex eval action accepts sourcePolicy | Task 2 |
-| Invoker chain forwards sourcePolicy | Task 3 |
-| Source diversity metric | Task 4 |
-| Per-channel recall metric | Task 4 |
-| External source utilization metric | Task 4 |
-| Source matrix fixture variants | Task 5 |
-| `--source-matrix` CLI option | Task 6 |
-| Report groups by source config | Task 7 |
-| Typecheck/lint/tests pass | Task 8 |
+| Invoker chain forwards sourcePolicy     | Task 3 |
+| Source diversity metric                 | Task 4 |
+| Per-channel recall metric               | Task 4 |
+| External source utilization metric      | Task 4 |
+| Source matrix fixture variants          | Task 5 |
+| `--source-matrix` CLI option            | Task 6 |
+| Report groups by source config          | Task 7 |
+| Typecheck/lint/tests pass               | Task 8 |
 
 ## Rollback
 

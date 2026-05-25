@@ -130,7 +130,11 @@ export class BibliographyParserService {
     return result;
   }
 
-  private parseBibTeX(content: string): { papers: PaperRecord[]; malformed: number; total: number } {
+  private parseBibTeX(content: string): {
+    papers: PaperRecord[];
+    malformed: number;
+    total: number;
+  } {
     const papers: PaperRecord[] = [];
     let malformed = 0;
     let total = 0;
@@ -146,8 +150,6 @@ export class BibliographyParserService {
 
       try {
         const convertedBody = this.convertLaTeXAccents(entryBody);
-        console.log('DEBUG entryBody:', JSON.stringify(entryBody));
-        console.log('DEBUG convertedBody:', JSON.stringify(convertedBody));
         const fields = this.parseBibTeXFields(convertedBody);
         const paper = this.buildPaperRecordFromBibTeX(fields, entryType);
         if (paper) {
@@ -214,7 +216,8 @@ export class BibliographyParserService {
     const fields = new Map<string, string>();
     // Match field = {value} or field = "value" or field = value
     // The brace pattern handles one level of nesting: {outer {inner} rest}
-    const fieldRegex = /(\w+)\s*=\s*(?:\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}|"([^"]*)"|([^,\n]*))\s*,?/g;
+    const fieldRegex =
+      /(\w+)\s*=\s*(?:\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}|"([^"]*)"|([^,\n]*))\s*,?/g;
     let match;
 
     while ((match = fieldRegex.exec(body)) !== null) {
@@ -226,7 +229,10 @@ export class BibliographyParserService {
     return fields;
   }
 
-  private buildPaperRecordFromBibTeX(fields: Map<string, string>, entryType: string): PaperRecord | null {
+  private buildPaperRecordFromBibTeX(
+    fields: Map<string, string>,
+    entryType: string
+  ): PaperRecord | null {
     const title = this.cleanBibTeXValue(fields.get("title") ?? "");
     if (!title) {
       return null;
@@ -424,48 +430,100 @@ export class BibliographyParserService {
 
     // 1. Double-braced forms: {\'{i}}, {\"{u}}, {\`{a}}, etc.
     applyReplacements([
-      { pattern: /{\\`{([aeiouAEIOU])}}/g, map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" } },
-      { pattern: /{\\'{([aeiouAEIOU])}}/g, map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" } },
-      { pattern: /{\\"{([aeiouAEIOU])}}/g, map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" } },
-      { pattern: /{\\\^{([aeiouAEIOU])}}/g, map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" } },
+      {
+        pattern: /{\\`{([aeiouAEIOU])}}/g,
+        map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" },
+      },
+      {
+        pattern: /{\\'{([aeiouAEIOU])}}/g,
+        map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" },
+      },
+      {
+        pattern: /{\\"{([aeiouAEIOU])}}/g,
+        map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" },
+      },
+      {
+        pattern: /{\\\^{([aeiouAEIOU])}}/g,
+        map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" },
+      },
       { pattern: /{\\~{([nNaAoO])}}/g, map: { n: "ñ", N: "Ñ", a: "ã", o: "õ", A: "Ã", O: "Õ" } },
       { pattern: /{\\c{([cC])}}/g, map: { c: "ç", C: "Ç" } },
     ]);
 
     // 2. Command with braced argument: \`{a}, \'{e}, \"{u}, etc.
     applyReplacements([
-      { pattern: /\\`{([aeiouAEIOU])}/g, map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" } },
-      { pattern: /\\'{([aeiouAEIOU])}/g, map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" } },
-      { pattern: /\\"{([aeiouAEIOU])}/g, map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" } },
-      { pattern: /\\\^{([aeiouAEIOU])}/g, map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" } },
+      {
+        pattern: /\\`{([aeiouAEIOU])}/g,
+        map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" },
+      },
+      {
+        pattern: /\\'{([aeiouAEIOU])}/g,
+        map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" },
+      },
+      {
+        pattern: /\\"{([aeiouAEIOU])}/g,
+        map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" },
+      },
+      {
+        pattern: /\\\^{([aeiouAEIOU])}/g,
+        map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" },
+      },
       { pattern: /\\~{([nNaAoO])}/g, map: { n: "ñ", N: "Ñ", a: "ã", o: "õ", A: "Ã", O: "Õ" } },
       { pattern: /\\c{([cC])}/g, map: { c: "ç", C: "Ç" } },
     ]);
 
     // 3. Braced forms: {\`a}, {\'e}, {\"u}, etc.
     applyReplacements([
-      { pattern: /{\\`([aeiouAEIOU])}/g, map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" } },
-      { pattern: /{\\'([aeiouAEIOU])}/g, map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" } },
-      { pattern: /{\\"([aeiouAEIOU])}/g, map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" } },
-      { pattern: /{\\\^([aeiouAEIOU])}/g, map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" } },
+      {
+        pattern: /{\\`([aeiouAEIOU])}/g,
+        map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" },
+      },
+      {
+        pattern: /{\\'([aeiouAEIOU])}/g,
+        map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" },
+      },
+      {
+        pattern: /{\\"([aeiouAEIOU])}/g,
+        map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" },
+      },
+      {
+        pattern: /{\\\^([aeiouAEIOU])}/g,
+        map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" },
+      },
       { pattern: /{\\~([nNaAoO])}/g, map: { n: "ñ", N: "Ñ", a: "ã", o: "õ", A: "Ã", O: "Õ" } },
     ]);
 
     // 4. Simple forms: \`a, \'e, \"u, etc.
     applyReplacements([
-      { pattern: /\\`([aeiouAEIOU])/g, map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" } },
-      { pattern: /\\'([aeiouAEIOU])/g, map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" } },
-      { pattern: /\\"([aeiouAEIOU])/g, map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" } },
-      { pattern: /\\\^([aeiouAEIOU])/g, map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" } },
+      {
+        pattern: /\\`([aeiouAEIOU])/g,
+        map: { a: "à", e: "è", i: "ì", o: "ò", u: "ù", A: "À", E: "È", I: "Ì", O: "Ò", U: "Ù" },
+      },
+      {
+        pattern: /\\'([aeiouAEIOU])/g,
+        map: { a: "á", e: "é", i: "í", o: "ó", u: "ú", A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú" },
+      },
+      {
+        pattern: /\\"([aeiouAEIOU])/g,
+        map: { a: "ä", e: "ë", i: "ï", o: "ö", u: "ü", A: "Ä", E: "Ë", I: "Ï", O: "Ö", U: "Ü" },
+      },
+      {
+        pattern: /\\\^([aeiouAEIOU])/g,
+        map: { a: "â", e: "ê", i: "î", o: "ô", u: "û", A: "Â", E: "Ê", I: "Î", O: "Ô", U: "Û" },
+      },
       { pattern: /\\~([nNaAoO])/g, map: { n: "ñ", N: "Ñ", a: "ã", o: "õ", A: "Ã", O: "Õ" } },
     ]);
 
     // 5. Special characters
     result = result
-      .replace(/\\ae/g, "æ").replace(/\\AE/g, "Æ")
-      .replace(/\\oe/g, "œ").replace(/\\OE/g, "Œ")
-      .replace(/\\aa/g, "å").replace(/\\AA/g, "Å")
-      .replace(/\\o\b/g, "ø").replace(/\\O\b/g, "Ø")
+      .replace(/\\ae/g, "æ")
+      .replace(/\\AE/g, "Æ")
+      .replace(/\\oe/g, "œ")
+      .replace(/\\OE/g, "Œ")
+      .replace(/\\aa/g, "å")
+      .replace(/\\AA/g, "Å")
+      .replace(/\\o\b/g, "ø")
+      .replace(/\\O\b/g, "Ø")
       .replace(/\\ss/g, "ß");
 
     return result;

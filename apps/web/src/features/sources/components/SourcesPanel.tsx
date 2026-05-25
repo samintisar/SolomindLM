@@ -37,6 +37,7 @@ interface SourcesPanelProps {
   /** Open this notebook document in the viewer (e.g. citation click). `seq` bumps so the same id can reopen. */
   focusSourceRequest?: SourcesPanelFocusRequest | null;
   onFocusSourceHandled?: () => void;
+  onDiscussTopic?: (topic: string) => void;
 }
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({
@@ -48,6 +49,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   onDocumentUploaded,
   focusSourceRequest,
   onFocusSourceHandled,
+  onDiscussTopic,
 }) => {
   const {
     sources,
@@ -416,13 +418,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           {viewingSource ? (
             <SourceViewer
               source={viewingSource}
-              onToggle={handleToggleSource}
               content={markdownContent}
               pdfStorageId={viewingSource?.type === "PDF" ? viewingDocument?.storageId : undefined}
               isLoading={sourceContent.isLoading(viewingSourceId ?? "")}
               error={
                 sourceContent.hasError(viewingSourceId ?? "") ? "Failed to load content" : undefined
               }
+              onDiscussTopic={onDiscussTopic}
             />
           ) : (
             <SourceList

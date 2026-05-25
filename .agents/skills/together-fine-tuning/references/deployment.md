@@ -1,4 +1,5 @@
 # Fine-tuned Model Deployment Reference
+
 ## Contents
 
 - [Deployment Options](#deployment-options)
@@ -6,7 +7,6 @@
 - [Job Monitoring](#job-monitoring)
 - [Continued Fine-tuning](#continued-fine-tuning)
 - [Pricing](#pricing)
-
 
 ## Deployment Options
 
@@ -83,54 +83,56 @@ tar -xf model-name.tar.zst
 ```
 
 Options:
+
 - `--output_dir`, `-o` -- Specify the output directory
 - `--checkpoint-step`, `-s` -- Download a specific checkpoint's weights (default: latest)
 - `--checkpoint-type` -- `default`, `merged`, or `adapter` (merged/adapter only for LoRA jobs)
 
 ## Training Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `model` | string | Required | Base model |
-| `training_file` | string | Required | File ID from upload |
-| `validation_file` | string | - | Optional validation file |
-| `suffix` | string | - | Custom model name suffix |
-| `n_epochs` | int | 1-3 | Training epochs |
-| `n_checkpoints` | int | 1 | Checkpoints to save |
-| `batch_size` | int/str | `"max"` | Batch size (or "max" for auto) |
-| `learning_rate` | float | ~1e-5 | Learning rate |
-| `warmup_ratio` | float | 0 | Warmup step ratio |
-| `lora` | bool | true | Use LoRA method |
-| `lora_r` | int | 64 | LoRA rank |
-| `lora_alpha` | int | 16 | LoRA scaling factor |
-| `train_on_inputs` | bool/str | "auto" | Train on prompts/user msgs |
-| `n_evals` | int | 0 | Validation evaluations (>0 to use validation set) |
-| `wandb_api_key` | string | - | W&B integration |
-| `from_checkpoint` | string | - | Continue from previous job ID |
+| Parameter         | Type     | Default  | Description                                       |
+| ----------------- | -------- | -------- | ------------------------------------------------- |
+| `model`           | string   | Required | Base model                                        |
+| `training_file`   | string   | Required | File ID from upload                               |
+| `validation_file` | string   | -        | Optional validation file                          |
+| `suffix`          | string   | -        | Custom model name suffix                          |
+| `n_epochs`        | int      | 1-3      | Training epochs                                   |
+| `n_checkpoints`   | int      | 1        | Checkpoints to save                               |
+| `batch_size`      | int/str  | `"max"`  | Batch size (or "max" for auto)                    |
+| `learning_rate`   | float    | ~1e-5    | Learning rate                                     |
+| `warmup_ratio`    | float    | 0        | Warmup step ratio                                 |
+| `lora`            | bool     | true     | Use LoRA method                                   |
+| `lora_r`          | int      | 64       | LoRA rank                                         |
+| `lora_alpha`      | int      | 16       | LoRA scaling factor                               |
+| `train_on_inputs` | bool/str | "auto"   | Train on prompts/user msgs                        |
+| `n_evals`         | int      | 0        | Validation evaluations (>0 to use validation set) |
+| `wandb_api_key`   | string   | -        | W&B integration                                   |
+| `from_checkpoint` | string   | -        | Continue from previous job ID                     |
 
 ### DPO-specific Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `training_method` | string | "sft" | Set to `"dpo"` for preference tuning |
-| `dpo_beta` | float | 0.1 | Deviation control (0.05-0.9) |
+| Parameter         | Type   | Default | Description                          |
+| ----------------- | ------ | ------- | ------------------------------------ |
+| `training_method` | string | "sft"   | Set to `"dpo"` for preference tuning |
+| `dpo_beta`        | float  | 0.1     | Deviation control (0.05-0.9)         |
 
 ### VLM-specific Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `train_vision` | bool | false | Update vision encoder weights |
+| Parameter      | Type | Default | Description                   |
+| -------------- | ---- | ------- | ----------------------------- |
+| `train_vision` | bool | false   | Update vision encoder weights |
 
 ### BYOM-specific Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `from_hf_model` | string | - | HuggingFace model ID |
-| `hf_api_token` | string | - | HuggingFace token (for private repos) |
+| Parameter       | Type   | Default | Description                           |
+| --------------- | ------ | ------- | ------------------------------------- |
+| `from_hf_model` | string | -       | HuggingFace model ID                  |
+| `hf_api_token`  | string | -       | HuggingFace token (for private repos) |
 
 ## Job Monitoring
 
 ### Status Flow
+
 `Pending` -> `Queued` -> `Running` -> `Uploading` -> `Completed`
 
 ### Python SDK

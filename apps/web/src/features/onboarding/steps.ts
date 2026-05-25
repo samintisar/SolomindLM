@@ -1,9 +1,4 @@
-export const STEP_IDS = [
-  "createNotebook",
-  "addSource",
-  "askQuestion",
-  "generateArtifact",
-] as const;
+export const STEP_IDS = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 
 export type StepId = (typeof STEP_IDS)[number];
 export type StepRoute = "home" | "notebook";
@@ -22,16 +17,14 @@ export const STEP_DEFINITIONS: readonly StepDefinition[] = [
     id: "createNotebook",
     route: "home",
     targetSelector: '[data-onboarding="create-notebook-button"]',
-    copy:
-      "Notebooks are where your sources, chats, and study tools live. Create your first one.",
+    copy: "Notebooks are where your sources, chats, and study tools live. Create your first one.",
     side: "right",
   },
   {
     id: "addSource",
     route: "notebook",
     targetSelector: '[data-onboarding="add-source-button"]',
-    copy:
-      "Add a PDF, URL, YouTube link, or pasted text. This is the knowledge your AI will work from.",
+    copy: "Add a PDF, URL, YouTube link, or pasted text. This is the knowledge your AI will work from.",
     side: "right",
   },
   {
@@ -45,8 +38,7 @@ export const STEP_DEFINITIONS: readonly StepDefinition[] = [
     id: "generateArtifact",
     route: "notebook",
     targetSelector: '[data-onboarding="studio-tool-grid"]',
-    copy:
-      "Pick any tool and generate your first artifact. We recommend a Report or Flashcards to start.",
+    copy: "Pick any tool and generate your first artifact. We recommend a Report or Flashcards to start.",
     side: "left",
   },
 ];

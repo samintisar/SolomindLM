@@ -2,12 +2,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import {
-  createLangSmithRunConfig,
-  invokeWithRetry,
-  invokeWithTimeout,
-  sanitizeUserInput,
-} from "../_shared/index.js";
+import { invokeWithRetry, invokeWithTimeout, sanitizeUserInput } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { FLASHCARD_CONFIG } from "./config.js";
@@ -59,19 +54,7 @@ export async function mapProcess(
       () =>
         invokeWithTimeout(
           () =>
-            structuredLlm.invoke(
-              [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "FlashcardGraph.MapProcess",
-                tags: ["agent", "flashcard", "map"],
-                metadata: {
-                  chunkIndex,
-                  cardCount,
-                  difficulty,
-                  topic: topic || "none",
-                },
-              }) as unknown as Record<string, unknown>
-            ),
+            structuredLlm.invoke([new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)]),
           FLASHCARD_CONFIG.MAP_TIMEOUT_MS,
           "FlashcardMap"
         ),

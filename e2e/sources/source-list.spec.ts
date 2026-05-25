@@ -71,7 +71,10 @@ test.describe("Source List", () => {
     await openSourceKebab(page, PASTED_TEXT_TITLE);
 
     // Click Rename (evaluate bypasses ChatEmptyState overlay)
-    await page.getByText("Rename").first().evaluate((el) => (el as HTMLElement).click());
+    await page
+      .getByText("Rename")
+      .first()
+      .evaluate((el) => (el as HTMLElement).click());
 
     // The rename input appears inline with border-primary class and autoFocus.
     // Can't use getSourceCard because the h4 text changes to an input.

@@ -106,10 +106,9 @@ export class DoiResolverService {
   async resolveBatch(dois: string[]): Promise<(PaperRecord | null)[]> {
     const invalidDois = dois.filter((doi) => !DOI_REGEX.test(doi));
     if (invalidDois.length > 0) {
-      throw new InputValidationError(
-        `Invalid DOI format(s): ${invalidDois.join(", ")}`,
-        { field: "doi" }
-      );
+      throw new InputValidationError(`Invalid DOI format(s): ${invalidDois.join(", ")}`, {
+        field: "doi",
+      });
     }
 
     // For batch, we could use Crossref's filter endpoint, but for simplicity
@@ -120,7 +119,10 @@ export class DoiResolverService {
         const result = await this.resolve(doi);
         results.push(result);
       } catch (error) {
-        this.logger.error("Batch resolution failed for DOI", { doi, error: (error as Error).message });
+        this.logger.error("Batch resolution failed for DOI", {
+          doi,
+          error: (error as Error).message,
+        });
         results.push(null);
       }
     }
@@ -131,45 +133,42 @@ export class DoiResolverService {
     const url = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
 
     try {
-      return await invokeWithHttpRetry(
-        async () => {
-          const t0 = Date.now();
-          this.logger.apiCall("crossref", "/works", { doi });
+      return await invokeWithHttpRetry(async () => {
+        const t0 = Date.now();
+        this.logger.apiCall("crossref", "/works", { doi });
 
-          const response = await fetch(url, {
-            headers: {
-              "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
-            },
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)",
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          this.logger.apiError("crossref", "/works", new Error(`HTTP ${response.status}`), {
+            status: response.status,
+            doi,
           });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            this.logger.apiError("crossref", "/works", new Error(`HTTP ${response.status}`), {
-              status: response.status,
-              doi,
-            });
-            if (response.status === 404) {
-              return null;
-            }
-            throw createExternalServiceErrorFromResponse(
-              "crossref",
-              response.status,
-              "/works",
-              errorText.slice(0, 500)
-            );
-          }
-
-          const data = (await response.json()) as CrossrefResponse;
-          this.logger.apiSuccess("crossref", "/works", Date.now() - t0, { doi });
-
-          if (data.status !== "ok" || !data.message) {
+          if (response.status === 404) {
             return null;
           }
+          throw createExternalServiceErrorFromResponse(
+            "crossref",
+            response.status,
+            "/works",
+            errorText.slice(0, 500)
+          );
+        }
 
-          return data.message;
-        },
-        "crossref_doi_resolution"
-      );
+        const data = (await response.json()) as CrossrefResponse;
+        this.logger.apiSuccess("crossref", "/works", Date.now() - t0, { doi });
+
+        if (data.status !== "ok" || !data.message) {
+          return null;
+        }
+
+        return data.message;
+      }, "crossref_doi_resolution");
     } catch (error) {
       this.logger.error("Crossref resolution failed", { doi, error: (error as Error).message });
       return null;
@@ -187,41 +186,38 @@ export class DoiResolverService {
     }
 
     try {
-      return await invokeWithHttpRetry(
-        async () => {
-          const t0 = Date.now();
-          this.logger.apiCall("semantic_scholar", "/graph/v1/paper/DOI", { doi });
+      return await invokeWithHttpRetry(async () => {
+        const t0 = Date.now();
+        this.logger.apiCall("semantic_scholar", "/graph/v1/paper/DOI", { doi });
 
-          const response = await fetch(url, { headers });
+        const response = await fetch(url, { headers });
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            this.logger.apiError(
-              "semantic_scholar",
-              "/graph/v1/paper/DOI",
-              new Error(`HTTP ${response.status}`),
-              { status: response.status, doi }
-            );
-            if (response.status === 404) {
-              return null;
-            }
-            throw createExternalServiceErrorFromResponse(
-              "semantic_scholar",
-              response.status,
-              "/graph/v1/paper/DOI",
-              errorText.slice(0, 500)
-            );
+        if (!response.ok) {
+          const errorText = await response.text();
+          this.logger.apiError(
+            "semantic_scholar",
+            "/graph/v1/paper/DOI",
+            new Error(`HTTP ${response.status}`),
+            { status: response.status, doi }
+          );
+          if (response.status === 404) {
+            return null;
           }
+          throw createExternalServiceErrorFromResponse(
+            "semantic_scholar",
+            response.status,
+            "/graph/v1/paper/DOI",
+            errorText.slice(0, 500)
+          );
+        }
 
-          const data = (await response.json()) as SemanticScholarPaper;
-          this.logger.apiSuccess("semantic_scholar", "/graph/v1/paper/DOI", Date.now() - t0, {
-            doi,
-          });
+        const data = (await response.json()) as SemanticScholarPaper;
+        this.logger.apiSuccess("semantic_scholar", "/graph/v1/paper/DOI", Date.now() - t0, {
+          doi,
+        });
 
-          return data;
-        },
-        "semantic_scholar_doi_resolution"
-      );
+        return data;
+      }, "semantic_scholar_doi_resolution");
     } catch (error) {
       this.logger.error("Semantic Scholar resolution failed", {
         doi,

@@ -76,7 +76,11 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-120 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
 
       <div
         role="dialog"
@@ -113,7 +117,9 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
           >
             {allSelected ? "Deselect all" : "Select all"}
           </button>
-          <span className="tabular-nums text-xs text-muted-foreground">{selected.size} selected</span>
+          <span className="tabular-nums text-xs text-muted-foreground">
+            {selected.size} selected
+          </span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-card/50 p-6">

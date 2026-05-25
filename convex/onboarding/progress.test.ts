@@ -4,15 +4,9 @@ import { describe, expect, test } from "vitest";
 import schema from "../schema";
 import { api } from "../_generated/api";
 
-const rawModules = import.meta.glob("/convex/**/*.ts") as Record<
-  string,
-  () => Promise<unknown>
->;
+const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 function withAuth(t: ReturnType<typeof convexTest>, userId: string) {
@@ -34,25 +28,21 @@ async function makeUserAndOnboarding(t: ReturnType<typeof convexTest>) {
   });
 }
 
-async function insertNotebook(
-  t: ReturnType<typeof convexTest>,
-  userId: string,
-  title = "N1",
-) {
+async function insertNotebook(t: ReturnType<typeof convexTest>, userId: string, title = "N1") {
   return await t.run(async (ctx) =>
     ctx.db.insert("notebooks", {
       userId: userId as never,
       title,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    }),
+    })
   );
 }
 
 async function insertDocument(
   t: ReturnType<typeof convexTest>,
   userId: string,
-  notebookId: string,
+  notebookId: string
 ) {
   return await t.run(async (ctx) =>
     ctx.db.insert("documents", {
@@ -63,14 +53,14 @@ async function insertDocument(
       status: "completed",
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    }),
+    })
   );
 }
 
 async function insertConversation(
   t: ReturnType<typeof convexTest>,
   userId: string,
-  notebookId: string,
+  notebookId: string
 ) {
   return await t.run(async (ctx) =>
     ctx.db.insert("conversations", {
@@ -78,7 +68,7 @@ async function insertConversation(
       notebookId: notebookId as never,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    }),
+    })
   );
 }
 
@@ -88,7 +78,7 @@ describe("getChecklistProgress", () => {
     const userId = await makeUserAndOnboarding(t);
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result).toEqual({
       createNotebook: false,
@@ -104,7 +94,7 @@ describe("getChecklistProgress", () => {
     await insertNotebook(t, userId);
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.createNotebook).toBe(true);
   });
@@ -116,7 +106,7 @@ describe("getChecklistProgress", () => {
     await insertDocument(t, userId, nbId);
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.addSource).toBe(true);
   });
@@ -128,7 +118,7 @@ describe("getChecklistProgress", () => {
     await insertConversation(t, userId, nbId);
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.askQuestion).toBe(true);
   });
@@ -145,20 +135,18 @@ describe("getChecklistProgress", () => {
         status: "completed",
         createdAt: Date.now(),
         updatedAt: Date.now(),
-      }),
+      })
     );
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.generateArtifact).toBe(true);
   });
 
   test("generateArtifact=true when report is in tourNotebookId (active tour path)", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     const nbId = await insertNotebook(t, userId, "Tour");
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
@@ -167,7 +155,7 @@ describe("getChecklistProgress", () => {
         currentStepId: "generateArtifact",
         tourNotebookId: nbId,
         checklistDismissed: false,
-      }),
+      })
     );
     await t.run(async (ctx) =>
       ctx.db.insert("reports", {
@@ -177,11 +165,11 @@ describe("getChecklistProgress", () => {
         status: "completed",
         createdAt: Date.now(),
         updatedAt: Date.now(),
-      }),
+      })
     );
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.generateArtifact).toBe(true);
   });
@@ -189,14 +177,9 @@ describe("getChecklistProgress", () => {
   test("auth-scoped: another user's notebooks do not tick this user's checklist", async () => {
     const t = convexTest(schema, modules);
     const userA = await makeUserAndOnboarding(t);
-    const userB = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "B" }),
-    );
+    const userB = await t.run(async (ctx) => ctx.db.insert("users", { name: "B" }));
     await insertNotebook(t, userB, "B's");
-    const result = await withAuth(t, userA).query(
-      api.onboarding.progress.getChecklistProgress,
-      {},
-    );
+    const result = await withAuth(t, userA).query(api.onboarding.progress.getChecklistProgress, {});
     expect(result.createNotebook).toBe(false);
   });
 
@@ -215,7 +198,7 @@ describe("getChecklistProgress", () => {
     await insertNotebook(t, userId);
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.createNotebook).toBe(true);
   });
@@ -241,7 +224,7 @@ describe("getChecklistProgress", () => {
     });
     const result = await withAuth(t, userId).query(
       api.onboarding.progress.getChecklistProgress,
-      {},
+      {}
     );
     expect(result.createNotebook).toBe(false);
   });
@@ -250,9 +233,7 @@ describe("getChecklistProgress", () => {
 describe("getTourProgress", () => {
   test("returns tourNotebookId from row", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     const nbId = await insertNotebook(t, userId, "Tour");
     await t.run(async (ctx) =>
       ctx.db.insert("userOnboarding", {
@@ -261,20 +242,15 @@ describe("getTourProgress", () => {
         currentStepId: "addSource",
         tourNotebookId: nbId,
         checklistDismissed: false,
-      }),
+      })
     );
-    const result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.tourNotebookId).toBe(nbId);
   });
 
   test("addSource=true only when document is in tourNotebookId", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     const tourNb = await insertNotebook(t, userId, "Tour");
     const otherNb = await insertNotebook(t, userId, "Other");
     await t.run(async (ctx) =>
@@ -284,28 +260,20 @@ describe("getTourProgress", () => {
         currentStepId: "addSource",
         tourNotebookId: tourNb,
         checklistDismissed: false,
-      }),
+      })
     );
     await insertDocument(t, userId, otherNb);
-    let result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    let result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.addSource).toBe(false);
 
     await insertDocument(t, userId, tourNb);
-    result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.addSource).toBe(true);
   });
 
   test("askQuestion=true only when conversation is in tourNotebookId", async () => {
     const t = convexTest(schema, modules);
-    const userId = await t.run(async (ctx) =>
-      ctx.db.insert("users", { name: "U" }),
-    );
+    const userId = await t.run(async (ctx) => ctx.db.insert("users", { name: "U" }));
     const tourNb = await insertNotebook(t, userId, "Tour");
     const otherNb = await insertNotebook(t, userId, "Other");
     await t.run(async (ctx) =>
@@ -315,20 +283,14 @@ describe("getTourProgress", () => {
         currentStepId: "askQuestion",
         tourNotebookId: tourNb,
         checklistDismissed: false,
-      }),
+      })
     );
     await insertConversation(t, userId, otherNb);
-    let result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    let result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.askQuestion).toBe(false);
 
     await insertConversation(t, userId, tourNb);
-    result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.askQuestion).toBe(true);
   });
 
@@ -356,13 +318,10 @@ describe("getTourProgress", () => {
         title: "After start",
         createdAt: Date.now(),
         updatedAt: Date.now(),
-      }),
+      })
     );
 
-    const result = await withAuth(t, userId).query(
-      api.onboarding.progress.getTourProgress,
-      {},
-    );
+    const result = await withAuth(t, userId).query(api.onboarding.progress.getTourProgress, {});
     expect(result.tourNotebookId).toBe(expectedNotebookId);
   });
 });

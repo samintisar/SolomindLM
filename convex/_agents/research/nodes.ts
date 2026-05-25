@@ -37,10 +37,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([
     promise.finally(() => clearTimeout(timer)),
     new Promise<T>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`${label} timed out after ${ms}ms`)),
-        ms
-      );
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
     }),
   ]);
 }
@@ -55,28 +52,32 @@ export interface ResearchNodeDeps {
   runHybridSearch: (
     query: string,
     documentIds?: string[]
-  ) => Promise<Array<{
-    sourceId: string;
-    documentId?: string;
-    sourceTitle: string;
-    sourceUrl?: string;
-    content: string;
-    chunkIndex: number;
-    similarity?: number;
-  }>>;
+  ) => Promise<
+    Array<{
+      sourceId: string;
+      documentId?: string;
+      sourceTitle: string;
+      sourceUrl?: string;
+      content: string;
+      chunkIndex: number;
+      similarity?: number;
+    }>
+  >;
   // External source discovery (web/news/academic)
   discoverSources?: (
     query: string,
     channels: Array<"web" | "news" | "academic">,
     maxResults?: number
-  ) => Promise<Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    sourceType: string;
-    score?: number;
-    rawContent?: string;
-  }>>;
+  ) => Promise<
+    Array<{
+      title: string;
+      url: string;
+      snippet: string;
+      sourceType: string;
+      score?: number;
+      rawContent?: string;
+    }>
+  >;
   // Web page loader for scraping discovered sources
   loadWebPage?: (url: string) => Promise<{ title: string; content: string; url: string }>;
   // Academic paper loader
@@ -87,12 +88,16 @@ export interface ResearchNodeDeps {
     abstract: string;
     url: string;
     pdfUrl?: string;
-    source: "arxiv" | "semantic_scholar" | "pubmed";
+    source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
     citationCount?: number;
     doi?: string;
   }) => Promise<{ title: string; content: string; source: string }>;
   // Stream progress callback
-  onProgress: (phase: ResearchPhase, subQuestionId?: string, sourcesFound?: number) => Promise<void>;
+  onProgress: (
+    phase: ResearchPhase,
+    subQuestionId?: string,
+    sourcesFound?: number
+  ) => Promise<void>;
 }
 
 // ============================================================
@@ -134,7 +139,9 @@ export async function plannerNode(
     id: sq.id,
     question: sq.question,
     searchQueries: sq.searchQueries,
-    sourceChannels: sq.sourceChannels.filter((ch) => enabledChannels.includes(ch as SourceChannel)) as SourceChannel[],
+    sourceChannels: sq.sourceChannels.filter((ch) =>
+      enabledChannels.includes(ch as SourceChannel)
+    ) as SourceChannel[],
     status: "pending",
   }));
 
@@ -173,9 +180,11 @@ export async function retrieverNode(
   }
 
   const { subQuestions, iteration, sourcePolicy } = state;
-  const maxResultsPerChannel = sourcePolicy.maxResultsPerChannel ?? 10;
-  // Cap external sources to 2 for cheap discovery; escalate only for high-value sources
-  const externalMaxResults = Math.min(maxResultsPerChannel, 2);
+  const DEFAULT_MAX_RESULTS_PER_CHANNEL = 8;
+  const EXTERNAL_RESULTS_HARD_CAP = 12;
+  const maxResultsPerChannel =
+    sourcePolicy.maxResultsPerChannel ?? DEFAULT_MAX_RESULTS_PER_CHANNEL;
+  const externalMaxResults = Math.min(maxResultsPerChannel, EXTERNAL_RESULTS_HARD_CAP);
   // Hard cap on raw content length from any scraped source — prevents prompt bloat
   const MAX_EVIDENCE_CONTENT_LENGTH = 4000;
   const newEvidence: EvidenceEntry[] = [];
@@ -246,7 +255,10 @@ export async function retrieverNode(
           );
           discoveredSources.push(...sources);
         } catch (_err) {
-          retrieverLog.error("web_discovery_failed", _err, { channel: primaryChannel, query: webQuery });
+          retrieverLog.error("web_discovery_failed", _err, {
+            channel: primaryChannel,
+            query: webQuery,
+          });
         }
 
         // Sort by score and take top results
@@ -260,7 +272,11 @@ export async function retrieverNode(
             if (source.rawContent && source.rawContent.trim().length > 200) {
               content = source.rawContent;
             } else {
-              const page = await withTimeout(deps.loadWebPage(source.url), 10_000, `loadWebPage(${source.url})`);
+              const page = await withTimeout(
+                deps.loadWebPage(source.url),
+                10_000,
+                `loadWebPage(${source.url})`
+              );
               content = page.content;
             }
 
@@ -331,7 +347,7 @@ export async function retrieverNode(
             pdfUrl?: string;
             doi?: string;
             citationCount?: number;
-            sourceApi?: "arxiv" | "semantic_scholar" | "pubmed";
+            sourceApi?: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
           };
         }> = [];
 
@@ -368,7 +384,7 @@ export async function retrieverNode(
         }));
 
         // Step 2: Lazy full-text load — only for top 1-2 papers, with timeout
-        const FULL_TEXT_LOAD_LIMIT = 2;
+        const FULL_TEXT_LOAD_LIMIT = 3;
         const papersToLoad = topPapers.slice(0, FULL_TEXT_LOAD_LIMIT);
 
         for (let i = 0; i < papersToLoad.length; i++) {
@@ -390,7 +406,10 @@ export async function retrieverNode(
             );
 
             // Replace the snippet with full content for this paper
-            academicChunks[i].content = truncateEvidenceContent(loaded.content, MAX_EVIDENCE_CONTENT_LENGTH);
+            academicChunks[i].content = truncateEvidenceContent(
+              loaded.content,
+              MAX_EVIDENCE_CONTENT_LENGTH
+            );
           } catch (_err) {
             // Keep the abstract/snippet fallback — no action needed
             retrieverLog.warn("fulltext_load_failed_using_abstract", {
@@ -465,7 +484,7 @@ export async function writerNode(
 
   // ── Prompt packing: sort, filter, and truncate evidence to stay under token budget ──
   const MAX_PROMPT_CHARS = 120_000; // ~30k tokens, leaves room for answer + instructions
-  const MAX_EVIDENCE_PER_SQ = 5;
+  const MAX_EVIDENCE_PER_SQ = 8;
   const MAX_ENTRY_CHARS = 2_000;
 
   // Group evidence by sub-question
@@ -493,7 +512,10 @@ export async function writerNode(
   // ── Emergency secondary compression if still over budget ──
   if (prompt.length > MAX_PROMPT_CHARS) {
     // Reduce MAX_ENTRY_CHARS and re-truncate
-    const budgetPerEntry = Math.max(500, Math.floor((MAX_PROMPT_CHARS - 5_000) / Math.max(1, evidence.length)));
+    const budgetPerEntry = Math.max(
+      500,
+      Math.floor((MAX_PROMPT_CHARS - 5_000) / Math.max(1, evidence.length))
+    );
     for (const sqId of Object.keys(evidenceBySubQuestion)) {
       evidenceBySubQuestion[sqId] = evidenceBySubQuestion[sqId].map((e) => ({
         ...e,
@@ -509,7 +531,8 @@ export async function writerNode(
     prompt = prompt.slice(0, MAX_PROMPT_CHARS);
     const lastBreak = prompt.lastIndexOf("\n\n");
     if (lastBreak > MAX_PROMPT_CHARS * 0.8) {
-      prompt = prompt.slice(0, lastBreak) + "\n\n[Additional evidence truncated to fit context window]";
+      prompt =
+        prompt.slice(0, lastBreak) + "\n\n[Additional evidence truncated to fit context window]";
     }
     retrieverLog.warn("prompt_hard_truncated", { originalLength, limitChars: MAX_PROMPT_CHARS });
   }
@@ -519,11 +542,12 @@ export async function writerNode(
     mapModel: deps.smartModel,
     phase: "smart",
     temperatures: 0.4,
-    maxTokens: 4000,
+    maxTokens: 8000,
   });
 
   const response = await llm.invoke([{ role: "user", content: prompt }]);
-  const finalResponse = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+  const finalResponse =
+    typeof response.content === "string" ? response.content : JSON.stringify(response.content);
 
   if (deps.ctx && deps.researchId) {
     await trackResearchStep(
@@ -531,8 +555,7 @@ export async function writerNode(
       deps.researchId,
       "research",
       "generating_report",
-      "completed",
-      "Report generation complete"
+      "completed"
     );
   }
 
@@ -542,3 +565,4 @@ export async function writerNode(
     stopReason: "completed",
   };
 }
+

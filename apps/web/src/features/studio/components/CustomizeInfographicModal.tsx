@@ -80,7 +80,10 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
             <h2 className="text-xl font-bold font-sans tracking-tight">Customize Infographic</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="infographic" onApplyPrompt={setCustomPrompt} />
+            <StudioModalDiscoverPromptsButton
+              studioTool="infographic"
+              onApplyPrompt={setCustomPrompt}
+            />
             <button
               type="button"
               onClick={onClose}
@@ -105,9 +108,10 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
                     onClick={() => setOrientation(opt)}
                     className={`
                       flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
-                      ${orientation === opt
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                      ${
+                        orientation === opt
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }
                     `}
                   >
@@ -128,9 +132,10 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
                     onClick={() => setDetailLevel(opt)}
                     className={`
                       flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all
-                      ${detailLevel === opt
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                      ${
+                        detailLevel === opt
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
                       }
                     `}
                   >
@@ -164,19 +169,24 @@ export const CustomizeInfographicModal: React.FC<CustomizeInfographicModalProps>
                     onClick={() => setVisualStyle(style.id)}
                     className={`
                       relative flex-shrink-0 flex flex-col items-center gap-2 p-3 rounded-xl border text-left transition-all w-[110px]
-                      ${visualStyle === style.id
-                        ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20"
-                        : "bg-card border-border/50 hover:border-primary/40 hover:bg-secondary/30"
+                      ${
+                        visualStyle === style.id
+                          ? "bg-primary/5 border-primary shadow-sm ring-1 ring-primary/20"
+                          : "bg-card border-border/50 hover:border-primary/40 hover:bg-secondary/30"
                       }
                     `}
                   >
-                    <div className={`
+                    <div
+                      className={`
                       w-full aspect-square rounded-lg flex items-center justify-center text-2xl
                       ${visualStyle === style.id ? "bg-primary/10" : "bg-secondary/50"}
-                    `}>
+                    `}
+                    >
                       {style.icon}
                     </div>
-                    <span className={`text-[11px] font-medium text-center leading-tight ${visualStyle === style.id ? "text-primary" : "text-foreground"}`}>
+                    <span
+                      className={`text-[11px] font-medium text-center leading-tight ${visualStyle === style.id ? "text-primary" : "text-foreground"}`}
+                    >
                       {style.label}
                     </span>
                     {visualStyle === style.id && (

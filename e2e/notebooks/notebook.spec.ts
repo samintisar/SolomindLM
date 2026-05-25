@@ -36,9 +36,7 @@ test.describe("Notebook CRUD", () => {
     if (count > 0) {
       await notebookCards.first().click();
       await expect(page).toHaveURL(/\/notebook\/.+/, { timeout: 5_000 });
-      await expect(
-        page.getByPlaceholder(/Ask a question/)
-      ).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByPlaceholder(/Ask a question/)).toBeVisible({ timeout: 5_000 });
     }
   });
 

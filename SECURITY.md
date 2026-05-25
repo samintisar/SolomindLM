@@ -21,6 +21,7 @@ If you discover a security vulnerability, please report it responsibly:
    - Suggested fix (if any)
 
 We will:
+
 - Acknowledge receipt within 48 hours
 - Provide a timeline for a fix within 7 days
 - Credit you in the release notes (if desired)
@@ -64,5 +65,6 @@ We will:
 ## Security Updates
 
 Subscribe to security updates:
+
 - Watch this repository on GitHub
 - Join our security mailing list: security@solomindlm.com

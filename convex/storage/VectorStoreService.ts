@@ -84,7 +84,7 @@ export const similaritySearch = internalAction({
     const chunkIds = results.map((r) => r._id);
     const rawChunks: (Doc<"documentChunks"> | null)[] =
       chunkIds.length > 0
-        ? await ctx.runQuery(internal.documents.index.getChunks, { chunkIds })
+        ? await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds })
         : [];
     const chunks = rawChunks.filter((c): c is Doc<"documentChunks"> => c !== null);
     const validIds = new Set(
@@ -156,7 +156,7 @@ export const hybridSearch = internalAction({
     const chunkIds = results.map((r) => r._id);
     const rawChunks: (Doc<"documentChunks"> | null)[] =
       chunkIds.length > 0
-        ? await ctx.runQuery(internal.documents.index.getChunks, { chunkIds })
+        ? await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds })
         : [];
     const allChunks = rawChunks.filter((c): c is Doc<"documentChunks"> => c !== null);
     const chunks = allChunks.filter(
@@ -182,7 +182,7 @@ export const getDocumentChunks = internalAction({
     "use node";
 
     const chunks: Doc<"documentChunks">[] = await ctx.runQuery(
-      internal.documents.index.listChunksByDocument,
+      internal.documents.chunks.listChunksByDocument,
       {
         documentId: args.documentId,
       }

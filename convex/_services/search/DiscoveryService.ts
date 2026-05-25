@@ -197,6 +197,7 @@ export interface DiscoverArgs {
     minCitations?: number;
     openAccessOnly?: boolean;
     hasFullText?: boolean;
+    fieldOfStudyTerms?: string[];
   };
   maxResults: number;
   sortBy?: string;
@@ -207,7 +208,7 @@ export type RunActionFn = (
   action: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => Promise<any>;
 
 export async function discoverHandler(
@@ -218,14 +219,7 @@ export async function discoverHandler(
   totalCount: number;
   sourceTypeCounts: Record<string, number>;
 }> {
-  const {
-    query,
-    sourceTypes,
-    timeRange,
-    academicFilters,
-    maxResults,
-    sortBy = "relevance",
-  } = args;
+  const { query, sourceTypes, timeRange, academicFilters, maxResults, sortBy = "relevance" } = args;
 
   const logger = createServiceLogger("discovery", "discover");
   const startTime = Date.now();
@@ -258,6 +252,7 @@ export async function discoverHandler(
     sourceType: string;
     results: UnifiedDiscoveryResult[];
     duration: number;
+    rateLimited?: boolean;
   }>[] = [];
 
   // For each web topic, create a search promise with timing
@@ -319,22 +314,26 @@ export async function discoverHandler(
         minCitations: academicFilters?.minCitations,
         openAccessOnly: academicFilters?.openAccessOnly,
         hasFullText: academicFilters?.hasFullText,
+        fieldOfStudyTerms: academicFilters?.fieldOfStudyTerms,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sortBy: sortBy as any,
       }
     )
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((results: any) => {
+      .then((payload: { sources: unknown[]; rateLimited?: boolean }) => {
         const duration = Date.now() - academicStartTime;
+        const sources = payload.sources ?? [];
         logger.info("ACADEMIC search completed", {
           durationMs: duration,
-          resultCount: results.length,
+          resultCount: sources.length,
+          rateLimited: payload.rateLimited ?? false,
         });
         return {
           sourceType: "academic",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          results: results.map((r: any) => transformAcademicResult(r)),
+          results: sources.map((r: any) => transformAcademicResult(r)),
           duration,
+          rateLimited: payload.rateLimited ?? false,
         };
       })
       .catch((error: Error) => {
@@ -382,6 +381,10 @@ export async function discoverHandler(
     durationMs: finalDuration,
   });
 
+  const academicRateLimited = searchResults.some(
+    (r) => r.sourceType === "academic" && r.rateLimited
+  );
+
   return {
     sources: finalResults,
     totalCount: finalResults.length,
@@ -392,6 +395,13 @@ export async function discoverHandler(
       },
       {} as Record<string, number>
     ),
+    ...(academicRateLimited
+      ? {
+          warnings: [
+            "Academic databases are temporarily rate-limited. Wait a minute and try again, add SEMANTIC_SCHOLAR_API_KEY to Convex, or use the Web tab for this topic.",
+          ],
+        }
+      : {}),
   };
 }
 
@@ -412,6 +422,7 @@ export const discover = action({
         minCitations: v.optional(v.number()),
         openAccessOnly: v.optional(v.boolean()),
         hasFullText: v.optional(v.boolean()),
+        fieldOfStudyTerms: v.optional(v.array(v.string())),
       })
     ),
     maxResults: v.number(),

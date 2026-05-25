@@ -10,7 +10,9 @@ const localStorageStub = {
   setItem: (key: string, value: string) => localStorageStore.set(key, value),
   removeItem: (key: string) => localStorageStore.delete(key),
   clear: () => localStorageStore.clear(),
-  get length() { return localStorageStore.size; },
+  get length() {
+    return localStorageStore.size;
+  },
   key: (_index: number) => null,
 };
 

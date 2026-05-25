@@ -52,8 +52,6 @@ describe("validateChunks", () => {
 
   it("filters out non-string entries", () => {
     const result = validateChunks(
-       
-       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       [null as any, 42 as any, "a".repeat(60), undefined as any],
       { targetSize: 100 }
@@ -78,10 +76,10 @@ describe("validateChunks", () => {
   });
 
   it("trims whitespace before checking minChunkLength", () => {
-    const result = validateChunks(
-      ["   " + "a".repeat(50) + "   "],
-      { targetSize: 100, minChunkLength: 50 }
-    );
+    const result = validateChunks(["   " + "a".repeat(50) + "   "], {
+      targetSize: 100,
+      minChunkLength: 50,
+    });
     expect(result).toHaveLength(1);
   });
 
@@ -101,8 +99,12 @@ describe("calculateOptimalChunkSize", () => {
   });
 
   it("throws for targetChunkCount <= 0", () => {
-    expect(() => calculateOptimalChunkSize(100, 0)).toThrow("targetChunkCount must be greater than 0");
-    expect(() => calculateOptimalChunkSize(100, -1)).toThrow("targetChunkCount must be greater than 0");
+    expect(() => calculateOptimalChunkSize(100, 0)).toThrow(
+      "targetChunkCount must be greater than 0"
+    );
+    expect(() => calculateOptimalChunkSize(100, -1)).toThrow(
+      "targetChunkCount must be greater than 0"
+    );
   });
 });
 

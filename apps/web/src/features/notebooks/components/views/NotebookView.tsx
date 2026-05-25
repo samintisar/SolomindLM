@@ -1,53 +1,250 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+
+import { useLocation, useNavigate } from "react-router-dom";
+
+import type { Id } from "@convex/_generated/dataModel";
+
+import type { ActiveLiteratureView } from "@/features/studio/types/literatureStudio";
+
 import { useAuth } from "@/features/auth/useAuth";
+
 import { useNotebookContext } from "@/features/notebooks/useNotebookContext";
+
 import { useSourcesContext } from "@/features/sources/useSourcesContext";
+
 import { useStudioContext } from "@/features/studio/useStudioContext";
+
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
+
+import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
+
 import { usePanelResize } from "@/shared/hooks/usePanelResize";
+
+import { useToast } from "@/shared/contexts/useToast";
+
 import {
   SourcesPanel,
   type SourcesPanelFocusRequest,
 } from "@/features/sources/components/SourcesPanel";
+
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
+
 import { StudioPanel } from "@/features/studio/components/StudioPanel";
+
+import { LiteraturePapersPanel } from "@/features/studio/components/LiteraturePapersPanel";
+import { LiteratureScreeningPanel } from "@/features/studio/components/LiteratureScreeningPanel";
+
+import { LiteratureStudioView } from "@/features/studio/components/LiteratureStudioView";
+
 import { STUDIO_TOOLS } from "@/shared/constants";
+
 import { isNativeShell } from "@/utils/platformDetection";
 
 export function NotebookView() {
   const { user } = useAuth();
+
+  const location = useLocation();
+
+  const navigate = useNavigate();
+
   const { urlNotebookId, notebookTitle, activeNotebook } = useNotebookContext();
+
   const { sources } = useSourcesContext();
+
   const { notes } = useStudioContext();
 
   const {
+    onSendMessage,
+
+    isChatStreaming,
+
+    remoteGenerationBlocksSend,
+  } = useChatStreamingContext();
+
+  const { error: toastError } = useToast();
+
+  const {
     leftWidth,
+
     rightWidth,
+
     isResizingLeft,
+
     isResizingRight,
+
     startResizingLeft,
+
     startResizingRight,
   } = usePanelResize();
 
   const [mobileActiveTab, setMobileActiveTab] = useState<"sources" | "chat" | "studio">("sources");
+
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
+
   const [isStudioOpen, setIsStudioOpen] = useState(true);
 
   const [sourceFocusRequest, setSourceFocusRequest] = useState<SourcesPanelFocusRequest | null>(
     null
   );
 
-  // Mini Audio Player state
-  const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
-  const [miniPlayerData, setMiniPlayerData] = useState<{
-    audioUrl: string;
-    title: string;
-    transcript?: string;
-    audioOverviewId?: string;
-  } | null>(null);
+  const [activeLiteratureView, setActiveLiteratureView] = useState<ActiveLiteratureView | null>(
+    null
+  );
+  const [activeStudioNoteId, setActiveStudioNoteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    const tableId = params.get("literatureTable");
+
+    const reportId = params.get("literatureReport");
+
+    if (!tableId && !reportId) return;
+
+    if (tableId) {
+      setActiveLiteratureView({ kind: "table", tableId: tableId as Id<"literatureTables"> });
+    } else if (reportId) {
+      setActiveLiteratureView({ kind: "report", reportId: reportId as Id<"literatureReports"> });
+    }
+
+    setIsStudioOpen(true);
+
+    setMobileActiveTab("studio");
+
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+
+  const handleOpenLiteratureTable = useCallback((tableId: Id<"literatureTables">) => {
+    setActiveLiteratureView({ kind: "table", tableId });
+
+    setIsStudioOpen(true);
+
+    setMobileActiveTab("studio");
+  }, []);
+
+  const handleOpenLiteratureReport = useCallback((reportId: Id<"literatureReports">) => {
+    setActiveLiteratureView({ kind: "report", reportId });
+
+    setIsStudioOpen(true);
+
+    setMobileActiveTab("studio");
+  }, []);
+
+  const handleOpenRankedPapers = useCallback((sessionId: Id<"literatureReviewSessions">) => {
+    setActiveLiteratureView({ kind: "papers", sessionId });
+
+    setIsStudioOpen(true);
+
+    setMobileActiveTab("studio");
+  }, []);
+
+  const handleOpenScreeningDecisions = useCallback((sessionId: Id<"literatureReviewSessions">) => {
+    setActiveLiteratureView({ kind: "screening", sessionId });
+
+    setIsStudioOpen(true);
+
+    setMobileActiveTab("studio");
+  }, []);
+
+  const handleCloseLiteratureView = useCallback(() => {
+    setActiveLiteratureView(null);
+  }, []);
+
+  const handleOpenSavedReport = useCallback((reportId: Id<"reports">) => {
+    setActiveStudioNoteId(reportId);
+    setActiveLiteratureView(null);
+    setIsStudioOpen(true);
+    setMobileActiveTab("studio");
+  }, []);
 
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
-  const toggleStudio = () => setIsStudioOpen(!isStudioOpen);
+
+  const toggleStudio = useCallback(() => setIsStudioOpen((isOpen) => !isOpen), []);
+
+  const renderRightPanel = useCallback(() => {
+    if (!isStudioOpen || !urlNotebookId) return null;
+
+    if (activeLiteratureView?.kind === "papers") {
+      return (
+        <LiteraturePapersPanel
+          sessionId={activeLiteratureView.sessionId}
+          notebookId={urlNotebookId as Id<"notebooks">}
+          width={rightWidth}
+          isResizing={isResizingRight}
+          onClose={handleCloseLiteratureView}
+        />
+      );
+    }
+
+    if (activeLiteratureView?.kind === "screening") {
+      return (
+        <LiteratureScreeningPanel
+          sessionId={activeLiteratureView.sessionId}
+          width={rightWidth}
+          isResizing={isResizingRight}
+          onClose={handleCloseLiteratureView}
+        />
+      );
+    }
+
+    if (activeLiteratureView?.kind === "table" || activeLiteratureView?.kind === "report") {
+      return (
+        <LiteratureStudioView
+          view={activeLiteratureView}
+          width={rightWidth}
+          notebookId={urlNotebookId as Id<"notebooks">}
+          onClose={handleCloseLiteratureView}
+          onOpenSavedReport={handleOpenSavedReport}
+        />
+      );
+    }
+
+    return (
+      <StudioPanel
+        isOpen={isStudioOpen}
+        onClose={toggleStudio}
+        tools={STUDIO_TOOLS}
+        width={rightWidth}
+        isResizing={isResizingRight}
+        sources={sources}
+        userId={user?.id}
+        noteId={activeStudioNoteId}
+      />
+    );
+  }, [
+    activeLiteratureView,
+
+    handleCloseLiteratureView,
+    handleOpenSavedReport,
+
+    isResizingRight,
+
+    isStudioOpen,
+
+    rightWidth,
+
+    sources,
+    activeStudioNoteId,
+    toggleStudio,
+
+    urlNotebookId,
+
+    user?.id,
+  ]);
+
+  // Mini Audio Player state
+
+  const [miniPlayerVisible, setMiniPlayerVisible] = useState(false);
+
+  const [miniPlayerData, setMiniPlayerData] = useState<{
+    audioUrl: string;
+
+    title: string;
+
+    transcript?: string;
+
+    audioOverviewId?: string;
+  } | null>(null);
 
   const clearSourceFocusRequest = useCallback(() => {
     setSourceFocusRequest(null);
@@ -55,28 +252,64 @@ export function NotebookView() {
 
   const handleOpenNotebookSourceFromChat = useCallback((documentId: string) => {
     setIsSourcesOpen(true);
+
     setMobileActiveTab("sources");
+
     setSourceFocusRequest((prev) => ({
       documentId,
+
       seq: (prev?.seq ?? 0) + 1,
     }));
   }, []);
 
+  const handleDiscussSourceTopic = useCallback(
+    (topic: string) => {
+      const trimmed = topic.trim();
+
+      if (!trimmed) return;
+
+      if (!urlNotebookId || isChatStreaming || remoteGenerationBlocksSend) return;
+
+      const selectedCompletedSources = sources.filter(
+        (source) => source.status === "completed" && source.selected
+      );
+
+      if (selectedCompletedSources.length === 0) {
+        toastError("Please select at least one source before asking a question");
+
+        return;
+      }
+
+      setMobileActiveTab("chat");
+
+      onSendMessage(`Discuss ${trimmed.toLowerCase()}`, undefined, { channels: ["notebook"] });
+    },
+    [isChatStreaming, onSendMessage, remoteGenerationBlocksSend, sources, toastError, urlNotebookId]
+  );
+
   const handlePlayAudio = useCallback(
     (
       audioUrl: string,
+
       title: string,
+
       transcript?: string,
+
       noteId?: string,
+
       audioOverviewId?: string
     ) => {
       setMiniPlayerData({ audioUrl, title, transcript, audioOverviewId });
+
       setMiniPlayerVisible(true);
+
       if (noteId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         (window as any).__currentPlayingAudioNoteId = noteId;
       }
     },
+
     []
   );
 
@@ -86,12 +319,17 @@ export function NotebookView() {
 
   const handleExpandAudioPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const noteId = (window as any).__currentPlayingAudioNoteId;
+
     if (noteId) {
       const note = notes.find((n) => n.id === noteId);
+
       if (note) {
         const event = new CustomEvent("setActiveNote", { detail: { noteId } });
+
         window.dispatchEvent(event);
       }
     }
@@ -100,18 +338,90 @@ export function NotebookView() {
   const audioPlayerContextValue = useMemo(
     () => ({
       miniPlayerVisible,
+
       miniPlayerData,
+
       onPlayAudio: handlePlayAudio,
+
       onCloseMiniPlayer: handleCloseMiniPlayer,
+
       onExpandAudioPlayer: handleExpandAudioPlayer,
     }),
-    [miniPlayerVisible, miniPlayerData, handlePlayAudio, handleCloseMiniPlayer, handleExpandAudioPlayer]
+
+    [
+      miniPlayerVisible,
+      miniPlayerData,
+      handlePlayAudio,
+      handleCloseMiniPlayer,
+      handleExpandAudioPlayer,
+    ]
   );
+
+  const mobileRightPanel = useMemo(() => {
+    if (!urlNotebookId) return null;
+
+    if (activeLiteratureView?.kind === "papers") {
+      return (
+        <LiteraturePapersPanel
+          sessionId={activeLiteratureView.sessionId}
+          notebookId={urlNotebookId as Id<"notebooks">}
+          width={390}
+          isResizing={false}
+          onClose={handleCloseLiteratureView}
+        />
+      );
+    }
+
+    if (activeLiteratureView?.kind === "screening") {
+      return (
+        <LiteratureScreeningPanel
+          sessionId={activeLiteratureView.sessionId}
+          width={390}
+          isResizing={false}
+          onClose={handleCloseLiteratureView}
+        />
+      );
+    }
+
+    if (activeLiteratureView?.kind === "table" || activeLiteratureView?.kind === "report") {
+      return (
+        <LiteratureStudioView
+          view={activeLiteratureView}
+          width={390}
+          notebookId={urlNotebookId as Id<"notebooks">}
+          onClose={handleCloseLiteratureView}
+          onOpenSavedReport={handleOpenSavedReport}
+        />
+      );
+    }
+
+    return (
+      <StudioPanel
+        isOpen={true}
+        onClose={() => {}}
+        tools={STUDIO_TOOLS}
+        width={390}
+        isResizing={false}
+        sources={sources}
+        userId={user?.id}
+        noteId={activeStudioNoteId}
+      />
+    );
+  }, [
+    activeLiteratureView,
+    activeStudioNoteId,
+    handleCloseLiteratureView,
+    handleOpenSavedReport,
+    sources,
+    urlNotebookId,
+    user?.id,
+  ]);
 
   return (
     <AudioPlayerProvider value={audioPlayerContextValue}>
       <main className="flex-1 flex flex-col overflow-hidden relative animate-in fade-in duration-300">
         {/* Mobile panel tabs: top on web; bottom-fixed in native shell so it clears the native tab bar */}
+
         <div
           className={`md:hidden flex items-center justify-around border-border bg-background z-60 h-12 ${
             isNativeShell()
@@ -129,7 +439,9 @@ export function NotebookView() {
           >
             Sources
           </button>
+
           <div className="w-px h-6 bg-border"></div>
+
           <button
             onClick={() => setMobileActiveTab("chat")}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
@@ -140,7 +452,9 @@ export function NotebookView() {
           >
             Chat
           </button>
+
           <div className="w-px h-6 bg-border"></div>
+
           <button
             data-onboarding="studio-panel-toggle"
             onClick={() => setMobileActiveTab("studio")}
@@ -155,6 +469,7 @@ export function NotebookView() {
         </div>
 
         {/* Desktop Layout */}
+
         <div className="hidden md:flex min-h-0 min-w-0 w-full flex-1 overflow-x-auto overflow-y-hidden">
           <SourcesPanel
             isOpen={isSourcesOpen}
@@ -166,6 +481,7 @@ export function NotebookView() {
             onDocumentUploaded={() => {}}
             focusSourceRequest={sourceFocusRequest}
             onFocusSourceHandled={clearSourceFocusRequest}
+            onDiscussTopic={handleDiscussSourceTopic}
           />
 
           {isSourcesOpen && (
@@ -181,12 +497,16 @@ export function NotebookView() {
               isRightOpen={isStudioOpen}
               toggleLeft={toggleSources}
               toggleRight={toggleStudio}
-              notebookId={urlNotebookId}
+              notebookId={urlNotebookId as Id<"notebooks"> | null}
               notebookTitle={notebookTitle}
               notebookIcon={activeNotebook?.icon}
               notebookCoverColor={activeNotebook?.coverColor}
               chatSettings={activeNotebook?.chatSettings}
               onOpenNotebookSource={handleOpenNotebookSourceFromChat}
+              onOpenLiteratureTable={handleOpenLiteratureTable}
+              onOpenLiteratureReport={handleOpenLiteratureReport}
+              onOpenRankedPapers={handleOpenRankedPapers}
+              onOpenScreeningDecisions={handleOpenScreeningDecisions}
             />
           </div>
 
@@ -197,19 +517,11 @@ export function NotebookView() {
             />
           )}
 
-          <StudioPanel
-            isOpen={isStudioOpen}
-            onClose={toggleStudio}
-            tools={STUDIO_TOOLS}
-            width={rightWidth}
-            isResizing={isResizingRight}
-            sources={sources}
-            userId={user?.id}
-            noteId={urlNotebookId}
-          />
+          {renderRightPanel()}
         </div>
 
         {/* Mobile Layout */}
+
         <div
           className={`md:hidden flex-1 overflow-hidden w-full flex flex-col ${
             isNativeShell() ? "pb-[calc(3rem+env(safe-area-inset-bottom,0px))]" : ""
@@ -227,9 +539,11 @@ export function NotebookView() {
                 onDocumentUploaded={() => {}}
                 focusSourceRequest={sourceFocusRequest}
                 onFocusSourceHandled={clearSourceFocusRequest}
+                onDiscussTopic={handleDiscussSourceTopic}
               />
             </div>
           )}
+
           {mobileActiveTab === "chat" && (
             <div className="flex-1 w-full overflow-hidden">
               <ChatPanel
@@ -243,22 +557,16 @@ export function NotebookView() {
                 notebookCoverColor={activeNotebook?.coverColor}
                 chatSettings={activeNotebook?.chatSettings}
                 onOpenNotebookSource={handleOpenNotebookSourceFromChat}
+                onOpenLiteratureTable={handleOpenLiteratureTable}
+                onOpenLiteratureReport={handleOpenLiteratureReport}
+                onOpenRankedPapers={handleOpenRankedPapers}
+                onOpenScreeningDecisions={handleOpenScreeningDecisions}
               />
             </div>
           )}
+
           {mobileActiveTab === "studio" && (
-            <div className="flex-1 w-full overflow-hidden">
-              <StudioPanel
-                isOpen={true}
-                onClose={() => {}}
-                tools={STUDIO_TOOLS}
-                width={390}
-                isResizing={false}
-                sources={sources}
-                userId={user?.id}
-                noteId={urlNotebookId}
-              />
-            </div>
+            <div className="flex-1 w-full overflow-hidden">{mobileRightPanel}</div>
           )}
         </div>
       </main>

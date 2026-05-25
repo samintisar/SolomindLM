@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import { X, FileText, Upload, Loader2, AlertCircle, CheckSquare, Square } from "lucide-react";
-import { useAction, useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { useParseBibliography, useBulkUpload } from "../services/documentsApi";
 
 interface BibtexImportModalProps {
   notebookId: Id<"notebooks">;
@@ -37,50 +36,64 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [papers, setPapers] = useState<ParsedPaper[]>([]);
   const [selectedPapers, setSelectedPapers] = useState<Set<number>>(new Set());
-  const [stats, setStats] = useState<{ total: number; withDoi: number; withoutDoi: number; malformed: number } | null>(null);
+  const [stats, setStats] = useState<{
+    total: number;
+    withDoi: number;
+    withoutDoi: number;
+    malformed: number;
+  } | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseBibliography = useAction(api.documents.index.parseBibliography);
-  const bulkUpload = useMutation(api.documents.index.bulkUpload);
+  const parseBibliography = useParseBibliography();
+  const bulkUpload = useBulkUpload();
 
-  const handleParse = useCallback(async (content: string) => {
-    if (!content.trim()) return;
-    setIsParsing(true);
-    setError(null);
+  const handleParse = useCallback(
+    async (content: string) => {
+      if (!content.trim()) return;
+      setIsParsing(true);
+      setError(null);
 
-    try {
-      const format: "auto" | "bibtex" | "ris" = activeTab === "file"
-        ? (fileContent?.trim().startsWith("TY  -") ? "ris" : "auto")
-        : "auto";
+      try {
+        const format: "auto" | "bibtex" | "ris" =
+          activeTab === "file"
+            ? fileContent?.trim().startsWith("TY  -")
+              ? "ris"
+              : "auto"
+            : "auto";
 
-      const result = await parseBibliography({ content, format });
-      setPapers(result.papers);
-      setStats(result.stats);
-      setWarnings(result.warnings || []);
-      setSelectedPapers(new Set(result.papers.map((_paper: ParsedPaper, i: number) => i)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse bibliography");
-    } finally {
-      setIsParsing(false);
-    }
-  }, [activeTab, fileContent, parseBibliography]);
+        const result = await parseBibliography({ content, format });
+        setPapers(result.papers);
+        setStats(result.stats);
+        setWarnings(result.warnings || []);
+        setSelectedPapers(new Set(result.papers.map((_paper: ParsedPaper, i: number) => i)));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to parse bibliography");
+      } finally {
+        setIsParsing(false);
+      }
+    },
+    [activeTab, fileContent, parseBibliography]
+  );
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    setError(null);
-    setPapers([]);
-    setSelectedPapers(new Set());
-    setStats(null);
-    setWarnings([]);
+      setError(null);
+      setPapers([]);
+      setSelectedPapers(new Set());
+      setStats(null);
+      setWarnings([]);
 
-    const text = await file.text();
-    setFileContent(text);
-    handleParse(text);
-  }, [handleParse]);
+      const text = await file.text();
+      setFileContent(text);
+      handleParse(text);
+    },
+    [handleParse]
+  );
 
   const handleImport = useCallback(async () => {
     if (selectedPapers.size === 0) return;
@@ -205,11 +218,10 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
               >
                 <Upload className="w-8 h-8 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Click to upload <span className="font-medium">.bib</span> or <span className="font-medium">.ris</span> file
+                  Click to upload <span className="font-medium">.bib</span> or{" "}
+                  <span className="font-medium">.ris</span> file
                 </p>
-                {fileContent && (
-                  <p className="text-xs text-primary">File loaded, ready to parse</p>
-                )}
+                {fileContent && <p className="text-xs text-primary">File loaded, ready to parse</p>}
               </div>
             </div>
           )}
@@ -254,7 +266,9 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
               <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
               <div className="space-y-1">
                 {warnings.map((w, i) => (
-                  <p key={i} className="text-sm text-warning">{w}</p>
+                  <p key={i} className="text-sm text-warning">
+                    {w}
+                  </p>
                 ))}
               </div>
             </div>
@@ -280,7 +294,8 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
             <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
               <p className="text-sm text-warning">
-                {withoutDoiCount} paper{withoutDoiCount !== 1 ? "s" : ""} missing DOI. These may have limited metadata.
+                {withoutDoiCount} paper{withoutDoiCount !== 1 ? "s" : ""} missing DOI. These may
+                have limited metadata.
               </p>
             </div>
           )}
@@ -329,9 +344,7 @@ export const BibtexImportModal: React.FC<BibtexImportModalProps> = ({
                           {paper.authors.join(", ")}
                         </p>
                       )}
-                      {!paper.doi && (
-                        <span className="text-xs text-warning">No DOI</span>
-                      )}
+                      {!paper.doi && <span className="text-xs text-warning">No DOI</span>}
                     </div>
                   </div>
                 ))}

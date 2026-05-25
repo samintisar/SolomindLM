@@ -33,7 +33,7 @@ describe("DropdownMenu", () => {
         <button type="button" role="menuitem" onClick={onClick}>
           Logout
         </button>
-      </DropdownMenu>,
+      </DropdownMenu>
     );
 
     await user.click(screen.getByRole("button", { name: /open menu/i }));
@@ -49,7 +49,7 @@ describe("DropdownMenu", () => {
     render(
       <DropdownMenu trigger={<button type="button">Open menu</button>}>
         <NestedMenuItem />
-      </DropdownMenu>,
+      </DropdownMenu>
     );
 
     await user.click(screen.getByRole("button", { name: /open menu/i }));

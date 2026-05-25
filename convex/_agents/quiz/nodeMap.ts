@@ -2,12 +2,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import {
-  createLangSmithRunConfig,
-  invokeWithRetry,
-  invokeWithTimeout,
-  sanitizeUserInput,
-} from "../_shared/index.js";
+import { invokeWithRetry, invokeWithTimeout, sanitizeUserInput } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
@@ -71,19 +66,10 @@ export async function mapProcess(
         invokeWithTimeout(
           () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (deps.fastLlmCandidateStructured as any).invoke(
-              [new SystemMessage(MAP_CANDIDATES_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "QuizGraph.MapCandidates",
-                tags: ["agent", "quiz", "map"],
-                metadata: {
-                  chunkIndex,
-                  questionCount,
-                  difficulty,
-                  focus: focus || "none",
-                },
-              })
-            ),
+            (deps.fastLlmCandidateStructured as any).invoke([
+              new SystemMessage(MAP_CANDIDATES_SYSTEM_PROMPT),
+              new HumanMessage(prompt),
+            ]),
           GRAPH_CONFIG.MAP_TIMEOUT_MS,
           "QuizMap"
         ),

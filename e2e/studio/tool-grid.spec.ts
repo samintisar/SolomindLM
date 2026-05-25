@@ -40,9 +40,9 @@ test.describe("Studio Tool Grid", () => {
 
     await openStudioTool(page, "Flashcards");
 
-    await expect(
-      page.getByRole("heading", { name: /customize flashcards/i })
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /customize flashcards/i })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("clicking Quiz tool opens quiz modal", async ({ notebookPage }) => {
@@ -60,9 +60,9 @@ test.describe("Studio Tool Grid", () => {
 
     await openStudioTool(page, "Audio Overview");
 
-    await expect(
-      page.getByRole("heading", { name: /customize audio overview/i })
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /customize audio overview/i })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("clicking Infographic tool opens infographic modal", async ({ notebookPage }) => {
@@ -70,9 +70,9 @@ test.describe("Studio Tool Grid", () => {
 
     await openStudioTool(page, "Infographic");
 
-    await expect(
-      page.getByRole("heading", { name: /customize infographic/i })
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /customize infographic/i })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("clicking Written Questions tool opens written questions modal", async ({
@@ -82,9 +82,9 @@ test.describe("Studio Tool Grid", () => {
 
     await openStudioTool(page, "Written Questions");
 
-    await expect(
-      page.getByRole("heading", { name: /customize written questions/i })
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: /customize written questions/i })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("clicking Spreadsheets tool opens spreadsheet modal", async ({ notebookPage }) => {

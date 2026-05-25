@@ -98,15 +98,13 @@ export const generateSuggestionsInternal = internalAction({
   },
   handler: async (ctx, args) => {
     const documents = await ctx.runQuery(
-      internal.documents.index.listDocumentsForNotebookReadInternal,
+      internal.documents.internal.listDocumentsForNotebookReadInternal,
       {
         notebookId: args.notebookId,
         userId: args.userId,
       }
     );
 
-     
-     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
 

@@ -24,7 +24,7 @@ export const DEFAULT_SOURCE_MATRIX: SourcePolicyConfig[] = [
  */
 export function withSourceMatrix(
   base: EvalFixture,
-  matrix: SourcePolicyConfig[] = DEFAULT_SOURCE_MATRIX,
+  matrix: SourcePolicyConfig[] = DEFAULT_SOURCE_MATRIX
 ): EvalFixture[] {
   return matrix.map((policy, index) => ({
     ...base,

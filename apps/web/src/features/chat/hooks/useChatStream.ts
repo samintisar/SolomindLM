@@ -127,6 +127,12 @@ export function useChatStream({
 
   // Reset streaming state when switching to a different conversation
   useEffect(() => {
+    // Abort any in-flight research stream for the previous conversation
+    // so its callbacks do not leak into the new chat's UI state.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     resetStreamingState();
     setExternalSources([]);
@@ -338,6 +344,11 @@ export function useChatStream({
 
   const handleClearChatHistory = useCallback(async () => {
     if (!activeNotebookId || activeNotebookId === "new") return;
+    // Abort any active stream before clearing so stale callbacks don't repopulate UI.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     try {
       await clearChatHistoryMutation({
         notebookId: activeNotebookId as Id<"notebooks">,

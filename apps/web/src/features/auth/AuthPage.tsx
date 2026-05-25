@@ -15,7 +15,7 @@ import {
 import { useAuth } from "@/features/auth/useAuth";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthFormPanel, type AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
-import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
+import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
@@ -164,175 +164,178 @@ function AuthHeroMockup() {
             hidden={mode !== "chat"}
             className="absolute inset-0 flex min-h-0 flex-col gap-3 overflow-hidden pt-20 sm:pt-21"
           >
-          <div className="flex min-h-0 flex-1 gap-3 px-4 pb-4 pt-1 sm:gap-4 sm:px-5 sm:pb-5">
-            <aside className="flex w-[min(38%,13.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
-              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm">
-                <FileStack className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="font-display text-sm font-bold uppercase tracking-wide">
-                  Sources
-                </span>
-              </div>
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4 sm:p-5">
-                {sources.map((s) => {
-                  const active = sourceId === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSourceId(s.id)}
-                      className={`rounded-lg border px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                        active
-                          ? "border-primary/50 bg-primary/8 shadow-sm"
-                          : "border-border/80 bg-background/60 hover:border-border hover:bg-accent/40"
-                      }`}
-                    >
-                      <p className="truncate font-sans text-xs font-medium text-foreground">
-                        {s.title}
-                      </p>
-                      <p className="mt-0.5 font-sans text-[11px] text-muted-foreground">{s.kind}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </aside>
-
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
-              <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-foreground">
-                  <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+            <div className="flex min-h-0 flex-1 gap-3 px-4 pb-4 pt-1 sm:gap-4 sm:px-5 sm:pb-5">
+              <aside className="flex w-[min(38%,13.5rem)] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
+                <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm">
+                  <FileStack className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="font-display text-sm font-bold uppercase tracking-wide">
-                    Chat
+                    Sources
                   </span>
                 </div>
-                <div className="flex items-center gap-2" aria-hidden>
-                  <span className="rounded-lg border border-border bg-card p-2 text-muted-foreground shadow-sm">
-                    <PanelLeftOpen className="h-4 w-4" />
-                  </span>
-                  <span className="rounded-lg border border-border bg-card p-2 text-muted-foreground shadow-sm">
-                    <PanelRightOpen className="h-4 w-4" />
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="chat-panel-graph-grid relative min-h-0 flex-1 overflow-y-auto"
-                style={{ backgroundColor: "var(--background)" }}
-              >
-                <div className="relative space-y-5 p-4 text-left sm:p-5">
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="max-w-[95%] rounded-xl bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))] p-4 text-left font-serif text-base leading-relaxed text-foreground shadow-sm sm:text-lg">
-                      What are the tradeoffs between 3NF and BCNF for our schema sketch?
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setActivityOpen((o) => !o)}
-                      className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2.5 text-left text-sm text-muted-foreground shadow-sm transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <Search className="h-4 w-4 shrink-0 text-primary/80" aria-hidden />
-                      <span className="font-sans">Searching your sources</span>
-                      <ChevronDown
-                        className={`ml-auto h-4 w-4 shrink-0 transition ${activityOpen ? "rotate-180" : ""}`}
-                        aria-hidden
-                      />
-                    </button>
-                    {activityOpen ? (
-                      <ul className="space-y-1.5 border-l-2 border-primary/20 py-1 pl-3 font-sans text-xs text-muted-foreground">
-                        <li className="flex items-center gap-2">
-                          <Check
-                            className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
-                            aria-hidden
-                          />
-                          HyDE + embeddings
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <Check
-                            className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
-                            aria-hidden
-                          />
-                          Ranked relevant passages
-                        </li>
-                        <li className="flex items-start gap-2 pt-0.5">
-                          <Globe className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-                          <span>Reading: CPSC 304 — notes.pdf</span>
-                        </li>
-                      </ul>
-                    ) : null}
-                  </div>
-
-                  <div className="flex w-full flex-col items-start gap-1 text-left">
-                    <div className="w-full max-w-4xl font-serif text-base leading-relaxed text-foreground sm:text-lg">
-                      <div className="prose max-w-none space-y-2 font-serif text-base leading-relaxed text-foreground">
-                        <p className="text-left text-base leading-relaxed">
-                          BCNF removes every dependency where the determinant isn&apos;t a superkey
-                          <button
-                            type="button"
-                            aria-pressed={refKey === 1}
-                            title="Reference 1"
-                            onClick={() => setRefKey((k) => (k === 1 ? null : 1))}
-                            className={`${citeBtnBase} mx-1 ${refKey === 1 ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            1
-                          </button>
-                          . Third normal form still allows some dependencies when the right-hand
-                          side is a prime attribute
-                          <button
-                            type="button"
-                            aria-pressed={refKey === 2}
-                            title="Reference 2"
-                            onClick={() => setRefKey((k) => (k === 2 ? null : 2))}
-                            className={`${citeBtnBase} mx-1 ${refKey === 2 ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            2
-                          </button>
-                          . In practice, pushing all the way to BCNF can mean more joins, so teams
-                          weigh anomaly risk against query ergonomics.
+                <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4 sm:p-5">
+                  {sources.map((s) => {
+                    const active = sourceId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSourceId(s.id)}
+                        className={`rounded-lg border px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                          active
+                            ? "border-primary/50 bg-primary/8 shadow-sm"
+                            : "border-border/80 bg-background/60 hover:border-border hover:bg-accent/40"
+                        }`}
+                      >
+                        <p className="truncate font-sans text-xs font-medium text-foreground">
+                          {s.title}
                         </p>
-                      </div>
+                        <p className="mt-0.5 font-sans text-[11px] text-muted-foreground">
+                          {s.kind}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </aside>
 
-                      {refKey !== null ? (
-                        <div
-                          className="mt-4 max-h-52 w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-popover p-5 text-left shadow-xl animate-in fade-in zoom-in-95 duration-200"
-                          role="note"
-                          aria-label={`Reference ${refKey}`}
-                        >
-                          <p className="mb-2 font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                            Reference {refKey} • {refDetails[refKey].sourceTitle}
-                          </p>
-                          <p className="wrap-break-word font-serif text-sm leading-relaxed text-popover-foreground">
-                            {refDetails[refKey].excerpt}
-                          </p>
-                        </div>
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-background/70 shadow-lg backdrop-blur-sm">
+                <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-foreground">
+                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="font-display text-sm font-bold uppercase tracking-wide">
+                      Chat
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2" aria-hidden>
+                    <span className="rounded-lg border border-border bg-card p-2 text-muted-foreground shadow-sm">
+                      <PanelLeftOpen className="h-4 w-4" />
+                    </span>
+                    <span className="rounded-lg border border-border bg-card p-2 text-muted-foreground shadow-sm">
+                      <PanelRightOpen className="h-4 w-4" />
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="chat-panel-graph-grid relative min-h-0 flex-1 overflow-y-auto"
+                  style={{ backgroundColor: "var(--background)" }}
+                >
+                  <div className="relative space-y-5 p-4 text-left sm:p-5">
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="max-w-[95%] rounded-xl bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))] p-4 text-left font-serif text-base leading-relaxed text-foreground shadow-sm sm:text-lg">
+                        What are the tradeoffs between 3NF and BCNF for our schema sketch?
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setActivityOpen((o) => !o)}
+                        className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-2.5 text-left text-sm text-muted-foreground shadow-sm transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Search className="h-4 w-4 shrink-0 text-primary/80" aria-hidden />
+                        <span className="font-sans">Searching your sources</span>
+                        <ChevronDown
+                          className={`ml-auto h-4 w-4 shrink-0 transition ${activityOpen ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
+                      </button>
+                      {activityOpen ? (
+                        <ul className="space-y-1.5 border-l-2 border-primary/20 py-1 pl-3 font-sans text-xs text-muted-foreground">
+                          <li className="flex items-center gap-2">
+                            <Check
+                              className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
+                              aria-hidden
+                            />
+                            HyDE + embeddings
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <Check
+                              className="h-3.5 w-3.5 shrink-0 text-vintage-green-600"
+                              aria-hidden
+                            />
+                            Ranked relevant passages
+                          </li>
+                          <li className="flex items-start gap-2 pt-0.5">
+                            <Globe className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                            <span>Reading: CPSC 304 — notes.pdf</span>
+                          </li>
+                        </ul>
                       ) : null}
                     </div>
+
+                    <div className="flex w-full flex-col items-start gap-1 text-left">
+                      <div className="w-full max-w-4xl font-serif text-base leading-relaxed text-foreground sm:text-lg">
+                        <div className="prose max-w-none space-y-2 font-serif text-base leading-relaxed text-foreground">
+                          <p className="text-left text-base leading-relaxed">
+                            BCNF removes every dependency where the determinant isn&apos;t a
+                            superkey
+                            <button
+                              type="button"
+                              aria-pressed={refKey === 1}
+                              title="Reference 1"
+                              onClick={() => setRefKey((k) => (k === 1 ? null : 1))}
+                              className={`${citeBtnBase} mx-1 ${refKey === 1 ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}
+                              style={{ verticalAlign: "middle" }}
+                            >
+                              1
+                            </button>
+                            . Third normal form still allows some dependencies when the right-hand
+                            side is a prime attribute
+                            <button
+                              type="button"
+                              aria-pressed={refKey === 2}
+                              title="Reference 2"
+                              onClick={() => setRefKey((k) => (k === 2 ? null : 2))}
+                              className={`${citeBtnBase} mx-1 ${refKey === 2 ? "ring-2 ring-primary/55 ring-offset-2 ring-offset-background" : ""}`}
+                              style={{ verticalAlign: "middle" }}
+                            >
+                              2
+                            </button>
+                            . In practice, pushing all the way to BCNF can mean more joins, so teams
+                            weigh anomaly risk against query ergonomics.
+                          </p>
+                        </div>
+
+                        {refKey !== null ? (
+                          <div
+                            className="mt-4 max-h-52 w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-popover p-5 text-left shadow-xl animate-in fade-in zoom-in-95 duration-200"
+                            role="note"
+                            aria-label={`Reference ${refKey}`}
+                          >
+                            <p className="mb-2 font-mono text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                              Reference {refKey} • {refDetails[refKey].sourceTitle}
+                            </p>
+                            <p className="wrap-break-word font-serif text-sm leading-relaxed text-popover-foreground">
+                              {refDetails[refKey].excerpt}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="shrink-0 border-t border-border bg-background/90 p-3 backdrop-blur-sm">
-                <div
-                  className={`flex items-center gap-2 rounded-xl border border-input bg-card px-3 py-2 shadow-sm transition ${
-                    inputFlash ? "ring-2 ring-primary/35" : ""
-                  }`}
-                >
-                  <div className="h-2 min-w-0 flex-1 rounded-full bg-muted/80" />
-                  <button
-                    type="button"
-                    onClick={flashInput}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Send (demo)"
+                <div className="shrink-0 border-t border-border bg-background/90 p-3 backdrop-blur-sm">
+                  <div
+                    className={`flex items-center gap-2 rounded-xl border border-input bg-card px-3 py-2 shadow-sm transition ${
+                      inputFlash ? "ring-2 ring-primary/35" : ""
+                    }`}
                   >
-                    <Send className="h-4 w-4" aria-hidden />
-                  </button>
+                    <div className="h-2 min-w-0 flex-1 rounded-full bg-muted/80" />
+                    <button
+                      type="button"
+                      onClick={flashInput}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="Send (demo)"
+                    >
+                      <Send className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
           <div
             id="auth-hero-panel-studio"
@@ -371,7 +374,7 @@ function AuthHeroMockup() {
         </div>
       </div>
 
-      <CreateReportModal
+      <CustomizeReportModal
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}
         onSelectFormat={() => {

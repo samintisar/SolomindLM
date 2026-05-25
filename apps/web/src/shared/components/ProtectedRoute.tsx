@@ -24,7 +24,7 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   const notebookId = useMemo(() => {
     if (requireNotebookAccess) {
-      const match = location.pathname.match(/^\/notebook\/([^/]+)$/);
+      const match = location.pathname.match(/^\/notebook\/([^/]+)/);
       return match && match[1] ? match[1] : null;
     }
     return null;

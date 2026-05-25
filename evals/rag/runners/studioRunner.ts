@@ -6,12 +6,7 @@
  *
  * Mirrors the shape of [chatRunner.ts](./chatRunner.ts).
  */
-import type {
-  EvalFixture,
-  EvalRunArtifact,
-  StudioRunnerKind,
-  StudioOutput,
-} from "../types";
+import type { EvalFixture, EvalRunArtifact, StudioRunnerKind, StudioOutput } from "../types";
 import { computeConfigHash } from "../configHash";
 import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 import type { StudioInvoker } from "./convexStudioInvoker";
@@ -26,13 +21,8 @@ function validateFixture(fixture: EvalFixture): string[] {
   }
   if (!Array.isArray(fixture.expectedItems)) {
     errors.push("expectedItems must be an array");
-  } else if (
-    fixture.expectedItems.length === 0 &&
-    !fixture.expectedAnswer?.trim()
-  ) {
-    errors.push(
-      "Fixture must have at least one expectedItem or a non-empty expectedAnswer"
-    );
+  } else if (fixture.expectedItems.length === 0 && !fixture.expectedAnswer?.trim()) {
+    errors.push("Fixture must have at least one expectedItem or a non-empty expectedAnswer");
   }
   return errors;
 }
@@ -174,10 +164,7 @@ function serializeInfographic(raw: unknown): string {
   const prompt = data?.prompt ?? "";
   const status = payload?.status ?? "unknown";
 
-  const lines: string[] = [
-    `Title: ${title}`,
-    `Status: ${status}`,
-  ];
+  const lines: string[] = [`Title: ${title}`, `Status: ${status}`];
   if (imageUrl) {
     lines.push(`Image URL: ${imageUrl}`);
   }

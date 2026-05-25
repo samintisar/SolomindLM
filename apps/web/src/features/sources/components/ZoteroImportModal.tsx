@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useRef, useMemo } from "react";
 import { X, Upload, Loader2, AlertCircle, BookOpen } from "lucide-react";
-import { useAction, useMutation, useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { useParseBibliography, useBulkUpload, useGetExistingPapers } from "../services/documentsApi";
 
 interface ZoteroImportModalProps {
   notebookId: Id<"notebooks">;
@@ -35,11 +34,9 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const parseBibliography = useAction(api.documents.index.parseBibliography);
-  const bulkUpload = useMutation(api.documents.index.bulkUpload);
-  const existingPapers = useQuery(api.documents.index.getExistingPapers, {
-    notebookId,
-  });
+  const parseBibliography = useParseBibliography();
+  const bulkUpload = useBulkUpload();
+  const existingPapers = useGetExistingPapers(notebookId);
 
   const newPapers = useMemo(() => {
     if (!existingPapers) return papers;
@@ -63,26 +60,29 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
     });
   }, [papers, existingPapers]);
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    setError(null);
-    setPapers([]);
+      setError(null);
+      setPapers([]);
 
-    const text = await file.text();
-    setFileContent(text);
+      const text = await file.text();
+      setFileContent(text);
 
-    setIsParsing(true);
-    try {
-      const result = await parseBibliography({ content: text, format: "auto" });
-      setPapers(result.papers);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse file");
-    } finally {
-      setIsParsing(false);
-    }
-  }, [parseBibliography]);
+      setIsParsing(true);
+      try {
+        const result = await parseBibliography({ content: text, format: "auto" });
+        setPapers(result.papers);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to parse file");
+      } finally {
+        setIsParsing(false);
+      }
+    },
+    [parseBibliography]
+  );
 
   const handleImport = useCallback(async () => {
     if (newPapers.length === 0) return;
@@ -162,9 +162,7 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
               <p className="text-sm text-muted-foreground">
                 Click to upload <span className="font-medium">.bib</span> file from Zotero
               </p>
-              {fileContent && (
-                <p className="text-xs text-primary">File loaded</p>
-              )}
+              {fileContent && <p className="text-xs text-primary">File loaded</p>}
             </div>
           </div>
 
@@ -193,7 +191,8 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
                 </div>
                 {skippedCount > 0 && (
                   <div className="px-3 py-1 bg-warning/10 rounded-lg">
-                    <span className="font-medium text-warning">{skippedCount}</span> already in notebook
+                    <span className="font-medium text-warning">{skippedCount}</span> already in
+                    notebook
                   </div>
                 )}
                 <div className="px-3 py-1 bg-primary/10 rounded-lg">

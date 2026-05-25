@@ -6,14 +6,11 @@
  * Optimized for token efficiency and reliable structured output.
  */
 
-import {
-  ChatTogetherAI,
-  type ChatTogetherAICallOptions,
-} from "@langchain/community/chat_models/togetherai";
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import Together from "together-ai";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
-import { createLangSmithRunConfig } from "../_shared/index.js";
+
 import { uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
@@ -112,14 +109,7 @@ export class ChatLLMWrapper {
       new HumanMessage(userMessage),
     ];
     try {
-      const traceConfig = createLangSmithRunConfig({
-        runName: "ChatAgentDirectResponse",
-        tags: ["agent", "chat", "direct"],
-      });
-      const response = await this.fastLlm.invoke(
-        messages,
-        traceConfig as ChatTogetherAICallOptions
-      );
+      const response = await this.fastLlm.invoke(messages);
       return typeof response.content === "string"
         ? response.content.trim()
         : String(response.content).trim();
@@ -134,7 +124,7 @@ export class ChatLLMWrapper {
    * The caller typically embeds this together with the declarative search query so
    * explicit keywords stay represented while HyDE improves semantic density.
    *
-   * Note: uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
+   * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
   async generateHypotheticalDocument(query: string): Promise<string> {
     console.log("[ChatLLMWrapper] Generating hypothetical document for HyDE");
@@ -166,7 +156,7 @@ Question: ${query}`;
 
   /**
    * Generates 2-3 follow-up question suggestions for a study session.
-   * Uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
+   * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
   async generateFollowUpQuestions(userMessage: string, answer: string): Promise<string[]> {
     console.log("[ChatLLMWrapper] Generating follow-up questions");
@@ -190,7 +180,9 @@ Question: ${query}`;
       });
       const text = response.content.trim();
       // Strip Qwen-style <redacted_thinking>...</redacted_thinking> reasoning blocks before parsing
-      const stripped = text.replace(/<redacted_thinking>[\s\S]*?<\/redacted_thinking>/gi, "").trim();
+      const stripped = text
+        .replace(/<redacted_thinking>[\s\S]*?<\/redacted_thinking>/gi, "")
+        .trim();
       const match = stripped.match(/\[[\s\S]*\]/);
       if (match) {
         const parsed = JSON.parse(match[0]);
@@ -208,7 +200,7 @@ Question: ${query}`;
   /**
    * One-shot decomposition for parallel retrieval. No clarification field — router owns clarify path.
    * On failure returns a single subquery = user message.
-   * Uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
+   * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
   async generateRetrievalSubqueries(
     userMessage: string,
@@ -228,16 +220,23 @@ Question: ${query}`;
       .map((t) => `${t.role}: ${t.content.slice(0, 400)}`)
       .join("\n");
 
-    const isListQuery = /\b\d+\s+(\w+\s+)?(items?|patterns?|types?|categories?|methods?|techniques?|strategies?|principles?|rules?|steps?|stages?|phases?|elements?|factors?|components?|ways?|kinds?|forms?|approaches?|practices?|examples?|topics?|concepts?|ideas?|reasons?|benefits?|features?|characteristics?|properties?|aspects?|dimensions?|domains?|areas?|fields?|themes?|subjects?|questions?|problems?|challenges?|solutions?|answers?)\b/i.test(trimmed) ||
-      /\b(list|enumerate|name|every|each\s+of|how\s+many|count\s+(of|all)|complete\s+(list|set)|full\s+list)\b/i.test(trimmed);
+    const isListQuery =
+      /\b\d+\s+(\w+\s+)?(items?|patterns?|types?|categories?|methods?|techniques?|strategies?|principles?|rules?|steps?|stages?|phases?|elements?|factors?|components?|ways?|kinds?|forms?|approaches?|practices?|examples?|topics?|concepts?|ideas?|reasons?|benefits?|features?|characteristics?|properties?|aspects?|dimensions?|domains?|areas?|fields?|themes?|subjects?|questions?|problems?|challenges?|solutions?|answers?)\b/i.test(
+        trimmed
+      ) ||
+      /\b(list|enumerate|name|every|each\s+of|how\s+many|count\s+(of|all)|complete\s+(list|set)|full\s+list)\b/i.test(
+        trimmed
+      );
 
-    const listInstruction = isListQuery ? `
+    const listInstruction = isListQuery
+      ? `
 
 CRITICAL FOR LIST/ENUMERATION QUERIES: The user is asking for a COMPLETE list. Generate subqueries that will retrieve chunks from DIFFERENT PARTS of the document. Each subquery should target:
 - Different sections or chapters (e.g., "introduction", "advanced topics")
 - Different item categories (e.g., "basic patterns", "advanced patterns", "safety patterns")
 - Different aspects (e.g., "definitions", "examples", "implementation")
-- DO NOT just rephrase the same query 6 times — use DISTINCT search terms` : "";
+- DO NOT just rephrase the same query 6 times — use DISTINCT search terms`
+      : "";
 
     const prompt = `Break the student's question into 1–6 short declarative search strings for document retrieval (not questions). Each string should be self-contained for hybrid search. If the question compares multiple topics, include one string per topic.
 
@@ -319,7 +318,13 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     }
   ): Promise<ChatResponse> {
     console.log("[ChatLLMWrapper] Retrying with strict grounding");
-    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, true, chatSettings);
+    return this._generateStructuredResponse(
+      chunks,
+      userMessage,
+      conversationHistory,
+      true,
+      chatSettings
+    );
   }
 
   /**
@@ -340,7 +345,13 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       responseLength: "default" | "longer" | "shorter";
     }
   ): Promise<ChatResponse> {
-    return this._generateStructuredResponse(chunks, userMessage, conversationHistory, false, chatSettings);
+    return this._generateStructuredResponse(
+      chunks,
+      userMessage,
+      conversationHistory,
+      false,
+      chatSettings
+    );
   }
 
   private async _generateStructuredResponse(
@@ -539,18 +550,9 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
 
     const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(groundedPrompt)];
-    const traceConfig = createLangSmithRunConfig({
-      runName: "ChatAgentStructuredResponse",
-      tags: ["agent", "chat"],
-      metadata: {
-        chunksCount: chunks.length,
-        conversationHistoryCount: conversationHistory.length,
-      },
-    });
-
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await structuredLlm.invoke(messages, traceConfig);
+      const response: any = await structuredLlm.invoke(messages);
       const validated = ChatResponseSchema.safeParse(response);
 
       if (!validated.success) {

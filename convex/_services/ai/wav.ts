@@ -135,8 +135,5 @@ export function concatenateWavBuffers(buffers: Buffer[]): Buffer {
   }
 
   const dataLength = parsed.reduce((total, wav) => total + wav.data.length, 0);
-  return Buffer.concat([
-    createPcmWavHeader(format, dataLength),
-    ...parsed.map((wav) => wav.data),
-  ]);
+  return Buffer.concat([createPcmWavHeader(format, dataLength), ...parsed.map((wav) => wav.data)]);
 }

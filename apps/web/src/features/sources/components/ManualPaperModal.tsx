@@ -1,8 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { X, FileText, Loader2, AlertCircle } from "lucide-react";
-import { useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { useUpload } from "../services/documentsApi";
 
 interface ManualPaperModalProps {
   notebookId: Id<"notebooks">;
@@ -27,7 +26,7 @@ export const ManualPaperModal: React.FC<ManualPaperModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const upload = useMutation(api.documents.index.upload);
+  const upload = useUpload();
 
   const isValid = title.trim() && authors.trim();
 
@@ -37,7 +36,10 @@ export const ManualPaperModal: React.FC<ManualPaperModalProps> = ({
     setError(null);
 
     try {
-      const authorList = authors.split(",").map((a) => a.trim()).filter(Boolean);
+      const authorList = authors
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
       const publicationYear = year.trim() ? parseInt(year.trim(), 10) : undefined;
 
       const result = await upload({
@@ -62,7 +64,20 @@ export const ManualPaperModal: React.FC<ManualPaperModalProps> = ({
     } finally {
       setIsUploading(false);
     }
-  }, [isValid, title, authors, abstract, doi, venue, year, pdfUrl, notebookId, upload, onSuccess, onClose]);
+  }, [
+    isValid,
+    title,
+    authors,
+    abstract,
+    doi,
+    venue,
+    year,
+    pdfUrl,
+    notebookId,
+    upload,
+    onSuccess,
+    onClose,
+  ]);
 
   const handleClose = useCallback(() => {
     setTitle("");

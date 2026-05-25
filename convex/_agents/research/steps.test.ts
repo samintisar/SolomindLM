@@ -41,13 +41,7 @@ describe("trackResearchStep", () => {
       runMutation,
     } as unknown as import("../../_generated/server").ActionCtx;
 
-    await trackResearchStep(
-      mockCtx,
-      "research-456",
-      "literature_review",
-      "searching",
-      "completed"
-    );
+    await trackResearchStep(mockCtx, "research-456", "literature_review", "searching", "completed");
 
     expect(runMutation).toHaveBeenCalledTimes(1);
     expect(runMutation).toHaveBeenCalledWith(
@@ -82,25 +76,16 @@ describe("trackResearchStep", () => {
       runMutation,
     } as unknown as import("../../_generated/server").ActionCtx;
 
-    await trackResearchStep(
-      mockCtx,
-      "research-abc",
-      "research",
-      "awaiting_user_input",
-      "pending"
-    );
+    await trackResearchStep(mockCtx, "research-abc", "research", "awaiting_user_input", "pending");
 
-    expect(runMutation).toHaveBeenCalledWith(
-      expect.anything(),
-      {
-        researchId: "research-abc",
-        agentType: "research",
-        stepType: "awaiting_user_input",
-        status: "pending",
-        details: undefined,
-        metadata: undefined,
-        order: 8,
-      }
-    );
+    expect(runMutation).toHaveBeenCalledWith(expect.anything(), {
+      researchId: "research-abc",
+      agentType: "research",
+      stepType: "awaiting_user_input",
+      status: "pending",
+      details: undefined,
+      metadata: undefined,
+      order: 8,
+    });
   });
 });

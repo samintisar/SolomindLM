@@ -30,7 +30,7 @@ import {
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // SCHEMAS
@@ -217,7 +217,7 @@ export async function runWrittenQuestionsGenerationPhase(
     );
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -370,10 +370,13 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[writtenQuestions] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[writtenQuestions] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -397,19 +400,10 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
-          createLangSmithRunConfig({
-            runName: "WrittenQuestionsJob.MapProcess",
-            tags: ["agent", "written_questions", "map"],
-            metadata: {
-              chunkIndex,
-              questionsPerChunk,
-              difficulty,
-              questionType,
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "WrittenQuestionsMap",
       onRetry: (attempt, error) => {
@@ -425,7 +419,13 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     // Assign fresh IDs per question so IDs are unique across parallel map chunks (models often repeat schemes like "1"–"5").
     // Filter out empty or invalid questions.
     const questions = (response as WrittenQuestionsResponse).questions
-      .filter((q) => q.question && q.question.trim().length > 0 && q.modelAnswer && q.modelAnswer.trim().length > 0)
+      .filter(
+        (q) =>
+          q.question &&
+          q.question.trim().length > 0 &&
+          q.modelAnswer &&
+          q.modelAnswer.trim().length > 0
+      )
       .map((q) => ({
         ...q,
         id: randomUUID(),
@@ -517,8 +517,8 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       : 0;
     const totalMaps = writtenQuestion.metadata?.totalMapTasks || totalChunks;
     const failedMaps = writtenQuestion.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -602,10 +602,13 @@ export async function runFinalizeWrittenQuestionsPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[writtenQuestions] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[writtenQuestions] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -678,20 +681,10 @@ export async function runFinalizeWrittenQuestionsPhase(
       const startTime = Date.now();
       const selectionResponse = await invokeStudioLlm({
         invoke: () =>
-          structuredSelectLLM.invoke(
-            [new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)), new HumanMessage(selectionPrompt)],
-            createLangSmithRunConfig({
-              runName: "WrittenQuestionsJob.Select",
-              tags: ["agent", "written_questions", "select"],
-              metadata: {
-                inputQuestions: dedupedQuestions.length,
-                targetCount: questionCount,
-                difficulty,
-                questionType,
-                focus: sanitizedFocus || "none",
-              },
-            })
-          ),
+          structuredSelectLLM.invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+            new HumanMessage(selectionPrompt),
+          ]),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "WrittenQuestionsSelect",
         retry: { maxAttempts: 2, baseDelayMs: 1000 },

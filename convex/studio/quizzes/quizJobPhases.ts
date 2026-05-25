@@ -33,7 +33,7 @@ import {
 import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // Interface for the structured LLM to avoid deep type instantiation
 interface QuizCandidateOutputInvoker {
@@ -228,7 +228,7 @@ export async function runQuizGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -365,10 +365,13 @@ export async function runProcessQuizMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[quiz] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[quiz] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -426,20 +429,10 @@ export async function runProcessQuizMapChunkPhase(
         response = await invokeStudioLlm({
           invoke: () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (structuredLLM as any).invoke(
-              [new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: `QuizJob.MapCandidates.r${round}`,
-                tags: ["agent", "quiz", "map"],
-                metadata: {
-                  chunkIndex,
-                  questionCount,
-                  difficulty,
-                  focus: focus || "none",
-                  mapRound: round,
-                },
-              })
-            ),
+            (structuredLLM as any).invoke([
+              new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)),
+              new HumanMessage(prompt),
+            ]),
           timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
           phaseLabel: "QuizMap",
           onRetry: (attempt, error) => {
@@ -559,8 +552,8 @@ export async function runProcessQuizMapChunkPhase(
       : 0;
     const totalMaps = quiz.metadata?.totalMapTasks || totalChunks;
     const failedMaps = quiz.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(quiz.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(quiz.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -633,10 +626,13 @@ export async function runFinalizeQuizPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[quiz] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[quiz] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -705,19 +701,10 @@ export async function runFinalizeQuizPhase(
     const selectionResponse = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredSelectLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)), new HumanMessage(selectionPrompt)],
-          createLangSmithRunConfig({
-            runName: "QuizJob.Select",
-            tags: ["agent", "quiz", "reduce"],
-            metadata: {
-              questionCount,
-              difficulty,
-              focus: focus || "none",
-              inputCandidates: allCandidates.length,
-            },
-          })
-        ),
+        (structuredSelectLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+          new HumanMessage(selectionPrompt),
+        ]),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "QuizSelect",
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
@@ -779,17 +766,12 @@ export async function runFinalizeQuizPhase(
             return await invokeStudioLlm({
               invoke: () =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (structuredExpandLLM as any).invoke(
-                  [new SystemMessage(withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
-                  createLangSmithRunConfig({
-                    runName: "QuizJob.Expand",
-                    tags: ["agent", "quiz", "expand"],
-                    metadata: {
-                      difficulty: candidate.difficulty,
-                      topic: candidate.topic,
-                    },
-                  })
-                ),
+                (structuredExpandLLM as any).invoke([
+                  new SystemMessage(
+                    withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)
+                  ),
+                  new HumanMessage(prompt),
+                ]),
               timeoutMs: CONFIG.EXPAND_TIMEOUT_MS,
               phaseLabel: "QuizExpand",
               retry: { maxAttempts: 2, baseDelayMs: 1000 },

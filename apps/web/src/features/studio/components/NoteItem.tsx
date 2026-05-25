@@ -83,9 +83,7 @@ export const NoteItem: React.FC<NoteItemProps> = ({
     Boolean(onPlayAudio) &&
     !isGenerating &&
     ((isAudioOverviewNote(note) && Boolean(note.audioUrl?.trim())) ||
-      (note.type === "audio" &&
-        isAudioNote(note) &&
-        Boolean(note.metadata.audioUrl?.trim())));
+      (note.type === "audio" && isAudioNote(note) && Boolean(note.metadata.audioUrl?.trim())));
 
   return (
     <div
@@ -188,52 +186,52 @@ export const NoteItem: React.FC<NoteItemProps> = ({
             </button>
           ) : null}
           <div className="relative kebab-menu">
-          <button
-            ref={menuButtonRef}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMenuToggle();
-            }}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-sm hover:bg-secondary transition-colors flex items-center justify-center shrink-0"
-            aria-label="More options"
-            aria-expanded={isMenuOpen}
-          >
-            <MoreVertical className="w-3.5 h-3.5 shrink-0" />
-          </button>
-          {isMenuOpen &&
-            menuPosition &&
-            createPortal(
-              <div
-                data-note-item-menu
-                className="fixed w-36 bg-popover border border-border shadow-lg rounded-md z-100 py-1 animate-in fade-in zoom-in-95 duration-100"
-                style={{
-                  top: menuPosition.top,
-                  right: menuPosition.right,
-                }}
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditStart();
-                    onMenuClose();
+            <button
+              ref={menuButtonRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMenuToggle();
+              }}
+              className="text-muted-foreground hover:text-foreground p-1 rounded-sm hover:bg-secondary transition-colors flex items-center justify-center shrink-0"
+              aria-label="More options"
+              aria-expanded={isMenuOpen}
+            >
+              <MoreVertical className="w-3.5 h-3.5 shrink-0" />
+            </button>
+            {isMenuOpen &&
+              menuPosition &&
+              createPortal(
+                <div
+                  data-note-item-menu
+                  className="fixed w-36 bg-popover border border-border shadow-lg rounded-md z-100 py-1 animate-in fade-in zoom-in-95 duration-100"
+                  style={{
+                    top: menuPosition.top,
+                    right: menuPosition.right,
                   }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-accent text-popover-foreground flex items-center gap-2"
                 >
-                  <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                    onMenuClose();
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
-                >
-                  <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
-                </button>
-              </div>,
-              document.body
-            )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditStart();
+                      onMenuClose();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-accent text-popover-foreground flex items-center gap-2"
+                  >
+                    <Pencil className="w-3.5 h-3.5 shrink-0" /> Rename
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                      onMenuClose();
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" /> Delete
+                  </button>
+                </div>,
+                document.body
+              )}
           </div>
         </div>
       </div>

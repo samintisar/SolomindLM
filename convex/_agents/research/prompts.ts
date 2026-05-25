@@ -10,16 +10,20 @@ import type { SourceChannel } from "./types";
 export const SubQuestionSchema = z.object({
   id: z.string().describe("Short ID like sq1, sq2"),
   question: z.string().describe("Clear, specific sub-question"),
-  searchQueries: z.array(z.string()).min(1).max(2).describe("1-2 highly targeted search queries (fewer precise queries beat many vague ones)"),
+  searchQueries: z
+    .array(z.string())
+    .min(1)
+    .max(3)
+    .describe("1-3 targeted search queries with distinct angles (synonyms, methods, datasets)"),
   sourceChannels: z.array(z.string()).describe("Target channels: notebook, web, academic, news"),
 });
 
 export const PlannerOutputSchema = z.object({
   subQuestions: z
     .array(SubQuestionSchema)
-    .min(2)
-    .max(3)
-    .describe("2-3 highly focused sub-questions — fewer precise questions beat many vague ones"),
+    .min(3)
+    .max(5)
+    .describe("3-5 focused sub-questions that cover distinct angles of the research question"),
 });
 
 export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
@@ -30,7 +34,7 @@ export type PlannerOutput = z.infer<typeof PlannerOutputSchema>;
 
 export function buildPlanPrompt(query: string, enabledChannels: SourceChannel[]): string {
   const channelList = enabledChannels.join(", ");
-  return `You are a research planner. Decompose the user's question into 2-3 highly focused sub-questions that together will comprehensively answer it.
+  return `You are a research planner. Decompose the user's question into 3-5 highly focused sub-questions that together will comprehensively answer it.
 
 USER QUESTION:
 ${query}
@@ -39,7 +43,7 @@ ENABLED SOURCE CHANNELS: ${channelList}
 
 For each sub-question:
 - Write a clear, specific question
-- Provide exactly 1 search query (highly targeted, not broad)
+- Provide 1-3 search queries per sub-question (distinct angles, not duplicates)
 - Assign source channels based on where the best evidence would come from (use only from: ${channelList})
   - Use "web" for general facts, concepts, and broad information
   - Use "news" ONLY for current events, recent developments, or time-sensitive facts
@@ -54,13 +58,16 @@ Guidelines:
 - Include at least one sub-question that directly addresses the user's core question
 - AVOID redundant or overlapping sub-questions — each should cover a distinct angle
 - NEVER assign both "web" and "news" to the same sub-question; pick the one that fits better
-- Limit to 2-3 sub-questions total; fewer focused questions beat many vague ones`;
+- Limit to 3-5 sub-questions total; each must cover a distinct angle`;
 }
 
 export function buildWriterPrompt(
   query: string,
   subQuestions: Array<{ id: string; question: string }>,
-  evidenceBySubQuestion: Record<string, Array<{ sourceTitle: string; sourceUrl?: string; content: string; sourceType: string }>>
+  evidenceBySubQuestion: Record<
+    string,
+    Array<{ sourceTitle: string; sourceUrl?: string; content: string; sourceType: string }>
+  >
 ): string {
   let globalN = 0;
   const subQuestionSection = subQuestions
@@ -80,7 +87,7 @@ export function buildWriterPrompt(
     })
     .join("\n\n---\n\n");
 
-  return `You are an expert curriculum designer. Synthesize the evidence into a focused, actionable learning roadmap.
+  return `You are an expert research assistant. Write a clear, chat-native research answer to the user's question using ONLY the provided evidence.
 
 USER QUESTION:
 ${query}
@@ -88,36 +95,15 @@ ${query}
 EVIDENCE BY SUB-QUESTION:
 ${subQuestionSection}
 
-OUTPUT FORMAT — produce ONLY this structure:
-
-## Quick Overview (2-3 bullets)
-- What the user needs to learn and why
-
-## Learning Roadmap
-
-### Phase 1: [Foundational Topic]
-- **Key concepts**: 2-3 specific skills/concepts to master
-- **Resources**: specific courses, papers, or tutorials from the evidence
-- **Milestone**: how to verify they've learned this
-
-### Phase 2: [Next Topic]
-(same structure)
-
-### Phase 3: [Advanced Topic]
-(same structure)
-
-## Projects to Build
-- 2-3 concrete project ideas that combine multiple concepts
-
-## Common Pitfalls to Avoid
-- 2-3 mistakes beginners make at this stage
-
-Requirements:
-- STRICT LENGTH: 1000-2000 words maximum
-- Cite sources inline using [N] notation matching the evidence numbers
-- Do NOT fabricate information — only use provided evidence
-- FOCUS on what to learn NEXT, not exhaustive theory
-- Be SPECIFIC: name concrete techniques, papers, and tools
-- If evidence is missing for a topic, provide the best guidance you can from the available evidence without calling attention to gaps
+OUTPUT FORMAT:
+- Write in Markdown for a chat message (not a formal literature review).
+- Start with a direct answer to the question (2-4 sentences).
+- Use ### subheadings only where they improve readability (e.g. key themes, limitations, practical takeaways).
+- Target 800-1,500 words total.
+- Cite sources inline using [N] notation matching the evidence numbers above. Every substantive claim needs a citation.
+- Do NOT include a References or Sources section (citations and source lists are added by the UI).
+- Do NOT fabricate studies, statistics, URLs, or quotes not supported by the evidence.
+- If evidence is thin or conflicting, say so explicitly.
+- End with a short "Limitations" or "What remains uncertain" subsection when appropriate.
 `;
 }

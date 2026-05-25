@@ -5,6 +5,7 @@
 SolomindLM is dual-licensed: under the **GNU Affero General Public License v3.0 (AGPL-3.0)** for open-source/compliant use, and under a **Commercial License** for proprietary or SaaS use.
 
 Under AGPL-3.0, you may:
+
 - **Use** the software for personal or internal purposes
 - **Study** and adapt it to your needs
 - **Redistribute** copies of the software
@@ -55,6 +56,7 @@ Contact us for pricing details:
 **Subject:** SolomindLM Commercial License Inquiry
 
 Please include:
+
 - Your organization name
 - Intended use case
 - Expected number of users
@@ -82,17 +84,17 @@ Installing and configuring SolomindLM on a client's own infrastructure constitut
 
 ## License Comparison
 
-| Use Case | AGPL-3.0 | Commercial License |
-|----------|----------|-------------------|
-| Personal use | ✅ Allowed | Not needed |
-| Internal business use | ✅ Allowed | Not needed |
-| Self-hosting (internal only) | ✅ Allowed | Not needed |
-| Academic / research | ✅ Allowed | Not needed |
-| Non-profit (AGPL-compliant) | ✅ Allowed | Not needed |
-| Open-source SaaS (source disclosed) | ✅ Allowed | Not needed |
-| Proprietary SaaS (no source disclosure) | ❌ Requires commercial license | ✅ Required |
-| White-label / resale without source | ❌ Requires commercial license | ✅ Required |
-| Embedded in proprietary product | ❌ Requires commercial license | ✅ Required |
+| Use Case                                | AGPL-3.0                       | Commercial License |
+| --------------------------------------- | ------------------------------ | ------------------ |
+| Personal use                            | ✅ Allowed                     | Not needed         |
+| Internal business use                   | ✅ Allowed                     | Not needed         |
+| Self-hosting (internal only)            | ✅ Allowed                     | Not needed         |
+| Academic / research                     | ✅ Allowed                     | Not needed         |
+| Non-profit (AGPL-compliant)             | ✅ Allowed                     | Not needed         |
+| Open-source SaaS (source disclosed)     | ✅ Allowed                     | Not needed         |
+| Proprietary SaaS (no source disclosure) | ❌ Requires commercial license | ✅ Required        |
+| White-label / resale without source     | ❌ Requires commercial license | ✅ Required        |
+| Embedded in proprietary product         | ❌ Requires commercial license | ✅ Required        |
 
 ## Contact
 
@@ -109,4 +111,4 @@ For open-source questions, please open an issue on GitHub.
 
 ---
 
-*Last updated: May 2026*
+_Last updated: May 2026_

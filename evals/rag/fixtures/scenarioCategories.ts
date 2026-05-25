@@ -6,24 +6,27 @@
  */
 
 export type ScenarioCategory =
-  | "factoid"           // Single-fact QA requiring precise retrieval
-  | "list-enumeration"  // Structured list completeness (e.g., "20 patterns")
-  | "comparison"        // Cross-source synthesis (A vs B)
-  | "causality"         // Multi-hop reasoning chains
-  | "temporal"          // Time/sequence-based queries
-  | "ambiguous"         // Query expansion/disambiguation testing
-  | "multi-doc"         // Synthesis across several sources
-  | "technical"         // Domain-specific (code, math, ML concepts)
-  | "summarization"     // Long-form condensation
-  | "explanation"       // "How does X work?" deep dives;
+  | "factoid" // Single-fact QA requiring precise retrieval
+  | "list-enumeration" // Structured list completeness (e.g., "20 patterns")
+  | "comparison" // Cross-source synthesis (A vs B)
+  | "causality" // Multi-hop reasoning chains
+  | "temporal" // Time/sequence-based queries
+  | "ambiguous" // Query expansion/disambiguation testing
+  | "multi-doc" // Synthesis across several sources
+  | "technical" // Domain-specific (code, math, ML concepts)
+  | "summarization" // Long-form condensation
+  | "explanation"; // "How does X work?" deep dives;
 
-export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
-  description: string;
-  typicalChallenge: string;
-  exampleQuestions: string[];
-  preferredMetricType: "deterministic" | "llm-judge" | "hybrid";
-}> = {
-  "factoid": {
+export const SCENARIO_CATEGORIES: Record<
+  ScenarioCategory,
+  {
+    description: string;
+    typicalChallenge: string;
+    exampleQuestions: string[];
+    preferredMetricType: "deterministic" | "llm-judge" | "hybrid";
+  }
+> = {
+  factoid: {
     description: "Single-fact QA requiring precise retrieval",
     typicalChallenge: "Retrieving the exact fact without noise",
     exampleQuestions: [
@@ -41,7 +44,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "deterministic",
   },
-  "comparison": {
+  comparison: {
     description: "Cross-source synthesis (A vs B)",
     typicalChallenge: "Balancing coverage of both entities",
     exampleQuestions: [
@@ -50,7 +53,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "llm-judge",
   },
-  "causality": {
+  causality: {
     description: "Multi-hop reasoning chains",
     typicalChallenge: "Connecting cause-effect across chunks",
     exampleQuestions: [
@@ -59,7 +62,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "llm-judge",
   },
-  "temporal": {
+  temporal: {
     description: "Time/sequence-based queries",
     typicalChallenge: "Preserving chronological ordering",
     exampleQuestions: [
@@ -68,7 +71,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "llm-judge",
   },
-  "ambiguous": {
+  ambiguous: {
     description: "Query expansion/disambiguation testing",
     typicalChallenge: "Correctly interpreting ambiguous queries",
     exampleQuestions: [
@@ -86,7 +89,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "llm-judge",
   },
-  "technical": {
+  technical: {
     description: "Domain-specific (code, math, ML concepts)",
     typicalChallenge: "Precise terminology and notation",
     exampleQuestions: [
@@ -95,7 +98,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "hybrid",
   },
-  "summarization": {
+  summarization: {
     description: "Long-form condensation",
     typicalChallenge: "Balancing completeness with conciseness",
     exampleQuestions: [
@@ -104,7 +107,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
     ],
     preferredMetricType: "llm-judge",
   },
-  "explanation": {
+  explanation: {
     description: "'How does X work?' deep dives",
     typicalChallenge: "Complete, accurate explanation flow",
     exampleQuestions: [
@@ -118,10 +121,7 @@ export const SCENARIO_CATEGORIES: Record<ScenarioCategory, {
 /**
  * Get the default category for a fixture based on its tags and question.
  */
-export function inferCategory(fixture: {
-  question: string;
-  tags: string[];
-}): ScenarioCategory {
+export function inferCategory(fixture: { question: string; tags: string[] }): ScenarioCategory {
   const q = fixture.question.toLowerCase();
 
   // Check explicit category tag

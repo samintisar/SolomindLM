@@ -199,3 +199,51 @@ export function useNotebookReports(notebookId: string | null) {
     notebookId ? { notebookId: notebookId as any } : "skip"
   );
 }
+
+// ============================================================
+// Sharing Hooks
+// ============================================================
+
+export function useShareLinks(notebookId: string) {
+  return useQuery(api.notebooks.sharing.listShareLinks, {
+    notebookId: notebookId as Id<"notebooks">,
+  });
+}
+
+export function useCreateShareLink() {
+  return useMutation(api.notebooks.sharing.createShareLink);
+}
+
+export function useRevokeShareLink() {
+  return useMutation(api.notebooks.sharing.revokeShareLink);
+}
+
+export function useRevokeShareLinkWithOptimisticUpdate(notebookId: string) {
+  const shareListArgs = { notebookId: notebookId as Id<"notebooks"> };
+  return useMutation(api.notebooks.sharing.revokeShareLink).withOptimisticUpdate(
+    (localStore, args: { shareLinkId: string }) => {
+      const current = localStore.getQuery(api.notebooks.sharing.listShareLinks, shareListArgs);
+      if (current === undefined) return;
+      localStore.setQuery(
+        api.notebooks.sharing.listShareLinks,
+        shareListArgs,
+        current.map((entry: { id: string; active: boolean; revokedAt: number | null }) =>
+          entry.id === args.shareLinkId
+            ? { ...entry, active: false, revokedAt: Date.now() }
+            : entry
+        )
+      );
+    }
+  );
+}
+
+export function useForkNotebookFromToken() {
+  return useMutation(api.notebooks.sharing.forkNotebookFromToken);
+}
+
+export function usePeekShareToken(token: string | null) {
+  return useQuery(
+    api.notebooks.sharing.peekShareToken,
+    token ? { token } : "skip"
+  );
+}

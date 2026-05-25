@@ -2,21 +2,11 @@
 
 import { env } from "../../_lib/env";
 
-/**
- * Available smart model IDs for RAG chat.
- * Used for validation on the backend. Keep in sync with AVAILABLE_SMART_MODELS in apps/web/src/shared/constants/models.ts
- */
-export const AVAILABLE_SMART_MODEL_IDS = [
-  "openai/gpt-oss-120b",
-  "moonshotai/Kimi-K2.6",
-  "deepseek-ai/DeepSeek-V4-Pro",
-  "MiniMaxAI/MiniMax-M2.7",
-  "google/gemma-4-31B-it",
-  "Qwen/Qwen3.5-397B-A17B",
-  "zai-org/GLM-5.1",
-] as const;
-
-export type SmartModelId = typeof AVAILABLE_SMART_MODEL_IDS[number];
+export {
+  AVAILABLE_SMART_MODEL_IDS,
+  resolveSmartModel,
+  type SmartModelId,
+} from "../../_lib/resolveSmartModel.js";
 
 /** HyDE + embed + hybrid search must finish before Convex action limits kill the stream (client saw only `searching` then disconnect). */
 export const SEARCH_PIPELINE_TIMEOUT_MS = 70000;

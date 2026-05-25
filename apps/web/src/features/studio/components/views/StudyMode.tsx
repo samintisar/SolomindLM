@@ -21,10 +21,7 @@ interface StudyModeProps {
     incorrect: number;
     longestStreak: number;
   }) => void;
-  onRateCard: (
-    cardIndex: number,
-    rating: "again" | "hard" | "good" | "easy"
-  ) => Promise<void>;
+  onRateCard: (cardIndex: number, rating: "again" | "hard" | "good" | "easy") => Promise<void>;
   onExit: () => void;
 }
 

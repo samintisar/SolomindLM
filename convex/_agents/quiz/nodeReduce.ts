@@ -6,7 +6,6 @@ import { Send } from "@langchain/langgraph";
 
 import {
   allWithConcurrency,
-  createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
   withoutMapOutputs,
@@ -156,19 +155,10 @@ export async function reduce(
           invokeWithTimeout(
             () =>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (structuredLlm as any).invoke(
-                [new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT), new HumanMessage(selectionPrompt)],
-                createLangSmithRunConfig({
-                  runName: "QuizGraph.ReduceSelect",
-                  tags: ["agent", "quiz", "reduce"],
-                  metadata: {
-                    targetQuestionCount: state.questionCount,
-                    difficulty: state.difficulty,
-                    focus: state.focus || "none",
-                    candidatesCount: dedupedCandidates.length,
-                  },
-                })
-              ),
+              (structuredLlm as any).invoke([
+                new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
+                new HumanMessage(selectionPrompt),
+              ]),
             GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
             "QuizReduce"
           ),
@@ -223,7 +213,7 @@ export async function reduce(
         return new Send("reduce", {
           ...withoutMapOutputs(state),
           reduceRetryCount: retryCount + 1,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
       }
 

@@ -170,7 +170,10 @@ export function getPresetInvoker(
  * @returns Array of metric results for all fixtures
  */
 export async function batchEvaluateWithLlmJudge(
-  fixturesAndArtifacts: Array<{ fixture: import("../types").EvalFixture; artifact: import("../types").EvalRunArtifact }>,
+  fixturesAndArtifacts: Array<{
+    fixture: import("../types").EvalFixture;
+    artifact: import("../types").EvalRunArtifact;
+  }>,
   config: TogetherJudgeConfig = {}
 ): Promise<import("../types").MetricResult[]> {
   const { scoreAllLlmJudgeMetrics } = await import("./llmJudge");

@@ -19,6 +19,6 @@ export function createStructuredLLM(
 ): FlashcardOutputInvoker {
   return llm.withStructuredOutput(schema, {
     name: "flashcard_array",
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as any;
 }

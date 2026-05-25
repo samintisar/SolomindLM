@@ -259,9 +259,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
                     <Globe className="h-4 w-4" aria-hidden />
                   </div>
-                  <span className="text-sm font-medium leading-snug">
-                    Import from DOI
-                  </span>
+                  <span className="text-sm font-medium leading-snug">Import from DOI</span>
                 </button>
                 <button
                   onClick={() => setActiveModal("bibtex")}
@@ -271,9 +269,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
                     <FileText className="h-4 w-4" aria-hidden />
                   </div>
-                  <span className="text-sm font-medium leading-snug">
-                    Import BibTeX or RIS
-                  </span>
+                  <span className="text-sm font-medium leading-snug">Import BibTeX or RIS</span>
                 </button>
                 <button
                   onClick={() => setActiveModal("zotero")}
@@ -283,9 +279,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
                     <Library className="h-4 w-4" aria-hidden />
                   </div>
-                  <span className="text-sm font-medium leading-snug">
-                    Import from Zotero
-                  </span>
+                  <span className="text-sm font-medium leading-snug">Import from Zotero</span>
                 </button>
                 <button
                   onClick={() => setActiveModal("mendeley")}
@@ -295,9 +289,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
                     <BookMarked className="h-4 w-4" aria-hidden />
                   </div>
-                  <span className="text-sm font-medium leading-snug">
-                    Import from Mendeley
-                  </span>
+                  <span className="text-sm font-medium leading-snug">Import from Mendeley</span>
                 </button>
                 <button
                   onClick={() => setActiveModal("manual")}

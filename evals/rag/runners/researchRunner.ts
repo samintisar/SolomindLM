@@ -22,6 +22,7 @@ export interface ResearchAgentInvoker {
       iteration: number;
     }>;
     latencyMs: number;
+    tokenUsage?: { prompt: number; completion: number; total: number };
     iterations: number;
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
@@ -72,7 +73,7 @@ export async function runResearchEval(
   if (!invoker) {
     throw new Error(
       "No ResearchAgentInvoker provided for real run. " +
-      "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
+        "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
     );
   }
 
@@ -137,11 +138,14 @@ export async function runResearchEval(
       configHash,
       answer: result.answer,
       citations: Array.from(citationSet),
-      preRerankChunks: evidenceChunks,
-      postRerankChunks: evidenceChunks,
+      // Research uses an evidence-based pipeline (plan → gather → synthesize)
+      // rather than chunk retrieval stages. Pre/post-rerank are not applicable.
+      preRerankChunks: [],
+      postRerankChunks: [],
       selectedChunks: evidenceChunks,
       subQueries: result.subQuestions.map((sq) => sq.question),
       latencyMs: result.latencyMs,
+      tokenUsage: result.tokenUsage,
       sourcePolicy: result.sourcePolicy,
       sourceEvidence,
       timestamp: new Date().toISOString(),

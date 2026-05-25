@@ -3,10 +3,7 @@ import { query, mutation, internalAction, internalMutation } from "../_generated
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { assertCanReadNotebook, assertCanEditNotebook } from "../_lib/notebookAccess";
-import {
-  getConversationIfReadable,
-  assertCanEditConversation,
-} from "../_lib/conversationAccess";
+import { getConversationIfReadable, assertCanEditConversation } from "../_lib/conversationAccess";
 import * as ConvModel from "../_model/conversations";
 import type { Id } from "../_generated/dataModel";
 import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
@@ -88,10 +85,12 @@ export const createConversation = mutation({
 
     // Snapshot the notebook's instruction mode onto the conversation (locked at creation)
     const notebook = await ctx.db.get(args.notebookId);
-    const chatSettings = notebook?.chatSettings as {
-      instructionMode?: "default" | "learningGuide" | "custom";
-      customInstructions?: string;
-    } | undefined;
+    const chatSettings = notebook?.chatSettings as
+      | {
+          instructionMode?: "default" | "learningGuide" | "custom";
+          customInstructions?: string;
+        }
+      | undefined;
 
     const now = Date.now();
 
@@ -177,7 +176,13 @@ export const sendMessageOptimistic = mutation({
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
 
-    let conversation: { _id: Id<"conversations">; chatGenerationInFlight?: number; title?: string; userId?: Id<"users">; notebookId?: Id<"notebooks"> } | null;
+    let conversation: {
+      _id: Id<"conversations">;
+      chatGenerationInFlight?: number;
+      title?: string;
+      userId?: Id<"users">;
+      notebookId?: Id<"notebooks">;
+    } | null;
     if (args.conversationId) {
       const c = await getConversationIfReadable(ctx, args.conversationId, userId);
       if (!c || c.notebookId !== args.notebookId) {
@@ -228,7 +233,7 @@ export const sendMessageOptimistic = mutation({
         .withIndex("by_conversation", (q) => q.eq("conversationId", conversation!._id))
         .collect();
       if (existingMessages.length <= 1) {
-        await ctx.scheduler.runAfter(0, internal.chat.messages.generateAndSetTitle, {
+        await ctx.scheduler.runAfter(0, internal.chat.actions.generateAndSetTitle, {
           conversationId: conversation._id,
           content: args.message,
         });
@@ -393,6 +398,11 @@ export const clearHistory = mutation({
       return { message: "No conversation found" };
     }
 
+    // Cancel any in-flight deep-research workflows before wiping messages.
+    await ctx.runMutation(internal.research.index.cancelResearchForConversationInternal, {
+      conversationId: conversation._id,
+    });
+
     // Delete all messages
     const messages = await ctx.db
       .query("messages")
@@ -450,22 +460,3 @@ export const setTitleInternal = internalMutation({
   },
 });
 
-/**
- * Internal action: generate a title for a conversation using LLM, then persist it.
- */
-export const generateAndSetTitle = internalAction({
-  args: {
-    conversationId: v.id("conversations"),
-    content: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const title: string = await ctx.runAction(
-      internal._services.ai.titleGenerator.generateTitle,
-      { chunk: args.content }
-    );
-    await ctx.runMutation(internal.chat.messages.setTitleInternal, {
-      conversationId: args.conversationId,
-      title,
-    });
-  },
-});

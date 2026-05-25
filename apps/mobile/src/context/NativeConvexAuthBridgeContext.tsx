@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 
 import { convexAuthSecureStorage } from "@mobile/services/auth/convexAuthSecureStorage";
@@ -41,7 +36,9 @@ export function NativeConvexAuthBridgeProvider({ children }: { children: ReactNo
   const onWebViewMessage = useCallback(
     (raw: string) => {
       try {
-        const msg = JSON.parse(raw) as { type: "convex-auth-tokens"; jwt: string; refresh: string } | { type: "convex-auth-clear" };
+        const msg = JSON.parse(raw) as
+          | { type: "convex-auth-tokens"; jwt: string; refresh: string }
+          | { type: "convex-auth-clear" };
         if (msg.type === "convex-auth-tokens" && msg.jwt && msg.refresh) {
           void persistTokens(msg.jwt, msg.refresh);
         } else if (msg.type === "convex-auth-clear") {

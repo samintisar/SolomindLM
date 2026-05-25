@@ -17,13 +17,7 @@ import {
 } from "@mobile/services/fileUpload/nativeFilePicker";
 import { uploadPickedFileToNotebook } from "@mobile/services/fileUpload/uploadService";
 
-export function FileUploadButton({
-  notebookId,
-  style,
-}: {
-  notebookId: string;
-  style?: ViewStyle;
-}) {
+export function FileUploadButton({ notebookId, style }: { notebookId: string; style?: ViewStyle }) {
   const { isAuthenticated } = useConvexAuth();
   const generateUploadUrl = useMutation(api.documents.index.generateUploadUrl);
   const createDocument = useMutation(api.documents.index.upload);

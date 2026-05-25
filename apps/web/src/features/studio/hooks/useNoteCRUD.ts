@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { Note } from "@/shared/types/index";
 import { useNotes } from "../services/notesApi";
 import { useUpdateReport, useDeleteReport } from "../services/reportsApi";
-import { useRenameFlashcards, useDeleteFlashcards } from "../services/flashcardsApi";
+import { useRenameFlashcard, useDeleteFlashcard } from "../services/flashcardsApi";
 import { useRenameQuiz, useDeleteQuiz } from "../services/quizzesApi";
 import { useRenameMindMap, useDeleteMindMap } from "../services/mindMapApi";
 import { useUpdateAudioOverview, useDeleteAudioOverview } from "../services/audioApi";
@@ -31,8 +31,8 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
 
   const updateReport = useUpdateReport();
   const deleteReport = useDeleteReport();
-  const renameFlashcards = useRenameFlashcards();
-  const deleteFlashcards = useDeleteFlashcards();
+  const renameFlashcards = useRenameFlashcard();
+  const deleteFlashcards = useDeleteFlashcard();
   const renameQuiz = useRenameQuiz();
   const deleteQuiz = useDeleteQuiz();
   const renameMindMap = useRenameMindMap();
@@ -74,7 +74,18 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
         alertError(error, "Failed to update note");
       }
     },
-    [notes, updateReport, renameFlashcards, renameQuiz, renameMindMap, updateAudioOverview, renameWrittenQuestions, renameInfographic, renameSpreadsheet, updateUserNote]
+    [
+      notes,
+      updateReport,
+      renameFlashcards,
+      renameQuiz,
+      renameMindMap,
+      updateAudioOverview,
+      renameWrittenQuestions,
+      renameInfographic,
+      renameSpreadsheet,
+      updateUserNote,
+    ]
   );
 
   const handleDeleteNote = useCallback(
@@ -103,7 +114,18 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
         alertError(error, "Failed to delete note");
       }
     },
-    [notes, deleteReport, deleteFlashcards, deleteQuiz, deleteMindMap, deleteAudioOverview, deleteWrittenQuestions, deleteInfographic, deleteSpreadsheet, deleteUserNote]
+    [
+      notes,
+      deleteReport,
+      deleteFlashcards,
+      deleteQuiz,
+      deleteMindMap,
+      deleteAudioOverview,
+      deleteWrittenQuestions,
+      deleteInfographic,
+      deleteSpreadsheet,
+      deleteUserNote,
+    ]
   );
 
   const handleSaveReportContent = useCallback(

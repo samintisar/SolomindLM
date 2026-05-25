@@ -12,8 +12,8 @@ export const getMigrationStatus = internalQuery({
   handler: async (ctx) => {
     const chunks = await ctx.db.query("documentChunks").collect();
 
-    const oldDimCount = chunks.filter(c => c.embedding && c.embedding.length === 1536).length;
-    const newDimCount = chunks.filter(c => c.embedding && c.embedding.length === 1024).length;
+    const oldDimCount = chunks.filter((c) => c.embedding && c.embedding.length === 1536).length;
+    const newDimCount = chunks.filter((c) => c.embedding && c.embedding.length === 1024).length;
     const otherDimCount = chunks.length - oldDimCount - newDimCount;
 
     return {

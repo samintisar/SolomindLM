@@ -38,6 +38,6 @@ export interface MapOutputInvoker {
 export function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutputInvoker {
   return llm.withStructuredOutput(schema, {
     name: "extract_topics_and_summary",
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as any;
 }

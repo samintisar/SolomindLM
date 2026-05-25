@@ -164,9 +164,6 @@ export {
   mapOutputsMergeReducer,
 } from "./stateUpdateHelpers.js";
 
-// LangSmith tracing utilities
-export { createLangSmithRunConfig, type LangSmithRunConfig } from "./langsmith.js";
-
 // Progress tracking utilities
 export {
   createProgressTracker,

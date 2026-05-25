@@ -26,10 +26,7 @@ function overwriteReducer<T>(x: T, y?: T): T {
   return y !== undefined ? y : x;
 }
 
-function mergeExtractedDataReducer(
-  x: ExtractedData,
-  y?: ExtractedData | null
-): ExtractedData {
+function mergeExtractedDataReducer(x: ExtractedData, y?: ExtractedData | null): ExtractedData {
   if (y === null) return {};
   if (y === undefined) return x;
   const merged: ExtractedData = { ...x };

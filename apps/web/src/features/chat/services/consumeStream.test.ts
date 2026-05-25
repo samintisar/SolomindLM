@@ -107,11 +107,7 @@ describe("consumePersistentTextStream", () => {
   });
 
   it("calls onStatus with status message", async () => {
-    const response = createStreamResponse([
-      "__STATUS:thinking:Analyzing...",
-      "text",
-      "__DONE",
-    ]);
+    const response = createStreamResponse(["__STATUS:thinking:Analyzing...", "text", "__DONE"]);
     const callbacks = createMockCallbacks();
 
     await consumePersistentTextStream(response, callbacks);
@@ -134,7 +130,9 @@ describe("consumePersistentTextStream", () => {
 
     expect(callbacks.calls.onToolCalls.length).toBeGreaterThan(0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastToolCalls = callbacks.calls.onToolCalls[callbacks.calls.onToolCalls.length - 1][0] as any[];
+    const lastToolCalls = callbacks.calls.onToolCalls[
+      callbacks.calls.onToolCalls.length - 1
+    ][0] as any[];
     expect(lastToolCalls).toHaveLength(1);
     expect(lastToolCalls[0].status).toBe("done");
     expect(lastToolCalls[0].resultCount).toBe(3);
@@ -142,10 +140,7 @@ describe("consumePersistentTextStream", () => {
 
   it("calls onGroundingChecks with parsed checks", async () => {
     const check = { passed: true, issues: [], message: "Grounded" };
-    const response = createStreamResponse([
-      `__GROUNDING:${JSON.stringify(check)}`,
-      "__DONE",
-    ]);
+    const response = createStreamResponse([`__GROUNDING:${JSON.stringify(check)}`, "__DONE"]);
     const callbacks = createMockCallbacks();
 
     await consumePersistentTextStream(response, callbacks);
@@ -155,10 +150,7 @@ describe("consumePersistentTextStream", () => {
 
   it("calls onFollowUps with parsed questions", async () => {
     const questions = ["What about X?", "Can you explain Y?"];
-    const response = createStreamResponse([
-      `__FOLLOWUPS:${JSON.stringify(questions)}`,
-      "__DONE",
-    ]);
+    const response = createStreamResponse([`__FOLLOWUPS:${JSON.stringify(questions)}`, "__DONE"]);
     const callbacks = createMockCallbacks();
 
     await consumePersistentTextStream(response, callbacks);
@@ -183,10 +175,7 @@ describe("consumePersistentTextStream", () => {
 
   it("calls onResearchPlan with parsed plan", async () => {
     const plan = { planId: "p1", subQuestions: ["q1"], sourcePolicy: { channels: ["web"] } };
-    const response = createStreamResponse([
-      `__RESEARCH_PLAN:${JSON.stringify(plan)}`,
-      "__DONE",
-    ]);
+    const response = createStreamResponse([`__RESEARCH_PLAN:${JSON.stringify(plan)}`, "__DONE"]);
     const callbacks = createMockCallbacks();
 
     await consumePersistentTextStream(response, callbacks);
@@ -196,7 +185,9 @@ describe("consumePersistentTextStream", () => {
   });
 
   it("calls onExternalSources with parsed sources", async () => {
-    const sources = [{ title: "Paper", url: "https://example.com", snippet: "abc", sourceType: "web", score: 0.8 }];
+    const sources = [
+      { title: "Paper", url: "https://example.com", snippet: "abc", sourceType: "web", score: 0.8 },
+    ];
     const response = createStreamResponse([
       `__EXTERNAL_SOURCES:${JSON.stringify(sources)}`,
       "__DONE",
@@ -211,9 +202,7 @@ describe("consumePersistentTextStream", () => {
 
   it("calls onError when __ERROR marker received", async () => {
     const error = { message: "Rate limited", type: "rate_limit" };
-    const response = createStreamResponse([
-      `__ERROR:${JSON.stringify(error)}`,
-    ]);
+    const response = createStreamResponse([`__ERROR:${JSON.stringify(error)}`]);
     const callbacks = createMockCallbacks();
 
     await consumePersistentTextStream(response, callbacks);
@@ -224,9 +213,7 @@ describe("consumePersistentTextStream", () => {
 
   it("does not call onComplete when error is received", async () => {
     const error = { message: "Failed" };
-    const response = createStreamResponse([
-      `__ERROR:${JSON.stringify(error)}`,
-    ]);
+    const response = createStreamResponse([`__ERROR:${JSON.stringify(error)}`]);
     const callbacks = createMockCallbacks();
 
     await consumePersistentTextStream(response, callbacks);

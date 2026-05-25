@@ -48,7 +48,6 @@ describe("countTokensBatch", () => {
   });
 
   it("handles non-string entries", () => {
-     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = countTokensBatch(["hello", null as any, 42 as any]);
     expect(result).toEqual([2, 0, 0]);

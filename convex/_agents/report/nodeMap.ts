@@ -2,8 +2,6 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { createLangSmithRunConfig } from "../_shared/index.js";
-
 import { PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
 import { invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
@@ -56,18 +54,10 @@ IMPORTANT: Respond with a JSON object containing:
       () =>
         invokeWithTimeout(
           () =>
-            fastLlmStructured.invoke(
-              [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(structuredPrompt)],
-              createLangSmithRunConfig({
-                runName: "ReportGraph.MapProcess",
-                tags: ["agent", "report", "map"],
-                metadata: {
-                  chunkIndex,
-                  reportType,
-                  chunkLength: chunk.length,
-                },
-              })
-            ),
+            fastLlmStructured.invoke([
+              new SystemMessage(MAP_SYSTEM_PROMPT),
+              new HumanMessage(structuredPrompt),
+            ]),
           PROCESSING_CONFIG.PER_CHUNK_TIMEOUT_MS,
           `Map ${chunkId}`
         ),

@@ -5,10 +5,7 @@ import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import { checkSourceLimit } from "../_lib/limits";
-import {
-  deriveFulltextStatus,
-  primaryLinkUrlForPaper,
-} from "./paperRecord";
+import { deriveFulltextStatus, primaryLinkUrlForPaper } from "./paperRecord";
 
 const MAX_PAPERS = 100;
 
@@ -104,7 +101,7 @@ export const bulkUpload = mutation({
         }
 
         // Check source limit before inserting
-        await checkSourceLimit(ctx, args.notebookId as string);
+        await checkSourceLimit(ctx, args.notebookId);
 
         const { title, ...paperRecordFields } = paper;
         const link = primaryLinkUrlForPaper(paperRecordFields);

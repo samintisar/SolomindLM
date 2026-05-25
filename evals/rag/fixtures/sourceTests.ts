@@ -1,6 +1,6 @@
 /**
  * Source-specific evaluation fixtures.
- * 
+ *
  * These fixtures are designed to test whether the chat agent correctly
  * utilizes different search sources (academic, web, finance, news) when
  * they are enabled via sourcePolicy.
@@ -18,7 +18,8 @@ export const academicFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "academic-transformer-architecture",
-    question: "What are the key architectural innovations in the Transformer model introduced in the 'Attention Is All You Need' paper?",
+    question:
+      "What are the key architectural innovations in the Transformer model introduced in the 'Attention Is All You Need' paper?",
     expectedItems: [
       "self-attention",
       "multi-head attention",
@@ -37,13 +38,9 @@ export const academicFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "academic-recent-llm",
-    question: "What are the main differences between GPT-4 and GPT-3.5 in terms of model architecture and capabilities?",
-    expectedItems: [
-      "multimodal",
-      "larger context window",
-      "RLHF",
-      "improved reasoning",
-    ],
+    question:
+      "What are the main differences between GPT-4 and GPT-3.5 in terms of model architecture and capabilities?",
+    expectedItems: ["multimodal", "larger context window", "RLHF", "improved reasoning"],
     expectedBehavior:
       "Answer should discuss architectural and capability differences between GPT-4 and GPT-3.5, potentially citing relevant research papers or technical reports.",
     runner: "chat",
@@ -62,14 +59,9 @@ export const webFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "web-react-best-practices",
-    question: "What are the current best practices for state management in React applications in 2024?",
-    expectedItems: [
-      "hooks",
-      "Context API",
-      "Redux",
-      "Zustand",
-      "server state",
-    ],
+    question:
+      "What are the current best practices for state management in React applications in 2024?",
+    expectedItems: ["hooks", "Context API", "Redux", "Zustand", "server state"],
     expectedBehavior:
       "Answer should discuss modern React state management approaches including built-in hooks, Context API, and popular libraries like Redux, Zustand, or TanStack Query.",
     runner: "chat",
@@ -81,14 +73,9 @@ export const webFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "web-cloud-comparison",
-    question: "What are the main differences between AWS Lambda and Google Cloud Functions for serverless computing?",
-    expectedItems: [
-      "cold start",
-      "pricing",
-      "triggers",
-      "runtime support",
-      "concurrency",
-    ],
+    question:
+      "What are the main differences between AWS Lambda and Google Cloud Functions for serverless computing?",
+    expectedItems: ["cold start", "pricing", "triggers", "runtime support", "concurrency"],
     expectedBehavior:
       "Answer should compare AWS Lambda and Google Cloud Functions across multiple dimensions including cold start performance, pricing models, supported triggers, runtime languages, and concurrency limits.",
     runner: "chat",
@@ -107,14 +94,9 @@ export const financeFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "finance-market-analysis",
-    question: "What is the current market sentiment for tech stocks and what factors are driving recent price movements?",
-    expectedItems: [
-      "tech stocks",
-      "market",
-      "AI",
-      "interest rates",
-      "bubble",
-    ],
+    question:
+      "What is the current market sentiment for tech stocks and what factors are driving recent price movements?",
+    expectedItems: ["tech stocks", "market", "AI", "interest rates", "bubble"],
     expectedBehavior:
       "Answer should discuss current market sentiment for technology stocks, mentioning market conditions, AI investment impact, interest rate decisions, and whether analysts see a bubble forming.",
     runner: "chat",
@@ -127,13 +109,7 @@ export const financeFixtures: EvalFixture[] = [
     schemaVersion: 1,
     id: "finance-crypto-trends",
     question: "What are the latest trends in cryptocurrency regulation and institutional adoption?",
-    expectedItems: [
-      "SEC",
-      "ETF",
-      "regulation",
-      "institutional",
-      "adoption",
-    ],
+    expectedItems: ["SEC", "ETF", "regulation", "institutional", "adoption"],
     expectedBehavior:
       "Answer should discuss recent regulatory developments (e.g., SEC actions), approval of cryptocurrency ETFs, and trends in institutional adoption of digital assets.",
     runner: "chat",
@@ -152,14 +128,9 @@ export const newsFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "news-ai-regulation",
-    question: "What are the latest developments in AI regulation in the European Union and United States?",
-    expectedItems: [
-      "AI Act",
-      "regulation",
-      "rules",
-      "negotiations",
-      "exemptions",
-    ],
+    question:
+      "What are the latest developments in AI regulation in the European Union and United States?",
+    expectedItems: ["AI Act", "regulation", "rules", "negotiations", "exemptions"],
     expectedBehavior:
       "Answer should cover recent regulatory developments including the AI Act, stalled negotiations, exemptions, and rules being discussed in the EU and US.",
     runner: "chat",
@@ -171,14 +142,9 @@ export const newsFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "news-climate-tech",
-    question: "What recent breakthroughs have been announced in climate technology and clean energy?",
-    expectedItems: [
-      "renewable energy",
-      "battery technology",
-      "carbon capture",
-      "solar",
-      "wind",
-    ],
+    question:
+      "What recent breakthroughs have been announced in climate technology and clean energy?",
+    expectedItems: ["renewable energy", "battery technology", "carbon capture", "solar", "wind"],
     expectedBehavior:
       "Answer should discuss recent announcements and developments in climate technology including advances in renewable energy, battery storage, carbon capture, and clean energy deployment.",
     runner: "chat",
@@ -197,14 +163,9 @@ export const crossSourceFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "cross-source-quantum-computing",
-    question: "What are the latest developments in quantum computing and when might practical applications emerge?",
-    expectedItems: [
-      "qubits",
-      "error correction",
-      "applications",
-      "timeline",
-      "challenges",
-    ],
+    question:
+      "What are the latest developments in quantum computing and when might practical applications emerge?",
+    expectedItems: ["qubits", "error correction", "applications", "timeline", "challenges"],
     expectedBehavior:
       "Answer should combine recent research findings (academic) with current industry news and market analysis about quantum computing commercialization timeline.",
     runner: "chat",
@@ -216,14 +177,9 @@ export const crossSourceFixtures: EvalFixture[] = [
   {
     schemaVersion: 1,
     id: "cross-source-biotech",
-    question: "How are CRISPR gene editing technologies being applied in medicine and what recent clinical trials show promise?",
-    expectedItems: [
-      "CRISPR",
-      "gene therapy",
-      "clinical trials",
-      "FDA",
-      "applications",
-    ],
+    question:
+      "How are CRISPR gene editing technologies being applied in medicine and what recent clinical trials show promise?",
+    expectedItems: ["CRISPR", "gene therapy", "clinical trials", "FDA", "applications"],
     expectedBehavior:
       "Answer should combine scientific research (academic sources) with recent clinical trial results and regulatory news to provide a comprehensive overview of CRISPR medical applications.",
     runner: "chat",

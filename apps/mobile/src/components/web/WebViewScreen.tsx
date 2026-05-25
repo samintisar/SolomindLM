@@ -5,10 +5,7 @@ import * as Linking from "expo-linking";
 import Constants from "expo-constants";
 
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
-import {
-  convexDeploymentUrl,
-  isConvexDeploymentConfigured,
-} from "@mobile/services/convex/client";
+import { convexDeploymentUrl, isConvexDeploymentConfigured } from "@mobile/services/convex/client";
 import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
 import { buildConvexAuthFlushInjectScript } from "./authFlushScript";
 
@@ -52,11 +49,7 @@ export function WebViewScreen({ path, onUrlChange, syncConvexAuth = true }: WebV
   if (Platform.OS === "web") {
     return (
       <View style={styles.webview}>
-        <WebShellIframe
-          uri={uri}
-          onUrlChange={onUrlChange}
-          onMessage={onWebViewMessage}
-        />
+        <WebShellIframe uri={uri} onUrlChange={onUrlChange} onMessage={onWebViewMessage} />
       </View>
     );
   }

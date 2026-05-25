@@ -97,7 +97,7 @@ export function useFlashcard(flashcardId: string | null) {
 /**
  * Create a new flashcard set and queue generation
  */
-export function useCreateFlashcards() {
+export function useCreateFlashcard() {
   const schedule = useAction(api.studio.scheduling.flashcards.scheduleFlashcards);
 
   return async (params: CreateFlashcardsParams): Promise<CreateFlashcardsResponse> => {
@@ -124,7 +124,7 @@ export function useCreateFlashcards() {
 /**
  * Rename a flashcard set by ID with optimistic update
  */
-export function useRenameFlashcards() {
+export function useRenameFlashcard() {
   const update = useMutation(api.studio.flashcards.index.update).withOptimisticUpdate(
     (localStore, args) => {
       const { id, title } = args;
@@ -163,7 +163,7 @@ export function useRenameFlashcards() {
 /**
  * Delete a flashcard set by ID with optimistic update
  */
-export function useDeleteFlashcards() {
+export function useDeleteFlashcard() {
   const remove = useMutation(api.studio.flashcards.index.remove).withOptimisticUpdate(
     (localStore, args) => {
       // Read the current flashcard to get its notebookId

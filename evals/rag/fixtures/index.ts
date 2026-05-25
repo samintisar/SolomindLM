@@ -13,6 +13,7 @@ import { mlExplanationFixtures } from "./ml/explanation";
 import { STUDIO_FIXTURES } from "./studio";
 import { allSourceFixtures } from "./sourceTests";
 import { researchFixtures } from "./research";
+import { literatureReviewFixtures } from "./literatureReview";
 
 // Export scenario category types and helpers
 export { SCENARIO_CATEGORIES, inferCategory } from "./scenarioCategories";
@@ -55,15 +56,15 @@ export const FIXTURES: Record<string, EvalFixture> = {
   ...Object.fromEntries(allSourceFixtures.map((f) => [f.id, f])),
   // Research fixtures
   ...Object.fromEntries(researchFixtures.map((f) => [f.id, f])),
+  // Literature review fixtures
+  ...Object.fromEntries(literatureReviewFixtures.map((f) => [f.id, f])),
 };
 
 /** Get a fixture by id, throws if not found */
 export function getFixture(id: string): EvalFixture {
   const fixture = FIXTURES[id];
   if (!fixture) {
-    throw new Error(
-      `Unknown fixture: "${id}". Available: ${Object.keys(FIXTURES).join(", ")}`
-    );
+    throw new Error(`Unknown fixture: "${id}". Available: ${Object.keys(FIXTURES).join(", ")}`);
   }
   return fixture;
 }

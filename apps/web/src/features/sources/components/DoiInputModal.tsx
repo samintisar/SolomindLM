@@ -1,8 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { X, Search, BookOpen, Loader2, AlertCircle } from "lucide-react";
-import { useAction, useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
+import { useResolveDoi, useUpload } from "../services/documentsApi";
 
 interface DoiInputModalProps {
   notebookId: Id<"notebooks">;
@@ -36,8 +35,8 @@ export const DoiInputModal: React.FC<DoiInputModalProps> = ({
   const [preview, setPreview] = useState<ResolvedPaper | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const resolveDoi = useAction(api.documents.index.resolveDoi);
-  const upload = useMutation(api.documents.index.upload);
+  const resolveDoi = useResolveDoi();
+  const upload = useUpload();
 
   const handleResolve = useCallback(async () => {
     if (!doi.trim()) return;
@@ -151,14 +150,10 @@ export const DoiInputModal: React.FC<DoiInputModalProps> = ({
             <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm">
               <h3 className="font-semibold text-lg">{preview.title || "Untitled Paper"}</h3>
               {preview.authors && preview.authors.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {preview.authors.join(", ")}
-                </p>
+                <p className="text-sm text-muted-foreground">{preview.authors.join(", ")}</p>
               )}
               {preview.abstract && (
-                <p className="text-sm text-muted-foreground line-clamp-4">
-                  {preview.abstract}
-                </p>
+                <p className="text-sm text-muted-foreground line-clamp-4">{preview.abstract}</p>
               )}
               <div className="flex gap-4 text-xs text-muted-foreground">
                 {preview.venue && <span>Venue: {preview.venue}</span>}

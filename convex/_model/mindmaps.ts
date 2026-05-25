@@ -25,9 +25,7 @@ export async function listByNotebook(
   if (userId) {
     return await ctx.db
       .query("mindmaps")
-      .withIndex("by_notebook_and_user", (q) =>
-        q.eq("notebookId", notebookId).eq("userId", userId)
-      )
+      .withIndex("by_notebook_and_user", (q) => q.eq("notebookId", notebookId).eq("userId", userId))
       .order("desc")
       .collect();
   }

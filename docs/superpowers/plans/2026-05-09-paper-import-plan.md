@@ -14,51 +14,52 @@
 
 ### New Backend Files
 
-| File | Responsibility |
-|------|----------------|
-| `convex/_services/extraction/DoiResolverService.ts` | Resolve DOIs to paperRecords via Crossref + Semantic Scholar batch APIs |
-| `convex/_services/extraction/BibliographyParserService.ts` | Parse BibTeX and RIS text into paperRecord arrays |
-| `convex/documents/resolveDoi.ts` | Convex action exposing DOI resolution |
-| `convex/documents/parseBibliography.ts` | Convex action exposing BibTeX/RIS parsing |
-| `convex/documents/bulkUpload.ts` | Convex mutation for batch paper import with dedup |
-| `convex/documents/getExistingPapers.ts` | Convex query returning existing DOIs + title hashes for dedup |
+| File                                                       | Responsibility                                                          |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `convex/_services/extraction/DoiResolverService.ts`        | Resolve DOIs to paperRecords via Crossref + Semantic Scholar batch APIs |
+| `convex/_services/extraction/BibliographyParserService.ts` | Parse BibTeX and RIS text into paperRecord arrays                       |
+| `convex/documents/resolveDoi.ts`                           | Convex action exposing DOI resolution                                   |
+| `convex/documents/parseBibliography.ts`                    | Convex action exposing BibTeX/RIS parsing                               |
+| `convex/documents/bulkUpload.ts`                           | Convex mutation for batch paper import with dedup                       |
+| `convex/documents/getExistingPapers.ts`                    | Convex query returning existing DOIs + title hashes for dedup           |
 
 ### Modified Backend Files
 
-| File | Change |
-|------|--------|
-| `convex/documents/index.ts` | Add `sourceType` to paperRecord; update `upload` to use `pdfUrl` from paperRecord |
-| `convex/_services/extraction/AcademicLoaderService.ts` | Use `pdfUrl` from paperRecord when available |
+| File                                                   | Change                                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `convex/documents/index.ts`                            | Add `sourceType` to paperRecord; update `upload` to use `pdfUrl` from paperRecord |
+| `convex/_services/extraction/AcademicLoaderService.ts` | Use `pdfUrl` from paperRecord when available                                      |
 
 ### New Frontend Files
 
-| File | Responsibility |
-|------|----------------|
-| `apps/web/src/features/sources/components/DoiInputModal.tsx` | DOI paste input + resolution preview + add to notebook |
-| `apps/web/src/features/sources/components/BibtexImportModal.tsx` | BibTeX/RIS upload/paste + preview + selective import |
-| `apps/web/src/features/sources/components/ZoteroImportModal.tsx` | Zotero BibTeX export upload + refresh |
-| `apps/web/src/features/sources/components/MendeleyImportModal.tsx` | Mendeley BibTeX export upload + refresh |
-| `apps/web/src/features/sources/components/ManualPaperModal.tsx` | Manual paper entry form |
+| File                                                               | Responsibility                                         |
+| ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `apps/web/src/features/sources/components/DoiInputModal.tsx`       | DOI paste input + resolution preview + add to notebook |
+| `apps/web/src/features/sources/components/BibtexImportModal.tsx`   | BibTeX/RIS upload/paste + preview + selective import   |
+| `apps/web/src/features/sources/components/ZoteroImportModal.tsx`   | Zotero BibTeX export upload + refresh                  |
+| `apps/web/src/features/sources/components/MendeleyImportModal.tsx` | Mendeley BibTeX export upload + refresh                |
+| `apps/web/src/features/sources/components/ManualPaperModal.tsx`    | Manual paper entry form                                |
 
 ### Modified Frontend Files
 
-| File | Change |
-|------|--------|
+| File                                                          | Change                                 |
+| ------------------------------------------------------------- | -------------------------------------- |
 | `apps/web/src/features/sources/components/AddSourceModal.tsx` | Add new cards for paper import methods |
 
 ### Test Files
 
-| File | Responsibility |
-|------|----------------|
-| `convex/_services/extraction/DoiResolverService.test.ts` | Unit tests for DOI resolution |
-| `convex/_services/extraction/BibliographyParserService.test.ts` | Unit tests for BibTeX/RIS parsing |
-| `convex/documents/bulkUpload.test.ts` | Unit tests for bulk upload mutation |
+| File                                                            | Responsibility                      |
+| --------------------------------------------------------------- | ----------------------------------- |
+| `convex/_services/extraction/DoiResolverService.test.ts`        | Unit tests for DOI resolution       |
+| `convex/_services/extraction/BibliographyParserService.test.ts` | Unit tests for BibTeX/RIS parsing   |
+| `convex/documents/bulkUpload.test.ts`                           | Unit tests for bulk upload mutation |
 
 ---
 
 ## Task 1: DoiResolverService
 
 **Files:**
+
 - Create: `convex/_services/extraction/DoiResolverService.ts`
 - Test: `convex/_services/extraction/DoiResolverService.test.ts`
 
@@ -73,7 +74,7 @@ describe("DoiResolverService", () => {
   it("resolves a valid DOI to paperRecord", async () => {
     const service = new DoiResolverService();
     const result = await service.resolve("10.1038/nature12373");
-    
+
     expect(result).toBeDefined();
     expect(result?.title).toBeDefined();
     expect(result?.doi).toBe("10.1038/nature12373");
@@ -82,14 +83,14 @@ describe("DoiResolverService", () => {
   it("returns null for invalid DOI format", async () => {
     const service = new DoiResolverService();
     const result = await service.resolve("not-a-doi");
-    
+
     expect(result).toBeNull();
   });
 
   it("handles PDF unavailability gracefully", async () => {
     const service = new DoiResolverService();
     const result = await service.resolve("10.1234/no-pdf");
-    
+
     expect(result).toBeDefined();
     expect(result?.isOa).toBe(false);
     expect(result?.pdfUrl).toBeUndefined();
@@ -97,11 +98,8 @@ describe("DoiResolverService", () => {
 
   it("resolves batch DOIs efficiently", async () => {
     const service = new DoiResolverService();
-    const results = await service.resolveBatch([
-      "10.1038/nature12373",
-      "10.1126/science.1234567"
-    ]);
-    
+    const results = await service.resolveBatch(["10.1038/nature12373", "10.1126/science.1234567"]);
+
     expect(results).toHaveLength(2);
     expect(results[0]?.title).toBeDefined();
     expect(results[1]?.title).toBeDefined();
@@ -136,16 +134,16 @@ export interface PaperRecord {
 
 export class DoiResolverService {
   private readonly doiRegex = /^10\.\d{4,}\/.+/;
-  
+
   async resolve(doi: string): Promise<PaperRecord | null> {
     if (!this.doiRegex.test(doi)) {
       throw new InputValidationError("Invalid DOI format");
     }
-    
+
     // TODO: Implement Crossref + Semantic Scholar resolution
     return null;
   }
-  
+
   async resolveBatch(dois: string[]): Promise<(PaperRecord | null)[]> {
     // TODO: Implement batch resolution using Crossref filter endpoint
     return dois.map(() => null);
@@ -174,6 +172,7 @@ git commit -m "feat: add DoiResolverService with tests
 ## Task 2: BibliographyParserService
 
 **Files:**
+
 - Create: `convex/_services/extraction/BibliographyParserService.ts`
 - Test: `convex/_services/extraction/BibliographyParserService.test.ts`
 
@@ -188,9 +187,9 @@ describe("BibliographyParserService", () => {
   it("parses BibTeX entries", async () => {
     const service = new BibliographyParserService();
     const bibtex = `@article{key1, title={Test Paper}, author={Smith, J.}, year={2023}}`;
-    
+
     const result = await service.parse(bibtex, "bibtex");
-    
+
     expect(result.papers).toHaveLength(1);
     expect(result.papers[0].title).toBe("Test Paper");
     expect(result.stats.total).toBe(1);
@@ -199,9 +198,9 @@ describe("BibliographyParserService", () => {
   it("parses RIS entries", async () => {
     const service = new BibliographyParserService();
     const ris = `TY  - JOUR\nTI  - Test Paper\nAU  - Smith, J.\nER  - `;
-    
+
     const result = await service.parse(ris, "ris");
-    
+
     expect(result.papers).toHaveLength(1);
     expect(result.papers[0].title).toBe("Test Paper");
   });
@@ -209,9 +208,9 @@ describe("BibliographyParserService", () => {
   it("handles malformed entries gracefully", async () => {
     const service = new BibliographyParserService();
     const malformed = `@article{key1, title={Good}}\n@article{broken`;
-    
+
     const result = await service.parse(malformed, "bibtex");
-    
+
     expect(result.papers).toHaveLength(1);
     expect(result.stats.malformed).toBe(1);
   });
@@ -219,9 +218,9 @@ describe("BibliographyParserService", () => {
   it("deduplicates entries within batch", async () => {
     const service = new BibliographyParserService();
     const dup = `@article{key1, title={Same}, doi={10.1234/same}}\n@article{key2, title={Same}, doi={10.1234/same}}`;
-    
+
     const result = await service.parse(dup, "bibtex");
-    
+
     expect(result.papers).toHaveLength(1);
     expect(result.stats.total).toBe(2);
   });
@@ -254,15 +253,15 @@ export class BibliographyParserService {
     // TODO: Implement parsing logic
     return {
       papers: [],
-      stats: { total: 0, withDoi: 0, withoutDoi: 0, malformed: 0 }
+      stats: { total: 0, withDoi: 0, withoutDoi: 0, malformed: 0 },
     };
   }
-  
+
   private parseBibtex(content: string): ParseResult {
     // TODO: Implement BibTeX parsing
     return { papers: [], stats: { total: 0, withDoi: 0, withoutDoi: 0, malformed: 0 } };
   }
-  
+
   private parseRis(content: string): ParseResult {
     // TODO: Implement RIS parsing
     return { papers: [], stats: { total: 0, withDoi: 0, withoutDoi: 0, malformed: 0 } };
@@ -291,6 +290,7 @@ git commit -m "feat: add BibliographyParserService with tests
 ## Task 3: resolveDoi Action
 
 **Files:**
+
 - Create: `convex/documents/resolveDoi.ts`
 
 - [ ] **Step 1: Create resolveDoi action**
@@ -352,6 +352,7 @@ git commit -m "feat: add resolveDoi action
 ## Task 4: parseBibliography Action
 
 **Files:**
+
 - Create: `convex/documents/parseBibliography.ts`
 
 - [ ] **Step 1: Create parseBibliography action**
@@ -368,19 +369,21 @@ export const parseBibliography = action({
     format: v.optional(v.union(v.literal("auto"), v.literal("bibtex"), v.literal("ris"))),
   },
   returns: v.object({
-    papers: v.array(v.object({
-      title: v.string(),
-      authors: v.array(v.string()),
-      abstract: v.string(),
-      doi: v.optional(v.string()),
-      venue: v.optional(v.string()),
-      year: v.optional(v.number()),
-      pdfUrl: v.optional(v.string()),
-      landingPageUrl: v.optional(v.string()),
-      openAlexId: v.optional(v.string()),
-      isOa: v.boolean(),
-      sourceType: v.string(),
-    })),
+    papers: v.array(
+      v.object({
+        title: v.string(),
+        authors: v.array(v.string()),
+        abstract: v.string(),
+        doi: v.optional(v.string()),
+        venue: v.optional(v.string()),
+        year: v.optional(v.number()),
+        pdfUrl: v.optional(v.string()),
+        landingPageUrl: v.optional(v.string()),
+        openAlexId: v.optional(v.string()),
+        isOa: v.boolean(),
+        sourceType: v.string(),
+      })
+    ),
     stats: v.object({
       total: v.number(),
       withDoi: v.number(),
@@ -420,6 +423,7 @@ git commit -m "feat: add parseBibliography action
 ## Task 5: getExistingPapers Query
 
 **Files:**
+
 - Create: `convex/documents/getExistingPapers.ts`
 
 - [ ] **Step 1: Create getExistingPapers query**
@@ -443,15 +447,15 @@ export const getExistingPapers = query({
       .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
       .filter((q) => q.neq(q.field("paperRecord"), null))
       .collect();
-    
+
     const dois: string[] = [];
     const titleHashes: string[] = [];
-    
+
     for (const doc of documents) {
       if (doc.paperRecord?.doi) {
         dois.push(doc.paperRecord.doi);
       }
-      
+
       // Generate title + first author hash
       if (doc.paperRecord?.title && doc.paperRecord?.authors?.length > 0) {
         const title = doc.paperRecord.title.toLowerCase().trim();
@@ -460,7 +464,7 @@ export const getExistingPapers = query({
         titleHashes.push(hash);
       }
     }
-    
+
     return { dois, titleHashes };
   },
 });
@@ -491,6 +495,7 @@ git commit -m "feat: add getExistingPapers query for dedup
 ## Task 6: bulkUpload Mutation
 
 **Files:**
+
 - Create: `convex/documents/bulkUpload.ts`
 - Test: `convex/documents/bulkUpload.test.ts`
 
@@ -512,7 +517,7 @@ describe("bulkUpload", () => {
         userId: "user123",
       });
     });
-    
+
     const result = await t.mutation(bulkUpload, {
       notebookId,
       papers: [
@@ -534,7 +539,7 @@ describe("bulkUpload", () => {
         },
       ],
     });
-    
+
     expect(result.imported).toBe(2);
     expect(result.skipped).toBe(0);
     expect(result.documentIds).toHaveLength(2);
@@ -548,7 +553,7 @@ describe("bulkUpload", () => {
         userId: "user123",
       });
     });
-    
+
     const papers = Array.from({ length: 101 }, (_, i) => ({
       title: `Paper ${i}`,
       authors: ["Author"],
@@ -557,10 +562,10 @@ describe("bulkUpload", () => {
       isOa: true,
       sourceType: "doi" as const,
     }));
-    
-    await expect(
-      t.mutation(bulkUpload, { notebookId, papers })
-    ).rejects.toThrow("Maximum 100 papers per import");
+
+    await expect(t.mutation(bulkUpload, { notebookId, papers })).rejects.toThrow(
+      "Maximum 100 papers per import"
+    );
   });
 
   it("skips duplicates", async () => {
@@ -571,7 +576,7 @@ describe("bulkUpload", () => {
         userId: "user123",
       });
     });
-    
+
     // First import
     await t.mutation(bulkUpload, {
       notebookId,
@@ -586,7 +591,7 @@ describe("bulkUpload", () => {
         },
       ],
     });
-    
+
     // Second import with same paper
     const result = await t.mutation(bulkUpload, {
       notebookId,
@@ -601,7 +606,7 @@ describe("bulkUpload", () => {
         },
       ],
     });
-    
+
     expect(result.imported).toBe(0);
     expect(result.skipped).toBe(1);
   });
@@ -626,19 +631,21 @@ const MAX_PAPERS = 100;
 export const bulkUpload = mutation({
   args: {
     notebookId: v.id("notebooks"),
-    papers: v.array(v.object({
-      title: v.string(),
-      authors: v.array(v.string()),
-      abstract: v.string(),
-      doi: v.optional(v.string()),
-      venue: v.optional(v.string()),
-      year: v.optional(v.number()),
-      pdfUrl: v.optional(v.string()),
-      landingPageUrl: v.optional(v.string()),
-      openAlexId: v.optional(v.string()),
-      isOa: v.boolean(),
-      sourceType: v.string(),
-    })),
+    papers: v.array(
+      v.object({
+        title: v.string(),
+        authors: v.array(v.string()),
+        abstract: v.string(),
+        doi: v.optional(v.string()),
+        venue: v.optional(v.string()),
+        year: v.optional(v.number()),
+        pdfUrl: v.optional(v.string()),
+        landingPageUrl: v.optional(v.string()),
+        openAlexId: v.optional(v.string()),
+        isOa: v.boolean(),
+        sourceType: v.string(),
+      })
+    ),
   },
   returns: v.object({
     imported: v.number(),
@@ -650,46 +657,46 @@ export const bulkUpload = mutation({
     if (args.papers.length > MAX_PAPERS) {
       throw new Error(`Maximum ${MAX_PAPERS} papers per import`);
     }
-    
+
     // Get existing papers for dedup
     const existingDocs = await ctx.db
       .query("documents")
       .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
       .filter((q) => q.neq(q.field("paperRecord"), null))
       .collect();
-    
-    const existingDois = new Set(existingDocs.map(d => d.paperRecord?.doi).filter(Boolean));
+
+    const existingDois = new Set(existingDocs.map((d) => d.paperRecord?.doi).filter(Boolean));
     const existingHashes = new Set(
       existingDocs
-        .filter(d => d.paperRecord?.title && d.paperRecord?.authors?.length > 0)
-        .map(d => {
+        .filter((d) => d.paperRecord?.title && d.paperRecord?.authors?.length > 0)
+        .map((d) => {
           const title = d.paperRecord!.title.toLowerCase().trim();
           const firstAuthor = d.paperRecord!.authors[0].split(",")[0].trim().toLowerCase();
           return `${title}|${firstAuthor}`;
         })
     );
-    
+
     const imported: string[] = [];
     const skipped = 0;
     const failed = 0;
-    
+
     for (const paper of args.papers) {
       // Check DOI dedup
       if (paper.doi && existingDois.has(paper.doi)) {
         skipped++;
         continue;
       }
-      
+
       // Check title+author hash dedup
       const title = paper.title.toLowerCase().trim();
       const firstAuthor = paper.authors[0]?.split(",")[0].trim().toLowerCase() || "";
       const hash = `${title}|${firstAuthor}`;
-      
+
       if (existingHashes.has(hash)) {
         skipped++;
         continue;
       }
-      
+
       try {
         const docId = await ctx.db.insert("documents", {
           notebookId: args.notebookId,
@@ -701,13 +708,13 @@ export const bulkUpload = mutation({
           status: "pending",
           createdAt: Date.now(),
         });
-        
+
         imported.push(docId);
       } catch (e) {
         failed++;
       }
     }
-    
+
     // Trigger embedding job once with all document IDs
     if (imported.length > 0) {
       await ctx.scheduler.runAfter(0, {
@@ -715,7 +722,7 @@ export const bulkUpload = mutation({
         args: { documentIds: imported },
       });
     }
-    
+
     return {
       imported: imported.length,
       skipped,
@@ -748,6 +755,7 @@ git commit -m "feat: add bulkUpload mutation with dedup
 ## Task 7: Update upload Mutation
 
 **Files:**
+
 - Modify: `convex/documents/index.ts`
 
 - [ ] **Step 1: Add sourceType to upload args**
@@ -793,6 +801,7 @@ git commit -m "feat: update upload mutation for paper imports
 ## Task 8: Frontend - DoiInputModal
 
 **Files:**
+
 - Create: `apps/web/src/features/sources/components/DoiInputModal.tsx`
 
 - [ ] **Step 1: Implement DoiInputModal**
@@ -816,12 +825,12 @@ export function DoiInputModal({ notebookId, isOpen, onClose, onSuccess }: DoiInp
   const [isResolving, setIsResolving] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [error, setError] = useState("");
-  
+
   const resolveDoi = useMutation(api.documents.resolveDoi);
   const upload = useMutation(api.documents.upload);
-  
+
   if (!isOpen) return null;
-  
+
   const handleResolve = async () => {
     setIsResolving(true);
     setError("");
@@ -838,7 +847,7 @@ export function DoiInputModal({ notebookId, isOpen, onClose, onSuccess }: DoiInp
       setIsResolving(false);
     }
   };
-  
+
   const handleAdd = async () => {
     if (!preview) return;
     try {
@@ -853,7 +862,7 @@ export function DoiInputModal({ notebookId, isOpen, onClose, onSuccess }: DoiInp
       setError("Failed to add paper");
     }
   };
-  
+
   return (
     <div className="modal">
       <h2>Add Paper by DOI</h2>
@@ -900,6 +909,7 @@ git commit -m "feat: add DoiInputModal component
 ## Task 9: Frontend - BibtexImportModal
 
 **Files:**
+
 - Create: `apps/web/src/features/sources/components/BibtexImportModal.tsx`
 
 - [ ] **Step 1: Implement BibtexImportModal**
@@ -918,24 +928,29 @@ interface BibtexImportModalProps {
   onSuccess?: (documentIds: Id<"documents">[]) => void;
 }
 
-export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: BibtexImportModalProps) {
+export function BibtexImportModal({
+  notebookId,
+  isOpen,
+  onClose,
+  onSuccess,
+}: BibtexImportModalProps) {
   const [activeTab, setActiveTab] = useState<"upload" | "paste">("upload");
   const [content, setContent] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [papers, setPapers] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [selectedPapers, setSelectedPapers] = useState<Set<number>>(new Set());
-  
+
   const parseBibliography = useMutation(api.documents.parseBibliography);
   const bulkUpload = useMutation(api.documents.bulkUpload);
-  
+
   if (!isOpen) return null;
-  
+
   const handleFileUpload = async (file: File) => {
     const text = await file.text();
     await handleParse(text, file.name.endsWith(".ris") ? "ris" : "bibtex");
   };
-  
+
   const handleParse = async (text: string, format: "bibtex" | "ris" | "auto") => {
     setIsParsing(true);
     try {
@@ -949,7 +964,7 @@ export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: Bi
       setIsParsing(false);
     }
   };
-  
+
   const handleImport = async () => {
     const selected = papers.filter((_, i) => selectedPapers.has(i));
     try {
@@ -960,7 +975,7 @@ export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: Bi
       console.error("Import failed", e);
     }
   };
-  
+
   return (
     <div className="modal">
       <h2>Import BibTeX or RIS</h2>
@@ -968,7 +983,7 @@ export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: Bi
         <button onClick={() => setActiveTab("upload")}>Upload File</button>
         <button onClick={() => setActiveTab("paste")}>Paste Text</button>
       </div>
-      
+
       {activeTab === "upload" && (
         <input
           type="file"
@@ -976,7 +991,7 @@ export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: Bi
           onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
         />
       )}
-      
+
       {activeTab === "paste" && (
         <textarea
           placeholder="Paste BibTeX or RIS content here..."
@@ -985,16 +1000,18 @@ export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: Bi
           rows={10}
         />
       )}
-      
+
       {activeTab === "paste" && (
         <button onClick={() => handleParse(content, "auto")} disabled={isParsing}>
           {isParsing ? "Parsing..." : "Parse"}
         </button>
       )}
-      
+
       {papers.length > 0 && (
         <div className="preview">
-          <h3>Found {papers.length} papers ({stats?.withDoi} with DOI)</h3>
+          <h3>
+            Found {papers.length} papers ({stats?.withDoi} with DOI)
+          </h3>
           {stats?.withoutDoi > 0 && (
             <div className="warning">
               {stats.withoutDoi} papers have no DOI — metadata enrichment will be limited
@@ -1018,12 +1035,10 @@ export function BibtexImportModal({ notebookId, isOpen, onClose, onSuccess }: Bi
               </div>
             ))}
           </div>
-          <button onClick={handleImport}>
-            Import {selectedPapers.size} selected papers
-          </button>
+          <button onClick={handleImport}>Import {selectedPapers.size} selected papers</button>
         </div>
       )}
-      
+
       <button onClick={onClose}>Cancel</button>
     </div>
   );
@@ -1047,6 +1062,7 @@ git commit -m "feat: add BibtexImportModal component
 ## Task 10: Frontend - ZoteroImportModal
 
 **Files:**
+
 - Create: `apps/web/src/features/sources/components/ZoteroImportModal.tsx`
 
 - [ ] **Step 1: Implement ZoteroImportModal**
@@ -1065,37 +1081,42 @@ interface ZoteroImportModalProps {
   onSuccess?: (documentIds: Id<"documents">[]) => void;
 }
 
-export function ZoteroImportModal({ notebookId, isOpen, onClose, onSuccess }: ZoteroImportModalProps) {
+export function ZoteroImportModal({
+  notebookId,
+  isOpen,
+  onClose,
+  onSuccess,
+}: ZoteroImportModalProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [newPapers, setNewPapers] = useState<any[]>([]);
-  
+
   const parseBibliography = useMutation(api.documents.parseBibliography);
   const bulkUpload = useMutation(api.documents.bulkUpload);
   const existingPapers = useQuery(api.documents.getExistingPapers, { notebookId });
-  
+
   if (!isOpen) return null;
-  
+
   const handleFileUpload = async (file: File) => {
     setIsImporting(true);
     try {
       const text = await file.text();
       const result = await parseBibliography({ content: text, format: "bibtex" });
-      
+
       // Filter out existing papers
       const existingDois = new Set(existingPapers?.dois || []);
       const existingHashes = new Set(existingPapers?.titleHashes || []);
-      
-      const filtered = result.papers.filter(paper => {
+
+      const filtered = result.papers.filter((paper) => {
         if (paper.doi && existingDois.has(paper.doi)) return false;
-        
+
         const title = paper.title.toLowerCase().trim();
         const firstAuthor = paper.authors[0]?.split(",")[0].trim().toLowerCase() || "";
         const hash = `${title}|${firstAuthor}`;
-        
+
         if (existingHashes.has(hash)) return false;
         return true;
       });
-      
+
       setNewPapers(filtered);
     } catch (e) {
       console.error("Import failed", e);
@@ -1103,7 +1124,7 @@ export function ZoteroImportModal({ notebookId, isOpen, onClose, onSuccess }: Zo
       setIsImporting(false);
     }
   };
-  
+
   const handleImport = async () => {
     try {
       const result = await bulkUpload({ notebookId, papers: newPapers });
@@ -1113,12 +1134,12 @@ export function ZoteroImportModal({ notebookId, isOpen, onClose, onSuccess }: Zo
       console.error("Import failed", e);
     }
   };
-  
+
   return (
     <div className="modal">
       <h2>Import from Zotero</h2>
       <p>Export your Zotero library as BibTeX, then upload the file below.</p>
-      
+
       {newPapers.length === 0 ? (
         <>
           <input
@@ -1143,7 +1164,7 @@ export function ZoteroImportModal({ notebookId, isOpen, onClose, onSuccess }: Zo
           <button onClick={() => setNewPapers([])}>Choose different file</button>
         </div>
       )}
-      
+
       <button onClick={onClose}>Cancel</button>
     </div>
   );
@@ -1167,11 +1188,13 @@ git commit -m "feat: add ZoteroImportModal component
 ## Task 11: Frontend - MendeleyImportModal
 
 **Files:**
+
 - Create: `apps/web/src/features/sources/components/MendeleyImportModal.tsx`
 
 - [ ] **Step 1: Implement MendeleyImportModal**
 
 Same as ZoteroImportModal but with Mendeley branding:
+
 - Title: "Import from Mendeley"
 - Instructions: "Export your Mendeley library as BibTeX, then upload the file below."
 
@@ -1193,6 +1216,7 @@ git commit -m "feat: add MendeleyImportModal component
 ## Task 12: Frontend - ManualPaperModal
 
 **Files:**
+
 - Create: `apps/web/src/features/sources/components/ManualPaperModal.tsx`
 
 - [ ] **Step 1: Implement ManualPaperModal**
@@ -1211,7 +1235,12 @@ interface ManualPaperModalProps {
   onSuccess?: (documentId: Id<"documents">) => void;
 }
 
-export function ManualPaperModal({ notebookId, isOpen, onClose, onSuccess }: ManualPaperModalProps) {
+export function ManualPaperModal({
+  notebookId,
+  isOpen,
+  onClose,
+  onSuccess,
+}: ManualPaperModalProps) {
   const [form, setForm] = useState({
     title: "",
     authors: "",
@@ -1221,21 +1250,21 @@ export function ManualPaperModal({ notebookId, isOpen, onClose, onSuccess }: Man
     year: "",
     pdfUrl: "",
   });
-  
+
   const upload = useMutation(api.documents.upload);
-  
+
   if (!isOpen) return null;
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const result = await upload({
         notebookId,
         type: "paper_record",
         paperRecord: {
           title: form.title,
-          authors: form.authors.split(",").map(a => a.trim()),
+          authors: form.authors.split(",").map((a) => a.trim()),
           abstract: form.abstract,
           doi: form.doi || undefined,
           venue: form.venue || undefined,
@@ -1245,14 +1274,14 @@ export function ManualPaperModal({ notebookId, isOpen, onClose, onSuccess }: Man
           sourceType: "manual",
         },
       });
-      
+
       onSuccess?.(result);
       onClose();
     } catch (e) {
       console.error("Upload failed", e);
     }
   };
-  
+
   return (
     <div className="modal">
       <h2>Add Paper Manually</h2>
@@ -1343,6 +1372,7 @@ git commit -m "feat: add ManualPaperModal component
 ## Task 13: Update AddSourceModal
 
 **Files:**
+
 - Modify: `apps/web/src/features/sources/components/AddSourceModal.tsx`
 
 - [ ] **Step 1: Add new import cards**
@@ -1366,22 +1396,22 @@ const [activeModal, setActiveModal] = useState<string | null>(null);
     <h3>Upload URL or DOI</h3>
     <p>Upload papers from URL or DOI</p>
   </div>
-  
+
   <div className="card" onClick={() => setActiveModal("bibtex")}>
     <h3>Import BibTeX or RIS</h3>
     <p>Add BibTeX or RIS files or Paste text</p>
   </div>
-  
+
   <div className="card" onClick={() => setActiveModal("zotero")}>
     <h3>Import from Zotero</h3>
     <p>Migrate files from Zotero</p>
   </div>
-  
+
   <div className="card" onClick={() => setActiveModal("mendeley")}>
     <h3>Import from Mendeley</h3>
     <p>Migrate files from Mendeley</p>
   </div>
-  
+
   <div className="card" onClick={() => setActiveModal("manual")}>
     <h3>Add Manually</h3>
     <p>Enter Citation data</p>
@@ -1436,6 +1466,7 @@ git commit -m "feat: extend AddSourceModal with paper import cards
 ## Task 14: Integration Testing
 
 **Files:**
+
 - Test: Run full integration test suite
 
 - [ ] **Step 1: Run all new tests**
@@ -1475,23 +1506,23 @@ git commit -m "test: add integration tests and verify type safety
 
 ### Spec Coverage Check
 
-| Spec Section | Implementing Task |
-|--------------|-------------------|
-| DOI Resolver (§2.1) | Task 1, 3 |
-| BibTeX/RIS Parser (§2.2) | Task 2, 4 |
-| Zotero Import (§2.3) | Task 10 |
-| Mendeley Import (§2.4) | Task 11 |
-| Manual Entry (§2.5) | Task 12 |
-| paperRecord Schema (§2.6) | Task 1, 7 |
-| AddSourceModal UI (§3.1) | Task 13 |
-| DOI Modal UI (§3.2) | Task 8 |
-| BibTeX Modal UI (§3.3) | Task 9 |
-| Zotero/Mendeley Modal UI (§3.4) | Task 10, 11 |
-| Manual Modal UI (§3.5) | Task 12 |
-| Data Flow (§4) | Tasks 1-7 |
-| Error Handling (§5) | Embedded in all tasks |
-| Testing (§6) | All tasks include tests |
-| V1 Scope (§7) | All in-scope items covered |
+| Spec Section                    | Implementing Task          |
+| ------------------------------- | -------------------------- |
+| DOI Resolver (§2.1)             | Task 1, 3                  |
+| BibTeX/RIS Parser (§2.2)        | Task 2, 4                  |
+| Zotero Import (§2.3)            | Task 10                    |
+| Mendeley Import (§2.4)          | Task 11                    |
+| Manual Entry (§2.5)             | Task 12                    |
+| paperRecord Schema (§2.6)       | Task 1, 7                  |
+| AddSourceModal UI (§3.1)        | Task 13                    |
+| DOI Modal UI (§3.2)             | Task 8                     |
+| BibTeX Modal UI (§3.3)          | Task 9                     |
+| Zotero/Mendeley Modal UI (§3.4) | Task 10, 11                |
+| Manual Modal UI (§3.5)          | Task 12                    |
+| Data Flow (§4)                  | Tasks 1-7                  |
+| Error Handling (§5)             | Embedded in all tasks      |
+| Testing (§6)                    | All tasks include tests    |
+| V1 Scope (§7)                   | All in-scope items covered |
 
 **Coverage: 100% — no spec requirements without implementing tasks.**
 

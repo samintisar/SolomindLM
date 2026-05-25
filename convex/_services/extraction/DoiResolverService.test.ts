@@ -67,7 +67,9 @@ describe("DoiResolverService", () => {
 
     it("throws InputValidationError for invalid DOI format", async () => {
       await expect(service.resolve("invalid-doi")).rejects.toThrow(InputValidationError);
-      await expect(service.resolve("invalid-doi")).rejects.toThrow("Invalid DOI format: invalid-doi");
+      await expect(service.resolve("invalid-doi")).rejects.toThrow(
+        "Invalid DOI format: invalid-doi"
+      );
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -270,7 +272,7 @@ describe("DoiResolverService", () => {
             message: {
               title: ["JATS Paper"],
               author: [{ given: "X", family: "Y" }],
-              abstract: '<jats:p>This is a <jats:bold>JATS</jats:bold> abstract.</jats:p>',
+              abstract: "<jats:p>This is a <jats:bold>JATS</jats:bold> abstract.</jats:p>",
               DOI: "10.1234/jats",
               URL: "https://doi.org/10.1234/jats",
             },

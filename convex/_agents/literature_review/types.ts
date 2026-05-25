@@ -63,7 +63,7 @@ export interface AcademicPaper {
   abstract: string;
   url: string;
   pdfUrl?: string;
-  source: "arxiv" | "semantic_scholar" | "pubmed";
+  source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
   citationCount?: number;
   doi?: string;
   score: number;
@@ -171,5 +171,5 @@ export interface LiteratureCitation {
   year?: number;
   doi?: string;
   url: string;
-  sourceApi: "arxiv" | "semantic_scholar" | "pubmed";
+  sourceApi: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
 }

@@ -23,7 +23,7 @@ import type { ConceptExtraction, MindMapNode, FinalMindMap } from "../../_agents
 import { validateWithPreset } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // SCHEMAS
@@ -261,7 +261,7 @@ export async function runMindmapGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -370,10 +370,13 @@ export async function runProcessMindMapMapChunkPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[mindmap] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[mindmap] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -389,17 +392,10 @@ export async function runProcessMindMapMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)), new HumanMessage(prompt)],
-          createLangSmithRunConfig({
-            runName: "MindMapJob.MapProcess",
-            tags: ["agent", "mindmap", "map"],
-            metadata: {
-              chunkIndex,
-              contentLength: chunk.length,
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "MindMapMap",
       onRetry: (attempt, error) => {
@@ -484,8 +480,8 @@ export async function runProcessMindMapMapChunkPhase(
       : 0;
     const totalMaps = mindmap.metadata?.totalMapTasks || totalChunks;
     const failedMaps = mindmap.metadata?.mapResults
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? Object.values(mindmap.metadata.mapResults).filter((r: any) => {
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Object.values(mindmap.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -557,10 +553,13 @@ export async function runFinalizeMindMapPhase(
       userPrefs = await ctx.runQuery(
         internal.userPreferences.index.getPreferencesByUserId,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any },
+        { userId: userId as any }
       );
     } catch (e) {
-      console.warn("[mindmap] user preference fetch failed, using default language", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[mindmap] user preference fetch failed, using default language",
+        e instanceof Error ? e.message : String(e)
+      );
     }
     const language = userPrefs?.outputLanguage;
 
@@ -625,20 +624,10 @@ export async function runFinalizeMindMapPhase(
       const response = await invokeStudioLlm({
         invoke: () =>
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (llm as any).invoke(
-            [
-              new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-              new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
-            ],
-            createLangSmithRunConfig({
-              runName: "MindMapJob.Reduce",
-              tags: ["agent", "mindmap", "reduce"],
-              metadata: {
-                extractionCount: allExtractions.length,
-                inputSize: safeInput.length,
-              },
-            })
-          ),
+          (llm as any).invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+            new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
+          ]),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "MindMapReduce",
       });

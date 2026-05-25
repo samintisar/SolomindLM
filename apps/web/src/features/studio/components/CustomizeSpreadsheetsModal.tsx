@@ -195,7 +195,10 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
             <h2 className="text-xl font-bold font-sans">Create spreadsheet</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <StudioModalDiscoverPromptsButton studioTool="spreadsheet" onApplyPrompt={setCustomPrompt} />
+            <StudioModalDiscoverPromptsButton
+              studioTool="spreadsheet"
+              onApplyPrompt={setCustomPrompt}
+            />
             <button
               type="button"
               onClick={onClose}

@@ -1,4 +1,5 @@
 # GPU Cluster Management Reference
+
 ## Contents
 
 - [Cluster Architecture](#cluster-architecture)
@@ -13,16 +14,17 @@
 - [Troubleshooting](#troubleshooting)
 - [Terraform](#terraform)
 
-
 ## Cluster Architecture
 
 ### Kubernetes Mode
+
 - **Control Plane** -- Manages cluster state, scheduling, API access
 - **Worker Nodes** -- GPU-equipped nodes running workloads
 - **Networking** -- High-speed InfiniBand for multi-node communication
 - **Storage Layer** -- Persistent volumes, local NVMe, shared storage
 
 ### Slurm on Kubernetes (Slinky)
+
 - **Slurm Controller** -- Runs as K8s pods, manages job queues
 - **Login Nodes** -- SSH-accessible entry points
 - **Compute Nodes** -- GPU workers registered with both K8s and Slurm
@@ -170,6 +172,7 @@ together beta clusters update <CLUSTER_ID> --num-gpus 16
 ### Autoscaling (Kubernetes)
 
 Enable autoscaling during cluster creation in the UI. The Kubernetes Cluster Autoscaler:
+
 - Scales up when pods are pending due to insufficient resources
 - Scales down when nodes are underutilized
 - Respects pod disruption budgets
@@ -199,6 +202,7 @@ Use reserved for baseline + on-demand for bursts.
 ### Kubernetes PVCs
 
 **Shared storage (ReadWriteMany):**
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -213,6 +217,7 @@ spec:
 ```
 
 **Local storage (ReadWriteOnce):**
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -293,6 +298,7 @@ spec:
 ### Automatic Acceptance Testing
 
 During provisioning, nodes undergo automatic tests:
+
 - **DCGM Diag (Level 2)** -- GPU compute, memory, thermal validation
 - **GPU Burn (5 min)** -- stress test for thermal/power issues
 - **Single-Node NCCL** -- GPU-to-GPU communication within a node
@@ -303,14 +309,17 @@ Nodes showing "Tests Failed" are not added to the cluster until repaired.
 ### Available Health Check Tests
 
 **GPU Diagnostics:**
+
 - DCGM Diag (levels 1-3): NVIDIA Data Center GPU Manager diagnostics
 - GPU Burn: intensive compute stress test
 
 **Network Performance:**
+
 - Single-Node NCCL: intra-node GPU communication
 - InfiniBand Write Bandwidth: high-speed interconnect performance
 
 **PCIe Performance:**
+
 - NVBandwidth: CPU-to-GPU, GPU-to-CPU bandwidth, GPU-CPU latency
 
 ### Node Repair
@@ -356,10 +365,10 @@ scontrol show job <jobid>
 
 ### Roles
 
-| Role | Control Plane | Data Plane |
-|------|--------------|------------|
-| **Admin** | Full write (create/delete/scale clusters and volumes) | Full SSH and kubectl |
-| **Member** | Read-only (view only) | SSH and kubectl access |
+| Role       | Control Plane                                         | Data Plane             |
+| ---------- | ----------------------------------------------------- | ---------------------- |
+| **Admin**  | Full write (create/delete/scale clusters and volumes) | Full SSH and kubectl   |
+| **Member** | Read-only (view only)                                 | SSH and kubectl access |
 
 Only admins can add or remove users. Member permissions for in-cluster operations may vary
 based on RBAC configuration.
@@ -396,17 +405,17 @@ Users require active Together AI accounts before they can be added.
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Cluster stuck provisioning | Check the status for phases like `WaitingForControlPlaneNodes` or `RunningAcceptanceTests` |
-| 400 "cuda version and nvidia driver version are required" | Pass `cuda_version` and `nvidia_driver_version` as separate fields alongside `driver_version` |
-| 409 "Out of stock" | GPUs unavailable in the requested region. Call `list_regions()` and try another region |
-| "Shared volume does not exist in the datacenter" | Volume was created in a different datacenter partition. Use inline `shared_volume` at cluster creation instead of a separate `volume_id` |
-| Pods not scheduling | Verify node readiness with `kubectl get nodes` and inspect resource requests and taints |
-| GPU not accessible in container | Use a CUDA-enabled image such as `pytorch/pytorch` or `nvidia/cuda` |
-| Storage PVC not binding | Confirm the volume name matches the shared volume and inspect `kubectl get pvc` |
-| Slurm job failures | Run `sinfo` to inspect partitions and `scontrol show job <jobid>` for details |
-| Node health issues | Check `nvidia-smi`, inspect Xid errors in `dmesg`, and trigger repair from the UI if needed |
+| Issue                                                     | Solution                                                                                                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Cluster stuck provisioning                                | Check the status for phases like `WaitingForControlPlaneNodes` or `RunningAcceptanceTests`                                               |
+| 400 "cuda version and nvidia driver version are required" | Pass `cuda_version` and `nvidia_driver_version` as separate fields alongside `driver_version`                                            |
+| 409 "Out of stock"                                        | GPUs unavailable in the requested region. Call `list_regions()` and try another region                                                   |
+| "Shared volume does not exist in the datacenter"          | Volume was created in a different datacenter partition. Use inline `shared_volume` at cluster creation instead of a separate `volume_id` |
+| Pods not scheduling                                       | Verify node readiness with `kubectl get nodes` and inspect resource requests and taints                                                  |
+| GPU not accessible in container                           | Use a CUDA-enabled image such as `pytorch/pytorch` or `nvidia/cuda`                                                                      |
+| Storage PVC not binding                                   | Confirm the volume name matches the shared volume and inspect `kubectl get pvc`                                                          |
+| Slurm job failures                                        | Run `sinfo` to inspect partitions and `scontrol show job <jobid>` for details                                                            |
+| Node health issues                                        | Check `nvidia-smi`, inspect Xid errors in `dmesg`, and trigger repair from the UI if needed                                              |
 
 ## Terraform
 

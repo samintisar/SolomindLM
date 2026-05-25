@@ -61,7 +61,9 @@ async function globalSetup(config: FullConfig) {
     try {
       const out = JSON.parse(cleanup.stdout.trim() || "{}") as { deleted?: number; error?: string };
       if (out.deleted && out.deleted > 0) {
-        console.log(`[e2e global-setup] Removed ${out.deleted} e2e-prefixed notebook(s) before tests.`);
+        console.log(
+          `[e2e global-setup] Removed ${out.deleted} e2e-prefixed notebook(s) before tests.`
+        );
       }
     } catch {
       // non-JSON output is fine

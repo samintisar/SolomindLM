@@ -9,9 +9,7 @@ import {
   extractDocumentMetadata,
   getFileExtension,
 } from "../_services/processing/DocumentMetadataExtractor";
-import {
-  StructuralChunker,
-} from "../_services/processing/StructuralChunker";
+import { StructuralChunker } from "../_services/processing/StructuralChunker";
 import {
   E5_RAG_CHUNK_OVERLAP_TOKENS,
   E5_RAG_CHUNK_SIZE_TOKENS,
@@ -97,7 +95,7 @@ export const docEmbedding = internalAction({
     try {
       // Phase: Initializing
       logger.phaseStart("initializing");
-      await ctx.runMutation(internal.documents.index.updateStatus, {
+      await ctx.runMutation(internal.documents.internal.updateStatus, {
         documentId,
         status: "processing",
       });
@@ -108,7 +106,7 @@ export const docEmbedding = internalAction({
       currentPhase = "loading_document";
 
       // Get document details
-      const docDetails = await ctx.runQuery(internal.documents.index.getDocumentDetails, {
+      const docDetails = await ctx.runQuery(internal.documents.internal.getDocumentDetails, {
         documentId,
       });
 
@@ -233,10 +231,9 @@ export const docEmbedding = internalAction({
         logger.info("Extracting web page content");
         const rawUrl = docDetails.fileUrl || "";
         effectiveFileUrl = rawUrl;
-        const meta = await ctx.runAction(
-          internal._services.extractors.scrapeWebPageInternal,
-          { url: rawUrl }
-        );
+        const meta = await ctx.runAction(internal._services.extractors.scrapeWebPageInternal, {
+          url: rawUrl,
+        });
         extractedText = meta.content;
         if (meta.title?.trim()) extractedTitle = meta.title.trim();
         logger.phaseComplete("extraction", {
@@ -244,7 +241,9 @@ export const docEmbedding = internalAction({
           title: extractedTitle,
         });
       } else if (docDetails.fileType === "paper_record") {
-        logger.info("Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)");
+        logger.info(
+          "Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)"
+        );
         const pr = docDetails.paperRecord;
         if (!pr) {
           throw new Error("paper_record document missing paperRecord");
@@ -275,7 +274,9 @@ export const docEmbedding = internalAction({
             });
           }
         } catch (e) {
-          logger.warn("AcademicLoaderService failed", { message: e instanceof Error ? e.message : String(e) });
+          logger.warn("AcademicLoaderService failed", {
+            message: e instanceof Error ? e.message : String(e),
+          });
         }
 
         if (!extractedText?.trim()) {
@@ -287,7 +288,7 @@ export const docEmbedding = internalAction({
           });
         }
 
-        await ctx.runMutation(internal.documents.index.patch, {
+        await ctx.runMutation(internal.documents.internal.patch, {
           documentId,
           patch: { ingestionStatus: paperIngestion },
         });
@@ -317,7 +318,7 @@ export const docEmbedding = internalAction({
           extractedMarkdownForUi.slice(0, MAX_STORED_MARKDOWN_CHARS) +
           "\n\n---\n\n**Note:** Display copy was truncated for a very large document. Use **Original PDF** to view the full file.";
       }
-      await ctx.runMutation(internal.documents.index.setExtractedMarkdown, {
+      await ctx.runMutation(internal.documents.internal.setExtractedMarkdown, {
         documentId,
         extractedMarkdown: extractedMarkdownForUi,
       });
@@ -374,13 +375,13 @@ export const docEmbedding = internalAction({
 
       logger.info("Title set", { title });
 
-      await ctx.runMutation(internal.documents.index.updateTitle, {
+      await ctx.runMutation(internal.documents.internal.updateTitle, {
         documentId,
         title,
       });
 
       // Store document-level metadata
-      await ctx.runMutation(internal.documents.index.updateMetadata, {
+      await ctx.runMutation(internal.documents.internal.updateMetadata, {
         documentId,
         metadata: {
           wordCount: docMetadata.wordCount,
@@ -430,7 +431,7 @@ export const docEmbedding = internalAction({
       // Store chunks with embeddings and metadata
       for (let i = 0; i < chunksWithMetadata.length; i++) {
         const chunk = chunksWithMetadata[i];
-        await ctx.runMutation(internal.documents.index.storeChunk, {
+        await ctx.runMutation(internal.documents.chunks.storeChunk, {
           documentId,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           userId: chunkUserId as any,
@@ -462,7 +463,7 @@ export const docEmbedding = internalAction({
       logger.phaseComplete("storing_chunks", { chunksStored: chunksWithMetadata.length });
 
       // Update status to completed
-      await ctx.runMutation(internal.documents.index.updateStatus, {
+      await ctx.runMutation(internal.documents.internal.updateStatus, {
         documentId,
         status: "completed",
       });
@@ -482,20 +483,20 @@ export const docEmbedding = internalAction({
       });
 
       // Mark as failed
-      await ctx.runMutation(internal.documents.index.updateStatus, {
+      await ctx.runMutation(internal.documents.internal.updateStatus, {
         documentId,
         status: "failed",
       });
 
       if (fileTypeForError === "paper_record") {
-        await ctx.runMutation(internal.documents.index.patch, {
+        await ctx.runMutation(internal.documents.internal.patch, {
           documentId,
           patch: { ingestionStatus: "failed" },
         });
       }
 
       // Store error in metadata
-      await ctx.runMutation(internal.documents.index.patch, {
+      await ctx.runMutation(internal.documents.internal.patch, {
         documentId,
         patch: {
           metadata: {

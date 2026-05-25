@@ -129,11 +129,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             className="p-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
-            {isPlaying ? (
-              <Pause className="w-5 h-5" />
-            ) : (
-              <Play className="w-5 h-5 ml-0.5" />
-            )}
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
           </button>
           <button
             onClick={() => skipBy(5)}
@@ -167,4 +163,3 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     </div>
   );
 };
-

@@ -18,10 +18,7 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<any>>;
 const modules = Object.fromEntries(
-  Object.entries(rawModules).map(([key, loader]) => [
-    key.replace(/^\/convex\//, "./"),
-    loader,
-  ]),
+  Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
 async function seedUser(t: ReturnType<typeof convexTest>) {
@@ -90,7 +87,7 @@ describe("Prompt Library — createPrompt", () => {
         title: "Test",
         promptText: "Hello",
         studioTool: "report",
-      }),
+      })
     ).rejects.toThrow("Unauthenticated");
   });
 
@@ -103,7 +100,7 @@ describe("Prompt Library — createPrompt", () => {
         title: "",
         promptText: "Some text",
         studioTool: "report",
-      }),
+      })
     ).rejects.toThrow("Title is required");
   });
 
@@ -120,7 +117,7 @@ describe("Prompt Library — createPrompt", () => {
         studioTool: "report",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notebookId: notebookId as any,
-      }),
+      })
     ).rejects.toThrow("Notebook not found");
   });
 
@@ -133,7 +130,7 @@ describe("Prompt Library — createPrompt", () => {
         title: "My Title",
         promptText: "   ",
         studioTool: "report",
-      }),
+      })
     ).rejects.toThrow("Prompt text is required");
   });
 
@@ -146,7 +143,7 @@ describe("Prompt Library — createPrompt", () => {
         title: "x".repeat(PROMPT_TITLE_MAX_LENGTH + 1),
         promptText: "Valid text",
         studioTool: "report",
-      }),
+      })
     ).rejects.toThrow(`Title must be ≤${PROMPT_TITLE_MAX_LENGTH}`);
   });
 
@@ -159,7 +156,7 @@ describe("Prompt Library — createPrompt", () => {
         title: "Valid title",
         promptText: "x".repeat(PROMPT_TEXT_MAX_LENGTH + 1),
         studioTool: "report",
-      }),
+      })
     ).rejects.toThrow(`Prompt text must be ≤${PROMPT_TEXT_MAX_LENGTH}`);
   });
 
@@ -223,7 +220,7 @@ describe("Prompt Library — publishPrompt / unpublishPrompt", () => {
       asUser(t, other).mutation(api.studio.prompts.index.publishPrompt, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
-      }),
+      })
     ).rejects.toThrow("Not found or not owner");
   });
 
@@ -359,7 +356,7 @@ describe("Prompt Library — savePublicPrompt", () => {
         publicPromptId: promptId as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         notebookId: foreignNotebook as any,
-      }),
+      })
     ).rejects.toThrow("Notebook not found");
   });
 });
@@ -396,7 +393,8 @@ describe("Prompt Library — ratePrompt", () => {
     expect(prompt!.ratingSum).toBe(5);
     expect(prompt!.ratingAverage).toBe(5);
 
-    const expectedBayesian = (5 + RATING_PRIOR_MEAN * RATING_PRIOR_COUNT) / (1 + RATING_PRIOR_COUNT);
+    const expectedBayesian =
+      (5 + RATING_PRIOR_MEAN * RATING_PRIOR_COUNT) / (1 + RATING_PRIOR_COUNT);
     expect(prompt!.bayesianRating).toBeCloseTo(expectedBayesian, 3);
   });
 
@@ -459,7 +457,7 @@ describe("Prompt Library — ratePrompt", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
         rating: 0,
-      }),
+      })
     ).rejects.toThrow("Rating must be an integer from 1 to 5");
 
     await expect(
@@ -467,7 +465,7 @@ describe("Prompt Library — ratePrompt", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
         rating: 6,
-      }),
+      })
     ).rejects.toThrow("Rating must be an integer from 1 to 5");
 
     await expect(
@@ -475,7 +473,7 @@ describe("Prompt Library — ratePrompt", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
         rating: 3.5,
-      }),
+      })
     ).rejects.toThrow("Rating must be an integer from 1 to 5");
   });
 });
@@ -533,7 +531,7 @@ describe("Prompt Library — reportPrompt", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
         reason: "x".repeat(PROMPT_REPORT_REASON_MAX_LENGTH + 1),
-      }),
+      })
     ).rejects.toThrow("Reason must be");
   });
 
@@ -594,7 +592,7 @@ describe("Prompt Library — reportPrompt", () => {
       asUser(t, reporter).mutation(api.studio.prompts.index.reportPrompt, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
-      }),
+      })
     ).rejects.toThrow("Already reported");
   });
 });
@@ -695,7 +693,7 @@ describe("Prompt Library — updatePrompt", () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         promptId: promptId as any,
         title: "Hacked Title",
-      }),
+      })
     ).rejects.toThrow("Not found or not owner");
   });
 });
@@ -704,7 +702,7 @@ describe("Prompt Library — listPublicPrompts", () => {
   async function publishOne(
     t: ReturnType<typeof convexTest>,
     userId: string,
-    overrides: { title?: string; studioTool?: "report" | "quiz" } = {},
+    overrides: { title?: string; studioTool?: "report" | "quiz" } = {}
   ) {
     const promptId = await asUser(t, userId).mutation(api.studio.prompts.index.createPrompt, {
       title: overrides.title ?? "Pub",
@@ -940,7 +938,7 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       await asUser(t, saver).query(api.studio.prompts.index.hasSavedPrompt, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBe(false);
 
     await asUser(t, saver).mutation(api.studio.prompts.index.savePublicPrompt, {
@@ -952,14 +950,14 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       await asUser(t, saver).query(api.studio.prompts.index.hasSavedPrompt, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBe(true);
 
     expect(
       await asUser(t, stranger).query(api.studio.prompts.index.hasSavedPrompt, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBe(false);
   });
 
@@ -981,7 +979,7 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       await t.query(api.studio.prompts.index.hasSavedPrompt, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBe(false);
   });
 
@@ -1004,7 +1002,7 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBeNull();
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
@@ -1017,7 +1015,7 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBe(4);
 
     await asUser(t, rater).mutation(api.studio.prompts.index.ratePrompt, {
@@ -1030,7 +1028,7 @@ describe("Prompt Library — hasSavedPrompt / getMyRating", () => {
       await asUser(t, rater).query(api.studio.prompts.index.getMyRating, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         publicPromptId: promptId as any,
-      }),
+      })
     ).toBe(2);
   });
 });

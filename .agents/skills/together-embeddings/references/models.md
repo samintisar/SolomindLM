@@ -2,9 +2,9 @@
 
 ## Embedding Models
 
-| Model | API String | Size | Dimensions | Context | Best For |
-|-------|-----------|------|-----------|---------|----------|
-| Multilingual E5 Large | `intfloat/multilingual-e5-large-instruct` | 560M | 1,024 | 514 tokens | Multilingual retrieval (recommended) |
+| Model                 | API String                                | Size | Dimensions | Context    | Best For                             |
+| --------------------- | ----------------------------------------- | ---- | ---------- | ---------- | ------------------------------------ |
+| Multilingual E5 Large | `intfloat/multilingual-e5-large-instruct` | 560M | 1,024      | 514 tokens | Multilingual retrieval (recommended) |
 
 ## Rerank Models
 
@@ -16,10 +16,10 @@ and setup instructions.
 
 ## Embeddings API Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model` | string | Yes | Embedding model identifier |
-| `input` | string or string[] | Yes | Text(s) to embed |
+| Parameter | Type               | Required | Description                |
+| --------- | ------------------ | -------- | -------------------------- |
+| `model`   | string             | Yes      | Embedding model identifier |
+| `input`   | string or string[] | Yes      | Text(s) to embed           |
 
 ## Embeddings Response
 
@@ -39,14 +39,14 @@ and setup instructions.
 
 ## Rerank Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `model` | string | Yes | Rerank model identifier |
-| `query` | string | Yes | Search query |
-| `documents` | string[] or object[] | Yes | Documents to rerank. Pass objects with named fields for structured documents. |
-| `top_n` | int | No | Return only top N results |
-| `return_documents` | bool | No | Include document text in response |
-| `rank_fields` | string[] | No | Fields to use for ranking when documents are JSON objects |
+| Parameter          | Type                 | Required | Description                                                                   |
+| ------------------ | -------------------- | -------- | ----------------------------------------------------------------------------- |
+| `model`            | string               | Yes      | Rerank model identifier                                                       |
+| `query`            | string               | Yes      | Search query                                                                  |
+| `documents`        | string[] or object[] | Yes      | Documents to rerank. Pass objects with named fields for structured documents. |
+| `top_n`            | int                  | No       | Return only top N results                                                     |
+| `return_documents` | bool                 | No       | Include document text in response                                             |
+| `rank_fields`      | string[]             | No       | Fields to use for ranking when documents are JSON objects                     |
 
 ## Rerank Response
 
@@ -56,9 +56,9 @@ and setup instructions.
   "id": "rerank-abc123",
   "model": "<your-dedicated-endpoint-model>",
   "results": [
-    {"index": 0, "relevance_score": 0.9823},
-    {"index": 3, "relevance_score": 0.8451},
-    {"index": 1, "relevance_score": 0.2134}
+    { "index": 0, "relevance_score": 0.9823 },
+    { "index": 3, "relevance_score": 0.8451 },
+    { "index": 1, "relevance_score": 0.2134 }
   ],
   "usage": {
     "prompt_tokens": 150,

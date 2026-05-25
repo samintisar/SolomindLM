@@ -2,6 +2,8 @@ import { createContext, useContext } from "react";
 import { Message, Note } from "@/shared/types/index";
 import type { Doc } from "@convex/_generated/dataModel";
 
+import type { ChatStreamSourcePolicy } from "./chatStreamTypes";
+
 export interface ChatStreamingContextType {
   messages: Message[];
   isChatStreaming: boolean;
@@ -9,7 +11,12 @@ export interface ChatStreamingContextType {
   remoteChatGenerating: boolean;
   /** When true, block starting a new message (last DB row is not assistant while server refcount > 0). */
   remoteGenerationBlocksSend: boolean;
-  onSendMessage: (messageText: string, deepResearch?: boolean, sourcePolicy?: { channels: string[] }) => void;
+  onSendMessage: (
+    messageText: string,
+    deepResearch?: boolean,
+    sourcePolicy?: ChatStreamSourcePolicy,
+    sendOptions?: { documentIdsOverride?: string[] }
+  ) => void;
   /** Stop the current streaming response */
   onStopChat: () => void;
   /** Attach UI to the HTTP body from POST /research/execute (same markers as chat stream). */
@@ -18,7 +25,13 @@ export interface ChatStreamingContextType {
   onSetFeedback: (messageId: string, feedback: "up" | "down" | null) => void;
   onRetry: (assistantMessageId: string) => void;
   onSaveChatOptimistic: (payload: { notebookId: string; note: Note } | null) => void;
-  externalSources: Array<{ title: string; url: string; snippet: string; sourceType: string; score?: number }>;
+  externalSources: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    sourceType: string;
+    score?: number;
+  }>;
   clearExternalSources: () => void;
   sourceCount: number;
   sourceSummary: string | null;

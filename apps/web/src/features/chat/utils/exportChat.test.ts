@@ -57,7 +57,7 @@ describe("exportAsMarkdown", () => {
     vi.spyOn(document, "createElement").mockReturnValue(anchor as any);
 
     const messages = [makeMessage("user", "hello")];
-    exportAsMarkdown(messages, 'My/Nested:Path?Notebook');
+    exportAsMarkdown(messages, "My/Nested:Path?Notebook");
 
     expect(anchor.download).not.toContain("/");
     expect(anchor.download).not.toContain(":");

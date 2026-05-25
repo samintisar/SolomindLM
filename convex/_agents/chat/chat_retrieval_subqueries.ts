@@ -6,13 +6,12 @@ export const RetrievalSubqueriesSchema = z.object({
 });
 
 /** Digits or common English count words (lecture notes often say "four tasks" not "4 tasks"). */
-const COUNT_QUANT =
-  "(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
+const COUNT_QUANT = "(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)";
 
 /** "N [optional-adjectives] <counted noun>" — list-style questions in natural language. */
 const COUNTED_LIST_TAIL = new RegExp(
   `\\b${COUNT_QUANT}\\s+(?:\\w+\\s+){0,6}?(items?|patterns?|types?|categories?|methods?|techniques?|strategies?|principles?|rules?|steps?|stages?|phases?|elements?|factors?|components?|ways?|kinds?|forms?|approaches?|practices?|examples?|topics?|tasks?|points?|criteria|architectures?|embeddings?|linkages?|concepts?|ideas?|reasons?|benefits?|features?|characteristics?|properties?|aspects?|dimensions?|domains?|areas?|fields?|themes?|subjects?|questions?|problems?|challenges?|solutions?|answers?)\\b`,
-  "i",
+  "i"
 );
 
 /**
@@ -78,19 +77,18 @@ export function parseRetrievalSubqueriesFromLlmContent(
       .trim();
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) {
-      console.warn(
-        "[chat_retrieval_subqueries] parse fallback: no_json_match",
-        { previewLen: text.length, preview: text.slice(0, 200) }
-      );
+      console.warn("[chat_retrieval_subqueries] parse fallback: no_json_match", {
+        previewLen: text.length,
+        preview: text.slice(0, 200),
+      });
       return null;
     }
     const raw = JSON.parse(match[0]);
     const parsed = RetrievalSubqueriesSchema.safeParse(raw);
     if (!parsed.success) {
-      console.warn(
-        "[chat_retrieval_subqueries] parse fallback: schema_invalid",
-        { issues: parsed.error.issues.slice(0, 3) }
-      );
+      console.warn("[chat_retrieval_subqueries] parse fallback: schema_invalid", {
+        issues: parsed.error.issues.slice(0, 3),
+      });
       return null;
     }
     const subs = parsed.data.subqueries.map((s) => s.trim()).filter(Boolean);
@@ -104,10 +102,10 @@ export function parseRetrievalSubqueriesFromLlmContent(
       rerankQuery: rq || undefined,
     };
   } catch (err) {
-    console.warn(
-      "[chat_retrieval_subqueries] parse fallback: exception",
-      { error: err instanceof Error ? err.message : String(err), previewLen: text.length }
-    );
+    console.warn("[chat_retrieval_subqueries] parse fallback: exception", {
+      error: err instanceof Error ? err.message : String(err),
+      previewLen: text.length,
+    });
     return null;
   }
 }

@@ -1,11 +1,6 @@
 // convex/onboarding/constants.ts
 
-export const STEP_IDS = [
-  "createNotebook",
-  "addSource",
-  "askQuestion",
-  "generateArtifact",
-] as const;
+export const STEP_IDS = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 
 export type StepId = (typeof STEP_IDS)[number];
 

@@ -29,7 +29,9 @@ export const QuizQuestionSchema = z.object({
     .int()
     .min(0)
     .max(3)
-    .describe("Zero-based index of the correct option (0–3). Must match the options array after normalization."),
+    .describe(
+      "Zero-based index of the correct option (0–3). Must match the options array after normalization."
+    ),
   hint: z.string().describe("A helpful hint that guides logic without giving the answer"),
   explanation: z
     .string()

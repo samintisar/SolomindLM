@@ -2,59 +2,20 @@ import { v } from "convex/values";
 import {
   mutation,
   query,
-  internalMutation,
-  internalQuery,
-  internalAction,
-  type MutationCtx,
+  action,
 } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { getAuthUserId } from "../auth";
 import { checkSourceLimit } from "../_lib/limits";
 import { MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
-  getNotebookAccess,
 } from "../_lib/notebookAccess";
-import { createServiceLogger } from "../_lib/logging/serviceLogger";
-import {
-  deriveFulltextStatus,
-  paperRecordValidator,
-  primaryLinkUrlForPaper,
-} from "./paperRecord";
-
-/**
- * Internal: verify a user can resolve a file URL for this storage (document in a readable notebook).
- */
-export const userCanAccessStorage = internalQuery({
-  args: {
-    userId: v.id("users"),
-    storageId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db
-      .query("documents")
-      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .first();
-    if (!doc) return false;
-    const access = await getNotebookAccess(ctx, doc.notebookId, args.userId);
-    return access !== null;
-  },
-});
-
-async function deleteAllChunksForDocument(
-  ctx: MutationCtx,
-  documentId: Id<"documents">
-): Promise<void> {
-  const chunks = await ctx.db
-    .query("documentChunks")
-    .withIndex("by_document", (q) => q.eq("documentId", documentId))
-    .collect();
-  for (const chunk of chunks) {
-    await ctx.db.delete(chunk._id);
-  }
-}
+import { env } from "../_lib/env";
+import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
+import { deleteAllChunksForDocument } from "./internal";
 
 /**
  * Get a presigned URL for uploading a file to Convex Storage
@@ -278,7 +239,7 @@ export const getContent = query({
     }
 
     if (sortedChunks.length === 0) {
-      throw new Error("Document content not found");
+      return null;
     }
 
     // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view
@@ -455,521 +416,6 @@ export const removeMany = mutation({
 });
 
 /**
- * Internal: Clear chunks, optionally swap Convex storage blob, reset doc fields, schedule embedding.
- */
-export const prepareDocumentReembed = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    delayMs: v.number(),
-    newStorageId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db.get(args.documentId);
-    if (!doc) throw new Error("Document not found");
-
-    if (args.newStorageId !== undefined) {
-      if (doc.storageId) {
-        await ctx.storage.delete(doc.storageId as Id<"_storage">);
-      }
-      await ctx.db.patch(args.documentId, {
-        storageId: args.newStorageId,
-        updatedAt: Date.now(),
-      });
-    }
-
-    await deleteAllChunksForDocument(ctx, args.documentId);
-
-    const before = await ctx.db.get(args.documentId);
-    await ctx.db.patch(args.documentId, {
-      status: "pending",
-      error: undefined,
-      wordCount: undefined,
-      estimatedReadingTimeMinutes: undefined,
-      totalPages: undefined,
-      totalChunks: undefined,
-      hasCodeBlocks: undefined,
-      hasMathNotation: undefined,
-      hasTables: undefined,
-      hasImages: undefined,
-      language: undefined,
-      documentStructure: undefined,
-      maxHeadingLevel: undefined,
-      metadata: undefined,
-      extractedMarkdown: undefined,
-      ...(before?.fileType === "paper_record" ? { ingestionStatus: "pending" as const } : {}),
-      updatedAt: Date.now(),
-    });
-
-    const after = await ctx.db.get(args.documentId);
-    if (!after) throw new Error("Document not found");
-
-    await ctx.scheduler.runAfter(args.delayMs, internal.documents.embeddingJob.docEmbedding, {
-      documentId: args.documentId,
-      userId: after.userId,
-      notebookId: after.notebookId,
-    });
-  },
-});
-
-/**
- * Internal: List documents in a notebook when the user can read the notebook (for internal actions).
- */
-export const listDocumentsForNotebookReadInternal = internalQuery({
-  args: {
-    notebookId: v.id("notebooks"),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    await assertCanReadNotebook(ctx, args.notebookId, args.userId);
-    return await ctx.db
-      .query("documents")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .order("desc")
-      .collect();
-  },
-});
-
-/**
- * Internal: Notebook documents for remote refresh (caller must pass authenticated user id).
- */
-export const listDocumentsForNotebookRefresh = internalQuery({
-  args: {
-    notebookId: v.id("notebooks"),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    await assertCanEditNotebook(ctx, args.notebookId, args.userId);
-    return await ctx.db
-      .query("documents")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .collect();
-  },
-});
-
-/**
- * Internal: Single document if the user can edit its notebook.
- */
-export const getDocumentForRefresh = internalQuery({
-  args: {
-    documentId: v.id("documents"),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db.get(args.documentId);
-    if (!doc) return null;
-    await assertCanEditNotebook(ctx, doc.notebookId, args.userId);
-    return doc;
-  },
-});
-
-/**
- * Internal: Update document status
- */
-export const updateStatus = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    status: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      status: args.status,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Internal: Update document title
- */
-export const updateTitle = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    title: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      fileName: args.title,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Internal: replace source URL (e.g. OpenAlex work page → DOI) before scrape / re-embed.
- */
-export const setDocumentFileUrl = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    fileUrl: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      fileUrl: args.fileUrl,
-      updatedAt: Date.now(),
-    });
-    return null;
-  },
-});
-
-/**
- * Internal: Update document-level metadata
- */
-/**
- * Full extracted markdown for source viewer / copy (single string, no chunk overlap).
- */
-export const setExtractedMarkdown = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    extractedMarkdown: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      extractedMarkdown: args.extractedMarkdown,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-export const updateMetadata = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    metadata: v.object({
-      wordCount: v.optional(v.number()),
-      estimatedReadingTimeMinutes: v.optional(v.number()),
-      totalPages: v.optional(v.number()),
-      totalChunks: v.optional(v.number()),
-      hasCodeBlocks: v.optional(v.boolean()),
-      hasMathNotation: v.optional(v.boolean()),
-      hasTables: v.optional(v.boolean()),
-      hasImages: v.optional(v.boolean()),
-      language: v.optional(v.string()),
-      documentStructure: v.optional(v.union(v.literal("flat"), v.literal("hierarchical"))),
-      maxHeadingLevel: v.optional(v.number()),
-    }),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      ...args.metadata,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Internal: Patch document with partial updates
- */
-export const patch = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    patch: v.any(),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.documentId, {
-      ...args.patch,
-      updatedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Internal: List chunks by document
- */
-export const listChunksByDocument = internalQuery({
-  args: {
-    documentId: v.id("documents"),
-  },
-  handler: async (ctx, args) => {
-    const chunks = await ctx.db
-      .query("documentChunks")
-      .withIndex("by_document", (q) => q.eq("documentId", args.documentId))
-      .order("asc")
-      .collect();
-
-    return chunks;
-  },
-});
-
-/**
- * Internal: Get chunks by IDs
- */
-export const getChunks = internalQuery({
-  args: {
-    chunkIds: v.array(v.id("documentChunks")),
-  },
-  handler: async (ctx, args) => {
-    return await Promise.all(args.chunkIds.map((id) => ctx.db.get(id)));
-  },
-});
-
-/**
- * Internal: List chunks by notebook (for debugging)
- */
-export const listChunksByNotebook = internalQuery({
-  args: {
-    notebookId: v.id("notebooks"),
-  },
-  handler: async (ctx, args) => {
-    const chunks = await ctx.db
-      .query("documentChunks")
-      .withIndex("by_notebook", (q) => q.eq("notebookId", args.notebookId))
-      .collect();
-    return chunks;
-  },
-});
-
-/**
- * Internal: Fetch chunks for documents (for use in agents)
- * This combines vector search with full chunk retrieval
- */
-export const fetchChunks = internalAction({
-  args: {
-    documentIds: v.array(v.id("documents")),
-  },
-  handler: async (ctx, args) => {
-    "use node";
-
-    // Get all chunks for the specified documents
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allChunks: any[] = [];
-
-    for (const documentId of args.documentIds) {
-      const chunks = await ctx.runQuery(internal.documents.index.listChunksByDocument, {
-        documentId,
-      });
-      allChunks.push(...chunks);
-    }
-
-    // Sort by document and chunk index
-    allChunks.sort((a, b) => {
-      if (a.documentId !== b.documentId) {
-        return a.documentId.localeCompare(b.documentId);
-      }
-      return a.chunkIndex - b.chunkIndex;
-    });
-
-    return allChunks;
-  },
-});
-
-/**
- * Internal: Keyword search using full-text search index
- */
-export const keywordSearch = internalQuery({
-  args: {
-    notebookId: v.id("notebooks"),
-    userId: v.id("users"), // Note: Using v.id("users") from Better Auth
-    query: v.string(),
-    limit: v.optional(v.number()),
-    documentIds: v.optional(v.array(v.id("documents"))),
-    /** When true, skip structured logs (deep research issues many keyword calls). */
-    quietLogs: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 50;
-
-    const results = await ctx.db
-      .query("documentChunks")
-      .withSearchIndex("search_content", (q) =>
-        q.search("content", args.query).eq("userId", args.userId).eq("notebookId", args.notebookId)
-      )
-      .take(limit);
-
-    // User explicitly has no selected sources - return empty results
-    if (args.documentIds && args.documentIds.length === 0) {
-      return [];
-    }
-
-    // FIXED: Explicit length > 0 check
-    let filtered = results;
-    if (args.documentIds && args.documentIds.length > 0) {
-      const docIdSet = new Set(args.documentIds.map((id) => id.toString()));
-      filtered = results.filter(
-        (r) => r.documentId !== undefined && docIdSet.has(r.documentId.toString())
-      );
-    }
-
-    if (!args.quietLogs) {
-      const log = createServiceLogger("documents", "keywordSearch", {
-        userId: args.userId,
-        notebookId: args.notebookId,
-      });
-      log.debug("query", {
-        preview: args.query.slice(0, 120),
-        raw: results.length,
-        afterFilter: filtered.length,
-        filteredByDocs: !!(args.documentIds && args.documentIds.length > 0),
-      });
-    }
-
-    const uniqueDocIds = [...new Set(filtered.map((r) => r.documentId))];
-    type DocId = NonNullable<(typeof filtered)[0]["documentId"]>;
-    const docMetaMap = new Map<DocId, { fileName: string; sourceUrl?: string }>();
-    for (const id of uniqueDocIds) {
-      const doc = await ctx.db.get(id);
-      const fileName = doc?.fileName ?? "Document";
-      const u = doc?.fileUrl?.trim();
-      const sourceUrl =
-        u &&
-        (doc?.fileType === "url" ||
-          doc?.fileType === "youtube" ||
-          doc?.fileType === "paper_record")
-          ? u
-          : undefined;
-      docMetaMap.set(id, { fileName, sourceUrl });
-    }
-
-    return filtered.map((r) => {
-      const meta = r.documentId ? docMetaMap.get(r.documentId) : undefined;
-      return {
-        _id: r._id,
-        _score: 0,
-        content: r.content,
-        chunkIndex: r.chunkIndex,
-        documentId: r.documentId,
-        sourceTitle: meta?.fileName ?? "Document",
-        sourceUrl: meta?.sourceUrl,
-        // Include chunk metadata for enhanced RAG context
-        metadata: {
-          totalChunks: r.totalChunks,
-          relativePosition: r.relativePosition,
-          chunkLengthChars: r.chunkLengthChars,
-          wordCount: r.wordCount,
-          sentenceCount: r.sentenceCount,
-          pageNumber: r.pageNumber,
-          sectionTitle: r.sectionTitle,
-          sectionLevel: r.sectionLevel,
-          headingPath: r.headingPath,
-          previousChunkPreview: r.previousChunkPreview,
-          nextChunkPreview: r.nextChunkPreview,
-          hasCodeBlock: r.hasCodeBlock,
-          hasMathNotation: r.hasMathNotation,
-          hasTable: r.hasTable,
-          hasBulletList: r.hasBulletList,
-          hasNumberedList: r.hasNumberedList,
-        },
-      };
-    });
-  },
-});
-
-/**
- * Internal: Get document details for job processing
- * Used by DocEmbeddingJob to fetch storage information
- */
-export const getDocumentDetails = internalQuery({
-  args: {
-    documentId: v.id("documents"),
-  },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db.get(args.documentId);
-    if (!doc) {
-      throw new Error("Document not found");
-    }
-    return {
-      storageId: doc.storageId,
-      fileName: doc.fileName,
-      fileType: doc.fileType,
-      fileUrl: doc.fileUrl,
-      paperRecord: doc.paperRecord,
-      fulltextStatus: doc.fulltextStatus,
-      ingestionStatus: doc.ingestionStatus,
-    };
-  },
-});
-
-/**
- * Internal: Get document titles by IDs (for chat reference tooltips)
- */
-export const getDocumentsByIds = internalQuery({
-  args: {
-    documentIds: v.array(v.id("documents")),
-  },
-  handler: async (ctx, args) => {
-    const uniqueIds = [...new Set(args.documentIds)];
-    return Promise.all(
-      uniqueIds.map(async (id) => {
-        const doc = await ctx.db.get(id);
-        return {
-          _id: id,
-          fileName: doc?.fileName ?? "Document",
-          fileUrl: doc?.fileUrl,
-          fileType: doc?.fileType,
-        };
-      })
-    );
-  },
-});
-
-/**
- * Internal: Store a document chunk with embedding and metadata
- */
-export const storeChunk = internalMutation({
-  args: {
-    documentId: v.id("documents"),
-    userId: v.id("users"),
-    notebookId: v.id("notebooks"),
-    content: v.string(),
-    chunkIndex: v.number(),
-    embedding: v.array(v.float64()),
-    metadata: v.optional(
-      v.object({
-        totalChunks: v.optional(v.number()),
-        relativePosition: v.optional(v.number()),
-        chunkLengthChars: v.optional(v.number()),
-        wordCount: v.optional(v.number()),
-        sentenceCount: v.optional(v.number()),
-        pageNumber: v.optional(v.number()),
-        sectionTitle: v.optional(v.string()),
-        sectionLevel: v.optional(v.number()),
-        headingPath: v.optional(v.array(v.string())),
-        previousChunkPreview: v.optional(v.string()),
-        nextChunkPreview: v.optional(v.string()),
-        hasCodeBlock: v.optional(v.boolean()),
-        hasMathNotation: v.optional(v.boolean()),
-        hasTable: v.optional(v.boolean()),
-        hasBulletList: v.optional(v.boolean()),
-        hasNumberedList: v.optional(v.boolean()),
-      })
-    ),
-  },
-  handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chunkData: any = {
-      documentId: args.documentId,
-      userId: args.userId,
-      notebookId: args.notebookId,
-      content: args.content,
-      chunkIndex: args.chunkIndex,
-      embedding: args.embedding,
-      createdAt: Date.now(),
-    };
-
-    // Add metadata fields if provided
-    if (args.metadata) {
-      chunkData.totalChunks = args.metadata.totalChunks;
-      chunkData.relativePosition = args.metadata.relativePosition;
-      chunkData.chunkLengthChars = args.metadata.chunkLengthChars;
-      chunkData.wordCount = args.metadata.wordCount;
-      chunkData.sentenceCount = args.metadata.sentenceCount;
-      chunkData.pageNumber = args.metadata.pageNumber;
-      chunkData.sectionTitle = args.metadata.sectionTitle;
-      chunkData.sectionLevel = args.metadata.sectionLevel;
-      chunkData.headingPath = args.metadata.headingPath;
-      chunkData.previousChunkPreview = args.metadata.previousChunkPreview;
-      chunkData.nextChunkPreview = args.metadata.nextChunkPreview;
-      chunkData.hasCodeBlock = args.metadata.hasCodeBlock;
-      chunkData.hasMathNotation = args.metadata.hasMathNotation;
-      chunkData.hasTable = args.metadata.hasTable;
-      chunkData.hasBulletList = args.metadata.hasBulletList;
-      chunkData.hasNumberedList = args.metadata.hasNumberedList;
-    }
-
-    await ctx.db.insert("documentChunks", chunkData);
-  },
-});
-
-/**
  * Add discovered external sources (from web/academic/news/finance search) to a notebook.
  * Creates document records and triggers embedding pipeline for each source.
  */
@@ -991,13 +437,6 @@ export const addExternalSources = mutation({
 
     await assertCanEditNotebook(ctx, args.notebookId, userId);
 
-    const logger = createServiceLogger("documents", "addExternalSources", {
-      userId,
-      notebookId: args.notebookId,
-    });
-
-    logger.operationStart({ sourceCount: args.sources.length });
-
     const now = Date.now();
     const createdIds: Id<"documents">[] = [];
 
@@ -1010,7 +449,6 @@ export const addExternalSources = mutation({
         .first();
 
       if (existing) {
-        logger.info("skipped_duplicate_source", { url: source.url });
         continue;
       }
 
@@ -1035,9 +473,142 @@ export const addExternalSources = mutation({
       });
     }
 
-    logger.operationComplete({ createdCount: createdIds.length, skippedCount: args.sources.length - createdIds.length });
-
     return createdIds;
+  },
+});
+
+/**
+ * Generate a source guide (summary + topics) for a document using the fast LLM.
+ * On-demand: called when user opens a document without a source guide.
+ */
+export const generateSourceGuide = action({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ summary: string; topics: string[]; generatedAt: number }> => {
+    "use node";
+
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthenticated");
+    }
+
+    const { documentId } = args;
+
+    // Get document
+    const document: {
+      notebookId: Id<"notebooks">;
+      extractedMarkdown: string | undefined;
+      sourceGuide: { summary: string; topics: string[]; generatedAt: number } | undefined;
+    } | null = await ctx.runQuery(internal.documents.internal.getDocumentDetails, {
+      documentId,
+    });
+
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    const canRead = await ctx.runQuery(internal.notebooks.index.canReadNotebookInternal, {
+      notebookId: document.notebookId,
+      userId,
+    });
+    if (!canRead) {
+      throw new Error("Unauthorized");
+    }
+
+    // Skip if already generated
+    if (document.sourceGuide) {
+      return document.sourceGuide;
+    }
+
+    if (!document.extractedMarkdown) {
+      throw new Error("Document content not yet extracted");
+    }
+
+    // Truncate if too long (fast LLM has context limits)
+    const MAX_CONTENT_CHARS = 150_000;
+    let content = document.extractedMarkdown;
+    if (content.length > MAX_CONTENT_CHARS) {
+      content =
+        content.slice(0, MAX_CONTENT_CHARS) + "\n\n[Content truncated for summary generation]";
+    }
+
+    // Call Together AI API directly (avoiding LangChain performance dependency)
+    const apiKey = env.TOGETHER_AI_API_KEY;
+    if (!apiKey) {
+      throw new Error("TOGETHER_AI_API_KEY is not set");
+    }
+
+    const systemPrompt = `You are an expert document analyst. Generate a concise source guide for the provided document.
+
+Your response must be a JSON object with exactly two fields:
+- "summary": A 2-3 sentence summary of the document's key themes and purpose. Use bold (**text**) for important terms and concepts. Keep it informative but concise.
+- "topics": An array of 4-8 key topics/tags covered in the document. Each should be a short phrase (1-4 words). Focus on the most important themes.
+
+The summary should help users quickly understand what this source is about and how it relates to their research.
+Respond ONLY with the JSON object, no other text.`;
+
+    const userPrompt = `Analyze this document and generate a source guide:\n\n${content}`;
+
+    const togetherResponse = await fetch("https://api.together.xyz/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: env.FAST_LLM,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 2048,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!togetherResponse.ok) {
+      const errorText = await togetherResponse.text();
+      throw new Error(`Together AI API error: ${togetherResponse.status} ${errorText}`);
+    }
+
+    const togetherData = await togetherResponse.json();
+    const text = togetherData.choices?.[0]?.message?.content || "";
+
+    // Parse the response
+    let summary: string;
+    let topics: string[];
+
+    try {
+      // Try to extract JSON if wrapped in markdown code blocks
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
+      const parsed = JSON.parse(jsonStr);
+      summary = parsed.summary || "";
+      topics = Array.isArray(parsed.topics) ? parsed.topics : [];
+    } catch {
+      // Fallback: use the raw text as summary, no topics
+      summary = text.slice(0, 500);
+      topics = [];
+    }
+
+    const sourceGuide = {
+      summary,
+      topics,
+      generatedAt: Date.now(),
+    };
+
+    // Store in database
+    await ctx.runMutation(internal.documents.internal.patch, {
+      documentId,
+      patch: { sourceGuide },
+    });
+
+    return sourceGuide;
   },
 });
 

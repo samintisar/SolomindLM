@@ -12,7 +12,9 @@ import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
 // call and returns a structured result.
 
 export interface ChatAgentInvoker {
-  invoke(context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }): Promise<{
+  invoke(
+    context: ChatAgentContext & { sourcePolicy?: import("../types").SourcePolicyConfig }
+  ): Promise<{
     answer: string;
     citations: string[];
     subQueries: string[];
@@ -51,13 +53,8 @@ function validateFixture(fixture: EvalFixture): string[] {
   }
   if (!Array.isArray(fixture.expectedItems)) {
     errors.push("expectedItems must be an array");
-  } else if (
-    fixture.expectedItems.length === 0 &&
-    !fixture.expectedAnswer?.trim()
-  ) {
-    errors.push(
-      "Fixture must have at least one expectedItem or a non-empty expectedAnswer",
-    );
+  } else if (fixture.expectedItems.length === 0 && !fixture.expectedAnswer?.trim()) {
+    errors.push("Fixture must have at least one expectedItem or a non-empty expectedAnswer");
   }
 
   return errors;
@@ -109,7 +106,7 @@ export async function runChatEval(
   if (!invoker) {
     throw new Error(
       "No ChatAgentInvoker provided for real run. " +
-      "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
+        "Use --dry-run to validate fixtures, or provide an invoker to run against real agents."
     );
   }
 

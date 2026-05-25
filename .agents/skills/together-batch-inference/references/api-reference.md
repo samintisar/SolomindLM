@@ -1,4 +1,5 @@
 # Batch Inference API Reference
+
 ## Contents
 
 - [Endpoints](#endpoints)
@@ -15,15 +16,14 @@
 - [Error Codes](#error-codes)
 - [CLI Commands](#cli-commands)
 
-
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST /batches` | Create batch | Submit a new batch job |
-| `GET /batches` | List batches | List all batch jobs |
-| `GET /batches/{id}` | Get batch | Get batch details |
-| `POST /batches/{id}/cancel` | Cancel batch | Cancel a batch job |
+| Method                      | Path         | Description            |
+| --------------------------- | ------------ | ---------------------- |
+| `POST /batches`             | Create batch | Submit a new batch job |
+| `GET /batches`              | List batches | List all batch jobs    |
+| `GET /batches/{id}`         | Get batch    | Get batch details      |
+| `POST /batches/{id}/cancel` | Cancel batch | Cancel a batch job     |
 
 Base URL: `https://api.together.xyz/v1`
 Authentication: `Authorization: Bearer $TOGETHER_API_KEY`
@@ -33,7 +33,14 @@ Authentication: `Authorization: Bearer $TOGETHER_API_KEY`
 Each line is a JSON object with two required fields:
 
 ```json
-{"custom_id": "request-1", "body": {"model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 200}}
+{
+  "custom_id": "request-1",
+  "body": {
+    "model": "Qwen/Qwen2.5-7B-Instruct-Turbo",
+    "messages": [{ "role": "user", "content": "Hello" }],
+    "max_tokens": 200
+  }
+}
 ```
 
 - `custom_id` (string, required): Unique identifier for tracking (max 64 chars)
@@ -44,7 +51,25 @@ Each line is a JSON object with two required fields:
 Each line in the output file is a JSON object keyed by `custom_id`:
 
 ```json
-{"custom_id": "request-1", "response": {"status_code": 200, "body": {"id": "...", "object": "chat.completion", "model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 12, "completion_tokens": 3, "total_tokens": 15}}}}
+{
+  "custom_id": "request-1",
+  "response": {
+    "status_code": 200,
+    "body": {
+      "id": "...",
+      "object": "chat.completion",
+      "model": "Qwen/Qwen2.5-7B-Instruct-Turbo",
+      "choices": [
+        {
+          "index": 0,
+          "message": { "role": "assistant", "content": "Hello!" },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": { "prompt_tokens": 12, "completion_tokens": 3, "total_tokens": 15 }
+    }
+  }
+}
 ```
 
 To extract the assistant's reply from a result line:
@@ -57,43 +82,43 @@ content = (
 
 ## Create Batch Request
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `endpoint` | string | Yes | API endpoint (`/v1/chat/completions`) |
-| `input_file_id` | string | Yes | ID of the uploaded input file |
-| `completion_window` | string | No | Time window for completion (default: `24h`) |
-| `priority` | integer | No | Priority for batch processing |
-| `model_id` | string | No | Model to use for processing |
+| Field               | Type    | Required | Description                                 |
+| ------------------- | ------- | -------- | ------------------------------------------- |
+| `endpoint`          | string  | Yes      | API endpoint (`/v1/chat/completions`)       |
+| `input_file_id`     | string  | Yes      | ID of the uploaded input file               |
+| `completion_window` | string  | No       | Time window for completion (default: `24h`) |
+| `priority`          | integer | No       | Priority for batch processing               |
+| `model_id`          | string  | No       | Model to use for processing                 |
 
 ## Batch Job Object (Response)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (UUID) | Unique batch job identifier |
-| `user_id` | string | Associated user ID |
-| `input_file_id` | string | Input file reference |
-| `file_size_bytes` | integer | Size of input file in bytes |
-| `status` | enum | Job state (see Status table below) |
-| `endpoint` | string | API endpoint used |
-| `progress` | float | Completion percentage (0.0 to 100.0) |
-| `model_id` | string | Model used for processing |
-| `output_file_id` | string | Results file reference (available on COMPLETED) |
-| `error_file_id` | string | Error file reference (available on failure) |
-| `error` | string | Error message (if applicable) |
-| `job_deadline` | datetime | Deadline for completion |
-| `created_at` | datetime | Creation timestamp |
-| `completed_at` | datetime | Completion timestamp |
+| Field             | Type          | Description                                     |
+| ----------------- | ------------- | ----------------------------------------------- |
+| `id`              | string (UUID) | Unique batch job identifier                     |
+| `user_id`         | string        | Associated user ID                              |
+| `input_file_id`   | string        | Input file reference                            |
+| `file_size_bytes` | integer       | Size of input file in bytes                     |
+| `status`          | enum          | Job state (see Status table below)              |
+| `endpoint`        | string        | API endpoint used                               |
+| `progress`        | float         | Completion percentage (0.0 to 100.0)            |
+| `model_id`        | string        | Model used for processing                       |
+| `output_file_id`  | string        | Results file reference (available on COMPLETED) |
+| `error_file_id`   | string        | Error file reference (available on failure)     |
+| `error`           | string        | Error message (if applicable)                   |
+| `job_deadline`    | datetime      | Deadline for completion                         |
+| `created_at`      | datetime      | Creation timestamp                              |
+| `completed_at`    | datetime      | Completion timestamp                            |
 
 ## Batch Job Status
 
-| Status | Description |
-|--------|-------------|
-| `VALIDATING` | Input file being validated |
-| `IN_PROGRESS` | Processing requests |
-| `COMPLETED` | All requests processed |
-| `FAILED` | Processing failed |
-| `EXPIRED` | Job exceeded time limit |
-| `CANCELLED` | User cancelled |
+| Status        | Description                |
+| ------------- | -------------------------- |
+| `VALIDATING`  | Input file being validated |
+| `IN_PROGRESS` | Processing requests        |
+| `COMPLETED`   | All requests processed     |
+| `FAILED`      | Processing failed          |
+| `EXPIRED`     | Job exceeded time limit    |
+| `CANCELLED`   | User cancelled             |
 
 ## Workflow
 
@@ -249,12 +274,12 @@ All serverless models support batch processing — models not listed have no dis
 
 ## Rate Limits
 
-| Limit | Value |
-|-------|-------|
-| Max requests per batch | 50,000 |
-| Max file size | 100MB |
-| Max tokens enqueued per model | 30B |
-| Recommended batch size | 1,000-10,000 |
+| Limit                         | Value        |
+| ----------------------------- | ------------ |
+| Max requests per batch        | 50,000       |
+| Max file size                 | 100MB        |
+| Max tokens enqueued per model | 30B          |
+| Recommended batch size        | 1,000-10,000 |
 
 Batch API rate limits are separate from standard per-model rate limits.
 
@@ -278,13 +303,13 @@ Per-request errors are recorded in a separate file accessible via `error_file_id
 
 ## Error Codes
 
-| Code | Description | Solution |
-|------|-------------|----------|
-| 400 | Invalid request format | Check JSONL syntax and required fields |
-| 401 | Authentication failed | Verify API key |
-| 404 | Batch not found | Check batch ID |
-| 429 | Rate limit exceeded | Reduce request frequency |
-| 500 | Server error | Retry with exponential backoff |
+| Code | Description            | Solution                               |
+| ---- | ---------------------- | -------------------------------------- |
+| 400  | Invalid request format | Check JSONL syntax and required fields |
+| 401  | Authentication failed  | Verify API key                         |
+| 404  | Batch not found        | Check batch ID                         |
+| 429  | Rate limit exceeded    | Reduce request frequency               |
+| 500  | Server error           | Retry with exponential backoff         |
 
 ## CLI Commands
 

@@ -10,7 +10,15 @@ import * as Notebooks from "../_model/notebooks";
 function toNotebookDTO(
   notebook: Pick<
     Doc<"notebooks">,
-    "_id" | "title" | "updatedAt" | "coverColor" | "icon" | "isFeatured" | "folderId" | "createdAt" | "chatSettings"
+    | "_id"
+    | "title"
+    | "updatedAt"
+    | "coverColor"
+    | "icon"
+    | "isFeatured"
+    | "folderId"
+    | "createdAt"
+    | "chatSettings"
   >,
   sourceCount: number,
   options?: { isSharedNotebook?: boolean }
@@ -201,14 +209,10 @@ export const update = mutation({
         instructionMode: v.union(
           v.literal("default"),
           v.literal("learningGuide"),
-          v.literal("custom"),
+          v.literal("custom")
         ),
         customInstructions: v.optional(v.string()),
-        responseLength: v.union(
-          v.literal("default"),
-          v.literal("longer"),
-          v.literal("shorter"),
-        ),
+        responseLength: v.union(v.literal("default"), v.literal("longer"), v.literal("shorter")),
         smartModel: v.optional(v.string()),
       })
     ),

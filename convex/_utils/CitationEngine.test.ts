@@ -117,9 +117,7 @@ describe("CitationEngine", () => {
 
     it("formats APA 7 reference with no year", () => {
       const result = engine.formatReference(noYearCitation, "apa7");
-      expect(result).toBe(
-        "Miller, F. (n.d.). No Year Paper. https://arxiv.org/abs/2401.12348"
-      );
+      expect(result).toBe("Miller, F. (n.d.). No Year Paper. https://arxiv.org/abs/2401.12348");
     });
 
     it("formats APA 7 reference with no authors", () => {
@@ -185,9 +183,7 @@ describe("CitationEngine", () => {
 
     it("formats MLA 9 reference with no year", () => {
       const result = engine.formatReference(noYearCitation, "mla9");
-      expect(result).toBe(
-        'Frank Miller. "No Year Paper." n.d., https://arxiv.org/abs/2401.12348'
-      );
+      expect(result).toBe('Frank Miller. "No Year Paper." n.d., https://arxiv.org/abs/2401.12348');
     });
   });
 
@@ -280,16 +276,12 @@ describe("CitationEngine", () => {
   describe("formatReference - ieee", () => {
     it("formats IEEE reference for single author", () => {
       const result = engine.formatReference(singleAuthorCitation, "ieee", 0);
-      expect(result).toBe(
-        '[1] B. Wilson, "Single Author Paper," arXiv:2401.12346, 2023.'
-      );
+      expect(result).toBe('[1] B. Wilson, "Single Author Paper," arXiv:2401.12346, 2023.');
     });
 
     it("formats IEEE reference for two authors", () => {
       const result = engine.formatReference(mockCitation, "ieee", 1);
-      expect(result).toBe(
-        '[2] J. Smith and A. Jones, "Test Paper Title," arXiv:2401.12345, 2024.'
-      );
+      expect(result).toBe('[2] J. Smith and A. Jones, "Test Paper Title," arXiv:2401.12345, 2024.');
     });
 
     it("formats IEEE reference for three authors", () => {
@@ -301,23 +293,17 @@ describe("CitationEngine", () => {
 
     it("formats IEEE reference for four or more authors", () => {
       const result = engine.formatReference(fourAuthorCitation, "ieee", 3);
-      expect(result).toBe(
-        '[4] F. Miller et al., "Four Author Paper," arXiv:2401.12350, 2021.'
-      );
+      expect(result).toBe('[4] F. Miller et al., "Four Author Paper," arXiv:2401.12350, 2021.');
     });
 
     it("formats IEEE reference with no authors", () => {
       const result = engine.formatReference(noAuthorsCitation, "ieee", 0);
-      expect(result).toBe(
-        '[1] "No Authors Paper," arXiv:2401.12349, 2021.'
-      );
+      expect(result).toBe('[1] "No Authors Paper," arXiv:2401.12349, 2021.');
     });
 
     it("formats IEEE reference with no year", () => {
       const result = engine.formatReference(noYearCitation, "ieee", 0);
-      expect(result).toBe(
-        '[1] F. Miller, "No Year Paper," https://arxiv.org/abs/2401.12348, n.d.'
-      );
+      expect(result).toBe('[1] F. Miller, "No Year Paper," https://arxiv.org/abs/2401.12348, n.d.');
     });
 
     it("throws without index for IEEE", () => {
@@ -350,23 +336,17 @@ describe("CitationEngine", () => {
   describe("formatReference - vancouver", () => {
     it("formats Vancouver reference for single author", () => {
       const result = engine.formatReference(singleAuthorCitation, "vancouver", 0);
-      expect(result).toBe(
-        "1. Wilson B. Single Author Paper. arXiv. 2023;2401.12346."
-      );
+      expect(result).toBe("1. Wilson B. Single Author Paper. arXiv. 2023;2401.12346.");
     });
 
     it("formats Vancouver reference for two authors", () => {
       const result = engine.formatReference(mockCitation, "vancouver", 1);
-      expect(result).toBe(
-        "2. Smith J, Jones A. Test Paper Title. arXiv. 2024;2401.12345."
-      );
+      expect(result).toBe("2. Smith J, Jones A. Test Paper Title. arXiv. 2024;2401.12345.");
     });
 
     it("formats Vancouver reference for three authors", () => {
       const result = engine.formatReference(threeAuthorCitation, "vancouver", 2);
-      expect(result).toBe(
-        "3. Brown C, Lee D, Taylor E. Three Author Paper. 2022;10.1234/multi."
-      );
+      expect(result).toBe("3. Brown C, Lee D, Taylor E. Three Author Paper. 2022;10.1234/multi.");
     });
 
     it("formats Vancouver reference for four or more authors", () => {
@@ -378,16 +358,12 @@ describe("CitationEngine", () => {
 
     it("formats Vancouver reference with no authors", () => {
       const result = engine.formatReference(noAuthorsCitation, "vancouver", 0);
-      expect(result).toBe(
-        "1. No Authors Paper. arXiv. 2021;2401.12349."
-      );
+      expect(result).toBe("1. No Authors Paper. arXiv. 2021;2401.12349.");
     });
 
     it("formats Vancouver reference with no year", () => {
       const result = engine.formatReference(noYearCitation, "vancouver", 0);
-      expect(result).toBe(
-        "1. Miller F. No Year Paper. n.d.;https://arxiv.org/abs/2401.12348."
-      );
+      expect(result).toBe("1. Miller F. No Year Paper. n.d.;https://arxiv.org/abs/2401.12348.");
     });
 
     it("throws without index for Vancouver", () => {
@@ -463,6 +439,243 @@ describe("CitationEngine", () => {
     });
   });
 
+  // ==================== APA 6 ====================
+
+  describe("formatInline - apa6", () => {
+    it("formats APA 6 inline citation for two authors", () => {
+      const result = engine.formatInline(mockCitation, "apa6");
+      expect(result).toBe("(Smith \u0026 Jones, 2024)");
+    });
+
+    it("formats APA 6 inline citation for single author", () => {
+      const result = engine.formatInline(singleAuthorCitation, "apa6");
+      expect(result).toBe("(Wilson, 2023)");
+    });
+
+    it("formats APA 6 inline citation for three or more authors", () => {
+      const result = engine.formatInline(threeAuthorCitation, "apa6");
+      expect(result).toBe("(Brown et al., 2022)");
+    });
+  });
+
+  describe("formatReference - apa6", () => {
+    it("formats APA 6 reference for arXiv with two authors", () => {
+      const result = engine.formatReference(mockCitation, "apa6");
+      expect(result).toBe(
+        "Smith, J., \u0026 Jones, A. (2024). Test Paper Title. arXiv. https://arxiv.org/abs/2401.12345"
+      );
+    });
+
+    it("formats APA 6 reference with DOI", () => {
+      const result = engine.formatReference(threeAuthorCitation, "apa6");
+      expect(result).toBe(
+        "Brown, C., Lee, D., \u0026 Taylor, E. (2022). Three Author Paper. doi:10.1234/multi"
+      );
+    });
+
+    it("formats APA 6 reference with no authors", () => {
+      const result = engine.formatReference(noAuthorsCitation, "apa6");
+      expect(result).toBe(
+        "NoA2021. (2021). No Authors Paper. arXiv. https://arxiv.org/abs/2401.12349"
+      );
+    });
+  });
+
+  // ==================== MLA 8 ====================
+
+  describe("formatInline - mla8", () => {
+    it("formats MLA 8 inline citation for single author", () => {
+      const result = engine.formatInline(singleAuthorCitation, "mla8");
+      expect(result).toBe("(Wilson)");
+    });
+
+    it("formats MLA 8 inline citation for two authors", () => {
+      const result = engine.formatInline(mockCitation, "mla8");
+      expect(result).toBe("(Smith and Jones)");
+    });
+
+    it("formats MLA 8 inline citation for three or more authors", () => {
+      const result = engine.formatInline(threeAuthorCitation, "mla8");
+      expect(result).toBe("(Brown et al.)");
+    });
+  });
+
+  describe("formatReference - mla8", () => {
+    it("formats MLA 8 reference for arXiv with two authors", () => {
+      const result = engine.formatReference(mockCitation, "mla8");
+      expect(result).toBe(
+        'John Smith, and Alice Jones. "Test Paper Title." arXiv, 2024, https://arxiv.org/abs/2401.12345'
+      );
+    });
+
+    it("formats MLA 8 reference for three or more authors", () => {
+      const result = engine.formatReference(threeAuthorCitation, "mla8");
+      expect(result).toBe(
+        'Carol Brown, et al. "Three Author Paper." 2022, https://doi.org/10.1234/multi'
+      );
+    });
+  });
+
+  // ==================== Chicago 17 Notes ====================
+
+  describe("formatInline - chicago17_notes", () => {
+    it("formats Chicago 17 Notes inline citation with index", () => {
+      const result = engine.formatInline(mockCitation, "chicago17_notes", 0);
+      expect(result).toBe("\u00b9");
+    });
+
+    it("formats Chicago 17 Notes inline citation with different index", () => {
+      const result = engine.formatInline(mockCitation, "chicago17_notes", 2);
+      expect(result).toBe("\u00b3");
+    });
+
+    it("throws without index for Chicago 17 Notes", () => {
+      expect(() => engine.formatInline(mockCitation, "chicago17_notes")).toThrow(
+        "Chicago 17 Notes inline citations require an index parameter"
+      );
+    });
+  });
+
+  describe("formatReference - chicago17_notes", () => {
+    it("formats Chicago 17 Notes reference for arXiv with two authors", () => {
+      const result = engine.formatReference(mockCitation, "chicago17_notes");
+      expect(result).toBe(
+        'John Smith, and Alice Jones, "Test Paper Title," arXiv, 2024, https://arxiv.org/abs/2401.12345.'
+      );
+    });
+
+    it("formats Chicago 17 Notes reference for single author", () => {
+      const result = engine.formatReference(singleAuthorCitation, "chicago17_notes");
+      expect(result).toBe(
+        'Bob Wilson, "Single Author Paper," arXiv, 2023, https://arxiv.org/abs/2401.12346.'
+      );
+    });
+
+    it("formats Chicago 17 Notes reference with no authors", () => {
+      const result = engine.formatReference(noAuthorsCitation, "chicago17_notes");
+      expect(result).toBe(
+        'NoA2021, "No Authors Paper," arXiv, 2021, https://arxiv.org/abs/2401.12349.'
+      );
+    });
+  });
+
+  // ==================== AMA 11 ====================
+
+  describe("formatInline - ama11", () => {
+    it("formats AMA 11 inline citation with index", () => {
+      const result = engine.formatInline(mockCitation, "ama11", 0);
+      expect(result).toBe("\u00b9");
+    });
+
+    it("formats AMA 11 inline citation with different index", () => {
+      const result = engine.formatInline(mockCitation, "ama11", 2);
+      expect(result).toBe("\u00b3");
+    });
+
+    it("throws without index for AMA 11", () => {
+      expect(() => engine.formatInline(mockCitation, "ama11")).toThrow(
+        "AMA 11 inline citations require an index parameter"
+      );
+    });
+  });
+
+  describe("formatReference - ama11", () => {
+    it("formats AMA 11 reference for single author", () => {
+      const result = engine.formatReference(singleAuthorCitation, "ama11", 0);
+      expect(result).toBe(
+        "1. Wilson B. Single Author Paper. arXiv. 2023. https://arxiv.org/abs/2401.12346."
+      );
+    });
+
+    it("formats AMA 11 reference for two authors", () => {
+      const result = engine.formatReference(mockCitation, "ama11", 1);
+      expect(result).toBe(
+        "2. Smith J, Jones A. Test Paper Title. arXiv. 2024. https://arxiv.org/abs/2401.12345."
+      );
+    });
+
+    it("formats AMA 11 reference for three authors", () => {
+      const result = engine.formatReference(threeAuthorCitation, "ama11", 2);
+      expect(result).toBe(
+        "3. Brown C, Lee D, Taylor E. Three Author Paper. 2022. doi:10.1234/multi."
+      );
+    });
+
+    it("throws without index for AMA 11", () => {
+      expect(() => engine.formatReference(mockCitation, "ama11")).toThrow(
+        "AMA 11 references require an index parameter"
+      );
+    });
+  });
+
+  // ==================== AMA 10 ====================
+
+  describe("formatInline - ama10", () => {
+    it("formats AMA 10 inline citation with index", () => {
+      const result = engine.formatInline(mockCitation, "ama10", 0);
+      expect(result).toBe("\u00b9");
+    });
+
+    it("throws without index for AMA 10", () => {
+      expect(() => engine.formatInline(mockCitation, "ama10")).toThrow(
+        "AMA 10 inline citations require an index parameter"
+      );
+    });
+  });
+
+  describe("formatReference - ama10", () => {
+    it("formats AMA 10 reference for single author", () => {
+      const result = engine.formatReference(singleAuthorCitation, "ama10", 0);
+      expect(result).toBe(
+        "1. Wilson B. Single Author Paper. arXiv. 2023. https://arxiv.org/abs/2401.12346."
+      );
+    });
+
+    it("formats AMA 10 reference for two authors", () => {
+      const result = engine.formatReference(mockCitation, "ama10", 1);
+      expect(result).toBe(
+        "2. Smith J., Jones A. Test Paper Title. arXiv. 2024. https://arxiv.org/abs/2401.12345."
+      );
+    });
+  });
+
+  // ==================== ACS ====================
+
+  describe("formatInline - acs", () => {
+    it("formats ACS inline citation with index", () => {
+      const result = engine.formatInline(mockCitation, "acs", 0);
+      expect(result).toBe("\u00b9");
+    });
+
+    it("throws without index for ACS", () => {
+      expect(() => engine.formatInline(mockCitation, "acs")).toThrow(
+        "ACS inline citations require an index parameter"
+      );
+    });
+  });
+
+  describe("formatReference - acs", () => {
+    it("formats ACS reference for single author", () => {
+      const result = engine.formatReference(singleAuthorCitation, "acs", 0);
+      expect(result).toBe(
+        "1. Wilson, B. Single Author Paper. arXiv. 2023. https://arxiv.org/abs/2401.12346."
+      );
+    });
+
+    it("formats ACS reference for two authors", () => {
+      const result = engine.formatReference(mockCitation, "acs", 1);
+      expect(result).toBe(
+        "2. Smith, J.; Jones, A. Test Paper Title. arXiv. 2024. https://arxiv.org/abs/2401.12345."
+      );
+    });
+
+    it("throws without index for ACS", () => {
+      expect(() => engine.formatReference(mockCitation, "acs")).toThrow(
+        "ACS references require an index parameter"
+      );
+    });
+  });
+
   // ==================== generateReferenceList ====================
 
   describe("generateReferenceList", () => {
@@ -471,8 +684,8 @@ describe("CitationEngine", () => {
       const result = engine.generateReferenceList(citations, "apa7");
       expect(result).toBe(
         "Brown, C., Lee, D., \u0026 Taylor, E. (2022). Three Author Paper. https://doi.org/10.1234/multi\n\n" +
-        "Smith, J., \u0026 Jones, A. (2024). Test Paper Title. arXiv. https://arxiv.org/abs/2401.12345\n\n" +
-        "Wilson, B. (2023). Single Author Paper. arXiv. https://arxiv.org/abs/2401.12346"
+          "Smith, J., \u0026 Jones, A. (2024). Test Paper Title. arXiv. https://arxiv.org/abs/2401.12345\n\n" +
+          "Wilson, B. (2023). Single Author Paper. arXiv. https://arxiv.org/abs/2401.12346"
       );
     });
 
@@ -481,8 +694,8 @@ describe("CitationEngine", () => {
       const result = engine.generateReferenceList(citations, "mla9");
       expect(result).toBe(
         'Carol Brown, et al. "Three Author Paper." 2022, https://doi.org/10.1234/multi\n\n' +
-        'John Smith, and Alice Jones. "Test Paper Title." arXiv, 2024, https://arxiv.org/abs/2401.12345\n\n' +
-        'Bob Wilson. "Single Author Paper." arXiv, 2023, https://arxiv.org/abs/2401.12346'
+          'John Smith, and Alice Jones. "Test Paper Title." arXiv, 2024, https://arxiv.org/abs/2401.12345\n\n' +
+          'Bob Wilson. "Single Author Paper." arXiv, 2023, https://arxiv.org/abs/2401.12346'
       );
     });
 
@@ -491,8 +704,8 @@ describe("CitationEngine", () => {
       const result = engine.generateReferenceList(citations, "chicago17");
       expect(result).toBe(
         'Carol Brown, David Lee, and Eve Taylor. 2022. "Three Author Paper." https://doi.org/10.1234/multi\n\n' +
-        'John Smith, and Alice Jones. 2024. "Test Paper Title." arXiv. https://arxiv.org/abs/2401.12345\n\n' +
-        'Bob Wilson. 2023. "Single Author Paper." arXiv. https://arxiv.org/abs/2401.12346'
+          'John Smith, and Alice Jones. 2024. "Test Paper Title." arXiv. https://arxiv.org/abs/2401.12345\n\n' +
+          'Bob Wilson. 2023. "Single Author Paper." arXiv. https://arxiv.org/abs/2401.12346'
       );
     });
 
@@ -501,8 +714,8 @@ describe("CitationEngine", () => {
       const result = engine.generateReferenceList(citations, "ieee");
       expect(result).toBe(
         '[1] C. Brown, D. Lee, and E. Taylor, "Three Author Paper," doi:10.1234/multi, 2022.\n\n' +
-        '[2] J. Smith and A. Jones, "Test Paper Title," arXiv:2401.12345, 2024.\n\n' +
-        '[3] B. Wilson, "Single Author Paper," arXiv:2401.12346, 2023.'
+          '[2] J. Smith and A. Jones, "Test Paper Title," arXiv:2401.12345, 2024.\n\n' +
+          '[3] B. Wilson, "Single Author Paper," arXiv:2401.12346, 2023.'
       );
     });
 
@@ -510,9 +723,9 @@ describe("CitationEngine", () => {
       const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
       const result = engine.generateReferenceList(citations, "vancouver");
       expect(result).toBe(
-        '1. Brown C, Lee D, Taylor E. Three Author Paper. 2022;10.1234/multi.\n\n' +
-        '2. Smith J, Jones A. Test Paper Title. arXiv. 2024;2401.12345.\n\n' +
-        '3. Wilson B. Single Author Paper. arXiv. 2023;2401.12346.'
+        "1. Brown C, Lee D, Taylor E. Three Author Paper. 2022;10.1234/multi.\n\n" +
+          "2. Smith J, Jones A. Test Paper Title. arXiv. 2024;2401.12345.\n\n" +
+          "3. Wilson B. Single Author Paper. arXiv. 2023;2401.12346."
       );
     });
 
@@ -521,8 +734,68 @@ describe("CitationEngine", () => {
       const result = engine.generateReferenceList(citations, "harvard");
       expect(result).toBe(
         "Brown, C. et al. (2022) 'Three Author Paper', Available at: https://doi.org/10.1234/multi\n\n" +
-        "Smith, J. and Jones, A. (2024) 'Test Paper Title', arXiv. Available at: https://arxiv.org/abs/2401.12345\n\n" +
-        "Wilson, B. (2023) 'Single Author Paper', arXiv. Available at: https://arxiv.org/abs/2401.12346"
+          "Smith, J. and Jones, A. (2024) 'Test Paper Title', arXiv. Available at: https://arxiv.org/abs/2401.12345\n\n" +
+          "Wilson, B. (2023) 'Single Author Paper', arXiv. Available at: https://arxiv.org/abs/2401.12346"
+      );
+    });
+
+    it("generates sorted APA 6 reference list", () => {
+      const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
+      const result = engine.generateReferenceList(citations, "apa6");
+      expect(result).toBe(
+        "Brown, C., Lee, D., \u0026 Taylor, E. (2022). Three Author Paper. doi:10.1234/multi\n\n" +
+          "Smith, J., \u0026 Jones, A. (2024). Test Paper Title. arXiv. https://arxiv.org/abs/2401.12345\n\n" +
+          "Wilson, B. (2023). Single Author Paper. arXiv. https://arxiv.org/abs/2401.12346"
+      );
+    });
+
+    it("generates sorted MLA 8 reference list", () => {
+      const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
+      const result = engine.generateReferenceList(citations, "mla8");
+      expect(result).toBe(
+        'Carol Brown, et al. "Three Author Paper." 2022, https://doi.org/10.1234/multi\n\n' +
+          'John Smith, and Alice Jones. "Test Paper Title." arXiv, 2024, https://arxiv.org/abs/2401.12345\n\n' +
+          'Bob Wilson. "Single Author Paper." arXiv, 2023, https://arxiv.org/abs/2401.12346'
+      );
+    });
+
+    it("generates sorted Chicago 17 Notes reference list", () => {
+      const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
+      const result = engine.generateReferenceList(citations, "chicago17_notes");
+      expect(result).toBe(
+        'Carol Brown, David Lee, and Eve Taylor, "Three Author Paper," 2022, https://doi.org/10.1234/multi.\n\n' +
+          'John Smith, and Alice Jones, "Test Paper Title," arXiv, 2024, https://arxiv.org/abs/2401.12345.\n\n' +
+          'Bob Wilson, "Single Author Paper," arXiv, 2023, https://arxiv.org/abs/2401.12346.'
+      );
+    });
+
+    it("generates sequentially numbered AMA 11 reference list", () => {
+      const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
+      const result = engine.generateReferenceList(citations, "ama11");
+      expect(result).toBe(
+        "1. Brown C, Lee D, Taylor E. Three Author Paper. 2022. doi:10.1234/multi.\n\n" +
+          "2. Smith J, Jones A. Test Paper Title. arXiv. 2024. https://arxiv.org/abs/2401.12345.\n\n" +
+          "3. Wilson B. Single Author Paper. arXiv. 2023. https://arxiv.org/abs/2401.12346."
+      );
+    });
+
+    it("generates sequentially numbered AMA 10 reference list", () => {
+      const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
+      const result = engine.generateReferenceList(citations, "ama10");
+      expect(result).toBe(
+        "1. Brown C., Lee D., Taylor E. Three Author Paper. 2022. doi:10.1234/multi.\n\n" +
+          "2. Smith J., Jones A. Test Paper Title. arXiv. 2024. https://arxiv.org/abs/2401.12345.\n\n" +
+          "3. Wilson B. Single Author Paper. arXiv. 2023. https://arxiv.org/abs/2401.12346."
+      );
+    });
+
+    it("generates sequentially numbered ACS reference list", () => {
+      const citations = [threeAuthorCitation, mockCitation, singleAuthorCitation];
+      const result = engine.generateReferenceList(citations, "acs");
+      expect(result).toBe(
+        "1. Brown, C.; Lee, D.; Taylor, E. Three Author Paper. 2022. doi:10.1234/multi.\n\n" +
+          "2. Smith, J.; Jones, A. Test Paper Title. arXiv. 2024. https://arxiv.org/abs/2401.12345.\n\n" +
+          "3. Wilson, B. Single Author Paper. arXiv. 2023. https://arxiv.org/abs/2401.12346."
       );
     });
 
@@ -532,7 +805,9 @@ describe("CitationEngine", () => {
     });
 
     it("throws for unsupported style", () => {
-      expect(() => engine.generateReferenceList([mockCitation], "invalid")).toThrow("Unsupported citation style");
+      expect(() => engine.generateReferenceList([mockCitation], "invalid")).toThrow(
+        "Unsupported citation style"
+      );
     });
   });
 
@@ -563,13 +838,13 @@ describe("CitationEngine", () => {
       const keys = new Set<string>();
       keys.add("Smith2024");
       const key = generateCitationKey(mockCitation, keys);
-      expect(key).toBe("Smith2024a");
+      expect(key).toBe("Smith2024_1");
     });
 
     it("increments suffix for multiple duplicates", () => {
-      const keys = new Set<string>(["Smith2024", "Smith2024a"]);
+      const keys = new Set<string>(["Smith2024", "Smith2024_1"]);
       const key = generateCitationKey(mockCitation, keys);
-      expect(key).toBe("Smith2024b");
+      expect(key).toBe("Smith2024_2");
     });
 
     it("generates key without year when year is missing", () => {

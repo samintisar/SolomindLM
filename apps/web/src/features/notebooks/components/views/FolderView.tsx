@@ -295,7 +295,10 @@ export const FolderView: React.FC<FolderViewProps> = ({ folderId, viewMode: init
               } catch (error) {
                 console.error("Failed to create notebook:", error);
                 const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                if (errorMessage.includes("Unauthorized") || errorMessage.includes("Unauthenticated")) {
+                if (
+                  errorMessage.includes("Unauthorized") ||
+                  errorMessage.includes("Unauthenticated")
+                ) {
                   notebookHandlers.closeCustomize();
                   if (onRequireAuth) onRequireAuth("You need to sign in to create a notebook.");
                 }

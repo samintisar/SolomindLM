@@ -12,28 +12,29 @@
 
 ## File Map
 
-| File | Action | Responsibility |
-|------|--------|----------------|
-| `convex/_services/search/FirecrawlSearchService.ts` | **Create** | Firecrawl `/search` for web/news/finance discovery |
-| `convex/_services/search/AcademicSearchService.ts` | **Create** | arXiv + Semantic Scholar + PubMed academic discovery |
-| `convex/_services/extraction/WebLoaderService.ts` | **Create** | Firecrawl scrape/crawl/map + Supadata social transcripts |
-| `convex/_services/extraction/AcademicLoaderService.ts` | **Create** | PDF download → Mistral OCR → text; abstract fallback |
-| `convex/_services/search/DiscoveryService.ts` | **Modify** | Wire new search services, update transforms |
-| `convex/chat/stream.ts` | **Modify** | Replace Tavily call with FirecrawlSearchService |
-| `convex/documents/embeddingJob.ts` | **Modify** | Replace SupadataLoaderService with WebLoaderService + AcademicLoaderService |
-| `convex/_services/extractors.ts` | **Modify** | Replace scrapeUrl/getYouTubeTranscript with WebLoaderService |
-| `convex/_lib/env.ts` | **Modify** | Add FIRECRAWL_API_KEY, SEMANTIC_SCHOLAR_API_KEY, PUBMED_EMAIL; remove TAVILY_API_KEY, OPENALEX_BASE_URL |
-| `package.json` | **Modify** | Add `@mendable/firecrawl-js` |
-| `convex/_services/search/TavilySearchService.ts` | **Delete** | Replaced by FirecrawlSearchService |
-| `convex/_services/search/OpenAlexSearchService.ts` | **Delete** | Replaced by AcademicSearchService |
-| `convex/_services/extraction/SupadataLoaderService.ts` | **Delete** | Replaced by WebLoaderService |
-| `convex/_lib/resolveOpenAlexSourceUrl.ts` | **Delete** | No longer needed (OpenAlex removed) |
+| File                                                   | Action     | Responsibility                                                                                          |
+| ------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `convex/_services/search/FirecrawlSearchService.ts`    | **Create** | Firecrawl `/search` for web/news/finance discovery                                                      |
+| `convex/_services/search/AcademicSearchService.ts`     | **Create** | arXiv + Semantic Scholar + PubMed academic discovery                                                    |
+| `convex/_services/extraction/WebLoaderService.ts`      | **Create** | Firecrawl scrape/crawl/map + Supadata social transcripts                                                |
+| `convex/_services/extraction/AcademicLoaderService.ts` | **Create** | PDF download → Mistral OCR → text; abstract fallback                                                    |
+| `convex/_services/search/DiscoveryService.ts`          | **Modify** | Wire new search services, update transforms                                                             |
+| `convex/chat/stream.ts`                                | **Modify** | Replace Tavily call with FirecrawlSearchService                                                         |
+| `convex/documents/embeddingJob.ts`                     | **Modify** | Replace SupadataLoaderService with WebLoaderService + AcademicLoaderService                             |
+| `convex/_services/extractors.ts`                       | **Modify** | Replace scrapeUrl/getYouTubeTranscript with WebLoaderService                                            |
+| `convex/_lib/env.ts`                                   | **Modify** | Add FIRECRAWL_API_KEY, SEMANTIC_SCHOLAR_API_KEY, PUBMED_EMAIL; remove TAVILY_API_KEY, OPENALEX_BASE_URL |
+| `package.json`                                         | **Modify** | Add `@mendable/firecrawl-js`                                                                            |
+| `convex/_services/search/TavilySearchService.ts`       | **Delete** | Replaced by FirecrawlSearchService                                                                      |
+| `convex/_services/search/OpenAlexSearchService.ts`     | **Delete** | Replaced by AcademicSearchService                                                                       |
+| `convex/_services/extraction/SupadataLoaderService.ts` | **Delete** | Replaced by WebLoaderService                                                                            |
+| `convex/_lib/resolveOpenAlexSourceUrl.ts`              | **Delete** | No longer needed (OpenAlex removed)                                                                     |
 
 ---
 
 ## Task 1: Add Firecrawl Dependency and Environment Variables
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `convex/_lib/env.ts`
 
@@ -69,6 +70,7 @@ Replace the Tavily and OpenAlex entries with Firecrawl and academic API entries:
 ```
 
 Remove these lines entirely:
+
 ```typescript
   // Tavily (web search)
   TAVILY_API_KEY: process.env.TAVILY_API_KEY || "",
@@ -91,6 +93,7 @@ git commit -m "chore: add firecrawl dependency and env vars, remove tavily/opena
 ## Task 2: Create FirecrawlSearchService
 
 **Files:**
+
 - Create: `convex/_services/search/FirecrawlSearchService.ts`
 
 - [ ] **Step 1: Write `FirecrawlSearchService.ts`**
@@ -171,8 +174,7 @@ export const searchInternal = internalAction({
     const firecrawl = new FirecrawlApp({ apiKey });
 
     // Map topic to Firecrawl sources filter
-    const sources: string[] | undefined =
-      topic === "news" ? ["news"] : undefined;
+    const sources: string[] | undefined = topic === "news" ? ["news"] : undefined;
 
     // Map timeRange to Google tbs parameter
     const tbsMap: Record<string, string> = {
@@ -219,17 +221,15 @@ export const searchInternal = internalAction({
         };
       }, "firecrawl_search");
 
-      let sourcesList: DiscoveredSource[] = (data.data?.web || []).map(
-        (result: any) => ({
-          title: result.title || "Untitled",
-          url: result.url || "",
-          snippet: result.snippet || "",
-          score: result.score || 0,
-          publishedDate: result.publishedDate,
-          domain: result.domain || (result.url ? new URL(result.url).hostname : undefined),
-          rawContent: result.rawContent || undefined,
-        })
-      );
+      let sourcesList: DiscoveredSource[] = (data.data?.web || []).map((result: any) => ({
+        title: result.title || "Untitled",
+        url: result.url || "",
+        snippet: result.snippet || "",
+        score: result.score || 0,
+        publishedDate: result.publishedDate,
+        domain: result.domain || (result.url ? new URL(result.url).hostname : undefined),
+        rawContent: result.rawContent || undefined,
+      }));
 
       sourcesList = sourcesList.filter((source) => source.score >= scoreThreshold);
       sourcesList.sort((a, b) => b.score - a.score);
@@ -327,6 +327,7 @@ git commit -m "feat: add FirecrawlSearchService for web/news/finance discovery"
 ## Task 3: Create AcademicSearchService
 
 **Files:**
+
 - Create: `convex/_services/search/AcademicSearchService.ts`
 
 - [ ] **Step 1: Write `AcademicSearchService.ts`**
@@ -393,7 +394,10 @@ function extractAllTags(xml: string, tag: string): string[] {
 }
 
 function stripXmlTags(text: string): string {
-  return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function sleepMs(ms: number): Promise<void> {
@@ -420,7 +424,12 @@ async function searchArxiv(
       headers: { "User-Agent": "SolomindLM/1.0 (mailto:support@solomindlm.com)" },
     });
     if (!response.ok) {
-      throw createExternalServiceErrorFromResponse("arxiv", response.status, "/api/query", await response.text());
+      throw createExternalServiceErrorFromResponse(
+        "arxiv",
+        response.status,
+        "/api/query",
+        await response.text()
+      );
     }
 
     const xml = await response.text();
@@ -434,9 +443,7 @@ async function searchArxiv(
 
       // Extract authors
       const authorXmls = extractAllTags(entryXml, "author");
-      const authors = authorXmls
-        .map((a) => extractTag(a, "name"))
-        .filter(Boolean) as string[];
+      const authors = authorXmls.map((a) => extractTag(a, "name")).filter(Boolean) as string[];
 
       // Extract PDF link
       const linkMatches = entryXml.match(/<link[^>]*href="([^"]*)"[^>]*\/>/g) || [];
@@ -455,7 +462,8 @@ async function searchArxiv(
         }
       }
 
-      const url = articleUrl || pdfUrl || `https://arxiv.org/abs/${extractTag(entryXml, "id") || ""}`;
+      const url =
+        articleUrl || pdfUrl || `https://arxiv.org/abs/${extractTag(entryXml, "id") || ""}`;
 
       return {
         title,
@@ -468,7 +476,9 @@ async function searchArxiv(
       };
     });
   } catch (error) {
-    logger.warn("arXiv search failed", { message: error instanceof Error ? error.message : String(error) });
+    logger.warn("arXiv search failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
@@ -493,7 +503,12 @@ async function searchSemanticScholar(
   try {
     const response = await fetch(url, { headers });
     if (!response.ok) {
-      throw createExternalServiceErrorFromResponse("semantic_scholar", response.status, "/paper/search", await response.text());
+      throw createExternalServiceErrorFromResponse(
+        "semantic_scholar",
+        response.status,
+        "/paper/search",
+        await response.text()
+      );
     }
 
     const data = (await response.json()) as {
@@ -521,7 +536,9 @@ async function searchSemanticScholar(
       doi: paper.externalIds?.DOI,
     }));
   } catch (error) {
-    logger.warn("Semantic Scholar search failed", { message: error instanceof Error ? error.message : String(error) });
+    logger.warn("Semantic Scholar search failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
@@ -543,7 +560,12 @@ async function searchPubMed(
     const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${encodeURIComponent(query)}&retmax=${maxResults}&sort=relevance${baseParams}`;
     const searchResponse = await fetch(searchUrl);
     if (!searchResponse.ok) {
-      throw createExternalServiceErrorFromResponse("pubmed", searchResponse.status, "/esearch", await searchResponse.text());
+      throw createExternalServiceErrorFromResponse(
+        "pubmed",
+        searchResponse.status,
+        "/esearch",
+        await searchResponse.text()
+      );
     }
     const searchXml = await searchResponse.text();
     const ids = extractAllTags(searchXml, "Id");
@@ -554,7 +576,12 @@ async function searchPubMed(
     const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=${ids.join(",")}&rettype=xml${baseParams}`;
     const fetchResponse = await fetch(fetchUrl);
     if (!fetchResponse.ok) {
-      throw createExternalServiceErrorFromResponse("pubmed", fetchResponse.status, "/efetch", await fetchResponse.text());
+      throw createExternalServiceErrorFromResponse(
+        "pubmed",
+        fetchResponse.status,
+        "/efetch",
+        await fetchResponse.text()
+      );
     }
     const fetchXml = await fetchResponse.text();
 
@@ -574,11 +601,13 @@ async function searchPubMed(
       // Authors
       const contribGroup = extractTag(meta, "contrib-group") || "";
       const nameTags = extractAllTags(contribGroup, "name");
-      const authors = nameTags.map((nameXml) => {
-        const surname = extractTag(nameXml, "surname") || "";
-        const given = extractTag(nameXml, "given-names") || "";
-        return `${given} ${surname}`.trim();
-      }).filter(Boolean);
+      const authors = nameTags
+        .map((nameXml) => {
+          const surname = extractTag(nameXml, "surname") || "";
+          const given = extractTag(nameXml, "given-names") || "";
+          return `${given} ${surname}`.trim();
+        })
+        .filter(Boolean);
 
       // Year from pub-date
       const pubDate = extractTag(meta, "pub-date") || "";
@@ -612,7 +641,9 @@ async function searchPubMed(
       };
     });
   } catch (error) {
-    logger.warn("PubMed search failed", { message: error instanceof Error ? error.message : String(error) });
+    logger.warn("PubMed search failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
@@ -762,7 +793,7 @@ export const discoverAcademicPapersInternal = internalAction({
         title: paper.title,
         url: paper.url,
         snippet: paper.abstract.substring(0, 500),
-        score: ((paper.citationCount ?? 0) * 0.001) + ((paper.year ?? 2000) * 0.0001),
+        score: (paper.citationCount ?? 0) * 0.001 + (paper.year ?? 2000) * 0.0001,
         publishedDate: paper.year ? String(paper.year) : undefined,
         rawContent: paper.abstract,
         metadata: {
@@ -806,6 +837,7 @@ git commit -m "feat: add AcademicSearchService with arXiv, Semantic Scholar, Pub
 ## Task 4: Create WebLoaderService
 
 **Files:**
+
 - Create: `convex/_services/extraction/WebLoaderService.ts`
 
 - [ ] **Step 1: Write `WebLoaderService.ts`**
@@ -846,48 +878,43 @@ export class WebLoaderService {
   // ============================================================
 
   private stripMedia(text: string): string {
-    return (
-      text
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "")
-        .replace(/!\[([^\]]*)\]\[[^\]]+\]/g, "")
-        .replace(/^\s*\[[^\]]+\]:\s*\S+.*$/gm, "")
-        .replace(/<img[^>]*>/gi, "")
-        .replace(/<img[^>]*\/>/gi, "")
-        .replace(/<video[^>]*>.*?<\/video>/gis, "")
-        .replace(/<audio[^>]*>.*?<\/audio>/gis, "")
-        .replace(/<picture[^>]*>.*?<\/picture>/gis, "")
-        .replace(/<source[^>]*>/gi, "")
-        .replace(/<source[^>]*\/>/gi, "")
-        .replace(/<figure[^>]*>(.*?)<\/figure>/gis, (_, content) => {
-          const figcaption = content.match(/<figcaption[^>]*>(.*?)<\/figcaption>/is);
-          return figcaption ? figcaption[1].trim() : "";
-        })
-        .replace(/<iframe[^>]*>.*?<\/iframe>/gis, "")
-        .replace(/<embed[^>]*>/gi, "")
-        .replace(/<embed[^>]*\/>/gi, "")
-        .replace(/<object[^>]*>.*?<\/object>/gis, "")
-        .replace(/<svg[^>]*>.*?<\/svg>/gis, "")
-        .replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
-        .replace(/data:video\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
-        .replace(/data:audio\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
-        .replace(
-          /\[([^\]]*)\]\([^)]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)[^)]*\)/gi,
-          ""
-        )
-        .replace(
-          /\[?https?:\/\/[^\s\]]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico)(\?[^\]\s]*)?\]?/gi,
-          ""
-        )
-        .replace(
-          /https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)(\?[^\s]*)?\b/gi,
-          ""
-        )
-        .replace(/\b\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, "")
-        .replace(/[^\s]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, "")
-        .replace(/\n\s*\n\s*\n+/g, "\n\n")
-        .replace(/^\s+|\s+$/g, "")
-        .trim()
-    );
+    return text
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, "")
+      .replace(/!\[([^\]]*)\]\[[^\]]+\]/g, "")
+      .replace(/^\s*\[[^\]]+\]:\s*\S+.*$/gm, "")
+      .replace(/<img[^>]*>/gi, "")
+      .replace(/<img[^>]*\/>/gi, "")
+      .replace(/<video[^>]*>.*?<\/video>/gis, "")
+      .replace(/<audio[^>]*>.*?<\/audio>/gis, "")
+      .replace(/<picture[^>]*>.*?<\/picture>/gis, "")
+      .replace(/<source[^>]*>/gi, "")
+      .replace(/<source[^>]*\/>/gi, "")
+      .replace(/<figure[^>]*>(.*?)<\/figure>/gis, (_, content) => {
+        const figcaption = content.match(/<figcaption[^>]*>(.*?)<\/figcaption>/is);
+        return figcaption ? figcaption[1].trim() : "";
+      })
+      .replace(/<iframe[^>]*>.*?<\/iframe>/gis, "")
+      .replace(/<embed[^>]*>/gi, "")
+      .replace(/<embed[^>]*\/>/gi, "")
+      .replace(/<object[^>]*>.*?<\/object>/gis, "")
+      .replace(/<svg[^>]*>.*?<\/svg>/gis, "")
+      .replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
+      .replace(/data:video\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
+      .replace(/data:audio\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, "")
+      .replace(
+        /\[([^\]]*)\]\([^)]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)[^)]*\)/gi,
+        ""
+      )
+      .replace(/\[?https?:\/\/[^\s\]]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico)(\?[^\]\s]*)?\]?/gi, "")
+      .replace(
+        /https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg|pdf)(\?[^\s]*)?\b/gi,
+        ""
+      )
+      .replace(/\b\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, "")
+      .replace(/[^\s]*\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|mp4|webm|mov|avi|mp3|wav|ogg)\b/gi, "")
+      .replace(/\n\s*\n\s*\n+/g, "\n\n")
+      .replace(/^\s+|\s+$/g, "")
+      .trim();
   }
 
   private stripCookieConsentNoise(text: string): string {
@@ -1037,10 +1064,7 @@ export class WebLoaderService {
     return content;
   }
 
-  async loadSocialTranscriptWithMeta(
-    url: string,
-    lang = "en"
-  ): Promise<TranscriptMeta> {
+  async loadSocialTranscriptWithMeta(url: string, lang = "en"): Promise<TranscriptMeta> {
     const validation = validateUrl(url);
     if (!validation.valid) {
       throw new Error(`Invalid URL: ${validation.error}`);
@@ -1164,6 +1188,7 @@ git commit -m "feat: add WebLoaderService with Firecrawl web + Supadata social t
 ## Task 5: Create AcademicLoaderService
 
 **Files:**
+
 - Create: `convex/_services/extraction/AcademicLoaderService.ts`
 
 - [ ] **Step 1: Write `AcademicLoaderService.ts`**
@@ -1197,7 +1222,9 @@ export class AcademicLoaderService {
     this.webLoader = new WebLoaderService();
   }
 
-  async loadPaper(paper: AcademicPaper): Promise<{ title: string; content: string; source: string }> {
+  async loadPaper(
+    paper: AcademicPaper
+  ): Promise<{ title: string; content: string; source: string }> {
     const logger = createServiceLogger("academic_loader", "loadPaper");
     logger.operationStart({
       title: paper.title.slice(0, 60),
@@ -1214,7 +1241,9 @@ export class AcademicLoaderService {
           return { title: paper.title, content: text, source: paper.source };
         }
       } catch (error) {
-        logger.warn("PDF OCR failed", { message: error instanceof Error ? error.message : String(error) });
+        logger.warn("PDF OCR failed", {
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -1227,16 +1256,14 @@ export class AcademicLoaderService {
           return { title: meta.title || paper.title, content: meta.content, source: paper.source };
         }
       } catch (error) {
-        logger.warn("Web scrape fallback failed", { message: error instanceof Error ? error.message : String(error) });
+        logger.warn("Web scrape fallback failed", {
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
     // 3. Fallback to structured markdown from metadata
-    const lines = [
-      `# ${paper.title}`,
-      "",
-      `**Authors:** ${paper.authors.join(", ") || "Unknown"}`,
-    ];
+    const lines = [`# ${paper.title}`, "", `**Authors:** ${paper.authors.join(", ") || "Unknown"}`];
     if (paper.year) lines.push(`**Year:** ${paper.year}`);
     if (paper.doi) lines.push(`**DOI:** ${paper.doi}`);
     if (paper.citationCount !== undefined) lines.push(`**Citations:** ${paper.citationCount}`);
@@ -1271,6 +1298,7 @@ git commit -m "feat: add AcademicLoaderService for PDF OCR and abstract fallback
 ## Task 6: Update DiscoveryService
 
 **Files:**
+
 - Modify: `convex/_services/search/DiscoveryService.ts`
 
 - [ ] **Step 1: Update imports and transform functions**
@@ -1278,6 +1306,7 @@ git commit -m "feat: add AcademicLoaderService for PDF OCR and abstract fallback
 Replace the Tavily and OpenAlex imports and transforms in `DiscoveryService.ts`:
 
 **Old imports (around lines 1-8):**
+
 ```typescript
 "use node";
 
@@ -1292,6 +1321,7 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 Change `"Normalizes results from different APIs (Tavily, OpenAlex)"` to `"Normalizes results from different APIs (Firecrawl, Academic APIs)"`.
 
 **Replace `transformTavilyResult` (lines 84-101) with `transformWebResult`:**
+
 ```typescript
 /**
  * Transform web search result to unified format
@@ -1317,6 +1347,7 @@ function transformWebResult(
 ```
 
 **Replace `transformOpenAlexResult` (lines 104-130) with `transformAcademicResult`:**
+
 ```typescript
 /**
  * Transform academic search result to unified format
@@ -1350,6 +1381,7 @@ function transformAcademicResult(result: any): UnifiedDiscoveryResult {
 **Replace the Tavily search loop (around lines 261-301):**
 
 Old code:
+
 ```typescript
     // For each Tavily topic, create a search promise with timing
     for (const topic of tavilyTopics) {
@@ -1388,54 +1420,56 @@ Old code:
 ```
 
 New code:
+
 ```typescript
-    // For each web topic, create a search promise with timing
-    for (const topic of tavilyTopics) {
-      const firecrawlTopic = topic === "web" ? "general" : topic;
-      const topicStartTime = Date.now();
+// For each web topic, create a search promise with timing
+for (const topic of tavilyTopics) {
+  const firecrawlTopic = topic === "web" ? "general" : topic;
+  const topicStartTime = Date.now();
 
-      const promise = (ctx.runAction as any)(
-        internal._services.search.FirecrawlSearchService.discoverSourcesInternal,
-        {
-          query,
-          maxResults: maxPerChannel,
-          topic: firecrawlTopic,
-          timeRange: timeRange as any,
-          searchDepth: "basic",
-        }
-      )
-        .then((results: any) => {
-          const duration = Date.now() - topicStartTime;
-          logger.info(`${topic.toUpperCase()} search completed`, {
-            durationMs: duration,
-            resultCount: results.length,
-          });
-          return {
-            sourceType: topic,
-            results: results.map((r: any) => transformWebResult(r, topic)),
-            duration,
-          };
-        })
-        .catch((error: Error) => {
-          const duration = Date.now() - topicStartTime;
-          logger.warn(`${topic.toUpperCase()} search failed`, {
-            durationMs: duration,
-            message: error.message,
-          });
-          return {
-            sourceType: topic,
-            results: [],
-            duration,
-          };
-        });
-
-      searchPromises.push(promise);
+  const promise = (ctx.runAction as any)(
+    internal._services.search.FirecrawlSearchService.discoverSourcesInternal,
+    {
+      query,
+      maxResults: maxPerChannel,
+      topic: firecrawlTopic,
+      timeRange: timeRange as any,
+      searchDepth: "basic",
     }
+  )
+    .then((results: any) => {
+      const duration = Date.now() - topicStartTime;
+      logger.info(`${topic.toUpperCase()} search completed`, {
+        durationMs: duration,
+        resultCount: results.length,
+      });
+      return {
+        sourceType: topic,
+        results: results.map((r: any) => transformWebResult(r, topic)),
+        duration,
+      };
+    })
+    .catch((error: Error) => {
+      const duration = Date.now() - topicStartTime;
+      logger.warn(`${topic.toUpperCase()} search failed`, {
+        durationMs: duration,
+        message: error.message,
+      });
+      return {
+        sourceType: topic,
+        results: [],
+        duration,
+      };
+    });
+
+  searchPromises.push(promise);
+}
 ```
 
 **Replace the OpenAlex academic search block (around lines 304-346):**
 
 Old code:
+
 ```typescript
     // OpenAlex search (academic) with timing
     if (searchAcademic) {
@@ -1476,74 +1510,77 @@ Old code:
 ```
 
 New code:
+
 ```typescript
-    // Academic search with timing
-    if (searchAcademic) {
-      const academicStartTime = Date.now();
+// Academic search with timing
+if (searchAcademic) {
+  const academicStartTime = Date.now();
 
-      const promise = (ctx.runAction as any)(
-        internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
-        {
-          query,
-          maxResults: maxPerChannel,
-          publicationYearFrom: academicFilters?.publicationYearFrom,
-          publicationYearTo: academicFilters?.publicationYearTo,
-          minCitations: academicFilters?.minCitations,
-          openAccessOnly: academicFilters?.openAccessOnly,
-          sortBy: sortBy as any,
-        }
-      )
-        .then((results: any) => {
-          const duration = Date.now() - academicStartTime;
-          logger.info("ACADEMIC search completed", {
-            durationMs: duration,
-            resultCount: results.length,
-          });
-          return {
-            sourceType: "academic",
-            results: results.map((r: any) => transformAcademicResult(r)),
-            duration,
-          };
-        })
-        .catch((error: Error) => {
-          const duration = Date.now() - academicStartTime;
-          logger.warn("ACADEMIC search failed", {
-            durationMs: duration,
-            message: error.message,
-          });
-          return {
-            sourceType: "academic",
-            results: [],
-            duration,
-          };
-        });
-
-      searchPromises.push(promise);
+  const promise = (ctx.runAction as any)(
+    internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
+    {
+      query,
+      maxResults: maxPerChannel,
+      publicationYearFrom: academicFilters?.publicationYearFrom,
+      publicationYearTo: academicFilters?.publicationYearTo,
+      minCitations: academicFilters?.minCitations,
+      openAccessOnly: academicFilters?.openAccessOnly,
+      sortBy: sortBy as any,
     }
+  )
+    .then((results: any) => {
+      const duration = Date.now() - academicStartTime;
+      logger.info("ACADEMIC search completed", {
+        durationMs: duration,
+        resultCount: results.length,
+      });
+      return {
+        sourceType: "academic",
+        results: results.map((r: any) => transformAcademicResult(r)),
+        duration,
+      };
+    })
+    .catch((error: Error) => {
+      const duration = Date.now() - academicStartTime;
+      logger.warn("ACADEMIC search failed", {
+        durationMs: duration,
+        message: error.message,
+      });
+      return {
+        sourceType: "academic",
+        results: [],
+        duration,
+      };
+    });
+
+  searchPromises.push(promise);
+}
 ```
 
 **Update the `discoverSources` action (around lines 395-421):**
 
 Replace:
+
 ```typescript
-    const result = await (ctx.runAction as any)(
-      internal._services.search.TavilySearchService.discoverSourcesInternal,
-      {
-        query: args.query,
-        maxResults: args.maxResults ?? 10,
-      }
-    );
+const result = await (ctx.runAction as any)(
+  internal._services.search.TavilySearchService.discoverSourcesInternal,
+  {
+    query: args.query,
+    maxResults: args.maxResults ?? 10,
+  }
+);
 ```
 
 With:
+
 ```typescript
-    const result = await (ctx.runAction as any)(
-      internal._services.search.FirecrawlSearchService.discoverSourcesInternal,
-      {
-        query: args.query,
-        maxResults: args.maxResults ?? 10,
-      }
-    );
+const result = await (ctx.runAction as any)(
+  internal._services.search.FirecrawlSearchService.discoverSourcesInternal,
+  {
+    query: args.query,
+    maxResults: args.maxResults ?? 10,
+  }
+);
 ```
 
 - [ ] **Step 3: Run typecheck**
@@ -1566,6 +1603,7 @@ git commit -m "refactor: wire FirecrawlSearchService and AcademicSearchService i
 ## Task 7: Update chat/stream.ts
 
 **Files:**
+
 - Modify: `convex/chat/stream.ts`
 
 - [ ] **Step 1: Replace Tavily call with Firecrawl**
@@ -1577,18 +1615,21 @@ Find the Tavily search call around line 771 in `stream.ts`. Replace:
 ```
 
 With:
+
 ```typescript
           ctx.runAction(internal._services.search.FirecrawlSearchService.discoverSourcesInternal, {
 ```
 
 Also update the error log message around line 785 from:
+
 ```typescript
-            chatStreamLog.warn("tavily_search_failed", { channel, topic, error: String(e) });
+chatStreamLog.warn("tavily_search_failed", { channel, topic, error: String(e) });
 ```
 
 To:
+
 ```typescript
-            chatStreamLog.warn("web_search_failed", { channel, topic, error: String(e) });
+chatStreamLog.warn("web_search_failed", { channel, topic, error: String(e) });
 ```
 
 - [ ] **Step 2: Run typecheck**
@@ -1611,22 +1652,26 @@ git commit -m "refactor: replace Tavily with Firecrawl in chat stream"
 ## Task 8: Update documents/embeddingJob.ts
 
 **Files:**
+
 - Modify: `convex/documents/embeddingJob.ts`
 
 - [ ] **Step 1: Update imports**
 
 Replace:
+
 ```typescript
 import { SupadataLoaderService } from "../_services/extraction/SupadataLoaderService";
 ```
 
 With:
+
 ```typescript
 import { WebLoaderService } from "../_services/extraction/WebLoaderService";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
 ```
 
 Remove:
+
 ```typescript
 import { resolveOpenAlexSourceUrlToArticleUrl } from "../_lib/resolveOpenAlexSourceUrl";
 ```
@@ -1634,19 +1679,22 @@ import { resolveOpenAlexSourceUrlToArticleUrl } from "../_lib/resolveOpenAlexSou
 - [ ] **Step 2: Update loader initialization and usage**
 
 In the `handler`, replace:
+
 ```typescript
-      const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
-      const supadataLoader = new SupadataLoaderService();
+const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
+const supadataLoader = new SupadataLoaderService();
 ```
 
 With:
+
 ```typescript
-      const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
-      const webLoader = new WebLoaderService();
-      const academicLoader = new AcademicLoaderService();
+const mistralOCR = new MistralOCRService(process.env.MISTRAL_API_KEY || "");
+const webLoader = new WebLoaderService();
+const academicLoader = new AcademicLoaderService();
 ```
 
 Replace the YouTube extraction block (around lines 141-149):
+
 ```typescript
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
@@ -1654,6 +1702,7 @@ Replace the YouTube extraction block (around lines 141-149):
 ```
 
 With:
+
 ```typescript
       if (docDetails.fileType === "youtube") {
         logger.info("Extracting YouTube transcript");
@@ -1663,6 +1712,7 @@ With:
 Replace the URL scraping block (around lines 228-249):
 
 Old:
+
 ```typescript
       } else if (docDetails.fileType === "url") {
         logger.info("Extracting web page content");
@@ -1683,6 +1733,7 @@ Old:
 ```
 
 New:
+
 ```typescript
       } else if (docDetails.fileType === "url") {
         logger.info("Extracting web page content");
@@ -1694,6 +1745,7 @@ New:
 Replace the paper_record block (around lines 250-336):
 
 Old:
+
 ```typescript
       } else if (docDetails.fileType === "paper_record") {
         logger.info("Processing paper_record (OA PDF → Supadata PDF → repository/landing URLs → metadata stub)");
@@ -1785,6 +1837,7 @@ Old:
 ```
 
 New:
+
 ```typescript
       } else if (docDetails.fileType === "paper_record") {
         logger.info("Processing paper_record (OA PDF → Mistral OCR → web scrape fallback → metadata stub)");
@@ -1858,6 +1911,7 @@ git commit -m "refactor: use WebLoaderService and AcademicLoaderService in embed
 ## Task 9: Update extractors.ts
 
 **Files:**
+
 - Modify: `convex/_services/extractors.ts`
 
 - [ ] **Step 1: Replace implementations with WebLoaderService**
@@ -1989,6 +2043,7 @@ git commit -m "refactor: replace extractors with WebLoaderService"
 ## Task 10: Delete Old Service Files
 
 **Files:**
+
 - Delete: `convex/_services/search/TavilySearchService.ts`
 - Delete: `convex/_services/search/OpenAlexSearchService.ts`
 - Delete: `convex/_services/extraction/SupadataLoaderService.ts`
@@ -2010,6 +2065,7 @@ npx convex dev --once
 ```
 
 Or if dev is already running, the types will regenerate automatically. To force:
+
 ```bash
 npx convex codegen
 ```
@@ -2036,6 +2092,7 @@ git commit -m "chore: delete Tavily, OpenAlex, SupadataLoader services and resol
 ## Task 11: Final Verification
 
 **Files:**
+
 - All modified/created files
 
 - [ ] **Step 1: Run Convex typecheck**
@@ -2117,19 +2174,19 @@ If anything fails in production: `git revert HEAD~N..HEAD` where N is the number
 
 ## Spec Coverage Checklist
 
-| Spec Requirement | Implementing Task |
-|------------------|-------------------|
-| Firecrawl `/search` replaces Tavily | Task 2 |
-| Firecrawl `/scrape`, `/crawl`, `/map` replaces Supadata web | Task 4 |
-| Supadata kept for YouTube/TikTok/Instagram/X | Task 4 (social methods) |
-| arXiv + Semantic Scholar + PubMed replace OpenAlex | Task 3 |
-| Academic PDF → Mistral OCR; abstract fallback | Task 5 |
-| No vendor names in service files | All tasks (FirecrawlSearchService, AcademicSearchService, WebLoaderService, AcademicLoaderService) |
-| No frontend changes | No tasks touch frontend |
-| No schema changes | No tasks touch schema |
-| DiscoveryService call-site updates | Task 6 |
-| chat/stream.ts call-site updates | Task 7 |
-| embeddingJob.ts call-site updates | Task 8 |
-| extractors.ts call-site updates | Task 9 |
-| env.ts updates | Task 1 |
-| Deleted old services | Task 10 |
+| Spec Requirement                                            | Implementing Task                                                                                  |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Firecrawl `/search` replaces Tavily                         | Task 2                                                                                             |
+| Firecrawl `/scrape`, `/crawl`, `/map` replaces Supadata web | Task 4                                                                                             |
+| Supadata kept for YouTube/TikTok/Instagram/X                | Task 4 (social methods)                                                                            |
+| arXiv + Semantic Scholar + PubMed replace OpenAlex          | Task 3                                                                                             |
+| Academic PDF → Mistral OCR; abstract fallback               | Task 5                                                                                             |
+| No vendor names in service files                            | All tasks (FirecrawlSearchService, AcademicSearchService, WebLoaderService, AcademicLoaderService) |
+| No frontend changes                                         | No tasks touch frontend                                                                            |
+| No schema changes                                           | No tasks touch schema                                                                              |
+| DiscoveryService call-site updates                          | Task 6                                                                                             |
+| chat/stream.ts call-site updates                            | Task 7                                                                                             |
+| embeddingJob.ts call-site updates                           | Task 8                                                                                             |
+| extractors.ts call-site updates                             | Task 9                                                                                             |
+| env.ts updates                                              | Task 1                                                                                             |
+| Deleted old services                                        | Task 10                                                                                            |

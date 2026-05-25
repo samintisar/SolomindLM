@@ -30,7 +30,7 @@ export const SourceSuggestionPrompt: React.FC<SourceSuggestionPromptProps> = ({
 }) => {
   const listFingerprint = useMemo(
     () => JSON.stringify(sources.map((s) => [s.url, s.title, s.snippet])),
-    [sources],
+    [sources]
   );
 
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
@@ -72,7 +72,9 @@ export const SourceSuggestionPrompt: React.FC<SourceSuggestionPromptProps> = ({
           <h4 className="font-semibold text-sm text-primary">
             Found {sources.length} external source{sources.length === 1 ? "" : "s"}
           </h4>
-          <p className="text-xs text-muted-foreground mt-0.5">Select the ones to add to this notebook.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Select the ones to add to this notebook.
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button

@@ -5,12 +5,7 @@
  * Runner-aware: studio runners produce no chunks/citations, so the
  * retrieval-only metrics are skipped and studio-specific scorers run instead.
  */
-import type {
-  EvalFixture,
-  EvalRunArtifact,
-  EvalBaseline,
-  MetricResult,
-} from "../types";
+import type { EvalFixture, EvalRunArtifact, EvalBaseline, MetricResult } from "../types";
 import {
   expectedItemRecall,
   retrievalItemRecall,
@@ -20,12 +15,21 @@ import {
   citationValidity,
   latencyCostBudget,
 } from "./index";
+import { scoreAllLlmJudgeMetrics } from "./llmJudge";
 import { scoreStudioMetrics } from "./studio";
 import {
   sourceDiversityScore,
   sourceRecallByChannel,
   externalSourceUtilization,
+  researchSourceBreadth,
 } from "./sourceAware";
+
+function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
+  // Chat uses a chunk-based retrieval pipeline with pre/post-rerank stages.
+  // Research uses an evidence-based pipeline (plan → gather → synthesize)
+  // where chunk-retrieval metrics don't map cleanly.
+  return runner === "chat";
+}
 
 function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
   return runner === "chat" || runner === "research";
@@ -40,7 +44,7 @@ function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
 export async function scoreAllMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline,
+  baseline?: EvalBaseline
 ): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
 
@@ -48,24 +52,39 @@ export async function scoreAllMetrics(
   results.push(expectedItemRecall(fixture, artifact, baseline));
   results.push(latencyCostBudget(fixture, artifact, baseline));
 
-  if (isRagRunner(artifact.runner)) {
-    // RAG-only metrics: depend on retrieval chunks/citations.
+  if (isChunkRetrievalRunner(artifact.runner)) {
+    // Chunk-retrieval metrics: only meaningful for chat's staged pipeline.
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
     results.push(abstentionCorrectness(fixture, artifact, baseline));
-    results.push(citationValidity(fixture, artifact, baseline));
     results.push(...retrievalItemRecall(fixture, artifact, baseline));
+  }
+
+  if (isRagRunner(artifact.runner)) {
+    // Citation and source metrics apply to both chat and research.
+    results.push(citationValidity(fixture, artifact, baseline));
 
     // Source-aware metrics (only for runs with sourcePolicy configured)
     if (artifact.sourcePolicy) {
       results.push(sourceDiversityScore(fixture, artifact, baseline));
       results.push(...sourceRecallByChannel(fixture, artifact, baseline));
       results.push(externalSourceUtilization(fixture, artifact, baseline));
+      if (artifact.runner === "research") {
+        results.push(researchSourceBreadth(fixture, artifact, baseline));
+      }
     }
   } else {
     // Studio runners: structural scorers keyed on studioOutput.
     const studioResults = await scoreStudioMetrics(fixture, artifact, baseline);
     results.push(...studioResults);
+  }
+
+  // LLM-as-a-judge metrics: semantic correctness, faithfulness, completeness.
+  // Correctness only runs when fixture.expectedAnswer is set.
+  // Literature review has its own dedicated LLM judge metrics (report quality, completeness, extraction quality).
+  if (artifact.runner !== "literatureReview") {
+    const judgeResults = await scoreAllLlmJudgeMetrics(fixture, artifact);
+    results.push(...judgeResults);
   }
 
   return results;

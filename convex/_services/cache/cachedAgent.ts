@@ -14,7 +14,6 @@ import { CACHE_TTL } from "./cache";
  * @returns Object with .fetch() method that includes lightweight validation logging
  */
 export function createCachedAction(
-   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   action: FunctionReference<"action", "internal", any, any>,
   options?: { ttl?: number; name?: string }
@@ -29,8 +28,6 @@ export function createCachedAction(
   // Note: ActionCache v0.3.0 doesn't expose cache hit information, so we don't track metrics
   const cacheName = options?.name || "unknown";
   return {
-     
-     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async fetch(ctx: any, args: any): Promise<any> {
       const logger = createServiceLogger("action-cache", cacheName);

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { normalizeQuizQuestion, stripMultipleChoiceLabel } from "./optionLabels";
 import type { QuizQuestion } from "./prompts";
 
-function q(partial: Partial<QuizQuestion> & Pick<QuizQuestion, "options" | "answer">): QuizQuestion {
+function q(
+  partial: Partial<QuizQuestion> & Pick<QuizQuestion, "options" | "answer">
+): QuizQuestion {
   return {
     question: partial.question ?? "Q",
     options: partial.options,

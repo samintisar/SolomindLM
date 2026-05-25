@@ -16,7 +16,8 @@ export const env = {
   QUIZ_LLM: process.env.QUIZ_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   MINDMAP_LLM: process.env.MINDMAP_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   SPREADSHEET_LLM: process.env.SPREADSHEET_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  WRITTEN_QUESTIONS_LLM: process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
+  WRITTEN_QUESTIONS_LLM:
+    process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   AUDIO_LLM: process.env.AUDIO_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   /** Together AI TTS model (e.g. Kokoro). */
   AUDIO_TTS_MODEL: process.env.AUDIO_TTS_MODEL || "hexgrad/Kokoro-82M",
@@ -33,17 +34,6 @@ export const env = {
 
   // Mistral (OCR)
   MISTRAL_API_KEY: process.env.MISTRAL_API_KEY || "",
-
-  // LangSmith (tracing)
-  LANGSMITH_API_KEY: process.env.LANGSMITH_API_KEY || "",
-  LANGSMITH_PROJECT: process.env.LANGSMITH_PROJECT || "",
-  LANGSMITH_ENDPOINT: process.env.LANGSMITH_ENDPOINT || "",
-  LANGSMITH_TRACING: process.env.LANGSMITH_TRACING || "false",
-
-  // LangChain env vars
-  LANGCHAIN_API_KEY: process.env.LANGCHAIN_API_KEY || "",
-  LANGCHAIN_PROJECT: process.env.LANGCHAIN_PROJECT || "",
-  LANGCHAIN_TRACING_V2: process.env.LANGCHAIN_TRACING_V2 || "false",
 
   // Supadata
   SUPADATA_API_KEY: process.env.SUPADATA_API_KEY || "",

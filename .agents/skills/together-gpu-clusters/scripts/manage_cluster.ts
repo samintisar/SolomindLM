@@ -53,8 +53,8 @@ async function createCluster(
   numGpus: number,
   driverVersion: DriverVersion,
   billingType: BillingType = "ON_DEMAND",
-  clusterType: ClusterType = "KUBERNETES",
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  clusterType: ClusterType = "KUBERNETES"
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const { cudaVersion, nvidiaDriver } = parseDriverVersion(driverVersion);
   const cluster = await client.beta.clusters.create({
@@ -76,8 +76,8 @@ async function createCluster(
 async function waitForReady(
   clusterId: string,
   timeoutMs: number = 1_800_000,
-  pollMs: number = 30_000,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pollMs: number = 30_000
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -123,9 +123,7 @@ async function main(): Promise<void> {
   await listClusters();
 
   // 3. Create a cluster
-  const cluster = await createCluster(
-    CLUSTER_NAME, REGION, GPU_TYPE, NUM_GPUS, DRIVER,
-  );
+  const cluster = await createCluster(CLUSTER_NAME, REGION, GPU_TYPE, NUM_GPUS, DRIVER);
 
   // 4. Wait for cluster to be ready
   console.log("\nWaiting for cluster to be ready...");

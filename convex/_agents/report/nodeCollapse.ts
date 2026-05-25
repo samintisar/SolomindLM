@@ -3,13 +3,7 @@
 import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { env } from "../../_lib/env.js";
-import {
-  allWithConcurrency,
-  clearStateKeys,
-  createLangSmithRunConfig,
-  withoutMapOutputs,
-} from "../_shared/index.js";
+import { allWithConcurrency, clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
@@ -42,16 +36,10 @@ async function collapseGroup(
       invokeWithTimeout(
         () =>
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (deps.smartLlm as any).invoke(
-            [new SystemMessage(COLLAPSE_SYSTEM_PROMPT), new HumanMessage(prompt)],
-            createLangSmithRunConfig({
-              runName: "ReportGraph.CollapseGroup",
-              tags: ["agent", "report", "collapse"],
-              metadata: {
-                groupCount: group.length,
-              },
-            })
-          ),
+          (deps.smartLlm as any).invoke([
+            new SystemMessage(COLLAPSE_SYSTEM_PROMPT),
+            new HumanMessage(prompt),
+          ]),
         GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
         "CollapseGroup"
       ),

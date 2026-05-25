@@ -557,7 +557,7 @@ export const startDeepResearch = mutation({
       messageId: userMessageId,
       query: args.query,
       subQuestions: [],
-      sourcePolicy: args.sourcePolicy ?? { channels: ["notebook"] },
+      sourcePolicy: args.sourcePolicy ?? { channels: ["notebook", "web"] },
       status: "planning" as const,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -574,7 +574,7 @@ export const startDeepResearch = mutation({
         conversationId,
         assistantMessageId,
         planId,
-        sourcePolicy: args.sourcePolicy ?? { channels: ["notebook"] },
+        sourcePolicy: args.sourcePolicy ?? { channels: ["notebook", "web"] },
         smartModel: args.smartModel,
       }
     );
@@ -635,5 +635,47 @@ export const retryDeepResearch = mutation({
     });
 
     return null;
+  },
+});
+
+/**
+ * INTERNAL: Cancel any active research workflows and runs tied to a conversation.
+ * Called when a conversation is deleted or cleared so orphaned workflows
+ * do not persist results into a non-existent (or recycled) chat.
+ */
+export const cancelResearchForConversationInternal = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const plans = await ctx.db
+      .query("researchPlans")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .collect();
+
+    for (const plan of plans) {
+      if (
+        plan.workflowId &&
+        ["planning", "draft", "approved", "running"].includes(plan.status)
+      ) {
+        try {
+          await workflow.cancel(ctx, plan.workflowId as WorkflowId);
+        } catch {
+          // Workflow may already be completed or cancelled.
+        }
+        await ctx.db.patch(plan._id, { status: "failed", updatedAt: Date.now() });
+      }
+
+      const runs = await ctx.db
+        .query("researchRuns")
+        .withIndex("by_plan", (q) => q.eq("planId", plan._id))
+        .collect();
+
+      for (const run of runs) {
+        if (["pending", "running"].includes(run.status)) {
+          await ctx.db.patch(run._id, { status: "cancelled", updatedAt: Date.now() });
+        }
+      }
+    }
   },
 });
