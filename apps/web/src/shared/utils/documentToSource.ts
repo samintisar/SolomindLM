@@ -27,6 +27,7 @@ export function documentToSource(doc: any): Source {
             fulltextStatus: doc.fulltextStatus,
             ingestionStatus: doc.ingestionStatus,
           },
+      sourceGuide: doc.sourceGuide,
     };
   }
 
@@ -127,5 +128,6 @@ export function documentToSource(doc: any): Source {
     status: doc.status,
     url,
     remoteRefreshKind,
+    sourceGuide: doc.sourceGuide,
   };
 }

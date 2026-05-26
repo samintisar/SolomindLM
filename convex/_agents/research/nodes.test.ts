@@ -141,4 +141,55 @@ describe("safeGetDomain (via retrieverNode)", () => {
     expect(result.evidence!.length).toBeGreaterThan(0);
     expect(result.evidence![0].metadata?.domain).toBe("example.com");
   });
+
+  it("passes maxResultsPerChannel to discoverSources (not a hard cap of 2)", async () => {
+    let discoverMax: number | undefined;
+    const state: ResearchStateType = {
+      query: "test",
+      subQuestions: [
+        {
+          id: "sq1",
+          question: "test question",
+          searchQueries: ["test query"],
+          sourceChannels: ["web"],
+          status: "pending",
+        },
+      ],
+      sourcePolicy: { channels: ["web"], maxResultsPerChannel: 5 },
+      evidence: [],
+      gaps: [],
+      iteration: 0,
+      maxIterations: 2,
+      conversationHistory: [],
+      documentIds: undefined,
+      notebookId: "",
+      userId: "",
+      shouldStop: false,
+      stopReason: "",
+      finalResponse: "",
+    };
+
+    const deps = createDeps(async (_query, _channels, maxResults) => {
+      discoverMax = maxResults;
+      return [
+        {
+          title: "Source A",
+          url: "https://example.com/a",
+          snippet: "a",
+          sourceType: "web",
+          score: 0.9,
+        },
+        {
+          title: "Source B",
+          url: "https://example.com/b",
+          snippet: "b",
+          sourceType: "web",
+          score: 0.8,
+        },
+      ];
+    });
+
+    await retrieverNode(state, deps);
+    expect(discoverMax).toBe(5);
+  });
 });

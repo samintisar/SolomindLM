@@ -175,7 +175,7 @@ const SUGGESTED_FORMATS: ReportFormat[] = [
 
 const ALL_FORMATS = [...FORMATS, ...SUGGESTED_FORMATS];
 
-export const CreateReportModal: React.FC<CreateReportModalProps> = ({
+export const CustomizeReportModal: React.FC<CustomizeReportModalProps> = ({
   isOpen,
   onClose,
   onSelectFormat,
@@ -351,7 +351,7 @@ const FormatCard: React.FC<{
   </div>
 );
 
-interface CreateReportModalProps {
+interface CustomizeReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectFormat: (formatId: string, customPrompt?: string) => void;

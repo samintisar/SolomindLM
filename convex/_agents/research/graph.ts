@@ -121,7 +121,8 @@ export async function runExecuteGraph(
 
     // Early stop: if all sub-questions have evidence and total is reasonable, skip iteration 2
     const totalEvidence = state.evidence.length;
-    const hasMinimumCoverage = gaps.length === 0 && totalEvidence >= state.subQuestions.length * 2;
+    const minEvidenceForCoverage = Math.max(12, state.subQuestions.length * 4);
+    const hasMinimumCoverage = gaps.length === 0 && totalEvidence >= minEvidenceForCoverage;
     if (hasMinimumCoverage) {
       graphLog.info("early_stop_sufficient_evidence", {
         totalEvidence,

@@ -1,8 +1,23 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
+import type { Doc } from "../../_generated/dataModel";
 import { getAuthUserId } from "../../auth";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Reports from "../../_model/reports";
+
+function toReportDTO(report: Doc<"reports">) {
+  return {
+    id: report._id,
+    notebookId: report.notebookId,
+    title: report.title,
+    content: report.content,
+    reportType: report.reportType,
+    status: report.status,
+    metadata: report.metadata,
+    createdAt: report.createdAt,
+    updatedAt: report.updatedAt,
+  };
+}
 
 /**
  * Internal: Get a report by ID (for use by jobs)
@@ -24,7 +39,8 @@ export const list = query({
     if (!userId) return [];
 
     await assertCanReadNotebook(ctx, args.notebookId, userId);
-    return await Reports.listByNotebook(ctx, args.notebookId);
+    const reports = await Reports.listByNotebook(ctx, args.notebookId);
+    return reports.map(toReportDTO);
   },
 });
 
@@ -49,21 +65,7 @@ export const get = query({
       return null;
     }
 
-    return report;
-  },
-});
-
-/**
- * Get reports grouped by type for a notebook
- */
-export const getReports = query({
-  args: { notebookId: v.id("notebooks") },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    await assertCanReadNotebook(ctx, args.notebookId, userId);
-    return await Reports.listByNotebook(ctx, args.notebookId);
+    return toReportDTO(report);
   },
 });
 
@@ -84,7 +86,7 @@ export const create = mutation({
 
     await assertCanEditNotebook(ctx, args.notebookId, userId);
 
-    return await Reports.createReportAndFetch(ctx, {
+    const report = await Reports.createReportAndFetch(ctx, {
       userId,
       notebookId: args.notebookId,
       title: args.title,
@@ -92,6 +94,7 @@ export const create = mutation({
       content: args.content,
       metadata: args.metadata,
     });
+    return toReportDTO(report);
   },
 });
 
@@ -148,7 +151,9 @@ export const update = mutation({
 
     await Reports.updateReport(ctx, id, updates);
 
-    return await Reports.getReport(ctx, id);
+    const report = await Reports.getReport(ctx, id);
+    if (!report) throw new Error("Report not found");
+    return toReportDTO(report);
   },
 });
 

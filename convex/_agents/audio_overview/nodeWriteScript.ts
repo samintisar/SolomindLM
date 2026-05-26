@@ -6,7 +6,6 @@ import {
   invokeWithTimeout,
   invokeWithRetry,
   sanitizeUserInput,
-  createLangSmithRunConfig,
   withoutMapOutputs,
 } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
@@ -112,20 +111,10 @@ export async function writeScript(
         () =>
           invokeWithTimeout(
             () =>
-              smartLlm.invoke(
-                [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(chunkPrompt)],
-                createLangSmithRunConfig({
-                  runName: "AudioOverviewGraph.WriteScript",
-                  tags: ["agent", "audio-overview", "reduce"],
-                  metadata: {
-                    chunkIndex: chunkIndex + 1,
-                    totalChunks: numChunks,
-                    audioType,
-                    length,
-                    focus: sanitizedFocus || "general overview",
-                  },
-                })
-              ),
+              smartLlm.invoke([
+                new SystemMessage(REDUCE_SYSTEM_PROMPT),
+                new HumanMessage(chunkPrompt),
+              ]),
             GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
             "AudioReduce"
           ),
@@ -207,20 +196,10 @@ Rules:
 DIALOGUE:
 ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
 
-          const extractionResponse = await smartLlm.invoke(
-            [
-              new SystemMessage(EXAMPLE_EXTRACTION_SYSTEM_PROMPT),
-              new HumanMessage(extractionPrompt),
-            ],
-            createLangSmithRunConfig({
-              runName: "AudioOverviewGraph.ExampleExtraction",
-              tags: ["agent", "audio-overview", "analysis"],
-              metadata: {
-                chunkIndex: chunkIndex + 1,
-                linesGenerated: chunkDialogue.length,
-              },
-            })
-          );
+          const extractionResponse = await smartLlm.invoke([
+            new SystemMessage(EXAMPLE_EXTRACTION_SYSTEM_PROMPT),
+            new HumanMessage(extractionPrompt),
+          ]);
 
           const extractionText = extractionResponse.content.toString();
           const exJsonStart = extractionText.indexOf("[");

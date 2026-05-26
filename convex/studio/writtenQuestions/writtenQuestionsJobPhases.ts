@@ -30,7 +30,7 @@ import {
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // SCHEMAS
@@ -217,7 +217,7 @@ export async function runWrittenQuestionsGenerationPhase(
     );
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -400,22 +400,10 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "WrittenQuestionsJob.MapProcess",
-            tags: ["agent", "written_questions", "map"],
-            metadata: {
-              chunkIndex,
-              questionsPerChunk,
-              difficulty,
-              questionType,
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "WrittenQuestionsMap",
       onRetry: (attempt, error) => {
@@ -693,23 +681,10 @@ export async function runFinalizeWrittenQuestionsPhase(
       const startTime = Date.now();
       const selectionResponse = await invokeStudioLlm({
         invoke: () =>
-          structuredSelectLLM.invoke(
-            [
-              new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
-              new HumanMessage(selectionPrompt),
-            ],
-            createLangSmithRunConfig({
-              runName: "WrittenQuestionsJob.Select",
-              tags: ["agent", "written_questions", "select"],
-              metadata: {
-                inputQuestions: dedupedQuestions.length,
-                targetCount: questionCount,
-                difficulty,
-                questionType,
-                focus: sanitizedFocus || "none",
-              },
-            })
-          ),
+          structuredSelectLLM.invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+            new HumanMessage(selectionPrompt),
+          ]),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "WrittenQuestionsSelect",
         retry: { maxAttempts: 2, baseDelayMs: 1000 },

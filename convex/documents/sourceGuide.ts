@@ -6,12 +6,13 @@
  * Falls back to smart LLM on parse failure.
  */
 
-import { action } from "../_generated/server";
+import { action, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { uncachedLlmCall } from "../_agents/_shared/cachedLlm";
 import { env } from "../_lib/env";
+import type { Id } from "../_generated/dataModel";
 
 /** Best-effort fixes before JSON.parse (models sometimes emit trailing commas). */
 function repairJsonObjectText(json: string): string {
@@ -87,69 +88,65 @@ async function generateSourceGuideWithModel(
   return parsed;
 }
 
-export const generateSourceGuide = action({
-  args: {
-    documentId: v.id("documents"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      console.warn("[sourceGuide] Unauthenticated");
-      return;
-    }
+async function generateSourceGuideHandler(
+  ctx: ActionCtx,
+  args: { documentId: Id<"documents"> }
+): Promise<{ summary: string; topics: string[]; generatedAt: number } | null> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
 
-    // Verify document exists and is completed
-    const document = await ctx.runQuery(
-      internal.documents.index.getDocumentInternal,
+  // Verify document exists and is completed
+  const document = await ctx.runQuery(
+    internal.documents.index.getDocumentInternal,
+    { documentId: args.documentId, userId }
+  );
+
+  if (!document) {
+    throw new Error("Document not found");
+  }
+
+  if (document.status !== "completed") {
+    throw new Error("Document content not yet extracted");
+  }
+
+  // Return existing if already generated
+  if (document.sourceGuide) {
+    return document.sourceGuide;
+  }
+
+  // Get content
+  let content = document.extractedMarkdown || "";
+  if (!content) {
+    // Fallback: stitch chunks
+    const chunks = await ctx.runQuery(
+      internal.documents.index.getDocumentChunksInternal,
       { documentId: args.documentId, userId }
     );
+    content = chunks.map((c: { content: string }) => c.content).join("\n\n");
+  }
 
-    if (!document) {
-      console.warn("[sourceGuide] Document not found:", args.documentId);
-      return;
-    }
+  if (content.length < 100) {
+    console.warn("[sourceGuide] Content too short, skipping:", args.documentId);
+    return null;
+  }
 
-    if (document.status !== "completed") {
-      console.warn("[sourceGuide] Document not completed:", args.documentId);
-      return;
-    }
+  // Rate limit check
+  try {
+    await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
+      userId,
+      feature: "sourceGuide",
+    });
+  } catch (limitErr) {
+    console.warn("[sourceGuide] Rate limit reached:", limitErr);
+    return null;
+  }
 
-    // Skip if already generated
-    if (document.sourceGuide) {
-      return;
-    }
+  // Truncate to avoid exceeding context window (~8000 chars is safe)
+  const truncatedContent = content.slice(0, 8000);
 
-    // Get content
-    let content = document.extractedMarkdown || "";
-    if (!content) {
-      // Fallback: stitch chunks
-      const chunks = await ctx.runQuery(
-        internal.documents.index.getDocumentChunksInternal,
-        { documentId: args.documentId, userId }
-      );
-      content = chunks.map((c: { content: string }) => c.content).join("\n\n");
-    }
-
-    if (content.length < 100) {
-      console.warn("[sourceGuide] Content too short, skipping:", args.documentId);
-      return;
-    }
-
-    // Rate limit check
-    try {
-      await ctx.runMutation(internal._lib.limits.checkDailyLimitInternal, {
-        userId,
-        feature: "sourceGuide",
-      });
-    } catch (limitErr) {
-      console.warn("[sourceGuide] Rate limit reached:", limitErr);
-      return;
-    }
-
-    // Truncate to avoid exceeding context window (~8000 chars is safe)
-    const truncatedContent = content.slice(0, 8000);
-
-    const prompt = `You are an AI study assistant analyzing a source document. Given the document content below, generate a JSON response with exactly these keys:
+  const prompt = `You are an AI study assistant analyzing a source document. Given the document content below, generate a JSON response with exactly these keys:
 - "summary": A concise 2-3 sentence overview of the document, highlighting the most important concepts and takeaways. Use bold formatting (markdown **bold**) for key terms.
 - "topics": An array of 4-6 specific topics, concepts, or themes covered in the document. Each topic should be 2-4 words, highly specific, and useful as a discussion prompt.
 
@@ -158,45 +155,60 @@ ${truncatedContent}
 
 Output ONLY a single JSON object. No markdown fences, no explanation.`;
 
+  try {
+    let parsed: { summary: string; topics: string[] };
     try {
-      let parsed: { summary: string; topics: string[] };
-      try {
-        parsed = await generateSourceGuideWithModel(env.FAST_LLM, prompt);
-      } catch (firstError) {
-        if (env.SMART_LLM !== env.FAST_LLM) {
-          console.warn(
-            "[sourceGuide] fast model failed, retrying with smart model:",
-            firstError
-          );
-          parsed = await generateSourceGuideWithModel(env.SMART_LLM, prompt);
-        } else {
-          throw firstError;
-        }
-      }
-
-      await ctx.runMutation(internal.documents.index.setSourceGuide, {
-        documentId: args.documentId,
-        summary: parsed.summary.slice(0, 500),
-        topics: parsed.topics.slice(0, 6),
-      });
-
-      // Consume rate limit token after confirmed storage
-      try {
-        await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
-          userId,
-          feature: "sourceGuide",
-        });
-      } catch (consumeErr) {
-        console.warn("[sourceGuide] Failed to consume rate limit (non-fatal):", consumeErr);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.startsWith("LLM API error:")) {
-        console.warn("[sourceGuide] LLM API request failed:", error);
+      parsed = await generateSourceGuideWithModel(env.FAST_LLM, prompt);
+    } catch (firstError) {
+      if (env.SMART_LLM !== env.FAST_LLM) {
+        console.warn(
+          "[sourceGuide] fast model failed, retrying with smart model:",
+          firstError
+        );
+        parsed = await generateSourceGuideWithModel(env.SMART_LLM, prompt);
       } else {
-        console.warn("[sourceGuide] LLM output parse failed:", error);
+        throw firstError;
       }
-      // Intentionally do not throw — failing to generate a guide is not a critical error
     }
+
+    const guide = {
+      summary: parsed.summary.slice(0, 500),
+      topics: parsed.topics.slice(0, 6),
+      generatedAt: Date.now(),
+    };
+
+    await ctx.runMutation(internal.documents.index.setSourceGuide, {
+      documentId: args.documentId,
+      summary: guide.summary,
+      topics: guide.topics,
+    });
+
+    // Consume rate limit token after confirmed storage
+    try {
+      await ctx.runMutation(internal._lib.limits.consumeDailyLimitInternal, {
+        userId,
+        feature: "sourceGuide",
+      });
+    } catch (consumeErr) {
+      console.warn("[sourceGuide] Failed to consume rate limit (non-fatal):", consumeErr);
+    }
+
+    return guide;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith("LLM API error:")) {
+      console.warn("[sourceGuide] LLM API request failed:", error);
+    } else {
+      console.warn("[sourceGuide] LLM output parse failed:", error);
+    }
+    // Intentionally do not throw — failing to generate a guide is not a critical error
+    return null;
+  }
+}
+
+export const generateSourceGuide = action({
+  args: {
+    documentId: v.id("documents"),
   },
+  handler: async (ctx, args) => generateSourceGuideHandler(ctx, args),
 });

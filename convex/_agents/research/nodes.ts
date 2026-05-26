@@ -5,6 +5,8 @@ import type { SubQuestion, SourceChannel, EvidenceEntry, ResearchPhase } from ".
 import { buildPlanPrompt, buildWriterPrompt, PlannerOutputSchema } from "./prompts";
 import { createLLM } from "../_shared/llm_factory";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { trackResearchStep } from "./steps";
+import type { ActionCtx } from "../../_generated/server";
 
 const retrieverLog = createServiceLogger("research", "retrieverNode");
 
@@ -42,6 +44,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 // Dependencies injected from the Convex action that runs the agent.
 export interface ResearchNodeDeps {
+  ctx?: ActionCtx;
+  researchId?: string;
   apiKey: string;
   smartModel: string;
   // Notebook search runners (same closures as ChatAgent uses)
@@ -84,7 +88,7 @@ export interface ResearchNodeDeps {
     abstract: string;
     url: string;
     pdfUrl?: string;
-    source: "arxiv" | "semantic_scholar" | "pubmed";
+    source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
     citationCount?: number;
     doi?: string;
   }) => Promise<{ title: string; content: string; source: string }>;
@@ -106,6 +110,17 @@ export async function plannerNode(
 ): Promise<Partial<ResearchStateType>> {
   const { query, sourcePolicy } = state;
   const enabledChannels = sourcePolicy.channels;
+
+  if (deps.ctx && deps.researchId) {
+    await trackResearchStep(
+      deps.ctx,
+      deps.researchId,
+      "research",
+      "planning",
+      "in_progress",
+      "Planning research strategy"
+    );
+  }
 
   const llm = createLLM({
     apiKey: deps.apiKey,
@@ -130,6 +145,17 @@ export async function plannerNode(
     status: "pending",
   }));
 
+  if (deps.ctx && deps.researchId) {
+    await trackResearchStep(
+      deps.ctx,
+      deps.researchId,
+      "research",
+      "planning",
+      "completed",
+      `Generated ${subQuestions.length} sub-questions`
+    );
+  }
+
   return { subQuestions };
 }
 
@@ -142,10 +168,23 @@ export async function retrieverNode(
   state: ResearchStateType,
   deps: ResearchNodeDeps
 ): Promise<Partial<ResearchStateType>> {
+  if (deps.ctx && deps.researchId) {
+    await trackResearchStep(
+      deps.ctx,
+      deps.researchId,
+      "research",
+      "searching",
+      "in_progress",
+      `Retrieving evidence for ${state.subQuestions.filter((sq) => sq.status === "pending").length} sub-questions`
+    );
+  }
+
   const { subQuestions, iteration, sourcePolicy } = state;
-  const maxResultsPerChannel = sourcePolicy.maxResultsPerChannel ?? 10;
-  // Cap external sources to 2 for cheap discovery; escalate only for high-value sources
-  const externalMaxResults = Math.min(maxResultsPerChannel, 2);
+  const DEFAULT_MAX_RESULTS_PER_CHANNEL = 8;
+  const EXTERNAL_RESULTS_HARD_CAP = 12;
+  const maxResultsPerChannel =
+    sourcePolicy.maxResultsPerChannel ?? DEFAULT_MAX_RESULTS_PER_CHANNEL;
+  const externalMaxResults = Math.min(maxResultsPerChannel, EXTERNAL_RESULTS_HARD_CAP);
   // Hard cap on raw content length from any scraped source — prevents prompt bloat
   const MAX_EVIDENCE_CONTENT_LENGTH = 4000;
   const newEvidence: EvidenceEntry[] = [];
@@ -308,7 +347,7 @@ export async function retrieverNode(
             pdfUrl?: string;
             doi?: string;
             citationCount?: number;
-            sourceApi?: "arxiv" | "semantic_scholar" | "pubmed";
+            sourceApi?: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
           };
         }> = [];
 
@@ -345,7 +384,7 @@ export async function retrieverNode(
         }));
 
         // Step 2: Lazy full-text load — only for top 1-2 papers, with timeout
-        const FULL_TEXT_LOAD_LIMIT = 2;
+        const FULL_TEXT_LOAD_LIMIT = 3;
         const papersToLoad = topPapers.slice(0, FULL_TEXT_LOAD_LIMIT);
 
         for (let i = 0; i < papersToLoad.length; i++) {
@@ -402,6 +441,18 @@ export async function retrieverNode(
     }
   }
 
+  if (deps.ctx && deps.researchId) {
+    const totalEvidence = newEvidence.length;
+    await trackResearchStep(
+      deps.ctx,
+      deps.researchId,
+      "research",
+      "searching",
+      "completed",
+      `Retrieved ${totalEvidence} evidence entries`
+    );
+  }
+
   return {
     evidence: newEvidence,
     subQuestions: updatedSubQuestions,
@@ -418,11 +469,22 @@ export async function writerNode(
 ): Promise<Partial<ResearchStateType>> {
   await deps.onProgress("writing");
 
+  if (deps.ctx && deps.researchId) {
+    await trackResearchStep(
+      deps.ctx,
+      deps.researchId,
+      "research",
+      "generating_report",
+      "in_progress",
+      `Synthesizing ${state.evidence.length} evidence entries into report`
+    );
+  }
+
   const { query, subQuestions, evidence } = state;
 
   // ── Prompt packing: sort, filter, and truncate evidence to stay under token budget ──
   const MAX_PROMPT_CHARS = 120_000; // ~30k tokens, leaves room for answer + instructions
-  const MAX_EVIDENCE_PER_SQ = 5;
+  const MAX_EVIDENCE_PER_SQ = 8;
   const MAX_ENTRY_CHARS = 2_000;
 
   // Group evidence by sub-question
@@ -480,12 +542,21 @@ export async function writerNode(
     mapModel: deps.smartModel,
     phase: "smart",
     temperatures: 0.4,
-    maxTokens: 4000,
+    maxTokens: 8000,
   });
 
   const response = await llm.invoke([{ role: "user", content: prompt }]);
   const finalResponse =
     typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+  if (deps.ctx && deps.researchId) {
+    await trackResearchStep(
+      deps.ctx,
+      deps.researchId,
+      "research",
+      "generating_report",
+      "completed"
+    );
+  }
 
   return {
     finalResponse,
@@ -493,3 +564,4 @@ export async function writerNode(
     stopReason: "completed",
   };
 }
+

@@ -26,6 +26,7 @@ import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
 import { assertRagEvalGate } from "./_gate";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
+import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -43,6 +44,28 @@ export const chatEvalActionArgs = {
     })
   ),
 };
+
+// ─── Token Estimation Helpers ────────────────────────────────
+
+/** Rough token estimate for eval cost tracking (~4 chars / token). */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function estimateChatTokenUsage(
+  question: string,
+  answer: string,
+  selectedChunks: ReferenceChunk[]
+): { prompt: number; completion: number; total: number } {
+  const contextText = selectedChunks.map((c) => c.content).join("\n\n");
+  const promptTokens = estimateTokens(question) + estimateTokens(contextText);
+  const completionTokens = estimateTokens(answer);
+  return {
+    prompt: promptTokens,
+    completion: completionTokens,
+    total: promptTokens + completionTokens,
+  };
+}
 
 export interface ChatEvalResult {
   answer: string;
@@ -109,7 +132,7 @@ export const runChatEval = action({
       const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
       if (chunkIds.length === 0) return [];
 
-      const fullChunks = await ctx.runQuery(internal.documents.index.getChunks, { chunkIds });
+      const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
 
       const chunkMap = new Map(
         (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map((c) => [
@@ -148,7 +171,7 @@ export const runChatEval = action({
     // ── Keyword search runner ──
 
     const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
-      return ctx.runQuery(internal.documents.index.keywordSearch, {
+      return ctx.runQuery(internal.documents.internal.keywordSearch, {
         notebookId: notebookIdTyped,
         userId: keywordSearchChunkUserId,
         query,
@@ -243,7 +266,7 @@ export const runChatEval = action({
                 query: refinedQuery,
                 maxResults: maxPerChannel,
                 topic: channelToTopic(channel),
-                searchDepth: "advanced",
+                searchDepth: "basic",
               }
             );
             allResults.push(
@@ -266,7 +289,7 @@ export const runChatEval = action({
       if (academicChannels.length > 0) {
         const academicQuery = await refineWebSearchQuery(args.question);
         try {
-          const academicResults = await ctx.runAction(
+          const academicPayload = await ctx.runAction(
             internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
             {
               query: academicQuery,
@@ -275,7 +298,7 @@ export const runChatEval = action({
           );
           allResults.push(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ...academicResults.map((r: any) => ({
+            ...academicDiscoverSources(academicPayload).map((r: any) => ({
               title: r.title ?? "Untitled",
               url: r.url ?? "",
               snippet: r.snippet ?? r.abstract ?? "",
@@ -429,6 +452,7 @@ export const runChatEval = action({
       postRerankChunks,
       selectedChunks,
       latencyMs: Date.now() - startTime,
+      tokenUsage: estimateChatTokenUsage(args.question, answer, selectedChunks),
       sourcePolicy: args.sourcePolicy,
     };
   },

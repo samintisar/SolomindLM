@@ -11,7 +11,7 @@ export { NoteListView } from "./NoteListView";
 export { ActiveNoteView } from "./ActiveNoteView";
 
 // Modals
-export { CreateReportModal } from "./CreateReportModal";
+export { CustomizeReportModal } from "./CustomizeReportModal";
 export { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 export { CustomizeQuizModal } from "./CustomizeQuizModal";
 export { CustomizeAudioModal } from "./CustomizeAudioModal";

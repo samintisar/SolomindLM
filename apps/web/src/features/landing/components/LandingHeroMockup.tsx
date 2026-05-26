@@ -11,7 +11,7 @@ import {
   Search,
   Send,
 } from "lucide-react";
-import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
+import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
@@ -364,7 +364,7 @@ export function LandingHeroMockup({
         </div>
       </div>
 
-      <CreateReportModal
+      <CustomizeReportModal
         embedded
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}

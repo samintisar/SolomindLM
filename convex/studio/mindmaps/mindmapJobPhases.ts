@@ -23,7 +23,7 @@ import type { ConceptExtraction, MindMapNode, FinalMindMap } from "../../_agents
 import { validateWithPreset } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // SCHEMAS
@@ -261,7 +261,7 @@ export async function runMindmapGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -392,20 +392,10 @@ export async function runProcessMindMapMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "MindMapJob.MapProcess",
-            tags: ["agent", "mindmap", "map"],
-            metadata: {
-              chunkIndex,
-              contentLength: chunk.length,
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "MindMapMap",
       onRetry: (attempt, error) => {
@@ -634,20 +624,10 @@ export async function runFinalizeMindMapPhase(
       const response = await invokeStudioLlm({
         invoke: () =>
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (llm as any).invoke(
-            [
-              new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-              new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
-            ],
-            createLangSmithRunConfig({
-              runName: "MindMapJob.Reduce",
-              tags: ["agent", "mindmap", "reduce"],
-              metadata: {
-                extractionCount: allExtractions.length,
-                inputSize: safeInput.length,
-              },
-            })
-          ),
+          (llm as any).invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+            new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
+          ]),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "MindMapReduce",
       });

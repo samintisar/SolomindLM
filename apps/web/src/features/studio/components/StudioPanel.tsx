@@ -7,7 +7,7 @@ import {
   isInfographicNote,
 } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-import { CreateReportModal } from "./CreateReportModal";
+import { CustomizeReportModal } from "./CustomizeReportModal";
 import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "./CustomizeQuizModal";
 import { CustomizeAudioModal } from "./CustomizeAudioModal";
@@ -370,7 +370,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       </div>
 
       {/* Modals */}
-      <CreateReportModal
+      <CustomizeReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         onSelectFormat={handleCreateReport}

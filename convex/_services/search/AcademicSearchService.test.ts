@@ -8,13 +8,12 @@ import {
   normalizeTitle,
   calculateScore,
   extractDomain,
+  normalizePublicationYear,
   yearToDateString,
   toDiscoveredSource,
   deduplicatePapers,
   filterPapers,
   sortPapers,
-  searchInternalHandler,
-  discoverAcademicPapersInternalHandler,
 } from "./AcademicSearchService";
 import type { AcademicPaper } from "./AcademicSearchService";
 
@@ -157,6 +156,18 @@ describe("AcademicSearchService - Utility Helpers", () => {
 
     it("returns undefined for invalid URL", () => {
       expect(extractDomain("not-a-url")).toBeUndefined();
+    });
+  });
+
+  describe("normalizePublicationYear", () => {
+    it("returns a valid year unchanged", () => {
+      expect(normalizePublicationYear(2023)).toBe(2023);
+    });
+
+    it("returns undefined for null, undefined, and NaN", () => {
+      expect(normalizePublicationYear(null)).toBeUndefined();
+      expect(normalizePublicationYear(undefined)).toBeUndefined();
+      expect(normalizePublicationYear(Number.NaN)).toBeUndefined();
     });
   });
 
@@ -373,6 +384,11 @@ describe("AcademicSearchService - Result Processing", () => {
       expect(result.map((p) => p.title)).toEqual(["Old", "Cited"]);
     });
 
+    it("filters by has full text (PDF)", () => {
+      const result = filterPapers(papers, { hasFullText: true });
+      expect(result.map((p) => p.title)).toEqual(["Open"]);
+    });
+
     it("filters by open access only", () => {
       const result = filterPapers(papers, { openAccessOnly: true });
       expect(result.map((p) => p.title)).toEqual(["Open"]);
@@ -435,130 +451,5 @@ describe("AcademicSearchService - Result Processing", () => {
       sortPapers(papers, "relevance");
       expect(papers).toEqual(original);
     });
-  });
-});
-
-// ============================================================
-// REAL Integration Tests - Actual API Calls
-// These tests require live internet access. Skip in restricted environments by
-// setting env var SKIP_NETWORK_TESTS=1 or running `bun run test:convex --testNamePattern`.
-// ============================================================
-
-// Skip real network tests in CI or when SKIP_NETWORK_TESTS=1 is set.
-// Developers with live internet access can run locally without the flag.
-const describeIfNetwork =
-  process.env.CI || process.env.SKIP_NETWORK_TESTS === "1" ? describe.skip : describe;
-
-describeIfNetwork("AcademicSearchService - REAL Integration Tests", () => {
-  vi.useRealTimers();
-
-  describe("searchInternalHandler - REAL arXiv API", () => {
-    it("returns real papers from arXiv", async () => {
-      const result = await searchInternalHandler({
-        query: "machine learning",
-        maxResults: 5,
-      });
-
-      expect(result.length).toBeGreaterThan(0);
-      expect(result.length).toBeLessThanOrEqual(5);
-
-      const firstPaper = result[0];
-      expect(firstPaper.title).toBeTruthy();
-      expect(firstPaper.url).toBeTruthy();
-      expect(typeof firstPaper.abstract).toBe("string");
-      expect(firstPaper.source).toBeTruthy();
-      expect(firstPaper.score).toBeGreaterThan(0);
-      expect(Array.isArray(firstPaper.authors)).toBe(true);
-    }, 30000);
-
-    it("filters arXiv results by year", async () => {
-      const result = await searchInternalHandler({
-        query: "deep learning",
-        maxResults: 10,
-        publicationYearFrom: 2020,
-      });
-
-      expect(result.length).toBeGreaterThan(0);
-      for (const paper of result) {
-        expect(paper.year).toBeGreaterThanOrEqual(2020);
-      }
-    }, 30000);
-  });
-
-  describe("searchInternalHandler - REAL Semantic Scholar API", () => {
-    it("returns real papers from Semantic Scholar", async () => {
-      const result = await searchInternalHandler({
-        query: "artificial intelligence",
-        maxResults: 5,
-      });
-
-      // Semantic Scholar might fail or return empty, so just verify structure if we get results
-      if (result.length > 0) {
-        const paper = result.find((p) => p.source === "semantic_scholar");
-        if (paper) {
-          expect(paper.title).toBeTruthy();
-          expect(paper.url).toBeTruthy();
-          expect(paper.abstract).toBeTruthy();
-          expect(paper.score).toBeGreaterThan(0);
-        }
-      }
-    }, 30000);
-  });
-
-  describe("searchInternalHandler - REAL PubMed API", () => {
-    it("returns real papers from PubMed", async () => {
-      const result = await searchInternalHandler({
-        query: "cancer immunotherapy",
-        maxResults: 5,
-      });
-
-      // PubMed might fail or return empty, so just verify structure if we get results
-      if (result.length > 0) {
-        const paper = result.find((p) => p.source === "pubmed");
-        if (paper) {
-          expect(paper.title).toBeTruthy();
-          expect(paper.url).toBeTruthy();
-          expect(paper.abstract).toBeTruthy();
-          expect(paper.score).toBeGreaterThan(0);
-        }
-      }
-    }, 30000);
-  });
-
-  describe("discoverAcademicPapersInternalHandler - REAL APIs", () => {
-    it("discovers and transforms real academic papers", async () => {
-      const result = await discoverAcademicPapersInternalHandler({
-        query: "neural networks",
-        maxResults: 5,
-      });
-
-      expect(result.length).toBeGreaterThan(0);
-      expect(result.length).toBeLessThanOrEqual(5);
-
-      const source = result[0];
-      expect(source.title).toBeTruthy();
-      expect(source.url).toBeTruthy();
-      expect(source.snippet).toBeTruthy();
-      expect(source.score).toBeGreaterThan(0);
-      expect(source.metadata).toBeDefined();
-    }, 30000);
-
-    it("applies real filters on live data", async () => {
-      const result = await discoverAcademicPapersInternalHandler({
-        query: "quantum computing",
-        maxResults: 10,
-        publicationYearFrom: 2020,
-        minCitations: 10,
-      });
-
-      // If we get results, verify they meet the filter criteria
-      if (result.length > 0) {
-        for (const source of result) {
-          if (source.metadata?.citationCount !== undefined) {
-            expect(source.metadata.citationCount).toBeGreaterThanOrEqual(10);
-          }
-        }
-      }
-    }, 30000);
   });
 });

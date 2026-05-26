@@ -16,7 +16,7 @@ import {
   synthesizeSpeechToBuffer,
 } from "../../_services/ai/togetherTts.js";
 import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
-import { concatenateWavBuffers, getPcmWavDurationSeconds } from "../../_services/ai/wav.js";
+import { concatenateWavBuffers } from "../../_services/ai/wav.js";
 import { packChunks, validateChunks } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import {
@@ -32,7 +32,7 @@ import type { DialogueLine } from "../../_agents/audio_overview/state";
 import { sanitizeUserInput, countTokens } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // CONFIGURATION
@@ -152,7 +152,7 @@ export async function runAudioOverviewGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -300,21 +300,10 @@ export async function runProcessAudioMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (llm as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "AudioJob.ExtractBeats",
-            tags: ["agent", "audio-overview", "map"],
-            metadata: {
-              chunkIndex,
-              chunkLength: chunk.length,
-              audioType,
-            },
-          })
-        ),
+        (llm as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "AudioMap",
       onRetry: (attempt, error) => {
@@ -579,22 +568,10 @@ export async function runFinalizeAudioOverviewPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (llm as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-            new HumanMessage(reducePrompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "AudioJob.WriteScript",
-            tags: ["agent", "audio-overview", "reduce"],
-            metadata: {
-              audioType,
-              length,
-              targetLines,
-              focus: sanitizedFocus || "general overview",
-            },
-          })
-        ),
+        (llm as any).invoke([
+          new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+          new HumanMessage(reducePrompt),
+        ]),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "AudioReduce",
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
@@ -749,7 +726,6 @@ export async function runFinalizeAudioOverviewPhase(
     }
 
     const wavBuffer = concatenateWavBuffers(sortedBuffers);
-    const durationSeconds = getPcmWavDurationSeconds(wavBuffer);
     const audioBuffer = encodePcmWavToMp3(wavBuffer);
     console.log(
       `[AudioJob] Audio synthesis complete: ${successCount} lines, ${wavBuffer.length} WAV bytes, ${audioBuffer.length} MP3 bytes`
@@ -813,7 +789,6 @@ export async function runFinalizeAudioOverviewPhase(
         mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
         mapFailedCount: failedCount.count,
         dialogueLines: successCount,
-        durationSeconds,
       },
     });
 

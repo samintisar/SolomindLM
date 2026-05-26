@@ -153,6 +153,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_notebook", ["notebookId"])
+    .index("by_notebook_and_fileType", ["notebookId", "fileType"])
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
     .index("by_notebook_and_status", ["notebookId", "status"])
@@ -539,8 +540,27 @@ export default defineSchema({
       requirePrimarySources: v.optional(v.boolean()),
       recencyDays: v.optional(v.number()),
       dedupeStrategy: v.optional(v.string()), // "strict" | "semantic" | "off"
+      academicFilters: v.optional(
+        v.object({
+          publicationYearFrom: v.optional(v.number()),
+          publicationYearTo: v.optional(v.number()),
+          minCitations: v.optional(v.number()),
+          openAccessOnly: v.optional(v.boolean()),
+          hasFullText: v.optional(v.boolean()),
+          fieldOfStudyTerms: v.optional(v.array(v.string())),
+        })
+      ),
     }),
-    status: v.string(), // "draft" | "approved" | "rejected"
+    status: v.union(
+      v.literal("planning"),
+      v.literal("draft"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    workflowId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -559,6 +579,8 @@ export default defineSchema({
     maxIterations: v.number(), // hard cap, default 2
     streamId: v.optional(v.string()),
     resultMessageId: v.optional(v.id("messages")),
+    tableId: v.optional(v.id("literatureTables")),
+    reportId: v.optional(v.id("literatureReports")),
     error: v.optional(v.string()),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -699,4 +721,268 @@ export default defineSchema({
   })
     .index("by_prompt", ["promptId"])
     .index("by_prompt_and_reporter", ["promptId", "reporterUserId"]),
+
+  // ── Literature Review & Citation tables ─────────────────────────────
+
+  citations: defineTable({
+    paperId: v.string(),
+    title: v.string(),
+    authors: v.array(v.string()),
+    year: v.optional(v.number()),
+    doi: v.optional(v.string()),
+    url: v.string(),
+    pdfUrl: v.optional(v.string()),
+    sourceApi: v.union(
+      v.literal("openalex"),
+      v.literal("arxiv"),
+      v.literal("semantic_scholar"),
+      v.literal("pubmed")
+    ),
+    citationCount: v.optional(v.number()),
+    abstract: v.optional(v.string()),
+    citationKey: v.string(),
+  })
+    .index("by_paperId", ["paperId"])
+    .index("by_citationKey", ["citationKey"]),
+
+  literatureTables: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+    /** Column definitions; `papers` can grow large — prefer `literatureTableDrafts` for very wide tables in future. */
+    columns: v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        type: v.union(
+          v.literal("paper_title"),
+          v.literal("authors"),
+          v.literal("year"),
+          v.literal("study_type"),
+          v.literal("custom")
+        ),
+        instructions: v.optional(v.string()),
+        isVisible: v.boolean(),
+        isSystem: v.boolean(),
+        order: v.number(),
+      })
+    ),
+    papers: v.array(
+      v.object({
+        citationId: v.id("citations"),
+        rowData: v.record(v.string(), v.string()),
+        includeReason: v.optional(v.string()),
+        isIncluded: v.boolean(),
+      })
+    ),
+    /** Set for chat workflow outputs — excluded from studio sidebar lists. */
+    literatureReviewSessionId: v.optional(v.id("literatureReviewSessions")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_user", ["userId"]),
+
+  literatureReports: defineTable({
+    title: v.string(),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    status: v.union(v.literal("generating"), v.literal("completed"), v.literal("failed")),
+    content: v.string(),
+    citationStyle: v.string(),
+    sections: v.array(
+      v.object({
+        heading: v.string(),
+        content: v.string(),
+      })
+    ),
+    citationIds: v.array(v.id("citations")),
+    tableId: v.optional(v.id("literatureTables")),
+    /** Set for chat workflow outputs — excluded from studio sidebar lists. */
+    literatureReviewSessionId: v.optional(v.id("literatureReviewSessions")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_table", ["tableId"]),
+
+  researchSteps: defineTable({
+    researchId: v.string(),
+    /** Optional owner for ACL when exposing steps publicly (backfill as needed). */
+    userId: v.optional(v.id("users")),
+    agentType: v.union(v.literal("research"), v.literal("literature_review")),
+    stepType: v.union(
+      v.literal("planning"),
+      v.literal("searching"),
+      v.literal("deduplicating"),
+      v.literal("ranking"),
+      v.literal("screening"),
+      v.literal("extracting"),
+      v.literal("populating"),
+      v.literal("generating_report"),
+      v.literal("awaiting_user_input")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    details: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    order: v.number(),
+  })
+    .index("by_research", ["researchId"])
+    .index("by_research_step", ["researchId", "stepType"])
+    .index("by_research_and_user", ["researchId", "userId"]),
+
+  literatureReviewSessions: defineTable({
+    query: v.string(),
+    /** Professional display title derived during planning (not the raw user query). */
+    reviewTitle: v.optional(v.string()),
+    notebookId: v.id("notebooks"),
+    userId: v.id("users"),
+    workflowId: v.string(),
+    /** Smart model used for LLM steps (plan, screen, extract, report). */
+    smartModel: v.optional(v.string()),
+    searchOptions: v.optional(
+      v.object({
+        researchDatabase: v.union(v.literal("all"), v.literal("pubmed"), v.literal("arxiv")),
+        academicFilters: v.optional(
+          v.object({
+            publicationYearFrom: v.optional(v.number()),
+            publicationYearTo: v.optional(v.number()),
+            minCitations: v.optional(v.number()),
+            openAccessOnly: v.optional(v.boolean()),
+            hasFullText: v.optional(v.boolean()),
+            fieldOfStudyTerms: v.optional(v.array(v.string())),
+          })
+        ),
+      })
+    ),
+    status: v.union(
+      v.literal("planning"),
+      v.literal("awaiting_columns"),
+      v.literal("searching"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    suggestedColumns: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          instructions: v.optional(v.string()),
+          isVisible: v.boolean(),
+        })
+      )
+    ),
+    confirmedColumns: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          instructions: v.optional(v.string()),
+          isVisible: v.boolean(),
+        })
+      )
+    ),
+    error: v.optional(v.string()),
+    tableId: v.optional(v.id("literatureTables")),
+    reportId: v.optional(v.id("literatureReports")),
+    conversationId: v.optional(v.id("conversations")),
+    assistantMessageId: v.optional(v.id("messages")),
+    /** PRISMA-style workflow counts and search provenance for report Methods. */
+    workflowProvenance: v.optional(
+      v.object({
+        searchQueries: v.optional(v.array(v.string())),
+        databasesUsed: v.optional(v.array(v.string())),
+        recordsIdentified: v.optional(v.number()),
+        recordsAfterDedupe: v.optional(v.number()),
+        recordsRanked: v.optional(v.number()),
+        recordsScreened: v.optional(v.number()),
+        recordsIncluded: v.optional(v.number()),
+        recordsExcluded: v.optional(v.number()),
+        extractedRowCount: v.optional(v.number()),
+        searchCompletedAt: v.optional(v.number()),
+        rankCompletedAt: v.optional(v.number()),
+        screenCompletedAt: v.optional(v.number()),
+        extractCompletedAt: v.optional(v.number()),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_notebook", ["notebookId"])
+    .index("by_user", ["userId"]),
+
+  /** Screening decisions (included and excluded) for PRISMA transparency. */
+  literatureReviewScreeningDecisions: defineTable({
+    sessionId: v.id("literatureReviewSessions"),
+    paperIndex: v.number(),
+    title: v.string(),
+    authors: v.array(v.string()),
+    year: v.optional(v.number()),
+    decision: v.union(v.literal("included"), v.literal("excluded")),
+    reason: v.string(),
+    rank: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_session", ["sessionId"]),
+
+  literatureTableDrafts: defineTable({
+    sessionId: v.id("literatureReviewSessions"),
+    citationId: v.id("citations"),
+    rowData: v.record(v.string(), v.string()),
+    includeReason: v.optional(v.string()),
+    isIncluded: v.boolean(),
+    batchNumber: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_batch", ["sessionId", "batchNumber"]),
+
+  /** Ranked papers snapshot after literature review ranking step (for papers panel UI). */
+  literatureReviewRankedPapers: defineTable({
+    sessionId: v.id("literatureReviewSessions"),
+    papers: v.array(
+      v.object({
+        title: v.string(),
+        authors: v.array(v.string()),
+        year: v.optional(v.number()),
+        abstract: v.string(),
+        url: v.string(),
+        pdfUrl: v.optional(v.string()),
+        source: v.union(
+          v.literal("openalex"),
+          v.literal("arxiv"),
+          v.literal("semantic_scholar"),
+          v.literal("pubmed")
+        ),
+        citationCount: v.optional(v.number()),
+        doi: v.optional(v.string()),
+        score: v.number(),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_session", ["sessionId"]),
+
+  /** Deployment-wide cooldowns for fragile external academic providers. */
+  externalProviderCooldowns: defineTable({
+    provider: v.union(v.literal("semantic_scholar"), v.literal("arxiv")),
+    cooldownUntil: v.number(),
+    lastStatus: v.optional(v.number()),
+    reason: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_provider", ["provider"]),
+
+  /** Deployment-wide gate for arXiv API rate limits (single logical row). */
+  arxivThrottle: defineTable({
+    lastRequestAt: v.number(),
+  }),
 });

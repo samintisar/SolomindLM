@@ -19,5 +19,6 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["tests/convex/**/*.ts", "convex/**/*.test.ts"],
+    exclude: ["convex/**/*.integration.test.ts"],
   },
 });

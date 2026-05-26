@@ -8,7 +8,7 @@ vi.mock("convex/react", () => ({
   useQuery: mockUseQuery,
 }));
 
-// Mock the Convex API — use a deep proxy so api.notes.index.listAllByNotebook resolves to a string path
+// Mock the Convex API — use a deep proxy so api.notes.index.list resolves to a string path
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deepProxy(): any {
   return new Proxy(

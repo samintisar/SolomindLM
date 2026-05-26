@@ -23,7 +23,6 @@ import {
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { useToast } from "@/shared/contexts/useToast";
-import { useChatStreamingContext } from "../../chat/useChatStreaming";
 
 export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
@@ -38,6 +37,7 @@ interface SourcesPanelProps {
   /** Open this notebook document in the viewer (e.g. citation click). `seq` bumps so the same id can reopen. */
   focusSourceRequest?: SourcesPanelFocusRequest | null;
   onFocusSourceHandled?: () => void;
+  onDiscussTopic?: (topic: string) => void;
 }
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({
@@ -49,6 +49,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   onDocumentUploaded,
   focusSourceRequest,
   onFocusSourceHandled,
+  onDiscussTopic,
 }) => {
   const {
     sources,
@@ -80,16 +81,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const refreshNotebookRemote = useRefreshNotebookRemoteSources();
   const refreshRemoteSource = useRefreshRemoteSource();
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
-
-  const chatContext = useChatStreamingContext();
-
-  const handleTopicClick = useCallback(
-    (topic: string) => {
-      if (!chatContext.onSendMessage) return;
-      chatContext.onSendMessage(`Discuss ${topic}`);
-    },
-    [chatContext]
-  );
 
   const handleGoogleDriveFiles = useCallback(
     async (files: PickedFile[], accessToken: string) => {
@@ -423,24 +414,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           onResizeStart={handleResizeStart}
         />
 
-        <div
-          className={
-            viewingSource
-              ? "flex min-h-0 w-full flex-1 flex-col overflow-hidden"
-              : "w-full flex-1 overflow-y-auto"
-          }
-        >
+        <div className="flex-1 overflow-y-auto w-full">
           {viewingSource ? (
             <SourceViewer
               source={viewingSource}
-              onToggle={handleToggleSource}
               content={markdownContent}
               pdfStorageId={viewingSource?.type === "PDF" ? viewingDocument?.storageId : undefined}
               isLoading={sourceContent.isLoading(viewingSourceId ?? "")}
               error={
                 sourceContent.hasError(viewingSourceId ?? "") ? "Failed to load content" : undefined
               }
-              onTopicClick={handleTopicClick}
+              onDiscussTopic={onDiscussTopic}
             />
           ) : (
             <SourceList
@@ -538,7 +522,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onClose={() => setIsDiscoverOpen(false)}
         onAddSource={onAddSource}
         notebookSources={sources}
-        isAtLimit={sources.length >= 100}
+        isAtLimit={sources.length >= 200}
         userId={userId}
         noteId={noteId}
         onDocumentUploaded={onDocumentUploaded}

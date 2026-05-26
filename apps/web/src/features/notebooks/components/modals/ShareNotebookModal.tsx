@@ -1,8 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { X, Copy, Check, Users, GitFork, Ban, Loader2, Lock, Share2 } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import {
+  useShareLinks,
+  useCreateShareLink,
+  useRevokeShareLinkWithOptimisticUpdate,
+} from "../../services/notebooksApi";
 import { useToast } from "@/shared/contexts/useToast";
 import { Button } from "@/shared/components/ui/button";
 
@@ -87,27 +90,10 @@ function LinkUrlRow({
 export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebookId, onClose }) => {
   const { success, error: showError } = useToast();
 
-  const shareListArgs = useMemo(
-    () => ({ notebookId: notebookId as Id<"notebooks"> }),
-    [notebookId]
-  );
+  const links = useShareLinks(notebookId);
 
-  const links = useQuery(api.notebooks.sharing.listShareLinks, shareListArgs);
-
-  const createLink = useMutation(api.notebooks.sharing.createShareLink);
-  const revokeLinkMutation = useMutation(
-    api.notebooks.sharing.revokeShareLink
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(api.notebooks.sharing.listShareLinks, shareListArgs);
-    if (current === undefined) return;
-    localStore.setQuery(
-      api.notebooks.sharing.listShareLinks,
-      shareListArgs,
-      current.map((entry: ShareLinkRow) =>
-        entry.id === args.shareLinkId ? { ...entry, active: false, revokedAt: Date.now() } : entry
-      )
-    );
-  });
+  const createLink = useCreateShareLink();
+  const revokeLinkMutation = useRevokeShareLinkWithOptimisticUpdate(notebookId);
 
   const [busy, setBusy] = useState<"collaborate" | "fork" | null>(null);
   const [coworkUrl, setCoworkUrl] = useState<string | null>(null);

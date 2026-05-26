@@ -6,30 +6,9 @@
  * Defaults (keep in sync across all studio jobs):
  * - **Retry:** `maxAttempts: 3`, `baseDelayMs: 1000`, exponential backoff via `invokeWithRetry`
  * - **Timeout:** caller-provided `timeoutMs` per phase (no global default — each job uses CONFIG.*)
- * - **LangSmith:** pass `createLangSmithRunConfig({ runName, tags, metadata })` as the second argument
- *   to `llm.invoke` / structured `.invoke` inside the `invoke` callback
- *
- * @example
- * ```ts
- * const response = await invokeStudioLlm({
- *   invoke: () =>
- *     (structuredLLM as ChatModel).invoke(
- *       [new SystemMessage(...), new HumanMessage(...)],
- *       createLangSmithRunConfig({ runName: 'MyJob.Map', tags: ['agent', 'myjob'], metadata: {} })
- *     ),
- *   timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
- *   phaseLabel: 'MyJobMap',
- *   onRetry: (attempt, error) => console.log(`Retry ${attempt}/3: ${error.message}`),
- * });
- * ```
  */
 
-import {
-  invokeWithRetry,
-  invokeWithTimeout,
-  createLangSmithRunConfig,
-  type RetryConfig,
-} from "../../_agents/_shared/index";
+import { invokeWithRetry, invokeWithTimeout, type RetryConfig } from "../../_agents/_shared/index";
 
 /** Documented defaults for Studio LLM retries (exponential backoff inside invokeWithRetry). */
 export const STUDIO_LLM_DEFAULT_RETRY: Pick<RetryConfig, "maxAttempts" | "baseDelayMs"> = {
@@ -38,7 +17,7 @@ export const STUDIO_LLM_DEFAULT_RETRY: Pick<RetryConfig, "maxAttempts" | "baseDe
 };
 
 export type InvokeStudioLlmOptions<T> = {
-  /** Full LLM invocation; include `createLangSmithRunConfig(...)` on `.invoke` where supported. */
+  /** Full LLM invocation. */
   invoke: () => Promise<T>;
   timeoutMs: number;
   /** Used for timeout errors and as the `phase` string passed to invokeWithRetry. */
@@ -75,5 +54,3 @@ export async function invokeStudioLlm<T>(options: InvokeStudioLlmOptions<T>): Pr
     phaseLabel
   );
 }
-
-export { createLangSmithRunConfig };

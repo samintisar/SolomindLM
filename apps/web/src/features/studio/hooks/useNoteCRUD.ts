@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { Note } from "@/shared/types/index";
 import { useNotes } from "../services/notesApi";
 import { useUpdateReport, useDeleteReport } from "../services/reportsApi";
-import { useRenameFlashcards, useDeleteFlashcards } from "../services/flashcardsApi";
+import { useRenameFlashcard, useDeleteFlashcard } from "../services/flashcardsApi";
 import { useRenameQuiz, useDeleteQuiz } from "../services/quizzesApi";
 import { useRenameMindMap, useDeleteMindMap } from "../services/mindMapApi";
 import { useUpdateAudioOverview, useDeleteAudioOverview } from "../services/audioApi";
@@ -31,8 +31,8 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
 
   const updateReport = useUpdateReport();
   const deleteReport = useDeleteReport();
-  const renameFlashcards = useRenameFlashcards();
-  const deleteFlashcards = useDeleteFlashcards();
+  const renameFlashcards = useRenameFlashcard();
+  const deleteFlashcards = useDeleteFlashcard();
   const renameQuiz = useRenameQuiz();
   const deleteQuiz = useDeleteQuiz();
   const renameMindMap = useRenameMindMap();

@@ -302,7 +302,7 @@ function getNotePreview(dbNote: any): string {
  */
 export function useNotes(notebookId: string | null, types?: string[]): Note[] {
   const notes = useQuery(
-    api.notes.index.listAllByNotebook,
+    api.notes.index.list,
     notebookId ? { notebookId: notebookId as Id<"notebooks">, types } : "skip"
   );
 
@@ -316,7 +316,7 @@ export function useNotes(notebookId: string | null, types?: string[]): Note[] {
  */
 export function useNoteCounts(notebookId: string | null) {
   return useQuery(
-    api.notes.index.countByType,
+    api.notes.index.count,
     notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
 }
@@ -326,7 +326,7 @@ export function useNoteCounts(notebookId: string | null) {
  */
 export function useNote(type: string, noteId: string | null) {
   const note = useQuery(
-    api.notes.index.getById,
+    api.notes.index.get,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     noteId && type ? { type, id: noteId as any } : "skip"
   );
@@ -338,7 +338,7 @@ export function useNote(type: string, noteId: string | null) {
  */
 export function useNotesLoading(notebookId: string | null): boolean {
   const notes = useQuery(
-    api.notes.index.listAllByNotebook,
+    api.notes.index.list,
     notebookId ? { notebookId: notebookId as Id<"notebooks"> } : "skip"
   );
 
@@ -346,13 +346,5 @@ export function useNotesLoading(notebookId: string | null): boolean {
   return notes === undefined;
 }
 
-// Re-export individual hooks for components that need them
-// These still use the optimized individual queries for single-type lookups
-export { useReports } from "./reportsApi";
-export { useFlashcards } from "./flashcardsApi";
-export { useQuizzes } from "./quizzesApi";
-export { useMindMaps } from "./mindMapApi";
-export { useAudioOverviews } from "./audioApi";
-export { useWrittenQuestions } from "./writtenQuestionsApi";
-export { useInfographics } from "./infographicApi";
-export { useSpreadsheets } from "./spreadsheetsApi";
+// For single-type lookups, import directly from the specific service file
+// (e.g., import { useReports } from "./reportsApi").

@@ -3,7 +3,7 @@
 import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { clearStateKeys, createLangSmithRunConfig, withoutMapOutputs } from "../_shared/index.js";
+import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
@@ -187,18 +187,10 @@ Do NOT combine topics or focus primarily on one.
         invokeWithTimeout(
           () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (deps.smartLlm as any).invoke(
-              [new SystemMessage(REDUCE_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "ReportGraph.Reduce",
-                tags: ["agent", "report", "reduce"],
-                metadata: {
-                  reportType: state.reportType,
-                  collapsedOutputsCount,
-                  validTopicsCount: validTopics.length,
-                },
-              })
-            ),
+            (deps.smartLlm as any).invoke([
+              new SystemMessage(REDUCE_SYSTEM_PROMPT),
+              new HumanMessage(prompt),
+            ]),
           GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
           "Reduce"
         ),

@@ -87,7 +87,7 @@ export function buildWriterPrompt(
     })
     .join("\n\n---\n\n");
 
-  return `You are an expert curriculum designer. Synthesize the evidence into a focused, actionable learning roadmap.
+  return `You are an expert research assistant. Write a clear, chat-native research answer to the user's question using ONLY the provided evidence.
 
 USER QUESTION:
 ${query}
@@ -95,36 +95,13 @@ ${query}
 EVIDENCE BY SUB-QUESTION:
 ${subQuestionSection}
 
-OUTPUT FORMAT — produce ONLY this structure:
-
-## Quick Overview (2-3 bullets)
-- What the user needs to learn and why
-
-## Learning Roadmap
-
-### Phase 1: [Foundational Topic]
-- **Key concepts**: 2-3 specific skills/concepts to master
-- **Resources**: specific courses, papers, or tutorials from the evidence
-- **Milestone**: how to verify they've learned this
-
-### Phase 2: [Next Topic]
-(same structure)
-
-### Phase 3: [Advanced Topic]
-(same structure)
-
-## Projects to Build
-- 2-3 concrete project ideas that combine multiple concepts
-
-## Common Pitfalls to Avoid
-- 2-3 mistakes beginners make at this stage
-
 Requirements:
-- STRICT LENGTH: 1000-2000 words maximum
+- Write in a natural, conversational tone — like you're explaining to a curious colleague
 - Cite sources inline using [N] notation matching the evidence numbers
 - Do NOT fabricate information — only use provided evidence
-- FOCUS on what to learn NEXT, not exhaustive theory
-- Be SPECIFIC: name concrete techniques, papers, and tools
 - If evidence is missing for a topic, provide the best guidance you can from the available evidence without calling attention to gaps
+- Be SPECIFIC: name concrete techniques, papers, and tools when the evidence supports it
+- Structure with clear headings and bullet points for readability
+- Length: 500-1500 words
 `;
 }

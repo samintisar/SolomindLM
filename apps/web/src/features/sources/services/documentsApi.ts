@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import type {
   Document,
   PaperRecordInput,
@@ -36,6 +37,27 @@ export function useDocument(id: string | null) {
  */
 export function useGenerateUploadUrl() {
   return useMutation(api.documents.index.generateUploadUrl);
+}
+
+/**
+ * Raw upload mutation (for advanced use cases like manual paper entry)
+ */
+export function useUpload() {
+  return useMutation(api.documents.index.upload);
+}
+
+/**
+ * Parse bibliography from BibTeX or RIS content
+ */
+export function useParseBibliography() {
+  return useAction(api.documents.index.parseBibliography);
+}
+
+/**
+ * Resolve a DOI to paper metadata
+ */
+export function useResolveDoi() {
+  return useAction(api.documents.index.resolveDoi);
 }
 
 /**
@@ -196,8 +218,28 @@ export function useRefreshRemoteSource() {
 }
 
 /**
+ * Add external sources (web, academic, etc.) to a notebook
+ */
+export function useAddExternalSources() {
+  return useMutation(api.documents.index.addExternalSources);
+}
+
+/**
  * Get the full content of a document (reconstructed from chunks)
  */
+/**
+ * Generate a source guide for a document (summary + topics)
+ */
+export function useGenerateSourceGuide() {
+  const generate = useAction(api.documents.index.generateSourceGuide);
+  return useCallback(
+    async (documentId: string) => {
+      return await generate({ documentId: documentId as Id<"documents"> });
+    },
+    [generate]
+  );
+}
+
 export function useDocumentContent(documentId: string | null) {
   return useQuery(
     api.documents.index.getContent,
@@ -232,6 +274,7 @@ export function useUnifiedDiscovery() {
       minCitations?: number;
       openAccessOnly?: boolean;
       hasFullText?: boolean;
+      fieldOfStudyTerms?: string[];
     };
     maxResults: number;
     sortBy?: "relevance" | "date" | "citations";
@@ -239,6 +282,7 @@ export function useUnifiedDiscovery() {
     sources: UnifiedDiscoveryResult[];
     totalCount: number;
     sourceTypeCounts: Record<string, number>;
+    warnings?: string[];
   }> => {
     const result = await discover({
       query: request.query,
@@ -339,6 +383,20 @@ export function useUploadDocument() {
 
     return { documentId: result.documentId };
   };
+}
+
+/**
+ * Get existing papers for a notebook (for deduplication during import)
+ */
+export function useGetExistingPapers(notebookId: string) {
+  return useQuery(api.documents.index.getExistingPapers, { notebookId: notebookId as Id<"notebooks"> });
+}
+
+/**
+ * Bulk upload papers from bibliography import
+ */
+export function useBulkUpload() {
+  return useMutation(api.documents.bulkUpload.bulkUpload);
 }
 
 // ============================================================

@@ -160,7 +160,7 @@ export const generateInfographicImage = internalAction({
       logger.phaseComplete("status_update");
 
       logger.phaseStart("fetch_chunks", { documentCount: documentIds.length });
-      const chunks = await ctx.runAction(internal.documents.index.fetchChunks, {
+      const chunks = await ctx.runAction(internal.documents.chunks.fetchChunks, {
         documentIds,
       });
       logger.phaseComplete("fetch_chunks", { chunkCount: chunks.length });

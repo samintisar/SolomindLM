@@ -34,7 +34,7 @@ import {
 import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // CONFIGURATION
@@ -166,7 +166,7 @@ export async function runFlashcardGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -336,22 +336,10 @@ export async function runProcessFlashcardMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "FlashcardJob.MapProcess",
-            tags: ["agent", "flashcard", "map"],
-            metadata: {
-              chunkIndex,
-              cardCount,
-              difficulty,
-              topic: topic || "none",
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "FlashcardMap",
       onRetry: (attempt, error) => {

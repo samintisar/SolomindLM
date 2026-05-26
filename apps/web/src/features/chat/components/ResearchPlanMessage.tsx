@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { useQuery } from "convex/react";
-import { Check, Pencil, X, Loader2, CircleCheck, Ban, FlaskConical } from "lucide-react";
-import { api } from "@convex/_generated/api";
+import { Check, Loader2, Ban, FlaskConical, X } from "lucide-react";
+import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
+import { mapDeepResearchSteps } from "../utils/deepResearchSteps";
 import type { Id } from "@convex/_generated/dataModel";
+import {
+  useResearchPlan,
+  useLatestRunForPlan,
+  useResearchSteps,
+} from "../services/researchApi";
 
 interface SubQuestion {
   id: string;
@@ -10,6 +15,16 @@ interface SubQuestion {
   searchQueries: string[];
   sourceChannels: string[];
 }
+
+const CHANNEL_LABELS: Record<string, string> = {
+  notebook: "Notebook",
+  web: "Web",
+  academic: "Academic",
+  news: "News",
+};
+
+const CHANNEL_PILL_CLASS =
+  "inline-flex max-w-full items-center rounded-lg border border-border/70 bg-muted/50 px-2.5 py-1 text-xs font-normal text-foreground/90";
 
 function normalizeSubQuestions(raw: unknown[]): SubQuestion[] {
   return raw
@@ -25,12 +40,20 @@ function normalizeSubQuestions(raw: unknown[]): SubQuestion[] {
     }));
 }
 
+function channelLabel(channel: string): string {
+  return CHANNEL_LABELS[channel] ?? channel;
+}
+
 interface ResearchPlanMessageProps {
   planId: string;
   /** Populated while streaming before the plan row exists in the DB; after load, Convex query wins. */
   subQuestions: SubQuestion[];
   onApprove: (planId: string) => void;
   onReject: (planId: string) => void;
+  /** @deprecated Legacy runs only — new deep research does not create table/report artifacts */
+  onOpenTable?: (tableId: Id<"literatureTables">) => void;
+  /** @deprecated Legacy runs only */
+  onOpenReport?: (reportId: Id<"literatureReports">) => void;
 }
 
 export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
@@ -39,31 +62,28 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
   onApprove,
   onReject,
 }) => {
-  const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const plan = useQuery(api.research.index.getPlan, {
-    planId: planId as Id<"researchPlans">,
-  });
+  const plan = useResearchPlan(planId);
 
   const planStatus = plan?.status as string | undefined;
   const isDraft = planStatus === "draft" || planStatus === undefined;
   const isRejected = planStatus === "rejected";
   const isApproved = planStatus === "approved";
 
-  const latestRun = useQuery(
-    api.research.index.getLatestRunForPlan,
-    isApproved ? { planId: planId as Id<"researchPlans"> } : "skip"
-  );
+  const latestRun = useLatestRunForPlan(planId, isApproved);
 
   const runState = latestRun?.status as string | undefined;
-  const runsQueryLoading = isApproved && latestRun === undefined;
   const runRowMissing = isApproved && latestRun === null;
   const runInFlight =
     isApproved && latestRun != null && (runState === "pending" || runState === "running");
   const runSucceeded = isApproved && latestRun != null && runState === "completed";
   const runFailed = isApproved && latestRun != null && runState === "failed";
-  const showProgressSpinner = runsQueryLoading || runRowMissing || runInFlight;
+
+  const stepsData = useResearchSteps(
+    latestRun ? String(latestRun._id) : null,
+    plan?.notebookId ?? null
+  );
 
   const displaySubQuestions = useMemo(() => {
     if (plan?.subQuestions && Array.isArray(plan.subQuestions) && plan.subQuestions.length > 0) {
@@ -75,8 +95,18 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
     return [];
   }, [plan, subQuestions]);
 
+  const steps = useMemo(() => {
+    if (!stepsData) return [];
+    return mapDeepResearchSteps(stepsData, displaySubQuestions);
+  }, [stepsData, displaySubQuestions]);
+
   const loadingFromServer = plan === undefined && displaySubQuestions.length === 0;
   const missingPlan = plan === null && displaySubQuestions.length === 0;
+  const showSteps =
+    isApproved && !isRejected && (steps.length > 0 || runInFlight || runRowMissing);
+
+  /** Plan review (draft), dismiss, and failure only—timeline + artifacts cover success. */
+  const showStatusCard = isDraft || isRejected || runFailed;
 
   const handleApprove = async () => {
     setSubmitting(true);
@@ -87,167 +117,141 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
     }
   };
 
-  const cardClass = isRejected
-    ? "border-border/80 bg-muted/25 shadow-none"
+  const cardBorderClass = isRejected
+    ? "border-border"
     : runFailed
-      ? "border-destructive/25 bg-gradient-to-b from-destructive/[0.06] to-card shadow-sm"
-      : runSucceeded
-        ? "border-success/25 bg-gradient-to-b from-success/[0.07] via-card to-card shadow-sm"
-        : "border-primary/25 bg-card shadow-sm";
-
-  const headerEyebrow = isRejected
-    ? "Plan status"
-    : runSucceeded
-      ? "Research plan"
-      : runFailed
-        ? "Research plan"
-        : runInFlight
-          ? "Research plan"
-          : runsQueryLoading || runRowMissing
-            ? "Research plan"
-            : "Research plan";
+      ? "border-destructive/25"
+      : "border-border";
 
   const headerTitle = isRejected
-    ? "Dismissed"
-    : runSucceeded
-      ? "Research complete"
-      : runFailed
-        ? "Run failed"
-        : runInFlight
-          ? "In progress"
-          : runsQueryLoading
-            ? "Loading…"
-            : runRowMissing
-              ? "Starting…"
-              : "Ready for review";
+    ? "Plan dismissed"
+    : runFailed
+      ? "Run failed"
+      : "Research plan";
 
-  const headerSubtitle =
-    isApproved && !isRejected
-      ? runSucceeded
-        ? "Your findings are in the next assistant reply—scroll down to read the full report."
-        : runFailed
-          ? "Something went wrong. Ask a follow-up in chat, or start a new deep research run."
-          : runInFlight
-            ? "Gathering sources and drafting the report. This can take a minute."
-            : runRowMissing || runsQueryLoading
-              ? "Spinning up the research run…"
-              : null
-      : isRejected
-        ? "This plan was cancelled. You can still chat normally."
-        : null;
+  const headerSubtitle = isRejected
+    ? "This plan was cancelled. You can still chat normally."
+    : runFailed
+      ? "Something went wrong. Ask a follow-up in chat, or start a new deep research run."
+      : "Review the sub-questions below, then approve to start deep research.";
 
-  const iconWellClass = isRejected
-    ? "bg-muted text-muted-foreground ring-1 ring-border/60"
-    : runSucceeded
-      ? "bg-success/15 text-success ring-1 ring-success/25"
-      : runFailed
-        ? "bg-destructive/10 text-destructive ring-1 ring-destructive/20"
-        : showProgressSpinner
-          ? "bg-primary/12 text-primary ring-1 ring-primary/20"
-          : "bg-primary/10 text-primary ring-1 ring-primary/25";
+  const StatusIcon = isRejected ? Ban : runFailed ? X : FlaskConical;
+
+  const statusIconClass = isRejected
+    ? "text-muted-foreground"
+    : runFailed
+      ? "text-destructive"
+      : "text-primary";
 
   return (
-    <div className={`rounded-2xl border p-4 sm:p-5 space-y-4 ${cardClass}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          <div
-            className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconWellClass}`}
-            aria-hidden
-          >
-            {runSucceeded ? (
-              <CircleCheck className="size-5 stroke-[2.25]" />
-            ) : isRejected ? (
-              <Ban className="size-[18px]" />
-            ) : showProgressSpinner ? (
-              <Loader2 className="size-5 animate-spin" />
-            ) : (
-              <FlaskConical className="size-5" />
-            )}
-          </div>
-          <div className="min-w-0 pt-0.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {headerEyebrow}
-            </p>
-            <h4 className="mt-1 font-semibold text-base text-foreground leading-snug tracking-tight">
-              {headerTitle}
-            </h4>
-            {headerSubtitle ? (
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-                {headerSubtitle}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        {isDraft && (
-          <button
-            type="button"
-            onClick={() => setEditing(!editing)}
-            className="p-2 rounded-xl hover:bg-muted/90 transition-colors shrink-0 text-muted-foreground hover:text-foreground"
-            title={editing ? "Cancel editing" : "Edit plan"}
-          >
-            {editing ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-          </button>
-        )}
-      </div>
+    <div className="w-full max-w-3xl space-y-6">
+      {showSteps ? (
+        <LiteratureReviewSteps steps={steps} expandAll={runSucceeded} />
+      ) : null}
 
-      <div className="space-y-2 border-t border-border/60 pt-4">
-        {loadingFromServer ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
-            Loading plan…
-          </div>
-        ) : missingPlan ? (
-          <p className="text-sm text-muted-foreground py-2">
-            Could not load this research plan. Try refreshing the page.
-          </p>
-        ) : null}
-        {displaySubQuestions.map((sq, index) => (
-          <div key={sq.id} className="flex gap-3 items-start text-sm">
-            <span className="shrink-0 w-7 h-7 rounded-lg bg-muted/80 text-foreground/80 flex items-center justify-center text-xs font-semibold tabular-nums ring-1 ring-border/50">
-              {index + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-foreground">{sq.question}</p>
-              <div className="flex gap-1.5 mt-1 flex-wrap">
-                {sq.sourceChannels.map((ch) => (
-                  <span
-                    key={ch}
-                    className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                  >
-                    {ch}
-                  </span>
-                ))}
-              </div>
+      {showStatusCard ? (
+      <div
+        className={`overflow-hidden rounded-xl border bg-card font-sans ${cardBorderClass}`}
+      >
+        <div className="border-b border-border px-4 py-3.5 sm:px-5">
+          <div className="flex items-start gap-3">
+            <StatusIcon className={`mt-0.5 size-5 shrink-0 ${statusIconClass}`} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+                {headerTitle}
+              </h3>
+              {headerSubtitle ? (
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {headerSubtitle}
+                </p>
+              ) : null}
             </div>
           </div>
-        ))}
-      </div>
-
-      {isDraft && (
-        <div className="flex items-center gap-2 pt-2 border-t border-border">
-          <button
-            type="button"
-            onClick={handleApprove}
-            disabled={submitting || displaySubQuestions.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Check className="w-4 h-4" />
-            )}
-            Approve & Research
-          </button>
-          <button
-            type="button"
-            onClick={() => onReject(planId)}
-            disabled={submitting}
-            className="px-4 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
         </div>
-      )}
+
+        {isDraft ? (
+          <ul className="divide-y divide-border">
+            {loadingFromServer ? (
+              <li className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground sm:px-5">
+                <Loader2 className="size-4 shrink-0 animate-spin" />
+                Loading plan…
+              </li>
+            ) : missingPlan ? (
+              <li className="px-4 py-4 text-sm text-muted-foreground sm:px-5">
+                Could not load this research plan. Try refreshing the page.
+              </li>
+            ) : (
+              displaySubQuestions.map((sq, index) => (
+                <li key={sq.id} className="px-4 py-3 sm:px-5">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/80 text-xs font-semibold tabular-nums text-foreground/80 ring-1 ring-border/50"
+                      aria-hidden
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium leading-snug text-foreground">
+                        {sq.question}
+                      </p>
+                      {sq.sourceChannels.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {sq.sourceChannels.map((ch) => (
+                            <span key={ch} className={CHANNEL_PILL_CLASS}>
+                              {channelLabel(ch)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
+        ) : null}
+
+        {isDraft && !loadingFromServer && !missingPlan && (
+          <div className="flex flex-col gap-3 border-t border-border bg-muted px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium tabular-nums text-foreground">
+                {displaySubQuestions.length}
+              </span>
+              {displaySubQuestions.length === 1 ? " sub-question" : " sub-questions"}
+            </p>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <button
+                type="button"
+                onClick={() => onReject(planId)}
+                disabled={submitting}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent/50 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApprove}
+                disabled={submitting || displaySubQuestions.length === 0}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Starting…
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-4" strokeWidth={2.5} />
+                    Approve & Research
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      ) : null}
     </div>
   );
 };
+

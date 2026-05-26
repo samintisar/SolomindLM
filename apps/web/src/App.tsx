@@ -14,6 +14,8 @@ import { SourcesProvider } from "./features/sources/SourcesContext";
 import { StudioProvider } from "./features/studio/StudioContext";
 import { NotebookView } from "./features/notebooks/components/views/NotebookView";
 import { ForkNotebookPage } from "./features/notebooks/components/views/ForkNotebookPage";
+import { LiteratureTablePage } from "./features/studio/components/LiteratureTablePage";
+import { LiteratureReportPage } from "./features/studio/components/LiteratureReportPage";
 import { ShareNotebookModal } from "./features/notebooks/components/modals/ShareNotebookModal";
 import { BillingPage } from "./features/billing/components/BillingPage";
 import { LandingPage } from "./features/landing/LandingPage";
@@ -75,28 +77,36 @@ const AppContent: React.FC = () => {
     [navigate, location.pathname, location.search]
   );
 
+  /** Path-derived id is available on first paint; `activeNotebookId` state syncs in an effect and can lag behind the route. */
+  const urlNotebookId = useMemo(() => {
+    const match = location.pathname.match(/^\/notebook\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [location.pathname]);
+
+  const dataNotebookId = useMemo(() => {
+    if (urlNotebookId && urlNotebookId !== "new") return urlNotebookId;
+    if (activeNotebookId && activeNotebookId !== "new") return activeNotebookId;
+    return null;
+  }, [urlNotebookId, activeNotebookId]);
+
   const notebooks = useNotebooks();
   const folders = useFolders();
   const documents =
     useQuery(
       api.documents.index.list,
-      activeNotebookId && activeNotebookId !== "new"
-        ? { notebookId: activeNotebookId as Id<"notebooks"> }
-        : "skip"
+      dataNotebookId ? { notebookId: dataNotebookId as Id<"notebooks"> } : "skip"
     ) ?? [];
   useGenerateUploadUrl();
   useCreateDocument();
 
   const sourceManager = useSourceManager({
     documents,
-    notebookId: activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null,
+    notebookId: dataNotebookId,
   });
-  const noteCRUD = useNoteCRUD({ activeNotebookId });
-  const conversationCRUD = useConversationCRUD(
-    activeNotebookId && activeNotebookId !== "new" ? activeNotebookId : null
-  );
+  const noteCRUD = useNoteCRUD({ activeNotebookId: dataNotebookId });
+  const conversationCRUD = useConversationCRUD(dataNotebookId);
   const chatStream = useChatStream({
-    activeNotebookId,
+    activeNotebookId: dataNotebookId,
     activeConversationId,
     sources: sourceManager.sources,
     notes: noteCRUD.notes,
@@ -132,13 +142,6 @@ const AppContent: React.FC = () => {
     if (location.pathname.startsWith("/folder/")) return "folder";
     if (location.pathname.startsWith("/notebook/")) return "notebook";
     return "landing";
-  }, [location.pathname]);
-
-  const urlNotebookId = useMemo(() => {
-    if (location.pathname.startsWith("/notebook/")) {
-      return location.pathname.split("/notebook/")[1] || null;
-    }
-    return null;
   }, [location.pathname]);
 
   const urlFolderId = useMemo(() => {
@@ -431,6 +434,24 @@ const AppContent: React.FC = () => {
                       </StudioProvider>
                     </SourcesProvider>
                   </ChatStreamingProvider>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/notebook/:id/table/:tableId"
+              element={
+                <ProtectedRoute requireNotebookAccess={true}>
+                  <LiteratureTablePage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/notebook/:id/report/:reportId"
+              element={
+                <ProtectedRoute requireNotebookAccess={true}>
+                  <LiteratureReportPage />
                 </ProtectedRoute>
               }
             />

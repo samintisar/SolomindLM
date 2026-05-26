@@ -3,7 +3,7 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { createLangSmithRunConfig, invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
+import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction";
 
@@ -107,20 +107,10 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
     () =>
       invokeWithTimeout(
         () =>
-          structuredLlm.invoke(
-            [
-              new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
-              new HumanMessage(prompt),
-            ],
-            createLangSmithRunConfig({
-              runName: "FlashcardGraph.CollapseGroup",
-              tags: ["agent", "flashcard", "collapse"],
-              metadata: {
-                inputCount: group.length,
-                mergedCardCount: allCards.length,
-              },
-            }) as unknown as Record<string, unknown>
-          ),
+          structuredLlm.invoke([
+            new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ]),
         FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
         "FlashcardCollapseGroup"
       ),
@@ -210,22 +200,10 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     () =>
       invokeWithTimeout(
         () =>
-          structuredLlm.invoke(
-            [
-              new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-              new HumanMessage(prompt),
-            ],
-            createLangSmithRunConfig({
-              runName: "FlashcardGraph.RefineSelection",
-              tags: ["agent", "flashcard", "reduce"],
-              metadata: {
-                targetCount,
-                difficulty,
-                topic: topic || "none",
-                candidateCount: flashcards.length,
-              },
-            }) as unknown as Record<string, unknown>
-          ),
+          structuredLlm.invoke([
+            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ]),
         FLASHCARD_CONFIG.REDUCE_TIMEOUT_MS,
         "FlashcardRefineSelection"
       ),

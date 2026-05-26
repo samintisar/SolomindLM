@@ -1,3 +1,9 @@
+export interface SourceGuide {
+  summary: string;
+  topics: string[];
+  generatedAt: number;
+}
+
 export interface Source {
   id: string;
   title: string;
@@ -33,6 +39,8 @@ export interface Source {
     fulltextStatus?: "available" | "unavailable" | "external_only";
     ingestionStatus?: "pending" | "ingested" | "metadata_only" | "failed";
   };
+  /** AI-generated summary and topics for the source (NotebookLM-style) */
+  sourceGuide?: SourceGuide;
 }
 
 /** Attached notebook documents shown as chips; IDs are sent separately (`attachedDocumentIds`). */
@@ -109,6 +117,23 @@ export interface Message {
   agentTrace?: ChatAgentTrace;
   /** Deep research plan metadata for plan-approval messages */
   researchPlan?: { planId: string; subQuestions: unknown[]; sourcePolicy: unknown };
+  /** Completed deep research answer linked to a research run */
+  deepResearch?: { researchRunId: string };
+  /** Literature review metadata for persisted review messages */
+  literatureReview?: {
+    sessionId: string;
+    status: string;
+    query: string;
+    tableId?: string;
+    reportId?: string;
+    suggestedColumns?: Array<{
+      id: string;
+      name: string;
+      instructions?: string;
+      isVisible: boolean;
+    }>;
+    error?: string;
+  };
   /** External sources discovered during chat (web, academic, news, finance) */
   externalSources?: Array<{
     title: string;

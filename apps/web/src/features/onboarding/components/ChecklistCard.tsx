@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useMutation, useQuery } from "convex/react";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
-import { api } from "@convex/_generated/api";
+import {
+  useOnboardingState,
+  useChecklistProgress,
+  useDismissChecklist,
+} from "../services/onboardingApi";
 import { ChecklistItem } from "./ChecklistItem";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 
@@ -23,9 +26,9 @@ function logOnboardingError(action: string, error: unknown) {
 
 export const ChecklistCard: React.FC = () => {
   const location = useLocation();
-  const state = useQuery(api.onboarding.state.getOnboardingState, {});
-  const progress = useQuery(api.onboarding.progress.getChecklistProgress, {});
-  const dismiss = useMutation(api.onboarding.mutations.dismissChecklist);
+  const state = useOnboardingState();
+  const progress = useChecklistProgress();
+  const dismiss = useDismissChecklist();
   const { showError } = useServiceErrorToast();
 
   const [collapsed, setCollapsed] = useState(() => {

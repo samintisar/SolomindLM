@@ -11,6 +11,14 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 
+// Convex action runtime may lack performance; LangChain SDK expects performance.now().
+if (typeof globalThis.performance === "undefined") {
+  (globalThis as unknown as Record<string, unknown>).performance = {
+    now: () => Date.now(),
+    timeOrigin: Date.now(),
+  };
+}
+
 // ============================================================
 // Types
 // ============================================================

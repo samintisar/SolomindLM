@@ -12,7 +12,7 @@ export interface AcademicPaper {
   abstract: string;
   url: string;
   pdfUrl?: string;
-  source: "arxiv" | "semantic_scholar" | "pubmed";
+  source: "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
   citationCount?: number;
   doi?: string;
 }

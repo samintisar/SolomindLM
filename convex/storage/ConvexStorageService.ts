@@ -100,7 +100,7 @@ export const getStorageUrl = action({
     if (!userId) {
       throw new Error("Unauthenticated");
     }
-    const canAccess = await ctx.runQuery(internal.documents.index.userCanAccessStorage, {
+    const canAccess = await ctx.runQuery(internal.documents.internal.userCanAccessStorage, {
       userId,
       storageId: args.storageId,
     });
@@ -169,7 +169,7 @@ export const deleteFile = action({
       throw new Error("Unauthenticated");
     }
     if (args.storageId) {
-      const canAccess = await ctx.runQuery(internal.documents.index.userCanAccessStorage, {
+      const canAccess = await ctx.runQuery(internal.documents.internal.userCanAccessStorage, {
         userId,
         storageId: args.storageId,
       });

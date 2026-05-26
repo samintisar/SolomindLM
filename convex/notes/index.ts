@@ -11,7 +11,7 @@ import * as NotesModel from "../_model/notes";
  *
  * @returns Array of all notes with a `type` discriminator field
  */
-export const listAllByNotebook = query({
+export const list = query({
   args: {
     notebookId: v.id("notebooks"),
     // Optional: Filter by specific types to reduce payload
@@ -150,7 +150,7 @@ export const listAllByNotebook = query({
 /**
  * Get a single note by type and ID
  */
-export const getById = query({
+export const get = query({
   args: {
     type: v.string(),
     id: v.union(
@@ -214,7 +214,7 @@ export const getById = query({
 /**
  * Count notes by type for a notebook
  */
-export const countByType = query({
+export const count = query({
   args: {
     notebookId: v.id("notebooks"),
   },

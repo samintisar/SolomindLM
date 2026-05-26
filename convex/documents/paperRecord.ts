@@ -13,6 +13,7 @@ export const paperRecordValidator = v.object({
   pdfUrl: v.optional(v.string()),
   landingPageUrl: v.optional(v.string()),
   license: v.optional(v.string()),
+  sourceType: v.optional(v.string()),
 });
 
 export const fulltextStatusValidator = v.union(
@@ -40,6 +41,7 @@ export type PaperRecord = {
   pdfUrl?: string;
   landingPageUrl?: string;
   license?: string;
+  sourceType?: string;
 };
 
 export function normalizeDoi(doi: string | undefined): string | undefined {

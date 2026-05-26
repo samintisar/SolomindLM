@@ -35,17 +35,6 @@ export const env = {
   // Mistral (OCR)
   MISTRAL_API_KEY: process.env.MISTRAL_API_KEY || "",
 
-  // LangSmith (tracing)
-  LANGSMITH_API_KEY: process.env.LANGSMITH_API_KEY || "",
-  LANGSMITH_PROJECT: process.env.LANGSMITH_PROJECT || "",
-  LANGSMITH_ENDPOINT: process.env.LANGSMITH_ENDPOINT || "",
-  LANGSMITH_TRACING: process.env.LANGSMITH_TRACING || "false",
-
-  // LangChain env vars
-  LANGCHAIN_API_KEY: process.env.LANGCHAIN_API_KEY || "",
-  LANGCHAIN_PROJECT: process.env.LANGCHAIN_PROJECT || "",
-  LANGCHAIN_TRACING_V2: process.env.LANGCHAIN_TRACING_V2 || "false",
-
   // Supadata
   SUPADATA_API_KEY: process.env.SUPADATA_API_KEY || "",
 

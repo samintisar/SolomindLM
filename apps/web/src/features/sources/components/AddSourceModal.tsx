@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
+import { Id } from "@convex/_generated/dataModel";
 import {
   X,
   FileStack,
@@ -10,9 +11,18 @@ import {
   Globe,
   File,
   HardDrive,
+  BookOpen,
+  BookMarked,
+  Library,
+  PenLine,
 } from "lucide-react";
+import { DoiInputModal } from "./DoiInputModal";
+import { BibtexImportModal } from "./BibtexImportModal";
+import { ZoteroImportModal } from "./ZoteroImportModal";
+import { MendeleyImportModal } from "./MendeleyImportModal";
+import { ManualPaperModal } from "./ManualPaperModal";
 
-const MAX_SOURCES = 100;
+const MAX_SOURCES = 200;
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -57,6 +67,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   fileInputRef,
   onFileSelect,
 }) => {
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+
   // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
   // onDragLeave is recreated each render, so [isOpen, onDragLeave] would retrigger after setState).
   const onDragLeaveRef = useRef(onDragLeave);
@@ -232,6 +244,65 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                 </button>
               </div>
             </div>
+
+            <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow md:col-span-2 xl:col-span-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                <BookOpen className="w-4 h-4" />
+                Research Papers
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+                <button
+                  onClick={() => setActiveModal("doi")}
+                  disabled={!canUpload}
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <Globe className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">Import from DOI</span>
+                </button>
+                <button
+                  onClick={() => setActiveModal("bibtex")}
+                  disabled={!canUpload}
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <FileText className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">Import BibTeX or RIS</span>
+                </button>
+                <button
+                  onClick={() => setActiveModal("zotero")}
+                  disabled={!canUpload}
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <Library className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">Import from Zotero</span>
+                </button>
+                <button
+                  onClick={() => setActiveModal("mendeley")}
+                  disabled={!canUpload}
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <BookMarked className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">Import from Mendeley</span>
+                </button>
+                <button
+                  onClick={() => setActiveModal("manual")}
+                  disabled={!canUpload}
+                  className="min-h-11 w-full flex items-center gap-3 rounded-lg border border-transparent bg-secondary/30 p-3 text-left transition-all hover:border-border hover:bg-secondary/50 group disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background shadow-sm group-hover:scale-105 transition-transform [&_svg]:stroke-2 [&_svg]:text-primary">
+                    <PenLine className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm font-medium leading-snug">Add manually</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Warnings */}
@@ -283,6 +354,37 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Paper Import Modals */}
+      {noteId && (
+        <>
+          <DoiInputModal
+            notebookId={noteId as Id<"notebooks">}
+            isOpen={activeModal === "doi"}
+            onClose={() => setActiveModal(null)}
+          />
+          <BibtexImportModal
+            notebookId={noteId as Id<"notebooks">}
+            isOpen={activeModal === "bibtex"}
+            onClose={() => setActiveModal(null)}
+          />
+          <ZoteroImportModal
+            notebookId={noteId as Id<"notebooks">}
+            isOpen={activeModal === "zotero"}
+            onClose={() => setActiveModal(null)}
+          />
+          <MendeleyImportModal
+            notebookId={noteId as Id<"notebooks">}
+            isOpen={activeModal === "mendeley"}
+            onClose={() => setActiveModal(null)}
+          />
+          <ManualPaperModal
+            notebookId={noteId as Id<"notebooks">}
+            isOpen={activeModal === "manual"}
+            onClose={() => setActiveModal(null)}
+          />
+        </>
+      )}
     </div>
   );
 };

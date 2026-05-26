@@ -2,12 +2,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import {
-  invokeWithTimeout,
-  invokeWithRetry,
-  sanitizeUserInput,
-  createLangSmithRunConfig,
-} from "../_shared/index.js";
+import { invokeWithTimeout, invokeWithRetry, sanitizeUserInput } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 import type { OverallStateType, ChunkProcessState } from "./state.js";
 import { getMapPrompt, MAP_SYSTEM_PROMPT } from "./prompts.js";
@@ -52,21 +47,7 @@ export async function extractBeats(
     const response = await invokeWithRetry(
       () =>
         invokeWithTimeout(
-          () =>
-            fastLlm.invoke(
-              [new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)],
-              createLangSmithRunConfig({
-                runName: "AudioOverviewGraph.ExtractBeats",
-                tags: ["agent", "audio-overview", "map"],
-                metadata: {
-                  chunkIndex,
-                  chunkLength: chunk.length,
-                  audioType,
-                  length,
-                  focus: focus || "none",
-                },
-              })
-            ),
+          () => fastLlm.invoke([new SystemMessage(MAP_SYSTEM_PROMPT), new HumanMessage(prompt)]),
           GRAPH_CONFIG.MAP_TIMEOUT_MS,
           "AudioMap"
         ),

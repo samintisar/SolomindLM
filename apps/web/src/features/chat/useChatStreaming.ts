@@ -2,6 +2,8 @@ import { createContext, useContext } from "react";
 import { Message, Note } from "@/shared/types/index";
 import type { Doc } from "@convex/_generated/dataModel";
 
+import type { ChatStreamSourcePolicy } from "./chatStreamTypes";
+
 export interface ChatStreamingContextType {
   messages: Message[];
   isChatStreaming: boolean;
@@ -12,9 +14,8 @@ export interface ChatStreamingContextType {
   onSendMessage: (
     messageText: string,
     deepResearch?: boolean,
-    sourcePolicy?: { channels: string[] },
-    documentIds?: string[],
-    attachedDocumentIds?: string[]
+    sourcePolicy?: ChatStreamSourcePolicy,
+    sendOptions?: { documentIdsOverride?: string[] }
   ) => void;
   /** Stop the current streaming response */
   onStopChat: () => void;

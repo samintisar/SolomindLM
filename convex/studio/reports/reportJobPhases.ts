@@ -23,7 +23,7 @@ import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 interface MapOutputInvoker {
   invoke(messages: Array<SystemMessage | HumanMessage>): Promise<MapOutput>;
@@ -139,7 +139,7 @@ export async function runReportGenerationPhase(
       },
     });
 
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -277,21 +277,10 @@ IMPORTANT: Respond with a JSON object containing:
     const mapOutput = (await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredLLM as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-            new HumanMessage(structuredPrompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "ReportJob.MapProcess",
-            tags: ["agent", "report", "map"],
-            metadata: {
-              chunkIndex,
-              reportType,
-              totalChunks,
-            },
-          })
-        ),
+        (structuredLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(structuredPrompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "ReportMap",
       onRetry: (attempt, error) => {
@@ -509,20 +498,10 @@ export async function runFinalizeReportPhase(
     const response = (await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (llm as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "ReportJob.Reduce",
-            tags: ["agent", "report", "reduce"],
-            metadata: {
-              reportType,
-              contentLength: combinedContent.length,
-            },
-          })
-        ),
+        (llm as any).invoke([
+          new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "ReportReduce",
       onRetry: (attempt, error) => {

@@ -271,132 +271,135 @@ export const discoverSourcesInternal = internalAction({
 });
 
 // ============================================================
-// Deep Research
+// Extract Internal Action
 // ============================================================
 
-export interface DeepResearchArgs {
-  input: string;
-  model?: "mini" | "pro" | "auto";
-  outputSchema?: Record<string, unknown>;
+export interface ExtractInternalArgs {
+  urls: string[];
+  extractDepth?: "basic" | "advanced";
+  format?: "markdown" | "text";
 }
 
-export interface DeepResearchResult {
-  requestId: string;
-  status: string;
-  content?: string;
-  sources?: Array<{ url: string; title: string }>;
-}
-
-export async function deepResearchHandler(args: DeepResearchArgs): Promise<DeepResearchResult> {
-  const { input, model = "auto" } = args;
-  const logger = createServiceLogger("tavily", "deepResearch");
-  logger.operationStart({ inputPreview: input.substring(0, 100), model });
-
-  const apiKey = env.TAVILY_API_KEY;
-  if (!apiKey) {
-    logger.error("TAVILY_API_KEY is not configured");
-    throw new Error("TAVILY_API_KEY is not configured");
-  }
-
-  let requestId: string | undefined;
+export async function extractInternalHandler(
+  args: ExtractInternalArgs
+): Promise<{ results: Array<{ url: string; title: string | null; rawContent: string }>; failedResults: Array<{ url: string; error: string }> }> {
+  const logger = createServiceLogger("tavily", "extractInternal");
+  const startTime = Date.now();
+  logger.operationStart({ urlCount: args.urls.length });
 
   try {
-    // Step 1: Start research task
-    const startResult = await getTavilyClient().research(input, {
-      model,
-      ...(args.outputSchema ? { outputSchema: args.outputSchema } : {}),
-    });
+    const data = await invokeWithHttpRetry(async () => {
+      const t0 = Date.now();
+      logger.apiCall("tavily", "/extract", { urlCount: args.urls.length });
 
-    // Handle both generator and direct response types
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof (startResult as any).next === "function") {
-      throw new Error("Streaming research not supported in eval mode");
-    }
-    const researchResponse = startResult as { requestId: string };
-    requestId = researchResponse.requestId;
-    logger.info("Deep research started", { requestId, model });
-
-    // Step 2: Poll until completed — cap at 100 attempts (8.3 min) to stay within Convex's 10-min action limit
-    let response = await getTavilyClient().getResearch(requestId);
-    let attempts = 0;
-    const maxAttempts = 100;
-
-    while (
-      response.status !== "completed" &&
-      response.status !== "failed" &&
-      attempts < maxAttempts
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-      response = await getTavilyClient().getResearch(requestId);
-      attempts++;
-      logger.debug("Polling research", {
-        requestId,
-        status: response.status,
-        attempt: attempts,
+      const response = await getTavilyClient().extract(args.urls, {
+        extractDepth: args.extractDepth ?? "advanced",
+        format: args.format ?? "markdown",
+        timeout: 30,
       });
-    }
 
-    if (response.status === "failed") {
-      const failedResponse = response as { error?: string };
-      const errorMsg = failedResponse.error || "Deep research task failed";
-      logger.error("Deep research failed", new Error(errorMsg), { requestId });
-      throw new Error(errorMsg);
-    }
-
-    if (attempts >= maxAttempts) {
-      logger.error("Deep research timed out", new Error("Max polling attempts exceeded"), {
-        requestId,
+      logger.apiSuccess("tavily", "/extract", Date.now() - t0, {
+        successCount: response.results.length,
+        failedCount: response.failedResults.length,
       });
-      throw new Error("Deep research timed out after 8 minutes");
-    }
-
-    if (response.status !== "completed") {
-      logger.error(
-        "Deep research ended with unexpected status",
-        new Error(`Unexpected status: ${response.status}`),
-        { requestId, status: response.status }
-      );
-      throw new Error(`Deep research ended with unexpected status: ${response.status}`);
-    }
-
-    const completedResponse = response as {
-      content?: string;
-      sources?: Array<{ title: string; url: string }>;
-    };
+      return response;
+    }, "tavily_extract");
 
     logger.operationComplete({
-      requestId,
-      contentLength: completedResponse.content?.length || 0,
-      sourceCount: completedResponse.sources?.length || 0,
+      successCount: data.results.length,
+      failedCount: data.failedResults.length,
+      durationMs: Date.now() - startTime,
     });
 
     return {
-      requestId,
-      status: response.status,
-      content: completedResponse.content,
-      sources: completedResponse.sources,
+      results: data.results.map((r) => ({
+        url: r.url,
+        title: r.title,
+        rawContent: r.rawContent,
+      })),
+      failedResults: data.failedResults.map((f) => ({
+        url: f.url,
+        error: f.error,
+      })),
     };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    const contextual = requestId
-      ? `Deep research polling failed (requestId: ${requestId}): ${msg}`
-      : msg;
-    logger.operationError(new Error(contextual));
+    logger.operationError(error);
+    if (error instanceof Error) {
+      const e = error as any;
+      const httpStatus =
+        e.statusCode ?? e.status ?? e.response?.statusCode ?? e.response?.status ?? 0;
+      throw createExternalServiceErrorFromResponse(
+        "tavily",
+        typeof httpStatus === "number" ? httpStatus : 0,
+        "/extract",
+        error.message
+      );
+    }
     throw error;
   }
 }
 
-export const deepResearch = internalAction({
+export const extractInternal = internalAction({
   args: {
-    input: v.string(),
-    model: v.optional(v.string()),
-    outputSchema: v.optional(v.any()),
+    urls: v.array(v.string()),
+    extractDepth: v.optional(v.union(v.literal("basic"), v.literal("advanced"))),
+    format: v.optional(v.union(v.literal("markdown"), v.literal("text"))),
   },
-  handler: async (_, args) =>
-    deepResearchHandler({
-      input: args.input,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      model: (args.model as any) || "auto",
-      outputSchema: args.outputSchema,
-    }),
+  handler: async (_ctx, args) => extractInternalHandler(args),
+});
+
+// ============================================================
+// Cached Wrapper
+// ============================================================
+
+const extractCache = createCachedAction(
+  internal._services.search.TavilySearchService.extractInternal,
+  { ttl: withJitter(CACHE_TTL.documentContent, 0.15), name: "tavily-extract" }
+);
+
+// ============================================================
+// Public Cached Action
+// ============================================================
+
+export interface ExtractContentArgs {
+  urls: string[];
+  extractDepth?: "basic" | "advanced";
+  format?: "markdown" | "text";
+}
+
+export async function extractContentInternalHandler(
+  ctx: any,
+  args: ExtractContentArgs
+): Promise<{ results: Array<{ url: string; title: string | null; rawContent: string }>; failedResults: Array<{ url: string; error: string }> }> {
+  const logger = createServiceLogger("tavily", "extractContentInternal");
+  const startTime = Date.now();
+
+  logger.operationStart({ urlCount: args.urls.length });
+
+  try {
+    const result = await extractCache.fetch(ctx, {
+      urls: args.urls,
+      extractDepth: args.extractDepth,
+      format: args.format,
+    });
+
+    logger.operationComplete({
+      successCount: result.results.length,
+      failedCount: result.failedResults.length,
+      durationMs: Date.now() - startTime,
+    });
+    return result;
+  } catch (error) {
+    logger.operationError(error);
+    throw error;
+  }
+}
+
+export const extractContentInternal = internalAction({
+  args: {
+    urls: v.array(v.string()),
+    extractDepth: v.optional(v.union(v.literal("basic"), v.literal("advanced"))),
+    format: v.optional(v.union(v.literal("markdown"), v.literal("text"))),
+  },
+  handler: async (ctx, args) => extractContentInternalHandler(ctx, args),
 });

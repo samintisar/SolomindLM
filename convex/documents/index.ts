@@ -274,7 +274,7 @@ export const getContent = query({
     }
 
     if (sortedChunks.length === 0) {
-      throw new Error("Document content not found");
+      return null;
     }
 
     // Legacy: stitched chunks (overlapping); prefer re-ingesting for clean view
@@ -1118,3 +1118,9 @@ export const setSourceGuide = internalMutation({
     });
   },
 });
+
+// Re-exports for paper import workflows
+export { generateSourceGuide } from "./sourceGuide";
+export { resolveDoi } from "./resolveDoi";
+export { parseBibliography } from "./parseBibliography";
+export { getExistingPapers } from "./getExistingPapers";

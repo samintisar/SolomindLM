@@ -15,7 +15,7 @@ import {
 import { useAuth } from "@/features/auth/useAuth";
 import { isNativeShell } from "@/utils/platformDetection";
 import { AuthFormPanel, type AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
-import { CreateReportModal } from "@/features/studio/components/CreateReportModal";
+import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
 import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
@@ -374,7 +374,7 @@ function AuthHeroMockup() {
         </div>
       </div>
 
-      <CreateReportModal
+      <CustomizeReportModal
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}
         onSelectFormat={() => {

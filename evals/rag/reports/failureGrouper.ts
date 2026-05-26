@@ -22,6 +22,24 @@ function classifyFailure(metric: MetricResult): FailureCategory {
     return "context_selection";
   }
 
+  // Literature review stage metrics
+  if (metric.metric === "lr_search_yield" || metric.metric === "lr_ranking_top_relevance") {
+    return "literature_review_search";
+  }
+  if (metric.metric === "lr_screening_inclusion_rate") {
+    return "literature_review_screening";
+  }
+  if (metric.metric === "lr_extraction_coverage" || metric.metric === "lr_extraction_depth" || metric.metric === "lr_llm_judge_extraction_quality") {
+    return "literature_review_extraction";
+  }
+  if (
+    metric.metric === "lr_report_citation_coverage" ||
+    metric.metric === "lr_llm_judge_report_quality" ||
+    metric.metric === "literature_review_report_sections"
+  ) {
+    return "literature_review_report";
+  }
+
   if (metric.metric === "citation_validity") return "citation";
   if (metric.metric === "latency_cost_budget") return "latency_cost";
   if (metric.metric === "expected_item_recall") return "prompt_answering";
@@ -77,6 +95,36 @@ const FIX_SUGGESTIONS: Record<FailureCategory, { scope: string; files: string[] 
     files: [
       "convex/_agents/chat/chatConfig.ts",
       "convex/_agents/chat/ChatAgent.ts",
+    ],
+  },
+  literature_review_search: {
+    scope: "Improve academic search query generation or search API configuration to find more relevant papers",
+    files: [
+      "convex/_agents/literature_review/prompts.ts",
+      "convex/_services/search/AcademicSearchService.ts",
+      "convex/literatureReview/workflowSteps.ts",
+    ],
+  },
+  literature_review_screening: {
+    scope: "Adjust PRISMA screening prompts or batch size to improve inclusion/exclusion accuracy",
+    files: [
+      "convex/_agents/literature_review/prompts.ts",
+      "convex/literatureReview/workflowSteps.ts",
+    ],
+  },
+  literature_review_extraction: {
+    scope: "Improve data extraction prompts or column definitions to get better coverage and accuracy",
+    files: [
+      "convex/_agents/literature_review/prompts.ts",
+      "convex/literatureReview/workflowSteps.ts",
+      "convex/literatureReview/db.ts",
+    ],
+  },
+  literature_review_report: {
+    scope: "Improve report generation prompts or citation handling for better narrative quality",
+    files: [
+      "convex/_agents/literature_review/prompts.ts",
+      "convex/literatureReview/workflowSteps.ts",
     ],
   },
 };

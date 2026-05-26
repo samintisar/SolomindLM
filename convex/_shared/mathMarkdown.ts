@@ -284,13 +284,41 @@ function fixArraysInAllMathSpans(segment: string): string {
     .join("");
 }
 
+/**
+ * LLM/OCR output often includes Unicode spaces KaTeX cannot render (e.g. U+202F narrow no-break space).
+ * Strict mode warns: unknownSymbol / missing character metrics. Replace with ASCII space inside math only.
+ */
+const KATEX_EXOTIC_SPACE_RE = /[\u00A0\u2000-\u200B\u202F\u205F\u2060\uFEFF]/g;
+
+function normalizeExoticSpacesInDelimitedMath(mathSpan: string): string {
+  if (!mathSpan.startsWith("$")) {
+    return mathSpan;
+  }
+  const isDisplay = mathSpan.startsWith("$$");
+  const delim = isDisplay ? "$$" : "$";
+  if (mathSpan.length < 2 * delim.length || !mathSpan.endsWith(delim)) {
+    return mathSpan;
+  }
+  const inner = mathSpan.slice(delim.length, -delim.length);
+  const normalized = inner.replace(KATEX_EXOTIC_SPACE_RE, " ");
+  return `${delim}${normalized}${delim}`;
+}
+
+function normalizeExoticSpacesInAllMathSpans(segment: string): string {
+  return splitByMathDelimiters(segment)
+    .map((part) => (part.kind === "math" ? normalizeExoticSpacesInDelimitedMath(part.s) : part.s))
+    .join("");
+}
+
 function normalizeTextOutsideMathOnly(segment: string): string {
   const delimiterFixed = collapseDoubledTexDelimiterBackslashes(segment);
   const arrayFixed = fixArraysInAllMathSpans(delimiterFixed);
   const stripped = stripInnerInlineDollarsInDisplayMath(arrayFixed);
-  return splitByMathDelimiters(stripped)
+  const delimitersNormalized = splitByMathDelimiters(stripped)
     .map((part) => (part.kind === "text" ? normalizeTextSegment(part.s) : part.s))
     .join("");
+  // After \(…\) → $…$ and \[…\] → $$…$$, so newly created math spans are cleaned too.
+  return normalizeExoticSpacesInAllMathSpans(delimitersNormalized);
 }
 
 export function normalizeMathMarkdown(content: string): string {

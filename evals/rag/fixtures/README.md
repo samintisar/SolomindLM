@@ -155,6 +155,9 @@ bun run eval:rag
 
 # Run one fixture
 bun run eval:rag -- --case agentic-patterns-20
+
+# Run only literature review fixtures
+bun run eval:literature-review
 ```
 
 ## Suggested Fixtures for Machine Learning Notebook

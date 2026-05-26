@@ -27,13 +27,13 @@ export function useSourceManager({ documents, notebookId }: UseSourceManagerProp
     const currentSignature = documents
       .map(
         (d: Doc<"documents">) =>
-          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}`
+          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${(d as Record<string, unknown>).sourceGuide ? "1" : "0"}`
       )
       .join(",");
     const prevSignature = prevDocumentsRef.current
       .map(
         (d: Doc<"documents">) =>
-          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}`
+          `${d._id}:${d.status}:${d.fileName}:${d.fileType}:${d.googleDriveFileId ?? ""}:${d.ingestionStatus ?? ""}:${d.fulltextStatus ?? ""}:${(d as Record<string, unknown>).sourceGuide ? "1" : "0"}`
       )
       .join(",");
 

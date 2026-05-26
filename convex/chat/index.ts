@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { getAuthUserId } from "../auth";
 import { getNotebookAccess } from "../_lib/notebookAccess";
 import { assertCanReadConversation, assertCanEditConversation } from "../_lib/conversationAccess";
@@ -291,7 +292,9 @@ export const persistAssistantFromStream = internalMutation({
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) {
-      throw new Error("Conversation not found");
+      // Conversation was deleted while the workflow was running — drop the message
+      // silently so the workflow does not retry forever.
+      return { messageId: null, inserted: false };
     }
 
     const existing = await ctx.db
@@ -352,6 +355,12 @@ export const remove = mutation({
 
     await assertCanEditConversation(ctx, args.conversationId, userId);
 
+    // Cancel any in-flight deep-research workflows so they do not persist
+    // results after the conversation is gone.
+    await ctx.runMutation(internal.research.index.cancelResearchForConversationInternal, {
+      conversationId: args.conversationId,
+    });
+
     // Delete all messages
     const messages = await ctx.db
       .query("messages")
@@ -366,6 +375,20 @@ export const remove = mutation({
     await ctx.db.delete(args.conversationId);
 
     return { message: "Conversation deleted successfully" };
+  },
+});
+
+/**
+ * Patch a message's metadata by messageId.
+ * Safe for workflow retries because it targets a specific row.
+ */
+export const updateMessageMetadata = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, { metadata: args.metadata });
   },
 });
 

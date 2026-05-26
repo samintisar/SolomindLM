@@ -4,12 +4,7 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { Send } from "@langchain/langgraph";
 
-import {
-  createLangSmithRunConfig,
-  invokeWithRetry,
-  invokeWithTimeout,
-  withoutMapOutputs,
-} from "../_shared/index.js";
+import { invokeWithRetry, invokeWithTimeout, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
@@ -255,20 +250,10 @@ export async function reduce(
         invokeWithTimeout(
           () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (structuredLlm as any).invoke(
-              [new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT), new HumanMessage(selectionPrompt)],
-              createLangSmithRunConfig({
-                runName: "WrittenQuestionsGraph.ReduceSelect",
-                tags: ["agent", "written-questions", "reduce"],
-                metadata: {
-                  targetCount: state.questionCount,
-                  difficulty: state.difficulty,
-                  questionType: state.questionType,
-                  focus: state.focus || "none",
-                  candidateCount: questionsForLLM.length,
-                },
-              })
-            ),
+            (structuredLlm as any).invoke([
+              new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
+              new HumanMessage(selectionPrompt),
+            ]),
           GRAPH_CONFIG.REDUCE_TIMEOUT_MS,
           "WrittenQuestionsReduce"
         ),

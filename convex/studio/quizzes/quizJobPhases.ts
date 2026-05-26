@@ -33,7 +33,7 @@ import {
 import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // Interface for the structured LLM to avoid deep type instantiation
 interface QuizCandidateOutputInvoker {
@@ -228,7 +228,7 @@ export async function runQuizGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -429,23 +429,10 @@ export async function runProcessQuizMapChunkPhase(
         response = await invokeStudioLlm({
           invoke: () =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (structuredLLM as any).invoke(
-              [
-                new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)),
-                new HumanMessage(prompt),
-              ],
-              createLangSmithRunConfig({
-                runName: `QuizJob.MapCandidates.r${round}`,
-                tags: ["agent", "quiz", "map"],
-                metadata: {
-                  chunkIndex,
-                  questionCount,
-                  difficulty,
-                  focus: focus || "none",
-                  mapRound: round,
-                },
-              })
-            ),
+            (structuredLLM as any).invoke([
+              new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)),
+              new HumanMessage(prompt),
+            ]),
           timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
           phaseLabel: "QuizMap",
           onRetry: (attempt, error) => {
@@ -714,22 +701,10 @@ export async function runFinalizeQuizPhase(
     const selectionResponse = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (structuredSelectLLM as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
-            new HumanMessage(selectionPrompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "QuizJob.Select",
-            tags: ["agent", "quiz", "reduce"],
-            metadata: {
-              questionCount,
-              difficulty,
-              focus: focus || "none",
-              inputCandidates: allCandidates.length,
-            },
-          })
-        ),
+        (structuredSelectLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
+          new HumanMessage(selectionPrompt),
+        ]),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "QuizSelect",
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
@@ -791,22 +766,12 @@ export async function runFinalizeQuizPhase(
             return await invokeStudioLlm({
               invoke: () =>
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (structuredExpandLLM as any).invoke(
-                  [
-                    new SystemMessage(
-                      withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)
-                    ),
-                    new HumanMessage(prompt),
-                  ],
-                  createLangSmithRunConfig({
-                    runName: "QuizJob.Expand",
-                    tags: ["agent", "quiz", "expand"],
-                    metadata: {
-                      difficulty: candidate.difficulty,
-                      topic: candidate.topic,
-                    },
-                  })
-                ),
+                (structuredExpandLLM as any).invoke([
+                  new SystemMessage(
+                    withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)
+                  ),
+                  new HumanMessage(prompt),
+                ]),
               timeoutMs: CONFIG.EXPAND_TIMEOUT_MS,
               phaseLabel: "QuizExpand",
               retry: { maxAttempts: 2, baseDelayMs: 1000 },

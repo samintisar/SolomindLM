@@ -44,7 +44,7 @@ function mapDatabaseReportToNote(dbReport: any): ReportNote {
   }
 
   return {
-    id: dbReport._id,
+    id: dbReport.id ?? dbReport._id,
     title: dbReport.title,
     preview,
     type: "report",
@@ -137,8 +137,8 @@ export function useUpdateReport() {
             localStore.setQuery(
               api.studio.reports.index.list,
               { notebookId: report.notebookId },
-              listResult.map((r: { _id: string; [key: string]: unknown }) =>
-                r._id === id ? { ...r, title } : r
+              listResult.map((r: { id: string; [key: string]: unknown }) =>
+                r.id === id ? { ...r, title } : r
               )
             );
           }
@@ -172,7 +172,7 @@ export function useDeleteReport() {
           localStore.setQuery(
             api.studio.reports.index.list,
             { notebookId: report.notebookId },
-            listResult.filter((r: { _id: string }) => r._id !== args.id)
+            listResult.filter((r: { id: string }) => r.id !== args.id)
           );
         }
       }

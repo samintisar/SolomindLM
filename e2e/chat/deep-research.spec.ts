@@ -1,10 +1,6 @@
 import { test, expect } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
-import {
-  sendMessage,
-  openResearchOptionsMenu,
-  enableWebOnlyFilter,
-} from "../helpers/chat-assertions";
+import { sendMessage, openComposerModeMenu, enableWebOnlyFilter } from "../helpers/chat-assertions";
 
 test.describe("Deep Research", () => {
   // Menu + LLM plan generation can exceed 2m on a cold Convex + model round-trip
@@ -18,11 +14,11 @@ test.describe("Deep Research", () => {
     // Switch to Web-only filter
     await enableWebOnlyFilter(page);
 
-    // Enable deep research — open options menu and click "Deep Research"
-    await openResearchOptionsMenu(page);
-    await page.getByRole("button", { name: /Deep Research/i }).click();
+    // Enable deep research — open composer mode menu and choose "Deep Research"
+    await openComposerModeMenu(page);
+    await page.getByRole("option", { name: "Deep Research", exact: true }).click();
 
-    // ChatInput closes the dropup when the Deep Research row is clicked.
+    // Menu closes after selecting a mode.
 
     // Send a research query
     await sendMessage(page, "What are the latest developments in quantum computing?");

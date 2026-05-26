@@ -304,7 +304,9 @@ export async function cachedLlmCall(ctx: any, options: LLMOptions): Promise<LLMR
   }
 
   // Build cache key for logging
-  const messagesHash = hashInput(options.messages.map((m) => `${m.role}:${m.content}`).join("|"));
+  const messagesHash = await hashInput(
+    options.messages.map((m) => `${m.role}:${m.content}`).join("|")
+  );
   console.log(`[CachedLLM] Cached call: model=${options.model}, messagesHash=${messagesHash}`);
 
   // Use cached action

@@ -6,14 +6,11 @@
  * Optimized for token efficiency and reliable structured output.
  */
 
-import {
-  ChatTogetherAI,
-  type ChatTogetherAICallOptions,
-} from "@langchain/community/chat_models/togetherai";
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import Together from "together-ai";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
-import { createLangSmithRunConfig } from "../_shared/index.js";
+
 import { uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
@@ -112,14 +109,7 @@ export class ChatLLMWrapper {
       new HumanMessage(userMessage),
     ];
     try {
-      const traceConfig = createLangSmithRunConfig({
-        runName: "ChatAgentDirectResponse",
-        tags: ["agent", "chat", "direct"],
-      });
-      const response = await this.fastLlm.invoke(
-        messages,
-        traceConfig as ChatTogetherAICallOptions
-      );
+      const response = await this.fastLlm.invoke(messages);
       return typeof response.content === "string"
         ? response.content.trim()
         : String(response.content).trim();
@@ -134,7 +124,7 @@ export class ChatLLMWrapper {
    * The caller typically embeds this together with the declarative search query so
    * explicit keywords stay represented while HyDE improves semantic density.
    *
-   * Note: uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
+   * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
   async generateHypotheticalDocument(query: string): Promise<string> {
     console.log("[ChatLLMWrapper] Generating hypothetical document for HyDE");
@@ -166,7 +156,7 @@ Question: ${query}`;
 
   /**
    * Generates 2-3 follow-up question suggestions for a study session.
-   * Uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
+   * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
   async generateFollowUpQuestions(userMessage: string, answer: string): Promise<string[]> {
     console.log("[ChatLLMWrapper] Generating follow-up questions");
@@ -210,7 +200,7 @@ Question: ${query}`;
   /**
    * One-shot decomposition for parallel retrieval. No clarification field — router owns clarify path.
    * On failure returns a single subquery = user message.
-   * Uses `uncachedLlmCall` (Together REST) — not LangChain `invoke`, so no LangSmith run config here.
+   * Uses `uncachedLlmCall` (Together REST), not LangChain `invoke`.
    */
   async generateRetrievalSubqueries(
     userMessage: string,
@@ -560,18 +550,9 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
 
     const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(groundedPrompt)];
-    const traceConfig = createLangSmithRunConfig({
-      runName: "ChatAgentStructuredResponse",
-      tags: ["agent", "chat"],
-      metadata: {
-        chunksCount: chunks.length,
-        conversationHistoryCount: conversationHistory.length,
-      },
-    });
-
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response: any = await structuredLlm.invoke(messages, traceConfig);
+      const response: any = await structuredLlm.invoke(messages);
       const validated = ChatResponseSchema.safeParse(response);
 
       if (!validated.success) {

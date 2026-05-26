@@ -3,7 +3,6 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
-  createLangSmithRunConfig,
   invokeWithRetry,
   invokeWithTimeout,
   validateQuiz,
@@ -40,17 +39,10 @@ export async function expandQuestion(
       invokeWithTimeout(
         () =>
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (deps.expandLlmQuestionStructured as any).invoke(
-            [new SystemMessage(EXPAND_QUESTION_SYSTEM_PROMPT), new HumanMessage(prompt)],
-            createLangSmithRunConfig({
-              runName: "QuizGraph.ExpandQuestion",
-              tags: ["agent", "quiz", "expand"],
-              metadata: {
-                difficulty: candidate.difficulty,
-                topic: candidate.topic,
-              },
-            })
-          ),
+          (deps.expandLlmQuestionStructured as any).invoke([
+            new SystemMessage(EXPAND_QUESTION_SYSTEM_PROMPT),
+            new HumanMessage(prompt),
+          ]),
         GRAPH_CONFIG.MAP_TIMEOUT_MS,
         "QuizExpand"
       ),

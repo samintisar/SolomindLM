@@ -1,7 +1,7 @@
 # Design: `@source` Mentions in Chat
 
-**Date:** 2026-05-04  
-**Status:** Approved  
+**Date:** 2026-05-04
+**Status:** Approved
 **Scope:** Frontend only (web app) — no Convex schema changes
 
 ---

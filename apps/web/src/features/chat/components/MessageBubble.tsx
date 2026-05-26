@@ -7,6 +7,7 @@ import { RefHandlers } from "../utils/messageRendering.utils";
 import { getStatusIcon, getStatusMessage } from "../utils/messageStatus";
 import { AgentActivityPanel } from "./AgentActivityPanel";
 import { ExternalSourcesModal } from "./ExternalSourcesModal";
+import { DeepResearchSourcesSection } from "./DeepResearchSourcesSection";
 
 interface ExternalSource {
   title: string;
@@ -32,6 +33,9 @@ interface MessageBubbleProps {
   onAddExternalSources?: (sources: ExternalSource[]) => void;
   /** Whether to show the "X sources" button for this message */
   showSourcesButton?: boolean;
+  notebookId?: string;
+  onOpenNotebookSource?: (documentId: string) => void;
+  notebookDocumentIds?: Set<string>;
 }
 
 const ACTION_FLASH_MS = 220;
@@ -49,6 +53,9 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     externalSources,
     onAddExternalSources,
     showSourcesButton = false,
+    notebookId,
+    onOpenNotebookSource,
+    notebookDocumentIds,
   }) => {
     const isUser = message.role === "user";
     const isCopied = copiedMessageId === message.id;
@@ -415,6 +422,15 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
                   <ActionBar />
                 </div>
                 <FollowUpChips />
+                {message.deepResearch?.researchRunId && message.content ? (
+                  <DeepResearchSourcesSection
+                    researchRunId={message.deepResearch.researchRunId}
+                    answerContent={message.content}
+                    notebookId={notebookId}
+                    onOpenNotebookSource={onOpenNotebookSource}
+                    notebookDocumentIds={notebookDocumentIds}
+                  />
+                ) : null}
                 <ExternalSourcesModal
                   isOpen={isSourcesModalOpen}
                   onClose={() => setIsSourcesModalOpen(false)}
@@ -444,7 +460,9 @@ export const MessageBubble = React.memo<MessageBubbleProps>(
     prev.copiedMessageId === next.copiedMessageId &&
     prev.isAssistantStreamActive === next.isAssistantStreamActive &&
     prev.showSourcesButton === next.showSourcesButton &&
-    JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources)
+    JSON.stringify(prev.externalSources) === JSON.stringify(next.externalSources) &&
+    prev.message.deepResearch?.researchRunId === next.message.deepResearch?.researchRunId &&
+    prev.notebookId === next.notebookId
 );
 
 MessageBubble.displayName = "MessageBubble";

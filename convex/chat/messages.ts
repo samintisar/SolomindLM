@@ -233,7 +233,7 @@ export const sendMessageOptimistic = mutation({
         .withIndex("by_conversation", (q) => q.eq("conversationId", conversation!._id))
         .collect();
       if (existingMessages.length <= 1) {
-        await ctx.scheduler.runAfter(0, internal.chat.messages.generateAndSetTitle, {
+        await ctx.scheduler.runAfter(0, internal.chat.actions.generateAndSetTitle, {
           conversationId: conversation._id,
           content: args.message,
         });
@@ -398,6 +398,11 @@ export const clearHistory = mutation({
       return { message: "No conversation found" };
     }
 
+    // Cancel any in-flight deep-research workflows before wiping messages.
+    await ctx.runMutation(internal.research.index.cancelResearchForConversationInternal, {
+      conversationId: conversation._id,
+    });
+
     // Delete all messages
     const messages = await ctx.db
       .query("messages")
@@ -455,21 +460,3 @@ export const setTitleInternal = internalMutation({
   },
 });
 
-/**
- * Internal action: generate a title for a conversation using LLM, then persist it.
- */
-export const generateAndSetTitle = internalAction({
-  args: {
-    conversationId: v.id("conversations"),
-    content: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const title: string = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
-      chunk: args.content,
-    });
-    await ctx.runMutation(internal.chat.messages.setTitleInternal, {
-      conversationId: args.conversationId,
-      title,
-    });
-  },
-});

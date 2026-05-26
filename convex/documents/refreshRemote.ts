@@ -28,7 +28,7 @@ async function refreshDriveDocument(
   const blob = await fetchGoogleDriveBlob(downloadUrl, accessToken);
   const newStorageId = await ctx.storage.store(blob);
 
-  await ctx.runMutation(internal.documents.index.prepareDocumentReembed, {
+  await ctx.runMutation(internal.documents.internal.prepareDocumentReembed, {
     documentId: doc._id,
     delayMs,
     newStorageId: newStorageId as unknown as string,
@@ -45,7 +45,7 @@ export const refreshNotebookRemoteSources = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const docs = await ctx.runQuery(internal.documents.index.listDocumentsForNotebookRefresh, {
+    const docs = await ctx.runQuery(internal.documents.internal.listDocumentsForNotebookRefresh, {
       notebookId: args.notebookId,
       userId,
     });
@@ -58,7 +58,7 @@ export const refreshNotebookRemoteSources = action({
       if (doc.fileType === "url") {
         urlCount += 1;
         const delayMs = Math.floor(Math.random() * 8000);
-        await ctx.runMutation(internal.documents.index.prepareDocumentReembed, {
+        await ctx.runMutation(internal.documents.internal.prepareDocumentReembed, {
           documentId: doc._id,
           delayMs,
         });
@@ -89,7 +89,7 @@ export const refreshRemoteSource = action({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
 
-    const doc = await ctx.runQuery(internal.documents.index.getDocumentForRefresh, {
+    const doc = await ctx.runQuery(internal.documents.internal.getDocumentForRefresh, {
       documentId: args.documentId,
       userId,
     });
@@ -99,7 +99,7 @@ export const refreshRemoteSource = action({
     }
 
     if (doc.fileType === "url") {
-      await ctx.runMutation(internal.documents.index.prepareDocumentReembed, {
+      await ctx.runMutation(internal.documents.internal.prepareDocumentReembed, {
         documentId: doc._id,
         delayMs: 0,
       });

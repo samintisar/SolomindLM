@@ -202,7 +202,7 @@ export const runResearchEval = action({
                 { query: refinedQuery, maxResults: maxPerChannel }
               );
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              channelResults = results.map((r: any) => ({
+              channelResults = results.sources.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
                 snippet: r.snippet ?? r.abstract ?? "",
@@ -225,7 +225,7 @@ export const runResearchEval = action({
                 }
               );
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              channelResults = results.map((r: any) => ({
+              channelResults = results.sources.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
                 snippet: r.snippet ?? r.content ?? "",

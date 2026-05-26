@@ -23,7 +23,7 @@ import {
 import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { invokeStudioLlm, createLangSmithRunConfig } from "../_job/invokeStudioLlm";
+import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
 // CONFIGURATION
@@ -244,7 +244,7 @@ export async function runSpreadsheetGenerationPhase(
     });
 
     // Get document chunks
-    const chunkObjects = await ctx.runAction(internal.documents.index.fetchChunks, {
+    const chunkObjects = await ctx.runAction(internal.documents.chunks.fetchChunks, {
       documentIds,
     });
 
@@ -395,21 +395,10 @@ export async function runProcessSpreadsheetMapChunkPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (llm as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "SpreadsheetJob.MapProcess",
-            tags: ["agent", "spreadsheet", "map"],
-            metadata: {
-              chunkIndex,
-              spreadsheetType,
-              chunkLength: chunk.length,
-            },
-          })
-        ),
+        (llm as any).invoke([
+          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "SpreadsheetMap",
       onRetry: (attempt, error) => {
@@ -677,20 +666,10 @@ export async function runFinalizeSpreadsheetPhase(
     const response = await invokeStudioLlm({
       invoke: () =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (reduceLLM as any).invoke(
-          [
-            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-            new HumanMessage(prompt),
-          ],
-          createLangSmithRunConfig({
-            runName: "SpreadsheetJob.Reduce",
-            tags: ["agent", "spreadsheet", "reduce"],
-            metadata: {
-              spreadsheetType,
-              collapsedOutputsCount: collapsedOutputs.length,
-            },
-          })
-        ),
+        (reduceLLM as any).invoke([
+          new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
+          new HumanMessage(prompt),
+        ]),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "SpreadsheetReduce",
     });
@@ -855,19 +834,10 @@ async function recursiveCollapse(
           const response = await invokeStudioLlm({
             invoke: () =>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (reduceLLM as any).invoke(
-                [
-                  new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
-                  new HumanMessage(prompt),
-                ],
-                createLangSmithRunConfig({
-                  runName: "SpreadsheetJob.CollapseGroup",
-                  tags: ["agent", "spreadsheet", "collapse"],
-                  metadata: {
-                    fragmentCount: group.length,
-                  },
-                })
-              ),
+              (reduceLLM as any).invoke([
+                new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
+                new HumanMessage(prompt),
+              ]),
             timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
             phaseLabel: "CollapseGroup",
           });

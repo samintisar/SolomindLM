@@ -17,28 +17,12 @@ import {
   useSourceSuggestions,
   consumePersistentTextStream,
 } from "../services/chatApi";
-
-function researchProgressToStreamingActivity(progress: {
-  phase: string;
-  subQuestionId?: string;
-  sourcesFound?: number;
-}): { phase: ChatActivityPhase; detail: string } {
-  const n = progress.sourcesFound ?? 0;
-  if (progress.phase === "writing") {
-    return { phase: "writing", detail: "Synthesizing research report…" };
-  }
-  if (progress.phase === "retrieving_notebook") {
-    const found =
-      n > 0
-        ? `Notebook search · ${n} chunk${n === 1 ? "" : "s"} found`
-        : "Searching your notebook…";
-    return { phase: "retrieving", detail: found };
-  }
-  return {
-    phase: "thinking",
-    detail: progress.phase.replace(/_/g, " "),
-  };
-}
+import { useStartDeepResearch } from "../services/researchApi";
+import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
+import {
+  computeRemoteGenerationBlocksSend,
+  researchProgressToStreamingActivity,
+} from "../utils/chatStreamHelpers";
 
 interface UseChatStreamProps {
   activeNotebookId: string | null;
@@ -77,16 +61,16 @@ export function useChatStream({
   const chatRemoteGenerating = chatBundle?.chatGenerating ?? false;
 
   /** True when server reports an in-flight generation and the DB still expects a reply (last row is not assistant). */
-  const remoteGenerationBlocksSend = useMemo(() => {
-    if (!chatRemoteGenerating) return false;
-    const last = messages[messages.length - 1];
-    return last?.role !== "assistant";
-  }, [chatRemoteGenerating, messages]);
+  const remoteGenerationBlocksSend = useMemo(
+    () => computeRemoteGenerationBlocksSend(chatRemoteGenerating, messages),
+    [chatRemoteGenerating, messages]
+  );
 
   const clearChatHistoryMutation = useMutation(api.chat.messages.clearHistory);
   const deleteMessagesFromMutation = useMutation(api.chat.messages.deleteMessagesFrom);
   const releaseChatGenerationMutation = useMutation(api.chat.messages.releaseChatGeneration);
   const { sendMessage, stopChat: stopSendMessage } = useSendMessage();
+  const startDeepResearch = useStartDeepResearch();
   const setMessageFeedback = useSetMessageFeedback();
 
   const [isChatStreaming, setIsChatStreaming] = useState(false);
@@ -143,6 +127,12 @@ export function useChatStream({
 
   // Reset streaming state when switching to a different conversation
   useEffect(() => {
+    // Abort any in-flight research stream for the previous conversation
+    // so its callbacks do not leak into the new chat's UI state.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     resetStreamingState();
     setExternalSources([]);
@@ -188,9 +178,8 @@ export function useChatStream({
     async (
       messageText: string,
       deepResearch?: boolean,
-      sourcePolicy?: { channels: string[] },
-      documentIds?: string[],
-      attachedDocumentIds?: string[]
+      sourcePolicy?: ChatStreamSourcePolicy,
+      sendOptions?: { documentIdsOverride?: string[] }
     ) => {
       if (!activeNotebookId || isChatStreaming) return;
       if (chatRemoteGenerating) {
@@ -210,11 +199,12 @@ export function useChatStream({
       setStreamingContent("");
       setStreamingReferences(null);
       const hasNotebookSearch = sourcePolicy?.channels?.includes("notebook") ?? true;
-      const selectedDocumentIds =
-        documentIds ??
-        (hasNotebookSearch
-          ? sourcesRef.current.filter((source) => source.selected).map((source) => source.id)
-          : []);
+      const override = sendOptions?.documentIdsOverride;
+      const selectedDocumentIds = !hasNotebookSearch
+        ? []
+        : override && override.length > 0
+          ? override
+          : sourcesRef.current.filter((source) => source.selected).map((source) => source.id);
 
       setStreamingToolCalls([]);
       setStreamingTracePhases([]);
@@ -237,91 +227,107 @@ export function useChatStream({
         streamStartedAtRef.current = null;
       };
 
-      try {
-        // Set up abort controller for this stream
-        abortControllerRef.current = new AbortController();
+      if (deepResearch) {
+        try {
+          await startDeepResearch({
+            notebookId: activeNotebookId as Id<"notebooks">,
+            conversationId: activeConversationId
+              ? (activeConversationId as Id<"conversations">)
+              : undefined,
+            query: messageText,
+            sourcePolicy,
+          });
+        } catch {
+          resetStreamingState();
+        } finally {
+          setIsChatStreaming(false);
+        }
+      } else {
+        try {
+          // Set up abort controller for this stream
+          abortControllerRef.current = new AbortController();
 
-        await sendMessage(
-          activeNotebookId,
-          messageText,
-          {
-            onToken: (token) => setStreamingContent((prev) => prev + token),
-            onReferences: (refs) => setStreamingReferences(refs),
-            onStatus: (status, message) => {
-              const allowed: ChatActivityPhase[] = [
-                "searching",
-                "reading",
-                "planning",
-                "thinking",
-                "generating",
-                "writing",
-                "retrieving",
-                "embedding",
-                "ranking",
-                "completed",
-              ];
-              if (allowed.includes(status as ChatActivityPhase)) {
-                setStreamingPhase(status as ChatActivityPhase);
-              } else {
-                setStreamingPhase("thinking");
-              }
-              setStreamingPhaseDetail(message ?? null);
-              const msg = message ?? "";
-              setStreamingTracePhases((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.status === status && last.message === msg) return prev;
-                return [...prev, { status, message: msg }];
-              });
+          await sendMessage(
+            activeNotebookId,
+            messageText,
+            {
+              onToken: (token) => setStreamingContent((prev) => prev + token),
+              onReferences: (refs) => setStreamingReferences(refs),
+              onStatus: (status, message) => {
+                const allowed: ChatActivityPhase[] = [
+                  "searching",
+                  "reading",
+                  "planning",
+                  "thinking",
+                  "generating",
+                  "writing",
+                  "retrieving",
+                  "embedding",
+                  "ranking",
+                  "completed",
+                ];
+                if (allowed.includes(status as ChatActivityPhase)) {
+                  setStreamingPhase(status as ChatActivityPhase);
+                } else {
+                  setStreamingPhase("thinking");
+                }
+                setStreamingPhaseDetail(message ?? null);
+                const msg = message ?? "";
+                setStreamingTracePhases((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last && last.status === status && last.message === msg) return prev;
+                  return [...prev, { status, message: msg }];
+                });
+              },
+              onToolCalls: (tcs) => setStreamingToolCalls(tcs),
+              onGroundingChecks: (checks) => setStreamingGrounding(checks),
+              onClarification: (q) => setStreamingClarification(q),
+              onResearchPlan: (plan) => setStreamingResearchPlan(plan),
+              onResearchProgress: (p) => {
+                const { phase, detail } = researchProgressToStreamingActivity(p);
+                const allowed: ChatActivityPhase[] = [
+                  "searching",
+                  "reading",
+                  "planning",
+                  "thinking",
+                  "generating",
+                  "writing",
+                  "retrieving",
+                  "embedding",
+                  "ranking",
+                  "completed",
+                ];
+                const st = allowed.includes(phase) ? phase : "thinking";
+                setStreamingPhase(st);
+                setStreamingPhaseDetail(detail);
+                setStreamingTracePhases((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (last && last.status === st && last.message === detail) return prev;
+                  return [...prev, { status: st, message: detail }];
+                });
+              },
+              onFollowUps: (qs) => setLastAssistantFollowUps(qs),
+              onExternalSources: (sources) => setExternalSources(sources),
+              onComplete: onStreamComplete,
+              onStopped: () => {
+                setIsChatStreaming(false);
+                setStreamingJustFinished(true);
+                streamStartedAtRef.current = null;
+                abortControllerRef.current = null;
+              },
+              onError: () => {
+                resetStreamingState();
+                abortControllerRef.current = null;
+              },
             },
-            onToolCalls: (tcs) => setStreamingToolCalls(tcs),
-            onGroundingChecks: (checks) => setStreamingGrounding(checks),
-            onClarification: (q) => setStreamingClarification(q),
-            onResearchPlan: (plan) => setStreamingResearchPlan(plan),
-            onResearchProgress: (p) => {
-              const { phase, detail } = researchProgressToStreamingActivity(p);
-              const allowed: ChatActivityPhase[] = [
-                "searching",
-                "reading",
-                "planning",
-                "thinking",
-                "generating",
-                "writing",
-                "retrieving",
-                "embedding",
-                "ranking",
-                "completed",
-              ];
-              const st = allowed.includes(phase) ? phase : "thinking";
-              setStreamingPhase(st);
-              setStreamingPhaseDetail(detail);
-              setStreamingTracePhases((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.status === st && last.message === detail) return prev;
-                return [...prev, { status: st, message: detail }];
-              });
-            },
-            onFollowUps: (qs) => setLastAssistantFollowUps(qs),
-            onExternalSources: (sources) => setExternalSources(sources),
-            onComplete: onStreamComplete,
-            onStopped: () => {
-              setIsChatStreaming(false);
-              setStreamingJustFinished(true);
-              streamStartedAtRef.current = null;
-              abortControllerRef.current = null;
-            },
-            onError: () => {
-              resetStreamingState();
-              abortControllerRef.current = null;
-            },
-          },
-          selectedDocumentIds.length > 0 ? selectedDocumentIds : [],
-          deepResearch,
-          sourcePolicy,
-          activeConversationId ?? undefined,
-          attachedDocumentIds
-        );
-      } catch {
-        resetStreamingState();
+            selectedDocumentIds.length > 0 ? selectedDocumentIds : [],
+            deepResearch,
+            sourcePolicy,
+            activeConversationId ?? undefined
+          );
+        } catch {
+          resetStreamingState();
+        }
       }
     },
     [
@@ -331,12 +337,18 @@ export function useChatStream({
       chatRemoteGenerating,
       releaseChatGenerationMutation,
       sendMessage,
+      startDeepResearch,
       resetStreamingState,
     ]
   );
 
   const handleClearChatHistory = useCallback(async () => {
     if (!activeNotebookId || activeNotebookId === "new") return;
+    // Abort any active stream before clearing so stale callbacks don't repopulate UI.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     try {
       await clearChatHistoryMutation({
         notebookId: activeNotebookId as Id<"notebooks">,
@@ -421,6 +433,21 @@ export function useChatStream({
               sourceType: string;
               score?: number;
             }>;
+            isLiteratureReview?: boolean;
+            isResearchResult?: boolean;
+            researchRunId?: string;
+            sessionId?: string;
+            status?: string;
+            query?: string;
+            tableId?: string;
+            reportId?: string;
+            suggestedColumns?: Array<{
+              id: string;
+              name: string;
+              instructions?: string;
+              isVisible: boolean;
+            }>;
+            error?: string;
           };
         }
       ).metadata;
@@ -449,6 +476,22 @@ export function useChatStream({
                 subQuestions: [],
                 sourcePolicy: {},
               })
+            : undefined,
+        literatureReview:
+          meta?.isLiteratureReview && meta?.sessionId
+            ? {
+                sessionId: meta.sessionId,
+                status: meta.status ?? "planning",
+                query: meta.query ?? "",
+                tableId: meta.tableId,
+                reportId: meta.reportId,
+                suggestedColumns: meta.suggestedColumns,
+                error: meta.error,
+              }
+            : undefined,
+        deepResearch:
+          meta?.isResearchResult && meta?.researchRunId
+            ? { researchRunId: String(meta.researchRunId) }
             : undefined,
       };
     });

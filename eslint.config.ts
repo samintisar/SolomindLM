@@ -45,6 +45,7 @@ export default defineConfig(
       "apps/mobile/.expo/**",
       "apps/mobile/components/__tests__/**",
       "apps/mobile/metro.config.js",
+      "apps/web/public/**",
     ],
   },
   {

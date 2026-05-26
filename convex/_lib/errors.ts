@@ -121,7 +121,9 @@ export function createSourceLimitError(
   limit: number,
   isPro: boolean = false
 ): LimitError {
-  const message = `Source limit reached (${current}/${limit}). Please upgrade to add more sources.`;
+  const message = isPro
+    ? `Source limit reached (${current}/${limit} sources per notebook). Remove a source to add another.`
+    : `Source limit reached (${current}/${limit} sources per notebook). Remove a source to add another, or upgrade for higher notebook limits and more features.`;
   return new LimitError(
     ErrorCode.SOURCE_LIMIT_REACHED,
     message,
