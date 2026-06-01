@@ -1,18 +1,16 @@
-import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "../auth";
+import { mutation, query } from "../_generated/server";
 import { checkNotebookLimit } from "../_lib/limits";
 import { assertNotebookOwner, getNotebookMember } from "../_lib/notebookAccess";
-import { generateShareToken, hashShareToken } from "../_lib/shareToken";
 import { rateLimiter } from "../_lib/rateLimits";
+import { generateShareToken, hashShareToken } from "../_lib/shareToken";
 import * as Notebooks from "../_model/notebooks";
+import { getAuthUserId } from "../auth";
 import { performNotebookFork } from "./_forkNotebook";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findActiveShareByTokenHash(ctx: { db: any }, tokenHash: string) {
   const row = await ctx.db
     .query("notebookShareLinks")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .withIndex("by_token_hash", (q: any) => q.eq("tokenHash", tokenHash))
     .first();
   if (!row || row.revokedAt !== undefined) {

@@ -1,5 +1,5 @@
+import { BadgePercent, Check } from "lucide-react";
 import React, { useState } from "react";
-import { Check, BadgePercent } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 
 interface PricingSectionProps {

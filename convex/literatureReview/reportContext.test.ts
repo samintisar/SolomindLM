@@ -64,9 +64,9 @@ describe("reportContext", () => {
   });
 
   it("needsDeterministicReportMerge detects unmerged LLM sections", () => {
-    expect(
-      needsDeterministicReportMerge([{ heading: "Results", content: "Themes only." }])
-    ).toBe(true);
+    expect(needsDeterministicReportMerge([{ heading: "Results", content: "Themes only." }])).toBe(
+      true
+    );
     expect(
       needsDeterministicReportMerge([
         {
@@ -93,5 +93,4 @@ describe("reportContext", () => {
     expect(table).toContain("Kim2026");
     expect(table).toContain("medicine");
   });
-
 });

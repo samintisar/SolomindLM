@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { Note, WrittenQuestionsNote } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
-import { useCreateWrittenQuestions } from "../../services/writtenQuestionsApi";
+import type { Note, WrittenQuestionsNote } from "@/shared/types/index";
 import type { WrittenQuestionsConfig } from "../../components/CustomizeWrittenQuestionsModal";
+import { useCreateWrittenQuestions } from "../../services/writtenQuestionsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 

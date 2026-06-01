@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * One-shot bootstrap for RAG eval environment.
  *

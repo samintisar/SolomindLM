@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+
 /**
  * Together AI Batch Inference — Full Workflow (TypeScript SDK)
  *
@@ -12,10 +13,10 @@
  *     export TOGETHER_API_KEY=your_key
  */
 
-import Together from "together-ai";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import Together from "together-ai";
 
 const client = new Together();
 
@@ -67,7 +68,6 @@ async function main() {
   console.log(`Created batch: ${batchId}`);
 
   // --- 4. Poll for completion ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let batch: any;
   while (true) {
     batch = await client.batches.retrieve(batchId);

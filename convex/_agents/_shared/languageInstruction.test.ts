@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { withLanguageInstruction, SUPPORTED_LANGUAGES } from "./languageInstruction";
+import { SUPPORTED_LANGUAGES, withLanguageInstruction } from "./languageInstruction";
 
 describe("withLanguageInstruction", () => {
   it("returns prompt unchanged when language is undefined", () => {

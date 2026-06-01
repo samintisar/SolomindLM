@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
-import { test, expect } from "../fixtures/notebook.fixture";
 import { test as authTest, expect as expectAuth } from "../fixtures/auth.fixture";
-import { expectFixedBackdropZIndex100 } from "../helpers/onboarding-assertions";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
+import { expectFixedBackdropZIndex100 } from "../helpers/onboarding-assertions";
 
 test.describe("Onboarding UI", () => {
   test("chat composer exposes data-onboarding anchor wrapping the textarea", async ({

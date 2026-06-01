@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { query } from "../_generated/server";
-import { getAuthUserId } from "../auth";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { query } from "../_generated/server";
+import { getAuthUserId } from "../auth";
 
 const checklistShape = {
   createNotebook: v.boolean(),

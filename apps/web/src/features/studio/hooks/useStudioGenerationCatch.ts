@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { useToast } from "@/shared/contexts/useToast";
+import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 
 export interface StudioGenerationCatchOptions {
   placeholderId: string;

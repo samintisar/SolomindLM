@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useLayoutEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { MoreVertical, Pencil, Play, Trash2 } from "lucide-react";
-import { Note, isAudioNote, isAudioOverviewNote } from "@/shared/types/index";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { isAudioNote, isAudioOverviewNote, Note } from "@/shared/types/index";
 import { getStudioGeneratingListLines } from "../utils/studioGenerationLabels";
 import { NoteIcon } from "./NoteIcon";
 

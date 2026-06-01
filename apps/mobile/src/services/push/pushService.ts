@@ -1,10 +1,10 @@
-import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
-import { useConvex, useConvexAuth } from "convex/react";
-import { useEffect, useRef } from "react";
 import { api } from "@convex/_generated/api";
 import { log } from "@mobile/utils/logger";
+import { useConvex, useConvexAuth } from "convex/react";
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
+import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

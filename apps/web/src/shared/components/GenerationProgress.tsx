@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 import { ProgressBar } from "./ProgressBar";
 
 export type GenerationStatus = "draft" | "generating" | "completed" | "failed";

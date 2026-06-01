@@ -1,6 +1,6 @@
 "use node";
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { deepResearchWorkflow, planApprovedEvent } from "./DeepResearchGraph";
 
 describe("DeepResearchGraph", () => {
@@ -16,7 +16,9 @@ describe("DeepResearchGraph", () => {
   it("planApprovedEvent has correct validator shape", () => {
     expect(planApprovedEvent.validator).toBeDefined();
     expect((planApprovedEvent.validator as Record<string, unknown>).fields).toBeDefined();
-    expect((planApprovedEvent.validator as Record<string, unknown>).fields).toHaveProperty("planId");
+    expect((planApprovedEvent.validator as Record<string, unknown>).fields).toHaveProperty(
+      "planId"
+    );
     expect((planApprovedEvent.validator as Record<string, unknown>).fields).toHaveProperty(
       "modifiedSubQuestions"
     );

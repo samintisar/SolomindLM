@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CACHE_TTL, withJitter } from "./cache";
 
 describe("CACHE_TTL", () => {

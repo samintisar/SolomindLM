@@ -1,7 +1,7 @@
 "use node";
 
 import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { HumanMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
+import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { invokeWithTimeout, validateWithPreset } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
@@ -68,7 +68,6 @@ export async function reduceNode(
     phase: "reduce",
     inputSize: inputData.length,
     truncatedSize: safeInput.length,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     model: (smartLlm as any).model,
   });
 
@@ -76,7 +75,6 @@ export async function reduceNode(
     const start = Date.now();
     const response = await invokeWithTimeout(
       () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (smartLlm as any).invoke([
           new SystemMessage(REDUCE_SYSTEM_PROMPT),
           new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),

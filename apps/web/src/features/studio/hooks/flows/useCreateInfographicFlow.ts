@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { Note, InfographicNote } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
-import { useCreateInfographic } from "../../services/infographicApi";
+import type { InfographicNote, Note } from "@/shared/types/index";
 import type { InfographicConfig } from "../../components/CustomizeInfographicModal";
+import { useCreateInfographic } from "../../services/infographicApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 

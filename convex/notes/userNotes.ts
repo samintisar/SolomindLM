@@ -1,14 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, action } from "../_generated/server";
-import { getAuthUserId } from "../auth";
+import { internal } from "../_generated/api";
+import { action, internalMutation, mutation, query } from "../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import * as Notes from "../_model/notes";
-import { internal } from "../_generated/api";
+import { getAuthUserId } from "../auth";
 
 /**
  * Convert chat messages to clean markdown format
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function messagesToMarkdown(messages: any[]): string {
   if (messages.length === 0) return "";
 
@@ -139,7 +138,6 @@ export const saveChat = action({
 
     // Generate title from first user message
     let title = "Chat Conversation";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstUserMessage = args.messages.find((m: any) => m.role === "user" && m.content);
 
     if (firstUserMessage && firstUserMessage.content) {

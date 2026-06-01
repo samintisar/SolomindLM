@@ -5,24 +5,24 @@
  * Runner-aware: studio runners produce no chunks/citations, so the
  * retrieval-only metrics are skipped and studio-specific scorers run instead.
  */
-import type { EvalFixture, EvalRunArtifact, EvalBaseline, MetricResult } from "../types";
+import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 import {
-  expectedItemRecall,
-  retrievalItemRecall,
-  retrievalPrecisionAtK,
-  retrievalNdcgAtK,
   abstentionCorrectness,
   citationValidity,
+  expectedItemRecall,
   latencyCostBudget,
+  retrievalItemRecall,
+  retrievalNdcgAtK,
+  retrievalPrecisionAtK,
 } from "./index";
 import { scoreAllLlmJudgeMetrics } from "./llmJudge";
-import { scoreStudioMetrics } from "./studio";
 import {
-  sourceDiversityScore,
-  sourceRecallByChannel,
   externalSourceUtilization,
   researchSourceBreadth,
+  sourceDiversityScore,
+  sourceRecallByChannel,
 } from "./sourceAware";
+import { scoreStudioMetrics } from "./studio";
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
   // Chat uses a chunk-based retrieval pipeline with pre/post-rerank stages.
@@ -92,11 +92,11 @@ export async function scoreAllMetrics(
 
 // Re-export individual metrics for direct consumption
 export {
-  expectedItemRecall,
-  retrievalItemRecall,
-  retrievalPrecisionAtK,
-  retrievalNdcgAtK,
   abstentionCorrectness,
   citationValidity,
+  expectedItemRecall,
   latencyCostBudget,
+  retrievalItemRecall,
+  retrievalNdcgAtK,
+  retrievalPrecisionAtK,
 };

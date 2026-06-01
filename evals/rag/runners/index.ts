@@ -6,9 +6,8 @@
  *   const results = await runEval(fixture, { dryRun: true });
  */
 
-export { runChatEval, type ChatAgentInvoker } from "./chatRunner";
-export { runResearchEval, type ResearchAgentInvoker } from "./researchRunner";
-export { runLiteratureReviewEval, type LiteratureReviewInvoker } from "./literatureReviewRunner";
+export { type ChatAgentInvoker, runChatEval } from "./chatRunner";
+export { snapshotRetrievalConfig } from "./config";
 export { createConvexChatInvoker } from "./convexChatInvoker";
 export { createConvexLiteratureReviewInvoker } from "./convexLiteratureReviewInvoker";
 export {
@@ -16,21 +15,22 @@ export {
   STUDIO_INVOKER_FACTORIES,
   type StudioInvoker,
 } from "./convexStudioInvoker";
+export { type LiteratureReviewInvoker, runLiteratureReviewEval } from "./literatureReviewRunner";
+export { type ResearchAgentInvoker, runResearchEval } from "./researchRunner";
 export { runStudioEval } from "./studioRunner";
-export { snapshotRetrievalConfig } from "./config";
 export type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 import type { EvalFixture, StudioRunnerKind } from "../types";
-import type { EvalRunnerResult } from "./types";
-import { snapshotRetrievalConfig } from "./config";
-import { runChatEval } from "./chatRunner";
-import { runResearchEval } from "./researchRunner";
-import { runLiteratureReviewEval } from "./literatureReviewRunner";
-import { runStudioEval } from "./studioRunner";
 import type { ChatAgentInvoker } from "./chatRunner";
-import type { ResearchAgentInvoker } from "./researchRunner";
-import type { LiteratureReviewInvoker } from "./literatureReviewRunner";
+import { runChatEval } from "./chatRunner";
+import { snapshotRetrievalConfig } from "./config";
 import type { StudioInvoker } from "./convexStudioInvoker";
+import type { LiteratureReviewInvoker } from "./literatureReviewRunner";
+import { runLiteratureReviewEval } from "./literatureReviewRunner";
+import type { ResearchAgentInvoker } from "./researchRunner";
+import { runResearchEval } from "./researchRunner";
+import { runStudioEval } from "./studioRunner";
+import type { EvalRunnerResult } from "./types";
 
 export interface RunEvalOptions {
   dryRun?: boolean;

@@ -1,21 +1,21 @@
 "use node";
-import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
+import { createErrorMetadata, createJobLogger } from "../_agents/_shared/logging";
 import { internal } from "../_generated/api";
-import { MistralOCRService } from "../_services/extraction/MistralOCRService";
-import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
-import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
-import {
-  extractDocumentMetadata,
-  getFileExtension,
-} from "../_services/processing/DocumentMetadataExtractor";
-import { StructuralChunker } from "../_services/processing/StructuralChunker";
+import { internalAction } from "../_generated/server";
 import {
   E5_RAG_CHUNK_OVERLAP_TOKENS,
   E5_RAG_CHUNK_SIZE_TOKENS,
   E5_TOGETHER_EMBED_BATCH_SIZE,
 } from "../_lib/e5Embedding";
-import { createJobLogger, createErrorMetadata } from "../_agents/_shared/logging";
+import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
+import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
+import { MistralOCRService } from "../_services/extraction/MistralOCRService";
+import {
+  extractDocumentMetadata,
+  getFileExtension,
+} from "../_services/processing/DocumentMetadataExtractor";
+import { StructuralChunker } from "../_services/processing/StructuralChunker";
 import { buildPaperMetadataMarkdown } from "./paperRecord";
 
 // File extensions that require OCR processing
@@ -433,7 +433,6 @@ export const docEmbedding = internalAction({
         const chunk = chunksWithMetadata[i];
         await ctx.runMutation(internal.documents.chunks.storeChunk, {
           documentId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           userId: chunkUserId as any,
           notebookId,
           content: chunk.content,

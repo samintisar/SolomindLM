@@ -9,10 +9,9 @@
  * 3. Execution (retrieve evidence + write response)
  */
 
-import { WorkflowManager, defineEvent, type WorkflowCtx } from "@convex-dev/workflow";
-import { components } from "../../_generated/api";
+import { defineEvent, type WorkflowCtx, WorkflowManager } from "@convex-dev/workflow";
 import { v } from "convex/values";
-import { internal } from "../../_generated/api";
+import { components, internal } from "../../_generated/api";
 
 export const workflow = new WorkflowManager(components.workflow);
 

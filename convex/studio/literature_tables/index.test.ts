@@ -1,9 +1,9 @@
+import type { FunctionReference } from "convex/server";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import type { FunctionReference } from "convex/server";
-import schema from "../../schema";
 import { api } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
+import schema from "../../schema";
 
 const modules = {
   "./studio/literature_tables/index.ts": () => import("./index.js"),
@@ -74,10 +74,9 @@ describe("saveLiteratureReportAsStudioReport", () => {
       }
     ).saveLiteratureReportAsStudioReport;
 
-    const reportId = await withAuth(t, userId).mutation(
-      saveLiteratureReportAsStudioReport,
-      { reportId: literatureReportId }
-    );
+    const reportId = await withAuth(t, userId).mutation(saveLiteratureReportAsStudioReport, {
+      reportId: literatureReportId,
+    });
 
     const savedReports = await withAuth(t, userId).query(api.notes.index.list, {
       notebookId,

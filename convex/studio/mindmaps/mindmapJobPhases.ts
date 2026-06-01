@@ -1,28 +1,29 @@
 "use node";
+
 /**
  * Mind map generation — phase logic.
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import type { ActionCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
-import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
-import { env } from "../../_lib/env";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { HumanMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
+import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { z } from "zod";
+import { validateWithPreset } from "../../_agents/_shared/index";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
 import {
   MAP_PROMPT,
-  REDUCE_PROMPT,
   MAP_SYSTEM_PROMPT,
+  REDUCE_PROMPT,
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/mindmap/prompts";
-import type { ConceptExtraction, MindMapNode, FinalMindMap } from "../../_agents/mindmap/state";
-import { validateWithPreset } from "../../_agents/_shared/index";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
-import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import type { ConceptExtraction, FinalMindMap, MindMapNode } from "../../_agents/mindmap/state";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import type { ActionCtx } from "../../_generated/server";
+import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
@@ -37,7 +38,6 @@ const ConceptExtractionSchema = z.object({
 
 // Interface for the structured LLM to avoid deep type instantiation
 interface ConceptExtractionInvoker {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<ConceptExtraction>;
 }
 
@@ -266,7 +266,6 @@ export async function runMindmapGenerationPhase(
     });
 
     // Extract content from chunk objects
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -367,11 +366,9 @@ export async function runProcessMindMapMapChunkPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[mindmap] user preference fetch failed, using default language",
@@ -391,7 +388,6 @@ export async function runProcessMindMapMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke([
           new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           new HumanMessage(prompt),
@@ -480,8 +476,7 @@ export async function runProcessMindMapMapChunkPhase(
       : 0;
     const totalMaps = mindmap.metadata?.totalMapTasks || totalChunks;
     const failedMaps = mindmap.metadata?.mapResults
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.values(mindmap.metadata.mapResults).filter((r: any) => {
+      ? Object.values(mindmap.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -550,11 +545,9 @@ export async function runFinalizeMindMapPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[mindmap] user preference fetch failed, using default language",
@@ -623,7 +616,6 @@ export async function runFinalizeMindMapPhase(
       const startTime = Date.now();
       const response = await invokeStudioLlm({
         invoke: () =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (llm as any).invoke([
             new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
             new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),

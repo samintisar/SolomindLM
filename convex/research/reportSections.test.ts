@@ -21,11 +21,7 @@ Background.
 Final thoughts.`;
 
     const sections = parseMarkdownSections(md);
-    expect(sections.map((s) => s.heading)).toEqual([
-      "Abstract",
-      "Introduction",
-      "Conclusion",
-    ]);
+    expect(sections.map((s) => s.heading)).toEqual(["Abstract", "Introduction", "Conclusion"]);
     expect(sections[0].content).toContain("Summary here");
     expect(sections[2].content).toContain("Final thoughts");
   });

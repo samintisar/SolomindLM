@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * ReportGraph
  *
@@ -12,11 +13,9 @@
  * Main export: ReportGraph class
  */
 
-// Re-export the main class from nodes module
-export { ReportGraph, packChunks, validateChunks } from "./report/ReportGraph.js";
-
-// Re-export types for backward compatibility
-export type { OverallStateType, ChunkProcessState } from "./report/state.js";
-
 // Re-export prompt constants for backward compatibility
 export { MAP_PROMPTS, REDUCE_PROMPTS } from "./report/prompts.js";
+// Re-export the main class from nodes module
+export { packChunks, ReportGraph, validateChunks } from "./report/ReportGraph.js";
+// Re-export types for backward compatibility
+export type { ChunkProcessState, OverallStateType } from "./report/state.js";

@@ -1,13 +1,13 @@
 "use node";
 
 import { v } from "convex/values";
-import { action } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { getAuthUserId } from "../../auth";
+import { action } from "../../_generated/server";
 import {
-  WrittenQuestionsGradingService,
   type WrittenQuestion,
+  WrittenQuestionsGradingService,
 } from "../../_services/grading/WrittenQuestionsGradingService";
+import { getAuthUserId } from "../../auth";
 
 /**
  * Submit an answer and grade it
@@ -38,7 +38,6 @@ export const submitAndGrade = action({
     }
 
     // Find the specific question
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const question = writtenQuestion.questionsData?.find((q: any) => q.id === questionId);
     if (!question) {
       throw new Error("Question not found");

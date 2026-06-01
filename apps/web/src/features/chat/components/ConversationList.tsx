@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { MoreVertical, Pencil, Trash2, X, Check, Pin } from "lucide-react";
 import type { Doc } from "@convex/_generated/dataModel";
-import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import { Check, MoreVertical, Pencil, Pin, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/shared/contexts/useToast";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
 interface ConversationListProps {
   conversations: Doc<"conversations">[] | undefined;

@@ -1,4 +1,4 @@
-import { AlertCircle, XCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, XCircle } from "lucide-react";
 
 interface ErrorMessageProps {
   error: string;

@@ -1,10 +1,10 @@
+import { api } from "@convex/_generated/api";
+import { useAction, useQuery } from "convex/react";
 import type {
-  SubscriptionStatusResponse,
   CheckoutSessionResponse,
   SubscriptionInterval,
+  SubscriptionStatusResponse,
 } from "../types";
-import { useQuery, useAction } from "convex/react";
-import { api } from "@convex/_generated/api";
 
 /**
  * Get subscription status for current user
@@ -59,7 +59,6 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
 
   return {
     hasSubscription: subscription.status === "active",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     status: subscription.status as any,
     plan: subscription.status === "active" ? "premium" : "free",
     notebookLimit: subscription.status === "active" ? 100 : 5,

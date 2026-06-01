@@ -1,5 +1,3 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   Check,
   ChevronDown,
@@ -12,19 +10,21 @@ import {
   Search,
   Send,
 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { type AuthFormInitialMode, AuthFormPanel } from "@/features/auth/components/AuthFormPanel";
 import { useAuth } from "@/features/auth/useAuth";
-import { isNativeShell } from "@/utils/platformDetection";
-import { AuthFormPanel, type AuthFormInitialMode } from "@/features/auth/components/AuthFormPanel";
-import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
-import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
 import { CustomizeInfographicModal } from "@/features/studio/components/CustomizeInfographicModal";
+import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
+import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
 import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
-import { useToast } from "@/shared/contexts/useToast";
 import { STUDIO_TOOLS } from "@/shared/constants";
+import { useToast } from "@/shared/contexts/useToast";
+import { isNativeShell } from "@/utils/platformDetection";
 
 type HeroMode = "chat" | "studio";
 

@@ -1,7 +1,7 @@
+import { Bookmark, MessageSquareText, X } from "lucide-react";
 import React, { useState } from "react";
-import { X, MessageSquareText, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeWrittenQuestionsModalProps {
   isOpen: boolean;

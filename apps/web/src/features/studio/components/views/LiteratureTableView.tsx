@@ -1,28 +1,25 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   ArrowLeft,
-  Plus,
-  Columns3,
-  Save,
-  Download,
   ChevronDown,
+  Columns3,
+  Download,
   FileText,
-  Sheet,
-  Table2,
-  X,
   Loader2,
   Maximize2,
   Minimize2,
+  Plus,
+  Save,
+  Sheet,
+  Table2,
+  X,
 } from "lucide-react";
-import type { Id } from "@convex/_generated/dataModel";
-import { useGetExistingPapers, useBulkUpload } from "@/features/sources/services/documentsApi";
-import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { useBulkUpload, useGetExistingPapers } from "@/features/sources/services/documentsApi";
 import { useToast } from "@/shared/contexts/useToast";
-import { ColumnManager, type TableColumn } from "../ColumnManager";
-import { CitePaperModal } from "../CitePaperModal";
-import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
-import { LiteratureTableExtractionCell } from "../LiteratureTableExtractionCell";
+import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import { isNativeShell } from "@/utils/platformDetection";
 import type { TablePaperRow } from "../../utils/literatureTablePaper";
 import {
   citationToRankedPaper,
@@ -31,7 +28,10 @@ import {
   isTablePaperInNotebook,
   tableCitationToBulkUpload,
 } from "../../utils/literatureTablePaper";
-import { isNativeShell } from "@/utils/platformDetection";
+import { CitePaperModal } from "../CitePaperModal";
+import { ColumnManager, type TableColumn } from "../ColumnManager";
+import { LiteratureTableExtractionCell } from "../LiteratureTableExtractionCell";
+import { LiteratureTablePaperCell } from "../LiteratureTablePaperCell";
 
 export type { TableColumn };
 
@@ -175,10 +175,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
     [table.columns]
   );
 
-  const includedPapers = useMemo(
-    () => table.papers.filter((p) => p.isIncluded),
-    [table.papers]
-  );
+  const includedPapers = useMemo(() => table.papers.filter((p) => p.isIncluded), [table.papers]);
 
   const allSelected =
     includedPapers.length > 0 && includedPapers.every((p) => selectedIds.has(p.citationId));
@@ -210,8 +207,9 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 
   const addPapersToNotebook = useCallback(
     async (papers: TablePaper[]) => {
-      const withCitation = papers.filter((p): p is TablePaper & { citation: NonNullable<TablePaper["citation"]> } =>
-        Boolean(p.citation)
+      const withCitation = papers.filter(
+        (p): p is TablePaper & { citation: NonNullable<TablePaper["citation"]> } =>
+          Boolean(p.citation)
       );
       if (withCitation.length === 0) return;
 
@@ -309,204 +307,209 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
 
   const tableShell = (
     <div className={shellClassName} data-literature-table-shell>
-        {onBack && !isFocusMode && (
-          <div className="md:hidden flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-            <button
-              onClick={onBack}
-              className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
-              aria-label="Back to Studio"
-            >
-              <ArrowLeft className="w-5 h-5 shrink-0" />
-            </button>
-            <span className="text-sm font-semibold text-foreground truncate">{table.title}</span>
-          </div>
-        )}
+      {onBack && !isFocusMode && (
+        <div className="md:hidden flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
+          <button
+            onClick={onBack}
+            className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
+            aria-label="Back to Studio"
+          >
+            <ArrowLeft className="w-5 h-5 shrink-0" />
+          </button>
+          <span className="text-sm font-semibold text-foreground truncate">{table.title}</span>
+        </div>
+      )}
 
-        <div className="@container/table-toolbar flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-card min-w-0 overflow-hidden">
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <Table2 className="hidden @min-[420px]/table-toolbar:block h-5 w-5 shrink-0 text-muted-foreground" />
-            <h1
-              className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
-              title={table.title}
-            >
-              {table.title}
-            </h1>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1">
-            <button type="button" onClick={onAddPapers} title="Add papers" className={TABLE_TOOLBAR_BTN}>
-              <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
-              <span className="hidden @min-[640px]/table-toolbar:inline">Add Papers</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsFocusMode(false);
-                setShowColumnManager((open) => !open);
-              }}
-              title="Manage columns"
-              aria-pressed={columnManagerOpen}
-              className={cn(TABLE_TOOLBAR_BTN, columnManagerOpen && "bg-secondary")}
-            >
-              <Columns3 className="h-4 w-4 shrink-0" strokeWidth={2} />
-              <span className="hidden @min-[720px]/table-toolbar:inline">Manage Columns</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSave?.(table)}
-              title="Save table"
-              className={TABLE_TOOLBAR_BTN}
-            >
-              <Save className="h-4 w-4 shrink-0" strokeWidth={2} />
-              <span className="hidden @min-[860px]/table-toolbar:inline">Save table</span>
-            </button>
-            <DropdownMenu
-              trigger={
-                <button
-                  type="button"
-                  disabled={exportDisabled}
-                  title="Export table"
-                  className={TABLE_TOOLBAR_BTN}
-                >
-                  <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  <span className="hidden @min-[980px]/table-toolbar:inline">Export</span>
-                  <ChevronDown className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground @min-[980px]/table-toolbar:inline" strokeWidth={2} />
-                </button>
-              }
-            >
-              <ExportMenuItem
-                icon={<Sheet className="w-4 h-4" />}
-                label="CSV (.csv)"
-                onClick={handleExportCSV}
-              />
-              <ExportMenuItem
-                icon={<Table2 className="w-4 h-4" />}
-                label="Excel (.xlsx)"
-                onClick={handleExportExcel}
-              />
-            </DropdownMenu>
-            <button
-              type="button"
-              onClick={() => {
-                setIsFocusMode((focus) => {
-                  const next = !focus;
-                  if (next) setShowColumnManager(false);
-                  return next;
-                });
-              }}
-              className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-foreground transition-colors hover:bg-secondary"
-              aria-label={isFocusMode ? "Exit full screen" : "Full screen table"}
-              title={isFocusMode ? "Exit full screen" : "Full screen"}
-            >
-              {isFocusMode ? (
-                <Minimize2 className="h-4 w-4 shrink-0" />
-              ) : (
-                <Maximize2 className="h-4 w-4 shrink-0" />
-              )}
-            </button>
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="inline-flex shrink-0 rounded-md p-1.5 text-foreground transition-colors hover:bg-secondary"
-                aria-label="Close table"
-                title="Close"
-              >
-                <X className="h-4 w-4 shrink-0" />
-              </button>
-            )}
-          </div>
+      <div className="@container/table-toolbar flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-card min-w-0 overflow-hidden">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          <Table2 className="hidden @min-[420px]/table-toolbar:block h-5 w-5 shrink-0 text-muted-foreground" />
+          <h1
+            className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
+            title={table.title}
+          >
+            {table.title}
+          </h1>
         </div>
 
-        {selectedIds.size > 0 && (
-          <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-              {selectedIds.size} selected
-            </button>
-            <button
-              type="button"
-              disabled={isBulkAdding}
-              onClick={() => void addPapersToNotebook(selectedPapers)}
-              className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-50"
-            >
-              {isBulkAdding ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Adding…
-                </span>
-              ) : (
-                `Add ${selectedIds.size} to notebook`
-              )}
-            </button>
-          </div>
-        )}
-
-        <div className="flex flex-1 min-h-0">
-          <div className="flex flex-1 flex-col min-w-0">
-            {table.papers.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="text-center">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No papers in this table yet</p>
-                  <button
-                    onClick={onAddPapers}
-                    className="mt-4 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-                  >
-                    Add Papers
-                  </button>
-                </div>
-              </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onAddPapers}
+            title="Add papers"
+            className={TABLE_TOOLBAR_BTN}
+          >
+            <Plus className="h-4 w-4 shrink-0" strokeWidth={2} />
+            <span className="hidden @min-[640px]/table-toolbar:inline">Add Papers</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsFocusMode(false);
+              setShowColumnManager((open) => !open);
+            }}
+            title="Manage columns"
+            aria-pressed={columnManagerOpen}
+            className={cn(TABLE_TOOLBAR_BTN, columnManagerOpen && "bg-secondary")}
+          >
+            <Columns3 className="h-4 w-4 shrink-0" strokeWidth={2} />
+            <span className="hidden @min-[720px]/table-toolbar:inline">Manage Columns</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave?.(table)}
+            title="Save table"
+            className={TABLE_TOOLBAR_BTN}
+          >
+            <Save className="h-4 w-4 shrink-0" strokeWidth={2} />
+            <span className="hidden @min-[860px]/table-toolbar:inline">Save table</span>
+          </button>
+          <DropdownMenu
+            trigger={
+              <button
+                type="button"
+                disabled={exportDisabled}
+                title="Export table"
+                className={TABLE_TOOLBAR_BTN}
+              >
+                <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
+                <span className="hidden @min-[980px]/table-toolbar:inline">Export</span>
+                <ChevronDown
+                  className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground @min-[980px]/table-toolbar:inline"
+                  strokeWidth={2}
+                />
+              </button>
+            }
+          >
+            <ExportMenuItem
+              icon={<Sheet className="w-4 h-4" />}
+              label="CSV (.csv)"
+              onClick={handleExportCSV}
+            />
+            <ExportMenuItem
+              icon={<Table2 className="w-4 h-4" />}
+              label="Excel (.xlsx)"
+              onClick={handleExportExcel}
+            />
+          </DropdownMenu>
+          <button
+            type="button"
+            onClick={() => {
+              setIsFocusMode((focus) => {
+                const next = !focus;
+                if (next) setShowColumnManager(false);
+                return next;
+              });
+            }}
+            className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-foreground transition-colors hover:bg-secondary"
+            aria-label={isFocusMode ? "Exit full screen" : "Full screen table"}
+            title={isFocusMode ? "Exit full screen" : "Full screen"}
+          >
+            {isFocusMode ? (
+              <Minimize2 className="h-4 w-4 shrink-0" />
             ) : (
-              <div className="relative isolate flex-1 min-h-0 overflow-auto bg-background">
-                <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-sm">
-                  <thead>
-                    <tr>
-                      <th className={TABLE_CORNER_HEADER}>
-                        <div className="flex h-full items-center gap-3 pl-9">
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={toggleSelectAll}
-                            className="h-4 w-4 rounded border-border"
-                            aria-label="Select all papers"
-                          />
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Papers ({paperCount})
-                          </span>
-                        </div>
-                      </th>
-                      {dataColumns.map((col) => (
-                        <th key={col.id} className={TABLE_DATA_HEADER}>
-                          {col.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      let visibleRank = 0;
-                      return table.papers.map((paper, index) => {
-                        if (!paper.isIncluded) return null;
-                        visibleRank += 1;
-                        const inNotebook =
-                          paper.citation && existingPapers
-                            ? isTablePaperInNotebook(paper.citation, existingPapers)
-                            : false;
+              <Maximize2 className="h-4 w-4 shrink-0" />
+            )}
+          </button>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex shrink-0 rounded-md p-1.5 text-foreground transition-colors hover:bg-secondary"
+              aria-label="Close table"
+              title="Close"
+            >
+              <X className="h-4 w-4 shrink-0" />
+            </button>
+          )}
+        </div>
+      </div>
 
-                        return (
-                          <tr
-                            key={paper.citationId}
-                            className="align-top hover:bg-muted/15"
-                          >
-                            <td className={TABLE_STICKY_BODY_CELL}>
-                              <LiteratureTablePaperCell
-                                rank={visibleRank}
-                                paper={paper}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-4 py-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+            {selectedIds.size} selected
+          </button>
+          <button
+            type="button"
+            disabled={isBulkAdding}
+            onClick={() => void addPapersToNotebook(selectedPapers)}
+            className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-50"
+          >
+            {isBulkAdding ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Adding…
+              </span>
+            ) : (
+              `Add ${selectedIds.size} to notebook`
+            )}
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 flex-col min-w-0">
+          {table.papers.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="text-center">
+                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No papers in this table yet</p>
+                <button
+                  onClick={onAddPapers}
+                  className="mt-4 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  Add Papers
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative isolate flex-1 min-h-0 overflow-auto bg-background">
+              <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-sm">
+                <thead>
+                  <tr>
+                    <th className={TABLE_CORNER_HEADER}>
+                      <div className="flex h-full items-center gap-3 pl-9">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleSelectAll}
+                          className="h-4 w-4 rounded border-border"
+                          aria-label="Select all papers"
+                        />
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Papers ({paperCount})
+                        </span>
+                      </div>
+                    </th>
+                    {dataColumns.map((col) => (
+                      <th key={col.id} className={TABLE_DATA_HEADER}>
+                        {col.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    let visibleRank = 0;
+                    return table.papers.map((paper, index) => {
+                      if (!paper.isIncluded) return null;
+                      visibleRank += 1;
+                      const inNotebook =
+                        paper.citation && existingPapers
+                          ? isTablePaperInNotebook(paper.citation, existingPapers)
+                          : false;
+
+                      return (
+                        <tr key={paper.citationId} className="align-top hover:bg-muted/15">
+                          <td className={TABLE_STICKY_BODY_CELL}>
+                            <LiteratureTablePaperCell
+                              rank={visibleRank}
+                              paper={paper}
                               columns={table.columns}
                               isSelected={selectedIds.has(paper.citationId)}
                               isAdding={addingIds.has(paper.citationId)}
@@ -521,25 +524,25 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
                               <LiteratureTableExtractionCell value={paper.rowData[col.id] ?? ""} />
                             </td>
                           ))}
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {columnManagerOpen && (
-            <ColumnManager
-              columns={table.columns}
-              onChange={handleColumnsChange}
-              onSavePreset={handleSavePreset}
-              onClose={() => setShowColumnManager(false)}
-            />
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
+
+        {columnManagerOpen && (
+          <ColumnManager
+            columns={table.columns}
+            onChange={handleColumnsChange}
+            onSavePreset={handleSavePreset}
+            onClose={() => setShowColumnManager(false)}
+          />
+        )}
+      </div>
     </div>
   );
 

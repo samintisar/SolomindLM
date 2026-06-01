@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { Note, FlashcardNote } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
-import { useCreateFlashcard } from "../../services/flashcardsApi";
+import type { FlashcardNote, Note } from "@/shared/types/index";
 import type { FlashcardConfig } from "../../components/CustomizeFlashcardsModal";
+import { useCreateFlashcard } from "../../services/flashcardsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 

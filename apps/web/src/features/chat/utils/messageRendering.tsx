@@ -1,13 +1,12 @@
 import React, { Suspense } from "react";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { replaceCitationMarkersOutsideMath } from "./citationMarkers";
-import { stripReferencesSection, RefHandlers } from "./messageRendering.utils";
 import { MarkdownRendererLazy } from "./MarkdownRendererLazy";
+import { RefHandlers, stripReferencesSection } from "./messageRendering.utils";
 
 export function renderMessageWithReferences(
   messageId: string,
   content: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _references: any[] | undefined,
   handlers: RefHandlers,
   options?: { isStreamingVisual?: boolean }
@@ -66,7 +65,6 @@ export function renderMessageWithReferences(
               ),
             p: ({ children }) => <p className="text-base leading-relaxed">{children}</p>,
             /** Citation pills: backend replaces [n] with `CITE:n` (inline code). Streamdown uses `inlineCode` for backticks. */
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             inlineCode: ({ children }: any) => {
               const text = String(children);
               if (text.startsWith("CITE:")) {

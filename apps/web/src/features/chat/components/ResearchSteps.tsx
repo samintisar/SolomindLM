@@ -1,6 +1,6 @@
+import type { Id } from "@convex/_generated/dataModel";
 import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
 import type { ResearchStep } from "./researchStepTypes";
-import type { Id } from "@convex/_generated/dataModel";
 
 export type { ResearchStep } from "./researchStepTypes";
 

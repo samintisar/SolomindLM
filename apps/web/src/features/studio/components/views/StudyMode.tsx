@@ -1,8 +1,8 @@
-import { useState, lazy, Suspense } from "react";
-import { ChevronLeft, ChevronRight, CheckCircle2, BookOpen } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { srsSubtextForRating } from "@/features/studio/utils/srsReviewLabels";
 import { Flashcard } from "@/shared/types";
 import { sanitizeMarkdown } from "@/shared/utils";
-import { srsSubtextForRating } from "@/features/studio/utils/srsReviewLabels";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))

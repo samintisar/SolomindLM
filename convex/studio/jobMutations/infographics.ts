@@ -1,5 +1,5 @@
-import { internalMutation } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalMutation } from "../../_generated/server";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveInfographicResults = internalMutation({
@@ -47,7 +47,6 @@ export const updateInfographicStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),

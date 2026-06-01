@@ -1,9 +1,9 @@
-import type { Flashcard, FlashcardNote } from "@/shared/types/index";
-import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
-import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
+import type { Flashcard, FlashcardNote } from "@/shared/types/index";
+import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
 
 export interface CreateFlashcardsParams {
   notebookId: string;
@@ -27,7 +27,6 @@ function capitalizeDifficulty(difficulty: string | undefined): string {
 /**
  * Matches unified list copy in `notesApi.getFlashcardPreview`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPreviewText(status: string, cardCount: number, metadata?: any): string {
   const difficulty = capitalizeDifficulty(metadata?.difficulty);
 
@@ -48,7 +47,6 @@ function getPreviewText(status: string, cardCount: number, metadata?: any): stri
 /**
  * Map a database flashcard response to the frontend FlashcardNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapFlashcardToNote(dbFlashcard: any): FlashcardNote {
   // Flashcards are stored in the cardsData field
   const flashcards: Flashcard[] = dbFlashcard.cardsData || [];

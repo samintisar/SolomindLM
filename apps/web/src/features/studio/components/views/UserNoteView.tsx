@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from "react";
 import { ArrowLeft, FileText } from "lucide-react";
+import React, { lazy, Suspense } from "react";
 import { UserNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 

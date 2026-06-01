@@ -1,5 +1,5 @@
+import { FileStack, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import React from "react";
-import { Search, Plus, FileStack, Trash2, RefreshCw } from "lucide-react";
 import { Source } from "@/shared/types";
 import { SourceListItem } from "./SourceListItem";
 

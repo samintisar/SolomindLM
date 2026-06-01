@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { query, internalMutation, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { getAuthUserId } from "../auth";
+import { internalAction, internalMutation, query } from "../_generated/server";
 import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { getAuthUserId } from "../auth";
 
 /**
  * Returns the first N chunks for a notebook (by index order), not semantic search.

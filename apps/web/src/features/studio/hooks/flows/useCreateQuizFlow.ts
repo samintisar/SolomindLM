@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { Note, QuizNote } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
-import { useCreateQuiz } from "../../services/quizzesApi";
+import type { Note, QuizNote } from "@/shared/types/index";
 import type { QuizConfig } from "../../components/CustomizeQuizModal";
+import { useCreateQuiz } from "../../services/quizzesApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 

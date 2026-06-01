@@ -1,8 +1,8 @@
 import { ConvexError, v } from "convex/values";
+import type { MutationCtx } from "../_generated/server";
 import { mutation } from "../_generated/server";
 import { getAuthUserId } from "../auth";
 import { nextStepId } from "./constants";
-import type { MutationCtx } from "../_generated/server";
 
 const stepIdValidator = v.union(
   v.literal("createNotebook"),

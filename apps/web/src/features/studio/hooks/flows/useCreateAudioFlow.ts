@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { Note, AudioOverviewNote } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
-import { useCreateAudioOverview } from "../../services/audioApi";
+import type { AudioOverviewNote, Note } from "@/shared/types/index";
 import type { AudioConfig } from "../../components/CustomizeAudioModal";
+import { useCreateAudioOverview } from "../../services/audioApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   BookOpen,
   Check,
@@ -13,14 +13,14 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import type { Id } from "@convex/_generated/dataModel";
-import { ResizeHandle } from "./ResizeHandle";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-  useLiteratureReviewSession,
   useLiteratureReviewScreeningDecisions,
+  useLiteratureReviewSession,
 } from "../services/literatureTablesApi";
-import { formatAuthorsLine } from "../types/rankedPaper";
 import type { LiteratureScreeningDecision } from "../types/literatureScreening";
+import { formatAuthorsLine } from "../types/rankedPaper";
+import { ResizeHandle } from "./ResizeHandle";
 
 interface LiteratureScreeningPanelProps {
   sessionId: Id<"literatureReviewSessions">;
@@ -83,7 +83,10 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
     };
   }, [sortedDecisions]);
 
-  const criteriaLabels = useMemo(() => getScreeningCriteriaLabels(session?.query), [session?.query]);
+  const criteriaLabels = useMemo(
+    () => getScreeningCriteriaLabels(session?.query),
+    [session?.query]
+  );
 
   const isLoading = screeningDecisions === undefined;
   const total = included.length + excluded.length;
@@ -159,9 +162,7 @@ function ScreeningPanelHeader({
   return (
     <div className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="min-w-0 flex-1 space-y-1">
-        <h2 className="truncate text-[15px] font-semibold text-foreground">
-          {title}
-        </h2>
+        <h2 className="truncate text-[15px] font-semibold text-foreground">{title}</h2>
         {subtitle ? (
           <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{subtitle}</p>
         ) : null}
@@ -204,13 +205,7 @@ function ScreeningOutcomeSummary({ included, excluded }: { included: number; exc
   );
 }
 
-function SummaryMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
+function SummaryMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="border-r border-border px-4 py-2 last:border-r-0">
       <div className="text-sm font-semibold text-foreground">{value.toLocaleString()}</div>
@@ -303,10 +298,7 @@ function ScreeningDecisionRow({
 
 function PaperSummaryCell({ decision }: { decision: LiteratureScreeningDecision }) {
   const authors = formatAuthorsLine(decision.authors);
-  const meta = [
-    decision.year != null ? String(decision.year) : null,
-    authors,
-  ]
+  const meta = [decision.year != null ? String(decision.year) : null, authors]
     .filter(Boolean)
     .join(" · ");
   const rank = decision.rank ?? decision.paperIndex + 1;
@@ -465,12 +457,15 @@ function inferCriterionStatus({
   isIncluded: boolean;
 }): CriterionStatus {
   const text = `${title} ${reason}`;
-  const negative = /\b(no|not|without|insufficient|limited|unclear|tangential|indirect|unavailable|different)\b/.test(
-    reason
-  );
+  const negative =
+    /\b(no|not|without|insufficient|limited|unclear|tangential|indirect|unavailable|different)\b/.test(
+      reason
+    );
 
   if (labelText.includes("real-world") || labelText.includes("direct relevance")) {
-    if (/\bnew engineering tasks|not real[-\s]?world|different topic|indirect|tangential\b/.test(text)) {
+    if (
+      /\bnew engineering tasks|not real[-\s]?world|different topic|indirect|tangential\b/.test(text)
+    ) {
       return "missed";
     }
     if (/\breal[-\s]?world|applied|practical|field|deployment|engineering|clinical\b/.test(text)) {
@@ -491,7 +486,9 @@ function inferCriterionStatus({
   }
 
   if (labelText.includes("empirical") || labelText.includes("evidence")) {
-    if (/\bempirical|dataset|experiment|evaluation|benchmark|evidence|study|analysis\b/.test(text)) {
+    if (
+      /\bempirical|dataset|experiment|evaluation|benchmark|evidence|study|analysis\b/.test(text)
+    ) {
       return "met";
     }
     return isIncluded ? "partial" : "missed";
@@ -512,7 +509,11 @@ function inferCriterionStatus({
   return index % 3 === 0 ? "partial" : "missed";
 }
 
-function criterionExplanation(status: CriterionStatus, reason: string, isIncluded: boolean): string {
+function criterionExplanation(
+  status: CriterionStatus,
+  reason: string,
+  isIncluded: boolean
+): string {
   if (status === "met") {
     return isIncluded
       ? `Satisfied by the screening rationale: ${reason}`
@@ -537,9 +538,7 @@ function exportScreeningDecisions(decisions: LiteratureScreeningDecision[], titl
     decision.decision,
     decision.reason,
   ]);
-  const csv = [headers, ...rows]
-    .map((row) => row.map(escapeCsvValue).join(","))
-    .join("\n");
+  const csv = [headers, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

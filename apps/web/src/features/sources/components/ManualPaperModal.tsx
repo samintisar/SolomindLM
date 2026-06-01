@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from "react";
-import { X, FileText, Loader2, AlertCircle } from "lucide-react";
 import { Id } from "@convex/_generated/dataModel";
+import { AlertCircle, FileText, Loader2, X } from "lucide-react";
+import React, { useCallback, useState } from "react";
 import { useUpload } from "../services/documentsApi";
 
 interface ManualPaperModalProps {

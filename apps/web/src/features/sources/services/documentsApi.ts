@@ -1,14 +1,14 @@
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { ConvexClient } from "convex/browser";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useCallback } from "react";
 import type {
   Document,
   PaperRecordInput,
-  UploadResponse,
   UnifiedDiscoveryResult,
+  UploadResponse,
 } from "@/shared/types/index";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
-import { ConvexClient } from "convex/browser";
 
 // ============================================================
 // Hooks (for use in React components)
@@ -389,7 +389,9 @@ export function useUploadDocument() {
  * Get existing papers for a notebook (for deduplication during import)
  */
 export function useGetExistingPapers(notebookId: string) {
-  return useQuery(api.documents.index.getExistingPapers, { notebookId: notebookId as Id<"notebooks"> });
+  return useQuery(api.documents.index.getExistingPapers, {
+    notebookId: notebookId as Id<"notebooks">,
+  });
 }
 
 /**

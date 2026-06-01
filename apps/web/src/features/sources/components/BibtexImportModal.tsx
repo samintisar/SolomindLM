@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useRef } from "react";
-import { X, FileText, Upload, Loader2, AlertCircle, CheckSquare, Square } from "lucide-react";
 import { Id } from "@convex/_generated/dataModel";
-import { useParseBibliography, useBulkUpload } from "../services/documentsApi";
+import { AlertCircle, CheckSquare, FileText, Loader2, Square, Upload, X } from "lucide-react";
+import React, { useCallback, useRef, useState } from "react";
+import { useBulkUpload, useParseBibliography } from "../services/documentsApi";
 
 interface BibtexImportModalProps {
   notebookId: Id<"notebooks">;

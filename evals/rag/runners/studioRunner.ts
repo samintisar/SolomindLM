@@ -6,10 +6,11 @@
  *
  * Mirrors the shape of [chatRunner.ts](./chatRunner.ts).
  */
-import type { EvalFixture, EvalRunArtifact, StudioRunnerKind, StudioOutput } from "../types";
+
 import { computeConfigHash } from "../configHash";
-import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
+import type { EvalFixture, EvalRunArtifact, StudioOutput, StudioRunnerKind } from "../types";
 import type { StudioInvoker } from "./convexStudioInvoker";
+import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 // ─── Validation ──────────────────────────────────────────────
 

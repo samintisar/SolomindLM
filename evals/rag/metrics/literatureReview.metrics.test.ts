@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { EvalFixture, EvalRunArtifact } from "../types";
 import type { LiteratureReviewEvalResult } from "../runners/literatureReviewRunner";
+import type { EvalFixture, EvalRunArtifact } from "../types";
 import {
   lrCitationKeyValidity,
   lrNumericGrounding,
@@ -116,7 +116,9 @@ describe("literatureReview metrics", () => {
       report: {
         title: "R",
         content: "",
-        sections: [{ heading: "Methods", content: "12 studies were included after screening 30 records." }],
+        sections: [
+          { heading: "Methods", content: "12 studies were included after screening 30 records." },
+        ],
       },
       latencyMs: 0,
     };

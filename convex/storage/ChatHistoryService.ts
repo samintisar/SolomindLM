@@ -1,7 +1,7 @@
-import { internalMutation, internalQuery, internalAction } from "../_generated/server";
-import type { Id, Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import type { Doc, Id } from "../_generated/dataModel";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { getNotebookAccess } from "../_lib/notebookAccess";
 import * as ConvModel from "../_model/conversations";
 
@@ -152,7 +152,6 @@ export const getConversationWithMessages = internalAction({
     // Get or create conversation
     const conversationId: Id<"conversations"> = await ctx.runMutation(
       internal.storage.ChatHistoryService.getOrCreateConversation,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { userId: userId as any, notebookId }
     );
 

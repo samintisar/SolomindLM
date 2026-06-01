@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
 import { enableWebOnlyFilter } from "../helpers/chat-assertions";
 

@@ -1,8 +1,8 @@
-import { ReactNode, useState } from "react";
-import { useQuery, useConvexAuth } from "convex/react";
-import { useNavigate } from "react-router-dom";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth, useQuery } from "convex/react";
+import { ReactNode, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
 import { getNativeWebViewBridge, isNativeShell } from "@/utils/platformDetection";
 import { AuthContext, User } from "./useAuth";

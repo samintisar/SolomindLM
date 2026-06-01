@@ -1,7 +1,7 @@
-import { useMemo, useEffect, useState, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from "convex/react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -39,7 +39,6 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   useEffect(() => {
     if (!shareToken || !notebookId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRedeemFinished(true);
       return;
     }
@@ -70,7 +69,6 @@ export function ProtectedRoute({ children, requireNotebookAccess = false }: Prot
 
   const notebook = useQuery(
     api.notebooks.index.get,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     notebookId ? { id: notebookId as any } : "skip"
   );
 

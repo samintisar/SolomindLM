@@ -15,11 +15,11 @@
  */
 "use node";
 
-import { action } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { Id, DataModel } from "../_generated/dataModel";
 import type { GenericActionCtx } from "convex/server";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
+import { DataModel, Id } from "../_generated/dataModel";
+import { action } from "../_generated/server";
 import { assertRagEvalGate } from "./_gate";
 
 type EvalActionCtx = GenericActionCtx<DataModel>;

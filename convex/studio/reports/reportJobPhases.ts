@@ -4,25 +4,25 @@
  * Report generation phase implementations (invoked from thin `job.ts` registrations).
  */
 
-import type { ActionCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
-import { packChunks, validateChunks } from "../../_agents/ReportGraph";
-import { env } from "../../_lib/env";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import {
-  MAP_SYSTEM_PROMPT,
-  MAP_PROMPTS,
-  REDUCE_SYSTEM_PROMPT,
-  REDUCE_PROMPTS,
-} from "../../_agents/report/prompts";
-import { MapOutputSchema, type MapOutput } from "../../_agents/report/nodes";
 import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { packChunks, validateChunks } from "../../_agents/ReportGraph";
+import { type MapOutput, MapOutputSchema } from "../../_agents/report/nodes";
+import {
+  MAP_PROMPTS,
+  MAP_SYSTEM_PROMPT,
+  REDUCE_PROMPTS,
+  REDUCE_SYSTEM_PROMPT,
+} from "../../_agents/report/prompts";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import type { ActionCtx } from "../../_generated/server";
+import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 interface MapOutputInvoker {
@@ -244,11 +244,9 @@ export async function runProcessReportMapChunkPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[report] user preference fetch failed, using default language",
@@ -276,7 +274,6 @@ IMPORTANT: Respond with a JSON object containing:
     const startTime = Date.now();
     const mapOutput = (await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke([
           new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           new HumanMessage(structuredPrompt),
@@ -423,11 +420,9 @@ export async function runFinalizeReportPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[report] user preference fetch failed, using default language",
@@ -497,7 +492,6 @@ export async function runFinalizeReportPhase(
     const startTime = Date.now();
     const response = (await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke([
           new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
           new HumanMessage(prompt),

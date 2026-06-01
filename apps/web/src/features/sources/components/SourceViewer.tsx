@@ -1,4 +1,3 @@
-import React, { lazy, Suspense, useState, useEffect, useRef } from "react";
 import {
   BookOpenText,
   ChevronDown,
@@ -8,10 +7,11 @@ import {
   Tags,
   XCircle,
 } from "lucide-react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Source } from "@/shared/types";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
-import { useGetSignedUrl, useGenerateSourceGuide } from "../services/documentsApi";
+import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
 import { PdfViewer } from "./PdfViewer";
 
 const MarkdownRenderer = lazy(() =>
@@ -53,7 +53,6 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
   // Fetch PDF signed URL only when user switches to Original PDF tab (avoids loading PDF until needed)
   useEffect(() => {
     if (viewMode !== "pdf" || !pdfStorageId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (viewMode !== "pdf") setPdfUrl(null);
       return;
     }

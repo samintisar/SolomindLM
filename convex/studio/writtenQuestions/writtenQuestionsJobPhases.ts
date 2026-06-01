@@ -1,35 +1,36 @@
 "use node";
+
 /**
  * Written questions generation — phase logic.
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import type { ActionCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
-import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
-import { env } from "../../_lib/env";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { randomUUID } from "crypto";
 import { z } from "zod";
-import {
-  getMapPrompt,
-  WrittenQuestionsArraySchema,
-  MAP_SYSTEM_PROMPT,
-  REDUCE_SELECT_SYSTEM_PROMPT,
-  type WrittenQuestion,
-  type WrittenQuestionsResponse,
-} from "../../_agents/written_questions/prompts";
+import { sanitizeUserInput } from "../../_agents/_shared/index";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
   applySelectedQuestionIds,
   dedupeQuestions,
   getSelectionIdsPrompt,
 } from "../../_agents/written_questions/postprocess";
-import { sanitizeUserInput } from "../../_agents/_shared/index";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
-import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import {
+  getMapPrompt,
+  MAP_SYSTEM_PROMPT,
+  REDUCE_SELECT_SYSTEM_PROMPT,
+  type WrittenQuestion,
+  WrittenQuestionsArraySchema,
+  type WrittenQuestionsResponse,
+} from "../../_agents/written_questions/prompts";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import type { ActionCtx } from "../../_generated/server";
+import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
@@ -40,7 +41,6 @@ import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 interface WrittenQuestionsOutputInvoker {
   invoke(
     messages: Array<SystemMessage | HumanMessage>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config?: any
   ): Promise<WrittenQuestionsResponse>;
 }
@@ -61,7 +61,6 @@ type WrittenQuestionIdSelectionResponse = z.infer<typeof WrittenQuestionIdSelect
 interface WrittenQuestionSelectionInvoker {
   invoke(
     messages: Array<SystemMessage | HumanMessage>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config?: any
   ): Promise<WrittenQuestionIdSelectionResponse>;
 }
@@ -222,7 +221,6 @@ export async function runWrittenQuestionsGenerationPhase(
     });
 
     // Extract content from chunk objects
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -367,11 +365,9 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[writtenQuestions] user preference fetch failed, using default language",
@@ -399,7 +395,6 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke([
           new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           new HumanMessage(prompt),
@@ -517,8 +512,7 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
       : 0;
     const totalMaps = writtenQuestion.metadata?.totalMapTasks || totalChunks;
     const failedMaps = writtenQuestion.metadata?.mapResults
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
+      ? Object.values(writtenQuestion.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -599,11 +593,9 @@ export async function runFinalizeWrittenQuestionsPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[writtenQuestions] user preference fetch failed, using default language",

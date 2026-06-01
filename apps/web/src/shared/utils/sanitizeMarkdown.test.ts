@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   restoreAngleBracketsAfterDomPurify,
-  sanitizeMarkdown,
   sanitizeHtml,
+  sanitizeMarkdown,
 } from "./sanitizeMarkdown";
 
 // Note: DOMPurify under jsdom may not perfectly match browser behavior,

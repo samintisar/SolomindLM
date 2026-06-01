@@ -1,51 +1,50 @@
 "use node";
+
 /**
  * Quiz generation — phase logic.
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import type { ActionCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
-import { packChunks, validateChunks } from "../../_agents/QuizGraph";
-import { env } from "../../_lib/env";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { packChunks, validateChunks } from "../../_agents/QuizGraph";
 import {
+  applySelectedCandidateIndices,
+  EXPAND_QUESTION_SYSTEM_PROMPT,
   getCandidateMapPrompt,
   getCandidateMapRecoveryPrompt,
   getCandidateMapTopUpPrompt,
   getCandidateSelectionPrompt,
   getExpandPrompt,
-  applySelectedCandidateIndices,
-  QuizCandidateArraySchema,
-  QuizCandidateIndexSelectionSchema,
-  QuizQuestionSchema,
+  MAP_CANDIDATES_SYSTEM_PROMPT,
   type QuizCandidate,
+  QuizCandidateArraySchema,
   type QuizCandidateIndexSelection,
+  QuizCandidateIndexSelectionSchema,
   type QuizCandidateResponse,
   type QuizQuestion,
-  MAP_CANDIDATES_SYSTEM_PROMPT,
+  QuizQuestionSchema,
   REDUCE_SELECT_SYSTEM_PROMPT,
-  EXPAND_QUESTION_SYSTEM_PROMPT,
 } from "../../_agents/quiz/prompts";
-import { sanitizeUserInput, allWithConcurrency } from "../../_agents/_shared/index";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
-import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import type { ActionCtx } from "../../_generated/server";
+import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // Interface for the structured LLM to avoid deep type instantiation
 interface QuizCandidateOutputInvoker {
   invoke(
     messages: Array<SystemMessage | HumanMessage>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config?: any
   ): Promise<QuizCandidateResponse>;
 }
 
 interface QuizQuestionOutputInvoker {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<QuizQuestion>;
 }
 
@@ -233,7 +232,6 @@ export async function runQuizGenerationPhase(
     });
 
     // Extract content from chunk objects
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -362,11 +360,9 @@ export async function runProcessQuizMapChunkPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[quiz] user preference fetch failed, using default language",
@@ -428,7 +424,6 @@ export async function runProcessQuizMapChunkPhase(
       try {
         response = await invokeStudioLlm({
           invoke: () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (structuredLLM as any).invoke([
               new SystemMessage(withLanguageInstruction(MAP_CANDIDATES_SYSTEM_PROMPT, language)),
               new HumanMessage(prompt),
@@ -552,8 +547,7 @@ export async function runProcessQuizMapChunkPhase(
       : 0;
     const totalMaps = quiz.metadata?.totalMapTasks || totalChunks;
     const failedMaps = quiz.metadata?.mapResults
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.values(quiz.metadata.mapResults).filter((r: any) => {
+      ? Object.values(quiz.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -623,11 +617,9 @@ export async function runFinalizeQuizPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[quiz] user preference fetch failed, using default language",
@@ -700,7 +692,6 @@ export async function runFinalizeQuizPhase(
     const startTime = Date.now();
     const selectionResponse = await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredSelectLLM as any).invoke([
           new SystemMessage(withLanguageInstruction(REDUCE_SELECT_SYSTEM_PROMPT, language)),
           new HumanMessage(selectionPrompt),
@@ -765,7 +756,6 @@ export async function runFinalizeQuizPhase(
             const prompt = getExpandPrompt(candidate);
             return await invokeStudioLlm({
               invoke: () =>
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (structuredExpandLLM as any).invoke([
                   new SystemMessage(
                     withLanguageInstruction(EXPAND_QUESTION_SYSTEM_PROMPT, language)

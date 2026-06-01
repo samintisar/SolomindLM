@@ -1,5 +1,5 @@
-import { v } from "convex/values";
 import type { Infer } from "convex/values";
+import { v } from "convex/values";
 
 export const literatureAcademicFiltersValidator = v.object({
   publicationYearFrom: v.optional(v.number()),

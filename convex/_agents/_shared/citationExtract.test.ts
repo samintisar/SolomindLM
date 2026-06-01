@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  extractUniqueSortedCitationIndices,
   INLINE_CITATION_MARKER_RE,
   matchAllInlineCitations,
-  extractUniqueSortedCitationIndices,
-  stripInlineCitationMarkers,
   replaceCitationMarkersWithPlaceholders,
+  stripInlineCitationMarkers,
 } from "./citationExtract";
 
 describe("INLINE_CITATION_MARKER_RE", () => {

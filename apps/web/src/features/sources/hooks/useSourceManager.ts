@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { type Doc } from "@convex/_generated/dataModel";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useToast } from "@/shared/contexts/useToast";
 import { Source } from "@/shared/types/index";
 import { documentToSource } from "@/shared/utils/documentToSource";
 import {
-  useUpdateDocument,
   useDeleteDocument,
   useRemoveManyDocuments,
+  useUpdateDocument,
 } from "../services/documentsApi";
-import { useToast } from "@/shared/contexts/useToast";
-import { type Doc } from "@convex/_generated/dataModel";
 
 interface UseSourceManagerProps {
   documents: Doc<"documents">[];
@@ -16,7 +16,6 @@ interface UseSourceManagerProps {
 
 export function useSourceManager({ documents, notebookId }: UseSourceManagerProps) {
   const [sources, setSources] = useState<Source[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prevDocumentsRef = useRef<any[]>([]);
   const updateDocument = useUpdateDocument();
   const deleteDocumentMutation = useDeleteDocument();

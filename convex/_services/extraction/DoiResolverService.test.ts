@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { DoiResolverService } from "./DoiResolverService";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InputValidationError } from "../../_lib/errors";
+import { DoiResolverService } from "./DoiResolverService";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch as unknown as typeof fetch;

@@ -19,7 +19,6 @@ export function ContentSkeleton({ lines = 8, className = "" }: ContentSkeletonPr
           key={i}
           className="h-4 bg-muted/10 animate-pulse rounded"
           style={{
-            // eslint-disable-next-line react-hooks/purity
             width: `${Math.random() * 30 + 70}%`,
             animationDelay: `${i * 50}ms`,
             animationDuration: "1.5s",

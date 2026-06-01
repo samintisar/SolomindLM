@@ -1,9 +1,9 @@
-import { describe, expect, test, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { TourTooltip } from "./TourTooltip";
-import { OnboardingContext } from "../OnboardingContext";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { OnboardingContextValue } from "../OnboardingContext";
+import { OnboardingContext } from "../OnboardingContext";
+import { TourTooltip } from "./TourTooltip";
 
 vi.mock("@/shared/hooks/useServiceErrorToast", () => ({
   useServiceErrorToast: () => ({ showError: vi.fn() }),

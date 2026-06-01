@@ -1,7 +1,7 @@
-import type { MindMapNote } from "@/shared/types/index";
-import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import type { MindMapNote } from "@/shared/types/index";
 
 export interface CreateMindMapParams {
   notebookId: string;
@@ -15,7 +15,6 @@ export interface CreateMindMapResponse {
   mindmap: MindMapNote;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
   const maybeWrapped = rawData?.nodeData?.nodeData ?? rawData?.nodeData ?? rawData;
   const normalized = maybeWrapped && typeof maybeWrapped === "object" ? { ...maybeWrapped } : {};
@@ -33,7 +32,6 @@ function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
 /**
  * Map a database mindmap response to the frontend MindMapNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapMindMapToNote(dbMindMap: any): MindMapNote {
   let preview: string;
 

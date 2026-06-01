@@ -1,3 +1,12 @@
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import {
+  pickDocument,
+  pickFromCamera,
+  pickFromLibrary,
+} from "@mobile/services/fileUpload/nativeFilePicker";
+import { uploadPickedFileToNotebook } from "@mobile/services/fileUpload/uploadService";
+import { useConvexAuth, useMutation } from "convex/react";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -7,15 +16,6 @@ import {
   Text,
   type ViewStyle,
 } from "react-native";
-import { useConvexAuth, useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
-import {
-  pickDocument,
-  pickFromCamera,
-  pickFromLibrary,
-} from "@mobile/services/fileUpload/nativeFilePicker";
-import { uploadPickedFileToNotebook } from "@mobile/services/fileUpload/uploadService";
 
 export function FileUploadButton({ notebookId, style }: { notebookId: string; style?: ViewStyle }) {
   const { isAuthenticated } = useConvexAuth();

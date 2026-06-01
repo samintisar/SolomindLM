@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Graph builder for agent operations.
  *
@@ -11,8 +12,8 @@
  * - Conditional routing between nodes
  */
 
-import { StateGraph, START, END } from "@langchain/langgraph";
 import type { Send } from "@langchain/langgraph";
+import { END, START, StateGraph } from "@langchain/langgraph";
 
 import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "./agent_graph_limits.js";
 
@@ -298,7 +299,6 @@ export function buildCustomGraph<_TState extends Record<string, unknown>>(
  * });
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createConditionalRoute<TState = any>(
   conditions: Record<string, (state: TState) => boolean>,
   defaultRoute: string = END
@@ -330,7 +330,6 @@ export function createConditionalRoute<TState = any>(
  * builder.addNode('init', updateProgressNode);
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createProgressNode<TState extends { progress?: any }>(progress: {
   phase: string;
   percentage: number;

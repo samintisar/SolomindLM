@@ -186,7 +186,6 @@ Do NOT combine topics or focus primarily on one.
       () =>
         invokeWithTimeout(
           () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (deps.smartLlm as any).invoke([
               new SystemMessage(REDUCE_SYSTEM_PROMPT),
               new HumanMessage(prompt),
@@ -198,7 +197,6 @@ Do NOT combine topics or focus primarily on one.
       "Reduce"
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const responseAny = response as any;
     const metadata = responseAny.response_metadata || {};
     const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;
@@ -239,7 +237,6 @@ Do NOT combine topics or focus primarily on one.
   } catch (error) {
     const elapsed = Date.now() - startTime;
     const isTimeout =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (error as any).isTimeout ||
       (error instanceof Error &&
         (error.message.includes("timeout") ||
@@ -261,11 +258,8 @@ Do NOT combine topics or focus primarily on one.
               name: error.name,
               message: error.message,
               stack: error.stack?.split("\n").slice(0, 5).join("\n"),
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               phase: (error as any).phase,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               isTimeout: (error as any).isTimeout,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               timeoutMs: (error as any).timeoutMs,
             }
           : String(error),
@@ -279,20 +273,13 @@ Do NOT combine topics or focus primarily on one.
         ? new Error(`Reduce phase failed: ${error.message}${isTimeout ? " (timeout)" : ""}`)
         : new Error("Reduce phase failed with unknown error");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (enhancedError as any).phase = "reduce";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (enhancedError as any).isTimeout = isTimeout;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (enhancedError as any).reportType = state.reportType;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (enhancedError as any).elapsedTime = elapsed;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (enhancedError as any).errorContext = errorContext;
     if (error instanceof Error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).originalError = error;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).stack = error.stack;
     }
 

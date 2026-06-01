@@ -1,5 +1,5 @@
 import { Streamdown } from "streamdown";
-import { streamdownPlugins, MarkdownRendererProps } from "./MarkdownRenderer.utils";
+import { MarkdownRendererProps, streamdownPlugins } from "./MarkdownRenderer.utils";
 
 /**
  * Shared markdown renderer (Streamdown + code + math plugins).

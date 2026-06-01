@@ -1,15 +1,16 @@
 "use node";
+
 /**
  * Audio overview generation job — Convex registrations only.
  * @see ./audioJobPhases.ts for phase logic.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalAction } from "../../_generated/server";
 import {
   runAudioOverviewGenerationPhase,
-  runProcessAudioMapChunkPhase,
   runFinalizeAudioOverviewPhase,
+  runProcessAudioMapChunkPhase,
 } from "./audioJobPhases";
 
 export const audioOverviewGeneration = internalAction({

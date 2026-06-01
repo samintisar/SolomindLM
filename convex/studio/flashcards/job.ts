@@ -1,15 +1,16 @@
 "use node";
+
 /**
  * Flashcard generation job — Convex registrations only.
  * @see ./flashcardJobPhases.ts for phase logic.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalAction } from "../../_generated/server";
 import {
+  runFinalizeFlashcardPhase,
   runFlashcardGenerationPhase,
   runProcessFlashcardMapChunkPhase,
-  runFinalizeFlashcardPhase,
 } from "./flashcardJobPhases";
 
 export const flashcardGeneration = internalAction({

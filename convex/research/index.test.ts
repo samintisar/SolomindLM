@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -213,11 +213,7 @@ Should not appear in stored sections.`,
 
     const report = await t.run(async (ctx) => ctx.db.get(result.reportId));
 
-    expect(report!.sections.map((s) => s.heading)).toEqual([
-      "Abstract",
-      "Methods",
-      "Discussion",
-    ]);
+    expect(report!.sections.map((s) => s.heading)).toEqual(["Abstract", "Methods", "Discussion"]);
     expect(report!.content).not.toContain("Should not appear");
   });
 

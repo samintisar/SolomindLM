@@ -1,28 +1,28 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
-  X,
-  Search,
-  Globe,
-  Plus,
-  Loader2,
-  ExternalLink,
-  Newspaper,
-  GraduationCap,
-  TrendingUp,
-  SlidersHorizontal,
-  List,
-  LayoutGrid,
   BookOpen,
-  Quote,
   Check,
+  ExternalLink,
   FileStack,
+  Globe,
+  GraduationCap,
+  LayoutGrid,
+  List,
+  Loader2,
+  Newspaper,
+  Plus,
+  Quote,
+  Search,
+  SlidersHorizontal,
+  TrendingUp,
+  X,
 } from "lucide-react";
-import { Source, UnifiedDiscoveryResult } from "@/shared/types/index";
-import { normalizeSourceUrlForNotebookMatch } from "@/shared/utils/sourceUrlMatch";
-import { useUnifiedDiscovery, useCreateDocument } from "../services/documentsApi";
-import { useToast } from "@/shared/contexts/useToast";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSessionStorage } from "@/hooks/useSessionStorage";
 import { Favicon } from "@/shared/components/Favicon";
+import { useToast } from "@/shared/contexts/useToast";
+import { Source, UnifiedDiscoveryResult } from "@/shared/types/index";
+import { normalizeSourceUrlForNotebookMatch } from "@/shared/utils/sourceUrlMatch";
+import { useCreateDocument, useUnifiedDiscovery } from "../services/documentsApi";
 import {
   AcademicDiscoveryFiltersSection,
   buildAcademicDiscoveryApiFilters,
@@ -282,7 +282,6 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
         : prev
     );
     // One-time clamp for session keys saved when the slider allowed 50.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
   const discover = useUnifiedDiscovery();
@@ -345,8 +344,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
       if (response.sources.length === 0) {
         const rateLimitWarning = response.warnings?.[0];
         setError(
-          rateLimitWarning ??
-            "No sources found. Try a different query or adjust your filters."
+          rateLimitWarning ?? "No sources found. Try a different query or adjust your filters."
         );
       }
     } catch (err) {

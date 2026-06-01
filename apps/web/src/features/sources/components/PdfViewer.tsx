@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Document, Page, pdfjs, Outline } from "react-pdf";
-import { Loader2, PanelLeft, Minus, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Minus, PanelLeft, Plus } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Document, Outline, Page, pdfjs } from "react-pdf";
 import { cn } from "@/shared/utils/cn";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -85,7 +85,6 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ file, className = "" }) =>
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNumPages(0);
     setLoading(true);
     setError(null);

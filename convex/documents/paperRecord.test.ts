@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
-import {
-  normalizeDoi,
-  deriveFulltextStatus,
-  primaryLinkUrlForPaper,
-  buildPaperMetadataMarkdown,
-} from "./paperRecord";
 import type { PaperRecord } from "./paperRecord";
+import {
+  buildPaperMetadataMarkdown,
+  deriveFulltextStatus,
+  normalizeDoi,
+  primaryLinkUrlForPaper,
+} from "./paperRecord";
 
 describe("normalizeDoi", () => {
   test("strips https://doi.org/ prefix", () => {

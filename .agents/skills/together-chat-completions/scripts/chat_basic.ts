@@ -51,7 +51,6 @@ async function multiTurnChat(): Promise<void> {
 
   const response = await client.chat.completions.create({
     model: "openai/gpt-oss-20b",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messages: messages as any,
   });
   const assistantReply = response.choices[0].message.content ?? "";
@@ -63,7 +62,6 @@ async function multiTurnChat(): Promise<void> {
 
   const response2 = await client.chat.completions.create({
     model: "openai/gpt-oss-20b",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messages: messages as any,
   });
   console.log("User: How about food recommendations?");

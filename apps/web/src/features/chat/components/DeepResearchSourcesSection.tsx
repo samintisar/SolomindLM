@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import type { Id } from "@convex/_generated/dataModel";
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -8,12 +9,11 @@ import {
   Loader2,
   Newspaper,
   Plus,
-  BookOpen,
 } from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { Favicon } from "@/shared/components/Favicon";
-import type { Id } from "@convex/_generated/dataModel";
-import { useResearchRunEvidence } from "../services/researchApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
+import { useResearchRunEvidence } from "../services/researchApi";
 import {
   buildDeepResearchDisplaySources,
   type ResearchEvidenceRow,
@@ -32,10 +32,8 @@ const STATUS_LABEL = {
 } as const;
 
 const STATUS_CLASS = {
-  usedInAnswer:
-    "border-primary/30 bg-primary/10 text-primary",
-  searchedOnly:
-    "border-border/60 bg-muted/40 text-muted-foreground",
+  usedInAnswer: "border-primary/30 bg-primary/10 text-primary",
+  searchedOnly: "border-border/60 bg-muted/40 text-muted-foreground",
 } as const;
 
 interface DeepResearchSourcesSectionProps {
@@ -62,10 +60,7 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
 
   const sources = useMemo(() => {
     if (!evidence?.length) return [];
-    return buildDeepResearchDisplaySources(
-      evidence as ResearchEvidenceRow[],
-      answerContent
-    );
+    return buildDeepResearchDisplaySources(evidence as ResearchEvidenceRow[], answerContent);
   }, [evidence, answerContent]);
 
   const usedCount = sources.filter((s) => s.status === "usedInAnswer").length;

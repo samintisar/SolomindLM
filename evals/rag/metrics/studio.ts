@@ -7,9 +7,9 @@
  * change.
  */
 import type {
+  EvalBaseline,
   EvalFixture,
   EvalRunArtifact,
-  EvalBaseline,
   MetricResult,
   MetricStatus,
 } from "../types";

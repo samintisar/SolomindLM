@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 test.describe("Auth — Auth page smoke tests", () => {
   test("landing page Get Started navigates to auth", async ({ page }) => {

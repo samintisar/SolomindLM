@@ -1,16 +1,16 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { internalMutation } from "../_generated/server";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
-import { generateCitationKey, createCitationEngine } from "../_utils/CitationEngine";
+import { createCitationEngine, generateCitationKey } from "../_utils/CitationEngine";
 import {
   applyNumericCitations,
   buildFallbackSections,
   buildMethodsSection,
   buildOrderedEvidence,
   parseMarkdownSections,
-  sortReportSections,
   type ReportSection,
+  sortReportSections,
 } from "./reportSections";
 
 function buildCitationFromEvidence(entry: {

@@ -1,35 +1,35 @@
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   ArrowUp,
-  Loader2,
-  Mic,
-  Search,
-  Telescope,
-  Monitor,
-  BookOpen,
-  Globe,
-  Newspaper,
-  TrendingUp,
-  GraduationCap,
-  ChevronDown,
-  Check,
-  Square,
-  MessageCircle,
-  FileText,
-  BriefcaseMedical,
   Atom,
+  BookOpen,
+  BriefcaseMedical,
+  Check,
+  ChevronDown,
+  FileText,
+  Globe,
+  GraduationCap,
   ListFilter,
+  Loader2,
+  MessageCircle,
+  Mic,
+  Monitor,
+  Newspaper,
+  Search,
+  Square,
+  Telescope,
+  TrendingUp,
 } from "lucide-react";
-import type { Id } from "@convex/_generated/dataModel";
-import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
-import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
-import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
-import type { ChatSettings } from "@/shared/types";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AcademicDiscoveryFiltersSection,
   buildAcademicDiscoveryApiFilters,
   type DiscoveryAcademicFilterState,
 } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
+import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
+import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
+import type { ChatSettings } from "@/shared/types";
+import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 
 const SOURCE_FILTERS = [
   { id: "notebook", label: "Notebook sources", icon: BookOpen },

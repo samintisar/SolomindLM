@@ -1,5 +1,5 @@
-import React from "react";
 import { ArrowRight } from "lucide-react";
+import React from "react";
 
 interface ResearchArtifactCardProps {
   icon: React.ReactNode;

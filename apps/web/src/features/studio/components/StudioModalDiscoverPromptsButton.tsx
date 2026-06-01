@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { DiscoverStudioPromptsModal } from "./DiscoverStudioPromptsModal";
 import type { StudioTool } from "../services/promptsApi";
+import { DiscoverStudioPromptsModal } from "./DiscoverStudioPromptsModal";
 
 interface StudioModalDiscoverPromptsButtonProps {
   studioTool: StudioTool;

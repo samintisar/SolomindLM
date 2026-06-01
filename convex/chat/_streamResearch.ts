@@ -1,23 +1,23 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { VectorSearchRunner } from "../_agents/chat/vector_search.js";
 import { ResearchAgent } from "../_agents/research/index.js";
 import type { ResearchNodeDeps } from "../_agents/research/nodes";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
+import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService.js";
+import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import {
+  createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
   createResearchVectorSearchRunner,
   loadHybridSearchConfig,
-  createHybridSearch,
 } from "./_streamSearch";
-import type { VectorSearchRunner } from "../_agents/chat/vector_search.js";
 import { createDiscoverSources, type DiscoveredSource } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
-import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 
 export interface ResearchAgentConfig {
   apiKey: string;
@@ -45,17 +45,13 @@ export async function buildResearchAgentDeps(
     { quietLogs: true }
   );
   const rerankFn = createRerankFn(ctx ?? ({} as ActionCtx));
-  const vectorSearchRunner = createResearchVectorSearchRunner(
-    ctx ?? ({} as ActionCtx),
-    notebookId
-  );
+  const vectorSearchRunner = createResearchVectorSearchRunner(ctx ?? ({} as ActionCtx), notebookId);
 
   const hybridSearch = createHybridSearch(
     loadHybridSearchConfig(),
     embeddingService,
     // The research runner returns a slightly different shape (sourceId vs _id).
     // This is preserved from the original code and works at runtime.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vectorSearchRunner as any as VectorSearchRunner,
     keywordSearchRunner,
     rerankFn

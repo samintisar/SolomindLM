@@ -1,7 +1,7 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
-import { consumePersistentTextStream } from "../services/chatApi";
+import { describe, expect, it } from "vitest";
 import type { SendMessageCallbacks } from "../services/chatApi";
+import { consumePersistentTextStream } from "../services/chatApi";
 
 function createMockCallbacks(): SendMessageCallbacks & {
   calls: Record<string, unknown[][]>;

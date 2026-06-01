@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { X, Globe, Loader2 } from "lucide-react";
+import { Globe, Loader2, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
 
 interface UrlInputModalProps {
@@ -21,7 +21,6 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUrlInput("");
     }
   }, [isOpen]);

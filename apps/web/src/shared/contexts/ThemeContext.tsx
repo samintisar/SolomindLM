@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode, useCallback } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { ThemeContext } from "./useTheme";
 
 type Theme = "light" | "dark";
@@ -11,7 +11,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedTheme = localStorage.getItem("solomind_theme") as Theme | null;
     if (storedTheme && (storedTheme === "light" || storedTheme === "dark")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTheme(storedTheme);
     }
     setIsInitialized(true);

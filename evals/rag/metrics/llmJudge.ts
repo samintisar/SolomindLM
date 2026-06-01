@@ -430,4 +430,4 @@ export async function scoreAllLlmJudgeMetrics(
 }
 
 // Re-export types
-export type { LlmJudgeOptions, JudgeResult };
+export type { JudgeResult, LlmJudgeOptions };

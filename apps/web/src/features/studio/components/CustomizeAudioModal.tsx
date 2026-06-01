@@ -1,7 +1,7 @@
+import { AudioLines, Bookmark, X } from "lucide-react";
 import React, { useState } from "react";
-import { X, AudioLines, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface AudioFormat {
   id: string;

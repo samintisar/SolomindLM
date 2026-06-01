@@ -1,22 +1,22 @@
-import React, { useRef, useEffect } from "react";
 import {
-  ChevronRight,
-  PenTool,
   ArrowLeft,
+  ChevronRight,
   Copy,
   Download,
   Loader2,
-  Pencil,
   Maximize2,
   Minimize2,
+  Pencil,
+  PenTool,
 } from "lucide-react";
+import React, { useEffect, useRef } from "react";
 import {
-  Note,
-  isReportNote,
   isFlashcardNote,
+  isInfographicNote,
+  isReportNote,
   isSpreadsheetNote,
   isUserNote,
-  isInfographicNote,
+  Note,
 } from "@/shared/types/index";
 
 interface StudioPanelHeaderProps {

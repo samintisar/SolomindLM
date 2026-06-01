@@ -38,7 +38,6 @@ export const migrateSlidePrompts = internalMutation({
     let updated = 0;
     for (const row of rows) {
       await ctx.db.patch(row._id, {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         studioTool: "infographic" as any,
         updatedAt: Date.now(),
       });

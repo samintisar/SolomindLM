@@ -1,54 +1,54 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import type { Id } from "@convex/_generated/dataModel";
+import { useAuthToken } from "@convex-dev/auth/react";
 import {
+  Download,
+  FileText,
+  History,
+  MessageCircle,
+  MoreVertical,
   PanelLeftOpen,
   PanelRightOpen,
-  MessageCircle,
-  FileText,
-  MoreVertical,
-  Download,
-  History,
-  Plus,
   Pin,
+  Plus,
   Settings2,
 } from "lucide-react";
-import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
-import { Message, Note, ReferenceChunk, ChatSettings } from "@/shared/types/index";
-import { useToast } from "@/shared/contexts/useToast";
-import { useChatStreamingContext } from "../useChatStreaming";
-import { exportAsMarkdown } from "../utils/exportChat";
-import { useSaveChat } from "../services/userNotesApi";
-import { RefHandlers } from "../utils/messageRendering.utils";
-import { MessageBubble } from "./MessageBubble";
-import { ReferenceTooltip } from "./ReferenceTooltip";
-import { ChatEmptyState } from "./ChatEmptyState";
-import {
-  ChatInput,
-  CHAT_DEFAULT_SOURCE_FILTERS,
-  DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
-  type ChatComposerMode,
-  type ResearchDatabaseOption,
-} from "./ChatInput";
-import { ConversationList } from "./ConversationList";
-import { ConfigureChatModal } from "./ConfigureChatModal";
-import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
-import { useSourcesContext } from "../../sources/useSourcesContext";
-import { ResearchPlanMessage } from "./ResearchPlanMessage";
-import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
-import { CONVEX_SITE_URL } from "../services/chatApi";
-import { useAuthToken } from "@convex-dev/auth/react";
-import type { Id } from "@convex/_generated/dataModel";
-import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
-import { useApproveResearchPlan, useRejectResearchPlan } from "../services/researchApi";
-import { useLiteratureReviewSession } from "../services/literatureReviewApi";
-import { useAddExternalSources } from "../../sources/services/documentsApi";
-import { useSessionStorage } from "@/hooks/useSessionStorage";
 import {
   buildAcademicDiscoveryApiFilters,
   type DiscoveryAcademicFilterState,
 } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
+import { useSessionStorage } from "@/hooks/useSessionStorage";
+import { useToast } from "@/shared/contexts/useToast";
+import { ChatSettings, Message, Note, ReferenceChunk } from "@/shared/types/index";
+import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
+import { useAddExternalSources } from "../../sources/services/documentsApi";
+import { useSourcesContext } from "../../sources/useSourcesContext";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
+import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
+import { CONVEX_SITE_URL } from "../services/chatApi";
+import { useLiteratureReviewSession } from "../services/literatureReviewApi";
+import { useApproveResearchPlan, useRejectResearchPlan } from "../services/researchApi";
+import { useSaveChat } from "../services/userNotesApi";
+import { useChatStreamingContext } from "../useChatStreaming";
+import { exportAsMarkdown } from "../utils/exportChat";
+import { RefHandlers } from "../utils/messageRendering.utils";
+import { ChatEmptyState } from "./ChatEmptyState";
+import {
+  CHAT_DEFAULT_SOURCE_FILTERS,
+  type ChatComposerMode,
+  ChatInput,
+  DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
+  type ResearchDatabaseOption,
+} from "./ChatInput";
+import { ConfigureChatModal } from "./ConfigureChatModal";
+import { ConversationList } from "./ConversationList";
+import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
+import { MessageBubble } from "./MessageBubble";
+import { ReferenceTooltip } from "./ReferenceTooltip";
+import { ResearchPlanMessage } from "./ResearchPlanMessage";
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -106,10 +106,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     consumeResearchExecuteStream,
   } = useChatStreamingContext();
   const { sources } = useSourcesContext();
-  const notebookDocumentIds = useMemo(
-    () => new Set(sources.map((s) => s.id)),
-    [sources]
-  );
+  const notebookDocumentIds = useMemo(() => new Set(sources.map((s) => s.id)), [sources]);
   const [hoveredRefId, setHoveredRefId] = useState<number | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<"top" | "bottom">("top");
@@ -272,7 +269,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const virtuosoRef = useRef<any>(null);
 
   // --- Chat action handlers ---
@@ -602,7 +598,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // --- Tooltip position computation ---
 
   const tooltipContent = useMemo(() => {
-    // eslint-disable-next-line react-hooks/refs
     if (hoveredRefId === null || hoveredMessageId === null || !messagesContainerRef.current)
       return null;
     const hoveredMessage = messages.find((msg) => msg.id === hoveredMessageId);
@@ -613,7 +608,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         ? refsArray[hoveredRefId - 1]
         : refsArray.find((r) => Number(r.id) === hoveredRefId);
 
-    // eslint-disable-next-line react-hooks/refs
     const containerRect = messagesContainerRef.current.getBoundingClientRect();
     if (!ref || !containerRect) return null;
 
@@ -841,7 +835,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     {message.researchPlan ? (
                       <ResearchPlanMessage
                         planId={message.researchPlan.planId}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         subQuestions={(message.researchPlan.subQuestions as any[]) ?? []}
                         onApprove={handleApproveResearchPlan}
                         onReject={handleRejectResearchPlan}
@@ -919,7 +912,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   if (!docId || !onOpenNotebookSource || !sources.some((s) => s.id === docId)) {
                     return undefined;
                   }
-                  // eslint-disable-next-line react-hooks/refs
                   return () => handleOpenReferenceInSources(tooltipContent.ref);
                 })()}
                 onAddToNotebook={(() => {
@@ -961,7 +953,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
           </div>
         </div>
-
 
         {/* Input Area â€” wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
         <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex min-w-0 justify-center px-3 sm:px-4">

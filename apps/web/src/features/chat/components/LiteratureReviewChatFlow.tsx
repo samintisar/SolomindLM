@@ -1,8 +1,8 @@
+import { ArrowRight, FileSpreadsheet, FileText, X } from "lucide-react";
 import React from "react";
-import { FileSpreadsheet, FileText, ArrowRight, X } from "lucide-react";
-import type { ResearchStep } from "./researchStepTypes";
-import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
 import { buildLiteratureReportChatPreview } from "../utils/literatureReportPreview";
+import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
+import type { ResearchStep } from "./researchStepTypes";
 
 interface TableColumn {
   id: string;

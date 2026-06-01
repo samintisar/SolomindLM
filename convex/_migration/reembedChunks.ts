@@ -11,8 +11,8 @@
 
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 
 /**
@@ -122,7 +122,6 @@ export const reembedDocumentChunks = internalAction({
     }
 
     // Generate new embeddings
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const texts = chunks.map((chunk: any) => chunk.content);
     const newEmbeddings = await embeddingService.embedBatch(texts);
 

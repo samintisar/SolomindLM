@@ -1,7 +1,7 @@
-import type { InfographicNote } from "@/shared/types/index";
-import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import type { InfographicNote } from "@/shared/types/index";
 
 export interface CreateInfographicParams {
   notebookId: string;
@@ -26,7 +26,6 @@ export interface InfographicConfig {
 /**
  * Get preview text based on status and metadata
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPreviewText(status: string, metadata?: any): string {
   const phase = metadata?.phase || status;
 
@@ -49,7 +48,6 @@ function getPreviewText(status: string, metadata?: any): string {
 /**
  * Map a database infographic response to the frontend InfographicNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapInfographicToNote(dbInfographic: any): InfographicNote {
   let imageUrl = "";
   let prompt = "";

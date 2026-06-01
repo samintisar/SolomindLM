@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { X, FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 interface TextInputModalProps {
   isOpen: boolean;
@@ -19,7 +19,6 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTextInput("");
     }
   }, [isOpen]);

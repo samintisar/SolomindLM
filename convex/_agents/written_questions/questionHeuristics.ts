@@ -1,9 +1,8 @@
 "use node";
 
 import { createAgentGraphLogger } from "../_shared/logging.js";
-
-import { PROBLEMATIC_PHRASES } from "./prompts.js";
 import type { WrittenQuestion } from "./prompts.js";
+import { PROBLEMATIC_PHRASES } from "./prompts.js";
 
 export function validateSelfContained(question: WrittenQuestion): boolean {
   const logger = createAgentGraphLogger("WrittenQuestionsGraph", "written_questions");

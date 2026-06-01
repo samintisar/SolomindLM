@@ -1,22 +1,22 @@
-import React, { useState, useCallback, useMemo } from "react";
+import type { Id } from "@convex/_generated/dataModel";
+import { ArrowRight, Check, FileSpreadsheet, FileText, Loader2, Plus, X } from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
 import type { Message } from "@/shared/types/index";
-import { FileSpreadsheet, FileText, ArrowRight, Loader2, Plus, X, Check } from "lucide-react";
+import {
+  useConfirmLiteratureReviewColumns,
+  useLiteratureReport,
+  useLiteratureReviewSession,
+  useLiteratureTable,
+  useRetryLiteratureReview,
+} from "../services/literatureReviewApi";
+import { useResearchSteps } from "../services/researchApi";
+import { buildLiteratureReportChatPreview } from "../utils/literatureReportPreview";
 import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
 import {
   extractSearchQueriesFromDetails,
   parseResearchStepMetadata,
   type ResearchStep,
 } from "./researchStepTypes";
-import { buildLiteratureReportChatPreview } from "../utils/literatureReportPreview";
-import type { Id } from "@convex/_generated/dataModel";
-import {
-  useLiteratureReviewSession,
-  useLiteratureTable,
-  useLiteratureReport,
-  useConfirmLiteratureReviewColumns,
-  useRetryLiteratureReview,
-} from "../services/literatureReviewApi";
-import { useResearchSteps } from "../services/researchApi";
 
 /** Steps shown in the chat timeline (matches reference UI). */
 const VISIBLE_LITERATURE_STEP_TYPES = new Set([
@@ -170,7 +170,9 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
     return stepsData
       .filter((step: { stepType: string }) => VISIBLE_LITERATURE_STEP_TYPES.has(step.stepType))
       .map((step: { stepType: string; status: string; details?: string; metadata?: unknown }) => {
-        const { searchQueries, papersFound, prismaCounts } = parseResearchStepMetadata(step.metadata);
+        const { searchQueries, papersFound, prismaCounts } = parseResearchStepMetadata(
+          step.metadata
+        );
         const detailsQueries = step.details
           ? extractSearchQueriesFromDetails(step.details)
           : undefined;
@@ -305,9 +307,7 @@ export const LiteratureReviewMessage: React.FC<LiteratureReviewMessageProps> = (
               : ". Open the table above to review and edit the extracted data."}
           </p>
           {reportPreview && (
-            <p className="mt-4 text-[15px] leading-relaxed text-foreground">
-              {reportPreview}
-            </p>
+            <p className="mt-4 text-[15px] leading-relaxed text-foreground">{reportPreview}</p>
           )}
         </div>
       )}

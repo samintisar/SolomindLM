@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { openAddSourceModal } from "../helpers/navigation";
 
 test.describe("Add Source Modal", () => {

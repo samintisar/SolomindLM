@@ -143,7 +143,10 @@ export const researchFixtures: EvalFixture[] = [
     documentIds: ["eval-doc-001", "eval-doc-002"],
     tags: ["research", "notebook-only", "source-isolation", "source-test"],
     scenarioCategory: "explanation",
-    sourcePolicy: { channels: ["notebook"], maxResultsPerChannel: DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL },
+    sourcePolicy: {
+      channels: ["notebook"],
+      maxResultsPerChannel: DEEP_RESEARCH_MAX_RESULTS_PER_CHANNEL,
+    },
   },
   {
     schemaVersion: 1,

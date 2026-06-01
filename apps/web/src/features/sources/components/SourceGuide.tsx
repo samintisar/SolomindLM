@@ -1,7 +1,7 @@
+import { ChevronDown, ChevronUp, Compass, Loader2 } from "lucide-react";
 import React, { useId, useState } from "react";
-import { Loader2, Compass, ChevronUp, ChevronDown } from "lucide-react";
-import { useSourceGuide } from "../hooks/useSourceGuide";
 import { sanitizeHtml } from "@/shared/utils";
+import { useSourceGuide } from "../hooks/useSourceGuide";
 
 interface SourceGuideProps {
   documentId: string;
@@ -28,11 +28,7 @@ export const SourceGuide: React.FC<SourceGuideProps> = ({ documentId, onTopicCli
         className="group flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Compass
-            className="size-5 shrink-0 text-primary"
-            strokeWidth={2}
-            aria-hidden
-          />
+          <Compass className="size-5 shrink-0 text-primary" strokeWidth={2} aria-hidden />
           <div className="min-w-0">
             <p
               id={headingId}

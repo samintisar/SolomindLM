@@ -1,9 +1,9 @@
 "use node";
 
-import { internalAction } from "../_generated/server";
-import { internal, components } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
+import { components, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { internalAction } from "../_generated/server";
 import { createChunkBuffer } from "./_streamBuffer";
 import { streamChatResponse } from "./_streamChatResponse";
 
@@ -11,7 +11,7 @@ export { streamChatResponse } from "./_streamChatResponse";
 
 // Re-export for consumers that expect these types from stream.ts
 export type { ChatVectorSearchResult } from "./_streamSearch";
-export type { ExternalChunk, DiscoveredSource } from "./_streamSources";
+export type { DiscoveredSource, ExternalChunk } from "./_streamSources";
 
 /** HTTP + internal stream `sourcePolicy` (subset persisted on research plans). */
 export type StreamSourcePolicy = {
@@ -154,5 +154,3 @@ export const runWithStreamId = internalAction({
     }
   },
 });
-
-

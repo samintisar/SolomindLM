@@ -1,13 +1,20 @@
-import { useQuery, useMutation, useAction, useConvexAuth } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import { useAuthToken } from "@convex-dev/auth/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
-import { CHAT_STREAM_URL, consumePersistentTextStream } from "./chatStream";
 import type { SendMessageCallbacks } from "./chatStream";
-export type { ParsedStreamData, ApiMessage, ChatHistoryResponse, ChatError, SendMessageCallbacks } from "./chatStream";
-export { parseStreamBody, consumePersistentTextStream, CONVEX_SITE_URL } from "./chatStream";
+import { CHAT_STREAM_URL, consumePersistentTextStream } from "./chatStream";
+
+export type {
+  ApiMessage,
+  ChatError,
+  ChatHistoryResponse,
+  ParsedStreamData,
+  SendMessageCallbacks,
+} from "./chatStream";
+export { CONVEX_SITE_URL, consumePersistentTextStream, parseStreamBody } from "./chatStream";
 
 // ============================================================
 // Chat API Hooks
@@ -230,7 +237,6 @@ interface SourceSuggestionsResult {
 
 export function useSourceSuggestions(
   notebookId: string | null,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   documents: any[]
 ): SourceSuggestionsResult {
   const [result, setResult] = useState<SourceSuggestionsResult>({
@@ -243,19 +249,14 @@ export function useSourceSuggestions(
   const sourceSuggestions = useAction(api.chat.sourceSuggestions.getSourceSuggestions);
 
   const documentSignature = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed = documents.filter((d: any) => d.status === "completed");
-    return (
-      completed
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((d: any) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
-        .join("|")
-    );
+    return completed
+      .map((d: any) => `${d._id}:${d.fileName}:${d.wordCount ?? 0}:${d.totalChunks ?? 0}`)
+      .join("|");
   }, [documents]);
 
   useEffect(() => {
     if (!notebookId || !documentSignature) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResult({ summary: null, suggestions: null, isLoading: false });
       fetchedSignatureRef.current = null;
       return;
@@ -272,7 +273,6 @@ export function useSourceSuggestions(
       notebookId: notebookId as Id<"notebooks">,
       documentSignature,
     })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => {
         if (cancelled) return;
         setResult({

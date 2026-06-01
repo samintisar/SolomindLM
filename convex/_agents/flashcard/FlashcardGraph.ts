@@ -76,22 +76,16 @@ export class FlashcardGraph {
       })
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge(START, "split_chunks" as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addConditionalEdges("split_chunks" as any, (s: OverallStateType) => routeToMap(s), {
       map_process: "map_process",
       collapse: "collapse",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("map_process" as any, "collapse" as any);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("collapse" as any, "reduce" as any);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge("reduce" as any, END as any);
 
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });

@@ -1,4 +1,4 @@
-import type { Message, ReferenceChunk, Source, Note } from "@/shared/types/index";
+import type { Message, Note, ReferenceChunk, Source } from "@/shared/types/index";
 
 export function createMockMessage(overrides: Partial<Message> = {}): Message {
   return {

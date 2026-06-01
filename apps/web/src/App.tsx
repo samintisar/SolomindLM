@@ -1,50 +1,50 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { api } from "@convex/_generated/api";
+import { Id } from "@convex/_generated/dataModel";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
-import { Header } from "./shared/ui/Header";
-import { HomePage } from "./features/notebooks/components/HomePage";
-import { FolderView } from "./features/notebooks/components/views/FolderView";
-import { NotebookProvider } from "./features/notebooks/NotebookContext";
-import { ChatStreamingProvider } from "./features/chat/ChatStreamingContext";
-import { SourcesProvider } from "./features/sources/SourcesContext";
-import { StudioProvider } from "./features/studio/StudioContext";
-import { NotebookView } from "./features/notebooks/components/views/NotebookView";
-import { ForkNotebookPage } from "./features/notebooks/components/views/ForkNotebookPage";
-import { LiteratureTablePage } from "./features/studio/components/LiteratureTablePage";
-import { LiteratureReportPage } from "./features/studio/components/LiteratureReportPage";
-import { ShareNotebookModal } from "./features/notebooks/components/modals/ShareNotebookModal";
-import { BillingPage } from "./features/billing/components/BillingPage";
-import { LandingPage } from "./features/landing/LandingPage";
-import { AuthProvider } from "./features/auth/AuthContext";
-import { useAuth } from "./features/auth/useAuth";
-import { AuthPage } from "./features/auth/AuthPage";
-import { ThemeProvider } from "./shared/contexts/ThemeContext";
-import { ToastProvider } from "./shared/contexts/ToastContext";
-import { ToastContainer } from "./shared/components/ToastContainer";
-import { ProtectedRoute } from "./shared/components/ProtectedRoute";
-import { PrivacyPolicy } from "./features/legal/components/PrivacyPolicy";
-import { TermsOfService } from "./features/legal/components/TermsOfService";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { NotebookItem } from "@/shared/types/index";
-import { useNotebooks } from "./features/notebooks/services/notebooksApi";
-import { useFolders } from "./features/notebooks/services/foldersApi";
-import { useGenerateUploadUrl, useCreateDocument } from "./features/sources/services/documentsApi";
-import { useSubscriptionStatus } from "./features/billing/services/subscriptionApi";
-import { useStripeRedirect } from "./features/auth/hooks/useStripeRedirect";
-import { useAuthGuard } from "./features/auth/hooks/useAuthGuard";
 import { isNativeShell } from "@/utils/platformDetection";
-import { useSourceManager } from "./features/sources/hooks/useSourceManager";
-import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
-import { useNotebookCRUD } from "./features/notebooks/hooks/useNotebookCRUD";
-import { useFolderCRUD } from "./features/notebooks/hooks/useFolderCRUD";
+import { AuthProvider } from "./features/auth/AuthContext";
+import { AuthPage } from "./features/auth/AuthPage";
+import { useAuthGuard } from "./features/auth/hooks/useAuthGuard";
+import { useStripeRedirect } from "./features/auth/hooks/useStripeRedirect";
+import { useAuth } from "./features/auth/useAuth";
+import { BillingPage } from "./features/billing/components/BillingPage";
+import { useSubscriptionStatus } from "./features/billing/services/subscriptionApi";
+import { ChatStreamingProvider } from "./features/chat/ChatStreamingContext";
 import { useChatStream } from "./features/chat/hooks/useChatStream";
 import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
-import { OnboardingProvider } from "./features/onboarding/OnboardingProvider";
-import { TourTooltip } from "./features/onboarding/components/TourTooltip";
+import { LandingPage } from "./features/landing/LandingPage";
+import { PrivacyPolicy } from "./features/legal/components/PrivacyPolicy";
+import { TermsOfService } from "./features/legal/components/TermsOfService";
+import { HomePage } from "./features/notebooks/components/HomePage";
+import { ShareNotebookModal } from "./features/notebooks/components/modals/ShareNotebookModal";
+import { FolderView } from "./features/notebooks/components/views/FolderView";
+import { ForkNotebookPage } from "./features/notebooks/components/views/ForkNotebookPage";
+import { NotebookView } from "./features/notebooks/components/views/NotebookView";
+import { useFolderCRUD } from "./features/notebooks/hooks/useFolderCRUD";
+import { useNotebookCRUD } from "./features/notebooks/hooks/useNotebookCRUD";
+import { NotebookProvider } from "./features/notebooks/NotebookContext";
+import { useFolders } from "./features/notebooks/services/foldersApi";
+import { useNotebooks } from "./features/notebooks/services/notebooksApi";
 import { ChecklistCard } from "./features/onboarding/components/ChecklistCard";
+import { TourTooltip } from "./features/onboarding/components/TourTooltip";
+import { OnboardingProvider } from "./features/onboarding/OnboardingProvider";
+import { useSourceManager } from "./features/sources/hooks/useSourceManager";
+import { SourcesProvider } from "./features/sources/SourcesContext";
+import { useCreateDocument, useGenerateUploadUrl } from "./features/sources/services/documentsApi";
+import { LiteratureReportPage } from "./features/studio/components/LiteratureReportPage";
+import { LiteratureTablePage } from "./features/studio/components/LiteratureTablePage";
+import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
+import { StudioProvider } from "./features/studio/StudioContext";
+import { ProtectedRoute } from "./shared/components/ProtectedRoute";
+import { ToastContainer } from "./shared/components/ToastContainer";
+import { ThemeProvider } from "./shared/contexts/ThemeContext";
+import { ToastProvider } from "./shared/contexts/ToastContext";
+import { Header } from "./shared/ui/Header";
 import "mind-elixir/style.css";
 
 const AppContent: React.FC = () => {
@@ -130,7 +130,6 @@ const AppContent: React.FC = () => {
       conversationCRUD.conversations &&
       conversationCRUD.conversations.length > 0
     ) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveConversationId(conversationCRUD.conversations[0]._id);
     }
   }, [activeConversationId, conversationCRUD.conversations]);
@@ -178,7 +177,6 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (urlNotebookId && urlNotebookId !== activeNotebookId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveNotebookId(urlNotebookId);
       setActiveConversationId(null);
     }
@@ -192,7 +190,6 @@ const AppContent: React.FC = () => {
     if (urlNotebookId && notebookList.length > 0) {
       const notebook = notebookList.find((nb: NotebookItem) => nb.id === urlNotebookId);
       if (notebook) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNotebookTitle(notebook.title);
       }
     }
@@ -201,7 +198,6 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (!shareModalOpen) return;
     if (!urlNotebookId || !activeNotebook || activeNotebook.isSharedNotebook) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShareModalOpen(false);
     }
   }, [shareModalOpen, urlNotebookId, activeNotebook]);

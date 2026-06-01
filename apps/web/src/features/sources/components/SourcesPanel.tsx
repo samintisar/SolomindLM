@@ -1,28 +1,28 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useSourcesContext } from "../useSourcesContext";
-import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
-import { AddSourceModal } from "./AddSourceModal";
-import { UrlInputModal } from "./UrlInputModal";
-import { SocialMediaInputModal } from "./SocialMediaInputModal";
-import { TextInputModal } from "./TextInputModal";
-import { GoogleDrivePicker } from "./GoogleDrivePicker";
-import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
-import { SourceList } from "./SourceList";
-import { SourceViewer } from "./SourceViewer";
-import { SourcesPanelHeader } from "./SourcesPanelHeader";
-import { useSourceUpload } from "../hooks/useSourceUpload";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useToast } from "@/shared/contexts/useToast";
+import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import { useSourceContent } from "../hooks/useSourceContent";
 import { useSourceSearch } from "../hooks/useSourceSearch";
+import { useSourceUpload } from "../hooks/useSourceUpload";
 import {
-  useDocumentContent,
   useDocument,
+  useDocumentContent,
   useIngestFromGoogleDrive,
   useRefreshNotebookRemoteSources,
   useRefreshRemoteSource,
 } from "../services/documentsApi";
+import { useSourcesContext } from "../useSourcesContext";
 import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccessToken";
-import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-import { useToast } from "@/shared/contexts/useToast";
+import { AddSourceModal } from "./AddSourceModal";
+import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
+import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
+import { GoogleDrivePicker } from "./GoogleDrivePicker";
+import { SocialMediaInputModal } from "./SocialMediaInputModal";
+import { SourceList } from "./SourceList";
+import { SourcesPanelHeader } from "./SourcesPanelHeader";
+import { SourceViewer } from "./SourceViewer";
+import { TextInputModal } from "./TextInputModal";
+import { UrlInputModal } from "./UrlInputModal";
 
 export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 
@@ -133,9 +133,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   // Refs to avoid effect depending on sourceContent (which is a new object every render and would cause infinite loop)
   const onContentUpdateRef = useRef(sourceContent.onContentUpdate);
   const onLoadingStartRef = useRef(sourceContent.onLoadingStart);
-  // eslint-disable-next-line react-hooks/refs
   onContentUpdateRef.current = sourceContent.onContentUpdate;
-  // eslint-disable-next-line react-hooks/refs
   onLoadingStartRef.current = sourceContent.onLoadingStart;
 
   // Update content cache when documentContent changes
@@ -169,7 +167,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     const { documentId } = focusSourceRequest;
     const exists = sources.some((s) => s.id === documentId);
     if (exists) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewingSourceId(documentId);
     }
     onFocusSourceHandled?.();

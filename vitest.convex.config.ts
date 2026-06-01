@@ -1,7 +1,7 @@
-import { defineConfig } from "vitest/config";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { defineConfig } from "vitest/config";
 
 // Load .env and .env.local for tests
 dotenv.config({ path: ".env.local" });

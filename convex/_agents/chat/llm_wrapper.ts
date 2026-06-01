@@ -12,27 +12,27 @@ import Together from "together-ai";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 
 import { uncachedLlmCall } from "../_shared/cachedLlm.js";
-import { mergeModelKwargs } from "../_shared/llm_factory.js";
-import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
+import { withLanguageInstruction } from "../_shared/languageInstruction.js";
+import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { buildGroundingPrompt, estimateTokens, isComplexQuery } from "./chat_llm_grounding.js";
 import {
+  buildNotebookChatInstructionBlock,
   CORE_SYSTEM_PROMPT,
   MINIMAL_FEW_SHOT,
   STRICT_GROUNDING_PREFIX,
-  buildNotebookChatInstructionBlock,
 } from "./chat_llm_prompts.js";
 import {
-  ChatResponseSchema,
-  stripLeakedConfidenceFromMarkdown,
   type ChatResponse,
+  ChatResponseSchema,
   type LLMWrapperConfig,
+  stripLeakedConfidenceFromMarkdown,
 } from "./chat_llm_types.js";
 import {
+  expandListSubqueries,
+  isListEnumerationQuery,
   parseRetrievalSubqueriesFromLlmContent,
   trivialRetrievalSubqueryMessage,
-  isListEnumerationQuery,
-  expandListSubqueries,
 } from "./chat_retrieval_subqueries.js";
 
 export type { ChatResponse, LLMWrapperConfig } from "./chat_llm_types.js";
@@ -447,7 +447,6 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
 
       // Parse the accumulated JSON
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let parsedResponse: any;
       try {
         parsedResponse = JSON.parse(fullResponse);
@@ -543,7 +542,6 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
       name: "chat_response",
     });
@@ -551,7 +549,6 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
     const messages = [new SystemMessage(systemPrompt), new HumanMessage(groundedPrompt)];
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await structuredLlm.invoke(messages);
       const validated = ChatResponseSchema.safeParse(response);
 
@@ -582,7 +579,6 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     return extractUniqueSortedCitationIndices(text);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private salvageResponse(response: any): ChatResponse | null {
     try {
       let answerText = "";

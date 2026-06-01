@@ -1,6 +1,6 @@
-import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { assertCanReadNotebook, assertCanEditNotebook } from "./notebookAccess";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { assertCanEditNotebook, assertCanReadNotebook } from "./notebookAccess";
 
 type DbCtx = QueryCtx | MutationCtx;
 

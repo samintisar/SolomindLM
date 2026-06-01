@@ -1,23 +1,22 @@
-import React from "react";
 import {
-  MoreVertical,
-  Settings2,
-  Trash2,
-  Folder,
-  Book,
   BarChart3,
-  Monitor,
-  Search,
+  Book,
   Brain,
-  Globe,
   FileText,
+  Folder,
+  Globe,
   GraduationCap,
   Lightbulb,
+  Monitor,
+  MoreVertical,
+  Search,
+  Settings2,
+  Trash2,
 } from "lucide-react";
+import React from "react";
 import { FolderItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   Folder,
   Book,

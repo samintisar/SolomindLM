@@ -1,4 +1,3 @@
-import { useCallback, useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -11,11 +10,12 @@ import {
   Search,
   Send,
 } from "lucide-react";
-import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
+import { useCallback, useMemo, useState } from "react";
 import { CustomizeAudioModal } from "@/features/studio/components/CustomizeAudioModal";
 import { CustomizeFlashcardsModal } from "@/features/studio/components/CustomizeFlashcardsModal";
-import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
 import { CustomizeInfographicModal } from "@/features/studio/components/CustomizeInfographicModal";
+import { CustomizeQuizModal } from "@/features/studio/components/CustomizeQuizModal";
+import { CustomizeReportModal } from "@/features/studio/components/CustomizeReportModal";
 import { CustomizeSpreadsheetsModal } from "@/features/studio/components/CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/CustomizeWrittenQuestionsModal";
 import { ToolGrid } from "@/features/studio/components/ToolGrid";

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 
 interface NavigationHeaderProps {

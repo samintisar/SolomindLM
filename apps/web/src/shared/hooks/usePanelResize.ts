@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const MIN_PANEL_WIDTH = 220;
 const getMaxPanelWidth = () => Math.min(window.innerWidth * 0.7, 1400);

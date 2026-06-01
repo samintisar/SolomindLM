@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
-import { getAuthUserId } from "../../auth";
+import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Quizzes from "../../_model/quizzes";
+import { getAuthUserId } from "../../auth";
 
 /**
  * List all quizzes for a notebook

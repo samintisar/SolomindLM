@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 /** Legacy full-page route — redirects into notebook split view (studio panel). */
 export const LiteratureTablePage: React.FC = () => {
   const { id, tableId } = useParams();

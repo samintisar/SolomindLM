@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
-import schema from "../schema";
 import { api } from "../_generated/api";
+import schema from "../schema";
 
 // convex-test resolves function references via module keys relative to the
 // convex/ root. Use a root-absolute glob so keys are stable from any subdir.

@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { getAuthUserId } from "../../auth";
+import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Spreadsheets from "../../_model/spreadsheets";
+import { getAuthUserId } from "../../auth";
 
 export const list = query({
   args: { notebookId: v.id("notebooks") },

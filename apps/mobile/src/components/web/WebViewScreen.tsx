@@ -1,12 +1,11 @@
-import { createElement, useEffect, useMemo } from "react";
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
-import { WebView } from "react-native-webview";
-import * as Linking from "expo-linking";
-import Constants from "expo-constants";
-
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
 import { convexDeploymentUrl, isConvexDeploymentConfigured } from "@mobile/services/convex/client";
 import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
+import Constants from "expo-constants";
+import * as Linking from "expo-linking";
+import { createElement, useEffect, useMemo } from "react";
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
+import { WebView } from "react-native-webview";
 import { buildConvexAuthFlushInjectScript } from "./authFlushScript";
 
 export type WebViewScreenProps = {

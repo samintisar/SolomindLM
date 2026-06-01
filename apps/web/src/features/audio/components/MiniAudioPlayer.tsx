@@ -1,7 +1,7 @@
+import { ChevronUp, Download, Pause, Play, RotateCcw, RotateCw, X } from "lucide-react";
 import React, { useEffect, useRef } from "react";
-import { Play, Pause, Download, ChevronUp, X, RotateCcw, RotateCw } from "lucide-react";
-import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 import { formatAudioTime, useAudioPlayer } from "../hooks/useAudioPlayer";
+import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 
 interface MiniAudioPlayerProps {
   audioUrl: string;

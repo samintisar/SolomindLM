@@ -1,13 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
-import { useLocation, useNavigate } from "react-router-dom";
-import { User as UserIcon, Share2 } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
+import { Share2, User as UserIcon } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 import { useAuth } from "../../features/auth/useAuth";
 import { useTheme } from "../contexts/useTheme";
+import { useServiceErrorToast } from "../hooks/useServiceErrorToast";
 import { DropdownMenu } from "./DropdownMenu";
-import { AvatarDropdown } from "../../features/auth/components/AvatarDropdown";
 
 interface HeaderProps {
   title: string;
@@ -59,13 +59,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Sync internal state if prop changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInputValue(title);
   }, [title]);
 
   useEffect(() => {
     if (!notebookRenamable && isEditing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInputValue(title);
       setIsEditing(false);
     }

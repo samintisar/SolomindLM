@@ -7,7 +7,10 @@ export const LiteratureTableExtractionCell: React.FC<{ value: string }> = ({ val
     return <span className="text-muted-foreground italic">—</span>;
   }
 
-  const lines = trimmed.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const lines = trimmed
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const bulletLines = lines.filter((l) => /^[-•*]\s+/.test(l));
 
   if (bulletLines.length >= 2 && bulletLines.length >= lines.length * 0.5) {

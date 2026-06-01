@@ -1,19 +1,19 @@
 "use node";
-import { action, internalAction } from "../../_generated/server";
-import { internal } from "../../_generated/api";
 import { v } from "convex/values";
-import { getAuthUserId } from "../../auth";
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
-import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { createCachedAction } from "../cache/cachedAgent";
-import { CACHE_TTL } from "../cache/cache";
+import { internal } from "../../_generated/api";
+import { action, internalAction } from "../../_generated/server";
 import {
   E5_EMBEDDING_MODEL,
   E5_TOGETHER_EMBED_BATCH_SIZE,
-  formatE5Input,
   type E5InputType,
+  formatE5Input,
 } from "../../_lib/e5Embedding";
+import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { getAuthUserId } from "../../auth";
+import { CACHE_TTL } from "../cache/cache";
+import { createCachedAction } from "../cache/cachedAgent";
 
 // ============================================================
 // 1. Internal action that generates embeddings (cacheable)

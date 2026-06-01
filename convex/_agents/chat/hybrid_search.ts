@@ -5,15 +5,15 @@
  * TYPE-SAFE: No "use node" directive - this is a library file.
  */
 
-import type { ReferenceChunk, ChunkMetadata } from "../../storage/ChatHistoryService";
-import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import type { ChunkMetadata, ReferenceChunk } from "../../storage/ChatHistoryService";
 import {
-  VectorSearchHandler,
-  VectorSearchRunner,
-  VectorSearchRawResult,
-  VectorSearchConfig,
   RerankFunction,
+  VectorSearchConfig,
+  VectorSearchHandler,
+  VectorSearchRawResult,
+  VectorSearchRunner,
 } from "./vector_search.js";
 
 // ============================================================
@@ -154,7 +154,6 @@ export class HybridSearchHandler extends VectorSearchHandler {
   ) {
     super(config, embeddingService, vectorSearchRunner, rerankFn);
     this.hybridConfig = { ...DEFAULT_HYBRID_CONFIG, ...config };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.keywordSearchRunner = keywordSearchRunner ?? (null as any);
   }
 

@@ -8,19 +8,25 @@
  *   bun run eval:rag -- --full                     # All fixtures, verbose
  *   bun run eval:rag -- --export-artifacts         # Export Ragas-compatible artifacts
  */
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
-import type { SourcePolicyConfig } from "./types";
-import { runEval, createConvexChatInvoker, createConvexStudioInvokers } from "./runners";
-import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
-import type { ChatAgentInvoker } from "./runners/chatRunner";
-import type { ResearchAgentInvoker } from "./runners/researchRunner";
-import type { StudioInvoker } from "./runners/convexStudioInvoker";
-import type { StudioRunnerKind, RunnerKind } from "./types";
 import { scoreAllMetrics } from "./metrics/scorers";
-import { generateReport, formatReport } from "./reports";
-import type { EvalBaseline, EvalRunArtifact, MetricResult, EvalFixture } from "./types";
+import { formatReport, generateReport } from "./reports";
+import { createConvexChatInvoker, createConvexStudioInvokers, runEval } from "./runners";
+import type { ChatAgentInvoker } from "./runners/chatRunner";
+import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
+import type { StudioInvoker } from "./runners/convexStudioInvoker";
+import type { ResearchAgentInvoker } from "./runners/researchRunner";
+import type {
+  EvalBaseline,
+  EvalFixture,
+  EvalRunArtifact,
+  MetricResult,
+  RunnerKind,
+  SourcePolicyConfig,
+  StudioRunnerKind,
+} from "./types";
 
 // ─── CLI Options ─────────────────────────────────────────────
 

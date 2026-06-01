@@ -1,28 +1,28 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { MiniAudioPlayer } from "@/features/audio/components/MiniAudioPlayer";
+import { useAudioPlayerContext } from "@/features/audio/useAudioPlayer";
 import {
-  StudioTool,
-  Note,
   isAudioNote,
   isAudioOverviewNote,
   isInfographicNote,
+  Note,
+  StudioTool,
 } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
-import { CustomizeReportModal } from "./CustomizeReportModal";
-import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
-import { CustomizeQuizModal } from "./CustomizeQuizModal";
+import { useNoteActions } from "../hooks/useNoteActions";
+import { useStudioHandlers } from "../hooks/useStudioHandlers";
+import { useStudioContext } from "../useStudioContext";
+import { ActiveNoteView } from "./ActiveNoteView";
 import { CustomizeAudioModal } from "./CustomizeAudioModal";
-import { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
+import { CustomizeFlashcardsModal } from "./CustomizeFlashcardsModal";
 import { CustomizeInfographicModal } from "./CustomizeInfographicModal";
+import { CustomizeQuizModal } from "./CustomizeQuizModal";
+import { CustomizeReportModal } from "./CustomizeReportModal";
 import { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";
+import { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
+import { NoteListView } from "./NoteListView";
 import { ResizeHandle } from "./ResizeHandle";
 import { StudioPanelHeader } from "./StudioPanelHeader";
-import { NoteListView } from "./NoteListView";
-import { ActiveNoteView } from "./ActiveNoteView";
-import { MiniAudioPlayer } from "@/features/audio/components/MiniAudioPlayer";
-import { useStudioContext } from "../useStudioContext";
-import { useAudioPlayerContext } from "@/features/audio/useAudioPlayer";
-import { useStudioHandlers } from "../hooks/useStudioHandlers";
-import { useNoteActions } from "../hooks/useNoteActions";
 import type { InfographicViewControls } from "./views/InfographicView";
 
 function isShowingExpandedAudioPlayer(note: Note): boolean {
@@ -41,7 +41,6 @@ interface StudioPanelProps {
   tools: StudioTool[];
   width: number;
   isResizing: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sources?: any[];
   userId?: string | null;
   noteId?: string | null;
@@ -108,7 +107,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   useEffect(() => {
     if (!activeNote || !isInfographicNote(activeNote)) {
       infographicControlsRef.current = null;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsInfographicFullscreen(false);
     }
   }, [activeNote]);

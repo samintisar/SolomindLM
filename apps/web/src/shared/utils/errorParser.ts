@@ -68,7 +68,6 @@ export function isLimitError(error: unknown): error is ParsedLimitError {
   if (!error || typeof error !== "object") return false;
 
   // Check for structured error with data property (from Convex serialization)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const err = error as any;
   if (err.data && typeof err.data === "object") {
     return (
@@ -107,7 +106,6 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
     }
 
     // Check if error has structured data attached
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
       const raw = err.data as Record<string, unknown>;
@@ -138,7 +136,6 @@ export function parseLimitError(error: unknown): ParsedLimitError | null {
 
   // Handle plain objects with error data
   if (typeof error === "object" && error !== null) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const err = error as any;
     if (err.data && isLimitError(err.data)) {
       const raw = err.data as Record<string, unknown>;

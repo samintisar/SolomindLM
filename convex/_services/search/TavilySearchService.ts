@@ -1,16 +1,15 @@
 "use node";
 
-import { internalAction } from "../../_generated/server";
-import { v } from "convex/values";
-import { createCachedAction } from "../cache/cachedAgent";
-import { CACHE_TTL, withJitter } from "../cache/cache";
-import { internal } from "../../_generated/api";
-import { env } from "../../_lib/env";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
-import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
-
 import { tavily } from "@tavily/core";
+import { v } from "convex/values";
+import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
+import { internal } from "../../_generated/api";
+import { internalAction } from "../../_generated/server";
+import { env } from "../../_lib/env";
+import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { CACHE_TTL, withJitter } from "../cache/cache";
+import { createCachedAction } from "../cache/cachedAgent";
 
 let _tavilyClient: ReturnType<typeof tavily> | null = null;
 function getTavilyClient(): ReturnType<typeof tavily> {
@@ -89,12 +88,9 @@ export async function searchInternalHandler(args: SearchInternalArgs): Promise<D
       });
 
       const response = await getTavilyClient().search(query, {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         searchDepth: (searchDepth || "basic") as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         topic: (topic || "general") as any,
         maxResults,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         timeRange: timeRange as any,
         includeAnswer: false,
         includeRawContent: includeRawContent ? "markdown" : false,
@@ -109,7 +105,6 @@ export async function searchInternalHandler(args: SearchInternalArgs): Promise<D
       return response;
     }, "tavily_search");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let sources: DiscoveredSource[] = (data.results || []).map((result: any) => ({
       title: result.title || "Untitled",
       url: result.url,
@@ -131,7 +126,6 @@ export async function searchInternalHandler(args: SearchInternalArgs): Promise<D
   } catch (error) {
     logger.operationError(error);
     if (error instanceof Error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const e = error as any;
       const httpStatus =
         e.statusCode ?? e.status ?? e.response?.statusCode ?? e.response?.status ?? 0;
@@ -280,9 +274,10 @@ export interface ExtractInternalArgs {
   format?: "markdown" | "text";
 }
 
-export async function extractInternalHandler(
-  args: ExtractInternalArgs
-): Promise<{ results: Array<{ url: string; title: string | null; rawContent: string }>; failedResults: Array<{ url: string; error: string }> }> {
+export async function extractInternalHandler(args: ExtractInternalArgs): Promise<{
+  results: Array<{ url: string; title: string | null; rawContent: string }>;
+  failedResults: Array<{ url: string; error: string }>;
+}> {
   const logger = createServiceLogger("tavily", "extractInternal");
   const startTime = Date.now();
   logger.operationStart({ urlCount: args.urls.length });
@@ -370,7 +365,10 @@ export interface ExtractContentArgs {
 export async function extractContentInternalHandler(
   ctx: any,
   args: ExtractContentArgs
-): Promise<{ results: Array<{ url: string; title: string | null; rawContent: string }>; failedResults: Array<{ url: string; error: string }> }> {
+): Promise<{
+  results: Array<{ url: string; title: string | null; rawContent: string }>;
+  failedResults: Array<{ url: string; error: string }>;
+}> {
   const logger = createServiceLogger("tavily", "extractContentInternal");
   const startTime = Date.now();
 

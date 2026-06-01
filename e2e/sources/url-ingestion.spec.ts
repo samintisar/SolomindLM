@@ -1,7 +1,7 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
-import { addUrlSource, waitForSourceStatus } from "../helpers/source-assertions";
 import { openAddSourceModal } from "../helpers/navigation";
+import { addUrlSource, waitForSourceStatus } from "../helpers/source-assertions";
 
 test.describe("URL Ingestion", () => {
   test("URL modal validates input format", async ({ notebookPage }) => {

@@ -1,7 +1,7 @@
-import { internalMutation, internalAction } from "../_generated/server";
-import type { Doc } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import type { Doc } from "../_generated/dataModel";
+import { internalAction, internalMutation } from "../_generated/server";
 
 export interface ChunkWithEmbedding {
   content: string;

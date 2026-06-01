@@ -1,6 +1,9 @@
+import { GripVertical, Plus, X } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
-import { X, Plus, GripVertical } from "lucide-react";
-import { LITERATURE_TABLE_COLUMN_CATALOG, catalogColumnInTable } from "../constants/literatureTableColumnCatalog";
+import {
+  catalogColumnInTable,
+  LITERATURE_TABLE_COLUMN_CATALOG,
+} from "../constants/literatureTableColumnCatalog";
 
 export interface TableColumn {
   id: string;
@@ -55,11 +58,7 @@ function ColumnToggle({
   );
 }
 
-export const ColumnManager: React.FC<ColumnManagerProps> = ({
-  columns,
-  onChange,
-  onClose,
-}) => {
+export const ColumnManager: React.FC<ColumnManagerProps> = ({ columns, onChange, onClose }) => {
   const [customName, setCustomName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -67,9 +66,7 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({
 
   const visibleDataColumns = useMemo(
     () =>
-      columns
-        .filter((c) => c.type === "custom" && c.isVisible)
-        .sort((a, b) => a.order - b.order),
+      columns.filter((c) => c.type === "custom" && c.isVisible).sort((a, b) => a.order - b.order),
     [columns]
   );
 
@@ -186,7 +183,11 @@ export const ColumnManager: React.FC<ColumnManagerProps> = ({
         )}
       >
         <span className="min-w-0 flex-1 text-sm text-foreground">{col.name}</span>
-        <ColumnToggle checked={options.checked} onChange={options.onToggle} label={`Toggle ${col.name}`} />
+        <ColumnToggle
+          checked={options.checked}
+          onChange={options.onToggle}
+          label={`Toggle ${col.name}`}
+        />
         {options.draggable && (
           <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
         )}

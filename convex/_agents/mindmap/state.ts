@@ -63,7 +63,6 @@ export const OverallState = Annotation.Root({
     },
     default: () => [],
   }),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   finalOutput: Annotation<any>({ reducer: (x, y) => y ?? x, default: () => null }),
   status: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "generating" }),
   progress: Annotation<{
@@ -74,7 +73,6 @@ export const OverallState = Annotation.Root({
     totalChunks?: number;
     conceptsExtracted?: number;
   }>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reducer: (_x, y?: any) => y ?? _x,
     default: () => ({ phase: "initializing", percentage: 0, message: "Initializing..." }),
   }),

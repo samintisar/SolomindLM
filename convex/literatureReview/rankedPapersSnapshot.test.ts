@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 import {
-  RANKED_PAPER_SNAPSHOT_ABSTRACT_MAX_CHARS,
-  RANKED_PAPERS_SNAPSHOT_MAX_COUNT,
-  WORKFLOW_PAPER_ABSTRACT_MAX_CHARS,
   compactPaperForSnapshot,
   compactPapersForSnapshot,
   compactPapersForWorkflow,
+  RANKED_PAPER_SNAPSHOT_ABSTRACT_MAX_CHARS,
+  RANKED_PAPERS_SNAPSHOT_MAX_COUNT,
   truncateAbstractForSnapshot,
   truncateAbstractForWorkflow,
+  WORKFLOW_PAPER_ABSTRACT_MAX_CHARS,
 } from "./rankedPapersSnapshot";
 
 const basePaper = {

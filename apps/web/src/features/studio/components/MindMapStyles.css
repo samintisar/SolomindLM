@@ -8,12 +8,7 @@
 .mind-elixir-container,
 .mind-map-container {
   background: #f8f9fa !important; /* Light grey background */
-  font-family:
-    "Roboto",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif !important;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
   cursor: grab !important;
   user-select: none !important;
   -webkit-user-select: none !important;

@@ -1,6 +1,6 @@
+import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { LEGAL_LAST_UPDATED } from "../legalMeta";
 

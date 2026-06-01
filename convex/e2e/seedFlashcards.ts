@@ -30,7 +30,7 @@ export const createFlashcardDeck = mutation({
 
     const flashcardId = await ctx.db.insert("flashcards", {
       userId: user._id,
-      notebookId: notebookId as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      notebookId: notebookId as any,
       title,
       status: "completed",
       cardsData: [

@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { getAuthUserId } from "../../auth";
+import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Mindmaps from "../../_model/mindmaps";
+import { getAuthUserId } from "../../auth";
 
 /**
  * List all mindmaps for a notebook

@@ -1,10 +1,10 @@
 "use node";
 
-import { runPlanGraph, runExecuteGraph } from "./graph";
+import { runExecuteGraph, runPlanGraph } from "./graph";
 import type { ResearchNodeDeps } from "./nodes";
-import type { SubQuestion, SourcePolicy, ResearchContext, ResearchStreamChunk } from "./types";
+import type { ResearchContext, ResearchStreamChunk, SourcePolicy, SubQuestion } from "./types";
 
-export type { SubQuestion, SourcePolicy, ResearchContext, ResearchStreamChunk };
+export type { ResearchContext, ResearchStreamChunk, SourcePolicy, SubQuestion };
 
 // Public interface for the deep research agent.
 // Phase 1: generate a research plan (sub-questions + search strategy)
@@ -52,7 +52,6 @@ export class ResearchAgent {
       const references = result.evidence.map((e, idx) => ({
         id: idx + 1,
         sourceId: e.subQuestionId ? `${e.subQuestionId}-${idx}` : String(idx + 1),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         documentId: (e.metadata as any)?.documentId,
         sourceTitle: e.sourceTitle,
         sourceUrl: e.sourceUrl,

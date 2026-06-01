@@ -1,15 +1,16 @@
 "use node";
+
 /**
  * Mind map generation job — Convex registrations only.
  * @see ./mindmapJobPhases.ts for phase logic.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalAction } from "../../_generated/server";
 import {
+  runFinalizeMindMapPhase,
   runMindmapGenerationPhase,
   runProcessMindMapMapChunkPhase,
-  runFinalizeMindMapPhase,
 } from "./mindmapJobPhases";
 
 export const mindmapGeneration = internalAction({

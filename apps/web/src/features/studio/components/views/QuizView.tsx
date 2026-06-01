@@ -1,21 +1,21 @@
-import React, { useState, useEffect, lazy, Suspense, useMemo, useRef } from "react";
 import {
-  Sparkles,
-  Lightbulb,
-  ChevronUp,
-  CheckCircle2,
-  XCircle,
-  Info,
-  Eye,
   ArrowLeft,
+  CheckCircle2,
+  ChevronUp,
+  Eye,
+  Info,
+  Lightbulb,
+  Sparkles,
+  XCircle,
 } from "lucide-react";
-import { QuizNote } from "@/shared/types/index";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
-  useSubmitQuizAnswer,
-  useResetQuizAnswers,
   useQuiz,
+  useResetQuizAnswers,
+  useSubmitQuizAnswer,
   useUpdateQuizProgress,
 } from "@/features/studio/services/quizzesApi";
+import { QuizNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { normalizeStoredQuizQuestion, stripQuizOptionLabel } from "@/shared/utils/quizOptionLabels";
 
@@ -31,7 +31,6 @@ export interface QuizViewProps {
 
 export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }) => {
   // Initialize currentIndex from note.metadata.lastViewedIndex if available
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const initialIndex = (note.metadata as any)?.lastViewedIndex ?? 0;
   const [currentIndex, setCurrentIndex] = useState(
     Math.min(initialIndex, Math.max(0, note.questions.length - 1))
@@ -52,11 +51,9 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   // Restore saved index on mount (from latestNote which has the latest data from server)
   useEffect(() => {
     if (!hasInitializedIndex.current && latestNote) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const savedIndex = (latestNote.metadata as any)?.lastViewedIndex ?? 0;
       const boundedIndex = Math.min(savedIndex, Math.max(0, note.questions.length - 1));
       if (savedIndex > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentIndex(boundedIndex);
       }
       hasInitializedIndex.current = true;
@@ -73,10 +70,8 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
   const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
   useEffect(() => {
     if (latestNote?.userAnswers) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUserAnswers(latestNote.userAnswers);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverUserAnswersKey]);
 
   const questions = note.questions;

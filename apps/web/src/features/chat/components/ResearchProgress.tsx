@@ -1,5 +1,5 @@
+import { BookOpen, Globe, Loader2, PenTool, Sparkles } from "lucide-react";
 import React from "react";
-import { Loader2, BookOpen, Globe, Sparkles, PenTool } from "lucide-react";
 
 const PHASE_CONFIG: Record<string, { label: string; icon: React.ElementType }> = {
   planning: { label: "Planning research...", icon: Sparkles },

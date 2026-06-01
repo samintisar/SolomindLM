@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { ExternalServiceError } from "../../_lib/errors";
 import {
-  invokeWithRetry,
   createRetryWrapper,
   invokeWithHttpRetry,
+  invokeWithRetry,
   isHttpAwareRetryableError,
   RetryPolicies,
 } from "./retry";
-import { ExternalServiceError } from "../../_lib/errors";
 
 describe("isHttpAwareRetryableError", () => {
   it("returns ExternalServiceError.retryable when error is ExternalServiceError", () => {

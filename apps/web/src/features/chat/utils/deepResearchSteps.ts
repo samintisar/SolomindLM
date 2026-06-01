@@ -30,7 +30,7 @@ export function mapDeepResearchSteps(
     details?: string;
     metadata?: unknown;
   }>,
-  subQuestions: SubQuestionForSteps[],
+  subQuestions: SubQuestionForSteps[]
 ): ResearchStep[] {
   const planningQueries = subQuestions.flatMap((sq) =>
     sq.searchQueries.filter((q) => q.trim().length > 0)
@@ -53,8 +53,7 @@ export function mapDeepResearchSteps(
         status: step.status as ResearchStep["status"],
         title: deepResearchStepConfig[step.stepType]?.title ?? step.stepType,
         description: deepResearchStepConfig[step.stepType]?.description ?? "",
-        details:
-          step.details?.trim() === "Report generation complete" ? undefined : step.details,
+        details: step.details?.trim() === "Report generation complete" ? undefined : step.details,
         searchQueries: resolvedQueries,
         papersFound,
       };

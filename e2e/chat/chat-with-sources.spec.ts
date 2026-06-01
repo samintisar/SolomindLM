@@ -1,17 +1,17 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
 import {
-  addPasteTextSource,
-  PASTED_TEXT_TITLE,
-  waitForSourceStatus,
-  selectSource,
-} from "../helpers/source-assertions";
-import {
+  getLastAssistantMessageProse,
   sendMessage,
   waitForAssistantMessage,
   waitForChatInputReEnabled,
-  getLastAssistantMessageProse,
 } from "../helpers/chat-assertions";
+import {
+  addPasteTextSource,
+  PASTED_TEXT_TITLE,
+  selectSource,
+  waitForSourceStatus,
+} from "../helpers/source-assertions";
 
 test.describe("Chat With Sources", () => {
   test("chat with selected source produces response with citations", async ({ notebookPage }) => {

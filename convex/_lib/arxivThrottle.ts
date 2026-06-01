@@ -1,5 +1,5 @@
-import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
+import { internalMutation } from "../_generated/server";
 
 /** arXiv ToU: ≥3s between requests, one connection; we use 3.5s deployment-wide. */
 export const ARXIV_MIN_INTERVAL_MS = 3500;

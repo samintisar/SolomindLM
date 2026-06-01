@@ -1,9 +1,8 @@
 "use node";
 
 import { Send } from "@langchain/langgraph";
-
-import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { packChunks, validateChunks } from "./chunkHelpers.js";
+import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
 
 // Generate a short hash for identifying chunks in logs

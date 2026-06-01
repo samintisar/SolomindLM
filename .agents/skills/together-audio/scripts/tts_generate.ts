@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+
 /**
  * Together AI text-to-speech examples with the TypeScript SDK.
  *
@@ -17,10 +18,10 @@
  *   export TOGETHER_API_KEY=your_key
  */
 
-import Together from "together-ai";
 import { createWriteStream, promises as fs } from "fs";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
+import Together from "together-ai";
 
 const client = new Together();
 

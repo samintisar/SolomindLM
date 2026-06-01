@@ -1,9 +1,9 @@
 "use node";
 
 import { v } from "convex/values";
-import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
+import { internalAction } from "../_generated/server";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 
 const TARGET_DIM = 1024;

@@ -1,6 +1,6 @@
-import { StreamdownProps } from "streamdown";
 import { createCodePlugin } from "@streamdown/code";
 import { createMathPlugin } from "@streamdown/math";
+import { StreamdownProps } from "streamdown";
 
 const codePlugin = createCodePlugin({
   themes: ["github-light", "github-light"],
@@ -16,17 +16,18 @@ export const streamdownPlugins: NonNullable<StreamdownProps["plugins"]> = {
   math: mathPlugin,
 };
 
-export interface MarkdownRendererProps extends Pick<
-  StreamdownProps,
-  | "className"
-  | "components"
-  | "controls"
-  | "isAnimating"
-  | "lineNumbers"
-  | "mode"
-  | "parseIncompleteMarkdown"
-  | "shikiTheme"
-> {
+export interface MarkdownRendererProps
+  extends Pick<
+    StreamdownProps,
+    | "className"
+    | "components"
+    | "controls"
+    | "isAnimating"
+    | "lineNumbers"
+    | "mode"
+    | "parseIncompleteMarkdown"
+    | "shikiTheme"
+  > {
   children: string;
   /** Word/stream animation; prefer false for static Studio content. */
   animated?: StreamdownProps["animated"];

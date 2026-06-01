@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  ACADEMIC_SEARCH_EMPTY_SKIP_CACHE,
-  searchInternalHandler,
-} from "./AcademicSearchService";
+import { ACADEMIC_SEARCH_EMPTY_SKIP_CACHE, searchInternalHandler } from "./AcademicSearchService";
 
 describe("searchInternalHandler rate limit metadata", () => {
   it("sets rateLimited when Semantic Scholar returns 429", async () => {
@@ -117,9 +114,9 @@ describe("searchInternalHandler rate limit metadata", () => {
                 authorships: [{ author: { display_name: "Tom Mitchell" } }],
                 publication_year: 1997,
                 abstract_inverted_index: {
-                  "Machine": [0],
-                  "learning": [1],
-                  "methods": [2],
+                  Machine: [0],
+                  learning: [1],
+                  methods: [2],
                 },
                 open_access: { oa_url: "https://example.com/paper.pdf" },
                 cited_by_count: 1234,

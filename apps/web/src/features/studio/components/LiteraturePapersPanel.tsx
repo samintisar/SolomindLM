@@ -1,30 +1,30 @@
-import React, { useCallback, useMemo, useState } from "react";
-import {
-  X,
-  Download,
-  List,
-  BookOpen,
-  Quote,
-  FileText,
-  CirclePlus,
-  Sparkles,
-  ExternalLink,
-  Loader2,
-  FileCode2,
-  Sheet,
-  Table2,
-} from "lucide-react";
 import type { Id } from "@convex/_generated/dataModel";
-import { ResizeHandle } from "./ResizeHandle";
-import { useRankedPapersForSession } from "../services/literatureTablesApi";
-import { useGetExistingPapers, useBulkUpload } from "../../sources/services/documentsApi";
-import { CitePaperModal } from "./CitePaperModal";
-import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import {
+  BookOpen,
+  CirclePlus,
+  Download,
+  ExternalLink,
+  FileCode2,
+  FileText,
+  List,
+  Loader2,
+  Quote,
+  Sheet,
+  Sparkles,
+  Table2,
+  X,
+} from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
+import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import { useBulkUpload, useGetExistingPapers } from "../../sources/services/documentsApi";
+import { useRankedPapersForSession } from "../services/literatureTablesApi";
 import type { RankedPaper } from "../types/rankedPaper";
 import { formatAuthorsLine, rankedPaperKey, sourceLabel } from "../types/rankedPaper";
-import { isPaperInNotebook, rankedPaperToBulkUpload } from "../utils/rankedPaperMappers";
 import { exportPapersToBibtex, exportPapersToCsv, exportPapersToExcel } from "../utils/paperExport";
+import { isPaperInNotebook, rankedPaperToBulkUpload } from "../utils/rankedPaperMappers";
+import { CitePaperModal } from "./CitePaperModal";
+import { ResizeHandle } from "./ResizeHandle";
 
 interface LiteraturePapersPanelProps {
   sessionId: Id<"literatureReviewSessions">;
@@ -66,10 +66,7 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
   );
 
   const selectedPapers = useMemo(
-    () =>
-      paperEntries
-        .filter((entry) => selectedKeys.has(entry.key))
-        .map((entry) => entry.paper),
+    () => paperEntries.filter((entry) => selectedKeys.has(entry.key)).map((entry) => entry.paper),
     [paperEntries, selectedKeys]
   );
 
@@ -393,9 +390,7 @@ const RankedPaperCard: React.FC<RankedPaperCardProps> = ({
     .join(" · ");
 
   const scoreLabel =
-    typeof paper.score === "number" && Number.isFinite(paper.score)
-      ? paper.score.toFixed(2)
-      : null;
+    typeof paper.score === "number" && Number.isFinite(paper.score) ? paper.score.toFixed(2) : null;
 
   return (
     <article className="px-4 py-4 hover:bg-muted/20 transition-colors">

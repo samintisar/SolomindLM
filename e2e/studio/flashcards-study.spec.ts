@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { seedFlashcardDeckForNotebook } from "../helpers/flashcard-seed";
 import { openStudioPanel } from "../helpers/navigation";
 

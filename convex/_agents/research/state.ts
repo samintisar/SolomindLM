@@ -1,7 +1,7 @@
 "use node";
 
 import { Annotation } from "@langchain/langgraph";
-import type { SubQuestion, EvidenceEntry, Gap, SourcePolicy } from "./types";
+import type { EvidenceEntry, Gap, SourcePolicy, SubQuestion } from "./types";
 
 // LangGraph Annotation state for the research agent.
 // Database is the source of truth; this is working memory for graph execution.

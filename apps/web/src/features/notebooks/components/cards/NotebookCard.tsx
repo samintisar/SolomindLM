@@ -1,21 +1,21 @@
-import React from "react";
 import {
-  MoreVertical,
-  Settings2,
-  Trash2,
-  FolderOpen,
-  FileText,
-  Book,
-  Globe,
   BarChart3,
-  Monitor,
-  Search,
+  Book,
   Brain,
+  FileText,
   Folder,
+  FolderOpen,
+  Globe,
   GraduationCap,
   Lightbulb,
+  Monitor,
+  MoreVertical,
+  Search,
+  Settings2,
+  Trash2,
   Users,
 } from "lucide-react";
+import React from "react";
 import { NotebookItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 

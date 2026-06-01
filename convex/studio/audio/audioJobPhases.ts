@@ -1,36 +1,41 @@
 "use node";
+
 /**
  * Audio overview generation — phase logic.
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import type { ActionCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
-import { env } from "../../_lib/env";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import {
+  countTokens,
+  packChunks,
+  sanitizeUserInput,
+  validateChunks,
+} from "../../_agents/_shared/index";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import {
+  type AudioLength,
+  type AudioType,
+  getMapPrompt,
+  getReducePrompt,
+  MAP_SYSTEM_PROMPT,
+  REDUCE_SYSTEM_PROMPT,
+  TARGET_LINE_COUNTS,
+} from "../../_agents/audio_overview/prompts";
+import type { DialogueLine } from "../../_agents/audio_overview/state";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import type { ActionCtx } from "../../_generated/server";
+import { env } from "../../_lib/env";
+import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
 import {
   createTogetherTtsClient,
   synthesizeSpeechToBuffer,
 } from "../../_services/ai/togetherTts.js";
-import { encodePcmWavToMp3 } from "../../_services/ai/mp3.js";
 import { concatenateWavBuffers } from "../../_services/ai/wav.js";
-import { packChunks, validateChunks } from "../../_agents/_shared/index";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
-import {
-  getMapPrompt,
-  getReducePrompt,
-  TARGET_LINE_COUNTS,
-  MAP_SYSTEM_PROMPT,
-  REDUCE_SYSTEM_PROMPT,
-  type AudioType,
-  type AudioLength,
-} from "../../_agents/audio_overview/prompts";
-import type { DialogueLine } from "../../_agents/audio_overview/state";
-import { sanitizeUserInput, countTokens } from "../../_agents/_shared/index";
-import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { collapseStringOutputsByTokens } from "../_job/collapseStringOutputsByTokens";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
@@ -157,7 +162,6 @@ export async function runAudioOverviewGenerationPhase(
     });
 
     // Extract content from chunk objects
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -268,11 +272,9 @@ export async function runProcessAudioMapChunkPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[audio] user preference fetch failed, using default language",
@@ -299,7 +301,6 @@ export async function runProcessAudioMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke([
           new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           new HumanMessage(prompt),
@@ -312,7 +313,6 @@ export async function runProcessAudioMapChunkPhase(
     });
 
     const elapsed = Date.now() - startTime;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const output = String((response as any).content);
 
     console.log(`[AudioJob] ${chunkId} LLM completed in ${elapsed}ms`);
@@ -390,8 +390,7 @@ export async function runProcessAudioMapChunkPhase(
       : 0;
     const totalMaps = audioOverview.metadata?.totalMapTasks || totalChunks;
     const failedMaps = audioOverview.metadata?.mapResults
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.values(audioOverview.metadata.mapResults).filter((r: any) => {
+      ? Object.values(audioOverview.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -460,11 +459,9 @@ export async function runFinalizeAudioOverviewPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[audio] user preference fetch failed, using default language",
@@ -567,7 +564,6 @@ export async function runFinalizeAudioOverviewPhase(
 
     const response = await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (llm as any).invoke([
           new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
           new HumanMessage(reducePrompt),
@@ -577,7 +573,6 @@ export async function runFinalizeAudioOverviewPhase(
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const responseAny = response as any;
     const responseContent = responseAny?.content;
     const responseText =
@@ -585,7 +580,6 @@ export async function runFinalizeAudioOverviewPhase(
         ? responseContent
         : Array.isArray(responseContent)
           ? responseContent
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .map((part: any) => {
                 if (typeof part === "string") return part;
                 if (part && typeof part === "object" && typeof part.text === "string")

@@ -78,11 +78,7 @@ function getStockPrice(args: { symbol: string }): Record<string, unknown> {
   return { symbol: args.symbol, price: 185.5, currency: "USD" };
 }
 
-const functions: Record<
-  string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (args: any) => Record<string, unknown>
-> = {
+const functions: Record<string, (args: any) => Record<string, unknown>> = {
   getWeather,
   getStockPrice,
 };

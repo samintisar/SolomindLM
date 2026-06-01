@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { ReferenceChunk } from "@/shared/types/index";
 import {
-  inferSourceBadgeLabel,
+  aggregateRetrievalSources,
   deriveWebOpenUrl,
+  inferSourceBadgeLabel,
   navigableUrlFromStoredSource,
   normalizeSourceTitleKey,
-  aggregateRetrievalSources,
 } from "./aggregateRetrievalSources";
-import type { ReferenceChunk } from "@/shared/types/index";
 
 describe("inferSourceBadgeLabel", () => {
   it("returns TEXT for empty string", () => {

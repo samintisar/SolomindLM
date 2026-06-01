@@ -1,15 +1,15 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
-import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import schema from "../schema";
 import {
+  checkDailyLimit,
   checkNotebookLimit,
   checkSourceLimit,
-  getSubscriptionLimit,
-  checkDailyLimit,
   consumeDailyLimit,
+  getSubscriptionLimit,
 } from "./limits";
 import * as rateLimitsModule from "./rateLimits";
 

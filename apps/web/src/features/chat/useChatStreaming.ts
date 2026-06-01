@@ -1,6 +1,6 @@
+import type { Doc } from "@convex/_generated/dataModel";
 import { createContext, useContext } from "react";
 import { Message, Note } from "@/shared/types/index";
-import type { Doc } from "@convex/_generated/dataModel";
 
 import type { ChatStreamSourcePolicy } from "./chatStreamTypes";
 

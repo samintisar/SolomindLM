@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock convex/react
 const mockUseQuery = vi.fn();
@@ -26,7 +26,6 @@ vi.mock("convex/browser", () => ({
 }));
 
 // Mock the Convex API
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function deepProxy(): any {
   return new Proxy(
     {},

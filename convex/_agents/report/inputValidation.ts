@@ -1,8 +1,8 @@
 "use node";
 
+import { PROCESSING_CONFIG } from "./config.js";
 import { MAP_PROMPTS } from "./prompts.js";
 import type { OverallStateType } from "./state.js";
-import { PROCESSING_CONFIG } from "./config.js";
 
 /**
  * Sanitize custom prompt input.

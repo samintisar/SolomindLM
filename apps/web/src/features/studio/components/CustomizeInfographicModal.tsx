@@ -1,7 +1,7 @@
-import React, { useState, useRef } from "react";
-import { X, Image, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { Bookmark, Image, X } from "lucide-react";
+import React, { useRef, useState } from "react";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface VisualStyle {
   id: string;

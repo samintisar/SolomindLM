@@ -1,8 +1,8 @@
-import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
-import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef } from "react";
+import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
 
 export interface CreateWrittenQuestionsParams {
   notebookId: string;
@@ -47,7 +47,6 @@ function capitalizeDifficulty(difficulty: string | undefined): string {
 /**
  * Matches unified list copy in `notesApi.getWrittenQuestionsPreview`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPreviewText(status: string, questionCount: number, metadata?: any): string {
   const difficulty = capitalizeDifficulty(metadata?.difficulty);
 
@@ -63,7 +62,6 @@ function getPreviewText(status: string, questionCount: number, metadata?: any): 
 /**
  * Map a database written questions response to the frontend WrittenQuestionsNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapWrittenQuestionsToNote(dbWQ: any): WrittenQuestionsNote {
   // Questions are stored in the questionsData field
   const questions: WrittenQuestion[] = dbWQ.questionsData || [];

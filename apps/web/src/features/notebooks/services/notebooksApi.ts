@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
 import type { ChatSettings } from "@/shared/types";
 
 // ============================================================
@@ -20,7 +20,6 @@ export function useNotebooks() {
  * Returns undefined while loading, null when not found
  */
 export function useNotebook(id: string | null) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return useQuery(api.notebooks.index.get, id ? { id: id as any } : "skip");
 }
 
@@ -31,9 +30,7 @@ export function useCreateNotebook() {
   const create = useMutation(api.notebooks.index.create).withOptimisticUpdate(
     (localStore, args) => {
       // Generate a temporary ID for the optimistic update
-      // eslint-disable-next-line react-hooks/purity
       const tempId = `temp-${Date.now()}` as Id<"notebooks">;
-      // eslint-disable-next-line react-hooks/purity
       const now = Date.now();
 
       const newNotebook = {
@@ -82,7 +79,6 @@ export function useUpdateNotebook() {
   const update = useMutation(api.notebooks.index.update).withOptimisticUpdate(
     (localStore, args) => {
       const { id, title, coverColor, icon, isFeatured, folderId, chatSettings } = args;
-      // eslint-disable-next-line react-hooks/purity
       const now = Date.now();
 
       // Update list view
@@ -157,7 +153,6 @@ export function useUpdateNotebook() {
           ? undefined
           : (updates.folderId as Id<"folders">)
         : undefined;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return await update({ id: id as any, ...updates, folderId });
   };
 }
@@ -184,7 +179,6 @@ export function useDeleteNotebook() {
   );
 
   return async (id: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return await remove({ id: id as any });
   };
 }
@@ -195,7 +189,6 @@ export function useDeleteNotebook() {
 export function useNotebookReports(notebookId: string | null) {
   return useQuery(
     api.notebooks.index.getReports,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     notebookId ? { notebookId: notebookId as any } : "skip"
   );
 }
@@ -228,9 +221,7 @@ export function useRevokeShareLinkWithOptimisticUpdate(notebookId: string) {
         api.notebooks.sharing.listShareLinks,
         shareListArgs,
         current.map((entry: { id: string; active: boolean; revokedAt: number | null }) =>
-          entry.id === args.shareLinkId
-            ? { ...entry, active: false, revokedAt: Date.now() }
-            : entry
+          entry.id === args.shareLinkId ? { ...entry, active: false, revokedAt: Date.now() } : entry
         )
       );
     }
@@ -242,8 +233,5 @@ export function useForkNotebookFromToken() {
 }
 
 export function usePeekShareToken(token: string | null) {
-  return useQuery(
-    api.notebooks.sharing.peekShareToken,
-    token ? { token } : "skip"
-  );
+  return useQuery(api.notebooks.sharing.peekShareToken, token ? { token } : "skip");
 }

@@ -1,13 +1,13 @@
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { X, ChevronUp, ChevronDown } from "lucide-react";
+import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 import {
-  useOnboardingState,
   useChecklistProgress,
   useDismissChecklist,
+  useOnboardingState,
 } from "../services/onboardingApi";
 import { ChecklistItem } from "./ChecklistItem";
-import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
 
 const COLLAPSED_KEY = "onboardingChecklistCollapsed";
 

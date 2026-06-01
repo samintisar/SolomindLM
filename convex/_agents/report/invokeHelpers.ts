@@ -15,11 +15,8 @@ export async function invokeWithTimeout<T>(
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       const timeoutError = new Error(`${phase} timeout after ${timeoutMs}ms`);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (timeoutError as any).phase = phase;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (timeoutError as any).isTimeout = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (timeoutError as any).timeoutMs = timeoutMs;
       reject(timeoutError);
     }, timeoutMs);
@@ -37,15 +34,10 @@ export async function invokeWithTimeout<T>(
 
     if (error instanceof Error && error.message.includes("timeout")) {
       const enhancedError = new Error(`${phase} phase exceeded timeout of ${timeoutMs}ms`);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).phase = phase;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).isTimeout = true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).timeoutMs = timeoutMs;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).elapsedTime = elapsed;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (enhancedError as any).originalError = error;
 
       console.error(`${LOG_PREFIX} ${phase} TIMEOUT after ${elapsed}ms (limit: ${timeoutMs}ms)`);
@@ -85,15 +77,11 @@ export async function invokeWithRetry<T>(
         error instanceof Error &&
         (error.message.includes("Invalid") ||
           error.message.includes("validation") ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (error as any).isTimeout === true ||
           error.message.includes("timeout"))
       ) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (error as any).phase = phase;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (error as any).attempt = attempt + 1;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (error as any).maxRetries = maxRetries;
         throw error;
       }
@@ -114,11 +102,8 @@ export async function invokeWithRetry<T>(
 
   const elapsed = Date.now() - startTime;
   const finalError = lastError || new Error(`${phase} failed after ${maxRetries} attempts`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (finalError as any).phase = phase;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (finalError as any).totalAttempts = maxRetries;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (finalError as any).totalElapsedTime = elapsed;
 
   console.error(`${LOG_PREFIX} ${phase} failed after ${maxRetries} attempts and ${elapsed}ms`);

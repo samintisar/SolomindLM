@@ -6,7 +6,7 @@ import { invokeWithRetry, invokeWithTimeout, sanitizeUserInput } from "../_share
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { FLASHCARD_CONFIG } from "./config.js";
-import { MAP_SYSTEM_PROMPT, getMapPrompt, type FlashcardResponse } from "./prompts.js";
+import { type FlashcardResponse, getMapPrompt, MAP_SYSTEM_PROMPT } from "./prompts.js";
 import type { ChunkProcessState, Flashcard, OverallStateType } from "./state.js";
 import type { FlashcardOutputInvoker } from "./structuredLlm.js";
 import { cleanBackText, cleanFrontText } from "./textCleanup.js";

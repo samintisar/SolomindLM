@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { env } from "../../_lib/env";
+import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
 import { discoverHandler, discoverSourcesHandler, type RunActionFn } from "./DiscoveryService";
 import { discoverSourcesInternalHandler } from "./TavilySearchService";
-import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
-import { env } from "../../_lib/env";
 
 /**
  * Integration tests that call the real Tavily and Academic APIs.

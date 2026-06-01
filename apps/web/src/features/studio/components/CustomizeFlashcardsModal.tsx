@@ -1,7 +1,7 @@
+import { Bookmark, Layers, X } from "lucide-react";
 import React, { useState } from "react";
-import { X, Layers, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeFlashcardsModalProps {
   isOpen: boolean;

@@ -41,7 +41,6 @@ async function createEndpoint(
   minReplicas: number = 1,
   maxReplicas: number = 1,
   displayName?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const endpoint = await client.endpoints.create({
     model,
@@ -61,7 +60,6 @@ async function waitForReady(
   endpointId: string,
   timeoutMs: number = 600_000,
   pollMs: number = 10_000
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

@@ -1,23 +1,23 @@
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import {
-  mutation,
-  query,
+  internalAction,
   internalMutation,
   internalQuery,
-  internalAction,
   type MutationCtx,
+  mutation,
+  query,
 } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { internal } from "../_generated/api";
-import { getAuthUserId } from "../auth";
 import { checkSourceLimit } from "../_lib/limits";
-import { MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
   getNotebookAccess,
 } from "../_lib/notebookAccess";
-import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
+import { getAuthUserId } from "../auth";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
 /**
@@ -727,7 +727,6 @@ export const fetchChunks = internalAction({
     "use node";
 
     // Get all chunks for the specified documents
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allChunks: any[] = [];
 
     for (const documentId of args.documentIds) {
@@ -929,7 +928,6 @@ export const storeChunk = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chunkData: any = {
       documentId: args.documentId,
       userId: args.userId,
@@ -1119,8 +1117,8 @@ export const setSourceGuide = internalMutation({
   },
 });
 
+export { getExistingPapers } from "./getExistingPapers";
+export { parseBibliography } from "./parseBibliography";
+export { resolveDoi } from "./resolveDoi";
 // Re-exports for paper import workflows
 export { generateSourceGuide } from "./sourceGuide";
-export { resolveDoi } from "./resolveDoi";
-export { parseBibliography } from "./parseBibliography";
-export { getExistingPapers } from "./getExistingPapers";

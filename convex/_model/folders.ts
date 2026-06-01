@@ -1,5 +1,5 @@
-import type { QueryCtx, MutationCtx } from "../_generated/server";
-import type { Id, Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { MAX_DOCS_TO_COUNT } from "../_lib/queryCaps";
 
 /**

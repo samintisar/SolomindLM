@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import schema from "../schema";
 import { api } from "../_generated/api";
+import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(

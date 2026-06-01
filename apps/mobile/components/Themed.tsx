@@ -4,7 +4,7 @@
  */
 
 import { Text as DefaultText, View as DefaultView } from "react-native";
-import { useThemeColor, TextProps, ViewProps } from "./Themed.utils";
+import { TextProps, useThemeColor, ViewProps } from "./Themed.utils";
 
 export function Text(props: TextProps) {
   const { style, lightColor, darkColor, ...otherProps } = props;

@@ -1,9 +1,9 @@
-import type { QueryCtx, MutationCtx } from "../_generated/server";
-import type { Id, Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import {
+  type CardProficiency,
   calculateNextReview,
   initializeProficiency,
-  type CardProficiency,
 } from "../_lib/srsScheduling";
 
 export type { CardProficiency, SM2State } from "../_lib/srsScheduling";

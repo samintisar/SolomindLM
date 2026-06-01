@@ -1,4 +1,3 @@
-import React from "react";
 import {
   CirclePlus,
   FileText,
@@ -10,7 +9,7 @@ import {
   Quote,
   Search,
 } from "lucide-react";
-import type { TableColumn } from "./ColumnManager";
+import React from "react";
 import type { TablePaperRow } from "../utils/literatureTablePaper";
 import {
   collectStudyTypeLabels,
@@ -20,6 +19,7 @@ import {
   getStudyTypePillStyle,
   type StudyTypePillIcon,
 } from "../utils/literatureTablePaper";
+import type { TableColumn } from "./ColumnManager";
 
 interface LiteratureTablePaperCellProps {
   rank: number;
@@ -106,8 +106,12 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
             >
               {title}
             </a>
-            <p className="text-sm leading-relaxed text-neutral-500">{formatPaperMetaLine(citation)}</p>
-            <p className="text-sm leading-relaxed text-neutral-500">{formatPaperAuthors(citation)}</p>
+            <p className="text-sm leading-relaxed text-neutral-500">
+              {formatPaperMetaLine(citation)}
+            </p>
+            <p className="text-sm leading-relaxed text-neutral-500">
+              {formatPaperAuthors(citation)}
+            </p>
           </>
         ) : (
           <>
@@ -178,4 +182,3 @@ export const LiteratureTablePaperCell: React.FC<LiteratureTablePaperCellProps> =
     </div>
   );
 };
-

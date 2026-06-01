@@ -1,7 +1,7 @@
 "use node";
 
-import { MAP_PROMPTS } from "./prompts.js";
 import { PROCESSING_CONFIG } from "./config.js";
+import { MAP_PROMPTS } from "./prompts.js";
 import type { OverallStateType } from "./state.js";
 
 /**

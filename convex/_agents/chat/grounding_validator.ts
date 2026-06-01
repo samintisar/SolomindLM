@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Grounding validator for chat responses.
  *
@@ -6,8 +7,8 @@
  * with appropriate citations.
  */
 
-import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { matchAllInlineCitations, stripInlineCitationMarkers } from "../_shared/citationExtract.js";
 
 // ============================================================

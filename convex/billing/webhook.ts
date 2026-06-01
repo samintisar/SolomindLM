@@ -1,10 +1,10 @@
 "use node";
 
-import Stripe from "stripe";
 import { v } from "convex/values";
+import Stripe from "stripe";
 import { internal } from "../_generated/api";
-import { internalAction } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 
 export const handleWebhook = internalAction({
   args: {
@@ -52,7 +52,6 @@ export const handleWebhook = internalAction({
 
 async function handleCheckoutCompleted(
   ctx: ActionCtx,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   event: { data: { object: any } },
   stripe: Stripe
 ) {
@@ -135,7 +134,6 @@ async function handleCheckoutCompleted(
   const cancelAtPeriodEnd = sub.cancel_at_period_end ?? false;
 
   await ctx.runMutation(internal.billing.index.upsertSubscription, {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     userId: userId as any,
     stripeSubscriptionId: subscriptionId,
     stripeCustomerId: customerId,
@@ -150,9 +148,7 @@ async function handleCheckoutCompleted(
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object: any } }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = event.data.object as any & {
     current_period_start: number;
     current_period_end: number;
@@ -173,7 +169,6 @@ async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object
   const interval = (raw.items?.data?.[0]?.price?.recurring?.interval as string) ?? "month";
 
   await ctx.runMutation(internal.billing.index.upsertSubscription, {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     userId: userId as any,
     stripeSubscriptionId: subscriptionId,
     stripeCustomerId: customerId,
@@ -188,9 +183,7 @@ async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleSubscriptionDeleted(ctx: ActionCtx, event: { data: { object: any } }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscription = event.data.object as any;
   const subscriptionId = subscription.id;
 
@@ -199,9 +192,7 @@ async function handleSubscriptionDeleted(ctx: ActionCtx, event: { data: { object
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleInvoicePaid(ctx: ActionCtx, event: { data: { object: any } }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const invoice = event.data.object as any & {
     subscription?: string | { id: string };
     amount_paid?: number;

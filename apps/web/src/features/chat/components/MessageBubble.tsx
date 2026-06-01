@@ -1,13 +1,13 @@
+import { Check, Copy, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 import React, { useState } from "react";
-import { Check, Copy, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import { Favicon } from "@/shared/components/Favicon";
-import { Message, type ChatActivityPhase } from "@/shared/types/index";
+import { type ChatActivityPhase, Message } from "@/shared/types/index";
 import { renderMessageWithReferences } from "../utils/messageRendering";
 import { RefHandlers } from "../utils/messageRendering.utils";
 import { getStatusIcon, getStatusMessage } from "../utils/messageStatus";
 import { AgentActivityPanel } from "./AgentActivityPanel";
-import { ExternalSourcesModal } from "./ExternalSourcesModal";
 import { DeepResearchSourcesSection } from "./DeepResearchSourcesSection";
+import { ExternalSourcesModal } from "./ExternalSourcesModal";
 
 interface ExternalSource {
   title: string;

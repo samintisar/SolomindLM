@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { useAuthToken } from "@convex-dev/auth/react";
+import { useEffect, useRef } from "react";
 import { convexAuthStorageKeys } from "@/utils/convexAuthStorageKeys";
 import { getNativeWebViewBridge, isNativeShell } from "@/utils/platformDetection";
 

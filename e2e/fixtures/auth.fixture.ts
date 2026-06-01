@@ -17,7 +17,6 @@ export const test = base.extend<AuthFixtures>({
     // Storage state is already applied via playwright.config.ts use.storageState.
     // Navigate to home to confirm auth is working.
     await page.goto("/home");
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- Playwright fixture `use`, not React hook
     await use(page);
   },
 });

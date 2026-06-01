@@ -1,8 +1,8 @@
-import type { QuizQuestion, QuizNote } from "@/shared/types/index";
-import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef } from "react";
+import type { QuizNote, QuizQuestion } from "@/shared/types/index";
 
 export interface CreateQuizParams {
   notebookId: string;
@@ -47,7 +47,6 @@ function capitalizeDifficulty(difficulty: string | undefined): string {
 /**
  * Matches unified list copy in `notesApi.getQuizPreview`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPreviewText(status: string, actualQuestionCount: number, metadata?: any): string {
   const phase = metadata?.phase || status;
   const difficulty = capitalizeDifficulty(metadata?.difficulty);
@@ -76,7 +75,6 @@ function getPreviewText(status: string, actualQuestionCount: number, metadata?: 
 /**
  * Map a database quiz response to the frontend QuizNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapQuizToNote(dbQuiz: any): QuizNote {
   // Quizzes are stored in the questionsData field
   const questions: QuizQuestion[] = dbQuiz.questionsData || [];

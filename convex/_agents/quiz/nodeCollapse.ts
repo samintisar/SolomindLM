@@ -5,9 +5,9 @@ import type { JobLogger } from "../_shared/logging.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
-import { heuristicDedupe } from "./quizHeuristics.js";
 import { callStatusUpdate } from "./nodeSplit.js";
 import type { QuizCandidate } from "./prompts.js";
+import { heuristicDedupe } from "./quizHeuristics.js";
 import type { OverallStateType } from "./state.js";
 
 export interface CollapseNodeDeps {

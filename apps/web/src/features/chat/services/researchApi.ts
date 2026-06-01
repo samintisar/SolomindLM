@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
 
 // ============================================================
 // Research Plan Hooks
@@ -19,15 +19,10 @@ export function useLatestRunForPlan(planId: string | null, isApproved: boolean) 
   );
 }
 
-export function useResearchSteps(
-  researchId: string | null,
-  notebookId: string | null
-) {
+export function useResearchSteps(researchId: string | null, notebookId: string | null) {
   return useQuery(
     api.research.index.getResearchSteps,
-    researchId && notebookId
-      ? { researchId, notebookId }
-      : "skip"
+    researchId && notebookId ? { researchId, notebookId } : "skip"
   );
 }
 

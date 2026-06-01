@@ -11,11 +11,11 @@ import { Annotation } from "@langchain/langgraph";
 import { mapOutputsMergeReducer } from "../_shared/stateUpdateHelpers.js";
 import type {
   AcademicPaper,
+  ExtractedData,
+  LiteratureCitation,
+  LiteratureReviewProgress,
   ScreenedPaper,
   TableColumn,
-  LiteratureReviewProgress,
-  LiteratureCitation,
-  ExtractedData,
 } from "./types";
 
 // ============================================================

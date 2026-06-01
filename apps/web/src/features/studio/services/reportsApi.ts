@@ -1,8 +1,8 @@
-import type { ReportNote } from "@/shared/types/index";
-import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
-import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "convex/react";
+import type { ReportNote } from "@/shared/types/index";
+import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
 
 export interface CreateReportParams {
   notebookId: string;
@@ -20,7 +20,6 @@ export interface CreateReportResponse {
 /**
  * Map a database report response to the frontend ReportNote interface with proper preview
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDatabaseReportToNote(dbReport: any): ReportNote {
   const reportType = normalizeReportTypeId(
     dbReport.reportType || dbReport.metadata?.reportType || "custom"

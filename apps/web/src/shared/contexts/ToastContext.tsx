@@ -1,4 +1,4 @@
-import { useCallback, useState, ReactNode } from "react";
+import { ReactNode, useCallback, useState } from "react";
 import { Toast, ToastContext } from "./useToast";
 
 const DEFAULT_DURATION = 4000;

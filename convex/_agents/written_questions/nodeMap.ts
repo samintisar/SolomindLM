@@ -83,7 +83,6 @@ export async function mapProcess(
       () =>
         invokeWithTimeout(
           () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (fastLlmStructured as any).invoke([
               new SystemMessage(MAP_SYSTEM_PROMPT),
               new HumanMessage(prompt),

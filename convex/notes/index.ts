@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { getAuthUserId } from "../auth";
 import { assertCanReadNotebook } from "../_lib/notebookAccess";
 import * as NotesModel from "../_model/notes";
+import { getAuthUserId } from "../auth";
 
 /**
  * Unified query to fetch all note types for a notebook in a single request.
@@ -39,7 +39,6 @@ export const list = query({
       "notes",
     ];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const queries: Promise<any[]>[] = [];
 
     if (!args.types || args.types.includes("reports")) {
@@ -186,7 +185,6 @@ export const get = query({
       return null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const note = await ctx.db.get(args.id as any);
     if (!note) return null;
 

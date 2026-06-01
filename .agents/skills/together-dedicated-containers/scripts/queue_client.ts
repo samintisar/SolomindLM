@@ -19,12 +19,7 @@ const client = new Together();
 
 const DEPLOYMENT = process.env.TOGETHER_DEPLOYMENT_NAME ?? "hello-world";
 
-async function submitAndPoll(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload: Record<string, any>,
-  priority: number = 1
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
+async function submitAndPoll(payload: Record<string, any>, priority: number = 1): Promise<any> {
   const job = await client.beta.jig.queue.submit({
     model: DEPLOYMENT,
     payload,
@@ -37,7 +32,6 @@ async function submitAndPoll(
   console.log(`Submitted job: ${requestId}`);
 
   while (true) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const status: any = await client.beta.jig.queue.retrieve({
       request_id: requestId,
       model: DEPLOYMENT,
@@ -64,10 +58,7 @@ async function submitAndPoll(
   }
 }
 
-async function submitMultiple(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payloads: Record<string, any>[]
-): Promise<string[]> {
+async function submitMultiple(payloads: Record<string, any>[]): Promise<string[]> {
   const requestIds: string[] = [];
   for (const payload of payloads) {
     const job = await client.beta.jig.queue.submit({
@@ -84,9 +75,7 @@ async function submitMultiple(
   return requestIds;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkStatus(requestId: string): Promise<any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const status: any = await client.beta.jig.queue.retrieve({
     request_id: requestId,
     model: DEPLOYMENT,

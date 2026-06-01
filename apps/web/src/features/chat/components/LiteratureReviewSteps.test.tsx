@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
 import type { ResearchStep } from "./researchStepTypes";
 
-const sessionId = "session123" as import("@convex/_generated/dataModel").Id<"literatureReviewSessions">;
+const sessionId =
+  "session123" as import("@convex/_generated/dataModel").Id<"literatureReviewSessions">;
 
 const baseSteps: ResearchStep[] = [
   {

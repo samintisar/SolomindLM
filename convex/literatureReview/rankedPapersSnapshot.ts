@@ -71,16 +71,12 @@ export function compactPaperForWorkflow<T extends RankedPaperSnapshotFields>(pap
   };
 }
 
-export function compactPapersForWorkflow<T extends RankedPaperSnapshotFields>(
-  papers: T[]
-): T[] {
+export function compactPapersForWorkflow<T extends RankedPaperSnapshotFields>(papers: T[]): T[] {
   return papers.map(compactPaperForWorkflow);
 }
 
 /** Keep top-N by score order, with trimmed abstracts (caller should pass score-sorted papers). */
-export function compactPapersForSnapshot<T extends RankedPaperSnapshotFields>(
-  papers: T[]
-): T[] {
+export function compactPapersForSnapshot<T extends RankedPaperSnapshotFields>(papers: T[]): T[] {
   return papers.slice(0, RANKED_PAPERS_SNAPSHOT_MAX_COUNT).map(compactPaperForSnapshot);
 }
 
@@ -88,7 +84,5 @@ export function compactPapersForSnapshot<T extends RankedPaperSnapshotFields>(
 export function compactRankedPapersForWorkflow<T extends RankedPaperSnapshotFields>(
   papers: T[]
 ): T[] {
-  return papers
-    .slice(0, RANKED_PAPERS_SNAPSHOT_MAX_COUNT)
-    .map(compactPaperForWorkflow);
+  return papers.slice(0, RANKED_PAPERS_SNAPSHOT_MAX_COUNT).map(compactPaperForWorkflow);
 }

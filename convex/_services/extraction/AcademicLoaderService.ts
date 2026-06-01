@@ -1,9 +1,9 @@
 "use node";
 
+import { env } from "../../_lib/env";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { MistralOCRService } from "./MistralOCRService";
 import { WebLoaderService } from "./WebLoaderService";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { env } from "../../_lib/env";
 
 export interface AcademicPaper {
   title: string;

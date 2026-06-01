@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { X, Pencil, FilePlus2, ChevronLeft, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { Bookmark, ChevronLeft, FilePlus2, Pencil, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface ReportFormat {
   id: string;
@@ -187,7 +187,6 @@ export const CustomizeReportModal: React.FC<CustomizeReportModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfiguringFormat(null);
       setCustomPrompt("");
     }

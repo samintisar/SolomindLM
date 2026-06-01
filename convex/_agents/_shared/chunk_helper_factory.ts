@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Chunk helper factory for agent operations.
  *
@@ -9,12 +10,12 @@
  * around the shared chunk operations utilities.
  */
 
+import { Send } from "@langchain/langgraph";
+import type { ChunkConfig } from "./chunk_operations.js";
 import {
   packChunks as sharedPackChunks,
   validateChunks as sharedValidateChunks,
 } from "./chunk_operations.js";
-import type { ChunkConfig } from "./chunk_operations.js";
-import { Send } from "@langchain/langgraph";
 
 // ============================================================
 // Types

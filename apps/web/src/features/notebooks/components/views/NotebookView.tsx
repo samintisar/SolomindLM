@@ -1,42 +1,26 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-
-import { useLocation, useNavigate } from "react-router-dom";
-
 import type { Id } from "@convex/_generated/dataModel";
-
-import type { ActiveLiteratureView } from "@/features/studio/types/literatureStudio";
-
-import { useAuth } from "@/features/auth/useAuth";
-
-import { useNotebookContext } from "@/features/notebooks/useNotebookContext";
-
-import { useSourcesContext } from "@/features/sources/useSourcesContext";
-
-import { useStudioContext } from "@/features/studio/useStudioContext";
-
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
 
+import { useAuth } from "@/features/auth/useAuth";
+import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
-
-import { usePanelResize } from "@/shared/hooks/usePanelResize";
-
-import { useToast } from "@/shared/contexts/useToast";
-
+import { useNotebookContext } from "@/features/notebooks/useNotebookContext";
 import {
   SourcesPanel,
   type SourcesPanelFocusRequest,
 } from "@/features/sources/components/SourcesPanel";
-
-import { ChatPanel } from "@/features/chat/components/ChatPanel";
-
-import { StudioPanel } from "@/features/studio/components/StudioPanel";
-
+import { useSourcesContext } from "@/features/sources/useSourcesContext";
 import { LiteraturePapersPanel } from "@/features/studio/components/LiteraturePapersPanel";
 import { LiteratureScreeningPanel } from "@/features/studio/components/LiteratureScreeningPanel";
-
 import { LiteratureStudioView } from "@/features/studio/components/LiteratureStudioView";
-
+import { StudioPanel } from "@/features/studio/components/StudioPanel";
+import type { ActiveLiteratureView } from "@/features/studio/types/literatureStudio";
+import { useStudioContext } from "@/features/studio/useStudioContext";
 import { STUDIO_TOOLS } from "@/shared/constants";
+import { useToast } from "@/shared/contexts/useToast";
+import { usePanelResize } from "@/shared/hooks/usePanelResize";
 
 import { isNativeShell } from "@/utils/platformDetection";
 
@@ -304,8 +288,6 @@ export function NotebookView() {
       setMiniPlayerVisible(true);
 
       if (noteId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
         (window as any).__currentPlayingAudioNoteId = noteId;
       }
     },
@@ -319,8 +301,6 @@ export function NotebookView() {
 
   const handleExpandAudioPlayer = useCallback(() => {
     setMiniPlayerVisible(false);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
     const noteId = (window as any).__currentPlayingAudioNoteId;
 

@@ -1,5 +1,5 @@
-import React from "react";
 import { CheckCircle2, Circle } from "lucide-react";
+import React from "react";
 
 interface Props {
   label: string;

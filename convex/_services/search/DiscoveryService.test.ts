@@ -1,19 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { env } from "../../_lib/env";
+import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
+import type { UnifiedDiscoveryResult } from "./DiscoveryService";
 import {
-  normalizeScore,
-  getRelevanceLabel,
-  transformWebResult,
-  transformAcademicResult,
-  sortResults,
-  distributeResults,
   discoverHandler,
   discoverSourcesHandler,
+  distributeResults,
+  getRelevanceLabel,
+  normalizeScore,
   type RunActionFn,
+  sortResults,
+  transformAcademicResult,
+  transformWebResult,
 } from "./DiscoveryService";
-import type { UnifiedDiscoveryResult } from "./DiscoveryService";
 import { discoverSourcesInternalHandler } from "./TavilySearchService";
-import { discoverAcademicPapersInternalHandler } from "./AcademicSearchService";
-import { env } from "../../_lib/env";
 
 describe("DiscoveryService", () => {
   describe("normalizeScore", () => {
@@ -246,7 +246,6 @@ describe("DiscoveryService", () => {
         url: `http://${prefix}-${i}`,
         snippet: "S",
         score: 1 - i * 0.1,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sourceType: prefix as any,
       }));
 

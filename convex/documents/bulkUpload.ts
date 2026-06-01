@@ -1,10 +1,10 @@
-import { mutation } from "../_generated/server";
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
-import { getAuthUserId } from "../auth";
-import { assertCanEditNotebook } from "../_lib/notebookAccess";
+import type { Id } from "../_generated/dataModel";
+import { mutation } from "../_generated/server";
 import { checkSourceLimit } from "../_lib/limits";
+import { assertCanEditNotebook } from "../_lib/notebookAccess";
+import { getAuthUserId } from "../auth";
 import { deriveFulltextStatus, primaryLinkUrlForPaper } from "./paperRecord";
 
 const MAX_PAPERS = 100;

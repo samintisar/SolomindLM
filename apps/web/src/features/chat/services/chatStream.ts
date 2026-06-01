@@ -1,7 +1,7 @@
 import {
-  ReferenceChunk,
-  type MessageToolCall,
   type AgentGroundingCheck,
+  type MessageToolCall,
+  ReferenceChunk,
 } from "@/shared/types/index";
 
 // Convex HTTP actions use the .site URL. Derive from .cloud if only VITE_CONVEX_URL is set.
@@ -57,7 +57,6 @@ export interface ApiMessage {
   content: string;
   created_at: string;
   references?: ReferenceChunk[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 

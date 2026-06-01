@@ -67,7 +67,6 @@ export async function mapProcess(
         conceptsExtracted: extraction.key_concepts.length,
       },
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e);
 

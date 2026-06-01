@@ -1,29 +1,29 @@
-import React, { useState, useEffect } from "react";
-import { X, Save, Loader2 } from "lucide-react";
-import {
-  Note,
-  isReportNote,
-  isFlashcardNote,
-  isQuizNote,
-  isMindMapNote,
-  isAudioNote,
-  isAudioOverviewNote,
-  isWrittenQuestionsNote,
-  isInfographicNote,
-  isSpreadsheetNote,
-  isUserNote,
-} from "@/shared/types/index";
-import { ReportView } from "./views/ReportView";
-import { FlashcardView } from "./views/FlashcardView";
-import { QuizView } from "./views/QuizView";
-import { MindMapView } from "./views/MindMapView";
-import { WrittenQuestionsView } from "./views/WrittenQuestionsView";
-import { InfographicView } from "./views/InfographicView";
-import { SpreadsheetView } from "./views/SpreadsheetView";
-import { UserNoteView } from "./views/UserNoteView";
-import type { InfographicViewControls } from "./views/InfographicView";
+import { Loader2, Save, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { AudioPlayer } from "@/features/audio/components/AudioPlayer";
 import type { ReportNote } from "@/shared/types/index";
+import {
+  isAudioNote,
+  isAudioOverviewNote,
+  isFlashcardNote,
+  isInfographicNote,
+  isMindMapNote,
+  isQuizNote,
+  isReportNote,
+  isSpreadsheetNote,
+  isUserNote,
+  isWrittenQuestionsNote,
+  Note,
+} from "@/shared/types/index";
+import { FlashcardView } from "./views/FlashcardView";
+import type { InfographicViewControls } from "./views/InfographicView";
+import { InfographicView } from "./views/InfographicView";
+import { MindMapView } from "./views/MindMapView";
+import { QuizView } from "./views/QuizView";
+import { ReportView } from "./views/ReportView";
+import { SpreadsheetView } from "./views/SpreadsheetView";
+import { UserNoteView } from "./views/UserNoteView";
+import { WrittenQuestionsView } from "./views/WrittenQuestionsView";
 
 interface ReportMarkdownEditorProps {
   note: ReportNote;
@@ -36,7 +36,6 @@ const ReportMarkdownEditor: React.FC<ReportMarkdownEditorProps> = ({ note, onSav
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftContent(note.content ?? "");
   }, [note.id, note.content]);
 

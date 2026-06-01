@@ -1,26 +1,26 @@
-import React, { useRef, useEffect, useState } from "react";
 import { Id } from "@convex/_generated/dataModel";
 import {
-  X,
-  FileStack,
-  Upload,
-  Link as LinkIcon,
-  Youtube,
+  BookMarked,
+  BookOpen,
   Clipboard,
+  File,
+  FileStack,
   FileText,
   Globe,
-  File,
   HardDrive,
-  BookOpen,
-  BookMarked,
   Library,
+  Link as LinkIcon,
   PenLine,
+  Upload,
+  X,
+  Youtube,
 } from "lucide-react";
-import { DoiInputModal } from "./DoiInputModal";
+import React, { useEffect, useRef, useState } from "react";
 import { BibtexImportModal } from "./BibtexImportModal";
-import { ZoteroImportModal } from "./ZoteroImportModal";
-import { MendeleyImportModal } from "./MendeleyImportModal";
+import { DoiInputModal } from "./DoiInputModal";
 import { ManualPaperModal } from "./ManualPaperModal";
+import { MendeleyImportModal } from "./MendeleyImportModal";
+import { ZoteroImportModal } from "./ZoteroImportModal";
 
 const MAX_SOURCES = 200;
 
@@ -72,7 +72,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
   // onDragLeave is recreated each render, so [isOpen, onDragLeave] would retrigger after setState).
   const onDragLeaveRef = useRef(onDragLeave);
-  // eslint-disable-next-line react-hooks/refs
   onDragLeaveRef.current = onDragLeave;
 
   // Reset dragging state when modal closes (run only when isOpen changes, not when callback identity changes).

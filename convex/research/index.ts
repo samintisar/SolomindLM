@@ -1,13 +1,20 @@
-import { v, ConvexError } from "convex/values";
-import { query, mutation, internalMutation, internalQuery, internalAction } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { components, internal } from "../_generated/api";
 import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
-import { getAuthUserId } from "../auth";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
-import { workflow } from "../_agents/research/DeepResearchGraph.js";
-import { sendEvent, restart, type WorkflowId } from "@convex-dev/workflow";
+import { restart, sendEvent, type WorkflowId } from "@convex-dev/workflow";
 import type { FunctionReference } from "convex/server";
+import { ConvexError, v } from "convex/values";
+import { workflow } from "../_agents/research/DeepResearchGraph.js";
+import { components, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "../_generated/server";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
+import { getAuthUserId } from "../auth";
+
 export { createResearchArtifacts } from "./artifacts";
 
 // ============================================================
@@ -654,10 +661,7 @@ export const cancelResearchForConversationInternal = internalMutation({
       .collect();
 
     for (const plan of plans) {
-      if (
-        plan.workflowId &&
-        ["planning", "draft", "approved", "running"].includes(plan.status)
-      ) {
+      if (plan.workflowId && ["planning", "draft", "approved", "running"].includes(plan.status)) {
         try {
           await workflow.cancel(ctx, plan.workflowId as WorkflowId);
         } catch {

@@ -1,12 +1,16 @@
 "use node";
+
 /**
  * Flashcard generation — phase logic.
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import type { ActionCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
+import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
+import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
+import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { packChunks, validateChunks } from "../../_agents/FlashcardGraph";
 import {
   recursiveCollapse,
@@ -19,21 +23,19 @@ import {
   validateSelfContained,
 } from "../../_agents/flashcard/flashcardHeuristics";
 import { formatFlashcardsAsText } from "../../_agents/flashcard/formatFlashcards";
+import {
+  type Flashcard,
+  FlashcardArraySchema,
+  type FlashcardResponse,
+  getMapPrompt,
+  MAP_SYSTEM_PROMPT,
+} from "../../_agents/flashcard/prompts";
 import { createStructuredLLM } from "../../_agents/flashcard/structuredLlm";
 import { cleanBackText, cleanFrontText } from "../../_agents/flashcard/textCleanup";
+import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { MAP_SYSTEM_PROMPT, getMapPrompt } from "../../_agents/flashcard/prompts";
-import {
-  FlashcardArraySchema,
-  type Flashcard,
-  type FlashcardResponse,
-} from "../../_agents/flashcard/prompts";
-import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
-import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
 // ============================================================
@@ -171,7 +173,6 @@ export async function runFlashcardGenerationPhase(
     });
 
     // Extract content from chunk objects
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawChunks = chunkObjects.map((chunk: any) => chunk.content);
 
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
@@ -304,11 +305,9 @@ export async function runProcessFlashcardMapChunkPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[flashcard] user preference fetch failed, using default language",
@@ -335,7 +334,6 @@ export async function runProcessFlashcardMapChunkPhase(
     const startTime = Date.now();
     const response = await invokeStudioLlm({
       invoke: () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (structuredLLM as any).invoke([
           new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
           new HumanMessage(prompt),
@@ -435,8 +433,7 @@ export async function runProcessFlashcardMapChunkPhase(
       : 0;
     const totalMaps = flashcard.metadata?.totalMapTasks || totalChunks;
     const failedMaps = flashcard.metadata?.mapResults
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Object.values(flashcard.metadata.mapResults).filter((r: any) => {
+      ? Object.values(flashcard.metadata.mapResults).filter((r: any) => {
           try {
             const parsed = JSON.parse(r as string);
             return parsed._error;
@@ -509,11 +506,9 @@ export async function runFinalizeFlashcardPhase(
 
     let userPrefs: { outputLanguage?: string } | null = null;
     try {
-      userPrefs = await ctx.runQuery(
-        internal.userPreferences.index.getPreferencesByUserId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { userId: userId as any }
-      );
+      userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+        userId: userId as any,
+      });
     } catch (e) {
       console.warn(
         "[flashcard] user preference fetch failed, using default language",

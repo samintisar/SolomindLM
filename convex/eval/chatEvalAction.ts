@@ -13,20 +13,20 @@
  */
 "use node";
 
-import { action } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
-import { env } from "../_lib/env";
-import type { ReferenceChunk } from "../storage/ChatHistoryService";
-import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
-import { assertRagEvalGate } from "./_gate";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
+import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
+import { internal } from "../_generated/api";
+import { Id } from "../_generated/dataModel";
+import { action } from "../_generated/server";
+import { env } from "../_lib/env";
+import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
+import type { ReferenceChunk } from "../storage/ChatHistoryService";
+import { assertRagEvalGate } from "./_gate";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -270,7 +270,6 @@ export const runChatEval = action({
               }
             );
             allResults.push(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ...results.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
@@ -297,7 +296,6 @@ export const runChatEval = action({
             }
           );
           allResults.push(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ...academicDiscoverSources(academicPayload).map((r: any) => ({
               title: r.title ?? "Untitled",
               url: r.url ?? "",

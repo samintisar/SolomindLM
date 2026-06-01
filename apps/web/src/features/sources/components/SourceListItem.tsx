@@ -1,21 +1,21 @@
-import React from "react";
 import {
+  CheckSquare,
+  Edit2,
+  File,
   FileText,
   Globe,
-  File,
-  CheckSquare,
-  Square,
-  Loader2,
-  XCircle,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  RefreshCw,
   GraduationCap,
+  Loader2,
+  MoreVertical,
+  RefreshCw,
+  Square,
+  Trash2,
+  XCircle,
   Youtube,
 } from "lucide-react";
-import { Source } from "@/shared/types";
+import React from "react";
 import { Favicon } from "@/shared/components/Favicon";
+import { Source } from "@/shared/types";
 
 interface SourceListItemProps {
   source: Source;

@@ -1,5 +1,5 @@
-import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 type DbCtx = QueryCtx | MutationCtx;
 

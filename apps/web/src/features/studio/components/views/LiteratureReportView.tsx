@@ -1,8 +1,8 @@
-import React, { useState, useMemo, lazy, Suspense } from "react";
 import { ArrowLeft, Check, Copy, Download, FileText, Loader2, Save, X } from "lucide-react";
-import { CitationStylePicker, CitationStyle } from "../CitationStylePicker";
-import { PrismaFlowDiagram, type PrismaFlowCounts } from "../PrismaFlowDiagram";
+import React, { lazy, Suspense, useMemo, useState } from "react";
 import { sanitizeMarkdown } from "@/shared/utils";
+import { CitationStyle, CitationStylePicker } from "../CitationStylePicker";
+import { type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -63,9 +63,7 @@ const SectionRenderer: React.FC<SectionRendererProps> = ({ section, workflowProv
         <PrismaFlowDiagram counts={workflowProvenance} className="mb-6" />
       ) : null}
       <div className="prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground">
-        <Suspense
-          fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}
-        >
+        <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
           <MarkdownRenderer>{sanitizeMarkdown(section.content)}</MarkdownRenderer>
         </Suspense>
       </div>
@@ -81,7 +79,11 @@ interface ReferencesSectionProps {
   onStyleChange: (style: CitationStyle) => void;
 }
 
-const ReferencesSection: React.FC<ReferencesSectionProps> = ({ citations, style, onStyleChange }) => {
+const ReferencesSection: React.FC<ReferencesSectionProps> = ({
+  citations,
+  style,
+  onStyleChange,
+}) => {
   const [didCopy, setDidCopy] = useState(false);
 
   const sortedCitations = useMemo(() => {

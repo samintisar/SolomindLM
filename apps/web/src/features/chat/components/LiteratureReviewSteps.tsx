@@ -1,27 +1,27 @@
-import React, { useState, useEffect, useCallback } from "react";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   Check,
-  Loader2,
-  X,
   ChevronDown,
-  Search,
-  ListFilter,
+  Circle,
   Database,
   FileText,
-  Table2,
   LayoutGrid,
-  Circle,
+  ListFilter,
+  Loader2,
+  Search,
+  Table2,
+  X,
 } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  canOpenRankedPapersDrilldown,
+  canOpenScreeningDrilldown,
+} from "../utils/literatureReviewStepDrilldown";
 import {
   extractSearchQueriesFromDetails,
   type LiteratureReviewStepCounts,
   type ResearchStep,
 } from "./researchStepTypes";
-import {
-  canOpenRankedPapersDrilldown,
-  canOpenScreeningDrilldown,
-} from "../utils/literatureReviewStepDrilldown";
 
 const STEP_ICONS: Record<string, React.ElementType> = {
   planning: Search,
@@ -75,7 +75,6 @@ export const LiteratureReviewSteps: React.FC<LiteratureReviewStepsProps> = ({
   });
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedSteps((prev) => {
       const next = expandAll ? new Set(steps.map((_, idx) => idx)) : new Set(prev);
       if (!expandAll) {
@@ -232,11 +231,7 @@ function PrismaCountsSummary({ counts }: { counts: LiteratureReviewStepCounts })
     items.push(`${counts.extractedRowCount.toLocaleString()} rows extracted`);
   }
   if (items.length === 0) return null;
-  return (
-    <p className="text-xs leading-relaxed text-muted-foreground">
-      {items.join(" · ")}
-    </p>
-  );
+  return <p className="text-xs leading-relaxed text-muted-foreground">{items.join(" · ")}</p>;
 }
 
 function StepDetails({

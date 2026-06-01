@@ -1,4 +1,4 @@
-import { Source, MentionedSource } from "@/shared/types/index";
+import { MentionedSource, Source } from "@/shared/types/index";
 
 /**
  * Filter sources by query (case-insensitive substring match)

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildNotebookChatInstructionBlock } from "./chat_llm_prompts.js";
 
 describe("buildNotebookChatInstructionBlock", () => {

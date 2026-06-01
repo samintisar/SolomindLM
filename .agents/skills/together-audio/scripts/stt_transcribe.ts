@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+
 /**
  * Together AI speech-to-text examples with the TypeScript SDK.
  *
@@ -19,8 +20,8 @@
  *   export TOGETHER_API_KEY=your_key
  */
 
-import Together from "together-ai";
 import { readFileSync } from "fs";
+import Together from "together-ai";
 
 const client = new Together();
 
@@ -120,7 +121,6 @@ async function translate(args: ParsedArgs): Promise<void> {
 }
 
 async function diarize(args: ParsedArgs): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response: any = await client.audio.transcriptions.create({
     file: loadAudioFile(args.audioFile),
     model: args.model,
@@ -143,7 +143,6 @@ async function diarize(args: ParsedArgs): Promise<void> {
 }
 
 async function timestamps(args: ParsedArgs): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response: any = await client.audio.transcriptions.create({
     file: loadAudioFile(args.audioFile),
     model: args.model,

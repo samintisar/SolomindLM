@@ -152,7 +152,9 @@ export function inferStudyTypeLabel(paper: TablePaperRow): string | null {
   if (/\bliterature review\b|\bnarrative review\b|\bscoping review\b/.test(text)) {
     return "Literature Review";
   }
-  if (/\brandomized controlled\b|\brandomised controlled\b|\bcontrolled trial\b|\brct\b/.test(text)) {
+  if (
+    /\brandomized controlled\b|\brandomised controlled\b|\bcontrolled trial\b|\brct\b/.test(text)
+  ) {
     return "Randomized controlled trial";
   }
   if (/\bobservational\b|\bcohort study\b|\bcase-control\b|\bcross-sectional\b/.test(text)) {
@@ -206,8 +208,7 @@ export interface StudyTypePillStyle {
 }
 
 export function getStudyTypePillStyle(label: string): StudyTypePillStyle {
-  const kind =
-    STUDY_TYPE_ICON_MATCHERS.find((entry) => entry.match.test(label))?.kind ?? "default";
+  const kind = STUDY_TYPE_ICON_MATCHERS.find((entry) => entry.match.test(label))?.kind ?? "default";
   return {
     className: STUDY_TYPE_PILL_CLASS,
     iconClassName: STUDY_TYPE_PILL_ICON_CLASS,
@@ -226,12 +227,7 @@ export function studyTypePillIcon(label: string): StudyTypePillIcon {
 }
 
 /** System columns rendered inside the Papers column — not as separate grid columns. */
-export const SYSTEM_COLUMN_TYPES = new Set([
-  "paper_title",
-  "authors",
-  "year",
-  "study_type",
-]);
+export const SYSTEM_COLUMN_TYPES = new Set(["paper_title", "authors", "year", "study_type"]);
 
 export function isDataColumn(col: TableColumn): boolean {
   return col.isVisible && !SYSTEM_COLUMN_TYPES.has(col.type);

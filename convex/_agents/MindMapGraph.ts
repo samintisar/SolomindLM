@@ -13,15 +13,13 @@
  */
 
 export { MindMapGraph, packChunks, validateChunks } from "./mindmap/MindMapGraph.js";
-
+// Re-export constants for backward compatibility
+export { MAP_PROMPT, NODES, REDUCE_PROMPT } from "./mindmap/prompts.js";
 // Re-export types for backward compatibility
 export type {
-  OverallStateType,
   ChunkStateType,
   ConceptExtraction,
-  MindMapNode,
   FinalMindMap,
+  MindMapNode,
+  OverallStateType,
 } from "./mindmap/state.js";
-
-// Re-export constants for backward compatibility
-export { NODES, MAP_PROMPT, REDUCE_PROMPT } from "./mindmap/prompts.js";

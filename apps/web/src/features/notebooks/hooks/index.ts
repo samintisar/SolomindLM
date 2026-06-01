@@ -1,12 +1,10 @@
-export { useNotebookHandlers } from "./useNotebookHandlers";
-export { useFolderHandlers } from "./useFolderHandlers";
-export { useNotebookSorting } from "./useNotebookSorting";
+export type { UseFolderExpansionProps, UseFolderExpansionReturn } from "./useFolderExpansion";
 export { useFolderExpansion } from "./useFolderExpansion";
+export type { UseFolderHandlersProps, UseFolderHandlersReturn } from "./useFolderHandlers";
+export { useFolderHandlers } from "./useFolderHandlers";
 
 export type { UseNotebookHandlersProps, UseNotebookHandlersReturn } from "./useNotebookHandlers";
+export { useNotebookHandlers } from "./useNotebookHandlers";
 
-export type { UseFolderHandlersProps, UseFolderHandlersReturn } from "./useFolderHandlers";
-
-export type { UseNotebookSortingReturn, SortOption } from "./useNotebookSorting";
-
-export type { UseFolderExpansionProps, UseFolderExpansionReturn } from "./useFolderExpansion";
+export type { SortOption, UseNotebookSortingReturn } from "./useNotebookSorting";
+export { useNotebookSorting } from "./useNotebookSorting";

@@ -1,5 +1,5 @@
-import { internalMutation } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
@@ -59,7 +59,6 @@ export const updateReportStatus = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),

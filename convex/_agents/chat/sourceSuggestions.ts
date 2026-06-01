@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Source Suggestions Generator
  *
@@ -10,11 +11,11 @@
  * `reasoningEnabled: false` maps to low `reasoning_effort` via mergeModelKwargs; no tool_calls.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../../_generated/api";
-import { uncachedLlmCall } from "../_shared/cachedLlm";
+import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { uncachedLlmCall } from "../_shared/cachedLlm";
 
 /** Best-effort fixes before JSON.parse (models sometimes emit trailing commas). */
 function repairJsonObjectText(json: string): string {
@@ -105,7 +106,6 @@ export const generateSuggestionsInternal = internalAction({
       }
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const completed: any[] = (documents as any[]).filter((d: any) => d.status === "completed");
 
     if (completed.length === 0) {
@@ -115,7 +115,6 @@ export const generateSuggestionsInternal = internalAction({
     // Build compact document summary for LLM
     const docLines = completed
       .slice(0, 20)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((d: any) => {
         const flags: string[] = [];
         if (d.metadata?.hasMathNotation) flags.push("math");

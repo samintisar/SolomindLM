@@ -8,16 +8,7 @@
  * @module
  */
 
-import type * as ResendOTP from "../ResendOTP.js";
-import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
-import type * as _agents_AudioOverviewGraph from "../_agents/AudioOverviewGraph.js";
-import type * as _agents_ChatAgent from "../_agents/ChatAgent.js";
-import type * as _agents_FlashcardGraph from "../_agents/FlashcardGraph.js";
-import type * as _agents_MindMapGraph from "../_agents/MindMapGraph.js";
-import type * as _agents_QuizGraph from "../_agents/QuizGraph.js";
-import type * as _agents_ReportGraph from "../_agents/ReportGraph.js";
-import type * as _agents_SpreadsheetGraph from "../_agents/SpreadsheetGraph.js";
-import type * as _agents_WrittenQuestionsGraph from "../_agents/WrittenQuestionsGraph.js";
+import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import type * as _agents__shared_agent_graph_limits from "../_agents/_shared/agent_graph_limits.js";
 import type * as _agents__shared_cachedLlm from "../_agents/_shared/cachedLlm.js";
 import type * as _agents__shared_chunk_helper_factory from "../_agents/_shared/chunk_helper_factory.js";
@@ -35,13 +26,14 @@ import type * as _agents__shared_node_builder from "../_agents/_shared/node_buil
 import type * as _agents__shared_progress from "../_agents/_shared/progress.js";
 import type * as _agents__shared_retry from "../_agents/_shared/retry.js";
 import type * as _agents__shared_sanitization from "../_agents/_shared/sanitization.js";
-import type * as _agents__shared_stateUpdateHelpers from "../_agents/_shared/stateUpdateHelpers.js";
 import type * as _agents__shared_state_cleanup from "../_agents/_shared/state_cleanup.js";
 import type * as _agents__shared_state_factory from "../_agents/_shared/state_factory.js";
+import type * as _agents__shared_stateUpdateHelpers from "../_agents/_shared/stateUpdateHelpers.js";
 import type * as _agents__shared_timeout from "../_agents/_shared/timeout.js";
 import type * as _agents__shared_tokenizer from "../_agents/_shared/tokenizer.js";
 import type * as _agents__shared_topic_extraction from "../_agents/_shared/topic_extraction.js";
 import type * as _agents__shared_validation from "../_agents/_shared/validation.js";
+import type * as _agents_AudioOverviewGraph from "../_agents/AudioOverviewGraph.js";
 import type * as _agents_audio_overview_AudioOverviewGraph from "../_agents/audio_overview/AudioOverviewGraph.js";
 import type * as _agents_audio_overview_chunkHelpers from "../_agents/audio_overview/chunkHelpers.js";
 import type * as _agents_audio_overview_config from "../_agents/audio_overview/config.js";
@@ -53,14 +45,15 @@ import type * as _agents_audio_overview_prompts from "../_agents/audio_overview/
 import type * as _agents_audio_overview_scriptParsing from "../_agents/audio_overview/scriptParsing.js";
 import type * as _agents_audio_overview_state from "../_agents/audio_overview/state.js";
 import type * as _agents_audio_overview_voices from "../_agents/audio_overview/voices.js";
+import type * as _agents_ChatAgent from "../_agents/ChatAgent.js";
 import type * as _agents_chat_ChatAgent from "../_agents/chat/ChatAgent.js";
-import type * as _agents_chat_chatConfig from "../_agents/chat/chatConfig.js";
-import type * as _agents_chat_chatHistoryBudget from "../_agents/chat/chatHistoryBudget.js";
-import type * as _agents_chat_chatRouter from "../_agents/chat/chatRouter.js";
 import type * as _agents_chat_chat_llm_grounding from "../_agents/chat/chat_llm_grounding.js";
 import type * as _agents_chat_chat_llm_prompts from "../_agents/chat/chat_llm_prompts.js";
 import type * as _agents_chat_chat_llm_types from "../_agents/chat/chat_llm_types.js";
 import type * as _agents_chat_chat_retrieval_subqueries from "../_agents/chat/chat_retrieval_subqueries.js";
+import type * as _agents_chat_chatConfig from "../_agents/chat/chatConfig.js";
+import type * as _agents_chat_chatHistoryBudget from "../_agents/chat/chatHistoryBudget.js";
+import type * as _agents_chat_chatRouter from "../_agents/chat/chatRouter.js";
 import type * as _agents_chat_chunkContext from "../_agents/chat/chunkContext.js";
 import type * as _agents_chat_grounding_validator from "../_agents/chat/grounding_validator.js";
 import type * as _agents_chat_hybrid_search from "../_agents/chat/hybrid_search.js";
@@ -73,10 +66,11 @@ import type * as _agents_chat_streamSlice from "../_agents/chat/streamSlice.js";
 import type * as _agents_chat_types from "../_agents/chat/types.js";
 import type * as _agents_chat_vector_search from "../_agents/chat/vector_search.js";
 import type * as _agents_chat_withTimeout from "../_agents/chat/withTimeout.js";
-import type * as _agents_flashcard_FlashcardGraph from "../_agents/flashcard/FlashcardGraph.js";
+import type * as _agents_FlashcardGraph from "../_agents/FlashcardGraph.js";
 import type * as _agents_flashcard_chunkHelpers from "../_agents/flashcard/chunkHelpers.js";
 import type * as _agents_flashcard_collapseReduceLlm from "../_agents/flashcard/collapseReduceLlm.js";
 import type * as _agents_flashcard_config from "../_agents/flashcard/config.js";
+import type * as _agents_flashcard_FlashcardGraph from "../_agents/flashcard/FlashcardGraph.js";
 import type * as _agents_flashcard_flashcardHeuristics from "../_agents/flashcard/flashcardHeuristics.js";
 import type * as _agents_flashcard_formatFlashcards from "../_agents/flashcard/formatFlashcards.js";
 import type * as _agents_flashcard_nodeCollapse from "../_agents/flashcard/nodeCollapse.js";
@@ -93,10 +87,11 @@ import type * as _agents_literature_review_planReviewColumns from "../_agents/li
 import type * as _agents_literature_review_prompts from "../_agents/literature_review/prompts.js";
 import type * as _agents_literature_review_state from "../_agents/literature_review/state.js";
 import type * as _agents_literature_review_types from "../_agents/literature_review/types.js";
-import type * as _agents_mindmap_MindMapGraph from "../_agents/mindmap/MindMapGraph.js";
+import type * as _agents_MindMapGraph from "../_agents/MindMapGraph.js";
 import type * as _agents_mindmap_chunkHelpers from "../_agents/mindmap/chunkHelpers.js";
 import type * as _agents_mindmap_config from "../_agents/mindmap/config.js";
 import type * as _agents_mindmap_fallbacks from "../_agents/mindmap/fallbacks.js";
+import type * as _agents_mindmap_MindMapGraph from "../_agents/mindmap/MindMapGraph.js";
 import type * as _agents_mindmap_nodeMap from "../_agents/mindmap/nodeMap.js";
 import type * as _agents_mindmap_nodeReduce from "../_agents/mindmap/nodeReduce.js";
 import type * as _agents_mindmap_parsing from "../_agents/mindmap/parsing.js";
@@ -104,7 +99,7 @@ import type * as _agents_mindmap_prompts from "../_agents/mindmap/prompts.js";
 import type * as _agents_mindmap_routing from "../_agents/mindmap/routing.js";
 import type * as _agents_mindmap_state from "../_agents/mindmap/state.js";
 import type * as _agents_mindmap_structuredLlm from "../_agents/mindmap/structuredLlm.js";
-import type * as _agents_quiz_QuizGraph from "../_agents/quiz/QuizGraph.js";
+import type * as _agents_QuizGraph from "../_agents/QuizGraph.js";
 import type * as _agents_quiz_chunkHelpers from "../_agents/quiz/chunkHelpers.js";
 import type * as _agents_quiz_config from "../_agents/quiz/config.js";
 import type * as _agents_quiz_nodeCollapse from "../_agents/quiz/nodeCollapse.js";
@@ -114,11 +109,12 @@ import type * as _agents_quiz_nodeSplit from "../_agents/quiz/nodeSplit.js";
 import type * as _agents_quiz_optionLabels from "../_agents/quiz/optionLabels.js";
 import type * as _agents_quiz_postprocess from "../_agents/quiz/postprocess.js";
 import type * as _agents_quiz_prompts from "../_agents/quiz/prompts.js";
+import type * as _agents_quiz_QuizGraph from "../_agents/quiz/QuizGraph.js";
 import type * as _agents_quiz_quizHeuristics from "../_agents/quiz/quizHeuristics.js";
 import type * as _agents_quiz_routing from "../_agents/quiz/routing.js";
 import type * as _agents_quiz_state from "../_agents/quiz/state.js";
 import type * as _agents_quiz_structuredLlm from "../_agents/quiz/structuredLlm.js";
-import type * as _agents_report_ReportGraph from "../_agents/report/ReportGraph.js";
+import type * as _agents_ReportGraph from "../_agents/ReportGraph.js";
 import type * as _agents_report_chunkHelpers from "../_agents/report/chunkHelpers.js";
 import type * as _agents_report_config from "../_agents/report/config.js";
 import type * as _agents_report_inputValidation from "../_agents/report/inputValidation.js";
@@ -129,6 +125,7 @@ import type * as _agents_report_nodeMerge from "../_agents/report/nodeMerge.js";
 import type * as _agents_report_nodeReduce from "../_agents/report/nodeReduce.js";
 import type * as _agents_report_nodes from "../_agents/report/nodes.js";
 import type * as _agents_report_prompts from "../_agents/report/prompts.js";
+import type * as _agents_report_ReportGraph from "../_agents/report/ReportGraph.js";
 import type * as _agents_report_routing from "../_agents/report/routing.js";
 import type * as _agents_report_state from "../_agents/report/state.js";
 import type * as _agents_report_structuredLlm from "../_agents/report/structuredLlm.js";
@@ -141,7 +138,7 @@ import type * as _agents_research_prompts from "../_agents/research/prompts.js";
 import type * as _agents_research_state from "../_agents/research/state.js";
 import type * as _agents_research_steps from "../_agents/research/steps.js";
 import type * as _agents_research_types from "../_agents/research/types.js";
-import type * as _agents_spreadsheet_SpreadsheetGraph from "../_agents/spreadsheet/SpreadsheetGraph.js";
+import type * as _agents_SpreadsheetGraph from "../_agents/SpreadsheetGraph.js";
 import type * as _agents_spreadsheet_chunkHelpers from "../_agents/spreadsheet/chunkHelpers.js";
 import type * as _agents_spreadsheet_config from "../_agents/spreadsheet/config.js";
 import type * as _agents_spreadsheet_csvHelpers from "../_agents/spreadsheet/csvHelpers.js";
@@ -152,8 +149,9 @@ import type * as _agents_spreadsheet_nodeMerge from "../_agents/spreadsheet/node
 import type * as _agents_spreadsheet_nodeReduce from "../_agents/spreadsheet/nodeReduce.js";
 import type * as _agents_spreadsheet_prompts from "../_agents/spreadsheet/prompts.js";
 import type * as _agents_spreadsheet_routing from "../_agents/spreadsheet/routing.js";
+import type * as _agents_spreadsheet_SpreadsheetGraph from "../_agents/spreadsheet/SpreadsheetGraph.js";
 import type * as _agents_spreadsheet_state from "../_agents/spreadsheet/state.js";
-import type * as _agents_written_questions_WrittenQuestionsGraph from "../_agents/written_questions/WrittenQuestionsGraph.js";
+import type * as _agents_WrittenQuestionsGraph from "../_agents/WrittenQuestionsGraph.js";
 import type * as _agents_written_questions_chunkHelpers from "../_agents/written_questions/chunkHelpers.js";
 import type * as _agents_written_questions_config from "../_agents/written_questions/config.js";
 import type * as _agents_written_questions_nodeCollapse from "../_agents/written_questions/nodeCollapse.js";
@@ -166,6 +164,7 @@ import type * as _agents_written_questions_questionHeuristics from "../_agents/w
 import type * as _agents_written_questions_routing from "../_agents/written_questions/routing.js";
 import type * as _agents_written_questions_state from "../_agents/written_questions/state.js";
 import type * as _agents_written_questions_structuredLlm from "../_agents/written_questions/structuredLlm.js";
+import type * as _agents_written_questions_WrittenQuestionsGraph from "../_agents/written_questions/WrittenQuestionsGraph.js";
 import type * as _lib_arxivThrottle from "../_lib/arxivThrottle.js";
 import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
 import type * as _lib_e5Embedding from "../_lib/e5Embedding.js";
@@ -211,8 +210,8 @@ import type * as _services_ai_togetherTts from "../_services/ai/togetherTts.js";
 import type * as _services_ai_wav from "../_services/ai/wav.js";
 import type * as _services_cache_cache from "../_services/cache/cache.js";
 import type * as _services_cache_cacheCrypto from "../_services/cache/cacheCrypto.js";
-import type * as _services_cache_cacheMetrics from "../_services/cache/cacheMetrics.js";
 import type * as _services_cache_cachedAgent from "../_services/cache/cachedAgent.js";
+import type * as _services_cache_cacheMetrics from "../_services/cache/cacheMetrics.js";
 import type * as _services_extraction_AcademicLoaderService from "../_services/extraction/AcademicLoaderService.js";
 import type * as _services_extraction_AudioTranscriptionService from "../_services/extraction/AudioTranscriptionService.js";
 import type * as _services_extraction_BibliographyParserService from "../_services/extraction/BibliographyParserService.js";
@@ -288,6 +287,8 @@ import type * as onboarding_mutations from "../onboarding/mutations.js";
 import type * as onboarding_progress from "../onboarding/progress.js";
 import type * as onboarding_state from "../onboarding/state.js";
 import type * as push_index from "../push/index.js";
+import type * as ResendOTP from "../ResendOTP.js";
+import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
 import type * as research_artifacts from "../research/artifacts.js";
 import type * as research_index from "../research/index.js";
 import type * as research_mapEvidenceForDb from "../research/mapEvidenceForDb.js";
@@ -344,12 +345,6 @@ import type * as studio_writtenQuestions_index from "../studio/writtenQuestions/
 import type * as studio_writtenQuestions_job from "../studio/writtenQuestions/job.js";
 import type * as studio_writtenQuestions_writtenQuestionsJobPhases from "../studio/writtenQuestions/writtenQuestionsJobPhases.js";
 import type * as userPreferences_index from "../userPreferences/index.js";
-
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 
 declare const fullApi: ApiFromModules<{
   ResendOTP: typeof ResendOTP;
@@ -698,10 +693,7 @@ declare const fullApi: ApiFromModules<{
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-export declare const api: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "public">
->;
+export declare const api: FilterApi<typeof fullApi, FunctionReference<any, "public">>;
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -711,10 +703,7 @@ export declare const api: FilterApi<
  * const myFunctionReference = internal.myModule.myFunction;
  * ```
  */
-export declare const internal: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "internal">
->;
+export declare const internal: FilterApi<typeof fullApi, FunctionReference<any, "internal">>;
 
 export declare const components: {
   stripe: import("@convex-dev/stripe/_generated/component.js").ComponentApi<"stripe">;

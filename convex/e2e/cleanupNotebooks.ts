@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { mutation } from "../_generated/server";
 
 /**
  * Delete all notebooks with titles starting with "e2e-" for a given user email.

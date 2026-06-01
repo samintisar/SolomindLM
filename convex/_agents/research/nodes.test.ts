@@ -1,8 +1,8 @@
 "use node";
 
-import { describe, it, expect } from "vitest";
-import { retrieverNode } from "./nodes";
+import { describe, expect, it } from "vitest";
 import type { ResearchNodeDeps } from "./nodes";
+import { retrieverNode } from "./nodes";
 import type { ResearchStateType } from "./state";
 
 describe("safeGetDomain (via retrieverNode)", () => {

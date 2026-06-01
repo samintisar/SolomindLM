@@ -11,9 +11,9 @@
  */
 import { v } from "convex/values";
 import { internalMutation } from "../_generated/server";
-import * as Mindmaps from "../_model/mindmaps";
-import * as Infographics from "../_model/infographics";
 import * as AudioOverviews from "../_model/audioOverviews";
+import * as Infographics from "../_model/infographics";
+import * as Mindmaps from "../_model/mindmaps";
 
 export const createMindmapInternal = internalMutation({
   args: {

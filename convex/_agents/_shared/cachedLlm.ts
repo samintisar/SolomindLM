@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Cached LLM Service
  *
@@ -6,13 +7,13 @@
  * Non-deterministic calls bypass cache and go directly to the LLM.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
-import { createCachedAction } from "../../_services/cache/cachedAgent";
+import { internal } from "../../_generated/api";
+import { internalAction } from "../../_generated/server";
+import { env } from "../../_lib/env";
 import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
 import { hashInput } from "../../_services/cache/cacheCrypto";
-import { internal } from "../../_generated/api";
-import { env } from "../../_lib/env";
+import { createCachedAction } from "../../_services/cache/cachedAgent";
 import { mergeModelKwargs } from "./llm_factory.js";
 
 // ============================================================
@@ -78,7 +79,6 @@ function messageContentToString(message: { content?: unknown } | undefined): str
  * Best-effort assistant text from a Together / OpenAI-style chat completion choice.
  * Some responses use legacy `text`; hybrid models may place a JSON payload only in `reasoning`.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function togetherChoiceAssistantText(choice: any): string {
   if (!choice) return "";
   const msg = choice.message;
@@ -98,7 +98,6 @@ function togetherChoiceAssistantText(choice: any): string {
   return "";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function logEmptyTogetherAssistant(model: string, choice: any): void {
   const msg = choice?.message;
   console.warn("[Together LLM] empty assistant text", {
@@ -189,7 +188,6 @@ async function executeTogetherLlmRequest(
         throw err;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
       try {
         data = JSON.parse(bodyText);
@@ -293,7 +291,6 @@ const llmCache = createCachedAction(internal._agents._shared.cachedLlm.llmIntern
  * @param options - LLM options including model, messages, temperature
  * @returns LLM response with content and usage stats
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function cachedLlmCall(ctx: any, options: LLMOptions): Promise<LLMResponse> {
   // Skip caching for non-deterministic calls
   if (options.temperature > 0) {

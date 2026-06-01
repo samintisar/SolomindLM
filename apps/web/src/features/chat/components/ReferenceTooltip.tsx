@@ -1,15 +1,15 @@
-import React, { Suspense, lazy, useMemo } from "react";
+import { Plus } from "lucide-react";
+import React, { lazy, Suspense, useMemo } from "react";
+import { Favicon } from "@/shared/components/Favicon";
 import { ReferenceChunk } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
-import { Favicon } from "@/shared/components/Favicon";
-import { Plus } from "lucide-react";
+
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
 );
 
 type TooltipNodeProps = { children?: React.ReactNode };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tooltipMarkdownComponents: any = {
   img: () => null,
   a: ({ children }: TooltipNodeProps) => <span className="text-foreground">{children}</span>,

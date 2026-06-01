@@ -31,17 +31,14 @@ export async function generateInfographicImage(
       n: 1,
       steps: undefined,
       response_format: undefined,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Image generation timeout")), timeoutMs)
     ),
   ]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.log(`[TogetherImage] Response keys: ${Object.keys(response as any).join(", ")}`);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const resp = response as any;
   console.log(`[TogetherImage] Response type: ${typeof resp}, has data: ${!!resp.data}`);
 

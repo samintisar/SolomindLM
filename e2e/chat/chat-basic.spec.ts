@@ -1,10 +1,10 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
 import {
-  sendMessage,
-  waitForStreamingComplete,
-  waitForAssistantMessage,
   enableWebOnlyFilter,
+  sendMessage,
+  waitForAssistantMessage,
+  waitForStreamingComplete,
 } from "../helpers/chat-assertions";
 
 test.describe("Chat Basic", () => {

@@ -1,13 +1,13 @@
+import { AlertTriangle, ChevronRight, CircleCheck, FileBox } from "lucide-react";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { ChevronRight, CircleCheck, FileBox, AlertTriangle } from "lucide-react";
 import type {
-  MessageToolCall,
   AgentGroundingCheck,
   ChatActivityPhase,
+  MessageToolCall,
   ReferenceChunk,
 } from "@/shared/types/index";
-import { getStatusMessage } from "../utils/messageStatus";
 import { aggregateRetrievalSources } from "../utils/aggregateRetrievalSources";
+import { getStatusMessage } from "../utils/messageStatus";
 
 const STORAGE_KEY = "solomind-chat-activity-open";
 

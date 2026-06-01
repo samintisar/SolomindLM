@@ -1,6 +1,6 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
-import { sendMessage, openComposerModeMenu, enableWebOnlyFilter } from "../helpers/chat-assertions";
+import { enableWebOnlyFilter, openComposerModeMenu, sendMessage } from "../helpers/chat-assertions";
 
 test.describe("Deep Research", () => {
   // Menu + LLM plan generation can exceed 2m on a cold Convex + model round-trip

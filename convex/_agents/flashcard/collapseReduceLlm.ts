@@ -4,8 +4,8 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
-import type { JobLogger } from "../_shared/logging.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction";
+import type { JobLogger } from "../_shared/logging.js";
 
 import { FLASHCARD_CONFIG } from "./config.js";
 import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
@@ -13,8 +13,8 @@ import { formatFlashcardsAsText } from "./formatFlashcards.js";
 import {
   COLLAPSE_SYSTEM_PROMPT,
   FlashcardArraySchema,
-  REDUCE_SYSTEM_PROMPT,
   type FlashcardResponse,
+  REDUCE_SYSTEM_PROMPT,
 } from "./prompts.js";
 import type { Flashcard } from "./state.js";
 import { createStructuredLLM } from "./structuredLlm.js";

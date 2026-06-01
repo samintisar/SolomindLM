@@ -1,7 +1,7 @@
+import { useAuthActions } from "@convex-dev/auth/react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useAuthActions } from "@convex-dev/auth/react";
 import { useAuth } from "@/features/auth/useAuth";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
 
@@ -42,7 +42,6 @@ export function AuthFormPanel({
 
   useEffect(() => {
     if (authError) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(authError);
     }
   }, [authError]);

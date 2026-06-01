@@ -1,14 +1,7 @@
-import { internalAction } from "../_generated/server";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
-import type { ActionCtx } from "../_generated/server";
-import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createLLM } from "../_agents/_shared/llm_factory.js";
-import { resolveSmartModel } from "../_lib/resolveSmartModel.js";
 import { invokeWithHttpRetry } from "../_agents/_shared/retry.js";
-import { createServiceLogger } from "../_lib/logging/serviceLogger.js";
-import { env } from "../_lib/env.js";
 import { cachedRerank } from "../_agents/chat/rerankCache.js";
 import {
   BENCHMARK_RELIABILITY_SUGGESTED_COLUMNS,
@@ -17,33 +10,38 @@ import {
   PLAN_REVIEW_COLUMN_RETRY_APPENDIX,
 } from "../_agents/literature_review/planReviewColumns.js";
 import {
-  PLAN_REVIEW_SYSTEM_PROMPT,
-  PLAN_REVIEW_PROMPT,
-  PlanReviewOutputSchema,
-  SCREEN_PAPERS_SYSTEM_PROMPT,
-  SCREEN_PAPERS_PROMPT,
-  ScreenPapersOutputSchema,
-  GENERATE_REPORT_SECTION_SYSTEM_PROMPT,
-  GENERATE_REPORT_SECTION_PROMPT,
-  GENERATE_FULL_REPORT_SYSTEM_PROMPT,
-  GENERATE_FULL_REPORT_PROMPT,
-  GenerateFullReportOutputSchema,
-  EXTRACT_DATA_SYSTEM_PROMPT,
   EXTRACT_DATA_PROMPT,
+  EXTRACT_DATA_SYSTEM_PROMPT,
   ExtractDataOutputSchema,
+  GENERATE_FULL_REPORT_PROMPT,
+  GENERATE_FULL_REPORT_SYSTEM_PROMPT,
+  GENERATE_REPORT_SECTION_PROMPT,
+  GENERATE_REPORT_SECTION_SYSTEM_PROMPT,
+  GenerateFullReportOutputSchema,
+  PLAN_REVIEW_PROMPT,
+  PLAN_REVIEW_SYSTEM_PROMPT,
+  PlanReviewOutputSchema,
+  SCREEN_PAPERS_PROMPT,
+  SCREEN_PAPERS_SYSTEM_PROMPT,
+  ScreenPapersOutputSchema,
 } from "../_agents/literature_review/prompts.js";
-import { generateCitationKey } from "../_utils/CitationEngine.js";
-import { normalizePublicationYear, searchCache } from "../_services/search/AcademicSearchService.js";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 import { ARXIV_MIN_INTERVAL_MS } from "../_lib/arxivThrottle.js";
+import { env } from "../_lib/env.js";
+import { createServiceLogger } from "../_lib/logging/serviceLogger.js";
+import { resolveSmartModel } from "../_lib/resolveSmartModel.js";
 import {
   literatureSearchOptionsValidator,
   sourcesForResearchDatabase,
 } from "../_model/literatureReviewSearchOptions.js";
 import {
-  fallbackReviewTitleFromQuery,
-  literatureReportTitle,
-  normalizeReviewTitle,
-} from "./titles.js";
+  normalizePublicationYear,
+  searchCache,
+} from "../_services/search/AcademicSearchService.js";
+import { generateCitationKey } from "../_utils/CitationEngine.js";
 import {
   compactPapersForSnapshot,
   compactPapersForWorkflow,
@@ -53,11 +51,16 @@ import {
   buildGroundedNumericSet,
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
-  needsDeterministicReportMerge,
   mergeDeterministicReportSections,
-  validateAndSanitizeReportSections,
+  needsDeterministicReportMerge,
   type ReportPaperRow,
+  validateAndSanitizeReportSections,
 } from "./reportContext.js";
+import {
+  fallbackReviewTitleFromQuery,
+  literatureReportTitle,
+  normalizeReviewTitle,
+} from "./titles.js";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -163,10 +166,7 @@ export async function planReviewHandler(
       response = await invokePlanReview(basePrompt + PLAN_REVIEW_COLUMN_RETRY_APPENDIX);
     }
 
-    if (
-      isLegacyGenericColumnSet(response.suggestedColumns) &&
-      isBenchmarkReliabilityQuestion(q)
-    ) {
+    if (isLegacyGenericColumnSet(response.suggestedColumns) && isBenchmarkReliabilityQuestion(q)) {
       logger.warn("Using benchmark-reliability fallback columns after generic retry");
       response = {
         ...response,
@@ -703,9 +703,12 @@ export async function generateReportHandler(
 
     const context = contextParts.join("\n\n");
 
-    const sessionContext = await ctx.runQuery(internal.literatureReview.db.getSessionReportContext, {
-      sessionId: args.sessionId,
-    });
+    const sessionContext = await ctx.runQuery(
+      internal.literatureReview.db.getSessionReportContext,
+      {
+        sessionId: args.sessionId,
+      }
+    );
     const provenance = sessionContext?.workflowProvenance ?? {};
     const columnNames = table.columns.map((c) => c.name);
 
@@ -814,12 +817,15 @@ export async function generateReportHandler(
     }
 
     if (generatedSections.length > 0) {
-      const { sections: sanitized, unknownCitations, ungroundedNumerics } =
-        validateAndSanitizeReportSections(
-          generatedSections,
-          allowedCitationKeys,
-          groundedNumericTokens
-        );
+      const {
+        sections: sanitized,
+        unknownCitations,
+        ungroundedNumerics,
+      } = validateAndSanitizeReportSections(
+        generatedSections,
+        allowedCitationKeys,
+        groundedNumericTokens
+      );
       if (unknownCitations.length > 0) {
         logger.warn("Removed unknown citation keys from report", { unknownCitations });
       }

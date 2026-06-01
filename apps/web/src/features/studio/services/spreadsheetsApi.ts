@@ -1,7 +1,7 @@
-import type { SpreadsheetNote } from "@/shared/types/index";
-import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useAction, useMutation, useQuery } from "convex/react";
+import type { SpreadsheetNote } from "@/shared/types/index";
 
 export interface CreateSpreadsheetParams {
   notebookId: string;
@@ -14,7 +14,6 @@ export interface CreateSpreadsheetParams {
 export interface CreateSpreadsheetResponse {
   spreadsheetId: string;
   status: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   spreadsheet: any; // Full database object
 }
 
@@ -49,7 +48,6 @@ export function getSpreadsheetSubtitle(spreadsheetType: string, status?: string)
 /**
  * Map a database spreadsheet response to the frontend SpreadsheetNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapSpreadsheetToNote(dbSpreadsheet: any): SpreadsheetNote {
   const spreadsheetType = dbSpreadsheet.metadata?.spreadsheetType || "custom";
   const preview = getSpreadsheetSubtitle(spreadsheetType, dbSpreadsheet.status);

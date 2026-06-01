@@ -1,5 +1,5 @@
 import React from "react";
-import { NotebookItem, FolderItem } from "@/shared/types/index";
+import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { NotebookCard } from "../cards/NotebookCard";
 
 interface FolderExpandedViewProps {

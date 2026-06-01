@@ -4,9 +4,9 @@ import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
-  invokeWithTimeout,
-  invokeWithRetry,
   clearStateKeys,
+  invokeWithRetry,
+  invokeWithTimeout,
   withoutMapOutputs,
 } from "../_shared/index.js";
 
@@ -70,7 +70,6 @@ export async function reduce(
       () =>
         invokeWithTimeout(
           () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (deps.smartLlm as any).invoke([
               new SystemMessage(REDUCE_SYSTEM_PROMPT),
               new HumanMessage(prompt),
@@ -92,7 +91,6 @@ export async function reduce(
       "Reduce"
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const responseAny = response as any;
     const metadata = responseAny.response_metadata || {};
     const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;

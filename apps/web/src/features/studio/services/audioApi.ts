@@ -1,7 +1,7 @@
-import type { AudioOverviewNote } from "@/shared/types/index";
-import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import type { AudioOverviewNote } from "@/shared/types/index";
 
 export interface CreateAudioOverviewParams {
   notebookId: string;
@@ -21,7 +21,6 @@ export interface CreateAudioOverviewResponse {
 /**
  * Map a database audio overview response to the frontend AudioOverviewNote interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapAudioOverviewToNote(dbAudio: any): AudioOverviewNote {
   // Audio content is stored in transcript and audioUrl fields
   const audioUrl = dbAudio.audioUrl || "";

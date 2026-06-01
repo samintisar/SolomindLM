@@ -1,5 +1,5 @@
+import { ArrowLeft, XCircle } from "lucide-react";
 import React, { lazy, Suspense } from "react";
-import { XCircle, ArrowLeft } from "lucide-react";
 import { ReportNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 

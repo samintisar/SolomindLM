@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { closeResearchOptionsMenu, openResearchOptionsMenu } from "../helpers/chat-assertions";
 
 test.describe("Chat Input", () => {

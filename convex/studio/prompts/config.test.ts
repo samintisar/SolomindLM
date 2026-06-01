@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  PROMPT_DESCRIPTION_MAX_LENGTH,
+  PROMPT_REPORT_AUTO_HIDE_THRESHOLD,
+  PROMPT_REPORT_REASON_MAX_LENGTH,
   PROMPT_TEXT_MAX_LENGTH,
   PROMPT_TITLE_MAX_LENGTH,
-  PROMPT_DESCRIPTION_MAX_LENGTH,
-  PROMPT_REPORT_REASON_MAX_LENGTH,
-  PROMPT_REPORT_AUTO_HIDE_THRESHOLD,
-  RATING_PRIOR_MEAN,
   RATING_PRIOR_COUNT,
+  RATING_PRIOR_MEAN,
 } from "./config.js";
 
 describe("Prompt library config constants", () => {

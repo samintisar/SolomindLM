@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/auth.fixture";
+import { expect, test } from "../fixtures/auth.fixture";
 
 test.describe("Billing page", () => {
   test("loads and displays pricing plans", async ({ authenticatedPage }) => {

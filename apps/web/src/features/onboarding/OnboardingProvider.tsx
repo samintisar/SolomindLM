@@ -1,14 +1,14 @@
-import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import type { TourProgress } from "./hooks/useTourProgress";
 import {
   OnboardingContext,
   type OnboardingContextValue,
   type TourStatus,
 } from "./OnboardingContext";
-import type { TourProgress } from "./hooks/useTourProgress";
 import type { StepId } from "./steps";
 
 interface Props {

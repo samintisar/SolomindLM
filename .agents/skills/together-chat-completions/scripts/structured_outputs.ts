@@ -103,7 +103,6 @@ async function regexExample(): Promise<void> {
       type: "regex",
       pattern: "(positive|neutral|negative)",
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
 
   console.log(`Sentiment: ${response?.choices[0]?.message?.content}`);

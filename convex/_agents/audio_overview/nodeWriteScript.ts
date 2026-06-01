@@ -3,32 +3,31 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
-  invokeWithTimeout,
   invokeWithRetry,
+  invokeWithTimeout,
   sanitizeUserInput,
   withoutMapOutputs,
 } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
-import type { OverallStateType, DialogueLine } from "./state.js";
+import { GRAPH_CONFIG } from "./config.js";
 import {
-  type AudioType,
   type AudioLength,
-  getReducePrompt,
+  type AudioType,
   buildCoveredTopicsPrompt,
-  TARGET_LINE_COUNTS,
   DIALOGUE_CHUNK_SIZE,
   ESTIMATED_WORDS_PER_LINE,
-  REDUCE_SYSTEM_PROMPT,
   EXAMPLE_EXTRACTION_SYSTEM_PROMPT,
+  getReducePrompt,
+  REDUCE_SYSTEM_PROMPT,
+  TARGET_LINE_COUNTS,
 } from "./prompts.js";
-import { GRAPH_CONFIG } from "./config.js";
+import type { DialogueLine, OverallStateType } from "./state.js";
 
 /**
  * Generate dialogue script from collapsed outputs (reduce phase).
  */
 export async function writeScript(
   state: OverallStateType,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   smartLlm: any
 ): Promise<Partial<OverallStateType>> {
   const logger = createAgentGraphLogger("AudioOverviewGraph", "audio");

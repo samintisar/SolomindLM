@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test, vi } from "vitest";
-import schema from "../schema";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import schema from "../schema";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
 const modules = Object.fromEntries(
@@ -12,7 +12,7 @@ const modules = Object.fromEntries(
 
 // Helper to create modules with mocked rate limits for source guide tests
 async function createModulesWithMockedLimits() {
-  const actualLimits = await modules["./_lib/limits.ts"]() as Record<string, unknown>;
+  const actualLimits = (await modules["./_lib/limits.ts"]()) as Record<string, unknown>;
   const { internalMutation } = await import("../_generated/server");
   const { v } = await import("convex/values");
   return {
@@ -625,7 +625,8 @@ describe("documents.generateSourceGuide", () => {
         fileName: "Test Paper",
         fileType: "paper_record",
         status: "completed",
-        extractedMarkdown: "This is a comprehensive paper about neural networks and transformers in machine learning. It covers attention mechanisms, deep learning architectures, and natural language processing applications in detail.",
+        extractedMarkdown:
+          "This is a comprehensive paper about neural networks and transformers in machine learning. It covers attention mechanisms, deep learning architectures, and natural language processing applications in detail.",
         createdAt: Date.now(),
         updatedAt: Date.now(),
       })

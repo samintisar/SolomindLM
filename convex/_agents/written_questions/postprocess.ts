@@ -4,9 +4,8 @@ import { randomUUID } from "crypto";
 
 import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
-
-import { extractTopic } from "./questionHeuristics.js";
 import type { WrittenQuestion } from "./prompts.js";
+import { extractTopic } from "./questionHeuristics.js";
 import type { OverallStateType } from "./state.js";
 
 export function getSelectionPrompt(params: {

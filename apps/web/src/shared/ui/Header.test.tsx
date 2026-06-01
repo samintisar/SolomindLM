@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { Header } from "./Header";
 
 const mockUseQuery = vi.fn();

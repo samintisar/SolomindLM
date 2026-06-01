@@ -163,10 +163,7 @@ export function needsDeterministicReportMerge(
 
 const CITATION_KEY_PATTERN = /\[([^\]]+)\]/g;
 
-export function findUnknownCitationKeys(
-  content: string,
-  allowedKeys: Set<string>
-): string[] {
+export function findUnknownCitationKeys(content: string, allowedKeys: Set<string>): string[] {
   const unknown: string[] = [];
   let match: RegExpExecArray | null;
   const re = new RegExp(CITATION_KEY_PATTERN.source, "g");
@@ -194,10 +191,7 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function findUngroundedNumericClaims(
-  content: string,
-  grounded: Set<string>
-): string[] {
+export function findUngroundedNumericClaims(content: string, grounded: Set<string>): string[] {
   const claims = extractNumericTokens(content);
   const ungrounded: string[] = [];
   for (const claim of claims) {
@@ -254,9 +248,7 @@ export function mergeDeterministicReportSections(
     studyTable: string;
   }
 ): Array<{ heading: string; content: string }> {
-  const byHeading = new Map(
-    llmSections.map((s) => [s.heading.trim().toLowerCase(), s.content])
-  );
+  const byHeading = new Map(llmSections.map((s) => [s.heading.trim().toLowerCase(), s.content]));
 
   const methodsNarrative = byHeading.get("methods") ?? "";
   const methodsContent = `${deterministic.methodsBlock}\n\n${methodsNarrative}`.trim();

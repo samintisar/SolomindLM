@@ -1,6 +1,6 @@
 import Resend from "@auth/core/providers/resend";
+import { generateRandomString, RandomReader } from "@oslojs/crypto/random";
 import { Resend as ResendAPI } from "resend";
-import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
 import { throwOnResendSendError } from "./_lib/resendSendError";
 
 /**

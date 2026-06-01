@@ -1,9 +1,9 @@
 "use node";
 import { Supadata, SupadataError } from "@supadata/js";
-import { env } from "../../_lib/env";
-import { validateUrl } from "../../_lib/utils/urlValidation.js";
 import { invokeWithRetry } from "../../_agents/_shared/retry.js";
+import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { validateUrl } from "../../_lib/utils/urlValidation.js";
 
 export interface WebPageMeta {
   title: string;

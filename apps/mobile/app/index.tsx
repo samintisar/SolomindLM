@@ -1,12 +1,11 @@
-import { useMemo } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { useTheme } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
-import { useConvexAuth } from "convex/react";
-
+import { FileUploadButton } from "@mobile/components/fileUpload/FileUploadButton";
 import { WebViewScreen } from "@mobile/components/web/WebViewScreen";
 import { useWebViewNavigation } from "@mobile/hooks/useWebViewNavigation";
-import { FileUploadButton } from "@mobile/components/fileUpload/FileUploadButton";
+import { useTheme } from "@react-navigation/native";
+import { useConvexAuth } from "convex/react";
+import { useLocalSearchParams } from "expo-router";
+import { useMemo } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 function normalizePath(p: string) {
   return p.startsWith("/") ? p : `/${p}`;

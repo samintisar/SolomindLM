@@ -1,13 +1,12 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { isNativeShell } from "@/utils/platformDetection";
-import { NotebookItem } from "@/shared/types/index";
-import { useCreateNotebook, useUpdateNotebook, useDeleteNotebook } from "../services/notebooksApi";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { NotebookItem } from "@/shared/types/index";
+import { isNativeShell } from "@/utils/platformDetection";
+import { useCreateNotebook, useDeleteNotebook, useUpdateNotebook } from "../services/notebooksApi";
 
 interface UseNotebookCRUDProps {
   isAuthenticated: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any;
   activeNotebookId: string | null;
   setNotebookTitle: (title: string) => void;
@@ -62,7 +61,6 @@ export function useNotebookCRUD({
       }
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updatePayload: any = {};
         if (updates.title !== undefined) updatePayload.title = updates.title;
         if (updates.coverColor !== undefined) updatePayload.coverColor = updates.coverColor;

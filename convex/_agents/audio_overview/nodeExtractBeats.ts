@@ -2,18 +2,17 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-import { invokeWithTimeout, invokeWithRetry, sanitizeUserInput } from "../_shared/index.js";
+import { invokeWithRetry, invokeWithTimeout, sanitizeUserInput } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
-import type { OverallStateType, ChunkProcessState } from "./state.js";
-import { getMapPrompt, MAP_SYSTEM_PROMPT } from "./prompts.js";
 import { GRAPH_CONFIG } from "./config.js";
+import { getMapPrompt, MAP_SYSTEM_PROMPT } from "./prompts.js";
+import type { ChunkProcessState, OverallStateType } from "./state.js";
 
 /**
  * Extract dialogue beats from a chunk (map phase).
  */
 export async function extractBeats(
   state: ChunkProcessState,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fastLlm: any
 ): Promise<Partial<OverallStateType>> {
   const logger = createAgentGraphLogger("AudioOverviewGraph", "audio");

@@ -1,24 +1,24 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Id, type Doc } from "@convex/_generated/dataModel";
+import { type Doc, Id } from "@convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Source,
-  Note,
-  Message,
-  MessageToolCall,
   AgentGroundingCheck,
   ChatActivityPhase,
   ChatAgentTrace,
+  Message,
+  MessageToolCall,
+  Note,
+  Source,
 } from "@/shared/types/index";
+import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 import {
+  consumePersistentTextStream,
   useSendMessage,
   useSetMessageFeedback,
   useSourceSuggestions,
-  consumePersistentTextStream,
 } from "../services/chatApi";
 import { useStartDeepResearch } from "../services/researchApi";
-import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 import {
   computeRemoteGenerationBlocksSend,
   researchProgressToStreamingActivity,
@@ -42,7 +42,6 @@ export function useChatStream({
   documents,
 }: UseChatStreamProps) {
   const sourcesRef = useRef(sources);
-  // eslint-disable-next-line react-hooks/refs
   sourcesRef.current = sources;
 
   const chatBundle = useQuery(
@@ -96,7 +95,6 @@ export function useChatStream({
   >([]);
   const messagesLengthWhenStreamCompleteRef = useRef(0);
   const messagesRef = useRef(messages);
-  // eslint-disable-next-line react-hooks/refs
   messagesRef.current = messages;
   const streamStartedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -133,7 +131,6 @@ export function useChatStream({
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     resetStreamingState();
     setExternalSources([]);
   }, [activeConversationId, resetStreamingState]);
@@ -389,7 +386,6 @@ export function useChatStream({
     if (last?.role !== "assistant" || !last.content) return;
     if (last.content.trimEnd() !== streamingContent.trimEnd()) return;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsChatStreaming(false);
     setStreamingToolCalls([]);
     setStreamingTracePhases([]);
@@ -458,7 +454,6 @@ export function useChatStream({
         content: msg.content,
         timestamp: new Date(msg.createdAt as number),
         references: msg.references,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         feedback: (msg as any).feedback as "up" | "down" | undefined,
         followUps:
           !streamingContent &&
@@ -495,7 +490,6 @@ export function useChatStream({
             : undefined,
       };
     });
-    // eslint-disable-next-line react-hooks/refs
     const t0 = streamStartedAtRef.current;
     const last = messages[messages.length - 1] as Doc<"messages"> | undefined;
     const prev = messages[messages.length - 2] as Doc<"messages"> | undefined;
@@ -506,10 +500,8 @@ export function useChatStream({
           ? last.content
           : String(last.content);
     const ghostStuckAssistantRow =
-      // eslint-disable-next-line react-hooks/refs
       isChatStreaming &&
       !streamingContent.trim() &&
-      // eslint-disable-next-line react-hooks/refs
       t0 != null &&
       last?.role === "assistant" &&
       prev?.role === "user" &&
@@ -519,7 +511,6 @@ export function useChatStream({
 
     if (
       (isChatStreaming || streamingContent || streamingClarification) &&
-      // eslint-disable-next-line react-hooks/refs
       !ghostStuckAssistantRow
     ) {
       const toolSearching = streamingToolCalls.some((t) => t.status === "searching");
@@ -570,7 +561,6 @@ export function useChatStream({
       !isChatStreaming &&
       !streamingContent.trim() &&
       !streamingClarification &&
-      // eslint-disable-next-line react-hooks/refs
       !ghostStuckAssistantRow;
 
     if (showRemoteOnlyPlaceholder) {
@@ -663,7 +653,6 @@ export function useChatStream({
     documents
   );
   const sourceCount = useMemo(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     () => documents.filter((d: any) => d.status === "completed").length,
     [documents]
   );

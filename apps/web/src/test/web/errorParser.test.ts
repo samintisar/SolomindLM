@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  isLimitError,
-  parseLimitError,
   getLimitErrorMessage,
-  getUpgradeMessage,
-  parseServiceError,
   getServiceErrorMessage,
+  getUpgradeMessage,
+  isLimitError,
   parseAppError,
+  parseLimitError,
+  parseServiceError,
 } from "@/shared/utils/errorParser";
 
 describe("isLimitError", () => {
@@ -52,7 +52,6 @@ describe("isLimitError", () => {
 describe("parseLimitError", () => {
   it("extracts data from Error with structured data", () => {
     const err = new Error("limit");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err as any).data = {
       code: "NOTEBOOK_LIMIT_REACHED",
       limit: 5,
@@ -166,7 +165,6 @@ describe("parseLimitError", () => {
 
   it("parses structured limit from Error with data property", () => {
     const err = new Error("limit");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err as any).data = {
       code: "DAILY_LIMIT_REACHED",
       limit: 50,
@@ -555,7 +553,6 @@ describe("parseServiceError", () => {
 
   it("parses from Error with data property", () => {
     const err = new Error("service error");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err as any).data = {
       type: "EXTERNAL_SERVICE_ERROR",
       service: "TogetherAI",
@@ -666,7 +663,6 @@ describe("parseAppError", () => {
 
   it("returns limit error from Error with data", () => {
     const err = new Error("limit");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err as any).data = {
       code: "DAILY_LIMIT_REACHED",
       limit: 50,

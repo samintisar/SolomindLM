@@ -1,5 +1,5 @@
-import React from "react";
 import { ArrowRight, Check } from "lucide-react";
+import React from "react";
 import { Button } from "@/shared/components/ui/button";
 
 interface FinalCTAProps {

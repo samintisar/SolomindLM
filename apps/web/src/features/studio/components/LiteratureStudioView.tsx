@@ -1,17 +1,17 @@
-import React from "react";
 import type { Id } from "@convex/_generated/dataModel";
 import { Loader2 } from "lucide-react";
-import type { ActiveLiteratureView } from "../types/literatureStudio";
+import React from "react";
 import {
-  useLiteratureTable,
   useLiteratureReportDetail,
+  useLiteratureTable,
   useSaveLiteratureReportAsStudioReport,
 } from "../services/literatureTablesApi";
-import { LiteratureTableView } from "./views/LiteratureTableView";
-import { LiteratureReportView } from "./views/LiteratureReportView";
-import { ResizeHandle } from "./ResizeHandle";
-import type { CitationStyle } from "./CitationStylePicker";
+import type { ActiveLiteratureView } from "../types/literatureStudio";
 import { literatureReportToolbarLabel } from "../utils/literatureReportLabels";
+import type { CitationStyle } from "./CitationStylePicker";
+import { ResizeHandle } from "./ResizeHandle";
+import { LiteratureReportView } from "./views/LiteratureReportView";
+import { LiteratureTableView } from "./views/LiteratureTableView";
 
 interface LiteratureStudioViewProps {
   view: Exclude<ActiveLiteratureView, { kind: "papers" } | { kind: "screening" }>;
@@ -119,9 +119,7 @@ function LiteratureReportStudioShell({
             sections: detail.report.sections,
             citationIds: detail.report.citationIds,
           }}
-          toolbarLabel={literatureReportToolbarLabel(
-            detail.report.literatureReviewSessionId
-          )}
+          toolbarLabel={literatureReportToolbarLabel(detail.report.literatureReviewSessionId)}
           citations={detail.citations}
           workflowProvenance={detail.workflowProvenance}
           onBack={onClose}

@@ -1,9 +1,8 @@
 "use node";
 
 import { createAgentGraphLogger } from "../_shared/logging.js";
-
-import { GRAPH_CONFIG } from "./config.js";
 import { packChunks, validateChunks } from "./chunkHelpers.js";
+import { GRAPH_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
 
 export async function callStatusUpdate(state: OverallStateType, phase: string): Promise<void> {

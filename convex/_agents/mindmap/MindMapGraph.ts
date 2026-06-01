@@ -4,28 +4,28 @@
  */
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { END, START, StateGraph, type Send } from "@langchain/langgraph";
+import { END, type Send, START, StateGraph } from "@langchain/langgraph";
 
 import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { validateChunks } from "./chunkHelpers.js";
-import { createMapTasks } from "./routing.js";
-import { mapProcess, type MindMapMapProcessDeps } from "./nodeMap.js";
-import { reduceNode } from "./nodeReduce.js";
 import { createSmartFallback as buildSmartFallbackTree } from "./fallbacks.js";
+import { type MindMapMapProcessDeps, mapProcess } from "./nodeMap.js";
+import { reduceNode } from "./nodeReduce.js";
 import { parseMarkdownToTree as markdownToMindMapTree } from "./parsing.js";
-import { extractConcepts as runConceptExtraction } from "./structuredLlm.js";
+import { NODES } from "./prompts.js";
+import { createMapTasks } from "./routing.js";
 import {
-  OverallState,
   type ChunkStateType,
   type ConceptExtraction,
   type FinalMindMap,
   type MindMapNode,
+  OverallState,
   type OverallStateType,
 } from "./state.js";
-import { NODES } from "./prompts.js";
+import { extractConcepts as runConceptExtraction } from "./structuredLlm.js";
 
 export { packChunks, validateChunks } from "./chunkHelpers.js";
 
@@ -137,9 +137,7 @@ export class MindMapGraph {
 
     builder.addConditionalEdges(START, createMapTasks);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge(NODES.MAP_PROCESS as any, NODES.REDUCE_NODE as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     builder.addEdge(NODES.REDUCE_NODE as any, END);
 
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });

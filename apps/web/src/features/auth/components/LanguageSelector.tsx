@@ -1,5 +1,5 @@
-import React from "react";
 import { Check, ChevronRight, Globe } from "lucide-react";
+import React from "react";
 import { SUPPORTED_LANGUAGES } from "../constants/languages";
 import { useOutputLanguage } from "../hooks/useOutputLanguage";
 

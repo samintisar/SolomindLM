@@ -4,19 +4,19 @@
  */
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { createTogetherTtsClient } from "../../_services/ai/togetherTts.js";
+import { type CompiledStateGraph, END, Send, START, StateGraph } from "@langchain/langgraph";
 import type Together from "together-ai";
-import { END, START, Send, StateGraph, type CompiledStateGraph } from "@langchain/langgraph";
+import { createTogetherTtsClient } from "../../_services/ai/togetherTts.js";
 
 import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
-import { OverallState, type OverallStateType, type ChunkProcessState } from "./state.js";
 import { packChunks, validateChunks } from "./chunkHelpers.js";
-import { extractBeats } from "./nodeExtractBeats.js";
 import { collapse } from "./nodeCollapse.js";
-import { writeScript } from "./nodeWriteScript.js";
+import { extractBeats } from "./nodeExtractBeats.js";
 import { synthesizeAudio as synthesizeAudioNode } from "./nodeSynthesizeAudio.js";
+import { writeScript } from "./nodeWriteScript.js";
+import { type ChunkProcessState, OverallState, type OverallStateType } from "./state.js";
 
 export class AudioOverviewGraph {
   private fastLlm: ChatTogetherAI;
@@ -85,7 +85,6 @@ export class AudioOverviewGraph {
    * Build the state graph for audio overview generation.
    */
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildGraph(): CompiledStateGraph<OverallStateType, any, any, any, any, any, any, any, any> {
     const builder = new StateGraph(OverallState);
 

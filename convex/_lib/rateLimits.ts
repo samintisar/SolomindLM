@@ -3,7 +3,7 @@
  * Defines daily limits for content generation features.
  */
 
-import { RateLimiter, HOUR } from "@convex-dev/rate-limiter";
+import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 
 const DAY = 24 * HOUR;

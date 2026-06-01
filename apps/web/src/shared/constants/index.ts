@@ -1,4 +1,4 @@
-import { Source, Message, StudioTool, Note, NotebookItem } from "@/shared/types/index";
+import { Message, Note, NotebookItem, Source, StudioTool } from "@/shared/types/index";
 
 export * from "./models";
 

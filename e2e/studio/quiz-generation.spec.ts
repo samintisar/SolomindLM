@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
 import { firstStudioNoteCard, openStudioTool } from "../helpers/studio-assertions";
 import { seedPastedTextSourceForStudio } from "../helpers/studio-seed";

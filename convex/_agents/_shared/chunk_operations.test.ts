@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  packChunks,
-  validateChunks,
   calculateOptimalChunkSize,
-  splitBySentenceBoundaries,
   getChunkPreview,
+  packChunks,
+  splitBySentenceBoundaries,
+  validateChunks,
 } from "./chunk_operations";
 
 describe("packChunks", () => {
@@ -13,7 +13,6 @@ describe("packChunks", () => {
   });
 
   it("returns empty array for null input", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(packChunks(null as any, { targetSize: 100 })).toEqual([]);
   });
 
@@ -51,11 +50,9 @@ describe("validateChunks", () => {
   });
 
   it("filters out non-string entries", () => {
-    const result = validateChunks(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      [null as any, 42 as any, "a".repeat(60), undefined as any],
-      { targetSize: 100 }
-    );
+    const result = validateChunks([null as any, 42 as any, "a".repeat(60), undefined as any], {
+      targetSize: 100,
+    });
     expect(result).toHaveLength(1);
     expect(result[0]).toBe("a".repeat(60));
   });

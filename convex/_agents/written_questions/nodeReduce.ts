@@ -8,15 +8,15 @@ import { invokeWithRetry, invokeWithTimeout, withoutMapOutputs } from "../_share
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
+import { callStatusUpdate } from "./nodeSplit.js";
+import { finalizeQuestions, getSelectionPrompt } from "./postprocess.js";
 import {
   REDUCE_SELECT_SYSTEM_PROMPT,
-  WrittenQuestionsArraySchema,
   type WrittenQuestion,
+  WrittenQuestionsArraySchema,
   type WrittenQuestionsResponse,
 } from "./prompts.js";
-import { callStatusUpdate } from "./nodeSplit.js";
 import { detectSimilarQuestions } from "./questionHeuristics.js";
-import { finalizeQuestions, getSelectionPrompt } from "./postprocess.js";
 import type { OverallStateType } from "./state.js";
 
 export async function reduce(
@@ -249,7 +249,6 @@ export async function reduce(
       () =>
         invokeWithTimeout(
           () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (structuredLlm as any).invoke([
               new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
               new HumanMessage(selectionPrompt),
@@ -315,7 +314,6 @@ export async function reduce(
       return new Send("reduce", {
         ...withoutMapOutputs(state),
         reduceRetryCount: retryCount + 1,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
     }
 

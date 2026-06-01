@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { X, Youtube, Loader2 } from "lucide-react";
+import { Loader2, X, Youtube } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useToast } from "@/shared/contexts/useToast";
 
 interface SocialMediaInputModalProps {
@@ -21,7 +21,6 @@ export const SocialMediaInputModal: React.FC<SocialMediaInputModalProps> = ({
   // Reset input when modal opens
   useEffect(() => {
     if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUrlInput("");
     }
   }, [isOpen]);

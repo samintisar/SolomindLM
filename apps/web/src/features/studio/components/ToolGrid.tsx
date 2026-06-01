@@ -1,14 +1,14 @@
-import React from "react";
 import {
-  FileText,
   AudioLines,
+  FileText,
   GitFork,
-  Layers,
   HelpCircle,
-  Presentation,
+  Layers,
   MessageSquareText,
+  Presentation,
   Table2,
 } from "lucide-react";
+import React from "react";
 import { StudioTool } from "@/shared/types/index";
 
 interface ToolGridProps {
@@ -20,7 +20,6 @@ interface ToolGridProps {
 }
 
 // Icon map for tool icons
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   AudioLines,
   GitFork,

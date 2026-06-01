@@ -1,8 +1,8 @@
 "use node";
 
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
+import { E5_EMBEDDING_MODEL, type E5InputType, formatE5Input } from "../../_lib/e5Embedding";
 import { createExternalServiceErrorFromResponse } from "../../_lib/errors";
-import { E5_EMBEDDING_MODEL, formatE5Input, type E5InputType } from "../../_lib/e5Embedding";
 
 /**
  * Together E5 embeddings for chat / vector search (same model as document indexing).

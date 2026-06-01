@@ -1,5 +1,5 @@
+import { BookOpen, Briefcase, GraduationCap, Languages, Microscope, Users } from "lucide-react";
 import React from "react";
-import { GraduationCap, Microscope, Languages, Briefcase, BookOpen, Users } from "lucide-react";
 
 interface UseCase {
   icon: React.ElementType;

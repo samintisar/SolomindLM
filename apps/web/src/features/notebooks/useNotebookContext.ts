@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import { NotebookItem, FolderItem } from "@/shared/types/index";
+import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { useSubscriptionStatus } from "../billing/services/subscriptionApi";
 
 export interface NotebookContextType {

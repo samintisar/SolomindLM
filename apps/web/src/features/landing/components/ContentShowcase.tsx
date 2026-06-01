@@ -1,5 +1,5 @@
+import { AudioLines, File, FileCode, FileText, Globe, Youtube } from "lucide-react";
 import React from "react";
-import { FileText, Youtube, Globe, AudioLines, File, FileCode } from "lucide-react";
 import { LANDING_CONTENT } from "../constants";
 
 export const ContentShowcase: React.FC = () => {

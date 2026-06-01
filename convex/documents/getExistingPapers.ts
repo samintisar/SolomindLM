@@ -1,7 +1,7 @@
-import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "../auth";
+import { query } from "../_generated/server";
 import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { getAuthUserId } from "../auth";
 
 export const getExistingPapers = query({
   args: {

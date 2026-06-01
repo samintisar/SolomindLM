@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { searchInternalHandler, discoverSourcesInternalHandler } from "./TavilySearchService";
+import { describe, expect, it } from "vitest";
 import { env } from "../../_lib/env";
+import { discoverSourcesInternalHandler, searchInternalHandler } from "./TavilySearchService";
 
 /**
  * Integration tests that call the real Tavily API.

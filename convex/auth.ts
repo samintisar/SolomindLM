@@ -1,9 +1,9 @@
-import { convexAuth } from "@convex-dev/auth/server";
 import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
+import { convexAuth } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { query, type QueryCtx, type MutationCtx, type ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { type ActionCtx, type MutationCtx, type QueryCtx, query } from "./_generated/server";
 import { ResendOTP } from "./ResendOTP";
 import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
 

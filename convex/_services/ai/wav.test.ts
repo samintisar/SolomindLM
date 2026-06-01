@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getPcmWavDurationSeconds } from "./wav";
 
 /** Minimal mono PCM WAV @ 8kHz int16 for duration testing */

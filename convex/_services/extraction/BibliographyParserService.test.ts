@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { BibliographyParserService, PaperRecord } from "./BibliographyParserService";
 
 describe("BibliographyParserService", () => {

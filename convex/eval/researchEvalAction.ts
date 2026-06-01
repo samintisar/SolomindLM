@@ -8,17 +8,16 @@
  */
 "use node";
 
-import { action } from "../_generated/server";
+import { v } from "convex/values";
+import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
+import { ResearchAgent } from "../_agents/research/index.js";
+import type { ResearchContext, SourcePolicy, SubQuestion } from "../_agents/research/types";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
-import { v } from "convex/values";
-import { ResearchAgent } from "../_agents/research/index.js";
-
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { action } from "../_generated/server";
 import { env } from "../_lib/env";
-import type { SubQuestion, SourcePolicy, ResearchContext } from "../_agents/research/types";
+import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { assertRagEvalGate } from "./_gate";
-import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
 
 export const researchEvalActionArgs = {
   evalSecret: v.string(),
@@ -72,7 +71,6 @@ export const runResearchEval = action({
     const keywordSearchChunkUserId = evalUserId;
 
     // In-memory cache for discoverSources to avoid duplicate API calls within one eval run
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const searchCache = new Map<string, any[]>();
 
     const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
@@ -180,7 +178,6 @@ export const runResearchEval = action({
         channels: Array<"web" | "news" | "academic">,
         maxResults?: number
       ) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const allResults: Array<any> = [];
         const refinedQuery = await refineWebSearchQuery(query);
         const maxPerChannel = Math.ceil((maxResults || 5) / channels.length);
@@ -193,7 +190,6 @@ export const runResearchEval = action({
             continue;
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let channelResults: any[] = [];
           if (channel === "academic") {
             try {
@@ -201,7 +197,6 @@ export const runResearchEval = action({
                 internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
                 { query: refinedQuery, maxResults: maxPerChannel }
               );
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               channelResults = results.sources.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
@@ -224,7 +219,6 @@ export const runResearchEval = action({
                   searchDepth: "advanced",
                 }
               );
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               channelResults = results.sources.map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
@@ -245,10 +239,10 @@ export const runResearchEval = action({
       loadWebPage: async (url: string) => {
         return ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url });
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       loadPaper: async (paper: any) => {
-        const { AcademicLoaderService } =
-          await import("../_services/extraction/AcademicLoaderService.js");
+        const { AcademicLoaderService } = await import(
+          "../_services/extraction/AcademicLoaderService.js"
+        );
         const loader = new AcademicLoaderService(async (url: string) =>
           ctx.runAction(internal._services.extractors.scrapeWebPageInternal, { url })
         );

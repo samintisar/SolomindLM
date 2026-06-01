@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect, ReactNode, ReactElement } from "react";
+import React, { ReactElement, ReactNode, useEffect, useRef, useState } from "react";
 
 interface DropdownMenuProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   trigger: ReactElement<any>;
   children: ReactNode;
   align?: "left" | "right";

@@ -1,7 +1,7 @@
+import { ArrowLeft, Download, Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import React from "react";
-import { Play, Pause, Download, RotateCcw, RotateCw, ArrowLeft } from "lucide-react";
-import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 import { formatAudioTime, useAudioPlayer } from "../hooks/useAudioPlayer";
+import { useResolvedAudioPlaybackUrl } from "../hooks/useResolvedAudioPlaybackUrl";
 
 interface AudioPlayerProps {
   audioUrl: string;

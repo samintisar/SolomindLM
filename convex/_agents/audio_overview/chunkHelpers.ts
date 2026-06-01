@@ -1,6 +1,6 @@
 "use node";
 
-import { createChunkHelpers, type ChunkHelpers } from "../_shared/chunk_helper_factory.js";
+import { type ChunkHelpers, createChunkHelpers } from "../_shared/chunk_helper_factory.js";
 
 import { GRAPH_CONFIG } from "./config.js";
 

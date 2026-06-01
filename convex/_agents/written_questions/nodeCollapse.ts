@@ -6,8 +6,8 @@ import { clearStateKeys, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
 import { GRAPH_CONFIG } from "./config.js";
-import type { WrittenQuestion } from "./prompts.js";
 import { callStatusUpdate } from "./nodeSplit.js";
+import type { WrittenQuestion } from "./prompts.js";
 import type { OverallStateType } from "./state.js";
 
 export async function collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {

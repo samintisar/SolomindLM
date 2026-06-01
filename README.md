@@ -533,7 +533,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 ### Development Tips
 
-- Follow the existing code style (enforced by ESLint and Prettier)
+- Follow the existing code style (enforced by [Biome](https://biomejs.dev) via `bun run lint` / `bun run format`)
 - Write tests for new Convex functions
 - Update documentation for new features
 - Use conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`)

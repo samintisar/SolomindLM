@@ -1,15 +1,16 @@
 "use node";
+
 /**
  * Written questions generation job — Convex registrations only.
  * @see ./writtenQuestionsJobPhases.ts for phase logic.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalAction } from "../../_generated/server";
 import {
-  runWrittenQuestionsGenerationPhase,
-  runProcessWrittenQuestionsMapChunkPhase,
   runFinalizeWrittenQuestionsPhase,
+  runProcessWrittenQuestionsMapChunkPhase,
+  runWrittenQuestionsGenerationPhase,
 } from "./writtenQuestionsJobPhases";
 
 export const writtenQuestionsGeneration = internalAction({

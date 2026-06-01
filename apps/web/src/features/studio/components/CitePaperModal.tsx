@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from "react";
-import { X, Copy, Quote } from "lucide-react";
 import { createCitationEngine } from "@convex/_utils/CitationEngine";
-import { CitationStylePicker, type CitationStyle } from "./CitationStylePicker";
+import { Copy, Quote, X } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { useToast } from "@/shared/contexts/useToast";
 import type { RankedPaper } from "../types/rankedPaper";
 import { rankedPaperToCitation } from "../utils/rankedPaperMappers";
-import { useToast } from "@/shared/contexts/useToast";
+import { type CitationStyle, CitationStylePicker } from "./CitationStylePicker";
 
 interface CitePaperModalProps {
   paper: RankedPaper;

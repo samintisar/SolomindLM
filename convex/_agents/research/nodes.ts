@@ -1,12 +1,12 @@
 "use node";
 
-import type { ResearchStateType } from "./state";
-import type { SubQuestion, SourceChannel, EvidenceEntry, ResearchPhase } from "./types";
-import { buildPlanPrompt, buildWriterPrompt, PlannerOutputSchema } from "./prompts";
-import { createLLM } from "../_shared/llm_factory";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import { trackResearchStep } from "./steps";
 import type { ActionCtx } from "../../_generated/server";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { createLLM } from "../_shared/llm_factory";
+import { buildPlanPrompt, buildWriterPrompt, PlannerOutputSchema } from "./prompts";
+import type { ResearchStateType } from "./state";
+import { trackResearchStep } from "./steps";
+import type { EvidenceEntry, ResearchPhase, SourceChannel, SubQuestion } from "./types";
 
 const retrieverLog = createServiceLogger("research", "retrieverNode");
 
@@ -182,8 +182,7 @@ export async function retrieverNode(
   const { subQuestions, iteration, sourcePolicy } = state;
   const DEFAULT_MAX_RESULTS_PER_CHANNEL = 8;
   const EXTERNAL_RESULTS_HARD_CAP = 12;
-  const maxResultsPerChannel =
-    sourcePolicy.maxResultsPerChannel ?? DEFAULT_MAX_RESULTS_PER_CHANNEL;
+  const maxResultsPerChannel = sourcePolicy.maxResultsPerChannel ?? DEFAULT_MAX_RESULTS_PER_CHANNEL;
   const externalMaxResults = Math.min(maxResultsPerChannel, EXTERNAL_RESULTS_HARD_CAP);
   // Hard cap on raw content length from any scraped source — prevents prompt bloat
   const MAX_EVIDENCE_CONTENT_LENGTH = 4000;
@@ -564,4 +563,3 @@ export async function writerNode(
     stopReason: "completed",
   };
 }
-

@@ -36,7 +36,10 @@ export function fallbackReviewTitleFromQuery(query: string): string {
   // Remove leading prompt-style prefixes.
   candidate = candidate
     .replace(/^(?:please\s+)?(?:write|create|generate|prepare)\s+(?:a\s+)?/i, "")
-    .replace(/^(?:literature\s+review|systematic\s+review|scoping\s+review)\s+(?:on|of|about)\s+/i, "")
+    .replace(
+      /^(?:literature\s+review|systematic\s+review|scoping\s+review)\s+(?:on|of|about)\s+/i,
+      ""
+    )
     .trim();
 
   if (!candidate) return normalizeReviewTitle(q.slice(0, MAX_REVIEW_TITLE_LENGTH));

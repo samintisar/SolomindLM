@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { X, Edit3, Trash2, Save } from "lucide-react";
+import { Edit3, Save, Trash2, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { Flashcard } from "@/shared/types";
 
 interface EditCardModalProps {
@@ -24,7 +24,6 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({
 
   useEffect(() => {
     if (card) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFront(card.front);
       setBack(card.back);
     } else {

@@ -1,22 +1,22 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/useAuth";
-import { isNativeShell } from "@/utils/platformDetection";
-import { NavigationHeader } from "./components/NavigationHeader";
-import { HeroSection } from "./components/HeroSection";
-import { FeaturesGrid } from "./components/FeaturesGrid";
-import { UseCasesSection } from "./components/UseCasesSection";
-import { ContentShowcase } from "./components/ContentShowcase";
-import { PricingSection } from "./components/PricingSection";
-import { FAQSection } from "./components/FAQSection";
-import { Footer } from "./components/Footer";
-import {
-  generateOrganizationStructuredData,
-  generateWebSiteStructuredData,
-  generateSoftwareApplicationStructuredData,
-  generateFAQStructuredData,
-} from "@/shared/seo/structuredData";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
+import {
+  generateFAQStructuredData,
+  generateOrganizationStructuredData,
+  generateSoftwareApplicationStructuredData,
+  generateWebSiteStructuredData,
+} from "@/shared/seo/structuredData";
+import { isNativeShell } from "@/utils/platformDetection";
+import { ContentShowcase } from "./components/ContentShowcase";
+import { FAQSection } from "./components/FAQSection";
+import { FeaturesGrid } from "./components/FeaturesGrid";
+import { Footer } from "./components/Footer";
+import { HeroSection } from "./components/HeroSection";
+import { NavigationHeader } from "./components/NavigationHeader";
+import { PricingSection } from "./components/PricingSection";
+import { UseCasesSection } from "./components/UseCasesSection";
 import { LANDING_FAQS } from "./constants";
 
 interface LandingPageProps {

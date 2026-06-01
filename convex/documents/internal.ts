@@ -1,14 +1,14 @@
 import { v } from "convex/values";
-import { internalQuery, internalMutation, type MutationCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { getAuthUserId } from "../auth";
+import { internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import {
   assertCanEditNotebook,
   assertCanReadNotebook,
   getNotebookAccess,
 } from "../_lib/notebookAccess";
-import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { getAuthUserId } from "../auth";
 
 /**
  * Helper: Delete all chunks for a document.

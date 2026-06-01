@@ -4,10 +4,7 @@
   "private": true,
   "packageManager": "bun@1.2.2",
   "workspaces": {
-    "packages": [
-      "apps/web",
-      "apps/mobile"
-    ]
+    "packages": ["apps/web", "apps/mobile"]
   },
   "engines": {
     "node": ">=20.0.0",
@@ -26,14 +23,17 @@
     "typecheck:convex": "bun x tsgo --noEmit -p convex/tsconfig.json",
     "typecheck:web": "bun x tsgo --noEmit -p apps/web/tsconfig.json",
     "typecheck:mobile": "bun x tsgo --noEmit -p apps/mobile/tsconfig.json",
-    "convex:env:push": "node scripts/push-convex-env.js",
-    "convex:env:push:prod": "node scripts/push-convex-env.js --prod",
-    "convex:env:push:dry": "node scripts/push-convex-env.js --dry-run",
+    "convex:env:pull": "node scripts/pull-convex-env.mjs",
+    "convex:env:pull:dev": "node scripts/pull-convex-env.mjs --dev-only",
+    "convex:env:pull:prod": "node scripts/pull-convex-env.mjs --prod-only",
+    "convex:env:push": "node scripts/push-convex-env.mjs",
+    "convex:env:push:prod": "node scripts/push-convex-env.mjs --prod",
+    "convex:env:push:dry": "node scripts/push-convex-env.mjs --dry-run",
     "link:claude-skills": "node scripts/link-claude-skills.js",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
     "test": "bun run test:web && bun run test:convex",
     "test:watch": "bun run --cwd apps/web test:watch",
     "test:web": "bun run --cwd apps/web test",
@@ -57,22 +57,16 @@
     "e2e:convex:cleanup-notebooks": "node scripts/cleanup-e2e-notebooks.mjs"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@biomejs/biome": "2.4.16",
     "@playwright/test": "^1.60.0",
     "@types/bun": "^1.3.14",
     "@types/node": "^25.9.1",
-    "@typescript/native-preview": "^7.0.0-dev.20260525.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260527.2",
     "convex": "1.36.0",
     "convex-test": "^0.0.50",
     "dotenv": "^17.4.2",
-    "eslint": "^9.39.4",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "prettier": "^3.8.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.60.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@auth/core": "0.37.2",
@@ -84,7 +78,7 @@
     "@convex-dev/stripe": "^0.1.4",
     "@convex-dev/workflow": "^0.3.12",
     "@convex-dev/workpool": "^0.3.2",
-    "@langchain/community": "^1.1.28",
+    "@langchain/community": "^1.1.29",
     "@langchain/core": "^1.1.48",
     "@langchain/langgraph": "^1.3.2",
     "@langchain/openai": "^1.4.7",

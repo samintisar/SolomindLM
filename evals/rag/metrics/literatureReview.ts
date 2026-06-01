@@ -7,14 +7,14 @@
  * coverage, and expected-item recall in the report.
  */
 
+import type { LiteratureReviewEvalResult } from "../runners/literatureReviewRunner";
 import type {
+  EvalBaseline,
   EvalFixture,
   EvalRunArtifact,
-  EvalBaseline,
   MetricResult,
   MetricStatus,
 } from "../types";
-import type { LiteratureReviewEvalResult } from "../runners/literatureReviewRunner";
 import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -939,17 +939,11 @@ export function lrRequiredSectionNames(
 ): MetricResult {
   const raw = getRaw(artifact);
   const headings = (raw?.report.sections ?? []).map((s) => s.heading.trim().toLowerCase());
-  const required = [
-    "abstract",
-    "introduction",
-    "methods",
-    "results",
-    "discussion",
-    "conclusion",
-  ];
+  const required = ["abstract", "introduction", "methods", "results", "discussion", "conclusion"];
   const missing = required.filter((r) => !headings.includes(r));
   const score = required.length === 0 ? 1 : (required.length - missing.length) / required.length;
-  const status: MetricStatus = missing.length === 0 ? "pass" : missing.length <= 1 ? "warn" : "fail";
+  const status: MetricStatus =
+    missing.length === 0 ? "pass" : missing.length <= 1 ? "warn" : "fail";
 
   return baseMetric(
     "lr_required_section_names",
@@ -972,8 +966,9 @@ export function lrSummaryOfEvidencePresent(
   const raw = getRaw(artifact);
   const content = (raw?.report.content ?? "").toLowerCase();
   const resultsSection =
-    raw?.report.sections.find((s) => s.heading.toLowerCase() === "results")?.content.toLowerCase() ??
-    "";
+    raw?.report.sections
+      .find((s) => s.heading.toLowerCase() === "results")
+      ?.content.toLowerCase() ?? "";
   const haystack = content + resultsSection;
   const hasTable =
     haystack.includes("summary of evidence") &&
@@ -1084,8 +1079,7 @@ export function lrNumericGrounding(
   const claims = extractNumericTokensForEval(content).filter((c) => c.length >= 2 && /\d/.test(c));
   const score =
     claims.length === 0 ? 1 : Math.max(0, 1 - ungrounded.length / Math.max(claims.length, 1));
-  const status: MetricStatus =
-    ungrounded.length === 0 ? "pass" : score >= 0.85 ? "warn" : "fail";
+  const status: MetricStatus = ungrounded.length === 0 ? "pass" : score >= 0.85 ? "warn" : "fail";
 
   return baseMetric(
     "lr_numeric_grounding",

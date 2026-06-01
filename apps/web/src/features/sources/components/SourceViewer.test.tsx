@@ -1,7 +1,7 @@
-import { describe, expect, test, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SourceViewer } from "./SourceViewer";
 
 // Mock dependencies

@@ -1,10 +1,10 @@
-import { test, expect } from "../fixtures/notebook.fixture";
-import { shouldSkipAITests } from "../helpers/ai-service";
-import { openAddSourceModal } from "../helpers/navigation";
-import { waitForSourceStatus, deleteSource, getSourceCard } from "../helpers/source-assertions";
-import path from "path";
 import fs from "fs";
 import os from "os";
+import path from "path";
+import { expect, test } from "../fixtures/notebook.fixture";
+import { shouldSkipAITests } from "../helpers/ai-service";
+import { openAddSourceModal } from "../helpers/navigation";
+import { deleteSource, getSourceCard, waitForSourceStatus } from "../helpers/source-assertions";
 
 /**
  * Helper to create a temporary test file for upload testing.

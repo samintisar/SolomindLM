@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * SpreadsheetGraph
  *
@@ -11,11 +12,9 @@
  * Main export: SpreadsheetGraph class
  */
 
-export { SpreadsheetGraph } from "./spreadsheet/SpreadsheetGraph.js";
 export { packChunks, validateChunks } from "./spreadsheet/chunkHelpers.js";
-
-// Re-export types for backward compatibility
-export type { OverallStateType, ChunkProcessState } from "./spreadsheet/state.js";
-
 // Re-export prompt constants for backward compatibility
 export { MAP_PROMPTS, REDUCE_PROMPTS } from "./spreadsheet/prompts.js";
+export { SpreadsheetGraph } from "./spreadsheet/SpreadsheetGraph.js";
+// Re-export types for backward compatibility
+export type { ChunkProcessState, OverallStateType } from "./spreadsheet/state.js";

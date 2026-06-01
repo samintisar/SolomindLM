@@ -3,9 +3,9 @@
  * across different source channel configurations.
  */
 import type {
+  EvalBaseline,
   EvalFixture,
   EvalRunArtifact,
-  EvalBaseline,
   MetricResult,
   MetricStatus,
 } from "../types";

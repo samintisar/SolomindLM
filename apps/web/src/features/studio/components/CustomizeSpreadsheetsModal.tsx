@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { X, Pencil, Table2, ChevronLeft, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
+import { Bookmark, ChevronLeft, Pencil, Table2, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeSpreadsheetsModalProps {
   isOpen: boolean;
@@ -139,7 +139,6 @@ export const CustomizeSpreadsheetsModal: React.FC<CustomizeSpreadsheetsModalProp
 
   useEffect(() => {
     if (!isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfiguringFormat(null);
       setCustomPrompt("");
     }

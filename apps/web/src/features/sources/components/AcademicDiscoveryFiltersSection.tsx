@@ -1,10 +1,10 @@
+import { Check, ChevronDown, ChevronRight, Search } from "lucide-react";
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Check, Search } from "lucide-react";
 import {
   ACADEMIC_FIELD_GROUPS,
   ACADEMIC_SJR_TIERS,
-  collectFieldSearchTerms,
   type AcademicSjrWorstAllowed,
+  collectFieldSearchTerms,
 } from "../constants/academicFieldTaxonomy";
 
 export type PublicationYearMode = "all" | "lastN" | "custom";

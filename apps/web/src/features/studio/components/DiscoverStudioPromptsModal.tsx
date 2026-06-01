@@ -1,34 +1,34 @@
-import React, { useState } from "react";
+import type { Id } from "@convex/_generated/dataModel";
 import {
-  X,
-  Search,
-  Star,
   Bookmark,
-  Flag,
-  Loader2,
+  ChevronDown,
   Compass,
-  Library,
-  Trash2,
   Eye,
   EyeOff,
-  ChevronDown,
+  Flag,
+  Library,
+  Loader2,
   MessageSquareQuote,
+  Search,
+  Star,
+  Trash2,
+  X,
 } from "lucide-react";
+import React, { useState } from "react";
+import { useToast } from "@/shared/contexts/useToast";
 import {
-  usePublicPrompts,
-  useMyPrompts,
-  useSavePublicPrompt,
-  useRatePrompt,
-  usePublishPrompt,
-  useUnpublishPrompt,
-  useDeletePrompt,
-  useReportPrompt,
-  type StudioTool,
   type PromptSortBy,
   type PublicPrompt,
+  type StudioTool,
+  useDeletePrompt,
+  useMyPrompts,
+  usePublicPrompts,
+  usePublishPrompt,
+  useRatePrompt,
+  useReportPrompt,
+  useSavePublicPrompt,
+  useUnpublishPrompt,
 } from "../services/promptsApi";
-import { useToast } from "@/shared/contexts/useToast";
-import type { Id } from "@convex/_generated/dataModel";
 
 // ── Props ──────────────────────────────────────────────────────────────
 

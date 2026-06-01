@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
 import { RefreshCw } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { InfographicNote } from "@/shared/types/index";
 
 export type InfographicViewControls = {

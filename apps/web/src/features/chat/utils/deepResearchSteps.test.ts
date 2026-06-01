@@ -22,10 +22,7 @@ describe("mapDeepResearchSteps", () => {
 
     expect(steps).toHaveLength(2);
     expect(steps[0]?.type).toBe("searching");
-    expect(steps[0]?.searchQueries).toEqual([
-      "quantum error correction",
-      "topological qubits",
-    ]);
+    expect(steps[0]?.searchQueries).toEqual(["quantum error correction", "topological qubits"]);
     expect(steps[1]?.type).toBe("generating_report");
   });
 

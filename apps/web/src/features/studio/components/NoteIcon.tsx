@@ -1,15 +1,15 @@
-import React from "react";
 import {
-  Loader2,
   AudioLines,
-  Layers,
   FileText,
-  HelpCircle,
   GitFork,
-  MessageSquareText,
+  HelpCircle,
   Image,
+  Layers,
+  Loader2,
+  MessageSquareText,
   Table2,
 } from "lucide-react";
+import React from "react";
 import { Note } from "@/shared/types/index";
 
 interface NoteIconProps {

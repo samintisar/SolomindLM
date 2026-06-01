@@ -1,9 +1,9 @@
-import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { getAuthUserId } from "../auth";
-import { assertCanReadNotebook } from "../_lib/notebookAccess";
+import { internalQuery, query } from "../_generated/server";
 import { assertCanReadConversation } from "../_lib/conversationAccess";
+import { assertCanReadNotebook } from "../_lib/notebookAccess";
 import * as Conversations from "../_model/conversations";
+import { getAuthUserId } from "../auth";
 
 /**
  * Get a conversation by ID

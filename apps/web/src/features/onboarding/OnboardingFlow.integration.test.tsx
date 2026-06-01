@@ -1,9 +1,9 @@
-import { describe, expect, test, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { OnboardingProvider } from "./OnboardingProvider";
-import { TourTooltip } from "./components/TourTooltip";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ChecklistCard } from "./components/ChecklistCard";
+import { TourTooltip } from "./components/TourTooltip";
+import { OnboardingProvider } from "./OnboardingProvider";
 
 const STEPS = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 

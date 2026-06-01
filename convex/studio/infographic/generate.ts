@@ -1,12 +1,12 @@
 "use node";
 
 import { v } from "convex/values";
-import { internalAction } from "../../_generated/server";
-import { internal } from "../../_generated/api";
-import { createTogetherClient } from "../../_services/ai/togetherClient";
 import { invokeWithRetry } from "../../_agents/_shared/index";
-import { createJobLogger, createErrorMetadata } from "../../_agents/_shared/logging";
+import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { internal } from "../../_generated/api";
+import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
+import { createTogetherClient } from "../../_services/ai/togetherClient";
 
 /**
  * Map orientation to supported gpt-image-1.5 dimensions.
@@ -176,7 +176,6 @@ export const generateInfographicImage = internalAction({
       // Concatenate chunk contents (up to ~8k tokens worth of text)
       logger.phaseStart("prepare_content", { chunkCount: chunks.length });
       const MAX_CHARS = 30000; // ~8k tokens
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let sourceText = chunks.map((c: any) => c.content).join("\n\n");
       if (sourceText.length > MAX_CHARS) {
         sourceText = sourceText.substring(0, MAX_CHARS) + "\n[...content truncated...]";
@@ -257,7 +256,6 @@ Return JSON: {
       );
 
       const designContent = designResponse.choices[0]?.message?.content || "{}";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const design = parseLlmJson(designContent) as Record<string, any>;
       if (!design.image_prompt) {
         throw new Error(
@@ -309,9 +307,7 @@ Return JSON: {
       const imageData = imageResponse.data?.[0];
       let imageUrl: string;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((imageData as any)?.b64_json) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         imageUrl = `data:image/png;base64,${(imageData as any).b64_json}`;
       } else if (imageData?.url) {
         imageUrl = imageData.url;

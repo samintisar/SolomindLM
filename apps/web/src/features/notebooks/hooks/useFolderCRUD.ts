@@ -1,11 +1,10 @@
 import { useCallback } from "react";
 import { FolderItem } from "@/shared/types/index";
-import { useCreateFolder, useUpdateFolder, useDeleteFolder } from "../services/foldersApi";
+import { useCreateFolder, useDeleteFolder, useUpdateFolder } from "../services/foldersApi";
 import { useUpdateNotebook } from "../services/notebooksApi";
 
 interface UseFolderCRUDProps {
   isAuthenticated: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any;
   onRequireAuth?: (message: string) => void;
 }

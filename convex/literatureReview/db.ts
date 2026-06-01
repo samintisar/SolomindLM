@@ -1,13 +1,13 @@
-import { internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { internalMutation, internalQuery } from "../_generated/server";
+import { compactPapersForSnapshot } from "./rankedPapersSnapshot.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
   literatureTableTitle,
   normalizeReviewTitle,
 } from "./titles.js";
-import { compactPapersForSnapshot } from "./rankedPapersSnapshot.js";
 import { literatureReviewWorkflowProvenanceValidator } from "./workflowProvenance.js";
 
 const literaturePaperFields = {

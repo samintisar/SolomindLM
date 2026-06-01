@@ -34,7 +34,6 @@ vi.mock("@convex-dev/auth/react", () => ({
  * Resets all previous query return values.
  */
 export function setupQueryReturns(returns: Record<string, unknown>) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockUseQuery.mockImplementation((queryRef: any, args: any) => {
     if (args === "skip") return undefined;
     const key = queryRef.name || String(queryRef);
@@ -46,7 +45,6 @@ export function setupQueryReturns(returns: Record<string, unknown>) {
  * Configure mock useMutation to return a specific function.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function setupMutationReturn(fn: (...args: any[]) => Promise<any>) {
   mockUseMutation.mockReturnValue(fn);
 }

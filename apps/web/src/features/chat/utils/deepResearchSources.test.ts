@@ -55,11 +55,10 @@ describe("buildDeepResearchDisplaySources", () => {
   ];
 
   test("dedupes sources and marks used vs searched only", () => {
-    const sources = buildDeepResearchDisplaySources(
-      evidence,
-      "Summary cites [1] only.",
-      [{ id: "sq1" }, { id: "sq2" }]
-    );
+    const sources = buildDeepResearchDisplaySources(evidence, "Summary cites [1] only.", [
+      { id: "sq1" },
+      { id: "sq2" },
+    ]);
     expect(sources).toHaveLength(2);
     const used = sources.find((s) => s.sourceTitle === "Paper A");
     const searched = sources.find((s) => s.sourceTitle === "Paper B");

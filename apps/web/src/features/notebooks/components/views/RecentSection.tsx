@@ -1,8 +1,8 @@
+import { FolderInput, Plus } from "lucide-react";
 import React from "react";
-import { Plus, FolderInput } from "lucide-react";
-import { NotebookItem, FolderItem } from "@/shared/types/index";
-import { NotebookCard } from "../cards/NotebookCard";
+import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { FolderCard } from "../cards/FolderCard";
+import { NotebookCard } from "../cards/NotebookCard";
 import { ListHeader } from "../ListHeader";
 
 interface RecentSectionProps {

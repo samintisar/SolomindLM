@@ -1,5 +1,5 @@
-import Constants from "expo-constants";
 import { ConvexReactClient } from "convex/react";
+import Constants from "expo-constants";
 
 /**
  * Valid absolute URL so `ConvexReactClient` can construct during SSR / static routes when

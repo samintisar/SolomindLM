@@ -1,12 +1,11 @@
-import type { Note } from "@/shared/types/index";
-import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
-import { getSpreadsheetTypeLabel } from "./spreadsheetsApi";
-import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
-import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { useQuery } from "convex/react";
+import type { Note } from "@/shared/types/index";
+import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportTypes";
+import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
+import { getSpreadsheetTypeLabel } from "./spreadsheetsApi";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
   const maybeWrapped = rawData?.nodeData?.nodeData ?? rawData?.nodeData ?? rawData;
   const normalized = maybeWrapped && typeof maybeWrapped === "object" ? { ...maybeWrapped } : {};
@@ -24,7 +23,6 @@ function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
 /**
  * Map a raw database note (with _type discriminator) to the frontend Note interface
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mapDatabaseNoteToNote(dbNote: any): Note {
   const { _type } = dbNote;
 
@@ -197,7 +195,6 @@ function capitalizeDifficulty(difficulty: string | undefined): string {
   return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getReportPreview(dbNote: any): string {
   const reportType = normalizeReportTypeId(
     dbNote.reportType || dbNote.metadata?.reportType || "custom"
@@ -208,7 +205,6 @@ function getReportPreview(dbNote: any): string {
   return subtitle;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getFlashcardPreview(dbNote: any): string {
   const count = dbNote.cardsData?.length || 0;
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
@@ -218,7 +214,6 @@ function getFlashcardPreview(dbNote: any): string {
   return `${count} Flashcard${count !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getQuizPreview(dbNote: any): string {
   const count = dbNote.questionsData?.length || 0;
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
@@ -228,7 +223,6 @@ function getQuizPreview(dbNote: any): string {
   return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getMindMapPreview(dbNote: any): string {
   if (dbNote.status === "generating") return "Mind Map";
   if (dbNote.status === "failed") return "Mind Map · Failed";
@@ -244,7 +238,6 @@ function formatAudioDurationForListSubtitle(seconds: number): string {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getAudioOverviewPreview(dbNote: any): string {
   if (dbNote.status === "generating") return "Audio Overview";
   if (dbNote.status === "failed") return "Audio Overview · Failed";
@@ -257,14 +250,12 @@ function getAudioOverviewPreview(dbNote: any): string {
   return `Audio Overview${durationPart}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getInfographicPreview(dbNote: any): string {
   if (dbNote.status === "generating") return "Infographic · Generating…";
   if (dbNote.status === "failed") return "Infographic · Failed";
   return "Infographic";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getSpreadsheetPreview(dbNote: any): string {
   const spreadsheetType = dbNote.metadata?.spreadsheetType || "custom";
   const typeLabel = getSpreadsheetTypeLabel(spreadsheetType);
@@ -273,7 +264,6 @@ function getSpreadsheetPreview(dbNote: any): string {
   return `Spreadsheet · ${typeLabel}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getWrittenQuestionsPreview(dbNote: any): string {
   const count = dbNote.questionsData?.length || 0;
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
@@ -283,7 +273,6 @@ function getWrittenQuestionsPreview(dbNote: any): string {
   return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getNotePreview(dbNote: any): string {
   const isChat = dbNote.type === "chat";
   if (isChat) return "Note · Saved Chat";
@@ -325,11 +314,7 @@ export function useNoteCounts(notebookId: string | null) {
  * Get a single note by type and ID
  */
 export function useNote(type: string, noteId: string | null) {
-  const note = useQuery(
-    api.notes.index.get,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    noteId && type ? { type, id: noteId as any } : "skip"
-  );
+  const note = useQuery(api.notes.index.get, noteId && type ? { type, id: noteId as any } : "skip");
   return note ? mapDatabaseNoteToNote(note) : null;
 }
 

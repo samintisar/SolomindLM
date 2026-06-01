@@ -1,11 +1,11 @@
-import React from "react";
 import { Check } from "lucide-react";
-import {
-  useSubscriptionStatus,
-  useCreateCheckout,
-  useCancelSubscription,
-} from "../services/subscriptionApi";
+import React from "react";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
+import {
+  useCancelSubscription,
+  useCreateCheckout,
+  useSubscriptionStatus,
+} from "../services/subscriptionApi";
 
 interface BillingPageProps {
   onBack: () => void;

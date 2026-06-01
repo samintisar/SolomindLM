@@ -1,19 +1,16 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
-import type { Id, Doc } from "../_generated/dataModel";
-import type { ChunkMetadata } from "../storage/ChatHistoryService";
+import type { HybridSearchConfig, KeywordSearchRunner } from "../_agents/chat/hybrid_search.js";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
+import type { RerankFunction, VectorSearchRunner } from "../_agents/chat/vector_search.js";
+import { internal } from "../_generated/api";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
-import type {
-  KeywordSearchRunner,
-  HybridSearchConfig,
-} from "../_agents/chat/hybrid_search.js";
-import type { VectorSearchRunner, RerankFunction } from "../_agents/chat/vector_search.js";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
+import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import type { ChunkMetadata } from "../storage/ChatHistoryService";
 
 type DocumentChunkDoc = Doc<"documentChunks">;
 type VectorSearchHit = { _id: Id<"documentChunks">; _score: number };
@@ -72,7 +69,6 @@ export function createKeywordSearchRunner(
       userId,
       query,
       limit,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       documentIds: docIds as any,
       quietLogs,
     });
@@ -102,7 +98,6 @@ export function createChatVectorSearchRunner(
       limit: limitToFetch,
       // Convex vector search filter typing is generated from the index schema;
       // using explicit any to avoid brittle type coupling.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       filter: (q: any) => q.eq("notebookId", notebookId),
     });
 
@@ -275,16 +270,12 @@ export function createChatVectorSearchRunner(
   };
 }
 
-export function createResearchVectorSearchRunner(
-  ctx: ActionCtx,
-  notebookId: Id<"notebooks">
-) {
+export function createResearchVectorSearchRunner(ctx: ActionCtx, notebookId: Id<"notebooks">) {
   return async (embedding: number[], limit: number, docIds?: string[]) => {
     const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
     const vectorResults = await ctx.vectorSearch("documentChunks", "by_embedding", {
       vector: embedding,
       limit: limitToFetch,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       filter: (q: any) => q.eq("notebookId", notebookId),
     });
 
@@ -292,19 +283,12 @@ export function createResearchVectorSearchRunner(
     if (chunkIds.length === 0) return [];
     const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
 
-    const chunkMap = new Map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fullChunks.filter(Boolean).map((c: any) => [c._id, c])
-    );
+    const chunkMap = new Map(fullChunks.filter(Boolean).map((c: any) => [c._id, c]));
 
     const docIds_unique = [
-      ...new Set(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        vectorResults.map((r: any) => chunkMap.get(r._id)?.documentId).filter(Boolean)
-      ),
+      ...new Set(vectorResults.map((r: any) => chunkMap.get(r._id)?.documentId).filter(Boolean)),
     ];
     const docRows = await ctx.runQuery(internal.documents.internal.getDocumentsByIds, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       documentIds: docIds_unique as any,
     });
     const titleMap = new Map(docRows.map((d) => [d._id, d.fileName]));

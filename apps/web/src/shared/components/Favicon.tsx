@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
 import { Globe } from "lucide-react";
+import React, { useMemo, useState } from "react";
 
 function extractHostname(url: string): string | null {
   try {

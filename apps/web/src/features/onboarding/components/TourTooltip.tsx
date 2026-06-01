@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useOnboarding } from "../OnboardingContext";
-import { findStep, STEP_IDS, TOTAL_STEPS, type StepDefinition } from "../steps";
 import { useServiceErrorToast } from "@/shared/hooks/useServiceErrorToast";
+import { useOnboarding } from "../OnboardingContext";
+import { findStep, STEP_IDS, type StepDefinition, TOTAL_STEPS } from "../steps";
 
 interface Rect {
   top: number;
@@ -113,7 +113,6 @@ export const TourTooltip: React.FC = () => {
 
   useEffect(() => {
     if (!step || tourStatus !== "active") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRect(null);
       return;
     }

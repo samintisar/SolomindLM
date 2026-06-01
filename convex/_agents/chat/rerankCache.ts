@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Cached ZeroEntropy Reranking Service
  *
@@ -6,13 +7,13 @@
  * @convex-dev/action-cache hashes the full `query` string and all `documents` bodies — cache invalidates when content changes.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
-import { createCachedAction } from "../../_services/cache/cachedAgent";
+import { internal } from "../../_generated/api";
+import { internalAction } from "../../_generated/server";
+import { env } from "../../_lib/env";
 import { CACHE_TTL, withJitter } from "../../_services/cache/cache";
 import { hashInput } from "../../_services/cache/cacheCrypto";
-import { internal } from "../../_generated/api";
-import { env } from "../../_lib/env";
+import { createCachedAction } from "../../_services/cache/cachedAgent";
 
 // ============================================================
 // Types
@@ -67,7 +68,6 @@ export const rerankInternal = internalAction({
       console.log("[RerankInternal] Results count:", response.results?.length ?? 0);
 
       // Return results with indices for mapping back to original documents
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results = (response.results || []).map((item: any) => ({
         index: item.index ?? item.document_index ?? 0,
         text: item.text ?? item.document,
@@ -115,7 +115,6 @@ function normalizeQuery(query: string): string {
  * @returns Reranked results with original document IDs preserved
  */
 export async function cachedRerank(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   query: string,
   documents: RerankDocument[],

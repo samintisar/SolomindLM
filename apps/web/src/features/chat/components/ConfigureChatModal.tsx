@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { X, MessageSquare, GraduationCap, PenLine, Check } from "lucide-react";
+import { Check, GraduationCap, MessageSquare, PenLine, X } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { ChatSettings } from "@/shared/types";
 
 const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 10000;
@@ -95,14 +95,12 @@ export const ConfigureChatModal: React.FC<ConfigureChatModalProps> = ({
   // Sync when external settings change (e.g. after save)
   useEffect(() => {
     if (!isOpen) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInstructionMode(chatSettings?.instructionMode ?? "default");
     setCustomInstructions(chatSettings?.customInstructions ?? "");
     setResponseLength(chatSettings?.responseLength ?? "default");
   }, [isOpen, chatSettings]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOpen) setShowMidChatSwitchWarning(false);
   }, [isOpen]);
 

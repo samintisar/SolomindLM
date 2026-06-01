@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery } from "../../_generated/server";
-import { getAuthUserId } from "../../auth";
+import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
 import * as Flashcards from "../../_model/flashcards";
+import { getAuthUserId } from "../../auth";
 
 /**
  * Internal: Get a flashcard set by ID (for use by jobs)
@@ -222,7 +222,6 @@ export const submitCardReview = mutation({
 
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cardsData = flashcard.cardsData as any[];
     if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
       throw new Error("Invalid card index");
@@ -275,7 +274,6 @@ export const updateCard = mutation({
 
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cardsData = flashcard.cardsData as any[];
     if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
       throw new Error("Invalid card index");
@@ -329,7 +327,6 @@ export const addCard = mutation({
 
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cardsData = flashcard.cardsData as any[];
     const newCard = {
       type: args.type || "wh-question",
@@ -376,7 +373,6 @@ export const deleteCard = mutation({
 
     await assertCanEditNotebook(ctx, flashcard.notebookId, userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cardsData = flashcard.cardsData as any[];
     if (!cardsData || args.cardIndex < 0 || args.cardIndex >= cardsData.length) {
       throw new Error("Invalid card index");
@@ -432,7 +428,6 @@ export const getDueCards = query({
       return [];
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cardsData = flashcard.cardsData as any[];
     const dueIndices = Flashcards.getDueCardIndices(cardsData, args.nowMs);
 

@@ -104,10 +104,10 @@ bun run typecheck:mobile       # Expo mobile typecheck
 **Lint & format:**
 
 ```bash
-bun run lint                   # ESLint (flat config)
-bun run lint:fix               # Auto-fix
-bun run format                 # Prettier write
-bun run format:check           # Prettier check
+bun run lint                   # Biome (lint + format check)
+bun run lint:fix               # Biome auto-fix
+bun run format                 # Biome format write
+bun run format:check           # Biome format check
 ```
 
 **Convex env push:**
@@ -199,8 +199,9 @@ Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; h
   3. `bun run test:web` — vitest for web utilities
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
   5. `bun run eval:rag --case=… / --runner=…` — agent or prompt changes (do NOT unit-test prompt outputs)
-- **TS strictness:** `@typescript-eslint/no-explicit-any` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves.
-- **Generated files excluded from lint:** `convex/_generated/`.
+- **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves.
+- **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
+- **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.
 - **Port management:** `bun run dev:web` kills stale :5173 via `kill-port`.
 - **Agent caching:** Agent results cached. Bump `cacheVersions` row when prompts change to invalidate.
 - **Convex generated guidelines** — read [`convex/_generated/ai/guidelines.md`](convex/_generated/ai/guidelines.md) before any Convex code change. It overrides training-data assumptions.

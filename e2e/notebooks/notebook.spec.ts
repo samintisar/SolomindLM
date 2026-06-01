@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/auth.fixture";
+import { expect, test } from "../fixtures/auth.fixture";
 import { tryDeleteNotebookByTitleFromHome } from "../helpers/notebook-cleanup";
 
 test.describe("Notebook CRUD", () => {

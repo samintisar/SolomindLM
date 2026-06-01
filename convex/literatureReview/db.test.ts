@@ -1,8 +1,8 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import schema from "../schema";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import schema from "../schema";
 import {
   RANKED_PAPER_SNAPSHOT_ABSTRACT_MAX_CHARS,
   RANKED_PAPERS_SNAPSHOT_MAX_COUNT,

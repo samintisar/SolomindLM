@@ -4,8 +4,9 @@
  * This file contains all helper mutations for job management.
  * Functions are organized by job type for easy navigation.
  */
-import { internalMutation } from "../../_generated/server";
+
 import { v } from "convex/values";
+import { internalMutation } from "../../_generated/server";
 import { type JobErrorType } from "./logging";
 
 // ============================================================
@@ -28,7 +29,6 @@ export const jobErrorMetadataValidator = v.object({
  * Build enhanced error metadata for database storage.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildErrorMetadata(error: string, phase: string, metadata?: any): any {
   if (metadata?.errorType && metadata?.errorPhase) {
     return {
@@ -179,7 +179,6 @@ export const updateFlashcardStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -340,7 +339,6 @@ export const updateQuizStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -501,7 +499,6 @@ export const updateWrittenQuestionsStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -674,7 +671,6 @@ export const updateReportStatus = internalMutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) return null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -843,7 +839,6 @@ export const updateMindMapStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -997,7 +992,6 @@ export const updateSpreadsheetStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -1157,7 +1151,6 @@ export const updateAudioOverviewStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),

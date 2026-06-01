@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import type { Note, SpreadsheetNote } from "@/shared/types/index";
 import { useToast } from "@/shared/contexts/useToast";
-import { useCreateSpreadsheet, getSpreadsheetTypeLabel } from "../../services/spreadsheetsApi";
+import type { Note, SpreadsheetNote } from "@/shared/types/index";
 import type { SpreadsheetConfig } from "../../components/CustomizeSpreadsheetsModal";
+import { getSpreadsheetTypeLabel, useCreateSpreadsheet } from "../../services/spreadsheetsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
 import type { CreateFlowContext } from "./types";
 

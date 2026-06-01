@@ -1,5 +1,5 @@
+import { ArrowLeft, XCircle } from "lucide-react";
 import React from "react";
-import { XCircle, ArrowLeft } from "lucide-react";
 import { SpreadsheetNote } from "@/shared/types/index";
 
 /**

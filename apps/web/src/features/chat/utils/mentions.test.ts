@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { MentionedSource, Source } from "@/shared/types/index";
 import {
-  filterSourcesByQuery,
   combineDocumentIds,
+  filterSourcesByQuery,
   getDocumentIdsFromMentions,
   prependAttachedSourceMentionsToMessage,
 } from "./mentions";
-import { Source, MentionedSource } from "@/shared/types/index";
 
 const mockSources: Source[] = [
   { id: "1", title: "PdfViewer.tsx", type: "PDF", date: "2024-01-01", selected: true },
@@ -91,20 +91,22 @@ describe("prependAttachedSourceMentionsToMessage", () => {
 
   it("normalizes whitespace in titles", () => {
     expect(
-      prependAttachedSourceMentionsToMessage("x", [{ documentId: "d", title: "AI\nagent\tpatterns" }])
+      prependAttachedSourceMentionsToMessage("x", [
+        { documentId: "d", title: "AI\nagent\tpatterns" },
+      ])
     ).toBe("@AI agent patterns\n\nx");
   });
 
   it("returns only prefix when body is empty", () => {
-    expect(
-      prependAttachedSourceMentionsToMessage("", [{ documentId: "d", title: "Doc" }])
-    ).toBe("@Doc");
+    expect(prependAttachedSourceMentionsToMessage("", [{ documentId: "d", title: "Doc" }])).toBe(
+      "@Doc"
+    );
   });
 
   it("returns only prefix when body is whitespace", () => {
-    expect(
-      prependAttachedSourceMentionsToMessage("   ", [{ documentId: "d", title: "Doc" }])
-    ).toBe("@Doc");
+    expect(prependAttachedSourceMentionsToMessage("   ", [{ documentId: "d", title: "Doc" }])).toBe(
+      "@Doc"
+    );
   });
 
   it("skips mentions with empty titles", () => {

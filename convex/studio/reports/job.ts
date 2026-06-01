@@ -1,15 +1,16 @@
 "use node";
+
 /**
  * Report generation job — Convex registrations only.
  * @see ./reportJobPhases.ts for phase logic.
  */
 
-import { internalAction } from "../../_generated/server";
 import { v } from "convex/values";
+import { internalAction } from "../../_generated/server";
 import {
-  runReportGenerationPhase,
-  runProcessReportMapChunkPhase,
   runFinalizeReportPhase,
+  runProcessReportMapChunkPhase,
+  runReportGenerationPhase,
 } from "./reportJobPhases";
 
 export const reportGeneration = internalAction({

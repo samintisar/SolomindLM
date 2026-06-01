@@ -1,6 +1,6 @@
-import { describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, expect, test, vi } from "vitest";
 import { SourceGuide } from "./SourceGuide";
 
 // Mock the useSourceGuide hook
@@ -20,9 +20,7 @@ describe("SourceGuide", () => {
       isLoading: false,
     });
 
-    const { container } = render(
-      <SourceGuide documentId="doc-1" onTopicClick={() => {}} />
-    );
+    const { container } = render(<SourceGuide documentId="doc-1" onTopicClick={() => {}} />);
 
     expect(container.firstChild).toBeNull();
   });

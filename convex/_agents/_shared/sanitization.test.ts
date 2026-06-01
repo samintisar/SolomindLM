@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  sanitizeUserInput,
-  sanitizeFilename,
-  sanitizeMarkdown,
   detectThreats,
   maskSensitiveInfo,
+  sanitizeFilename,
+  sanitizeMarkdown,
+  sanitizeUserInput,
   validateInput,
 } from "./sanitization";
 
@@ -256,7 +256,6 @@ describe("maskSensitiveInfo", () => {
 
 describe("validateInput", () => {
   it("returns invalid for non-string input", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = validateInput(null as any);
     expect(result.isValid).toBe(false);
     expect(result.issues).toContain("Input is not a valid string");

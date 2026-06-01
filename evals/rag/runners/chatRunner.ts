@@ -1,9 +1,9 @@
-import type { EvalFixture, EvalRunArtifact, ChunkSnapshot } from "../types";
-import { inferSourceChannel } from "../metrics/sourceAware";
-import { computeConfigHash } from "../configHash";
-import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
-import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
 import type { ChatAgentContext } from "../../../convex/_agents/chat/types";
+import type { ReferenceChunk } from "../../../convex/storage/ChatHistoryService";
+import { computeConfigHash } from "../configHash";
+import { inferSourceChannel } from "../metrics/sourceAware";
+import type { ChunkSnapshot, EvalFixture, EvalRunArtifact } from "../types";
+import type { EvalRunnerOptions, EvalRunnerResult } from "./types";
 
 // ─── Invoker interface ────────────────────────────────────────
 // The eval runner cannot call Convex agents directly from a

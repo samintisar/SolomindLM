@@ -1,9 +1,8 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { components } from "../_generated/api";
+import type { ActionCtx } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { mapAgentEvidenceForSave } from "../research/mapEvidenceForDb";
 import { createResearchAgent } from "./_streamResearch";
@@ -68,7 +67,10 @@ export async function runResearchExecuteImpl(
       researchId: String(runId),
       notebookId: plan.notebookId,
       userId,
-      sourcePolicy: plan.sourcePolicy as { channels: string[]; academicFilters?: Record<string, unknown> },
+      sourcePolicy: plan.sourcePolicy as {
+        channels: string[];
+        academicFilters?: Record<string, unknown>;
+      },
       onProgress: async (phase, subQuestionId, sourcesFound) => {
         await chunkAppender(
           `\n__RESEARCH_PROGRESS:${JSON.stringify({ phase, subQuestionId, sourcesFound })}\n`
@@ -93,9 +95,7 @@ export async function runResearchExecuteImpl(
 
     const gen = agent.executeResearch(
       plan.query,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       plan.subQuestions.map((sq: any) => ({ ...sq, status: "pending" as const })),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       plan.sourcePolicy as any,
       context
     );

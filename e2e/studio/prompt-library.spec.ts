@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { openStudioTool } from "../helpers/studio-assertions";
 
 test.use({ viewport: { width: 1440, height: 900 } });

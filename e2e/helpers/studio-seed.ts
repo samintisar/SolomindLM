@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
-import { PASTED_TEXT_TITLE, addPasteTextSource, waitForSourceStatus } from "./source-assertions";
 import { openSourcesPanel } from "./navigation";
+import { addPasteTextSource, PASTED_TEXT_TITLE, waitForSourceStatus } from "./source-assertions";
 
 /**
  * Substantive pasted article for studio E2E: long enough for realistic chunking,

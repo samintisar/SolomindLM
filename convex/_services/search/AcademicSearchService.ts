@@ -1,17 +1,11 @@
 "use node";
 
-import { internalAction, type ActionCtx } from "../../_generated/server";
 import { v } from "convex/values";
-import { createCachedAction } from "../cache/cachedAgent";
-import { CACHE_TTL, withJitter } from "../cache/cache";
+import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
 import { internal } from "../../_generated/api";
+import { type ActionCtx, internalAction } from "../../_generated/server";
 import { ARXIV_MIN_INTERVAL_MS } from "../../_lib/arxivThrottle";
 import { env } from "../../_lib/env";
-import {
-  resolveAcademicSearchSources,
-  type AcademicPaperSource,
-} from "../../_model/literatureReviewSearchOptions";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import {
   createExternalServiceErrorFromResponse,
   ExternalServiceError,
@@ -19,11 +13,17 @@ import {
 } from "../../_lib/errors";
 import {
   ARXIV_RATE_LIMIT_COOLDOWN_MS,
+  type FragileAcademicProvider,
   SEMANTIC_SCHOLAR_AUTHENTICATED_COOLDOWN_MS,
   SEMANTIC_SCHOLAR_UNAUTHENTICATED_COOLDOWN_MS,
-  type FragileAcademicProvider,
 } from "../../_lib/externalProviderCooldowns";
-import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import {
+  type AcademicPaperSource,
+  resolveAcademicSearchSources,
+} from "../../_model/literatureReviewSearchOptions";
+import { CACHE_TTL, withJitter } from "../cache/cache";
+import { createCachedAction } from "../cache/cachedAgent";
 
 /**
  * Academic paper from external APIs (arXiv, Semantic Scholar, PubMed)
@@ -560,10 +560,7 @@ function normalizeDoi(doi: string | null | undefined): string | undefined {
   return doi?.replace(/^https?:\/\/doi\.org\//i, "");
 }
 
-async function searchOpenAlex(
-  query: string,
-  maxResults: number
-): Promise<AcademicPaper[]> {
+async function searchOpenAlex(query: string, maxResults: number): Promise<AcademicPaper[]> {
   const logger = createServiceLogger("academic_search", "searchOpenAlex");
   const email = env.PUBMED_EMAIL || "support@solomindlm.com";
   const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${maxResults}&mailto=${encodeURIComponent(email)}`;
@@ -1180,9 +1177,8 @@ export interface DiscoverAcademicPapersArgs {
 
 export async function discoverAcademicPapersInternalHandler(
   args: DiscoverAcademicPapersArgs,
-  fetchSearch: (
-    args: SearchInternalArgs
-  ) => Promise<SearchInternalResult> = (a) => searchInternalHandler(a)
+  fetchSearch: (args: SearchInternalArgs) => Promise<SearchInternalResult> = (a) =>
+    searchInternalHandler(a)
 ): Promise<DiscoverAcademicPapersResult> {
   const logger = createServiceLogger("academic_search", "discoverAcademicPapersInternal");
   const startTime = Date.now();

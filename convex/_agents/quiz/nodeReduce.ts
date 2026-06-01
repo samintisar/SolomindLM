@@ -18,11 +18,11 @@ import { expandQuestion, finalizeQuestions } from "./postprocess.js";
 import {
   applySelectedCandidateIndices,
   getCandidateSelectionPrompt,
-  QuizCandidateIndexSelectionSchema,
-  REDUCE_SELECT_SYSTEM_PROMPT,
   type QuizCandidate,
   type QuizCandidateIndexSelection,
+  QuizCandidateIndexSelectionSchema,
   type QuizQuestion,
+  REDUCE_SELECT_SYSTEM_PROMPT,
 } from "./prompts.js";
 import { detectSimilarQuestions, heuristicDedupe } from "./quizHeuristics.js";
 import type { OverallStateType } from "./state.js";
@@ -154,7 +154,6 @@ export async function reduce(
         () =>
           invokeWithTimeout(
             () =>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (structuredLlm as any).invoke([
                 new SystemMessage(REDUCE_SELECT_SYSTEM_PROMPT),
                 new HumanMessage(selectionPrompt),
@@ -213,7 +212,6 @@ export async function reduce(
         return new Send("reduce", {
           ...withoutMapOutputs(state),
           reduceRetryCount: retryCount + 1,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
       }
 

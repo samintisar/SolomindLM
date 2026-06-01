@@ -1,7 +1,7 @@
+import { Bookmark, HelpCircle, X } from "lucide-react";
 import React, { useState } from "react";
-import { X, HelpCircle, Bookmark } from "lucide-react";
-import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
+import { StudioModalDiscoverPromptsButton } from "./StudioModalDiscoverPromptsButton";
 
 interface CustomizeQuizModalProps {
   isOpen: boolean;

@@ -6,19 +6,12 @@
  */
 
 import { env } from "../../_lib/env";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import type { ServiceLogger } from "../../_lib/logging/serviceLogger";
-
-import { VectorSearchHandler } from "./vector_search.js";
-import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
-import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
-import { budgetConversationHistory } from "./chatHistoryBudget.js";
-import { routeChatMessage } from "./chatRouter.js";
-
-import type { ChatAgentContext, ChatAgentOptions, GlobalRerankFn, StreamChunk } from "./types.js";
 import { countTokens } from "../_shared/tokenizer";
+import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
 import {
   CONTEXT_TOKEN_BUDGET,
   FOLLOWUP_GENERATION_TIMEOUT_MS,
@@ -28,14 +21,20 @@ import {
   SEARCH_PIPELINE_TIMEOUT_MS,
   STREAM_TOKEN_DELAY_MS,
 } from "./chatConfig.js";
-import { withTimeout } from "./withTimeout.js";
+import { budgetConversationHistory } from "./chatHistoryBudget.js";
+import { routeChatMessage } from "./chatRouter.js";
 import {
   chunkDedupKey,
   chunkRankingScore,
   mergeChunkScores,
   selectChunksByTokenBudgetWithReservation,
 } from "./chunkContext.js";
-import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
+import { validateGrounding, validateSemanticGrounding } from "./grounding_validator.js";
+import { ChatLLMWrapper, type ChatResponse } from "./llm_wrapper.js";
+import type { ChatAgentContext, ChatAgentOptions, GlobalRerankFn, StreamChunk } from "./types.js";
+import { VectorSearchHandler } from "./vector_search.js";
+import { withTimeout } from "./withTimeout.js";
+
 /**
 
  * Threshold for when to use full-document mode.
@@ -43,6 +42,7 @@ import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
  * fetch the full document instead.
  */
 const FULL_DOCUMENT_CHUNK_RATIO_THRESHOLD = 0.4;
+
 import { expandQueryWithKeywords } from "./queryExpansion.js";
 import { sliceParagraphForStream } from "./streamSlice.js";
 

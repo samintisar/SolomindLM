@@ -1,14 +1,14 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
+import { internal } from "../_generated/api";
+import type { ActionCtx } from "../_generated/server";
+import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 import {
   academicDiscoverSources,
   type DiscoverAcademicPapersResult,
 } from "../_services/search/AcademicSearchService.js";
 import type { StreamSourcePolicy } from "./stream";
-import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 
 export interface DiscoveredSource {
   title: string;
@@ -79,15 +79,25 @@ export function createDiscoverSources(
               ...(searchDepth ? { searchDepth } : {}),
               ...(includeRawContent !== undefined ? { includeRawContent } : {}),
             })
-            .then((results: Array<{ title?: string; url?: string; snippet?: string; content?: string; score?: number; rawContent?: string }>) =>
-              results.map((r) => ({
-                title: r.title ?? "Untitled",
-                url: r.url ?? "",
-                snippet: r.snippet ?? r.content ?? "",
-                sourceType: channel,
-                score: r.score,
-                rawContent: r.rawContent,
-              }))
+            .then(
+              (
+                results: Array<{
+                  title?: string;
+                  url?: string;
+                  snippet?: string;
+                  content?: string;
+                  score?: number;
+                  rawContent?: string;
+                }>
+              ) =>
+                results.map((r) => ({
+                  title: r.title ?? "Untitled",
+                  url: r.url ?? "",
+                  snippet: r.snippet ?? r.content ?? "",
+                  sourceType: channel,
+                  score: r.score,
+                  rawContent: r.rawContent,
+                }))
             )
             .catch((e: unknown) => {
               log?.warn("web_search_failed", { channel, topic, error: String(e) });
@@ -110,7 +120,6 @@ export function createDiscoverSources(
             }
           )
           .then((payload: DiscoverAcademicPapersResult) =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (academicDiscoverSources(payload) as any[]).map((r: any) => ({
               title: r.title ?? "Untitled",
               url: r.url ?? "",

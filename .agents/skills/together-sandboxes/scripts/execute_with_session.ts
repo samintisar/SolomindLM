@@ -21,9 +21,7 @@ async function executeCode(
   code: string,
   sessionId?: string,
   files?: { name: string; encoding: string; content: string }[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ sessionId: string | null; outputs: any[] }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params: any = { code, language: "python" };
   if (sessionId) params.session_id = sessionId;
   if (files) params.files = files;
@@ -35,7 +33,6 @@ async function executeCode(
     return { sessionId: null, outputs: [] };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const outputs: any[] = [];
   for (const output of response.data.outputs) {
     if (output.type === "stdout" || output.type === "stderr") {

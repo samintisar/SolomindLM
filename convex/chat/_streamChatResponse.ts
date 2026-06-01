@@ -1,23 +1,20 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
+import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
+import { AVAILABLE_SMART_MODEL_IDS, type SmartModelId } from "../_agents/chat/chatConfig.js";
+import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
-import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
-import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
-import {
-  AVAILABLE_SMART_MODEL_IDS,
-  type SmartModelId,
-} from "../_agents/chat/chatConfig.js";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import {
   createChatVectorSearchRunner,
+  createHybridSearch,
   createKeywordSearchRunner,
   createRerankFn,
   loadHybridSearchConfig,
-  createHybridSearch,
 } from "./_streamSearch";
 import { discoverChatExternalSources } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
@@ -152,10 +149,9 @@ export async function streamChatResponse(
 
   let userPrefs: { outputLanguage?: string } | null = null;
   try {
-    userPrefs = await ctx.runQuery(
-      internal.userPreferences.index.getPreferencesByUserId,
-      { userId: userId as Id<"users"> }
-    );
+    userPrefs = await ctx.runQuery(internal.userPreferences.index.getPreferencesByUserId, {
+      userId: userId as Id<"users">,
+    });
   } catch (e) {
     console.warn(
       "[chat] user preference fetch failed, using default language",
@@ -380,8 +376,7 @@ export async function streamChatResponse(
     });
   } else {
     const refsToStore = fullResponse.trim() ? references : undefined;
-    const errorSuffix =
-      "\n\n_⚠️ This response ended early due to an error. Please try again._";
+    const errorSuffix = "\n\n_⚠️ This response ended early due to an error. Please try again._";
     const contentFinal = hasError
       ? contentToPersist
         ? `${contentToPersist}${errorSuffix}`

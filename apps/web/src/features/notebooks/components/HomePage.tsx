@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { LayoutGrid, List, ChevronDown, Calendar, ArrowUpAZ, CheckCircle2 } from "lucide-react";
-import { NotebookItem, FolderItem } from "@/shared/types/index";
-import { FeaturedSection, RecentSection } from "./views";
-import { CustomizeNotebookModal, MoveToFolderModal, CustomizeFolderModal } from "./modals";
-import { useNotebookHandlers, useFolderHandlers, useNotebookSorting } from "../hooks";
-import { useNotebookContext } from "../useNotebookContext";
-import { useCreateNotebook, useUpdateNotebook } from "../services/notebooksApi";
-import { useCreateFolder, useUpdateFolder } from "../services/foldersApi";
+import { ArrowUpAZ, Calendar, CheckCircle2, ChevronDown, LayoutGrid, List } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { FolderItem, NotebookItem } from "@/shared/types/index";
+import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
+import { useCreateFolder, useUpdateFolder } from "../services/foldersApi";
+import { useCreateNotebook, useUpdateNotebook } from "../services/notebooksApi";
+import { useNotebookContext } from "../useNotebookContext";
+import { CustomizeFolderModal, CustomizeNotebookModal, MoveToFolderModal } from "./modals";
+import { FeaturedSection, RecentSection } from "./views";
 
 interface NotebookCreateData {
   title: string;

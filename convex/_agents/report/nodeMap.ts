@@ -6,8 +6,8 @@ import { PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
 import { invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
 import { MAP_PROMPTS, MAP_SYSTEM_PROMPT } from "./prompts.js";
-import type { MapOutput, MapOutputInvoker } from "./structuredLlm.js";
 import type { ChunkProcessState, OverallStateType } from "./state.js";
+import type { MapOutput, MapOutputInvoker } from "./structuredLlm.js";
 
 export async function mapProcess(
   state: ChunkProcessState,
@@ -67,7 +67,6 @@ IMPORTANT: Respond with a JSON object containing:
   } catch (error) {
     const elapsed = Date.now() - startTime;
     const isTimeout =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (error as any).isTimeout ||
       (error instanceof Error &&
         (error.message.includes("timeout") ||
@@ -90,9 +89,7 @@ IMPORTANT: Respond with a JSON object containing:
               name: error.name,
               message: error.message,
               stack: error.stack?.split("\n").slice(0, 5).join("\n"),
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               phase: (error as any).phase,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               isTimeout: (error as any).isTimeout,
             }
           : String(error),

@@ -1,22 +1,22 @@
-import React, { useState, useMemo } from "react";
 import {
   ArrowLeft,
+  ArrowUpAZ,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
   LayoutGrid,
   List,
-  ChevronDown,
-  Calendar,
-  ArrowUpAZ,
-  CheckCircle2,
   Plus,
 } from "lucide-react";
-import { NotebookItem, FolderItem } from "@/shared/types/index";
-import { NotebookCard } from "../cards/NotebookCard";
+import React, { useMemo, useState } from "react";
+import { PageSkeleton } from "@/shared/components/PageSkeleton";
+import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { useNotebookHandlers, useNotebookSorting } from "../../hooks";
-import { useNotebookContext } from "../../useNotebookContext";
 import { useFolderNotebooks } from "../../services/foldersApi";
 import { useCreateNotebook, useUpdateNotebook } from "../../services/notebooksApi";
+import { useNotebookContext } from "../../useNotebookContext";
+import { NotebookCard } from "../cards/NotebookCard";
 import { CustomizeNotebookModal, MoveToFolderModal } from "../modals";
-import { PageSkeleton } from "@/shared/components/PageSkeleton";
 
 interface FolderViewProps {
   folderId: string;

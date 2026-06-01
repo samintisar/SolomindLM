@@ -1,10 +1,10 @@
 import { v } from "convex/values";
-import { query, mutation, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { getAuthUserId } from "../auth";
+import { internalMutation, internalQuery, mutation, query } from "../_generated/server";
+import { assertCanEditConversation, assertCanReadConversation } from "../_lib/conversationAccess";
 import { getNotebookAccess } from "../_lib/notebookAccess";
-import { assertCanReadConversation, assertCanEditConversation } from "../_lib/conversationAccess";
 import * as ConvModel from "../_model/conversations";
+import { getAuthUserId } from "../auth";
 
 /**
  * Get or create a conversation for a notebook
@@ -159,7 +159,6 @@ export const getMessages = query({
       .query("messages")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .order("asc")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .paginate({ cursor: args.cursor as any, numItems: args.limit || 50 });
 
     return {
@@ -185,7 +184,6 @@ export const getMessagesInternal = internalQuery({
       .query("messages")
       .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
       .order("asc")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .paginate({ cursor: args.cursor as any, numItems: args.limit || 50 });
 
     return {

@@ -46,7 +46,7 @@ export function exportPapersToCsv(papers: RankedPaper[], filename: string) {
     "Source",
     "Abstract",
   ];
-  const escape = (v: string) => {
+  const escapeCsvField = (v: string) => {
     if (v.includes(",") || v.includes('"') || v.includes("\n")) {
       return `"${v.replace(/"/g, '""')}"`;
     }
@@ -65,7 +65,7 @@ export function exportPapersToCsv(papers: RankedPaper[], filename: string) {
       p.source,
       p.abstract,
     ]
-      .map(escape)
+      .map(escapeCsvField)
       .join(",")
   );
 

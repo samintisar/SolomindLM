@@ -1,21 +1,20 @@
-import React from "react";
 import {
-  X,
+  BarChart3,
+  Book,
+  Brain,
+  FileText,
   Folder,
   FolderOpen,
-  Book,
-  BarChart3,
-  Monitor,
-  Search,
-  Brain,
   Globe,
-  FileText,
   GraduationCap,
   Lightbulb,
+  Monitor,
+  Search,
+  X,
 } from "lucide-react";
+import React from "react";
 import { FolderItem } from "@/shared/types/index";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const IconMap: Record<string, React.FC<any>> = {
   Folder,
   Book,

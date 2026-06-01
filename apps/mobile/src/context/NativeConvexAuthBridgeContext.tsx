@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-
 import { convexAuthSecureStorage } from "@mobile/services/auth/convexAuthSecureStorage";
 import { convexAuthStorageKeys } from "@mobile/services/auth/convexAuthStorageKeys";
 import { convexClient, convexDeploymentUrl } from "@mobile/services/convex/client";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { NativeConvexAuthBridgeContext } from "./useNativeConvexAuthBridge";
 
 export function NativeConvexAuthBridgeProvider({ children }: { children: ReactNode }) {

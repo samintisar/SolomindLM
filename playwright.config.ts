@@ -1,5 +1,5 @@
 import { defineConfig } from "@playwright/test";
-import { readFileSync, existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
 // Load .env.e2e if present (gitignored — holds E2E_TEST_EMAIL, E2E_TEST_PASSWORD)

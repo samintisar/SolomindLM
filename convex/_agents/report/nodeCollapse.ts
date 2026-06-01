@@ -9,8 +9,8 @@ import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
 import { getMessageContent, invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
 import { COLLAPSE_PROMPTS, COLLAPSE_SYSTEM_PROMPT } from "./prompts.js";
-import type { MapOutput } from "./structuredLlm.js";
 import type { OverallStateType } from "./state.js";
+import type { MapOutput } from "./structuredLlm.js";
 import { analyzeAllTopics } from "./topicAnalysis.js";
 
 export interface CollapseDeps {
@@ -35,7 +35,6 @@ async function collapseGroup(
     () =>
       invokeWithTimeout(
         () =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (deps.smartLlm as any).invoke([
             new SystemMessage(COLLAPSE_SYSTEM_PROMPT),
             new HumanMessage(prompt),
@@ -102,7 +101,6 @@ export async function collapse(
   console.log("=".repeat(80));
 
   const validOutputs: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const errorOutputs: Array<{ index: number; error: any }> = [];
 
   state.mapOutputs.forEach((output, idx) => {

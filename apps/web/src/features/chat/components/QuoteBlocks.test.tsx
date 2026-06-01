@@ -1,9 +1,9 @@
-import { describe, expect, test } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { QuoteBlocks } from "./QuoteBlocks";
+import { describe, expect, test } from "vitest";
 import { SelectionQuoteProvider, useSelectionQuotes } from "../contexts/SelectionQuoteContext";
+import { QuoteBlocks } from "./QuoteBlocks";
 
 describe("QuoteBlocks", () => {
   test("renders nothing when no quotes", () => {

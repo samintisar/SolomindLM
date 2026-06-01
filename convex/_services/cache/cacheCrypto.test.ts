@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { hashInput, generateAgentCacheKey, generateEmbeddingCacheKey } from "./cacheCrypto";
+import { describe, expect, it } from "vitest";
+import { generateAgentCacheKey, generateEmbeddingCacheKey, hashInput } from "./cacheCrypto";
 
 describe("hashInput", () => {
   it("returns a stable 16-char hex prefix", async () => {

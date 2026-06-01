@@ -1,6 +1,6 @@
-import { describe, expect, test, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import React from "react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   SelectionQuoteProvider,
   useSelectionQuotes,

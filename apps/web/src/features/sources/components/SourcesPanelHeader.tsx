@@ -1,5 +1,5 @@
-import React from "react";
 import { ChevronLeft, Copy, Download, ExternalLink, FileStack } from "lucide-react";
+import React from "react";
 import { Source } from "@/shared/types";
 
 interface SourcesPanelHeaderProps {

@@ -1,6 +1,6 @@
-import { test, expect } from "../fixtures/notebook.fixture";
-import { TOOL_LABELS, openStudioTool } from "../helpers/studio-assertions";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { openStudioPanel } from "../helpers/navigation";
+import { openStudioTool, TOOL_LABELS } from "../helpers/studio-assertions";
 
 // Keep layout on md+ (three columns + chat header) so Studio is not forced into mobile tab affordances only
 test.use({ viewport: { width: 1440, height: 900 } });

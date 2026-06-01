@@ -1,15 +1,15 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Folder,
-  Book,
   BarChart3,
-  Monitor,
-  Search,
+  Book,
   Brain,
-  Globe,
   FileText,
+  Folder,
+  Globe,
   GraduationCap,
   Lightbulb,
+  Monitor,
+  Search,
 } from "lucide-react";
 
 const NOTEBOOK_LUCIDE_ICON_MAP: Record<string, LucideIcon> = {

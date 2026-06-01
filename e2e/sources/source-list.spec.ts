@@ -1,13 +1,13 @@
-import { test, expect } from "../fixtures/notebook.fixture";
+import { expect, test } from "../fixtures/notebook.fixture";
 import { shouldSkipAITests } from "../helpers/ai-service";
 import {
   addPasteTextSource,
-  selectSource,
   deleteSource,
-  waitForSourceStatus,
   getSourceCard,
   openSourceKebab,
   PASTED_TEXT_TITLE,
+  selectSource,
+  waitForSourceStatus,
 } from "../helpers/source-assertions";
 
 test.describe("Source List", () => {

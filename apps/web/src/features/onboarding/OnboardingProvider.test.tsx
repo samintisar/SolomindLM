@@ -1,8 +1,8 @@
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { OnboardingProvider } from "./OnboardingProvider";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { useOnboarding } from "./OnboardingContext";
+import { OnboardingProvider } from "./OnboardingProvider";
 
 const mockMutations = {
   startTour: vi.fn(async () => {}),

@@ -1,5 +1,5 @@
+import { ListChecks, LogIn, LogOut, Moon, Sun } from "lucide-react";
 import React from "react";
-import { LogIn, LogOut, Sun, Moon, ListChecks } from "lucide-react";
 import type { User } from "../useAuth";
 import { LanguageSelector } from "./LanguageSelector";
 

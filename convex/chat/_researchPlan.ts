@@ -1,8 +1,8 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { createResearchAgent } from "./_streamResearch";
 import type { StreamSourcePolicy } from "./stream";
@@ -57,9 +57,10 @@ export async function runResearchPlanPhase(
   });
 
   // Phase 1: Generate plan
-  const subQuestions = await agent.generatePlan(message, sourcePolicy as Parameters<
-    typeof agent.generatePlan
-  >[1]);
+  const subQuestions = await agent.generatePlan(
+    message,
+    sourcePolicy as Parameters<typeof agent.generatePlan>[1]
+  );
 
   // Save plan to database
   const planId = await ctx.runMutation(internal.research.index.createResearchPlan, {

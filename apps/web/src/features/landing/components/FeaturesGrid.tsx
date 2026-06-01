@@ -1,16 +1,16 @@
-import React from "react";
-import Marquee from "react-fast-marquee";
 import {
   AudioLines,
-  GitFork,
-  FileText,
-  Layers,
-  HelpCircle,
-  MessageSquareText,
   Brain,
-  Table2,
+  FileText,
+  GitFork,
+  HelpCircle,
+  Layers,
+  MessageSquareText,
   Presentation,
+  Table2,
 } from "lucide-react";
+import React from "react";
+import Marquee from "react-fast-marquee";
 import { LANDING_CONTENT } from "../constants";
 
 export const FeaturesGrid: React.FC = () => {

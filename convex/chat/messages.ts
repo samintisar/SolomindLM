@@ -1,12 +1,12 @@
 import { v } from "convex/values";
-import { query, mutation, internalAction, internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { getAuthUserId } from "../auth";
-import { assertCanReadNotebook, assertCanEditNotebook } from "../_lib/notebookAccess";
-import { getConversationIfReadable, assertCanEditConversation } from "../_lib/conversationAccess";
-import * as ConvModel from "../_model/conversations";
 import type { Id } from "../_generated/dataModel";
+import { internalAction, internalMutation, mutation, query } from "../_generated/server";
+import { assertCanEditConversation, getConversationIfReadable } from "../_lib/conversationAccess";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { MAX_MESSAGES_PER_CONVERSATION } from "../_lib/queryCaps";
+import * as ConvModel from "../_model/conversations";
+import { getAuthUserId } from "../auth";
 
 /**
  * Get all messages for a notebook
@@ -459,4 +459,3 @@ export const setTitleInternal = internalMutation({
     });
   },
 });
-

@@ -1,5 +1,5 @@
+import { ExternalLink, Globe, GraduationCap, Newspaper, Plus, TrendingUp, X } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
-import { Globe, GraduationCap, Newspaper, TrendingUp, Plus, X, ExternalLink } from "lucide-react";
 import { Favicon } from "@/shared/components/Favicon";
 
 export interface ExternalSource {
@@ -36,7 +36,6 @@ export const ExternalSourcesModal: React.FC<ExternalSourcesModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelected(new Set());
     }
   }, [isOpen]);

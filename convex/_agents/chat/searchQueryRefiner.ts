@@ -1,4 +1,5 @@
 "use node";
+
 /**
  * Search Query Refiner
  *
@@ -10,8 +11,8 @@
  * results without slowing down the pipeline significantly.
  */
 
-import { uncachedLlmCall } from "../_shared/cachedLlm";
 import { env } from "../../_lib/env";
+import { uncachedLlmCall } from "../_shared/cachedLlm";
 
 /**
  * Rewrite a user message into a concise, search-optimized query.

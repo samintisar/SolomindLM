@@ -1,8 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  createDiscoverSources,
-  discoverChatExternalSources,
-} from "./_streamSources";
+import { describe, expect, it, vi } from "vitest";
+import { createDiscoverSources, discoverChatExternalSources } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
 
 describe("createDiscoverSources", () => {
@@ -21,14 +18,16 @@ describe("createDiscoverSources", () => {
 
   it("discovers web sources via Tavily", async () => {
     const ctx = {
-      runAction: vi.fn().mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
-        if (args.topic === "general") {
-          return [
-            { title: "Web Result", url: "https://example.com", snippet: "Hello", score: 0.9 },
-          ];
-        }
-        return [];
-      }),
+      runAction: vi
+        .fn()
+        .mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+          if (args.topic === "general") {
+            return [
+              { title: "Web Result", url: "https://example.com", snippet: "Hello", score: 0.9 },
+            ];
+          }
+          return [];
+        }),
     } as unknown as Parameters<typeof createDiscoverSources>[0];
 
     const policy: StreamSourcePolicy = { channels: ["web"] };
@@ -78,20 +77,22 @@ describe("discoverChatExternalSources chunking", () => {
   it("builds chunks from rawContent when available", async () => {
     const rawContent = "a".repeat(5000);
     const ctx = {
-      runAction: vi.fn().mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
-        if (args.topic === "general") {
-          return [
-            {
-              title: "Deep Article",
-              url: "https://example.com/deep",
-              snippet: "Short",
-              score: 0.95,
-              rawContent,
-            },
-          ];
-        }
-        return [];
-      }),
+      runAction: vi
+        .fn()
+        .mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+          if (args.topic === "general") {
+            return [
+              {
+                title: "Deep Article",
+                url: "https://example.com/deep",
+                snippet: "Short",
+                score: 0.95,
+                rawContent,
+              },
+            ];
+          }
+          return [];
+        }),
     } as unknown as Parameters<typeof createDiscoverSources>[0];
 
     const policy: StreamSourcePolicy = { channels: ["web"] };
@@ -107,20 +108,22 @@ describe("discoverChatExternalSources chunking", () => {
 
   it("falls back to snippet when rawContent is too short", async () => {
     const ctx = {
-      runAction: vi.fn().mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
-        if (args.topic === "general") {
-          return [
-            {
-              title: "Brief",
-              url: "https://example.com",
-              snippet: "This is a reasonably long snippet that should be used.",
-              score: 0.8,
-              rawContent: "short",
-            },
-          ];
-        }
-        return [];
-      }),
+      runAction: vi
+        .fn()
+        .mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+          if (args.topic === "general") {
+            return [
+              {
+                title: "Brief",
+                url: "https://example.com",
+                snippet: "This is a reasonably long snippet that should be used.",
+                score: 0.8,
+                rawContent: "short",
+              },
+            ];
+          }
+          return [];
+        }),
     } as unknown as Parameters<typeof createDiscoverSources>[0];
 
     const policy: StreamSourcePolicy = { channels: ["web"] };

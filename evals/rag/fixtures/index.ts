@@ -1,39 +1,37 @@
 import type { EvalFixture } from "../types";
 import { agenticPatterns20 } from "./agentic-patterns-20";
+import { literatureReviewFixtures } from "./literatureReview";
+import { mlAmbiguousFixtures } from "./ml/ambiguous";
+import { mlCausalityFixtures } from "./ml/causality";
+import { mlComparisonFixtures } from "./ml/comparison";
+import { mlExplanationFixtures } from "./ml/explanation";
 import { mlFactoidFixtures } from "./ml/factoid";
 import { mlListEnumerationFixtures } from "./ml/listEnumeration";
-import { mlComparisonFixtures } from "./ml/comparison";
-import { mlCausalityFixtures } from "./ml/causality";
-import { mlTemporalFixtures } from "./ml/temporal";
-import { mlAmbiguousFixtures } from "./ml/ambiguous";
 import { mlMultiDocFixtures } from "./ml/multiDoc";
-import { mlTechnicalFixtures } from "./ml/technical";
 import { mlSummarizationFixtures } from "./ml/summarization";
-import { mlExplanationFixtures } from "./ml/explanation";
-import { STUDIO_FIXTURES } from "./studio";
-import { allSourceFixtures } from "./sourceTests";
+import { mlTechnicalFixtures } from "./ml/technical";
+import { mlTemporalFixtures } from "./ml/temporal";
 import { researchFixtures } from "./research";
-import { literatureReviewFixtures } from "./literatureReview";
-
-// Export scenario category types and helpers
-export { SCENARIO_CATEGORIES, inferCategory } from "./scenarioCategories";
-export type { ScenarioCategory } from "./scenarioCategories";
+import { allSourceFixtures } from "./sourceTests";
+import { STUDIO_FIXTURES } from "./studio";
 
 // Export fixture creation helpers
 export { createFixture, createFixtureBatch, exampleMlFixture } from "./fixtureTemplate";
-
 // Export NotebookLM converter
 export {
-  parseNotebookLMOutput,
-  notebookLMToFixtures,
   convertNotebookLM,
+  notebookLMToFixtures,
+  parseNotebookLMOutput,
 } from "./notebookLM_converter";
+export type { ScenarioCategory } from "./scenarioCategories";
+// Export scenario category types and helpers
+export { inferCategory, SCENARIO_CATEGORIES } from "./scenarioCategories";
 
 export {
-  withSourceMatrix,
+  DEFAULT_SOURCE_MATRIX,
   withAcademicWebMatrix,
   withNewsMatrix,
-  DEFAULT_SOURCE_MATRIX,
+  withSourceMatrix,
 } from "./sourceFilterVariants";
 
 /** Registry of all golden eval fixtures */

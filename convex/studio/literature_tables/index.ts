@@ -1,16 +1,16 @@
-import { v } from "convex/values";
+import { restart, sendEvent, type WorkflowId } from "@convex-dev/workflow";
 import type { FunctionReference } from "convex/server";
-import type { Id } from "../../_generated/dataModel";
-import { mutation, query, internalMutation } from "../../_generated/server";
-import { sendEvent, restart, type WorkflowId } from "@convex-dev/workflow";
-import { components, internal } from "../../_generated/api";
-import { getAuthUserId } from "../../auth";
-import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
+import { v } from "convex/values";
 import { workflow } from "../../_agents/literature_review/LiteratureReviewGraph.js";
-import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
-import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
-import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
+import { components, internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
+import { internalMutation, mutation, query } from "../../_generated/server";
+import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/notebookAccess";
+import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
+import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
+import { getAuthUserId } from "../../auth";
+import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
 
 /** Chat workflow tables/reports — never listed in the studio sidebar. */
 async function getChatLinkedLiteratureArtifactIds(

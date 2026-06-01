@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { TEST_EMAIL, TEST_PASSWORD } from "../fixtures/auth.fixture";
 
 test.describe("Auth — Sign-in flow", () => {

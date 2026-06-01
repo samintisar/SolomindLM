@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from "react";
 import { PenTool, Search } from "lucide-react";
-import { StudioTool, Note } from "@/shared/types/index";
-import { ToolGrid } from "./ToolGrid";
+import React, { useMemo, useState } from "react";
+import { Note, StudioTool } from "@/shared/types/index";
 import { NoteItem } from "./NoteItem";
+import { ToolGrid } from "./ToolGrid";
 
 interface NoteListViewProps {
   tools: StudioTool[];

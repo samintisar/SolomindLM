@@ -3,10 +3,10 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
+  clearStateKeys,
   invokeWithRetry,
   invokeWithTimeout,
   validateQuiz,
-  clearStateKeys,
   withoutMapOutputs,
 } from "../_shared/index.js";
 import type { JobLogger } from "../_shared/logging.js";
@@ -38,7 +38,6 @@ export async function expandQuestion(
     () =>
       invokeWithTimeout(
         () =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (deps.expandLlmQuestionStructured as any).invoke([
             new SystemMessage(EXPAND_QUESTION_SYSTEM_PROMPT),
             new HumanMessage(prompt),
