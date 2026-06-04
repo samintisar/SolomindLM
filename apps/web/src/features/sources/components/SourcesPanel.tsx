@@ -16,7 +16,7 @@ import { requestGoogleDriveAccessToken } from "../utils/requestGoogleDriveAccess
 import { AddSourceModal } from "./AddSourceModal";
 import { DiscoverSourcesModal } from "./DiscoverSourcesModal";
 import type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
-import { GoogleDrivePicker } from "./GoogleDrivePicker";
+import { GoogleDrivePicker, isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
 import { SocialMediaInputModal } from "./SocialMediaInputModal";
 import { SourceList } from "./SourceList";
 import { SourcesPanelHeader } from "./SourcesPanelHeader";
@@ -529,7 +529,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         }}
       />
 
-      <GoogleDrivePicker ref={googleDriveRef} onFilesSelected={handleGoogleDriveFiles} />
+      {isGoogleDrivePickerConfigured ? (
+        <GoogleDrivePicker ref={googleDriveRef} onFilesSelected={handleGoogleDriveFiles} />
+      ) : null}
       <ConfirmDialogComponent />
     </>
   );

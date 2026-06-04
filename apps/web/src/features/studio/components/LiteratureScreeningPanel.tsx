@@ -76,20 +76,13 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
     });
   }, [screeningDecisions]);
 
-  const { included, excluded } = useMemo(() => {
-    return {
-      included: sortedDecisions.filter((d) => d.decision === "included"),
-      excluded: sortedDecisions.filter((d) => d.decision === "excluded"),
-    };
-  }, [sortedDecisions]);
-
   const criteriaLabels = useMemo(
     () => getScreeningCriteriaLabels(session?.query),
     [session?.query]
   );
 
   const isLoading = screeningDecisions === undefined;
-  const total = included.length + excluded.length;
+  const total = sortedDecisions.length;
   const isEmpty = screeningDecisions !== undefined && total === 0;
 
   const toggleDecisionExpanded = useCallback((paperIndex: number) => {
@@ -112,19 +105,12 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
     >
       <ResizeHandle width={width} position="left" />
 
-      <div className="flex shrink-0 flex-col border-b border-border bg-background">
-        <ScreeningPanelHeader
-          title="Screening Decisions and Outcome Summary"
-          subtitle={session?.query}
-          count={total}
-          canExport={total > 0}
-          onExport={handleExport}
-          onClose={onClose}
-        />
-        {!isLoading && total > 0 ? (
-          <ScreeningOutcomeSummary included={included.length} excluded={excluded.length} />
-        ) : null}
-      </div>
+      <ScreeningPanelHeader
+        title="Screening Decisions and Outcome Summary"
+        canExport={total > 0}
+        onExport={handleExport}
+        onClose={onClose}
+      />
 
       <div className="flex-1 overflow-y-auto bg-background">
         {isLoading ? (
@@ -146,31 +132,19 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
 
 function ScreeningPanelHeader({
   title,
-  subtitle,
-  count,
   canExport,
   onExport,
   onClose,
 }: {
   title: string;
-  subtitle?: string;
-  count: number;
   canExport: boolean;
   onExport: () => void;
   onClose: () => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 px-4 py-3">
-      <div className="min-w-0 flex-1 space-y-1">
-        <h2 className="truncate text-[15px] font-semibold text-foreground">{title}</h2>
-        {subtitle ? (
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{subtitle}</p>
-        ) : null}
-        {count > 0 ? (
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            {count.toLocaleString()} screened papers
-          </p>
-        ) : null}
+    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-background p-4">
+      <div className="min-w-0 flex-1">
+        <h2 className="truncate text-sm font-medium text-foreground">{title}</h2>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button
@@ -191,25 +165,6 @@ function ScreeningPanelHeader({
           <X className="h-4 w-4" />
         </button>
       </div>
-    </div>
-  );
-}
-
-function ScreeningOutcomeSummary({ included, excluded }: { included: number; excluded: number }) {
-  return (
-    <div className="grid grid-cols-3 border-t border-border bg-muted/20 text-xs">
-      <SummaryMetric label="Papers" value={included + excluded} />
-      <SummaryMetric label="Included" value={included} />
-      <SummaryMetric label="Excluded" value={excluded} />
-    </div>
-  );
-}
-
-function SummaryMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border-r border-border px-4 py-2 last:border-r-0">
-      <div className="text-sm font-semibold text-foreground">{value.toLocaleString()}</div>
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
     </div>
   );
 }

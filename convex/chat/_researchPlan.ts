@@ -3,6 +3,7 @@
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
+import { env } from "../_lib/env.js";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { createResearchAgent } from "./_streamResearch";
 import type { StreamSourcePolicy } from "./stream";
@@ -24,8 +25,8 @@ export async function runResearchPlanPhase(
     notebookId: notebookId as Id<"notebooks">,
   });
 
-  const apiKey = process.env.TOGETHER_API_KEY ?? "";
-  const smartModel = process.env.SMART_MODEL ?? "openai/gpt-oss-120b";
+  const apiKey = env.TOGETHER_AI_API_KEY;
+  const smartModel = env.SMART_LLM;
   const notebookIdTyped = notebookId as Id<"notebooks">;
 
   let resolvedUserMessageId = userMessageId;

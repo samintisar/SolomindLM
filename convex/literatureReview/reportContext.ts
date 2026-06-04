@@ -114,6 +114,125 @@ PRISMA-style flow (counts from this review run):
 Data were extracted into a structured evidence table using question-specific columns. Extracted fields were used for narrative synthesis; numeric claims in this report are limited to values present in extracted cells or the counts above.`;
 }
 
+/** True when a column id/name refers to bibliographic title (not generic "title" row key). */
+export function isTitleLikeColumnName(columnLabel: string): boolean {
+  const id = columnLabel.toLowerCase().replace(/\s+/g, "_");
+  const name = columnLabel.toLowerCase();
+  return (
+    id === "title" ||
+    id.includes("paper_title") ||
+    name.includes("paper title") ||
+    (name.includes("title") && name.includes("year"))
+  );
+}
+
+export function formatPaperTitleYear(title: string, year: string): string {
+  const t = title.trim();
+  if (!t) return "";
+  const y = year.trim();
+  return y ? `${t} (${y})` : t;
+}
+
+/** Resolve an extraction cell for display, including metadata fallbacks. */
+export function resolveStudyTableCellValue(
+  paper: ReportPaperRow,
+  columnLabel: string
+): string {
+  const normalized = columnLabel.toLowerCase().replace(/\s+/g, "_");
+  const direct =
+    paper.rowData[columnLabel] ??
+    paper.rowData[normalized] ??
+    paper.rowData["title"];
+  if (direct?.trim() && direct.trim() !== "N/A") {
+    return direct.trim();
+  }
+
+  const fuzzyKey = Object.keys(paper.rowData).find((k) => {
+    const kn = k.toLowerCase();
+    return kn === normalized || kn.replace(/_/g, "") === normalized.replace(/_/g, "");
+  });
+  const fuzzy = fuzzyKey ? paper.rowData[fuzzyKey] : "";
+  if (fuzzy?.trim() && fuzzy.trim() !== "N/A") {
+    return fuzzy.trim();
+  }
+
+  if (isTitleLikeColumnName(columnLabel) && paper.title.trim()) {
+    return formatPaperTitleYear(paper.title, paper.year);
+  }
+
+  return "";
+}
+
+/** Minimum word counts for narrative sections (full-report single-call mode). */
+export const REPORT_SECTION_MIN_WORDS: Record<string, number> = {
+  abstract: 100,
+  introduction: 150,
+  methods: 50,
+  results: 120,
+  discussion: 150,
+  conclusion: 80,
+};
+
+function reportSectionWordCount(content: string): number {
+  return content.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** LLM copied JSON examples or stub phrases instead of writing prose. */
+export function isTrivialReportSectionContent(content: string, heading?: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) return true;
+  const lower = trimmed.toLowerCase();
+
+  if (lower === "..." || lower === "…" || lower === "n/a" || lower === "na") {
+    return true;
+  }
+  if (trimmed.length < 40 && /^\.+$/.test(trimmed)) return true;
+  if (/^<[^>]{1,200}>$/i.test(trimmed)) return true;
+  if (/content here\.?$/i.test(lower)) return true;
+  if (/^(tbd|todo|placeholder|pending|fill in)\.?$/i.test(lower)) return true;
+  if (/^[\w\s]{2,40}\s+content\s+here\.?$/i.test(trimmed)) return true;
+
+  if (heading) {
+    const key = heading.trim().toLowerCase();
+    if (lower === `${key} content here` || lower === `${key} content here.`) {
+      return true;
+    }
+    const minWords = REPORT_SECTION_MIN_WORDS[key];
+    if (minWords !== undefined && reportSectionWordCount(trimmed) < minWords) {
+      const hasCitation = /\[[A-Za-z][\w,.-\s]{0,50}\d{2,4}\]/.test(trimmed);
+      const hasStructure = /^#{1,3}\s/m.test(trimmed) || trimmed.length >= 500;
+      if (!hasCitation && !hasStructure) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** Section headings that still need per-section LLM generation. */
+export function getReportSectionsNeedingRegeneration(
+  sections: Array<{ heading: string; content: string }>,
+  requiredHeadings: string[]
+): string[] {
+  const byHeading = new Map(
+    sections.map((s) => [s.heading.trim().toLowerCase(), s.content] as const)
+  );
+  return requiredHeadings.filter((name) => {
+    const content = byHeading.get(name.toLowerCase()) ?? "";
+    return isTrivialReportSectionContent(content, name);
+  });
+}
+
+/** @deprecated Use getReportSectionsNeedingRegeneration — kept for tests. */
+export function fullReportHasOnlyTrivialContent(
+  sections: Array<{ heading: string; content: string }>
+): boolean {
+  const headings = sections.map((s) => s.heading);
+  return getReportSectionsNeedingRegeneration(sections, headings).length >=
+    Math.ceil(headings.length / 2);
+}
+
 export function buildStudyCharacteristicsTable(
   papers: ReportPaperRow[],
   columnNames: string[]
@@ -134,14 +253,8 @@ export function buildStudyCharacteristicsTable(
       studyCell,
       p.year || "N/A",
       ...displayCols.slice(0, 4).map((col) => {
-        const key = Object.keys(p.rowData).find(
-          (k) => k.toLowerCase() === col.toLowerCase().replace(/\s+/g, "_")
-        );
-        const val =
-          p.rowData[col] ??
-          p.rowData[col.toLowerCase().replace(/\s+/g, "_")] ??
-          (key ? p.rowData[key] : "");
-        const trimmed = (val ?? "").slice(0, 120);
+        const val = resolveStudyTableCellValue(p, col);
+        const trimmed = val.slice(0, 120);
         return trimmed || "—";
       }),
     ];
@@ -184,7 +297,66 @@ export function stripUnknownCitationMarkers(content: string, unknownKeys: string
   for (const key of unknownKeys) {
     out = out.replace(new RegExp(`\\[${escapeRegex(key)}\\]`, "g"), "");
   }
-  return out.replace(/\s{2,}/g, " ").trim();
+  // Collapse extra spaces per line only — preserve newlines (tables, ### headings).
+  return out
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Removes a leading `#` / `##` line when it repeats the structured section heading
+ * (the UI renders `section.heading` separately).
+ */
+export function stripLeadingSectionHeadingLine(content: string, heading: string): string {
+  const h = escapeRegex(heading.trim());
+  if (!h) return content;
+  let out = content.trim();
+  let prev = "";
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(new RegExp(`^#{1,2}\\s*${h}\\s*:?\\s*\\n+`, "i"), "").trim();
+  }
+  return out;
+}
+
+/**
+ * Fixes common LLM markdown issues before render/export: duplicate section titles,
+ * inline ### headings, and row separators like |||.
+ */
+export function normalizeLiteratureReportSectionContent(
+  content: string,
+  sectionHeading?: string
+): string {
+  let out = content.trim();
+  if (sectionHeading?.trim()) {
+    out = stripLeadingSectionHeadingVariants(out, sectionHeading.trim());
+  }
+  return ensureMarkdownBlockBoundaries(out);
+}
+
+/** Bold/plain title lines and "Results ### …" echoes not covered by ATX strip. */
+function stripLeadingSectionHeadingVariants(content: string, heading: string): string {
+  const h = escapeRegex(heading);
+  let out = content;
+  out = out.replace(new RegExp(`^\\*\\*${h}\\*\\*\\s*\\n+`, "i"), "");
+  out = out.replace(new RegExp(`^${h}\\s*\\n+`, "i"), "");
+  out = out.replace(new RegExp(`^${h}\\s+(#{1,6}\\s+)`, "i"), "$1");
+  return out.trim();
+}
+
+function ensureMarkdownBlockBoundaries(content: string): string {
+  let out = content;
+  // ### mid-paragraph → own line (requires blank line before for most parsers)
+  out = out.replace(/([^\n#])\s+(#{1,6}\s+\S)/g, "$1\n\n$2");
+  // Table row after prose (not already separated)
+  out = out.replace(/([^\n|])\n(\|)/g, "$1\n\n$2");
+  // LLM row breaks (||| or || before next row)
+  out = out.replace(/\s*\|\|\|\s*/g, "\n");
+  out = out.replace(/\|\|\s*(?=\|)/g, "\n");
+  return out;
 }
 
 function escapeRegex(s: string): string {
@@ -232,6 +404,8 @@ export function validateAndSanitizeReportSections(
     if (unknown.length > 0) {
       content = stripUnknownCitationMarkers(content, unknown);
     }
+    content = stripLeadingSectionHeadingLine(content, section.heading);
+    content = normalizeLiteratureReportSectionContent(content, section.heading);
     return { ...section, content };
   });
   return {
@@ -250,10 +424,16 @@ export function mergeDeterministicReportSections(
 ): Array<{ heading: string; content: string }> {
   const byHeading = new Map(llmSections.map((s) => [s.heading.trim().toLowerCase(), s.content]));
 
-  const methodsNarrative = byHeading.get("methods") ?? "";
+  const methodsNarrative = normalizeLiteratureReportSectionContent(
+    byHeading.get("methods") ?? "",
+    "Methods"
+  );
   const methodsContent = `${deterministic.methodsBlock}\n\n${methodsNarrative}`.trim();
 
-  const resultsNarrative = byHeading.get("results") ?? "";
+  const resultsNarrative = normalizeLiteratureReportSectionContent(
+    byHeading.get("results") ?? "",
+    "Results"
+  );
   const resultsContent = `### Characteristics of Included Studies
 
 ${deterministic.studyTable}
@@ -280,7 +460,8 @@ _Ensure subsections above include a **Summary of Evidence** table when synthesiz
     } else if (key === "results") {
       out.push({ heading: "Results", content: resultsContent });
     } else {
-      const content = byHeading.get(key) ?? `[${name} not generated]`;
+      const raw = byHeading.get(key) ?? `[${name} not generated]`;
+      const content = normalizeLiteratureReportSectionContent(raw, name);
       out.push({ heading: name, content });
     }
   }

@@ -8,33 +8,24 @@ const GOOGLE_API_KEY_PATTERN = /^AIza[0-9A-Za-z_-]+$/;
 const GOOGLE_CLIENT_ID_SUFFIX = ".apps.googleusercontent.com";
 const GOOGLE_APP_ID_PATTERN = /^\d+$/;
 
-function hasValidGooglePickerConfig() {
+function isGooglePickerConfigValid() {
   if (!GOOGLE_BROWSER_API_KEY || !GOOGLE_API_KEY_PATTERN.test(GOOGLE_BROWSER_API_KEY)) {
-    console.error(
-      'Google Drive picker misconfigured: expected VITE_GOOGLE_BROWSER_API_KEY to be a browser API key starting with "AIza". Configure API restrictions and HTTP referrer restrictions in Google Cloud Console.',
-      { apiKeyPresent: Boolean(GOOGLE_BROWSER_API_KEY) }
-    );
     return false;
   }
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_ID.endsWith(GOOGLE_CLIENT_ID_SUFFIX)) {
-    console.error(
-      "Google Drive picker misconfigured: expected VITE_GOOGLE_CLIENT_ID to be a Google OAuth web client ID.",
-      { clientIdPresent: Boolean(GOOGLE_CLIENT_ID) }
-    );
     return false;
   }
 
   if (!GOOGLE_APP_ID || !GOOGLE_APP_ID_PATTERN.test(GOOGLE_APP_ID)) {
-    console.error(
-      "Google Drive picker misconfigured: expected VITE_GOOGLE_APP_ID to be your Google Cloud project number used by PickerBuilder.setAppId().",
-      { appIdPresent: Boolean(GOOGLE_APP_ID) }
-    );
     return false;
   }
 
   return true;
 }
+
+/** True when all VITE_GOOGLE_* env vars required for the Drive picker are set. */
+export const isGoogleDrivePickerConfigured = isGooglePickerConfigValid();
 
 export interface PickedFile {
   id: string;
@@ -64,7 +55,7 @@ export function GoogleDrivePicker({
 
   const openPicker = useCallback(
     (accessToken: string) => {
-      if (!hasValidGooglePickerConfig()) return;
+      if (!isGoogleDrivePickerConfigured) return;
 
       if (typeof google === "undefined" || !google.picker?.PickerBuilder) {
         pendingOpenRef.current = true;
@@ -130,7 +121,7 @@ export function GoogleDrivePicker({
     ref,
     () => ({
       open: () => {
-        if (!hasValidGooglePickerConfig()) return;
+        if (!isGoogleDrivePickerConfigured) return;
 
         pendingOpenRef.current = true;
         maybeOpenPicker();
@@ -146,7 +137,7 @@ export function GoogleDrivePicker({
   );
 
   useEffect(() => {
-    if (scriptsLoadedRef.current || !hasValidGooglePickerConfig()) return;
+    if (scriptsLoadedRef.current || !isGoogleDrivePickerConfigured) return;
 
     const gisScript = document.createElement("script");
     gisScript.src = "https://accounts.google.com/gsi/client";

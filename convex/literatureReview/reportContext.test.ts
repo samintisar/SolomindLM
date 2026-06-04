@@ -3,8 +3,14 @@ import {
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
   findUnknownCitationKeys,
+  fullReportHasOnlyTrivialContent,
+  getReportSectionsNeedingRegeneration,
+  isTrivialReportSectionContent,
   mergeDeterministicReportSections,
   needsDeterministicReportMerge,
+  resolveStudyTableCellValue,
+  normalizeLiteratureReportSectionContent,
+  stripLeadingSectionHeadingLine,
   validateAndSanitizeReportSections,
 } from "./reportContext";
 
@@ -28,6 +34,53 @@ describe("reportContext", () => {
     expect(unknownCitations).toEqual(["bad"]);
     expect(sections[0].content).not.toContain("[bad]");
     expect(sections[0].content).toContain("[Kim2026]");
+  });
+
+  it("stripUnknownCitationMarkers preserves markdown newlines", () => {
+    const content = "Line one.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |";
+    const { sections } = validateAndSanitizeReportSections(
+      [{ heading: "Results", content: "Finding [Kim2026] and [bad].\n\n" + content }],
+      new Set(["Kim2026"]),
+      new Set()
+    );
+    expect(sections[0].content).toContain("\n| A | B |");
+    expect(sections[0].content).not.toMatch(/Line one\. \| A/);
+  });
+
+  it("stripLeadingSectionHeadingLine removes leading # / ## duplicate titles", () => {
+    expect(stripLeadingSectionHeadingLine("## Abstract\n\nBody text.", "Abstract")).toBe(
+      "Body text."
+    );
+    expect(stripLeadingSectionHeadingLine("# Introduction\n\nBody.", "Introduction")).toBe(
+      "Body."
+    );
+    expect(stripLeadingSectionHeadingLine("### Overview\n\nBody.", "Results")).toBe(
+      "### Overview\n\nBody."
+    );
+  });
+
+  it("validateAndSanitizeReportSections strips duplicate ## heading", () => {
+    const { sections } = validateAndSanitizeReportSections(
+      [{ heading: "Abstract", content: "## Abstract\n\nFindings here." }],
+      new Set(),
+      new Set()
+    );
+    expect(sections[0].content).toBe("Findings here.");
+  });
+
+  it("normalizeLiteratureReportSectionContent fixes inline headings and duplicate titles", () => {
+    const fixed = normalizeLiteratureReportSectionContent(
+      "Results ### Overview\n\nMore text. End. ### Next",
+      "Results"
+    );
+    expect(fixed).not.toMatch(/^Results\s+###/);
+    expect(fixed).toContain("### Overview");
+    expect(fixed).toContain("\n\n### Next");
+  });
+
+  it("normalizeLiteratureReportSectionContent splits ||| table rows", () => {
+    const fixed = normalizeLiteratureReportSectionContent("| a | b ||| | c | d |");
+    expect(fixed).toContain("\n| c | d |");
   });
 
   it("buildPrismaMethodsBlock uses provenance counts", () => {
@@ -92,5 +145,65 @@ describe("reportContext", () => {
     );
     expect(table).toContain("Kim2026");
     expect(table).toContain("medicine");
+  });
+
+  it("resolveStudyTableCellValue backfills Paper Title & Year from metadata", () => {
+    const val = resolveStudyTableCellValue(
+      {
+        citationKey: "Gao2023",
+        title: "Retrieval-Augmented Generation for LLMs",
+        authors: "Y. Gao",
+        year: "2023",
+        rowData: { retrieval_approach: "dense" },
+      },
+      "Paper Title & Year"
+    );
+    expect(val).toBe("Retrieval-Augmented Generation for LLMs (2023)");
+  });
+
+  it("isTrivialReportSectionContent detects JSON example placeholders", () => {
+    expect(isTrivialReportSectionContent("...")).toBe(true);
+    expect(isTrivialReportSectionContent("Abstract content here", "Abstract")).toBe(true);
+    expect(isTrivialReportSectionContent("Results content here", "Results")).toBe(true);
+    expect(
+      isTrivialReportSectionContent(
+        "A substantive abstract with enough words to summarize the review purpose, methods, synthesized findings across thirty included studies on retrieval-augmented generation for question answering, and conclusions about hybrid retrieval and evaluation gaps [Gao2023].",
+        "Abstract"
+      )
+    ).toBe(false);
+  });
+
+  it("fullReportHasOnlyTrivialContent triggers when majority are placeholders", () => {
+    const substantive =
+      "Retrieval-augmented generation for question answering integrates external corpora with large language models across thirty included studies from 2022 to 2025, comparing dense, sparse, and hybrid retrieval, graph-augmented variants, and evaluation benchmarks such as RAGAS and human judgments [Gao2023]. Findings highlight trade-offs between long-context models and retrieval, domain deployments in medicine and manufacturing, and gaps in standardized multi-hop QA evaluation.";
+    expect(
+      fullReportHasOnlyTrivialContent([
+        { heading: "Abstract", content: "..." },
+        { heading: "Introduction", content: "..." },
+        { heading: "Methods", content: "..." },
+        { heading: "Results", content: "..." },
+      ])
+    ).toBe(true);
+    expect(
+      fullReportHasOnlyTrivialContent([
+        { heading: "Abstract", content: substantive },
+        { heading: "Introduction", content: substantive },
+        { heading: "Methods", content: "..." },
+      ])
+    ).toBe(false);
+  });
+
+  it("getReportSectionsNeedingRegeneration lists only trivial headings", () => {
+    const substantive =
+      "Retrieval-augmented generation for question answering integrates external corpora with large language models across thirty included studies from 2022 to 2025, comparing dense, sparse, and hybrid retrieval, graph-augmented variants, and evaluation benchmarks such as RAGAS and human judgments [Gao2023]. Findings highlight trade-offs between long-context models and retrieval, domain deployments in medicine and manufacturing, and gaps in standardized multi-hop QA evaluation.";
+    expect(
+      getReportSectionsNeedingRegeneration(
+        [
+          { heading: "Abstract", content: substantive },
+          { heading: "Introduction", content: "Introduction content here" },
+        ],
+        ["Abstract", "Introduction", "Methods"]
+      )
+    ).toEqual(["Introduction", "Methods"]);
   });
 });

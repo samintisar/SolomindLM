@@ -4,9 +4,6 @@
  */
 
 export const env = {
-  // OpenAI
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
-
   // Together AI
   TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY || "",
   FAST_LLM: process.env.FAST_LLM || "openai/gpt-oss-120b",

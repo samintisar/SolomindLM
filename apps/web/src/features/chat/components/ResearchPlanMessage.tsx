@@ -1,6 +1,10 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { Ban, Check, FlaskConical, Loader2, X } from "lucide-react";
+import { Ban, Check, FileSpreadsheet, FileText, FlaskConical, Loader2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import {
+  useLiteratureReport,
+  useLiteratureTable,
+} from "../services/literatureReviewApi";
 import { useLatestRunForPlan, useResearchPlan, useResearchSteps } from "../services/researchApi";
 import { mapDeepResearchSteps } from "../utils/deepResearchSteps";
 import { LiteratureReviewSteps } from "./LiteratureReviewSteps";
@@ -52,11 +56,41 @@ interface ResearchPlanMessageProps {
   onOpenReport?: (reportId: Id<"literatureReports">) => void;
 }
 
+function ResultCard({
+  icon,
+  title,
+  typeLabel,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  typeLabel: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:bg-accent/30"
+    >
+      <div className="flex items-center gap-3">
+        {icon}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground">{typeLabel}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
   planId,
   subQuestions,
   onApprove,
   onReject,
+  onOpenTable,
+  onOpenReport,
 }) => {
   const [submitting, setSubmitting] = useState(false);
 
@@ -68,6 +102,11 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
   const isApproved = planStatus === "approved";
 
   const latestRun = useLatestRunForPlan(planId, isApproved);
+
+  const tableId = latestRun?.tableId as Id<"literatureTables"> | undefined;
+  const reportId = latestRun?.reportId as Id<"literatureReports"> | undefined;
+  const table = useLiteratureTable(tableId ?? null);
+  const report = useLiteratureReport(reportId ?? null);
 
   const runState = latestRun?.status as string | undefined;
   const runRowMissing = isApproved && latestRun === null;
@@ -118,7 +157,16 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
       ? "border-destructive/25"
       : "border-border";
 
-  const headerTitle = isRejected ? "Plan dismissed" : runFailed ? "Run failed" : "Research plan";
+  const planTitle =
+    typeof plan?.researchTitle === "string" && plan.researchTitle.trim().length > 0
+      ? plan.researchTitle.trim()
+      : null;
+
+  const headerTitle = isRejected
+    ? "Plan dismissed"
+    : runFailed
+      ? "Run failed"
+      : (planTitle ?? "Research plan");
 
   const headerSubtitle = isRejected
     ? "This plan was cancelled. You can still chat normally."
@@ -134,9 +182,33 @@ export const ResearchPlanMessage: React.FC<ResearchPlanMessageProps> = ({
       ? "text-destructive"
       : "text-primary";
 
+  const showArtifacts =
+    runSucceeded && (tableId !== undefined || reportId !== undefined) && plan?.notebookId;
+
   return (
     <div className="w-full max-w-3xl space-y-6">
       {showSteps ? <LiteratureReviewSteps steps={steps} expandAll={runSucceeded} /> : null}
+
+      {showArtifacts ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          {tableId ? (
+            <ResultCard
+              icon={<FileSpreadsheet className="h-6 w-6 shrink-0 text-primary" />}
+              title={table?.title ?? "Evidence Table"}
+              typeLabel="Table"
+              onClick={() => onOpenTable?.(tableId)}
+            />
+          ) : null}
+          {reportId ? (
+            <ResultCard
+              icon={<FileText className="h-6 w-6 shrink-0 text-primary" />}
+              title={report?.title ?? "Deep Research Report"}
+              typeLabel="Document"
+              onClick={() => onOpenReport?.(reportId)}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       {showStatusCard ? (
         <div className={`overflow-hidden rounded-xl border bg-card font-sans ${cardBorderClass}`}>

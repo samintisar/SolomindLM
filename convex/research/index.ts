@@ -14,6 +14,7 @@ import {
 } from "../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { normalizeResearchTitle } from "./titles";
 
 export { createResearchArtifacts } from "./artifacts";
 
@@ -128,6 +129,16 @@ export const getPlanInternal = internalQuery({
   args: { planId: v.id("researchPlans") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.planId);
+  },
+});
+
+export const getRunEvidenceInternal = internalQuery({
+  args: { runId: v.id("researchRuns") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("researchEvidence")
+      .withIndex("by_run", (q) => q.eq("runId", args.runId))
+      .collect();
   },
 });
 
@@ -479,11 +490,25 @@ export const patchResearchPlanInternal = internalMutation({
         )
       ),
       query: v.optional(v.string()),
+      researchTitle: v.optional(v.string()),
       sourcePolicy: v.optional(v.any()),
     }),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.planId, args.patch);
+  },
+});
+
+export const setPlanResearchTitle = internalMutation({
+  args: {
+    planId: v.id("researchPlans"),
+    researchTitle: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.planId, {
+      researchTitle: normalizeResearchTitle(args.researchTitle),
+      updatedAt: Date.now(),
+    });
   },
 });
 

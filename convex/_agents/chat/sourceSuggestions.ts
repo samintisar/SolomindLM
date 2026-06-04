@@ -57,9 +57,13 @@ function parseSuggestionsPayload(raw: string): {
     throw new Error("Invalid response structure");
   }
 
+  const suggestions = [
+    ...new Set(parsed.suggestions.map(String).map((s) => s.trim()).filter(Boolean)),
+  ];
+
   return {
     summary: String(parsed.summary),
-    suggestions: parsed.suggestions.map(String).filter(Boolean),
+    suggestions,
   };
 }
 

@@ -1,7 +1,9 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { v } from "convex/values";
+import { allWithConcurrency } from "../_agents/_shared/concurrency.js";
 import { createLLM } from "../_agents/_shared/llm_factory.js";
 import { invokeWithHttpRetry } from "../_agents/_shared/retry.js";
+import { invokeWithTimeout } from "../_agents/_shared/timeout.js";
 import { cachedRerank } from "../_agents/chat/rerankCache.js";
 import {
   BENCHMARK_RELIABILITY_SUGGESTED_COLUMNS,
@@ -21,9 +23,9 @@ import {
   PLAN_REVIEW_PROMPT,
   PLAN_REVIEW_SYSTEM_PROMPT,
   PlanReviewOutputSchema,
-  SCREEN_PAPERS_PROMPT,
   SCREEN_PAPERS_SYSTEM_PROMPT,
-  ScreenPapersOutputSchema,
+  SCREEN_SINGLE_PAPER_PROMPT,
+  ScreenSinglePaperOutputSchema,
 } from "../_agents/literature_review/prompts.js";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
@@ -51,11 +53,18 @@ import {
   buildGroundedNumericSet,
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
+  getReportSectionsNeedingRegeneration,
+  isTrivialReportSectionContent,
   mergeDeterministicReportSections,
-  needsDeterministicReportMerge,
   type ReportPaperRow,
   validateAndSanitizeReportSections,
 } from "./reportContext.js";
+import { EXTRACT_DATA_CHUNK_SIZE, SCREEN_PAPERS_BATCH_SIZE } from "./batchSizes.js";
+import {
+  bulkLlmModel,
+  LITERATURE_BULK_LLM_CONCURRENCY,
+  truncateForLiteratureLlm,
+} from "./llmTuning.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -65,6 +74,13 @@ import {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/** Per-paper LLM ceiling (fast model; fail fast → metadata / conservative fallback). */
+const EXTRACT_DATA_PER_PAPER_TIMEOUT_MS = 90_000;
+
+const SCREEN_SINGLE_PAPER_TIMEOUT_MS = 45_000;
+
+export { EXTRACT_DATA_CHUNK_SIZE } from "./batchSizes.js";
 
 const literaturePaperFields = {
   title: v.string(),
@@ -386,8 +402,123 @@ export const rankPapers = internalAction({
   handler: rankPapersHandler,
 });
 
-export async function screenPapersHandler(
+function conservativeScreeningDecisions(
+  batchStartIndex: number,
+  batchLength: number
+): Array<{ paperIndex: number; isIncluded: boolean; reason: string }> {
+  const reason = "Included by conservative fallback due to screening error.";
+  return Array.from({ length: batchLength }, (_, j) => ({
+    paperIndex: batchStartIndex + j,
+    isIncluded: true,
+    reason,
+  }));
+}
+
+async function screenOnePaperWithLlm(
+  paper: { title: string; abstract: string },
+  query: string
+): Promise<{ isIncluded: boolean; reason: string }> {
+  const llm = createLLM({
+    apiKey: env.TOGETHER_AI_API_KEY,
+    mapModel: bulkLlmModel(),
+    temperatures: 0.2,
+    maxTokens: 256,
+    phase: "fast",
+  });
+
+  const structuredLlm = llm.withStructuredOutput(ScreenSinglePaperOutputSchema, {
+    name: "screen_single_paper",
+  });
+
+  const prompt = SCREEN_SINGLE_PAPER_PROMPT.replace(/{query}/g, query)
+    .replace(/{title}/g, paper.title)
+    .replace(/{abstract}/g, truncateForLiteratureLlm(paper.abstract));
+
+  const response = await invokeWithHttpRetry(
+    () =>
+      invokeWithTimeout(
+        () =>
+          structuredLlm.invoke([
+            new SystemMessage(SCREEN_PAPERS_SYSTEM_PROMPT),
+            new HumanMessage(prompt),
+          ]),
+        SCREEN_SINGLE_PAPER_TIMEOUT_MS,
+        "screenPapers"
+      ),
+    "screenPapers"
+  );
+
+  return { isIncluded: response.isIncluded, reason: response.reason };
+}
+
+/** Screens up to five papers per action (parallel per-paper LLM calls). */
+export async function screenPapersBatchHandler(
   _ctx: ActionCtx,
+  args: {
+    papers: any[];
+    query: string;
+    batchStartIndex: number;
+    smartModel?: string;
+  }
+) {
+  const logger = createServiceLogger("literatureReview", "screenPapersBatch");
+  const batchLength = args.papers.length;
+  logger.info("Screening batch", {
+    batchStartIndex: args.batchStartIndex,
+    paperCount: batchLength,
+  });
+
+  if (batchLength === 0) {
+    return { decisions: [] as Array<{ paperIndex: number; isIncluded: boolean; reason: string }> };
+  }
+
+  const fallbackReason = "Included by conservative fallback due to screening error.";
+  const decisions = await allWithConcurrency(
+    args.papers.map((paper, localIndex) => async () => {
+      const paperIndex = args.batchStartIndex + localIndex;
+      try {
+        const { isIncluded, reason } = await screenOnePaperWithLlm(paper, args.query);
+        return { paperIndex, isIncluded, reason };
+      } catch (error) {
+        logger.error("Screening failed for paper, using conservative fallback", error, {
+          batchStartIndex: args.batchStartIndex,
+          paperIndex,
+          title: paper.title,
+        });
+        return { paperIndex, isIncluded: true, reason: fallbackReason };
+      }
+    }),
+    LITERATURE_BULK_LLM_CONCURRENCY
+  );
+
+  logger.info("Screening batch complete", {
+    batchStartIndex: args.batchStartIndex,
+    decisionCount: decisions.length,
+  });
+  return { decisions };
+}
+
+const screenPaperDecisionValidator = v.object({
+  paperIndex: v.number(),
+  isIncluded: v.boolean(),
+  reason: v.string(),
+});
+
+export const screenPapersBatch = internalAction({
+  args: {
+    papers: v.array(literaturePaperValidator),
+    query: v.string(),
+    batchStartIndex: v.number(),
+    smartModel: v.optional(v.string()),
+  },
+  returns: v.object({
+    decisions: v.array(screenPaperDecisionValidator),
+  }),
+  handler: screenPapersBatchHandler,
+});
+
+export async function screenPapersHandler(
+  ctx: ActionCtx,
   args: { papers: any[]; query: string; smartModel?: string }
 ) {
   const logger = createServiceLogger("literatureReview", "screenPapers");
@@ -396,85 +527,45 @@ export async function screenPapersHandler(
     return { papers: [] };
   }
 
+  const totalBatches = Math.ceil(args.papers.length / SCREEN_PAPERS_BATCH_SIZE);
+  logger.info("Starting screening", {
+    paperCount: args.papers.length,
+    totalBatches,
+  });
+
   try {
-    const llm = createLLM({
-      apiKey: env.TOGETHER_AI_API_KEY,
-      mapModel: mapModelForLiteratureReview(args.smartModel),
-      temperatures: 0.3,
-      maxTokens: 2000,
-      phase: "smart",
-    });
-
-    const structuredLlm = llm.withStructuredOutput(ScreenPapersOutputSchema, {
-      name: "screen_papers",
-    });
-
-    const batchSize = 5;
     const decisions = new Map<number, { isIncluded: boolean; reason: string }>();
 
-    for (let i = 0; i < args.papers.length; i += batchSize) {
-      const batch = args.papers.slice(i, i + batchSize);
-
-      const papersText = batch
-        .map(
-          (p, idx) =>
-            `Paper ${idx + 1}:
-Title: ${p.title}
-Abstract: ${p.abstract}
----`
-        )
-        .join("\n");
-
-      const prompt = SCREEN_PAPERS_PROMPT.replace(/{query}/g, args.query).replace(
-        /{papers}/g,
-        papersText
+    for (let i = 0; i < args.papers.length; i += SCREEN_PAPERS_BATCH_SIZE) {
+      const batch = args.papers.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
+      const { decisions: batchDecisions } = await ctx.runAction(
+        internal.literatureReview.workflowSteps.screenPapersBatch,
+        {
+          papers: batch,
+          query: args.query,
+          batchStartIndex: i,
+          smartModel: args.smartModel,
+        }
       );
 
-      try {
-        const response = await invokeWithHttpRetry(
-          () =>
-            structuredLlm.invoke([
-              new SystemMessage(SCREEN_PAPERS_SYSTEM_PROMPT),
-              new HumanMessage(prompt),
-            ]),
-          "screenPapers"
-        );
-
-        for (const decision of response.decisions) {
-          const match = decision.paperId.match(/paper_(\d+)/);
-          if (match) {
-            const batchIndex = parseInt(match[1], 10) - 1;
-            if (batchIndex >= 0 && batchIndex < batch.length) {
-              decisions.set(i + batchIndex, {
-                isIncluded: decision.isIncluded,
-                reason: decision.reason,
-              });
-            }
-          }
-        }
-      } catch (error) {
-        logger.error(
-          `Batch starting at index ${i} failed, including all papers conservatively`,
-          error,
-          {
-            batchStart: i,
-            batchSize: batch.length,
-          }
-        );
-        for (let j = 0; j < batch.length; j++) {
-          decisions.set(i + j, {
-            isIncluded: true,
-            reason: "Included by conservative fallback due to screening error.",
-          });
-        }
+      for (const decision of batchDecisions) {
+        decisions.set(decision.paperIndex, {
+          isIncluded: decision.isIncluded,
+          reason: decision.reason,
+        });
       }
     }
 
-    const screenedPapers = args.papers.map((p, i) => ({
+    const screenedPapers = args.papers.map((p, index) => ({
       ...p,
-      isIncluded: decisions.get(i)?.isIncluded ?? true,
-      includeReason: decisions.get(i)?.reason ?? "No screening decision available.",
+      isIncluded: decisions.get(index)?.isIncluded ?? true,
+      includeReason: decisions.get(index)?.reason ?? "No screening decision available.",
     }));
+
+    logger.info("Screening complete", {
+      paperCount: args.papers.length,
+      includedCount: screenedPapers.filter((p) => p.isIncluded === true).length,
+    });
 
     return { papers: compactPapersForWorkflow(screenedPapers) };
   } catch (error) {
@@ -500,6 +591,133 @@ export const screenPapers = internalAction({
   handler: screenPapersHandler,
 });
 
+async function extractPaperFieldsWithLlm(
+  paper: {
+    title: string;
+    authors: string[];
+    year?: number;
+    abstract: string;
+    url: string;
+  },
+  columns: Array<{ id: string; name: string; instructions?: string }>,
+  query: string | undefined,
+  smartModel: string | undefined
+): Promise<Record<string, string> | undefined> {
+  const llm = createLLM({
+    apiKey: env.TOGETHER_AI_API_KEY,
+    mapModel: bulkLlmModel(),
+    temperatures: 0.2,
+    maxTokens: 900,
+    phase: "fast",
+  });
+
+  const structuredLlm = llm.withStructuredOutput(ExtractDataOutputSchema, {
+    name: "extract_data",
+  });
+
+  const columnsText = columns
+    .map(
+      (col) =>
+        `- ${col.name} (id: ${col.id}): ${col.instructions || "Extract relevant information."}`
+    )
+    .join("\n");
+
+  const prompt = EXTRACT_DATA_PROMPT.replace(/{query}/g, query || "")
+    .replace(/{title}/g, paper.title)
+    .replace(/{authors}/g, paper.authors.join(", "))
+    .replace(/{year}/g, paper.year !== undefined ? String(paper.year) : "N/A")
+    .replace(/{abstract}/g, truncateForLiteratureLlm(paper.abstract))
+    .replace(/{url}/g, paper.url)
+    .replace(/{columns}/g, columnsText);
+
+  const response = await invokeWithHttpRetry(
+    () =>
+      invokeWithTimeout(
+        () =>
+          structuredLlm.invoke([
+            new SystemMessage(EXTRACT_DATA_SYSTEM_PROMPT),
+            new HumanMessage(prompt),
+          ]),
+        EXTRACT_DATA_PER_PAPER_TIMEOUT_MS,
+        "extractData"
+      ),
+    "extractData"
+  );
+
+  return response.extractedData;
+}
+
+/** One draft batch — separate action so extraction stays under Convex action limits. */
+export async function extractDataBatchHandler(
+  ctx: ActionCtx,
+  args: {
+    papers: any[];
+    columns: any[];
+    sessionId: Id<"literatureReviewSessions">;
+    batchNumber: number;
+    query?: string;
+    smartModel?: string;
+  }
+) {
+  const logger = createServiceLogger("literatureReview", "extractDataBatch");
+  const batchSize = args.papers.length;
+  logger.info("Extracting draft batch", {
+    sessionId: args.sessionId,
+    batchNumber: args.batchNumber,
+    paperCount: batchSize,
+  });
+
+  const papersWithExtractedData = await allWithConcurrency(
+    args.papers.map((paper) => async () => {
+      try {
+        const extractedData = await extractPaperFieldsWithLlm(
+          paper,
+          args.columns,
+          args.query,
+          args.smartModel
+        );
+        return extractedData ? { ...paper, extractedData } : paper;
+      } catch (error) {
+        logger.error(`Extraction failed for paper: ${paper.title}`, error);
+        return paper;
+      }
+    }),
+    LITERATURE_BULK_LLM_CONCURRENCY
+  );
+
+  await ctx.runMutation(internal.literatureReview.db.insertDraftBatch, {
+    sessionId: args.sessionId,
+    papers: papersWithExtractedData,
+    columns: args.columns,
+    batchNumber: args.batchNumber,
+  });
+
+  logger.info("Draft batch complete", {
+    sessionId: args.sessionId,
+    batchNumber: args.batchNumber,
+    paperCount: batchSize,
+  });
+  return null;
+}
+
+export const extractDataBatch = internalAction({
+  args: {
+    papers: v.array(literaturePaperValidator),
+    columns: v.array(confirmedColumnValidator),
+    sessionId: v.id("literatureReviewSessions"),
+    batchNumber: v.number(),
+    query: v.optional(v.string()),
+    smartModel: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: extractDataBatchHandler,
+});
+
+/**
+ * Runs all extraction batches in one action (eval / retries only).
+ * The literature review workflow calls `extractDataBatch` per batch so each batch
+ * gets its own Convex action time limit — do not call this from the workflow graph.
+ */
 export async function extractDataHandler(
   ctx: ActionCtx,
   args: {
@@ -512,82 +730,67 @@ export async function extractDataHandler(
 ) {
   const logger = createServiceLogger("literatureReview", "extractData");
   const included = args.papers.filter((p) => p.isIncluded === true);
-  const chunkSize = 5;
-
-  // Check which batches already exist to support idempotent retries
   const existingBatchNumbers = await ctx.runQuery(
     internal.literatureReview.db.getExistingBatchNumbers,
     { sessionId: args.sessionId }
   );
-  const existingSet = new Set(existingBatchNumbers);
+  await runExtractDataBatches(ctx, {
+    includedPapers: included,
+    columns: args.columns,
+    sessionId: args.sessionId,
+    query: args.query,
+    smartModel: args.smartModel,
+    existingBatchNumbers,
+    logger,
+  });
+  return null;
+}
 
-  for (let b = 0; b < included.length; b += chunkSize) {
-    const batchNumber = Math.floor(b / chunkSize);
+/** Shared batch loop for eval/retry entrypoints (nested under a single action). */
+export async function runExtractDataBatches(
+  ctx: ActionCtx,
+  args: {
+    includedPapers: any[];
+    columns: any[];
+    sessionId: Id<"literatureReviewSessions">;
+    query?: string;
+    smartModel?: string;
+    existingBatchNumbers: number[];
+    logger: ReturnType<typeof createServiceLogger>;
+  }
+) {
+  const existingSet = new Set(args.existingBatchNumbers);
+  const totalBatches = Math.ceil(args.includedPapers.length / EXTRACT_DATA_CHUNK_SIZE) || 0;
+
+  args.logger.info("Starting extraction", {
+    sessionId: args.sessionId,
+    includedCount: args.includedPapers.length,
+    totalBatches,
+    skippedBatches: existingSet.size,
+  });
+
+  for (let b = 0; b < args.includedPapers.length; b += EXTRACT_DATA_CHUNK_SIZE) {
+    const batchNumber = Math.floor(b / EXTRACT_DATA_CHUNK_SIZE);
     if (existingSet.has(batchNumber)) {
       continue;
     }
-    const slice = included.slice(b, b + chunkSize);
+    const slice = args.includedPapers.slice(b, b + EXTRACT_DATA_CHUNK_SIZE);
 
-    // LLM-based data extraction for each paper in the batch
-    const papersWithExtractedData = await Promise.all(
-      slice.map(async (paper) => {
-        try {
-          const llm = createLLM({
-            apiKey: env.TOGETHER_AI_API_KEY,
-            mapModel: mapModelForLiteratureReview(args.smartModel),
-            temperatures: 0.2,
-            maxTokens: 1500,
-            phase: "smart",
-          });
-
-          const structuredLlm = llm.withStructuredOutput(ExtractDataOutputSchema, {
-            name: "extract_data",
-          });
-
-          const columnsText = args.columns
-            .map(
-              (col: { id: string; name: string; instructions?: string }) =>
-                `- ${col.name} (id: ${col.id}): ${col.instructions || "Extract relevant information."}`
-            )
-            .join("\n");
-
-          const prompt = EXTRACT_DATA_PROMPT.replace(/{query}/g, args.query || "")
-            .replace(/{title}/g, paper.title)
-            .replace(/{authors}/g, paper.authors.join(", "))
-            .replace(/{year}/g, paper.year !== undefined ? String(paper.year) : "N/A")
-            .replace(/{abstract}/g, paper.abstract)
-            .replace(/{url}/g, paper.url)
-            .replace(/{columns}/g, columnsText);
-
-          const response = await invokeWithHttpRetry(
-            () =>
-              structuredLlm.invoke([
-                new SystemMessage(EXTRACT_DATA_SYSTEM_PROMPT),
-                new HumanMessage(prompt),
-              ]),
-            "extractData"
-          );
-
-          return {
-            ...paper,
-            extractedData: response.extractedData,
-          };
-        } catch (error) {
-          logger.error(`Extraction failed for paper: ${paper.title}`, error);
-          // Fallback: return paper without extractedData so insertDraftBatch uses basic metadata
-          return paper;
-        }
-      })
-    );
-
-    await ctx.runMutation(internal.literatureReview.db.insertDraftBatch, {
-      sessionId: args.sessionId,
-      papers: papersWithExtractedData,
+    await ctx.runAction(internal.literatureReview.workflowSteps.extractDataBatch, {
+      papers: slice,
       columns: args.columns,
+      sessionId: args.sessionId,
       batchNumber,
+      query: args.query,
+      smartModel: args.smartModel,
     });
   }
-  return null;
+
+  args.logger.info("Extraction orchestration complete", {
+    sessionId: args.sessionId,
+    includedCount: args.includedPapers.length,
+    totalBatches,
+  });
 }
 
 export const extractData = internalAction({
@@ -747,7 +950,7 @@ export async function generateReportHandler(
       "Discussion",
       "Conclusion",
     ];
-    const generatedSections: Array<{ heading: string; content: string }> = [];
+    const sectionContent = new Map<string, string>();
 
     const llm = createLLM({
       apiKey: env.TOGETHER_AI_API_KEY,
@@ -756,6 +959,35 @@ export async function generateReportHandler(
       maxTokens: 2000,
       phase: "smart",
     });
+
+    const citationsBlock = Array.from(citationKeyMap.entries())
+      .map(([id, key]) => {
+        const c = citationMap.get(id);
+        return c ? `[${key}] ${c.title} (${c.year ?? "N/A"})` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    const generateOneSection = async (sectionName: string): Promise<string> => {
+      const prompt = GENERATE_REPORT_SECTION_PROMPT.replace(/{section}/g, sectionName)
+        .replace(/{query}/g, args.query)
+        .replace(/{sessionMetadata}/g, sessionMetadata)
+        .replace(/{extractedData}/g, context)
+        .replace(/{citations}/g, citationsBlock);
+
+      const response = await invokeWithHttpRetry(
+        () =>
+          llm.invoke([
+            new SystemMessage(GENERATE_REPORT_SECTION_SYSTEM_PROMPT),
+            new HumanMessage(prompt),
+          ]),
+        `generateReport_${sectionName}`
+      );
+
+      return typeof response.content === "string"
+        ? response.content
+        : JSON.stringify(response.content);
+    };
 
     // Use single-call mode when generating all 6 standard sections (faster, one round-trip)
     const isFullReport =
@@ -770,20 +1002,12 @@ export async function generateReportHandler(
           apiKey: env.TOGETHER_AI_API_KEY,
           mapModel: mapModelForLiteratureReview(args.smartModel),
           temperatures: 0.3,
-          maxTokens: 6000,
+          maxTokens: 8000,
           phase: "smart",
         });
         const structuredLlm = fullLlm.withStructuredOutput(GenerateFullReportOutputSchema, {
           name: "generate_full_report",
         });
-
-        const citationsBlock = Array.from(citationKeyMap.entries())
-          .map(([id, key]) => {
-            const c = citationMap.get(id);
-            return c ? `[${key}] ${c.title} (${c.year ?? "N/A"})` : "";
-          })
-          .filter(Boolean)
-          .join("\n");
 
         const prompt = GENERATE_FULL_REPORT_PROMPT.replace(/{query}/g, args.query)
           .replace(/{sessionMetadata}/g, sessionMetadata)
@@ -803,109 +1027,78 @@ export async function generateReportHandler(
           const found = response.sections.find(
             (s) => s.heading.toLowerCase() === sectionName.toLowerCase()
           );
-          const content = found?.content ?? `[${sectionName} generation failed]`;
-          generatedSections.push({ heading: sectionName, content });
-          logger.info(`Generated section: ${sectionName}`, {
-            sectionName,
-            contentLength: content.length,
+          if (found && !isTrivialReportSectionContent(found.content, sectionName)) {
+            sectionContent.set(sectionName, found.content);
+            logger.info(`Generated section: ${sectionName}`, {
+              sectionName,
+              contentLength: found.content.length,
+              source: "full_report",
+            });
+          }
+        }
+
+        const needsRegen = getReportSectionsNeedingRegeneration(response.sections, sections);
+        if (needsRegen.length > 0) {
+          logger.warn("Full report returned placeholder or short sections; regenerating", {
+            sections: needsRegen,
+            sectionLengths: response.sections.map((s) => ({
+              heading: s.heading,
+              contentLength: s.content.length,
+            })),
           });
         }
       } catch (error) {
         logger.error("Full report generation failed, falling back to per-section mode", error);
-        // Fall through to per-section mode
       }
     }
 
-    if (generatedSections.length > 0) {
-      const {
-        sections: sanitized,
-        unknownCitations,
-        ungroundedNumerics,
-      } = validateAndSanitizeReportSections(
-        generatedSections,
-        allowedCitationKeys,
-        groundedNumericTokens
-      );
-      if (unknownCitations.length > 0) {
-        logger.warn("Removed unknown citation keys from report", { unknownCitations });
-      }
-      if (ungroundedNumerics.length > 0) {
-        logger.warn("Report contains potentially ungrounded numerics", { ungroundedNumerics });
-      }
-      generatedSections.length = 0;
-      generatedSections.push(
-        ...mergeDeterministicReportSections(sanitized, {
-          methodsBlock,
-          studyTable,
-        })
-      );
-    }
-
-    // Per-section fallback (for partial reports or if single-call failed)
-    if (generatedSections.length === 0) {
-      for (const sectionName of sections) {
-        try {
-          const citationsBlock = Array.from(citationKeyMap.entries())
-            .map(([id, key]) => {
-              const c = citationMap.get(id);
-              return c ? `[${key}] ${c.title} (${c.year ?? "N/A"})` : "";
-            })
-            .filter(Boolean)
-            .join("\n");
-
-          const prompt = GENERATE_REPORT_SECTION_PROMPT.replace(/{section}/g, sectionName)
-            .replace(/{query}/g, args.query)
-            .replace(/{sessionMetadata}/g, sessionMetadata)
-            .replace(/{extractedData}/g, context)
-            .replace(/{citations}/g, citationsBlock);
-
-          const response = await invokeWithHttpRetry(
-            () =>
-              llm.invoke([
-                new SystemMessage(GENERATE_REPORT_SECTION_SYSTEM_PROMPT),
-                new HumanMessage(prompt),
-              ]),
-            `generateReport_${sectionName}`
-          );
-
-          const content =
-            typeof response.content === "string"
-              ? response.content
-              : JSON.stringify(response.content);
-
-          generatedSections.push({
-            heading: sectionName,
-            content,
-          });
-
-          logger.info(`Generated section: ${sectionName}`, {
-            sectionName,
+    const sectionsToGenerate = sections.filter((name) => !sectionContent.has(name));
+    for (const sectionName of sectionsToGenerate) {
+      try {
+        const content = await generateOneSection(sectionName);
+        if (isTrivialReportSectionContent(content, sectionName)) {
+          logger.warn(`Per-section output still trivial for ${sectionName}`, {
             contentLength: content.length,
           });
-        } catch (error) {
-          logger.error(`Failed to generate section: ${sectionName}`, error);
-          generatedSections.push({
-            heading: sectionName,
-            content: "[Section generation failed]",
-          });
         }
+        sectionContent.set(sectionName, content);
+        logger.info(`Generated section: ${sectionName}`, {
+          sectionName,
+          contentLength: content.length,
+          source: "per_section",
+        });
+      } catch (error) {
+        logger.error(`Failed to generate section: ${sectionName}`, error);
+        sectionContent.set(sectionName, `[${sectionName} generation failed]`);
       }
     }
 
-    if (generatedSections.length > 0 && needsDeterministicReportMerge(generatedSections)) {
-      const { sections: sanitized } = validateAndSanitizeReportSections(
-        generatedSections,
-        allowedCitationKeys,
-        groundedNumericTokens
-      );
-      generatedSections.length = 0;
-      generatedSections.push(
-        ...mergeDeterministicReportSections(sanitized, {
-          methodsBlock,
-          studyTable,
-        })
-      );
+    let generatedSections: Array<{ heading: string; content: string }> = sections.map(
+      (sectionName) => ({
+        heading: sectionName,
+        content: sectionContent.get(sectionName) ?? `[${sectionName} generation failed]`,
+      })
+    );
+
+    const {
+      sections: sanitized,
+      unknownCitations,
+      ungroundedNumerics,
+    } = validateAndSanitizeReportSections(
+      generatedSections,
+      allowedCitationKeys,
+      groundedNumericTokens
+    );
+    if (unknownCitations.length > 0) {
+      logger.warn("Removed unknown citation keys from report", { unknownCitations });
     }
+    if (ungroundedNumerics.length > 0) {
+      logger.warn("Report contains potentially ungrounded numerics", { ungroundedNumerics });
+    }
+    generatedSections = mergeDeterministicReportSections(sanitized, {
+      methodsBlock,
+      studyTable,
+    });
 
     // Step 5: Combine sections into full markdown report
     const fullContent = generatedSections

@@ -12,6 +12,7 @@ import {
   type ReportSection,
   sortReportSections,
 } from "./reportSections";
+import { deepResearchReportTitle, deepResearchTableTitle, fallbackResearchTitleFromQuery } from "./titles";
 
 function buildCitationFromEvidence(entry: {
   sourceType: string;
@@ -76,6 +77,8 @@ export const createResearchArtifacts = internalMutation({
         question: v.string(),
       })
     ),
+    /** Normalized base title; table/report titles are derived (see literature review). */
+    researchTitle: v.optional(v.string()),
   },
   returns: v.object({
     tableId: v.id("literatureTables"),
@@ -206,9 +209,14 @@ export const createResearchArtifacts = internalMutation({
       });
     }
 
+    const baseTitle =
+      args.researchTitle?.trim() || fallbackResearchTitleFromQuery(args.query);
+    const tableTitle = deepResearchTableTitle(baseTitle);
+    const reportTitle = deepResearchReportTitle(baseTitle);
+
     const tableId = await ctx.db.insert("literatureTables", {
-      title: args.query.slice(0, 200),
-      description: `Auto-generated literature table from research: ${args.query.slice(0, 100)}`,
+      title: tableTitle,
+      description: `Auto-generated evidence table from deep research: ${args.query.slice(0, 100)}`,
       notebookId: args.notebookId,
       userId: args.userId,
       status: "completed",
@@ -276,7 +284,7 @@ export const createResearchArtifacts = internalMutation({
     const fullContent = sections.map((s) => `## ${s.heading}\n\n${s.content}`).join("\n\n");
 
     const reportId = await ctx.db.insert("literatureReports", {
-      title: args.query.slice(0, 200),
+      title: reportTitle,
       notebookId: args.notebookId,
       userId: args.userId,
       status: "completed",

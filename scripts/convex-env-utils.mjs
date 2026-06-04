@@ -114,11 +114,16 @@ export function listConvexEnv({ prod = false } = {}) {
   return vars;
 }
 
+/** Keys kept in .env.local for local tooling only — never upload to Convex. */
+const SKIP_PUSH_PREFIXES = ["LANGCHAIN_", "RAG_EVAL_"];
+
 export function filterPushVars(vars) {
   const filtered = [];
   for (const [key, value] of vars) {
     if (SKIP_PUSH_KEYS.has(key)) continue;
     if (key.startsWith("VITE_")) continue;
+    if (SKIP_PUSH_PREFIXES.some((prefix) => key.startsWith(prefix))) continue;
+    if (key === "RAG_EVALS_ENABLED") continue; // set via eval bootstrap, not bulk push
     filtered.push([key, value]);
   }
   return filtered;

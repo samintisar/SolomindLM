@@ -6,7 +6,10 @@ const providerValidator = v.union(v.literal("semantic_scholar"), v.literal("arxi
 export type FragileAcademicProvider = "semantic_scholar" | "arxiv";
 
 export const SEMANTIC_SCHOLAR_UNAUTHENTICATED_COOLDOWN_MS = 15 * 60 * 1000;
-export const SEMANTIC_SCHOLAR_AUTHENTICATED_COOLDOWN_MS = 5 * 60 * 1000;
+/** After repeated 429s; prefer Retry-After when API sends it. */
+export const SEMANTIC_SCHOLAR_AUTHENTICATED_COOLDOWN_MS = 2 * 60 * 1000;
+/** Max 429 retries before recording deployment cooldown (honor Retry-After between attempts). */
+export const SEMANTIC_SCHOLAR_MAX_429_RETRIES = 3;
 export const ARXIV_RATE_LIMIT_COOLDOWN_MS = 15 * 60 * 1000;
 
 export const checkProviderCooldown = internalMutation({

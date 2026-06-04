@@ -1,5 +1,9 @@
 import { ArrowLeft, Check, Copy, Download, FileText, Loader2, Save, X } from "lucide-react";
 import React, { lazy, Suspense, useMemo, useState } from "react";
+import {
+  normalizeLiteratureReportSectionContent,
+  stripLeadingSectionHeadingLine,
+} from "@convex/literatureReview/reportContext";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { CitationStyle, CitationStylePicker } from "../CitationStylePicker";
 import { type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
@@ -64,7 +68,14 @@ const SectionRenderer: React.FC<SectionRendererProps> = ({ section, workflowProv
       ) : null}
       <div className="prose prose-stone dark:prose-invert max-w-none font-serif leading-relaxed text-foreground">
         <Suspense fallback={<div className="animate-pulse h-4 bg-secondary/30 rounded w-full" />}>
-          <MarkdownRenderer>{sanitizeMarkdown(section.content)}</MarkdownRenderer>
+          <MarkdownRenderer>
+            {sanitizeMarkdown(
+              normalizeLiteratureReportSectionContent(
+                stripLeadingSectionHeadingLine(section.content, section.heading),
+                section.heading
+              )
+            )}
+          </MarkdownRenderer>
         </Suspense>
       </div>
     </section>

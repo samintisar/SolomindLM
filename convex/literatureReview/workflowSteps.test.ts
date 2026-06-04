@@ -6,11 +6,13 @@ import type { ActionCtx } from "../_generated/server";
 import {
   dedupePapers,
   deduplicatePapersHandler,
+  extractDataBatchHandler,
   extractDataHandler,
   generateReportHandler,
   generateTableHandler,
   planReviewHandler,
   rankPapersHandler,
+  screenPapersBatchHandler,
   screenPapersHandler,
   searchPapersHandler,
 } from "./workflowSteps";
@@ -22,6 +24,10 @@ vi.mock("../_agents/_shared/llm_factory.js", () => ({
 
 vi.mock("../_agents/_shared/retry.js", () => ({
   invokeWithHttpRetry: vi.fn(),
+}));
+
+vi.mock("../_agents/_shared/timeout.js", () => ({
+  invokeWithTimeout: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock("../_lib/logging/serviceLogger.js", () => ({
@@ -435,16 +441,22 @@ describe("rankPapersHandler", () => {
 });
 
 describe("screenPapersHandler", () => {
+  beforeEach(() => {
+    (mockCtx.runAction as any).mockImplementation(
+      async (_ref: unknown, args: Parameters<typeof screenPapersBatchHandler>[1]) =>
+        screenPapersBatchHandler(mockCtx, args)
+    );
+  });
+
   it("makes inclusion decisions", async () => {
+    let call = 0;
+    const mockInvoke = vi.fn().mockImplementation(async () => {
+      call += 1;
+      if (call === 1) return { isIncluded: true, reason: "Relevant" };
+      return { isIncluded: false, reason: "Not relevant" };
+    });
     const mockLLM = {
-      withStructuredOutput: vi.fn().mockReturnValue({
-        invoke: vi.fn().mockResolvedValue({
-          decisions: [
-            { paperId: "paper_1", isIncluded: true, reason: "Relevant" },
-            { paperId: "paper_2", isIncluded: false, reason: "Not relevant" },
-          ],
-        }),
-      }),
+      withStructuredOutput: vi.fn().mockReturnValue({ invoke: mockInvoke }),
     };
     (createLLM as any).mockReturnValue(mockLLM as any);
     (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
@@ -462,9 +474,10 @@ describe("screenPapersHandler", () => {
     expect(result.papers[1].isIncluded).toBe(false);
   });
 
-  it("batches 5 papers per call", async () => {
+  it("batches 5 papers per workflow action with parallel per-paper LLM calls", async () => {
     const mockInvoke = vi.fn().mockResolvedValue({
-      decisions: [{ paperId: "paper_1", isIncluded: true, reason: "Relevant" }],
+      isIncluded: true,
+      reason: "Relevant",
     });
     const mockLLM = {
       withStructuredOutput: vi.fn().mockReturnValue({
@@ -483,7 +496,30 @@ describe("screenPapersHandler", () => {
 
     await screenPapersHandler(mockCtx, { papers, query: "test" });
 
-    expect(mockInvoke).toHaveBeenCalledTimes(2);
+    expect(mockCtx.runAction).toHaveBeenCalledTimes(2);
+    expect(mockInvoke).toHaveBeenCalledTimes(6);
+  });
+
+  it("uses the fast model for screening", async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      isIncluded: true,
+      reason: "Relevant",
+    });
+    const mockLLM = {
+      withStructuredOutput: vi.fn().mockReturnValue({ invoke: mockInvoke }),
+    };
+    (createLLM as any).mockReturnValue(mockLLM as any);
+    (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
+
+    await screenPapersBatchHandler(mockCtx, {
+      papers: [{ title: "A", authors: ["A"], abstract: "Abstract A", score: 0.8 }],
+      query: "test",
+      batchStartIndex: 0,
+    });
+
+    expect(createLLM).toHaveBeenCalledWith(
+      expect.objectContaining({ mapModel: "test-fast-model", phase: "fast" })
+    );
   });
 
   it("handles screening failure with conservative fallback", async () => {
@@ -510,6 +546,13 @@ describe("screenPapersHandler", () => {
 });
 
 describe("extractDataHandler", () => {
+  beforeEach(() => {
+    (mockCtx.runAction as any).mockImplementation(
+      async (_ref: unknown, args: Parameters<typeof extractDataBatchHandler>[1]) =>
+        extractDataBatchHandler(mockCtx, args)
+    );
+  });
+
   it("writes drafts in batches", async () => {
     (mockCtx.runQuery as any).mockResolvedValue([]);
     (mockCtx.runMutation as any).mockResolvedValue(null);
@@ -528,6 +571,7 @@ describe("extractDataHandler", () => {
       sessionId: "test-session" as Id<"literatureReviewSessions">,
     });
 
+    expect(mockCtx.runAction).toHaveBeenCalledTimes(2);
     expect(mockCtx.runMutation).toHaveBeenCalledTimes(2);
   });
 
@@ -591,6 +635,13 @@ describe("extractDataHandler", () => {
 });
 
 describe("extractDataHandler with LLM extraction", () => {
+  beforeEach(() => {
+    (mockCtx.runAction as any).mockImplementation(
+      async (_ref: unknown, args: Parameters<typeof extractDataBatchHandler>[1]) =>
+        extractDataBatchHandler(mockCtx, args)
+    );
+  });
+
   it("extracts custom column data via LLM and passes extractedData to insertDraftBatch", async () => {
     const mockLLM = {
       withStructuredOutput: vi.fn().mockReturnValue({
@@ -713,11 +764,103 @@ describe("generateTableHandler", () => {
   });
 });
 
+const substantiveSectionBody =
+  "Retrieval-augmented generation for question answering integrates external corpora with large language models. " +
+  "This review synthesizes thirty included studies from 2022 to 2025, comparing dense, sparse, and hybrid retrieval pipelines, " +
+  "graph-augmented variants, and evaluation benchmarks such as RAGAS and human judgments [Gao2023]. " +
+  "Findings highlight trade-offs between long-context models and retrieval, domain-specific deployments in medicine and manufacturing, " +
+  "and persistent gaps in standardized QA evaluation for multi-hop and conversational settings.";
+
 describe("generateReportHandler", () => {
+  it("regenerates sections when full report returns placeholder content", async () => {
+    const perSectionInvoke = vi.fn().mockResolvedValue({
+      content: substantiveSectionBody,
+    });
+    const mockLLM = {
+      invoke: perSectionInvoke,
+      withStructuredOutput: vi.fn().mockReturnValue({
+        invoke: vi.fn().mockResolvedValue({
+          sections: [
+            { heading: "Abstract", content: "Abstract content here" },
+            { heading: "Introduction", content: "Introduction content here" },
+            { heading: "Methods", content: "Methods content here" },
+            { heading: "Results", content: "Results content here" },
+            { heading: "Discussion", content: "Discussion content here" },
+            { heading: "Conclusion", content: "Conclusion content here" },
+          ],
+        }),
+      }),
+    };
+    (createLLM as any).mockReturnValue(mockLLM as any);
+    (invokeWithHttpRetry as any).mockImplementation(async (fn) => fn());
+
+    let sessionQueryCount = 0;
+    (mockCtx.runQuery as any).mockImplementation(async (_ref, args: any) => {
+      if (args?.tableId) {
+        return { columns: [{ id: "col1", name: "Column 1" }] };
+      }
+      if (args?.sessionId) {
+        sessionQueryCount += 1;
+        if (sessionQueryCount === 1) {
+          return [
+            {
+              citationId: "cit1" as Id<"citations">,
+              rowData: { col1: "value1" },
+              batchNumber: 0,
+            },
+          ];
+        }
+        return { reviewTitle: "RAG for QA", query: "test query" };
+      }
+      if (args?.citationIds) {
+        return [
+          {
+            _id: "cit1" as Id<"citations">,
+            title: "Paper Title",
+            authors: ["Author A"],
+            year: 2023,
+            doi: "10.1234/a",
+            url: "http://a",
+            abstract: "Abstract",
+          },
+        ];
+      }
+      return null;
+    });
+    (mockCtx.runMutation as any).mockResolvedValue({
+      reportId: "report123" as Id<"literatureReports">,
+    });
+
+    await generateReportHandler(mockCtx, {
+      sessionId: "session123" as Id<"literatureReviewSessions">,
+      tableId: "table123" as Id<"literatureTables">,
+      query: "test query",
+    });
+
+    expect(perSectionInvoke).toHaveBeenCalled();
+    const persistCall = (mockCtx.runMutation as any).mock.calls.find(
+      (c: unknown[]) => (c[1] as { content?: string })?.content?.includes("## Abstract")
+    );
+    expect(persistCall?.[1]?.content).toContain("Retrieval-augmented generation");
+    expect(perSectionInvoke).toHaveBeenCalledTimes(6);
+  });
+
   it("generates sections and persists report", async () => {
     const mockLLM = {
       invoke: vi.fn().mockResolvedValue({
-        content: "Generated section content",
+        content: substantiveSectionBody,
+      }),
+      withStructuredOutput: vi.fn().mockReturnValue({
+        invoke: vi.fn().mockResolvedValue({
+          sections: [
+            { heading: "Abstract", content: substantiveSectionBody },
+            { heading: "Introduction", content: substantiveSectionBody },
+            { heading: "Methods", content: substantiveSectionBody },
+            { heading: "Results", content: substantiveSectionBody },
+            { heading: "Discussion", content: substantiveSectionBody },
+            { heading: "Conclusion", content: substantiveSectionBody },
+          ],
+        }),
       }),
     };
     (createLLM as any).mockReturnValue(mockLLM as any);

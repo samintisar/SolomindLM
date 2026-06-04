@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 
 import { getNotebookLucideIcon } from "@/shared/notebook/notebookLucideIcon";
 
@@ -38,7 +38,16 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   notebookTitle,
 }) => {
   const hasSources = sourceCount > 0;
-  const displaySuggestions = hasSources && suggestions?.length ? suggestions : STARTER_PROMPTS;
+  const displaySuggestions = useMemo(() => {
+    const raw = hasSources && suggestions?.length ? suggestions : STARTER_PROMPTS;
+    const seen = new Set<string>();
+    return raw.filter((text) => {
+      const trimmed = text.trim();
+      if (!trimmed || seen.has(trimmed)) return false;
+      seen.add(trimmed);
+      return true;
+    });
+  }, [hasSources, suggestions]);
   const notebookGlyph = getNotebookLucideIcon(notebookIcon);
   const iconTintClass = notebookCoverColor?.length
     ? notebookCoverColor.replace("bg-", "text-")
@@ -105,9 +114,9 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
               ))}
             </>
           ) : (
-            displaySuggestions.map((prompt) => (
+            displaySuggestions.map((prompt, index) => (
               <button
-                key={prompt}
+                key={`suggestion-${index}`}
                 type="button"
                 disabled={disabled}
                 onClick={() => onSendMessage(prompt)}

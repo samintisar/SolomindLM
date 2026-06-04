@@ -15,8 +15,13 @@ import {
   ARXIV_RATE_LIMIT_COOLDOWN_MS,
   type FragileAcademicProvider,
   SEMANTIC_SCHOLAR_AUTHENTICATED_COOLDOWN_MS,
+  SEMANTIC_SCHOLAR_MAX_429_RETRIES,
   SEMANTIC_SCHOLAR_UNAUTHENTICATED_COOLDOWN_MS,
 } from "../../_lib/externalProviderCooldowns";
+import {
+  isSemanticScholarAuthenticated,
+  semanticScholarMinIntervalMs,
+} from "../../_lib/semanticScholarThrottle.js";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import {
   type AcademicPaperSource,
@@ -174,7 +179,9 @@ export function toDiscoveredSource(paper: AcademicPaper): DiscoveredSource {
 // arXiv Search
 // ============================================================
 
-const SEMANTIC_SCHOLAR_GAP_MS = 1000;
+/** Extra pause after SS before the next provider in the same search (on top of global slot). */
+const SEMANTIC_SCHOLAR_GAP_MS = 200;
+const SEMANTIC_SCHOLAR_SLOT_MAX_WAIT_MS = 12_000;
 
 /** Action context for deployment-wide arXiv throttle (omit in unit tests). */
 export type AcademicSearchThrottleCtx = Pick<ActionCtx, "runMutation">;
@@ -381,6 +388,103 @@ function isHttp429Error(error: unknown): boolean {
 // Semantic Scholar Search
 // ============================================================
 
+type SemanticScholarSlotResult =
+  | { ok: true }
+  | { ok: false; rateLimited: true; reason: "cooldown" | "slot_timeout" };
+
+async function acquireSemanticScholarRequestSlot(
+  throttleCtx: AcademicSearchThrottleCtx | null | undefined,
+  logger: ReturnType<typeof createServiceLogger>
+): Promise<SemanticScholarSlotResult> {
+  if (!throttleCtx) {
+    return { ok: true };
+  }
+
+  let waitedMs = 0;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const slot = await throttleCtx.runMutation(
+      internal._lib.semanticScholarThrottle.tryAcquireSemanticScholarSlot,
+      {}
+    );
+    if (slot.acquired) {
+      if (waitedMs > 0) {
+        logger.info("Semantic Scholar slot acquired after wait", { waitedMs });
+      }
+      return { ok: true };
+    }
+
+    const waitMs = Math.min(slot.waitMs, SEMANTIC_SCHOLAR_SLOT_MAX_WAIT_MS - waitedMs);
+    if (waitMs <= 0 || waitedMs >= SEMANTIC_SCHOLAR_SLOT_MAX_WAIT_MS) {
+      logger.warn("Semantic Scholar slot unavailable", {
+        waitMs: slot.waitMs,
+        waitedMs,
+        minIntervalMs: slot.minIntervalMs,
+      });
+      return { ok: false, rateLimited: true, reason: "slot_timeout" };
+    }
+
+    logger.info("Semantic Scholar throttled, waiting for slot", {
+      waitMs,
+      minIntervalMs: slot.minIntervalMs,
+    });
+    await delay(waitMs);
+    waitedMs += waitMs;
+  }
+
+  return { ok: false, rateLimited: true, reason: "slot_timeout" };
+}
+
+function semanticScholarFallbackCooldownMs(): number {
+  return isSemanticScholarAuthenticated()
+    ? SEMANTIC_SCHOLAR_AUTHENTICATED_COOLDOWN_MS
+    : SEMANTIC_SCHOLAR_UNAUTHENTICATED_COOLDOWN_MS;
+}
+
+function parseSemanticScholarSearchResponse(
+  data: {
+    data?: Array<{
+      paperId?: string;
+      title?: string;
+      authors?: Array<{ name?: string }>;
+      year?: number;
+      abstract?: string;
+      openAccessPdf?: { url?: string } | null;
+      citationCount?: number;
+      externalIds?: { DOI?: string; ArXiv?: string };
+      url?: string;
+    }>;
+  },
+  query: string
+): AcademicPaper[] {
+  const papers: AcademicPaper[] = [];
+  const items = data.data || [];
+
+  for (const item of items) {
+    const title = item.title || "Untitled";
+    const authors = (item.authors || []).map((a) => a.name).filter(Boolean) as string[];
+    const abstract = item.abstract || "";
+    const pdfUrl = item.openAccessPdf?.url || undefined;
+    const doi = item.externalIds?.DOI || undefined;
+    const paperUrl = item.url || `https://www.semanticscholar.org/paper/${item.paperId || ""}`;
+
+    const basePaper: Omit<AcademicPaper, "score"> = {
+      title,
+      authors,
+      year: normalizePublicationYear(item.year),
+      abstract,
+      url: paperUrl,
+      pdfUrl,
+      source: "semantic_scholar",
+      citationCount: item.citationCount,
+      doi,
+    };
+
+    papers.push({ ...basePaper, score: calculateScore(basePaper) });
+  }
+
+  return papers;
+}
+
 async function searchSemanticScholar(
   throttleCtx: AcademicSearchThrottleCtx | null | undefined,
   query: string,
@@ -391,7 +495,7 @@ async function searchSemanticScholar(
     minCitations?: number;
     openAccessOnly?: boolean;
   }
-): Promise<AcademicPaper[]> {
+): Promise<{ papers: AcademicPaper[]; rateLimited: boolean }> {
   const logger = createServiceLogger("academic_search", "searchSemanticScholar");
   const fields = "title,authors,year,abstract,openAccessPdf,citationCount,externalIds,url";
   const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&fields=${fields}&limit=${maxResults}`;
@@ -403,42 +507,70 @@ async function searchSemanticScholar(
     headers["x-api-key"] = env.SEMANTIC_SCHOLAR_API_KEY;
   }
 
-  // Custom retry config for Semantic Scholar rate limits
-  const MAX_ATTEMPTS = 5;
+  const slot = await acquireSemanticScholarRequestSlot(throttleCtx, logger);
+  if (!slot.ok) {
+    return { papers: [], rateLimited: true };
+  }
+
+  const MAX_TRANSIENT_ATTEMPTS = 3;
   const BASE_DELAY_MS = 2000;
-
   let lastError: Error | undefined;
-  let retryAfterMs: number | undefined;
+  let rateLimited = false;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    try {
-      const t0 = Date.now();
-      logger.apiCall("semantic_scholar", "/graph/v1/paper/search", {
-        query: query.substring(0, 50),
-      });
-
-      const response = await fetch(url, { headers });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        const status = response.status;
-
-        logger.apiError("semantic_scholar", "/graph/v1/paper/search", new Error(`HTTP ${status}`), {
-          status,
+  for (let attempt429 = 0; attempt429 < SEMANTIC_SCHOLAR_MAX_429_RETRIES; attempt429++) {
+    for (let attempt = 0; attempt < MAX_TRANSIENT_ATTEMPTS; attempt++) {
+      try {
+        const t0 = Date.now();
+        logger.apiCall("semantic_scholar", "/graph/v1/paper/search", {
+          query: query.substring(0, 50),
+          attempt429: attempt429 + 1,
         });
 
-        retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
-        if (status === 429) {
-          logger.warn("Semantic Scholar HTTP 429, no retry");
-          await recordProviderRateLimit(
-            throttleCtx,
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const status = response.status;
+
+          logger.apiError(
             "semantic_scholar",
-            env.SEMANTIC_SCHOLAR_API_KEY
-              ? SEMANTIC_SCHOLAR_AUTHENTICATED_COOLDOWN_MS
-              : SEMANTIC_SCHOLAR_UNAUTHENTICATED_COOLDOWN_MS,
-            retryAfterMs,
-            logger
+            "/graph/v1/paper/search",
+            new Error(`HTTP ${status}`),
+            { status }
           );
+
+          const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
+
+          if (status === 429) {
+            rateLimited = true;
+            const hasMore429Retries = attempt429 < SEMANTIC_SCHOLAR_MAX_429_RETRIES - 1;
+            if (hasMore429Retries) {
+              const delayMs = retryAfterMs ?? semanticScholarMinIntervalMs() * (attempt429 + 1);
+              logger.warn("Semantic Scholar HTTP 429, backing off before retry", {
+                attempt429: attempt429 + 1,
+                delayMs,
+                retryAfterHeader: retryAfterMs ?? null,
+              });
+              await delay(delayMs);
+              break;
+            }
+
+            logger.warn("Semantic Scholar HTTP 429, retries exhausted");
+            await recordProviderRateLimit(
+              throttleCtx,
+              "semantic_scholar",
+              semanticScholarFallbackCooldownMs(),
+              retryAfterMs,
+              logger
+            );
+            throw createExternalServiceErrorFromResponse(
+              "semantic_scholar",
+              status,
+              "/graph/v1/paper/search",
+              errorText.slice(0, 500)
+            );
+          }
+
           throw createExternalServiceErrorFromResponse(
             "semantic_scholar",
             status,
@@ -447,90 +579,51 @@ async function searchSemanticScholar(
           );
         }
 
-        throw createExternalServiceErrorFromResponse(
-          "semantic_scholar",
-          status,
-          "/graph/v1/paper/search",
-          errorText.slice(0, 500)
-        );
+        const data = (await response.json()) as Parameters<typeof parseSemanticScholarSearchResponse>[0];
+
+        logger.apiSuccess("semantic_scholar", "/graph/v1/paper/search", Date.now() - t0, {
+          maxResults,
+        });
+
+        return { papers: parseSemanticScholarSearchResponse(data, query), rateLimited: false };
+      } catch (error) {
+        lastError = error as Error;
+
+        const statusCode = (() => {
+          if (lastError instanceof ExternalServiceError) return lastError.statusCode;
+          const m = lastError.message.match(/\bHTTP\s+(\d{3})\b/i);
+          return m ? parseInt(m[1], 10) : undefined;
+        })();
+
+        if (statusCode === 429) {
+          break;
+        }
+
+        if (attempt >= MAX_TRANSIENT_ATTEMPTS - 1) {
+          break;
+        }
+
+        const isRetryable =
+          lastError instanceof ExternalServiceError
+            ? lastError.retryable
+            : statusCode !== undefined && isRetryableHttpStatus(statusCode);
+
+        if (!isRetryable) {
+          break;
+        }
+
+        let delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+        const jitterAmount = delayMs * 0.25;
+        delayMs = Math.max(0, Math.floor(delayMs + (Math.random() - 0.5) * 2 * jitterAmount));
+
+        logger.info("Retrying Semantic Scholar after transient error", { attempt: attempt + 1, delayMs });
+        await delay(delayMs);
       }
-
-      const data = (await response.json()) as {
-        data?: Array<{
-          paperId?: string;
-          title?: string;
-          authors?: Array<{ name?: string }>;
-          year?: number;
-          abstract?: string;
-          openAccessPdf?: { url?: string } | null;
-          citationCount?: number;
-          externalIds?: { DOI?: string; ArXiv?: string };
-          url?: string;
-        }>;
-      };
-
-      logger.apiSuccess("semantic_scholar", "/graph/v1/paper/search", Date.now() - t0, {
-        maxResults,
-      });
-
-      const papers: AcademicPaper[] = [];
-      const items = data.data || [];
-
-      for (const item of items) {
-        const title = item.title || "Untitled";
-        const authors = (item.authors || []).map((a) => a.name).filter(Boolean) as string[];
-        const abstract = item.abstract || "";
-        const pdfUrl = item.openAccessPdf?.url || undefined;
-        const doi = item.externalIds?.DOI || undefined;
-        const url = item.url || `https://www.semanticscholar.org/paper/${item.paperId || ""}`;
-
-        const basePaper: Omit<AcademicPaper, "score"> = {
-          title,
-          authors,
-          year: normalizePublicationYear(item.year),
-          abstract,
-          url,
-          pdfUrl,
-          source: "semantic_scholar",
-          citationCount: item.citationCount,
-          doi,
-        };
-
-        papers.push({ ...basePaper, score: calculateScore(basePaper) });
-      }
-
-      return papers;
-    } catch (error) {
-      lastError = error as Error;
-
-      const statusCode = (() => {
-        if (lastError instanceof ExternalServiceError) return lastError.statusCode;
-        const m = lastError.message.match(/\bHTTP\s+(\d{3})\b/i);
-        return m ? parseInt(m[1], 10) : undefined;
-      })();
-
-      if (statusCode === 429 || attempt >= MAX_ATTEMPTS - 1) {
-        break;
-      }
-
-      const isRetryable =
-        lastError instanceof ExternalServiceError
-          ? lastError.retryable
-          : statusCode !== undefined && isRetryableHttpStatus(statusCode);
-
-      if (!isRetryable) {
-        break;
-      }
-
-      // Calculate delay: respect Retry-After if present, else exponential backoff with jitter
-      let delayMs = retryAfterMs ?? BASE_DELAY_MS * Math.pow(2, attempt);
-      // Add ±25% jitter
-      const jitterAmount = delayMs * 0.25;
-      delayMs = Math.max(0, Math.floor(delayMs + (Math.random() - 0.5) * 2 * jitterAmount));
-
-      logger.info("Retrying Semantic Scholar after delay", { attempt: attempt + 1, delayMs });
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
+  }
+
+  if (lastError && isHttp429Error(lastError)) {
+    return { papers: [], rateLimited: true };
   }
 
   throw lastError ?? new Error("Semantic Scholar search failed after all retries");
@@ -972,6 +1065,8 @@ export async function searchInternalHandler(
     hasFullText: hasFullText ?? null,
     fieldBoostLen: boost.length,
     sortBy: sortBy || "relevance",
+    semanticScholarAuth: isSemanticScholarAuthenticated(),
+    semanticScholarMinIntervalMs: semanticScholarMinIntervalMs(),
   });
 
   const orderedSources = resolveAcademicSearchSources(sourceAllowlist);
@@ -1004,11 +1099,13 @@ export async function searchInternalHandler(
             setTimeout(() => reject(new Error("Semantic Scholar timeout after 30000ms")), 30000)
           ),
         ]);
-        semanticResults = await semanticPromise.catch((error) => {
+        const semanticOutcome = await semanticPromise.catch((error) => {
           logger.warn("Semantic Scholar search failed", { message: (error as Error).message });
           if (isHttp429Error(error)) rateLimited = true;
-          return [] as AcademicPaper[];
+          return { papers: [] as AcademicPaper[], rateLimited: true };
         });
+        semanticResults = semanticOutcome.papers;
+        if (semanticOutcome.rateLimited) rateLimited = true;
         const next = orderedSources[i + 1];
         if (next) {
           await delay(SEMANTIC_SCHOLAR_GAP_MS);
@@ -1130,7 +1227,7 @@ export const searchInternal = internalAction({
 
 const academicSearchActionCache = createCachedAction(
   internal._services.search.AcademicSearchService.searchInternalForCache,
-  { ttl: withJitter(CACHE_TTL.search * 24, 0.15), name: "academic-search-v2" }
+  { ttl: withJitter(CACHE_TTL.search * 24, 0.15), name: "academic-search-v3" }
 );
 
 /** Cached academic search; empty results are never stored (retry can hit live APIs). */

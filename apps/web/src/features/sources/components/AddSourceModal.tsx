@@ -21,6 +21,7 @@ import { DoiInputModal } from "./DoiInputModal";
 import { ManualPaperModal } from "./ManualPaperModal";
 import { MendeleyImportModal } from "./MendeleyImportModal";
 import { ZoteroImportModal } from "./ZoteroImportModal";
+import { isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
 
 const MAX_SOURCES = 200;
 
@@ -227,22 +228,24 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               </div>
             </div>
 
-            <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow md:col-span-2 xl:col-span-1">
-              <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <HardDrive className="w-4 h-4" />
-                Google Drive
+            {isGoogleDrivePickerConfigured ? (
+              <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow md:col-span-2 xl:col-span-1">
+                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <HardDrive className="w-4 h-4" />
+                  Google Drive
+                </div>
+                <div className="space-y-2">
+                  <button
+                    onClick={onGoogleDriveClick}
+                    disabled={!canUpload}
+                    className="h-11 w-full flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <HardDrive className="w-4 h-4 text-chart-2 group-hover:scale-110 transition-transform shrink-0" />
+                    <span className="text-sm font-medium">Choose from Google Drive</span>
+                  </button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <button
-                  onClick={onGoogleDriveClick}
-                  disabled={!canUpload}
-                  className="h-11 w-full flex items-center justify-center gap-2 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 border border-transparent hover:border-border transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <HardDrive className="w-4 h-4 text-chart-2 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="text-sm font-medium">Choose from Google Drive</span>
-                </button>
-              </div>
-            </div>
+            ) : null}
 
             <div className="border border-border/50 rounded-xl p-5 space-y-4 bg-card shadow-sm hover:shadow-md transition-shadow md:col-span-2 xl:col-span-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
