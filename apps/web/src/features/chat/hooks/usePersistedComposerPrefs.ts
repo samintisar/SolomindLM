@@ -17,7 +17,7 @@ function loadPrefsForNotebook(notebookKey: string | null) {
  */
 export function usePersistedComposerPrefs(notebookId: string | null | undefined) {
   const notebookKey = notebookId ? String(notebookId) : null;
-  const hydratedKeyRef = useRef<string | null>(null);
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const initialPrefsRef = useRef<PersistedComposerPrefs | null>(null);
 
   const [composerMode, setComposerMode] = useState<ChatComposerMode>(() => {
@@ -44,17 +44,17 @@ export function usePersistedComposerPrefs(notebookId: string | null | undefined)
     setComposerMode(loaded.mode);
     setSourceFilters(loaded.sourceFilters);
     setResearchDatabase(loaded.researchDatabase);
-    hydratedKeyRef.current = notebookKey;
+    setHydratedKey(notebookKey);
   }, [notebookKey]);
 
   useEffect(() => {
-    if (!notebookKey || hydratedKeyRef.current !== notebookKey) return;
+    if (!notebookKey || hydratedKey !== notebookKey) return;
     writeComposerPrefsToStorage(notebookKey, {
       mode: composerMode,
       sourceFilters,
       researchDatabase,
     });
-  }, [notebookKey, composerMode, sourceFilters, researchDatabase]);
+  }, [notebookKey, hydratedKey, composerMode, sourceFilters, researchDatabase]);
 
   return {
     composerMode,

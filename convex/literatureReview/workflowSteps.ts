@@ -40,10 +40,17 @@ import {
   sourcesForResearchDatabase,
 } from "../_model/literatureReviewSearchOptions.js";
 import {
+  type AcademicSearchCacheResult,
   normalizePublicationYear,
   searchCache,
 } from "../_services/search/AcademicSearchService.js";
 import { generateCitationKey } from "../_utils/CitationEngine.js";
+import { EXTRACT_DATA_CHUNK_SIZE, SCREEN_PAPERS_BATCH_SIZE } from "./batchSizes.js";
+import {
+  bulkLlmModel,
+  LITERATURE_BULK_LLM_CONCURRENCY,
+  truncateForLiteratureLlm,
+} from "./llmTuning.js";
 import {
   compactPapersForSnapshot,
   compactPapersForWorkflow,
@@ -59,12 +66,6 @@ import {
   type ReportPaperRow,
   validateAndSanitizeReportSections,
 } from "./reportContext.js";
-import { EXTRACT_DATA_CHUNK_SIZE, SCREEN_PAPERS_BATCH_SIZE } from "./batchSizes.js";
-import {
-  bulkLlmModel,
-  LITERATURE_BULK_LLM_CONCURRENCY,
-  truncateForLiteratureLlm,
-} from "./llmTuning.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -251,10 +252,11 @@ export async function searchPapersHandler(
     query: string,
     maxResults: number,
     searchOptions?: typeof args.searchOptions
-  ) => Promise<any[]>
+  ) => Promise<AcademicSearchCacheResult>
 ) {
   const queries = args.searchQueries.length > 0 ? args.searchQueries : [args.query];
   const unique = [...new Set(queries.map((q) => q.trim()).filter(Boolean))];
+  let rateLimited = false;
   const merged: Array<{
     title: string;
     authors: string[];
@@ -296,7 +298,8 @@ export async function searchPapersHandler(
     }
   }
   for (const batch of batches) {
-    for (const p of batch) {
+    if (batch.rateLimited) rateLimited = true;
+    for (const p of batch.papers) {
       merged.push({
         title: p.title,
         authors: p.authors,
@@ -318,6 +321,7 @@ export async function searchPapersHandler(
     papers: compactPapersForWorkflow(deduped),
     recordsIdentified,
     recordsAfterDedupe: deduped.length,
+    rateLimited,
   };
 }
 
@@ -331,6 +335,7 @@ export const searchPapers = internalAction({
     papers: v.array(literaturePaperValidator),
     recordsIdentified: v.number(),
     recordsAfterDedupe: v.number(),
+    rateLimited: v.boolean(),
   }),
   handler: searchPapersHandler,
 });
@@ -1148,12 +1153,17 @@ export async function generateReportHandler(
     });
   } catch (error) {
     logger.error("Report generation failed", error);
-    // Fallback to placeholder report
-    return await ctx.runMutation(internal.literatureReview.db.persistReport, {
+    await ctx.runMutation(internal.literatureReview.db.patchSessionStatus, {
+      sessionId: args.sessionId,
+      status: "failed",
+    });
+    await ctx.runMutation(internal.literatureReview.db.persistReport, {
       sessionId: args.sessionId,
       tableId: args.tableId,
       query: args.query,
+      status: "failed",
     });
+    throw error;
   }
 }
 

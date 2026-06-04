@@ -34,7 +34,20 @@ export const tryAcquireSemanticScholarSlot = internalMutation({
   handler: async (ctx) => {
     const minIntervalMs = semanticScholarMinIntervalMs();
     const now = Date.now();
-    const row = await ctx.db.query("semanticScholarThrottle").first();
+    const rows = await ctx.db.query("semanticScholarThrottle").collect();
+    if (rows.length > 1) {
+      const [keep, ...dupes] = [...rows].sort((a, b) => a._creationTime - b._creationTime);
+      for (const dup of dupes) {
+        await ctx.db.delete(dup._id);
+      }
+      const elapsed = now - keep.lastRequestAt;
+      if (elapsed < minIntervalMs) {
+        return { acquired: false, waitMs: minIntervalMs - elapsed, minIntervalMs };
+      }
+      await ctx.db.patch(keep._id, { lastRequestAt: now });
+      return { acquired: true, waitMs: 0, minIntervalMs };
+    }
+    const row = rows[0];
     if (row) {
       const elapsed = now - row.lastRequestAt;
       if (elapsed < minIntervalMs) {

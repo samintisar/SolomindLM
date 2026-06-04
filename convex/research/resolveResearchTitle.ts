@@ -1,7 +1,8 @@
 "use node";
 
-import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
+import type { ActionCtx } from "../_generated/server";
+import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { parseMarkdownSections } from "./reportSections";
 import {
   deepResearchReportTitle,
@@ -36,16 +37,17 @@ export async function resolveResearchTitle(
   const q = args.query.trim();
   if (!q) return normalizeResearchTitle("");
 
-  const snippet = args.finalResponse
-    ? abstractSnippetFromResponse(args.finalResponse)
-    : q;
+  const snippet = args.finalResponse ? abstractSnippetFromResponse(args.finalResponse) : q;
 
   try {
     const generated = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
       chunk: researchTitleChunk(q, snippet),
     });
     return normalizeResearchTitle(generated);
-  } catch {
+  } catch (error) {
+    createServiceLogger("research", "resolveResearchTitle").warn("title_generation_failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return fallbackResearchTitleFromQuery(q);
   }
 }

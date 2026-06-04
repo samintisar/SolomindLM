@@ -143,11 +143,6 @@ export async function runResearchExecuteImpl(
       return;
     }
 
-    await ctx.runMutation(internal.research.index.updateRunProgress, {
-      runId,
-      status: "completed",
-    });
-
     const evidenceRows = await ctx.runQuery(internal.research.index.getRunEvidenceInternal, {
       runId,
     });
@@ -196,6 +191,11 @@ export async function runResearchExecuteImpl(
         });
       }
     }
+
+    await ctx.runMutation(internal.research.index.updateRunProgress, {
+      runId,
+      status: "completed",
+    });
 
     researchLog.operationComplete({ runId: String(runId) });
   } catch (e) {

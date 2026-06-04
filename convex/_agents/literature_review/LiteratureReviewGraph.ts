@@ -18,14 +18,14 @@ import { defineEvent, type WorkflowCtx, WorkflowManager } from "@convex-dev/work
 import { v } from "convex/values";
 import { components, internal } from "../../_generated/api";
 import {
+  literatureSearchOptionsValidator,
+  sourcesForResearchDatabase,
+} from "../../_model/literatureReviewSearchOptions";
+import {
   EXTRACT_DATA_CHUNK_SIZE,
   SCREEN_PAPERS_BATCH_SIZE,
 } from "../../literatureReview/batchSizes.js";
 import { LITERATURE_SCREEN_TOP_N } from "../../literatureReview/llmTuning.js";
-import {
-  literatureSearchOptionsValidator,
-  sourcesForResearchDatabase,
-} from "../../_model/literatureReviewSearchOptions";
 
 export const workflow = new WorkflowManager(components.workflow);
 
@@ -212,6 +212,7 @@ export const literatureReviewWorkflow = workflow
         papersFound: searchResults.papers.length,
         recordsIdentified: searchResults.recordsIdentified,
         recordsAfterDedupe: searchResults.recordsAfterDedupe,
+        ...(searchResults.rateLimited ? { rateLimited: true } : {}),
       });
 
       await trackStep(
@@ -371,8 +372,7 @@ export const literatureReviewWorkflow = workflow
         { sessionId: args.sessionId }
       );
       const existingBatchSet = new Set(existingBatchNumbers);
-      const extractBatchCount =
-        Math.ceil(includedPapers.length / EXTRACT_DATA_CHUNK_SIZE) || 0;
+      const extractBatchCount = Math.ceil(includedPapers.length / EXTRACT_DATA_CHUNK_SIZE) || 0;
 
       await trackStep(
         step,

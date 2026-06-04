@@ -18,11 +18,11 @@ import {
   SEMANTIC_SCHOLAR_MAX_429_RETRIES,
   SEMANTIC_SCHOLAR_UNAUTHENTICATED_COOLDOWN_MS,
 } from "../../_lib/externalProviderCooldowns";
+import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import {
   isSemanticScholarAuthenticated,
   semanticScholarMinIntervalMs,
 } from "../../_lib/semanticScholarThrottle.js";
-import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import {
   type AcademicPaperSource,
   resolveAcademicSearchSources,
@@ -420,6 +420,15 @@ async function acquireSemanticScholarRequestSlot(
         waitedMs,
         minIntervalMs: slot.minIntervalMs,
       });
+      if (throttleCtx) {
+        await recordProviderRateLimit(
+          throttleCtx,
+          "semantic_scholar",
+          semanticScholarFallbackCooldownMs(),
+          undefined,
+          logger
+        );
+      }
       return { ok: false, rateLimited: true, reason: "slot_timeout" };
     }
 
@@ -431,6 +440,15 @@ async function acquireSemanticScholarRequestSlot(
     waitedMs += waitMs;
   }
 
+  if (throttleCtx) {
+    await recordProviderRateLimit(
+      throttleCtx,
+      "semantic_scholar",
+      semanticScholarFallbackCooldownMs(),
+      undefined,
+      logger
+    );
+  }
   return { ok: false, rateLimited: true, reason: "slot_timeout" };
 }
 
@@ -509,7 +527,7 @@ async function searchSemanticScholar(
 
   const slot = await acquireSemanticScholarRequestSlot(throttleCtx, logger);
   if (!slot.ok) {
-    return { papers: [], rateLimited: true };
+    return { papers: [], rateLimited: slot.rateLimited };
   }
 
   const MAX_TRANSIENT_ATTEMPTS = 3;
@@ -552,6 +570,11 @@ async function searchSemanticScholar(
                 retryAfterHeader: retryAfterMs ?? null,
               });
               await delay(delayMs);
+              const retrySlot = await acquireSemanticScholarRequestSlot(throttleCtx, logger);
+              if (!retrySlot.ok) {
+                rateLimited = true;
+                break;
+              }
               break;
             }
 
@@ -579,7 +602,9 @@ async function searchSemanticScholar(
           );
         }
 
-        const data = (await response.json()) as Parameters<typeof parseSemanticScholarSearchResponse>[0];
+        const data = (await response.json()) as Parameters<
+          typeof parseSemanticScholarSearchResponse
+        >[0];
 
         logger.apiSuccess("semantic_scholar", "/graph/v1/paper/search", Date.now() - t0, {
           maxResults,
@@ -616,7 +641,10 @@ async function searchSemanticScholar(
         const jitterAmount = delayMs * 0.25;
         delayMs = Math.max(0, Math.floor(delayMs + (Math.random() - 0.5) * 2 * jitterAmount));
 
-        logger.info("Retrying Semantic Scholar after transient error", { attempt: attempt + 1, delayMs });
+        logger.info("Retrying Semantic Scholar after transient error", {
+          attempt: attempt + 1,
+          delayMs,
+        });
         await delay(delayMs);
       }
     }
@@ -1101,8 +1129,9 @@ export async function searchInternalHandler(
         ]);
         const semanticOutcome = await semanticPromise.catch((error) => {
           logger.warn("Semantic Scholar search failed", { message: (error as Error).message });
-          if (isHttp429Error(error)) rateLimited = true;
-          return { papers: [] as AcademicPaper[], rateLimited: true };
+          const limited = isHttp429Error(error);
+          if (limited) rateLimited = true;
+          return { papers: [] as AcademicPaper[], rateLimited: limited };
         });
         semanticResults = semanticOutcome.papers;
         if (semanticOutcome.rateLimited) rateLimited = true;
@@ -1230,14 +1259,24 @@ const academicSearchActionCache = createCachedAction(
   { ttl: withJitter(CACHE_TTL.search * 24, 0.15), name: "academic-search-v3" }
 );
 
+export interface AcademicSearchCacheResult {
+  papers: AcademicPaper[];
+  rateLimited: boolean;
+}
+
 /** Cached academic search; empty results are never stored (retry can hit live APIs). */
 export const searchCache = {
-  async fetch(ctx: AcademicSearchThrottleCtx, args: SearchInternalArgs): Promise<AcademicPaper[]> {
+  async fetch(
+    ctx: AcademicSearchThrottleCtx,
+    args: SearchInternalArgs
+  ): Promise<AcademicSearchCacheResult> {
     try {
-      return await academicSearchActionCache.fetch(ctx, args);
+      const papers = await academicSearchActionCache.fetch(ctx, args);
+      return { papers, rateLimited: false };
     } catch (error) {
       if (error instanceof Error && error.message === ACADEMIC_SEARCH_EMPTY_SKIP_CACHE) {
-        return [];
+        const live = await searchInternalHandler(args, ctx);
+        return { papers: live.papers, rateLimited: live.rateLimited };
       }
       throw error;
     }
@@ -1270,6 +1309,7 @@ export interface DiscoverAcademicPapersArgs {
   hasFullText?: boolean;
   fieldOfStudyTerms?: string[];
   sortBy?: string;
+  sources?: AcademicPaperSource[];
 }
 
 export async function discoverAcademicPapersInternalHandler(
@@ -1299,6 +1339,7 @@ export async function discoverAcademicPapersInternalHandler(
       hasFullText: args.hasFullText,
       fieldOfStudyTerms: args.fieldOfStudyTerms,
       sortBy: args.sortBy ?? "relevance",
+      sources: args.sources,
     });
 
     const sources: DiscoveredSource[] = papers.map(toDiscoveredSource);
@@ -1346,6 +1387,7 @@ export async function discoverAcademicPapersLive(
       hasFullText: args.hasFullText,
       fieldOfStudyTerms: args.fieldOfStudyTerms,
       sortBy: args.sortBy ?? "relevance",
+      sources: args.sources,
     }
   )) as SearchInternalResult;
 
@@ -1371,6 +1413,16 @@ export const discoverAcademicPapersInternal = internalAction({
     hasFullText: v.optional(v.boolean()),
     fieldOfStudyTerms: v.optional(v.array(v.string())),
     sortBy: v.optional(v.string()),
+    sources: v.optional(
+      v.array(
+        v.union(
+          v.literal("openalex"),
+          v.literal("arxiv"),
+          v.literal("semantic_scholar"),
+          v.literal("pubmed")
+        )
+      )
+    ),
   },
   handler: async (ctx, args) => discoverAcademicPapersLive(ctx, args),
 });

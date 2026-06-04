@@ -209,6 +209,10 @@ describe("planReviewHandler", () => {
   });
 });
 
+function mockSearchBatch(papers: Array<Record<string, unknown>>, rateLimited = false) {
+  return { papers, rateLimited };
+}
+
 describe("searchPapersHandler", () => {
   const mockFetchPapers = vi.fn();
 
@@ -217,17 +221,19 @@ describe("searchPapersHandler", () => {
   });
 
   it("searches across sources", async () => {
-    mockFetchPapers.mockResolvedValue([
-      {
-        title: "Paper 1",
-        authors: ["A"],
-        year: 2023,
-        abstract: "Abstract 1",
-        url: "http://1",
-        source: "arxiv",
-        score: 0.9,
-      },
-    ]);
+    mockFetchPapers.mockResolvedValue(
+      mockSearchBatch([
+        {
+          title: "Paper 1",
+          authors: ["A"],
+          year: 2023,
+          abstract: "Abstract 1",
+          url: "http://1",
+          source: "arxiv",
+          score: 0.9,
+        },
+      ])
+    );
 
     const result = await searchPapersHandler(
       mockCtx,
@@ -244,7 +250,7 @@ describe("searchPapersHandler", () => {
   });
 
   it("passes search options to fetch", async () => {
-    mockFetchPapers.mockResolvedValue([]);
+    mockFetchPapers.mockResolvedValue(mockSearchBatch([]));
 
     await searchPapersHandler(
       mockCtx,
@@ -271,17 +277,19 @@ describe("searchPapersHandler", () => {
   });
 
   it("deduplicates results", async () => {
-    mockFetchPapers.mockResolvedValue([
-      {
-        title: "Paper 1",
-        authors: ["A"],
-        abstract: "Abstract 1",
-        url: "http://1",
-        source: "arxiv",
-        doi: "10.1234/a",
-        score: 0.9,
-      },
-    ]);
+    mockFetchPapers.mockResolvedValue(
+      mockSearchBatch([
+        {
+          title: "Paper 1",
+          authors: ["A"],
+          abstract: "Abstract 1",
+          url: "http://1",
+          source: "arxiv",
+          doi: "10.1234/a",
+          score: 0.9,
+        },
+      ])
+    );
 
     const result = await searchPapersHandler(
       mockCtx,
@@ -296,7 +304,7 @@ describe("searchPapersHandler", () => {
   });
 
   it("handles empty results", async () => {
-    mockFetchPapers.mockResolvedValue([]);
+    mockFetchPapers.mockResolvedValue(mockSearchBatch([]));
 
     const result = await searchPapersHandler(
       mockCtx,
@@ -311,17 +319,19 @@ describe("searchPapersHandler", () => {
   });
 
   it("strips null publication year from search results", async () => {
-    mockFetchPapers.mockResolvedValue([
-      {
-        title: "Paper without year",
-        authors: ["A"],
-        year: null,
-        abstract: "Abstract",
-        url: "http://1",
-        source: "semantic_scholar",
-        score: 0.9,
-      },
-    ]);
+    mockFetchPapers.mockResolvedValue(
+      mockSearchBatch([
+        {
+          title: "Paper without year",
+          authors: ["A"],
+          year: null,
+          abstract: "Abstract",
+          url: "http://1",
+          source: "semantic_scholar",
+          score: 0.9,
+        },
+      ])
+    );
 
     const result = await searchPapersHandler(
       mockCtx,
@@ -338,7 +348,7 @@ describe("searchPapersHandler", () => {
   });
 
   it("uses query when searchQueries is empty", async () => {
-    mockFetchPapers.mockResolvedValue([]);
+    mockFetchPapers.mockResolvedValue(mockSearchBatch([]));
 
     await searchPapersHandler(
       mockCtx,
@@ -838,8 +848,8 @@ describe("generateReportHandler", () => {
     });
 
     expect(perSectionInvoke).toHaveBeenCalled();
-    const persistCall = (mockCtx.runMutation as any).mock.calls.find(
-      (c: unknown[]) => (c[1] as { content?: string })?.content?.includes("## Abstract")
+    const persistCall = (mockCtx.runMutation as any).mock.calls.find((c: unknown[]) =>
+      (c[1] as { content?: string })?.content?.includes("## Abstract")
     );
     expect(persistCall?.[1]?.content).toContain("Retrieval-augmented generation");
     expect(perSectionInvoke).toHaveBeenCalledTimes(6);
@@ -929,31 +939,30 @@ describe("generateReportHandler", () => {
     );
   });
 
-  it("handles missing table with fallback report", async () => {
-    // When table is missing, the handler catches the error and falls back
+  it("marks session failed when table is missing", async () => {
     (mockCtx.runQuery as any).mockReset().mockResolvedValue(null);
-    (mockCtx.runMutation as any)
-      .mockReset()
-      .mockResolvedValue({ reportId: "fallback123" as Id<"literatureReports"> });
-
-    const result = await generateReportHandler(mockCtx, {
-      sessionId: "session123" as Id<"literatureReviewSessions">,
-      tableId: "table123" as Id<"literatureTables">,
-      query: "test query",
+    (mockCtx.runMutation as any).mockReset().mockResolvedValue({
+      reportId: "fallback123" as Id<"literatureReports">,
     });
 
-    expect(result.reportId).toBe("fallback123");
+    await expect(
+      generateReportHandler(mockCtx, {
+        sessionId: "session123" as Id<"literatureReviewSessions">,
+        tableId: "table123" as Id<"literatureTables">,
+        query: "test query",
+      })
+    ).rejects.toThrow();
+
     expect(mockCtx.runMutation).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         sessionId: "session123",
-        tableId: "table123",
-        query: "test query",
+        status: "failed",
       })
     );
   });
 
-  it("handles generation failure with fallback", async () => {
+  it("marks session failed when generation throws", async () => {
     (createLLM as any).mockImplementation(() => {
       throw new Error("LLM Error");
     });
@@ -974,17 +983,19 @@ describe("generateReportHandler", () => {
       reportId: "report123" as Id<"literatureReports">,
     });
 
-    const result = await generateReportHandler(mockCtx, {
-      sessionId: "session123" as Id<"literatureReviewSessions">,
-      tableId: "table123" as Id<"literatureTables">,
-      query: "test query",
-    });
+    await expect(
+      generateReportHandler(mockCtx, {
+        sessionId: "session123" as Id<"literatureReviewSessions">,
+        tableId: "table123" as Id<"literatureTables">,
+        query: "test query",
+      })
+    ).rejects.toThrow();
 
-    expect(result.reportId).toBe("report123");
     expect(mockCtx.runMutation).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        query: "test query",
+        sessionId: "session123",
+        status: "failed",
       })
     );
   });

@@ -161,9 +161,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       if (Object.keys(api).length > 0) {
         policy.academicFilters = api;
       }
+      if (researchDatabase === "pubmed") {
+        policy.academicSources = ["pubmed"];
+      } else if (researchDatabase === "arxiv") {
+        policy.academicSources = ["arxiv"];
+      }
     }
     return policy;
-  }, [channelsForChatSend, chatAcademicFilters, composerMode]);
+  }, [channelsForChatSend, chatAcademicFilters, composerMode, researchDatabase]);
 
   const historyContainerRef = useRef<HTMLDivElement>(null);
 

@@ -447,6 +447,25 @@ export const getSessionTitleContext = internalQuery({
   },
 });
 
+export const patchSessionStatus = internalMutation({
+  args: {
+    sessionId: v.id("literatureReviewSessions"),
+    status: v.union(
+      v.literal("planning"),
+      v.literal("awaiting_columns"),
+      v.literal("searching"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.sessionId, { status: args.status, updatedAt: Date.now() });
+    return null;
+  },
+});
+
 export const persistReport = internalMutation({
   args: {
     sessionId: v.id("literatureReviewSessions"),
@@ -454,6 +473,9 @@ export const persistReport = internalMutation({
     query: v.string(),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
+    status: v.optional(
+      v.union(v.literal("generating"), v.literal("completed"), v.literal("failed"))
+    ),
     sections: v.optional(
       v.array(
         v.object({
@@ -489,7 +511,7 @@ export const persistReport = internalMutation({
       title,
       notebookId: session.notebookId,
       userId: session.userId,
-      status: "completed",
+      status: args.status ?? "completed",
       content,
       citationStyle: "apa",
       sections,
