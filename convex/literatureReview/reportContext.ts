@@ -17,6 +17,80 @@ export type ReportPaperRow = {
   rowData: Record<string, string>;
 };
 
+/** Row keys filled from citations — not sent to the extraction LLM. */
+export const LITERATURE_METADATA_COLUMN_IDS = new Set([
+  "title",
+  "authors",
+  "year",
+  "summary",
+]);
+
+export type ExtractionColumnDef = { id: string; name: string };
+
+function normalizeColumnKey(key: string): string {
+  return key.toLowerCase().replace(/\s+/g, "_");
+}
+
+function compactColumnKey(key: string): string {
+  return normalizeColumnKey(key).replace(/_/g, "");
+}
+
+function isEmptyExtractionValue(value: string | undefined): boolean {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length === 0 || trimmed.toUpperCase() === "N/A";
+}
+
+/**
+ * Map LLM extraction keys (often display names) onto configured column ids.
+ * The studio table reads `rowData[columnId]` only — mismatched keys show as empty cells.
+ */
+export function alignExtractedDataToColumns(
+  extractedData: Record<string, string>,
+  columns: ExtractionColumnDef[]
+): Record<string, string> {
+  const byNormalizedKey = new Map<string, string>();
+  for (const [key, value] of Object.entries(extractedData)) {
+    if (isEmptyExtractionValue(value)) continue;
+    const trimmed = value.trim();
+    byNormalizedKey.set(normalizeColumnKey(key), trimmed);
+    byNormalizedKey.set(compactColumnKey(key), trimmed);
+    byNormalizedKey.set(key.toLowerCase(), trimmed);
+  }
+
+  const aligned: Record<string, string> = {};
+  for (const col of columns) {
+    if (LITERATURE_METADATA_COLUMN_IDS.has(col.id.toLowerCase())) continue;
+
+    const directCandidates = [col.id, col.name, normalizeColumnKey(col.name)];
+    for (const candidate of directCandidates) {
+      const direct = extractedData[candidate];
+      if (!isEmptyExtractionValue(direct)) {
+        aligned[col.id] = direct!.trim();
+        break;
+      }
+    }
+    if (aligned[col.id]) continue;
+
+    const idNorm = normalizeColumnKey(col.id);
+    const idCompact = compactColumnKey(col.id);
+    const nameCompact = compactColumnKey(col.name);
+    for (const [key, value] of byNormalizedKey) {
+      const keyCompact = key.replace(/_/g, "");
+      if (key === idNorm || keyCompact === idCompact || keyCompact === nameCompact) {
+        aligned[col.id] = value;
+        break;
+      }
+    }
+  }
+
+  return aligned;
+}
+
+export function columnsForExtraction<T extends ExtractionColumnDef>(columns: T[]): T[] {
+  const custom = columns.filter((c) => !LITERATURE_METADATA_COLUMN_IDS.has(c.id.toLowerCase()));
+  return custom.length > 0 ? custom : columns;
+}
+
 export type LiteratureReportContext = {
   query: string;
   reviewTitle?: string;
@@ -229,18 +303,24 @@ export function fullReportHasOnlyTrivialContent(
   );
 }
 
+export type StudyTableColumnRef = string | ExtractionColumnDef;
+
+function resolveStudyTableColumns(columns: StudyTableColumnRef[]): ExtractionColumnDef[] {
+  return columns
+    .map((col) => (typeof col === "string" ? { id: col, name: col } : col))
+    .filter((col) => !LITERATURE_METADATA_COLUMN_IDS.has(col.id.toLowerCase()));
+}
+
 export function buildStudyCharacteristicsTable(
   papers: ReportPaperRow[],
-  columnNames: string[]
+  columns: StudyTableColumnRef[]
 ): string {
   if (papers.length === 0) {
     return "_No included studies._";
   }
 
-  const displayCols = columnNames.filter(
-    (n) => !["title", "authors", "year", "summary"].includes(n.toLowerCase())
-  );
-  const headers = ["Study", "Year", ...displayCols.slice(0, 4)];
+  const displayCols = resolveStudyTableColumns(columns).slice(0, 4);
+  const headers = ["Study", "Year", ...displayCols.map((c) => c.name)];
 
   const rows = papers.map((p) => {
     const authorLabel = p.authors.split(",")[0]?.trim() ?? "Unknown";
@@ -248,8 +328,9 @@ export function buildStudyCharacteristicsTable(
     const cells = [
       studyCell,
       p.year || "N/A",
-      ...displayCols.slice(0, 4).map((col) => {
-        const val = resolveStudyTableCellValue(p, col);
+      ...displayCols.map((col) => {
+        const val =
+          resolveStudyTableCellValue(p, col.id) || resolveStudyTableCellValue(p, col.name);
         const trimmed = val.slice(0, 120);
         return trimmed || "—";
       }),

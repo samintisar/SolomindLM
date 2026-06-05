@@ -2,7 +2,11 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { compactPapersForSnapshot } from "./rankedPapersSnapshot.js";
-import { formatPaperTitleYear, isTitleLikeColumnName } from "./reportContext.js";
+import {
+  alignExtractedDataToColumns,
+  formatPaperTitleYear,
+  isTitleLikeColumnName,
+} from "./reportContext.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -116,8 +120,10 @@ export const insertDraftBatch = internalMutation({
         citationKey,
       });
 
-      // Start with extracted data and always merge basic metadata so title/authors/year/summary are present
-      const rowData: Record<string, string> = paper.extractedData ? { ...paper.extractedData } : {};
+      // Start with extracted data aligned to column ids (LLM keys often use display names)
+      const rowData: Record<string, string> = paper.extractedData
+        ? alignExtractedDataToColumns(paper.extractedData, args.columns)
+        : {};
 
       // Always inject core bibliographic fields regardless of column configuration
       rowData["title"] = paper.title;

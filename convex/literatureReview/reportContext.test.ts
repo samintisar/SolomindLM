@@ -9,6 +9,7 @@ import {
   mergeDeterministicReportSections,
   needsDeterministicReportMerge,
   normalizeLiteratureReportSectionContent,
+  alignExtractedDataToColumns,
   resolveStudyTableCellValue,
   stripLeadingSectionHeadingLine,
   validateAndSanitizeReportSections,
@@ -128,6 +129,21 @@ describe("reportContext", () => {
     ).toBe(false);
   });
 
+  it("alignExtractedDataToColumns maps display-name keys to column ids", () => {
+    const aligned = alignExtractedDataToColumns(
+      {
+        "Framework Name": "Transformer-based RAG",
+        performance_metrics: "F1 0.82 on benchmark X",
+      },
+      [
+        { id: "framework_name", name: "Framework Name" },
+        { id: "performance_metrics", name: "Performance Metrics" },
+      ]
+    );
+    expect(aligned.framework_name).toBe("Transformer-based RAG");
+    expect(aligned.performance_metrics).toBe("F1 0.82 on benchmark X");
+  });
+
   it("buildStudyCharacteristicsTable renders rows", () => {
     const table = buildStudyCharacteristicsTable(
       [
@@ -139,10 +155,27 @@ describe("reportContext", () => {
           rowData: { domain: "medicine" },
         },
       ],
-      ["domain"]
+      [{ id: "domain", name: "Domain" }]
     );
     expect(table).toContain("Kim2026");
     expect(table).toContain("medicine");
+  });
+
+  it("buildStudyCharacteristicsTable resolves cells by column id when name differs", () => {
+    const table = buildStudyCharacteristicsTable(
+      [
+        {
+          citationKey: "Liu2026",
+          title: "Example",
+          authors: "Liu, D.",
+          year: "2026",
+          rowData: { framework_name: "Multi-agent orchestration" },
+        },
+      ],
+      [{ id: "framework_name", name: "Framework Name" }]
+    );
+    expect(table).toContain("Framework Name");
+    expect(table).toContain("Multi-agent orchestration");
   });
 
   it("resolveStudyTableCellValue backfills Paper Title & Year from metadata", () => {

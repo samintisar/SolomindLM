@@ -517,6 +517,48 @@ describe("insertDraftBatch with custom columns", () => {
     expect(drafts[0].rowData["sample_size"]).toBe("N = 245");
   });
 
+  test("aligns LLM keys that use display names to configured column ids", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const sessionId = await seedSession(t, notebookId, userId);
+
+    await t.mutation(internal.literatureReview.db.insertDraftBatch, {
+      sessionId,
+      papers: [
+        {
+          title: "Paper One",
+          authors: ["Smith, J."],
+          year: 2023,
+          abstract: "Abstract one",
+          url: "http://example.com/1",
+          source: "arxiv" as const,
+          score: 0.9,
+          isIncluded: true,
+          extractedData: {
+            "Framework Name": "Retrieval-augmented pipeline",
+            "Performance Metrics": "Accuracy 91%",
+          },
+        },
+      ],
+      columns: [
+        { id: "framework_name", name: "Framework Name", isVisible: true },
+        { id: "performance_metrics", name: "Performance Metrics", isVisible: true },
+      ],
+      batchNumber: 0,
+    });
+
+    const drafts = await t.run(async (ctx) =>
+      ctx.db
+        .query("literatureTableDrafts")
+        .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+        .collect()
+    );
+
+    expect(drafts[0].rowData.framework_name).toBe("Retrieval-augmented pipeline");
+    expect(drafts[0].rowData.performance_metrics).toBe("Accuracy 91%");
+  });
+
   test("falls back to basic metadata when rowData is not provided", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
