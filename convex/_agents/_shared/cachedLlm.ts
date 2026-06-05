@@ -30,7 +30,15 @@ export interface LLMOptions {
   messages: LLMMessage[];
   temperature: number;
   maxTokens?: number;
-  responseFormat?: { type: "text" | "json_object" };
+  responseFormat?:
+    | { type: "text" | "json_object" }
+    | {
+        type: "json_schema";
+        json_schema: {
+          name: string;
+          schema: Record<string, unknown>;
+        };
+      };
   /**
    * When false: `mergeModelKwargs(model, "fast")` (GPT-OSS: reasoning_effort low; Qwen: thinking off).
    * When true: `mergeModelKwargs(model, "smart")` (GPT-OSS: reasoning_effort medium; Qwen: thinking on).
@@ -44,6 +52,8 @@ export interface LLMOptions {
 
 export interface LLMResponse {
   content: string;
+  /** Populated for `json_schema` calls when a JSON object is found in content or reasoning. */
+  structuredJson?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -72,6 +82,71 @@ function messageContentToString(message: { content?: unknown } | undefined): str
       })
       .join("");
   }
+  return "";
+}
+
+/**
+ * Extract a JSON object string from assistant text (fenced block or outermost `{...}`).
+ * Returns null when no valid JSON object is found (e.g. reasoning monologue only).
+ */
+export function extractJsonObjectString(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  const candidates: string[] = [];
+  if (trimmed.startsWith("{")) {
+    candidates.push(trimmed);
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    candidates.push(fenced[1].trim());
+  }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    candidates.push(trimmed.slice(start, end + 1));
+  }
+
+  for (const candidate of candidates) {
+    if (!candidate.startsWith("{")) continue;
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // try next candidate shape
+    }
+  }
+
+  return null;
+}
+
+/** Prefer JSON in `content`; only use `reasoning` when it contains a parseable JSON object. */
+export function togetherStructuredJsonPayload(choice: any): string {
+  if (!choice) return "";
+
+  const msg = choice.message;
+  if (!msg) {
+    const legacy = typeof choice.text === "string" ? choice.text : "";
+    return extractJsonObjectString(legacy) ?? "";
+  }
+
+  const content = messageContentToString(msg);
+  const fromContent = extractJsonObjectString(content);
+  if (fromContent) return fromContent;
+
+  const reasoning = (msg as { reasoning?: unknown }).reasoning;
+  if (typeof reasoning === "string") {
+    const fromReasoning = extractJsonObjectString(reasoning);
+    if (fromReasoning) return fromReasoning;
+  }
+
+  if (typeof choice.text === "string") {
+    const fromLegacy = extractJsonObjectString(choice.text);
+    if (fromLegacy) return fromLegacy;
+  }
+
   return "";
 }
 
@@ -197,12 +272,29 @@ async function executeTogetherLlmRequest(
 
       const choice = data.choices?.[0];
       const content = togetherChoiceAssistantText(choice);
-      if (!content.trim()) {
+      const wantsStructuredJson =
+        options.responseFormat?.type === "json_schema" ||
+        options.responseFormat?.type === "json_object";
+      const structuredJson = wantsStructuredJson
+        ? togetherStructuredJsonPayload(choice)
+        : undefined;
+
+      if (!content.trim() && !structuredJson) {
         logEmptyTogetherAssistant(options.model, choice);
+      } else if (wantsStructuredJson && !structuredJson) {
+        const msg = choice?.message;
+        console.warn("[Together LLM] json_schema response missing JSON payload", {
+          model: options.model,
+          finishReason: choice?.finish_reason,
+          contentPreview: messageContentToString(msg).slice(0, 120),
+          reasoningPreview:
+            typeof msg?.reasoning === "string" ? msg.reasoning.slice(0, 120) : undefined,
+        });
       }
 
       return {
         content,
+        structuredJson,
         usage: data.usage
           ? {
               promptTokens: data.usage.prompt_tokens,

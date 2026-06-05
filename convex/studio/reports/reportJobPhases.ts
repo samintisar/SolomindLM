@@ -6,16 +6,15 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { packChunks, validateChunks } from "../../_agents/ReportGraph";
-import { type MapOutput, MapOutputSchema } from "../../_agents/report/nodes";
+import { invokeMapStructuredOutput } from "../../_agents/report/structuredLlm";
 import {
   MAP_PROMPTS,
-  MAP_SYSTEM_PROMPT,
+  MAP_STRUCTURED_SYSTEM_PROMPT,
   REDUCE_PROMPTS,
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/report/prompts";
@@ -25,37 +24,18 @@ import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 
-interface MapOutputInvoker {
-  invoke(messages: Array<SystemMessage | HumanMessage>): Promise<MapOutput>;
-}
-
-function createStructuredLLM(llm: ChatTogetherAI, schema: z.ZodTypeAny): MapOutputInvoker {
-  return llm.withStructuredOutput(schema, {
-    name: "extract_topics_and_summary",
-  }) as unknown as MapOutputInvoker;
-}
-
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
+  MAP_MAX_OUTPUT_TOKENS: 16_384,
   PER_CHUNK_TIMEOUT_MS: 600_000, // 10 minutes
   REDUCE_TIMEOUT_MS: 600_000, // 10 minutes
   MAX_OUTPUT_TOKENS: 32_000,
   MIN_SUMMARY_LENGTH: 50,
 } as const;
 
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.3,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    maxTokens: 8_192,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-  });
-}
-
 function createReduceLLM(modelOverride?: string): ChatTogetherAI {
   const model = modelOverride || env.REPORT_LLM;
+  console.log(`[ReportJob] Reduce model: ${model}`);
   return new ChatTogetherAI({
     apiKey: env.TOGETHER_AI_API_KEY,
     model,
@@ -255,9 +235,6 @@ export async function runProcessReportMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    const llm = createMapLLM();
-    const structuredLLM = createStructuredLLM(llm, MapOutputSchema);
-
     const promptTemplate = MAP_PROMPTS[reportType] || MAP_PROMPTS["custom"];
     const prompt = promptTemplate
       .replace("{chunk}", chunk)
@@ -272,18 +249,21 @@ IMPORTANT: Respond with a JSON object containing:
     console.log(`[ReportJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
-    const mapOutput = (await invokeStudioLlm({
+    const mapOutput = await invokeStudioLlm({
       invoke: () =>
-        (structuredLLM as any).invoke([
-          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-          new HumanMessage(structuredPrompt),
-        ]),
+        invokeMapStructuredOutput({
+          systemPrompt: withLanguageInstruction(MAP_STRUCTURED_SYSTEM_PROMPT, language),
+          userPrompt: structuredPrompt,
+          model: env.FAST_LLM,
+          maxTokens: CONFIG.MAP_MAX_OUTPUT_TOKENS,
+          temperature: 0.3,
+        }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "ReportMap",
       onRetry: (attempt, error) => {
         console.log(`[ReportJob] ${chunkId} Retry attempt ${attempt}/3: ${error.message}`);
       },
-    })) as MapOutput;
+    });
 
     const elapsed = Date.now() - startTime;
     console.log(`[ReportJob] ${chunkId} LLM completed in ${elapsed}ms`);
@@ -483,9 +463,16 @@ export async function runFinalizeReportPhase(
     const llm = createReduceLLM(smartLlm);
     const promptTemplate = REDUCE_PROMPTS[reportType] || REDUCE_PROMPTS["custom"];
 
-    const prompt = promptTemplate
+    let prompt = promptTemplate
       .replace("{content}", combinedContent)
       .replace("{customPrompt}", customPrompt ? sanitizeUserInput(customPrompt) : "");
+
+    const customFocus = customPrompt?.trim();
+    if (customFocus && reportType !== "custom") {
+      prompt =
+        `ADDITIONAL USER REQUIREMENTS (highest priority — MUST follow):\n${sanitizeUserInput(customFocus)}\n\n` +
+        prompt;
+    }
 
     console.log(`[ReportJob] Reduce prompt: ${prompt.length} chars`);
 

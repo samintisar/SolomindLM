@@ -51,17 +51,30 @@ async function resolveDocumentIds(
   ctx: EvalActionCtx,
   notebookId: Id<"notebooks">,
   userId: Id<"users">,
-  provided?: Id<"documents">[]
+  provided?: Id<"documents">[],
+  documentTitleHint?: string
 ): Promise<Id<"documents">[]> {
   if (provided && provided.length > 0) return provided;
   const docs = await ctx.runQuery(internal.documents.index.listDocumentsForNotebookReadInternal, {
     notebookId,
     userId,
   });
-  const ids = (docs as Array<{ _id: Id<"documents"> }>).map((d) => d._id);
+  const typedDocs = docs as Array<{ _id: Id<"documents">; fileName?: string }>;
+  const hint = documentTitleHint?.trim().toLowerCase();
+  const scoped =
+    hint && hint.length > 0
+      ? typedDocs.filter((d) => (d.fileName ?? "").toLowerCase().includes(hint))
+      : typedDocs;
+  const chosen = scoped.length > 0 ? scoped : typedDocs;
+  const ids = chosen.map((d) => d._id);
   if (ids.length === 0) {
     throw new Error(
       `Notebook ${notebookId} has no documents — studio agents require at least one source.`
+    );
+  }
+  if (hint && scoped.length > 0 && scoped.length < typedDocs.length) {
+    console.log(
+      `[RAG eval] documentTitleHint "${documentTitleHint}" narrowed ${typedDocs.length} → ${scoped.length} document(s)`
     );
   }
   return ids;
@@ -121,6 +134,7 @@ export const startReportEval = action({
     reportType: v.optional(v.string()),
     customPrompt: v.optional(v.string()),
     smartLlm: v.optional(v.string()),
+    documentTitleHint: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<ReportEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
@@ -128,7 +142,13 @@ export const startReportEval = action({
       throw new Error("smartLlm must be a non-empty model identifier when provided");
     }
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
-    const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
+    const documentIds = await resolveDocumentIds(
+      ctx,
+      args.notebookId,
+      userId,
+      args.documentIds,
+      args.documentTitleHint
+    );
     const reportType = args.reportType ?? "summary";
 
     const report = await ctx.runMutation(internal.studio.reports.index.createInternal, {

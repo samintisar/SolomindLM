@@ -15,14 +15,12 @@ import { mergeResults as mergeResultsNode } from "./nodeMerge.js";
 import { reduce as reducePhase } from "./nodeReduce.js";
 import { routeToMap as routeToMapPhase } from "./routing.js";
 import { type ChunkProcessState, OverallState, type OverallStateType } from "./state.js";
-import { createStructuredLLM, type MapOutputInvoker, MapOutputSchema } from "./structuredLlm.js";
 
 export { packChunks, validateChunks } from "./chunkHelpers.js";
 
 export class ReportGraph {
-  private fastLlm: ChatTogetherAI;
+  private mapModel: string;
   private smartLlm: ChatTogetherAI;
-  private fastLlmStructured: MapOutputInvoker;
   private maxTokens: number;
 
   constructor(
@@ -31,14 +29,7 @@ export class ReportGraph {
     reduceModel: string,
     maxTokens: number = GRAPH_CONFIG.MAX_TOKENS
   ) {
-    this.fastLlm = new ChatTogetherAI({
-      apiKey,
-      model: mapModel,
-      temperature: 0.3,
-      timeout: GRAPH_CONFIG.MAP_TIMEOUT_MS,
-      maxTokens: GRAPH_CONFIG.MAP_MAX_OUTPUT_TOKENS,
-      modelKwargs: mergeModelKwargs(mapModel, "fast"),
-    });
+    this.mapModel = mapModel;
 
     this.smartLlm = new ChatTogetherAI({
       apiKey,
@@ -48,8 +39,6 @@ export class ReportGraph {
       maxTokens: GRAPH_CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
-
-    this.fastLlmStructured = createStructuredLLM(this.fastLlm, MapOutputSchema);
 
     this.maxTokens = maxTokens;
   }
@@ -67,7 +56,7 @@ export class ReportGraph {
   }
 
   async mapProcess(state: ChunkProcessState): Promise<Partial<OverallStateType>> {
-    return mapProcessPhase(state, this.fastLlmStructured);
+    return mapProcessPhase(state, this.mapModel);
   }
 
   async collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {

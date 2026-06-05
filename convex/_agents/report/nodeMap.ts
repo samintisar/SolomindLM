@@ -1,17 +1,15 @@
 "use node";
 
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-
-import { PROCESSING_CONFIG } from "./config.js";
+import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import { sanitizeUserInput } from "./inputValidation.js";
 import { invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
-import { MAP_PROMPTS, MAP_SYSTEM_PROMPT } from "./prompts.js";
+import { MAP_PROMPTS, MAP_STRUCTURED_SYSTEM_PROMPT } from "./prompts.js";
 import type { ChunkProcessState, OverallStateType } from "./state.js";
-import type { MapOutput, MapOutputInvoker } from "./structuredLlm.js";
+import { type MapOutput, invokeMapStructuredOutput } from "./structuredLlm.js";
 
 export async function mapProcess(
   state: ChunkProcessState,
-  fastLlmStructured: MapOutputInvoker
+  mapModel: string
 ): Promise<Partial<OverallStateType>> {
   const { chunk, chunkIndex, reportType, customPrompt } = state;
   const startTime = Date.now();
@@ -54,10 +52,12 @@ IMPORTANT: Respond with a JSON object containing:
       () =>
         invokeWithTimeout(
           () =>
-            fastLlmStructured.invoke([
-              new SystemMessage(MAP_SYSTEM_PROMPT),
-              new HumanMessage(structuredPrompt),
-            ]),
+            invokeMapStructuredOutput({
+              systemPrompt: MAP_STRUCTURED_SYSTEM_PROMPT,
+              userPrompt: structuredPrompt,
+              model: mapModel,
+              maxTokens: GRAPH_CONFIG.MAP_MAX_OUTPUT_TOKENS,
+            }),
           PROCESSING_CONFIG.PER_CHUNK_TIMEOUT_MS,
           `Map ${chunkId}`
         ),

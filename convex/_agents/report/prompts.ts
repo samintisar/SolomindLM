@@ -21,6 +21,18 @@ CRITICAL OUTPUT FORMAT: You MUST output your summaries in MARKDOWN text format, 
 
 ${MARKDOWN_MATH_NOTATION_FOR_APP}`;
 
+/**
+ * Map phase when using structured output (JSON schema / withStructuredOutput).
+ * Wire format is JSON; markdown lives inside the `summary` string field.
+ */
+export const MAP_STRUCTURED_SYSTEM_PROMPT = `You are a professional content analyzer and writer. Always extract 3-5 key topics and provide comprehensive summaries.
+
+CRITICAL OUTPUT FORMAT: Respond only with a JSON object matching the required schema. Do not output raw markdown outside JSON.
+- "topics": array of 3-5 key topic strings
+- "summary": the full section summary as markdown text (headers, bullet points, formatting) inside this string field
+
+${MARKDOWN_MATH_NOTATION_FOR_APP}`;
+
 /** System prompt for collapse phase summary condensation */
 export const COLLAPSE_SYSTEM_PROMPT = `You are a skilled summarizer. Always maintain structured format with topic headers like "Main Topics:". CRITICAL: You MUST output MARKDOWN text format, NOT JSON. Use markdown headers and bullet points, not JSON objects or arrays.
 

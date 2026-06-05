@@ -171,9 +171,16 @@ Do NOT combine topics or focus primarily on one.
     );
   }
 
-  const prompt = promptTemplate
+  let prompt = promptTemplate
     .replace("{content}", combined)
     .replace("{customPrompt}", sanitizeUserInput(state.customPrompt || ""));
+
+  const customFocus = state.customPrompt?.trim();
+  if (customFocus && state.reportType !== "custom") {
+    prompt =
+      `ADDITIONAL USER REQUIREMENTS (highest priority — MUST follow):\n${sanitizeUserInput(customFocus)}\n\n` +
+      prompt;
+  }
 
   console.log(`[ReportGraph] Reduce: prompt length: ${prompt.length} chars`);
   console.log(`[ReportGraph] Reduce: prompt preview: ${prompt.substring(0, 500)}...`);

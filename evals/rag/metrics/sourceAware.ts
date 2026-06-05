@@ -169,6 +169,61 @@ export function inferSourceChannel(sourceUrl?: string): string {
  * Score = fraction of selected chunks that came from external sources
  * Status: pass if >= 20% external when external channels enabled
  */
+/**
+ * Research source breadth: unique external URLs in selected evidence.
+ * Pass ≥8, warn 4–7, fail <4. Skipped for notebook-only policies.
+ */
+export function researchSourceBreadth(
+  fixture: EvalFixture,
+  artifact: EvalRunArtifact,
+  _baseline?: EvalBaseline
+): MetricResult {
+  const channels = artifact.sourcePolicy?.channels ?? ["notebook"];
+  const hasExternal = channels.some((c) => c !== "notebook");
+
+  if (!hasExternal) {
+    return baseMetric(
+      "research_source_breadth",
+      fixture,
+      artifact,
+      "pass",
+      1,
+      "Notebook-only mode — source breadth not applicable.",
+      { channels }
+    );
+  }
+
+  const uniqueUrls = new Set(
+    artifact.selectedChunks
+      .map((c) => c.sourceUrl?.trim())
+      .filter((url): url is string => Boolean(url))
+  );
+  const count = uniqueUrls.size;
+
+  let status: MetricStatus;
+  let score: number;
+  if (count >= 8) {
+    status = "pass";
+    score = 1;
+  } else if (count >= 4) {
+    status = "warn";
+    score = 0.5;
+  } else {
+    status = "fail";
+    score = 0;
+  }
+
+  return baseMetric(
+    "research_source_breadth",
+    fixture,
+    artifact,
+    status,
+    score,
+    `${count} unique external source URL(s) in selected chunks (pass ≥8, warn 4–7).`,
+    { uniqueSourceCount: count, channels }
+  );
+}
+
 export function externalSourceUtilization(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,

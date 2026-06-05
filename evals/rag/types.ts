@@ -56,6 +56,8 @@ export interface StudioParams {
   audioType?: string;
   /** Override the smart LLM model used for reduce/collapse phases (eval only) */
   smartLlm?: string;
+  /** When set, eval resolves only notebook documents whose fileName contains this substring */
+  documentTitleHint?: string;
 }
 
 export interface SourcePolicyConfig {

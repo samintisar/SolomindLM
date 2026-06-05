@@ -15,7 +15,8 @@ import {
   retrievalNdcgAtK,
   retrievalPrecisionAtK,
 } from "./index";
-import { scoreAllLlmJudgeMetrics } from "./llmJudge";
+import { scoreAllLlmJudgeMetrics, type LlmJudgeOptions } from "./llmJudge";
+import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
 import {
   externalSourceUtilization,
   researchSourceBreadth,
@@ -83,7 +84,10 @@ export async function scoreAllMetrics(
   // Correctness only runs when fixture.expectedAnswer is set.
   // Literature review has its own dedicated LLM judge metrics (report quality, completeness, extraction quality).
   if (artifact.runner !== "literatureReview") {
-    const judgeResults = await scoreAllLlmJudgeMetrics(fixture, artifact);
+    const judgeOptions: LlmJudgeOptions = process.env.TOGETHER_AI_API_KEY?.trim()
+      ? { invoke: createTogetherJudgeInvoker() }
+      : {};
+    const judgeResults = await scoreAllLlmJudgeMetrics(fixture, artifact, judgeOptions);
     results.push(...judgeResults);
   }
 

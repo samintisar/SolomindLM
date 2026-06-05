@@ -181,32 +181,19 @@ function parseJsonResponse(response: string): unknown {
  * Default LLM invocation - attempts to use Together AI if available.
  * Provide an explicit `invoke` function in LlmJudgeOptions for custom behavior.
  */
-async function defaultLlmInvoke(prompt: string, model: string = "gpt-oss-20b"): Promise<string> {
+async function defaultLlmInvoke(
+  prompt: string,
+  model: string = "openai/gpt-oss-20b"
+): Promise<string> {
   // Try to use Together AI via dynamic import (for eval scripts outside Convex)
   try {
-    const { createTogetherClient } = await import("./togetherLlmJudge");
-    const client = createTogetherClient({ model });
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert RAG evaluator. Respond only with valid JSON. " +
-            "Do not include markdown code blocks or additional text.",
-        },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1024,
-      temperature: 0.1,
-    });
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error("Empty response");
-    return content;
-  } catch {
+    const { createTogetherJudgeInvoker } = await import("./togetherLlmJudge");
+    const invoke = createTogetherJudgeInvoker({ model });
+    return await invoke(prompt);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
     throw new Error(
-      "LLM judge integration not available. Provide an `invoke` function in LlmJudgeOptions " +
+      `LLM judge integration not available: ${detail}. Provide an \`invoke\` function in LlmJudgeOptions ` +
         "or ensure TOGETHER_AI_API_KEY is set."
     );
   }

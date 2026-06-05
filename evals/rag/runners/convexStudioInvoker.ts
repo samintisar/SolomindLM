@@ -79,6 +79,7 @@ export function createConvexReportInvoker(
         reportType: context.studioParams?.reportType,
         customPrompt: context.studioParams?.customPrompt,
         smartLlm: context.studioParams?.smartLlm,
+        documentTitleHint: context.studioParams?.documentTitleHint,
       });
       const populated = await pollStatus(
         () =>

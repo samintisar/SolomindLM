@@ -4,7 +4,11 @@
  * ground-truth list as `expectedItems`.
  */
 import type { EvalFixture } from "../../types";
-import { AGENTIC_20_ITEMS, AGENTIC_20_NOTEBOOK_ID } from "../agentic-patterns-20";
+import {
+  AGENTIC_20_ITEMS,
+  AGENTIC_20_NOTEBOOK_ID,
+  AGENTIC_20_STUDIO_PARAMS,
+} from "../agentic-patterns-20";
 
 import { studioFlashcardsAgentic20 } from "./flashcards";
 
@@ -17,6 +21,12 @@ const sharedTags = (kind: string): string[] => [
   "agentic-patterns",
 ];
 
+const REPORT_ENUMERATION_PROMPT =
+  "Include a dedicated section titled '## The 20 Agentic Design Patterns' with numbered entries 1–20. " +
+  "Each entry must name one pattern and give a 2–4 sentence description. " +
+  "Use [Source N] citations where appropriate. " +
+  "Cover only agentic AI design patterns — exclude unrelated topics.";
+
 export const studioReportAgentic20: EvalFixture = {
   schemaVersion: 1,
   id: "studio-report-agentic-patterns-20",
@@ -25,9 +35,17 @@ export const studioReportAgentic20: EvalFixture = {
   notebookId: AGENTIC_20_NOTEBOOK_ID,
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
-    "Report should describe each of the 20 patterns. Cite source content where appropriate.",
-  studioParams: { reportType: "summary" },
-  expectedStructure: { minItems: 20 },
+    "Report should explicitly enumerate and describe each of the 20 agentic AI design patterns " +
+    "with clear organization and citations to source content.",
+  studioParams: {
+    ...AGENTIC_20_STUDIO_PARAMS,
+    reportType: "summary",
+    customPrompt: REPORT_ENUMERATION_PROMPT,
+  },
+  expectedStructure: {
+    minItems: 20,
+    requiredSections: ["The 20 Agentic Design Patterns"],
+  },
   tags: sharedTags("report"),
 };
 
