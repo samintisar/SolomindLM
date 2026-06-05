@@ -17,13 +17,8 @@ export type ReportPaperRow = {
   rowData: Record<string, string>;
 };
 
-/** Row keys filled from citations — not sent to the extraction LLM. */
-export const LITERATURE_METADATA_COLUMN_IDS = new Set([
-  "title",
-  "authors",
-  "year",
-  "summary",
-]);
+/** Citation-backed row keys; excluded from custom-column extraction prompts and alignment. */
+export const LITERATURE_METADATA_COLUMN_IDS = new Set(["title", "authors", "year", "summary"]);
 
 export type ExtractionColumnDef = { id: string; name: string };
 
@@ -40,6 +35,34 @@ function isEmptyExtractionValue(value: string | undefined): boolean {
   return trimmed.length === 0 || trimmed.toUpperCase() === "N/A";
 }
 
+const AMBIGUOUS_EXTRACTED_KEY = Symbol("ambiguousExtractedKey");
+
+type ExtractedKeyIndex = Map<string, string | typeof AMBIGUOUS_EXTRACTED_KEY>;
+
+/** Index LLM keys under normalized/compact/lowercase aliases; mark aliases with conflicting values ambiguous. */
+function indexExtractedDataByKey(extractedData: Record<string, string>): ExtractedKeyIndex {
+  const index: ExtractedKeyIndex = new Map();
+  for (const [key, value] of Object.entries(extractedData)) {
+    if (isEmptyExtractionValue(value)) continue;
+    const trimmed = value.trim();
+    for (const alias of [normalizeColumnKey(key), compactColumnKey(key), key.toLowerCase()]) {
+      const existing = index.get(alias);
+      if (existing === undefined) {
+        index.set(alias, trimmed);
+      } else if (existing !== AMBIGUOUS_EXTRACTED_KEY && existing !== trimmed) {
+        index.set(alias, AMBIGUOUS_EXTRACTED_KEY);
+      }
+    }
+  }
+  return index;
+}
+
+function lookupIndexedValue(index: ExtractedKeyIndex, alias: string): string | undefined {
+  const hit = index.get(alias);
+  if (hit === undefined || hit === AMBIGUOUS_EXTRACTED_KEY) return undefined;
+  return hit;
+}
+
 /**
  * Map LLM extraction keys (often display names) onto configured column ids.
  * The studio table reads `rowData[columnId]` only — mismatched keys show as empty cells.
@@ -48,19 +71,13 @@ export function alignExtractedDataToColumns(
   extractedData: Record<string, string>,
   columns: ExtractionColumnDef[]
 ): Record<string, string> {
-  const byNormalizedKey = new Map<string, string>();
-  for (const [key, value] of Object.entries(extractedData)) {
-    if (isEmptyExtractionValue(value)) continue;
-    const trimmed = value.trim();
-    byNormalizedKey.set(normalizeColumnKey(key), trimmed);
-    byNormalizedKey.set(compactColumnKey(key), trimmed);
-    byNormalizedKey.set(key.toLowerCase(), trimmed);
-  }
+  const indexedKeys = indexExtractedDataByKey(extractedData);
 
   const aligned: Record<string, string> = {};
   for (const col of columns) {
     if (LITERATURE_METADATA_COLUMN_IDS.has(col.id.toLowerCase())) continue;
 
+    // Prefer exact keys (column id, then display name) before fuzzy normalized/compact matching.
     const directCandidates = [col.id, col.name, normalizeColumnKey(col.name)];
     for (const candidate of directCandidates) {
       const direct = extractedData[candidate];
@@ -71,15 +88,12 @@ export function alignExtractedDataToColumns(
     }
     if (aligned[col.id]) continue;
 
-    const idNorm = normalizeColumnKey(col.id);
-    const idCompact = compactColumnKey(col.id);
-    const nameCompact = compactColumnKey(col.name);
-    for (const [key, value] of byNormalizedKey) {
-      const keyCompact = key.replace(/_/g, "");
-      if (key === idNorm || keyCompact === idCompact || keyCompact === nameCompact) {
-        aligned[col.id] = value;
-        break;
-      }
+    const fuzzyHit =
+      lookupIndexedValue(indexedKeys, normalizeColumnKey(col.id)) ??
+      lookupIndexedValue(indexedKeys, compactColumnKey(col.id)) ??
+      lookupIndexedValue(indexedKeys, compactColumnKey(col.name));
+    if (fuzzyHit) {
+      aligned[col.id] = fuzzyHit;
     }
   }
 
@@ -87,8 +101,7 @@ export function alignExtractedDataToColumns(
 }
 
 export function columnsForExtraction<T extends ExtractionColumnDef>(columns: T[]): T[] {
-  const custom = columns.filter((c) => !LITERATURE_METADATA_COLUMN_IDS.has(c.id.toLowerCase()));
-  return custom.length > 0 ? custom : columns;
+  return columns.filter((c) => !LITERATURE_METADATA_COLUMN_IDS.has(c.id.toLowerCase()));
 }
 
 export type LiteratureReportContext = {

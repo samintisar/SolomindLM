@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  alignExtractedDataToColumns,
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
+  columnsForExtraction,
   findUnknownCitationKeys,
   fullReportHasOnlyTrivialContent,
   getReportSectionsNeedingRegeneration,
@@ -9,7 +11,6 @@ import {
   mergeDeterministicReportSections,
   needsDeterministicReportMerge,
   normalizeLiteratureReportSectionContent,
-  alignExtractedDataToColumns,
   resolveStudyTableCellValue,
   stripLeadingSectionHeadingLine,
   validateAndSanitizeReportSections,
@@ -142,6 +143,66 @@ describe("reportContext", () => {
     );
     expect(aligned.framework_name).toBe("Transformer-based RAG");
     expect(aligned.performance_metrics).toBe("F1 0.82 on benchmark X");
+  });
+
+  it("alignExtractedDataToColumns prefers column id when id and display name conflict", () => {
+    const aligned = alignExtractedDataToColumns(
+      {
+        framework_name: "Id-key value",
+        "Framework Name": "Display-name value",
+      },
+      [{ id: "framework_name", name: "Framework Name" }]
+    );
+    expect(aligned.framework_name).toBe("Id-key value");
+  });
+
+  it("alignExtractedDataToColumns drops empty and N/A values", () => {
+    const aligned = alignExtractedDataToColumns(
+      {
+        framework_name: "N/A",
+        performance_metrics: "   ",
+        sample_size: "N = 120",
+      },
+      [
+        { id: "framework_name", name: "Framework Name" },
+        { id: "performance_metrics", name: "Performance Metrics" },
+        { id: "sample_size", name: "Sample Size" },
+      ]
+    );
+    expect(aligned.framework_name).toBeUndefined();
+    expect(aligned.performance_metrics).toBeUndefined();
+    expect(aligned.sample_size).toBe("N = 120");
+  });
+
+  it("alignExtractedDataToColumns skips ambiguous compact-key collisions", () => {
+    const aligned = alignExtractedDataToColumns(
+      {
+        sample_size: "From underscore key",
+        "sample size": "From spaced key",
+      },
+      [{ id: "samplesize", name: "Size" }]
+    );
+    expect(aligned.samplesize).toBeUndefined();
+  });
+
+  it("columnsForExtraction returns only non-metadata columns", () => {
+    const columns = [
+      { id: "title", name: "Title" },
+      { id: "authors", name: "Authors" },
+      { id: "framework_name", name: "Framework Name" },
+    ];
+    expect(columnsForExtraction(columns)).toEqual([
+      { id: "framework_name", name: "Framework Name" },
+    ]);
+  });
+
+  it("columnsForExtraction returns empty when only metadata columns exist", () => {
+    expect(
+      columnsForExtraction([
+        { id: "title", name: "Title" },
+        { id: "year", name: "Year" },
+      ])
+    ).toEqual([]);
   });
 
   it("buildStudyCharacteristicsTable renders rows", () => {

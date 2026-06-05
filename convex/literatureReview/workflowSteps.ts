@@ -608,7 +608,8 @@ async function extractPaperFieldsWithLlm(
   },
   columns: Array<{ id: string; name: string; instructions?: string }>,
   query: string | undefined,
-  smartModel: string | undefined
+  smartModel: string | undefined,
+  logger: ReturnType<typeof createServiceLogger>
 ): Promise<Record<string, string> | undefined> {
   const extractionColumns = columnsForExtraction(columns);
   if (extractionColumns.length === 0) {
@@ -657,6 +658,13 @@ async function extractPaperFieldsWithLlm(
   );
 
   const aligned = alignExtractedDataToColumns(response.extractedData, columns);
+  if (Object.keys(aligned).length === 0 && Object.keys(response.extractedData).length > 0) {
+    logger.warn("LLM extraction returned keys that did not map to configured columns", {
+      paperTitle: paper.title,
+      llmKeys: Object.keys(response.extractedData),
+      columnIds: columns.map((c) => c.id),
+    });
+  }
   return Object.keys(aligned).length > 0 ? aligned : undefined;
 }
 
@@ -687,7 +695,8 @@ export async function extractDataBatchHandler(
           paper,
           args.columns,
           args.query,
-          args.smartModel
+          args.smartModel,
+          logger
         );
         return extractedData ? { ...paper, extractedData } : paper;
       } catch (error) {

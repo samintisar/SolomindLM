@@ -741,13 +741,46 @@ describe("extractDataHandler with LLM extraction", () => {
 
     await extractDataHandler(mockCtx, {
       papers,
-      columns: [{ id: "title", name: "Title", isVisible: true }],
+      columns: [{ id: "study_design", name: "Study Design", isVisible: true }],
       sessionId: "test-session" as Id<"literatureReviewSessions">,
     });
 
     expect(mockCtx.runMutation).toHaveBeenCalledTimes(1);
     const callArgs = (mockCtx.runMutation as any).mock.calls[0][1];
-    // Should not have extractedData since LLM failed
+    expect(callArgs.papers[0].extractedData).toBeUndefined();
+  });
+
+  it("skips LLM extraction when columns are metadata-only", async () => {
+    vi.mocked(createLLM).mockClear();
+    (mockCtx.runQuery as any).mockResolvedValue([]);
+    (mockCtx.runMutation as any).mockResolvedValue(null);
+
+    const papers = [
+      {
+        title: "Paper One",
+        authors: ["Smith, J."],
+        year: 2023,
+        abstract: "Abstract one",
+        url: "http://example.com/1",
+        source: "arxiv" as const,
+        score: 0.9,
+        isIncluded: true,
+      },
+    ];
+
+    await extractDataHandler(mockCtx, {
+      papers,
+      columns: [
+        { id: "title", name: "Title", isVisible: true },
+        { id: "authors", name: "Authors", isVisible: true },
+        { id: "year", name: "Year", isVisible: true },
+      ],
+      sessionId: "test-session" as Id<"literatureReviewSessions">,
+    });
+
+    expect(createLLM).not.toHaveBeenCalled();
+    expect(mockCtx.runMutation).toHaveBeenCalledTimes(1);
+    const callArgs = (mockCtx.runMutation as any).mock.calls[0][1];
     expect(callArgs.papers[0].extractedData).toBeUndefined();
   });
 });
