@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { compactPapersForSnapshot } from "./rankedPapersSnapshot.js";
+import { formatPaperTitleYear, isTitleLikeColumnName } from "./reportContext.js";
 import {
   fallbackReviewTitleFromQuery,
   literatureReportTitle,
@@ -125,17 +126,24 @@ export const insertDraftBatch = internalMutation({
       rowData["summary"] = paper.abstract.slice(0, 2000);
 
       // Also backfill any configured columns that map to these fields
+      const yearStr = paper.year !== undefined ? String(paper.year) : "";
       const basicMap: Record<string, string> = {
         title: paper.title,
         authors: paper.authors.join(", "),
-        year: paper.year !== undefined ? String(paper.year) : "",
+        year: yearStr,
         summary: paper.abstract.slice(0, 2000),
       };
+      const titleYearFormatted = formatPaperTitleYear(paper.title, yearStr);
       for (const col of args.columns) {
-        if (
-          basicMap[col.id] &&
-          (!rowData[col.id] || rowData[col.id].trim() === "" || rowData[col.id] === "N/A")
-        ) {
+        const empty =
+          !rowData[col.id] || rowData[col.id].trim() === "" || rowData[col.id] === "N/A";
+        if (isTitleLikeColumnName(col.id) || isTitleLikeColumnName(col.name)) {
+          if (empty && titleYearFormatted) {
+            rowData[col.id] = titleYearFormatted;
+          }
+          continue;
+        }
+        if (basicMap[col.id] && empty) {
           rowData[col.id] = basicMap[col.id];
         }
       }
@@ -439,6 +447,25 @@ export const getSessionTitleContext = internalQuery({
   },
 });
 
+export const patchSessionStatus = internalMutation({
+  args: {
+    sessionId: v.id("literatureReviewSessions"),
+    status: v.union(
+      v.literal("planning"),
+      v.literal("awaiting_columns"),
+      v.literal("searching"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.sessionId, { status: args.status, updatedAt: Date.now() });
+    return null;
+  },
+});
+
 export const persistReport = internalMutation({
   args: {
     sessionId: v.id("literatureReviewSessions"),
@@ -446,6 +473,9 @@ export const persistReport = internalMutation({
     query: v.string(),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
+    status: v.optional(
+      v.union(v.literal("generating"), v.literal("completed"), v.literal("failed"))
+    ),
     sections: v.optional(
       v.array(
         v.object({
@@ -481,7 +511,7 @@ export const persistReport = internalMutation({
       title,
       notebookId: session.notebookId,
       userId: session.userId,
-      status: "completed",
+      status: args.status ?? "completed",
       content,
       citationStyle: "apa",
       sections,

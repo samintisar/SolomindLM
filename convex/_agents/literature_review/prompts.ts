@@ -27,6 +27,14 @@ export const ScreenPapersOutputSchema = z.object({
 
 export type ScreenPapersOutput = z.infer<typeof ScreenPapersOutputSchema>;
 
+/** One paper per LLM call (faster, avoids batch timeouts). */
+export const ScreenSinglePaperOutputSchema = z.object({
+  isIncluded: z.boolean(),
+  reason: z.string(),
+});
+
+export type ScreenSinglePaperOutput = z.infer<typeof ScreenSinglePaperOutputSchema>;
+
 /**
  * Schema for data extraction output.
  */
@@ -84,6 +92,11 @@ NUMERIC GROUNDING (mandatory):
 STRUCTURE:
 - Results: organize thematic subsections (### headings). Include a ### Summary of Evidence markdown table with columns: Theme | Key finding | Applicability | Effect direction | Confidence | Supporting studies.
 - Discussion: use ### Principal Findings, ### Comparison With Existing Literature, ### Practical Implications (researchers, developers, practitioners, regulators), ### Strengths and Limitations, ### Gaps and Future Directions.
+
+MARKDOWN FORMAT (mandatory):
+- Do NOT repeat the section name (Abstract, Introduction, Results, etc.) inside section content — the UI already shows it as the section title.
+- Put every ### subsection heading on its own line with a blank line before it. Never embed headings mid-sentence (wrong: "text ### Heading"; correct: blank line then "### Heading" on its own line).
+- Tables: one row per line; single | between columns; include a separator row (e.g. |---|---|). Never use ||| or || as row breaks.
 `;
 
 // ============================================================
@@ -172,6 +185,24 @@ Screening criteria:
 
 JSON OUTPUT:`;
 
+export const SCREEN_SINGLE_PAPER_PROMPT = `CRITICAL OUTPUT FORMAT: You MUST output valid JSON only.
+
+RESEARCH QUESTION: "{query}"
+
+PAPER:
+Title: {title}
+Abstract: {abstract}
+
+Decide if this paper should be included in a systematic review for the research question.
+
+Respond in the following JSON format exactly:
+
+{\n  "isIncluded": true,\n  "reason": "One sentence explaining the decision."\n}
+
+Be selective: exclude tangential papers, editorials without evidence, and duplicates. Include review/survey papers when they directly address the question.
+
+JSON OUTPUT:`;
+
 // ============================================================
 // EXTRACT DATA PROMPT
 // ============================================================
@@ -205,6 +236,8 @@ Respond in the following JSON format exactly (use one key per column id from EXT
 Guidelines:
 - Only use "N/A" when the information is completely absent and cannot be reasonably inferred.
 - Do not invent data not present in the paper, but do make reasonable inferences from the abstract and title.
+- For columns about paper title, citation, or "Paper Title & Year", always set the value to the PAPER title and year shown above (e.g. "Title Here (2024)").
+- For methodology columns (retrieval approach, knowledge source, integration), infer from the abstract when not stated explicitly; prefer a short specific phrase over "N/A".
 - For numeric values, include units where applicable.
 - For multi-part answers, use semicolons to separate items.
 - Maintain consistency with extraction instructions for each column.
@@ -244,7 +277,8 @@ Section-specific guidance:
 - Conclusion: State the main conclusions, practical implications, and recommendations for future research.
 
 Formatting:
-- Use Markdown formatting (headers, bold, bullet points).
+- Write body prose only for SECTION "{section}". Do NOT start with the section name or a # / ## line for that name (wrong: "## Abstract", "# Introduction", or a standalone "Abstract" title). The report UI already shows the section title.
+- Use Markdown for subsections (###), bold, and bullet points inside the body.
 - Integrate citations naturally within the text.
 - If no studies support a particular point, state this explicitly.
 - Maintain an objective, academic tone throughout.
@@ -290,12 +324,15 @@ Sections to generate (do NOT duplicate the study characteristics table — PRISM
 6. Conclusion (200-300 words): State the main conclusions, practical implications, and recommendations for future research.
 
 Formatting guidelines:
-- Use Markdown formatting (headers, bold, bullet points, tables).
+- Each section's "content" is body prose only. Do not repeat the section title as a heading line (## Abstract, etc.) — headings are stored separately.
+- Use Markdown (### subsections, bold, bullet points, tables) inside the body.
 - If no studies support a particular point, state this explicitly.
 - Maintain an objective, academic tone throughout.
 - Group studies by major approach, technology, or category and compare across groups.
 
-Respond in the following JSON format exactly:
+Output valid JSON only: an object with a "sections" array; each item has "heading" (string) and "content" (string).
+Include exactly these headings: Abstract, Introduction, Methods, Results, Discussion, Conclusion.
 
-{\n  "sections": [\n    {\n      "heading": "Abstract",\n      "content": "..."\n    },\n    {\n      "heading": "Introduction",\n      "content": "..."\n    },\n    {\n      "heading": "Methods",\n      "content": "..."\n    },\n    {\n      "heading": "Results",\n      "content": "..."\n    },\n    {\n      "heading": "Discussion",\n      "content": "..."\n    },\n    {\n      "heading": "Conclusion",\n      "content": "..."\n    }\n  ]\n}\n
+CRITICAL: Every "content" value must be complete, publication-ready prose meeting the word targets above. Do not output stub phrases (e.g. "content here", "Abstract content here"), ellipsis-only text, or angle-bracket templates.
+
 JSON OUTPUT:`;

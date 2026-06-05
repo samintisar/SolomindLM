@@ -1,7 +1,7 @@
 export { AddSourceModal } from "./AddSourceModal";
 export { DiscoverSourcesModal } from "./DiscoverSourcesModal";
 export type { GoogleDrivePickerHandle, PickedFile } from "./GoogleDrivePicker";
-export { GoogleDrivePicker } from "./GoogleDrivePicker";
+export { GoogleDrivePicker, isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
 export { SocialMediaInputModal } from "./SocialMediaInputModal";
 export { SourceList } from "./SourceList";
 export { SourceListItem } from "./SourceListItem";

@@ -1,9 +1,13 @@
 "use node";
 
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
+import { env } from "../_lib/env.js";
 import { runResearchExecuteImpl } from "../chat/_researchExecuteImpl";
 import { createResearchAgent } from "../chat/_streamResearch";
+import { researchTitleChunk } from "./resolveResearchTitle";
+import { fallbackResearchTitleFromQuery, normalizeResearchTitle } from "./titles";
 
 export const planReview = internalAction({
   args: {
@@ -33,6 +37,7 @@ export const planReview = internalAction({
     smartModel: v.optional(v.string()),
   },
   returns: v.object({
+    researchTitle: v.string(),
     subQuestions: v.array(
       v.object({
         id: v.string(),
@@ -44,8 +49,8 @@ export const planReview = internalAction({
   }),
   handler: async (ctx, args) => {
     const agent = await createResearchAgent({
-      apiKey: process.env.TOGETHER_API_KEY ?? "",
-      smartModel: args.smartModel ?? process.env.SMART_MODEL ?? "openai/gpt-oss-120b",
+      apiKey: env.TOGETHER_AI_API_KEY,
+      smartModel: args.smartModel ?? env.SMART_LLM,
       notebookId: args.notebookId,
       userId: args.userId,
       sourcePolicy: args.sourcePolicy,
@@ -57,7 +62,21 @@ export const planReview = internalAction({
       args.sourcePolicy as Parameters<typeof agent.generatePlan>[1]
     );
 
+    const q = args.query.trim();
+    let researchTitle = fallbackResearchTitleFromQuery(q);
+    if (q.length > 0) {
+      try {
+        const generated = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
+          chunk: researchTitleChunk(q, q),
+        });
+        researchTitle = normalizeResearchTitle(generated);
+      } catch {
+        researchTitle = fallbackResearchTitleFromQuery(q);
+      }
+    }
+
     return {
+      researchTitle,
       subQuestions: subQuestions.map((sq) => ({
         id: sq.id,
         question: sq.question,

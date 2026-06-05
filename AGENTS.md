@@ -184,7 +184,7 @@ CI on push to `main` and PRs: Convex typecheck + web build (uses repo variable `
 
 Auto-typecheck runs after edits in `apps/web/` (web typecheck) and `convex/` (convex typecheck). Config: `.claude/settings.json`.
 
-Troubleshooting: ensure `Bash(bun run typecheck:*)` is in `permissions.allow`; hooks belong in `settings.json` (not `settings.local.json`); no `shell: "powershell"` (use default); restart Claude Code to reload.
+Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.cmd` on Windows). Ensure `Bash(bun run typecheck:*)` is in `permissions.allow`. Restart Cursor after hook changes; check **Settings → Hooks** and the **Hooks** output channel. Disable `security-guidance` on Windows if `python3` is missing.
 
 ---
 

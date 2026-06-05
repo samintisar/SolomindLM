@@ -8,9 +8,14 @@ export type ChatStreamAcademicFilters = {
   fieldOfStudyTerms?: string[];
 };
 
+/** Maps composer corpus picker to AcademicSearchService source allowlist. */
+export type ChatAcademicSource = "openalex" | "arxiv" | "semantic_scholar" | "pubmed";
+
 export type ChatStreamSourcePolicy = {
   channels: string[];
   /** Deep Research: max hits per channel per sub-question (default 8 server-side). */
   maxResultsPerChannel?: number;
+  /** When academic search runs, limit to these APIs (from research database picker). */
+  academicSources?: ChatAcademicSource[];
   academicFilters?: ChatStreamAcademicFilters;
 };

@@ -21,6 +21,11 @@ import {
   literatureSearchOptionsValidator,
   sourcesForResearchDatabase,
 } from "../../_model/literatureReviewSearchOptions";
+import {
+  EXTRACT_DATA_CHUNK_SIZE,
+  SCREEN_PAPERS_BATCH_SIZE,
+} from "../../literatureReview/batchSizes.js";
+import { LITERATURE_SCREEN_TOP_N } from "../../literatureReview/llmTuning.js";
 
 export const workflow = new WorkflowManager(components.workflow);
 
@@ -207,6 +212,7 @@ export const literatureReviewWorkflow = workflow
         papersFound: searchResults.papers.length,
         recordsIdentified: searchResults.recordsIdentified,
         recordsAfterDedupe: searchResults.recordsAfterDedupe,
+        ...(searchResults.rateLimited ? { rateLimited: true } : {}),
       });
 
       await trackStep(
@@ -251,13 +257,60 @@ export const literatureReviewWorkflow = workflow
         papers: ranked.papers,
       });
 
-      // Step 5: Screen (top 30)
-      await trackStep(step, args.sessionId, "screening", "in_progress", "Screening top 30 papers");
-      const screened = await step.runAction(internal.literatureReview.workflowSteps.screenPapers, {
-        papers: ranked.papers.slice(0, 30),
-        query: args.query,
-        smartModel: args.smartModel,
-      });
+      // Step 5: Screen (top 30) — one workflow step per batch (each gets its own action limit)
+      const papersToScreen = ranked.papers.slice(0, LITERATURE_SCREEN_TOP_N);
+      await trackStep(
+        step,
+        args.sessionId,
+        "screening",
+        "in_progress",
+        `Screening top ${papersToScreen.length} papers`
+      );
+
+      const screeningDecisions = new Map<number, { isIncluded: boolean; reason: string }>();
+      for (let i = 0; i < papersToScreen.length; i += SCREEN_PAPERS_BATCH_SIZE) {
+        const batch = papersToScreen.slice(i, i + SCREEN_PAPERS_BATCH_SIZE);
+        const { decisions } = await step.runAction(
+          internal.literatureReview.workflowSteps.screenPapersBatch,
+          {
+            papers: batch,
+            query: args.query,
+            batchStartIndex: i,
+            smartModel: args.smartModel,
+          }
+        );
+        for (const decision of decisions) {
+          screeningDecisions.set(decision.paperIndex, {
+            isIncluded: decision.isIncluded,
+            reason: decision.reason,
+          });
+        }
+      }
+
+      const screened = {
+        papers: papersToScreen.map(
+          (
+            p: {
+              title: string;
+              authors: string[];
+              year?: number;
+              abstract: string;
+              url: string;
+              source: string;
+              score: number;
+              isIncluded?: boolean;
+              includeReason?: string;
+            },
+            index: number
+          ) => ({
+            ...p,
+            isIncluded: screeningDecisions.get(index)?.isIncluded ?? true,
+            includeReason:
+              screeningDecisions.get(index)?.reason ?? "No screening decision available.",
+          })
+        ),
+      };
+
       const includedCount = screened.papers.filter(
         (p: { isIncluded?: boolean }) => p.isIncluded === true
       ).length;
@@ -311,6 +364,16 @@ export const literatureReviewWorkflow = workflow
       );
 
       // Step 6: Extract data (batch 5, write to literatureTableDrafts)
+      const includedPapers = screened.papers.filter(
+        (p: { isIncluded?: boolean }) => p.isIncluded === true
+      );
+      const existingBatchNumbers = await step.runQuery(
+        internal.literatureReview.db.getExistingBatchNumbers,
+        { sessionId: args.sessionId }
+      );
+      const existingBatchSet = new Set(existingBatchNumbers);
+      const _extractBatchCount = Math.ceil(includedPapers.length / EXTRACT_DATA_CHUNK_SIZE) || 0;
+
       await trackStep(
         step,
         args.sessionId,
@@ -318,13 +381,22 @@ export const literatureReviewWorkflow = workflow
         "in_progress",
         "Extracting data from included papers"
       );
-      await step.runAction(internal.literatureReview.workflowSteps.extractData, {
-        papers: screened.papers.filter((p: { isIncluded?: boolean }) => p.isIncluded === true),
-        columns: confirmedColumns,
-        sessionId: args.sessionId,
-        query: args.query,
-        smartModel: args.smartModel,
-      });
+
+      for (let b = 0; b < includedPapers.length; b += EXTRACT_DATA_CHUNK_SIZE) {
+        const batchNumber = Math.floor(b / EXTRACT_DATA_CHUNK_SIZE);
+        if (existingBatchSet.has(batchNumber)) {
+          continue;
+        }
+        const batchPapers = includedPapers.slice(b, b + EXTRACT_DATA_CHUNK_SIZE);
+        await step.runAction(internal.literatureReview.workflowSteps.extractDataBatch, {
+          papers: batchPapers,
+          columns: confirmedColumns,
+          sessionId: args.sessionId,
+          batchNumber,
+          query: args.query,
+          smartModel: args.smartModel,
+        });
+      }
       const draftCount = await step.runQuery(internal.literatureReview.db.getDraftsBySession, {
         sessionId: args.sessionId,
       });

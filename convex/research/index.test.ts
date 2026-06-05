@@ -124,7 +124,7 @@ describe("createResearchArtifacts", () => {
     });
 
     expect(table).not.toBeNull();
-    expect(table!.title).toBe("Another research query");
+    expect(table!.title).toBe("Another research query: Evidence Table");
     expect(table!.columns.length).toBe(4); // paper_title, authors, year, custom
 
     const customCol = table!.columns.find((c) => c.id === "col_sq1");
@@ -145,6 +145,7 @@ describe("createResearchArtifacts", () => {
       notebookId,
       userId,
       query: "Research on AI",
+      researchTitle: "Research on AI",
       evidence: [
         {
           subQuestionId: "sq1",

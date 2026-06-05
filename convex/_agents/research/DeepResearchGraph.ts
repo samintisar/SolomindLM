@@ -110,6 +110,7 @@ export const deepResearchWorkflow = workflow
       await step.runMutation(internal.research.index.patchResearchPlanInternal, {
         planId: args.planId,
         patch: {
+          researchTitle: planResult.researchTitle,
           subQuestions: planResult.subQuestions.map((sq) => ({
             ...sq,
             status: "pending" as const,

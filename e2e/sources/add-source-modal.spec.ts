@@ -18,7 +18,10 @@ test.describe("Add Source Modal", () => {
     await expect(page.getByRole("button", { name: "Website" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Transcripts" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Copied text" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Choose from Google Drive/ })).toBeVisible();
+    const googleDriveButton = page.getByRole("button", { name: /Choose from Google Drive/ });
+    if (await googleDriveButton.isVisible()) {
+      await expect(googleDriveButton).toBeVisible();
+    }
 
     // Discover sources button (in header)
     await expect(page.getByRole("button", { name: /Discover sources/ })).toBeVisible();

@@ -522,6 +522,8 @@ export default defineSchema({
     conversationId: v.id("conversations"),
     messageId: v.id("messages"),
     query: v.string(),
+    /** LLM-generated short title (FAST_LLM); used for studio table/report artifacts */
+    researchTitle: v.optional(v.string()),
     subQuestions: v.array(
       v.object({
         id: v.string(),
@@ -983,6 +985,11 @@ export default defineSchema({
 
   /** Deployment-wide gate for arXiv API rate limits (single logical row). */
   arxivThrottle: defineTable({
+    lastRequestAt: v.number(),
+  }),
+
+  /** Deployment-wide gate for Semantic Scholar (1 RPS per API key). */
+  semanticScholarThrottle: defineTable({
     lastRequestAt: v.number(),
   }),
 });

@@ -27,6 +27,7 @@ import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
+import { usePersistedComposerPrefs } from "../hooks/usePersistedComposerPrefs";
 import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
 import { CONVEX_SITE_URL } from "../services/chatApi";
 import { useLiteratureReviewSession } from "../services/literatureReviewApi";
@@ -41,7 +42,6 @@ import {
   type ChatComposerMode,
   ChatInput,
   DEEP_RESEARCH_DEFAULT_SOURCE_FILTERS,
-  type ResearchDatabaseOption,
 } from "./ChatInput";
 import { ConfigureChatModal } from "./ConfigureChatModal";
 import { ConversationList } from "./ConversationList";
@@ -115,11 +115,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [composerMode, setComposerMode] = useState<ChatComposerMode>("chat");
-  const [researchDatabase, setResearchDatabase] = useState<ResearchDatabaseOption>("all");
+  const {
+    composerMode,
+    setComposerMode,
+    sourceFilters,
+    setSourceFilters,
+    researchDatabase,
+    setResearchDatabase,
+  } = usePersistedComposerPrefs(notebookId);
   const [activeLiteratureSessionId, setActiveLiteratureSessionId] =
     useState<Id<"literatureReviewSessions"> | null>(null);
-  const [sourceFilters, setSourceFilters] = useState<string[]>([...CHAT_DEFAULT_SOURCE_FILTERS]);
   const [chatAcademicFilters, setChatAcademicFilters] =
     useSessionStorage<DiscoveryAcademicFilterState>("chat-academic-filters", {});
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -156,9 +161,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       if (Object.keys(api).length > 0) {
         policy.academicFilters = api;
       }
+      if (researchDatabase === "pubmed") {
+        policy.academicSources = ["pubmed"];
+      } else if (researchDatabase === "arxiv") {
+        policy.academicSources = ["arxiv"];
+      }
     }
     return policy;
-  }, [channelsForChatSend, chatAcademicFilters, composerMode]);
+  }, [channelsForChatSend, chatAcademicFilters, composerMode, researchDatabase]);
 
   const historyContainerRef = useRef<HTMLDivElement>(null);
 
@@ -450,7 +460,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     } finally {
       setIsCreatingConversation(false);
     }
-  }, [messages.length, onCreateConversation, onSelectConversation, toastError, closeTooltip]);
+  }, [
+    messages.length,
+    onCreateConversation,
+    onSelectConversation,
+    toastError,
+    closeTooltip,
+    setComposerMode,
+  ]);
 
   // --- Message handlers ---
 
@@ -497,7 +514,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
       setComposerMode(next);
     },
-    [composerMode]
+    [composerMode, setSourceFilters, setComposerMode]
   );
 
   const handleSendMessage = useCallback(async () => {

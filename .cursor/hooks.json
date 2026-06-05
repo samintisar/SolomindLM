@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/cursor-hooks@latest/schema/hooks.schema.json",
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/run-hook.cmd"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/run-hook.cmd",
+        "matcher": "Write|StrReplace|EditNotebook"
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": ".cursor/hooks/run-hook.cmd"
+      }
+    ]
+  }
+}

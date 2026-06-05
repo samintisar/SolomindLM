@@ -34,6 +34,13 @@ const envFilePath =
 
 const isWindows = process.platform === "win32";
 
+/** Never log full secret values (dry-run / verbose). */
+function redactForDisplay(key, value) {
+  if (!value) return `${key}=`;
+  if (value.length <= 12) return `${key}=***`;
+  return `${key}=${value.slice(0, 4)}…(${value.length} chars)`;
+}
+
 if (!fs.existsSync(envFilePath)) {
   console.error(`Error: env file not found at ${envFilePath}`);
   console.error(`Expected ${defaultEnvFile} in the repo root (or pass --env-file).`);
@@ -60,14 +67,12 @@ for (const [key, value] of vars) {
   if (prod) cmd.push("--prod");
 
   if (dryRun) {
-    const display = value.length > 40 ? `${key}=${value.slice(0, 37)}...` : nameEqualsValue;
-    console.log(`  npx convex env set "${display}"${prod ? " --prod" : ""}`);
+    console.log(`  npx convex env set "${redactForDisplay(key, value)}"${prod ? " --prod" : ""}`);
     continue;
   }
 
   if (verbose) {
-    const display = value.length > 50 ? `${key}=${value.slice(0, 47)}...` : nameEqualsValue;
-    console.log(`\n> npx convex env set "${display}"${prod ? " --prod" : ""}`);
+    console.log(`\n> npx convex env set "${redactForDisplay(key, value)}"${prod ? " --prod" : ""}`);
   }
 
   const result = spawnSync("npx", cmd, {

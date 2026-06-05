@@ -267,13 +267,14 @@ Create a `.env` file in the project root. See `.env.example` for the template.
 | `CONVEX_SITE_URL`   | Your Convex HTTP site URL   | Found in Convex dashboard             |
 | `SITE_URL`          | Your production site URL    | Your domain                           |
 
-#### Authentication (Required)
+#### Authentication (Required on Convex)
 
-| Variable               | Description                | How to Get                                               |
-| ---------------------- | -------------------------- | -------------------------------------------------------- |
-| `BETTER_AUTH_SECRET`   | Random secret for auth     | Generate with `openssl rand -hex 32`                     |
-| `GOOGLE_CLIENT_ID`     | Google OAuth client ID     | [Google Cloud Console](https://console.cloud.google.com) |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | [Google Cloud Console](https://console.cloud.google.com) |
+| Variable              | Description                         | How to Get                                               |
+| --------------------- | ----------------------------------- | -------------------------------------------------------- |
+| `AUTH_GOOGLE_ID`      | Google OAuth client ID (Convex)     | [Google Cloud Console](https://console.cloud.google.com) |
+| `AUTH_GOOGLE_SECRET`  | Google OAuth client secret (Convex) | [Google Cloud Console](https://console.cloud.google.com) |
+| `JWKS`                | Public JWKS JSON for session tokens | [Convex Auth](https://docs.convex.dev/auth) setup        |
+| `JWT_PRIVATE_KEY`     | Private key matching `JWKS`         | [Convex Auth](https://docs.convex.dev/auth) setup        |
 
 #### AI Services (Required for core functionality)
 
@@ -283,7 +284,9 @@ Create a `.env` file in the project root. See `.env.example` for the template.
 | `TAVILY_API_KEY`      | Tavily search API key         | [Tavily](https://tavily.com)            |
 | `MISTRAL_API_KEY`     | Mistral OCR API key           | [Mistral](https://mistral.ai)           |
 | `SUPADATA_API_KEY`    | Supadata extraction API key   | [Supadata](https://supadata.ai)         |
-| `ZEROENTROPY_API_KEY` | ZeroEntropy reranking API key | [ZeroEntropy](https://zeroentropy.dev)  |
+| `ZEROENTROPY_API_KEY`     | ZeroEntropy reranking API key | [ZeroEntropy](https://zeroentropy.dev)  |
+| `SEMANTIC_SCHOLAR_API_KEY`| Semantic Scholar (optional)   | [Semantic Scholar](https://www.semanticscholar.org/product/api) |
+| `PUBMED_EMAIL`            | PubMed API contact (optional) | Your team email                           |
 
 #### Optional Services
 
@@ -295,8 +298,25 @@ Create a `.env` file in the project root. See `.env.example` for the template.
 | `STRIPE_PRO_YEARLY_PRICE_ID`  | Stripe price ID        | Pro plan (yearly)        |
 | `RESEND_API_KEY`              | Resend email API key   | Email OTP/password reset |
 | `AUTH_RESEND_FROM`            | From email address     | Email sending            |
-| `LANGCHAIN_API_KEY`           | LangSmith API key      | Tracing and monitoring   |
-| `LANGCHAIN_PROJECT`           | LangSmith project name | Tracing organization     |
+| `LANGCHAIN_API_KEY`           | LangSmith API key (local only, not pushed) | Tracing when running CLI/tools locally |
+| `LANGCHAIN_PROJECT`           | LangSmith project name                     | Tracing organization                 |
+
+#### Audio TTS (Optional on Convex)
+
+| Variable              | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `AUDIO_VOICE_HOST_A`  | Together Kokoro voice ID for host A (default `af_sky`) |
+| `AUDIO_VOICE_HOST_B`  | Together Kokoro voice ID for host B (default `am_echo`) |
+
+#### RAG evaluation (dev only)
+
+| Variable               | Where        | Description |
+| ---------------------- | ------------ | ----------- |
+| `RAG_EVALS_ENABLED`    | Convex dev   | Set `true` to enable eval actions |
+| `RAG_EVAL_SECRET`      | Convex dev + local `.env` | Shared secret (≥16 chars); see `evals/rag/env.eval.example` |
+| `RAG_EVAL_CONVEX_URL`  | Local only   | Dev deployment URL for `bun run eval:rag` (not pushed) |
+
+Run `bun run eval:rag:bootstrap-env` once to wire dev URL + secret.
 
 #### LLM Model Configuration
 
@@ -317,17 +337,23 @@ AUDIO_LLM=MiniMaxAI/MiniMax-M2.7
 
 ### Frontend Environment Variables
 
-Create `apps/web/.env.local`:
+Create `apps/web/.env.local` (see `apps/web/.env.local.example`):
 
 ```env
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 VITE_CONVEX_SITE_URL=https://your-deployment.convex.site
 VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...  # Optional, for billing
+# Google Drive picker (optional):
+# VITE_GOOGLE_CLIENT_ID=...
+# VITE_GOOGLE_BROWSER_API_KEY=...
+# VITE_GOOGLE_APP_ID=...
 ```
+
+Sync from root after pull: `bun run convex:env:pull:dev` updates `CONVEX_URL` → `VITE_CONVEX_URL` when `apps/web/.env.local` exists.
 
 ### Mobile Environment Variables
 
-Create `apps/mobile/.env`:
+Create `apps/mobile/.env.local` from `apps/mobile/.env.local.example`:
 
 ```env
 EXPO_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud

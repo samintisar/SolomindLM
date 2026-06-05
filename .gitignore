@@ -143,7 +143,10 @@ dist
 
 # VSCode and Cursor
 .vscode/
-.cursor/
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
 
 # yarn v2
 .yarn/cache

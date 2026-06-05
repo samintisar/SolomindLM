@@ -16,6 +16,7 @@ export type { DiscoveredSource, ExternalChunk } from "./_streamSources";
 /** HTTP + internal stream `sourcePolicy` (subset persisted on research plans). */
 export type StreamSourcePolicy = {
   channels: string[];
+  academicSources?: Array<"openalex" | "arxiv" | "semantic_scholar" | "pubmed">;
   academicFilters?: {
     publicationYearFrom?: number;
     publicationYearTo?: number;
@@ -48,6 +49,16 @@ export const runWithStreamId = internalAction({
         requirePrimarySources: v.optional(v.boolean()),
         recencyDays: v.optional(v.number()),
         dedupeStrategy: v.optional(v.string()),
+        academicSources: v.optional(
+          v.array(
+            v.union(
+              v.literal("openalex"),
+              v.literal("arxiv"),
+              v.literal("semantic_scholar"),
+              v.literal("pubmed")
+            )
+          )
+        ),
         academicFilters: v.optional(
           v.object({
             publicationYearFrom: v.optional(v.number()),

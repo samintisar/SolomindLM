@@ -131,11 +131,16 @@ export const DeepResearchSourcesSection: React.FC<DeepResearchSourcesSectionProp
 
             return (
               <li key={source.key} className="flex gap-3 px-4 py-3">
-                <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted/60">
                   {source.sourceUrl ? (
-                    <Favicon url={source.sourceUrl} className="size-4" />
+                    <Favicon
+                      url={source.sourceUrl}
+                      size={20}
+                      fit="cover"
+                      className="size-full min-h-full min-w-full rounded-md"
+                    />
                   ) : (
-                    <Icon className="size-4 text-muted-foreground" />
+                    <Icon className="size-3 text-muted-foreground" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">

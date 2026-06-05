@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "ignoreUnknown": false },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      "!convex/_generated/**",
+      "!apps/web/src/convex-generated-api.d.ts",
+      "!apps/web/src/convex-generated-dataModel.d.ts"
+    ]
+  },
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,

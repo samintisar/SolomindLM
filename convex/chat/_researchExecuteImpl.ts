@@ -3,8 +3,10 @@
 import { components, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
+import { env } from "../_lib/env.js";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { mapAgentEvidenceForSave } from "../research/mapEvidenceForDb";
+import { resolveResearchTitle } from "../research/resolveResearchTitle";
 import { createResearchAgent } from "./_streamResearch";
 
 export interface ResearchExecuteArgs {
@@ -57,8 +59,8 @@ export async function runResearchExecuteImpl(
     });
     researchLog.operationStart({ runId: String(runId), planId: String(run.planId) });
 
-    const apiKey = process.env.TOGETHER_API_KEY ?? "";
-    const smartModel = process.env.SMART_MODEL ?? "openai/gpt-oss-120b";
+    const apiKey = env.TOGETHER_AI_API_KEY;
+    const smartModel = env.SMART_LLM;
 
     const agent = await createResearchAgent({
       apiKey,
@@ -141,10 +143,60 @@ export async function runResearchExecuteImpl(
       return;
     }
 
+    const evidenceRows = await ctx.runQuery(internal.research.index.getRunEvidenceInternal, {
+      runId,
+    });
+    if (evidenceRows.length > 0) {
+      const baseTitle = await resolveResearchTitle(ctx, {
+        query: plan.query,
+        researchTitle: plan.researchTitle,
+        finalResponse: contentFinal,
+      });
+
+      const { tableId, reportId } = await ctx.runMutation(
+        internal.research.index.createResearchArtifacts,
+        {
+          researchId: String(runId),
+          notebookId: plan.notebookId,
+          userId: plan.userId,
+          query: plan.query,
+          researchTitle: baseTitle,
+          evidence: evidenceRows.map((e) => ({
+            subQuestionId: e.subQuestionId,
+            sourceType: e.sourceType,
+            sourceTitle: e.sourceTitle,
+            sourceUrl: e.sourceUrl,
+            content: e.content,
+            relevanceScore: e.relevanceScore,
+            metadata: e.metadata,
+          })),
+          finalResponse: contentFinal,
+          subQuestions: plan.subQuestions.map((sq: { id: string; question: string }) => ({
+            id: sq.id,
+            question: sq.question,
+          })),
+        }
+      );
+
+      await ctx.runMutation(internal.research.index.updateRunArtifacts, {
+        runId,
+        tableId,
+        reportId,
+      });
+
+      if (!plan.researchTitle?.trim()) {
+        await ctx.runMutation(internal.research.index.setPlanResearchTitle, {
+          planId: run.planId,
+          researchTitle: baseTitle,
+        });
+      }
+    }
+
     await ctx.runMutation(internal.research.index.updateRunProgress, {
       runId,
       status: "completed",
     });
+
     researchLog.operationComplete({ runId: String(runId) });
   } catch (e) {
     const failLog = createServiceLogger("chatStream", "researchExecute", {

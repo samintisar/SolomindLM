@@ -145,7 +145,7 @@ export const runResearchEval = action({
     // Build deps for ResearchAgent
     const deps = {
       apiKey: process.env.TOGETHER_AI_API_KEY || "",
-      smartModel: process.env.SMART_MODEL || "openai/gpt-oss-120b",
+      smartModel: env.SMART_LLM,
       runHybridSearch: async (query: string, docIds?: string[]) => {
         const embedding = await embeddingService.embedText(query, "query");
         const vectorResults = await vectorSearchRunner(embedding, 10, docIds);

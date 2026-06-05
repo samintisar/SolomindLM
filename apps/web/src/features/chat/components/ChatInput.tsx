@@ -20,7 +20,8 @@ import {
   Telescope,
   TrendingUp,
 } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AcademicDiscoveryFiltersSection,
   buildAcademicDiscoveryApiFilters,
@@ -29,6 +30,7 @@ import {
 import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
 import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
 import type { ChatSettings } from "@/shared/types";
+import { cn } from "@/shared/utils/cn";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 
 const SOURCE_FILTERS = [
@@ -112,6 +114,72 @@ interface ChatInputProps {
 
 type OpenComposerMenu = "none" | "mode" | "corpus" | "filters" | "model";
 
+type DropUpAlign = "left" | "right";
+
+function useDropUpMenuStyle(
+  anchorRef: React.RefObject<HTMLElement | null>,
+  open: boolean,
+  align: DropUpAlign
+) {
+  const [style, setStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const update = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      setStyle({
+        position: "fixed",
+        bottom: window.innerHeight - rect.top + 8,
+        ...(align === "right"
+          ? { right: window.innerWidth - rect.right, left: "auto" }
+          : { left: rect.left, right: "auto" }),
+        visibility: "visible",
+      });
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchorRef, open, align]);
+
+  return style;
+}
+
+type ComposerDropUpProps = {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  open: boolean;
+  align?: DropUpAlign;
+  panelRef: React.RefObject<HTMLDivElement | null>;
+  className?: string;
+  children: React.ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>;
+
+function ComposerDropUp({
+  anchorRef,
+  open,
+  align = "left",
+  panelRef,
+  className,
+  children,
+  ...rest
+}: ComposerDropUpProps) {
+  const style = useDropUpMenuStyle(anchorRef, open, align);
+  if (!open) return null;
+  return createPortal(
+    <div ref={panelRef} className={className} style={{ ...style, zIndex: 200 }} {...rest}>
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 export const ChatInput: React.FC<ChatInputProps> = ({
   value,
   onChange,
@@ -136,24 +204,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
-  const modeMenuRef = useRef<HTMLDivElement>(null);
-  const corpusMenuRef = useRef<HTMLDivElement>(null);
-  const filtersMenuRef = useRef<HTMLDivElement>(null);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const modeAnchorRef = useRef<HTMLButtonElement>(null);
+  const modePanelRef = useRef<HTMLDivElement>(null);
+  const corpusAnchorRef = useRef<HTMLButtonElement>(null);
+  const corpusPanelRef = useRef<HTMLDivElement>(null);
+  const filtersAnchorRef = useRef<HTMLButtonElement>(null);
+  const filtersPanelRef = useRef<HTMLDivElement>(null);
+  const modelAnchorRef = useRef<HTMLButtonElement>(null);
+  const modelPanelRef = useRef<HTMLDivElement>(null);
   const [openMenu, setOpenMenu] = useState<OpenComposerMenu>("none");
 
-  const openMenuRef = (menu: OpenComposerMenu): React.RefObject<HTMLDivElement | null> | null => {
+  const menuInteractionRefs = (menu: OpenComposerMenu) => {
     switch (menu) {
       case "mode":
-        return modeMenuRef;
+        return [modeAnchorRef, modePanelRef];
       case "corpus":
-        return corpusMenuRef;
+        return [corpusAnchorRef, corpusPanelRef];
       case "filters":
-        return filtersMenuRef;
+        return [filtersAnchorRef, filtersPanelRef];
       case "model":
-        return modelMenuRef;
+        return [modelAnchorRef, modelPanelRef];
       default:
-        return null;
+        return [];
     }
   };
 
@@ -188,6 +260,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const academicFiltersActive =
     Object.keys(buildAcademicDiscoveryApiFilters(academicDiscoveryFilters ?? {})).length > 0;
   const showModelRow = Boolean(onModelChange);
+  const toolbarControlCount =
+    1 +
+    (showResearchDatabases ? 1 : 0) +
+    (showLiteratureAcademicFilters ? 1 : 0) +
+    (showSourceChannelFilters ? 1 : 0);
+  /** Icon-only model control when the left toolbar is crowded (e.g. literature review). */
+  const hideModelButtonLabel = toolbarControlCount >= 3;
 
   const placeholder =
     mode === "literatureReview"
@@ -196,32 +275,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         ? "Ask a complex research question with multi-step investigation..."
         : "Ask a question about your sources...";
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
-    }
-  }, [value]);
+    if (!textarea) return;
+    // Reset before measuring so scrollHeight shrinks when content is cleared.
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [value, placeholder]);
 
   useEffect(() => {
     if (openMenu === "none") return;
-    const menuRef = openMenuRef(openMenu);
+
     const handlePointerDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (menuRef?.current?.contains(target)) return;
+      const refs = menuInteractionRefs(openMenu);
+      if (refs.some((ref) => ref.current?.contains(target))) return;
       setOpenMenu("none");
     };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpenMenu("none");
     };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
+
+    const timeoutId = window.setTimeout(() => {
+      document.addEventListener("mousedown", handlePointerDown);
+      document.addEventListener("keydown", handleEscape);
+    }, 0);
+
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [openMenu]);
+  }, [openMenu, menuInteractionRefs]);
 
   useEffect(() => {
     if (!showResearchDatabases && openMenu === "corpus") {
@@ -268,12 +353,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       <div
         ref={shellRef}
         data-onboarding="chat-input"
-        className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-1 rounded-2xl border border-border/80 bg-card px-3 py-2 shadow-lg"
+        className="@container/chat-input pointer-events-auto relative flex w-full min-w-0 flex-col gap-0.5 overflow-visible rounded-2xl border border-border/80 bg-card px-3 py-1.5 shadow-lg"
       >
         <textarea
           ref={textareaRef}
           placeholder={placeholder}
-          className="w-full min-w-0 bg-transparent border-none py-2.5 px-1 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 min-h-[52px] max-h-[160px] font-serif text-base @min-[400px]/chat-input:text-lg"
+          className="w-full min-w-0 bg-transparent border-none py-1.5 px-1 resize-none outline-none text-foreground placeholder:text-muted-foreground/70 max-h-[160px] font-serif text-sm leading-snug"
           rows={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -281,11 +366,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           disabled={disabled}
         />
 
-        <div className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-2 pb-0.5">
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden">
             {/* Mode */}
-            <div className="relative" ref={modeMenuRef}>
+            <div className="relative">
               <button
+                ref={modeAnchorRef}
                 type="button"
                 disabled={Boolean(disabled)}
                 aria-haspopup="listbox"
@@ -309,46 +395,48 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   aria-hidden
                 />
               </button>
-              {openMenu === "mode" && (
-                <div
-                  className="absolute bottom-full left-0 z-50 mb-2 w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-border bg-card py-2 shadow-xl font-sans"
-                  role="listbox"
-                  aria-label="Choose chat mode"
-                >
-                  <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Mode
-                  </p>
-                  {COMPOSER_MODES.map(({ id, label, icon: Icon }) => {
-                    const active = mode === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        role="option"
-                        aria-selected={active}
-                        className={[
-                          "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
-                          active ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/70",
-                        ].join(" ")}
-                        onClick={() => {
-                          onModeChange(id);
-                          setOpenMenu("none");
-                        }}
-                      >
-                        <Icon className="size-4 shrink-0 opacity-90" />
-                        <span className="flex-1 min-w-0">{label}</span>
-                        {active ? <Check className="size-3.5 shrink-0" strokeWidth={2.5} /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <ComposerDropUp
+                anchorRef={modeAnchorRef}
+                open={openMenu === "mode"}
+                panelRef={modePanelRef}
+                className="w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-border bg-card py-2 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                role="listbox"
+                aria-label="Choose chat mode"
+              >
+                <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Mode
+                </p>
+                {COMPOSER_MODES.map(({ id, label, icon: Icon }) => {
+                  const active = mode === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      className={[
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors",
+                        active ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/70",
+                      ].join(" ")}
+                      onClick={() => {
+                        onModeChange(id);
+                        setOpenMenu("none");
+                      }}
+                    >
+                      <Icon className="size-4 shrink-0 opacity-90" />
+                      <span className="flex-1 min-w-0">{label}</span>
+                      {active ? <Check className="size-3.5 shrink-0" strokeWidth={2.5} /> : null}
+                    </button>
+                  );
+                })}
+              </ComposerDropUp>
             </div>
 
             {/* Research paper corpus: literature review always; chat/deep research when Academic filter is on */}
             {showResearchDatabases && (
-              <div className="relative" ref={corpusMenuRef}>
+              <div className="relative">
                 <button
+                  ref={corpusAnchorRef}
                   type="button"
                   disabled={Boolean(disabled)}
                   aria-haspopup="listbox"
@@ -365,69 +453,71 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     aria-hidden
                   />
                 </button>
-                {openMenu === "corpus" && (
-                  <div
-                    className="absolute bottom-full left-0 z-50 mb-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border/80 bg-popover py-3 font-sans text-popover-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/10"
-                    role="listbox"
-                    aria-label="Choose research database"
-                  >
-                    <p className="px-3 pb-2.5 text-sm font-medium text-muted-foreground">
-                      Research Databases:
-                    </p>
-                    <div className="flex flex-col gap-0.5 px-1.5">
-                      {RESEARCH_DATABASES.map(({ id, title, description, icon: Icon }) => {
-                        const selected = researchDatabase === id;
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            role="option"
-                            aria-selected={selected}
+                <ComposerDropUp
+                  anchorRef={corpusAnchorRef}
+                  open={openMenu === "corpus"}
+                  panelRef={corpusPanelRef}
+                  className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border/80 bg-popover py-3 font-sans text-popover-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  role="listbox"
+                  aria-label="Choose research database"
+                >
+                  <p className="px-3 pb-2.5 text-sm font-medium text-muted-foreground">
+                    Research Databases:
+                  </p>
+                  <div className="flex flex-col gap-0.5 px-1.5">
+                    {RESEARCH_DATABASES.map(({ id, title, description, icon: Icon }) => {
+                      const selected = researchDatabase === id;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          className={[
+                            "grid w-full grid-cols-[auto_auto_1fr] grid-rows-[auto_auto] items-start gap-x-3 gap-y-0.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors",
+                            selected ? "bg-primary/5" : "hover:bg-muted/60",
+                          ].join(" ")}
+                          onClick={() => {
+                            onResearchDatabaseChange(id);
+                            setOpenMenu("none");
+                          }}
+                        >
+                          <span
                             className={[
-                              "grid w-full grid-cols-[auto_auto_1fr] grid-rows-[auto_auto] items-start gap-x-3 gap-y-0.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors",
-                              selected ? "bg-primary/5" : "hover:bg-muted/60",
+                              "col-start-1 row-span-2 row-start-1 flex size-4 shrink-0 items-center justify-center justify-self-center self-center rounded-full border-2",
+                              selected
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/35 bg-transparent",
                             ].join(" ")}
-                            onClick={() => {
-                              onResearchDatabaseChange(id);
-                              setOpenMenu("none");
-                            }}
+                            aria-hidden
                           >
-                            <span
-                              className={[
-                                "col-start-1 row-span-2 row-start-1 flex size-4 shrink-0 items-center justify-center justify-self-center self-center rounded-full border-2",
-                                selected
-                                  ? "border-primary bg-primary"
-                                  : "border-muted-foreground/35 bg-transparent",
-                              ].join(" ")}
-                              aria-hidden
-                            >
-                              {selected ? (
-                                <span className="size-1.5 rounded-full bg-primary-foreground" />
-                              ) : null}
-                            </span>
-                            <Icon
-                              className="col-start-2 row-span-2 row-start-1 size-4 shrink-0 self-center text-foreground/85"
-                              aria-hidden
-                            />
-                            <span className="col-start-3 row-start-1 min-w-0 font-semibold leading-tight text-foreground">
-                              {title}
-                            </span>
-                            <span className="col-start-3 row-start-2 min-w-0 text-xs font-normal leading-snug text-muted-foreground">
-                              {description}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                            {selected ? (
+                              <span className="size-1.5 rounded-full bg-primary-foreground" />
+                            ) : null}
+                          </span>
+                          <Icon
+                            className="col-start-2 row-span-2 row-start-1 size-4 shrink-0 self-center text-foreground/85"
+                            aria-hidden
+                          />
+                          <span className="col-start-3 row-start-1 min-w-0 font-semibold leading-tight text-foreground">
+                            {title}
+                          </span>
+                          <span className="col-start-3 row-start-2 min-w-0 text-xs font-normal leading-snug text-muted-foreground">
+                            {description}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
+                </ComposerDropUp>
               </div>
             )}
 
             {/* Literature review: academic paper filters */}
             {showLiteratureAcademicFilters && (
-              <div className="relative" ref={filtersMenuRef}>
+              <div className="relative">
                 <button
+                  ref={filtersAnchorRef}
                   type="button"
                   disabled={Boolean(disabled)}
                   aria-expanded={openMenu === "filters"}
@@ -438,22 +528,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   <ListFilter className="size-4 shrink-0" strokeWidth={2} aria-hidden />
                   Filters
                 </button>
-                {openMenu === "filters" && (
-                  <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150">
-                    <AcademicDiscoveryFiltersSection
-                      academic={academicDiscoveryFilters ?? {}}
-                      setAcademic={onAcademicDiscoveryFiltersChange!}
-                      showTopDivider={false}
-                    />
-                  </div>
-                )}
+                <ComposerDropUp
+                  anchorRef={filtersAnchorRef}
+                  open={openMenu === "filters"}
+                  panelRef={filtersPanelRef}
+                  className="max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                >
+                  <AcademicDiscoveryFiltersSection
+                    academic={academicDiscoveryFilters ?? {}}
+                    setAcademic={onAcademicDiscoveryFiltersChange!}
+                    showTopDivider={false}
+                  />
+                </ComposerDropUp>
               </div>
             )}
 
             {/* Chat / deep research: source channels + academic filters */}
             {showSourceChannelFilters && (
-              <div className="relative" ref={filtersMenuRef}>
+              <div className="relative">
                 <button
+                  ref={filtersAnchorRef}
                   type="button"
                   disabled={Boolean(disabled)}
                   aria-expanded={openMenu === "filters"}
@@ -466,67 +560,78 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   <ListFilter className="size-4 shrink-0" strokeWidth={2} aria-hidden />
                   Filters
                 </button>
-                {openMenu === "filters" && (
-                  <div className="absolute bottom-full left-0 z-50 mb-2 max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150">
-                    <p className="text-xs font-semibold text-foreground">Source channels</p>
-                    <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
-                      {SOURCE_FILTERS.map(({ id, label, icon: Icon }) => {
-                        const isActive = activeFilters.includes(id);
-                        return (
-                          <label
-                            key={id}
-                            className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm select-none transition-colors ${
-                              isActive
-                                ? "text-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            <Icon className="size-4 shrink-0" />
-                            <span className="flex-1 min-w-0">{label}</span>
-                            <input
-                              type="checkbox"
-                              checked={isActive}
-                              disabled={!onSourceFilterChange}
-                              onChange={() => toggleFilter(id)}
-                              className="h-4 w-4 shrink-0 rounded border-2 border-border bg-background text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-                            />
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {activeFilters.includes("academic") && onAcademicDiscoveryFiltersChange && (
-                      <AcademicDiscoveryFiltersSection
-                        academic={academicDiscoveryFilters ?? {}}
-                        setAcademic={onAcademicDiscoveryFiltersChange}
-                      />
-                    )}
+                <ComposerDropUp
+                  anchorRef={filtersAnchorRef}
+                  open={openMenu === "filters"}
+                  panelRef={filtersPanelRef}
+                  className="max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                >
+                  <p className="text-xs font-semibold text-foreground">Source channels</p>
+                  <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
+                    {SOURCE_FILTERS.map(({ id, label, icon: Icon }) => {
+                      const isActive = activeFilters.includes(id);
+                      return (
+                        <label
+                          key={id}
+                          className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm select-none transition-colors ${
+                            isActive
+                              ? "text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Icon className="size-4 shrink-0" />
+                          <span className="flex-1 min-w-0">{label}</span>
+                          <input
+                            type="checkbox"
+                            checked={isActive}
+                            disabled={!onSourceFilterChange}
+                            onChange={() => toggleFilter(id)}
+                            className="h-4 w-4 shrink-0 rounded border-2 border-border bg-background text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                          />
+                        </label>
+                      );
+                    })}
                   </div>
-                )}
+                  {activeFilters.includes("academic") && onAcademicDiscoveryFiltersChange && (
+                    <AcademicDiscoveryFiltersSection
+                      academic={academicDiscoveryFilters ?? {}}
+                      setAcademic={onAcademicDiscoveryFiltersChange}
+                    />
+                  )}
+                </ComposerDropUp>
               </div>
             )}
           </div>
 
-          <div className="flex min-h-10 min-w-0 shrink-0 flex-nowrap items-center justify-end gap-2 pl-1">
+          <div className="flex min-h-9 min-w-0 shrink-0 flex-nowrap items-center justify-end gap-2 pl-1">
             {showModelRow && (
-              <div className="relative max-w-full min-w-0" ref={modelMenuRef}>
+              <div className="relative max-w-full min-w-0">
                 <button
+                  ref={modelAnchorRef}
                   type="button"
                   onClick={() => setOpenMenu((o) => (o === "model" ? "none" : "model"))}
                   disabled={Boolean(disabled)}
                   aria-expanded={openMenu === "model"}
                   aria-haspopup="listbox"
-                  className={[
-                    "group h-9 max-w-full min-w-0 inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-transparent px-1.5 font-sans text-sm font-medium tabular-nums text-muted-foreground",
+                  className={cn(
+                    "group h-9 max-w-full min-w-0 inline-flex shrink-0 items-center rounded-lg border border-transparent bg-transparent font-sans text-sm font-medium tabular-nums text-muted-foreground",
                     "transition-[color,background-color,transform] duration-150",
                     "hover:bg-muted/45 hover:text-foreground",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
                     "disabled:cursor-not-allowed disabled:opacity-50",
-                    openMenu === "model" && "bg-muted/40 text-foreground",
-                  ].join(" ")}
+                    hideModelButtonLabel ? "gap-1 px-1.5" : "gap-1.5 px-1.5",
+                    openMenu === "model" && "bg-muted/40 text-foreground"
+                  )}
                   title={currentModel?.name ?? "Choose model"}
+                  aria-label={`Model: ${currentModel?.name ?? "Choose model"}`}
                 >
                   <ModelBrandIcon brand={currentModel?.brand ?? "openai"} />
-                  <span className="min-w-0 max-w-[9rem] truncate @max-[32rem]/chat-input:sr-only">
+                  <span
+                    className={cn(
+                      "min-w-0 max-w-36 truncate",
+                      hideModelButtonLabel ? "sr-only" : "@max-4xl/chat-input:sr-only"
+                    )}
+                  >
                     {currentModel?.name ?? "GPT-OSS 120B"}
                   </span>
                   <ChevronDown
@@ -539,9 +644,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     aria-hidden
                   />
                 </button>
-                {openMenu === "model" && onModelChange && (
-                  <div
-                    className="absolute bottom-full right-0 z-50 mb-2 min-w-[13.5rem] max-w-[min(18rem,calc(100vw-2rem))] max-h-[min(70vh,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
+                {onModelChange && (
+                  <ComposerDropUp
+                    anchorRef={modelAnchorRef}
+                    open={openMenu === "model"}
+                    align="right"
+                    panelRef={modelPanelRef}
+                    className="min-w-[13.5rem] max-w-[min(18rem,calc(100vw-2rem))] max-h-[min(70vh,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
                     role="listbox"
                     aria-label="Choose model"
                   >
@@ -586,7 +695,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         );
                       })}
                     </div>
-                  </div>
+                  </ComposerDropUp>
                 )}
               </div>
             )}

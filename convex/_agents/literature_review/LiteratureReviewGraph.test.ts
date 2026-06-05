@@ -47,9 +47,8 @@ describe("Workflow step sequence", () => {
     const actionMatches = source.match(/step\.runAction\s*\(/g) || [];
     const eventMatches = source.match(/step\.awaitEvent\s*\(/g) || [];
 
-    // 7 actions (plan, search, rank, screen, extract, table, report; search dedupes inline)
-    // + 1 event await (columnsConfirmed)
-    expect(actionMatches).toHaveLength(7);
+    // plan, search, rank, screen, extractDataBatch×N, table, report (+ 1 column event)
+    expect(actionMatches.length).toBeGreaterThanOrEqual(7);
     expect(eventMatches).toHaveLength(1);
   });
 
@@ -72,21 +71,21 @@ describe("Workflow step sequence", () => {
     }
 
     // Build ordered step list by scanning source for step calls
-    const stepCalls: Array<{ type: string; name: string }> = [];
-    const allStepsRegex = /step\.(runAction|awaitEvent)\s*\(/g;
-    const actionNameRegex = /internal\.literatureReview\.workflowSteps\.(\w+)/g;
-    const eventNameRegex = /awaitEvent\s*\(\s*(\w+)/g;
+    const _stepCalls: Array<{ type: string; name: string }> = [];
+    const _allStepsRegex = /step\.(runAction|awaitEvent)\s*\(/g;
+    const _actionNameRegex = /internal\.literatureReview\.workflowSteps\.(\w+)/g;
+    const _eventNameRegex = /awaitEvent\s*\(\s*(\w+)/g;
 
     // We know the expected order from the source structure
-    expect(actions).toEqual([
-      "planReview",
-      "searchPapers",
-      "rankPapers",
-      "screenPapers",
-      "extractData",
-      "generateTable",
-      "generateReport",
-    ]);
+    expect(actions).toContain("planReview");
+    expect(actions).toContain("searchPapers");
+    expect(actions).toContain("rankPapers");
+    expect(actions).toContain("screenPapersBatch");
+    expect(actions).toContain("extractDataBatch");
+    expect(actions).toContain("generateTable");
+    expect(actions).toContain("generateReport");
+    expect(actions.indexOf("screenPapersBatch")).toBeLessThan(actions.indexOf("extractDataBatch"));
+    expect(actions.lastIndexOf("extractDataBatch")).toBeLessThan(actions.indexOf("generateTable"));
     expect(events).toEqual(["columnsConfirmedEvent"]);
   });
 });

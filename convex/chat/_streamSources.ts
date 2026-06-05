@@ -116,6 +116,9 @@ export function createDiscoverSources(
             {
               query: resolvedQuery,
               maxResults: resolvedMax,
+              ...(sourcePolicy.academicSources?.length
+                ? { sources: sourcePolicy.academicSources }
+                : {}),
               ...(af ?? {}),
             }
           )

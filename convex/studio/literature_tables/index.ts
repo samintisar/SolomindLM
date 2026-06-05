@@ -348,8 +348,9 @@ export const retryLiteratureReview = mutation({
       searching: internal.literatureReview.workflowSteps.searchPapers,
       deduplicating: internal.literatureReview.workflowSteps.deduplicatePapers,
       ranking: internal.literatureReview.workflowSteps.rankPapers,
-      screening: internal.literatureReview.workflowSteps.screenPapers,
-      extracting: internal.literatureReview.workflowSteps.extractData,
+      // Screening runs as multiple workflow steps (screenPapersBatch); restart from rank to replay the loop.
+      screening: internal.literatureReview.workflowSteps.rankPapers,
+      extracting: internal.literatureReview.workflowSteps.extractDataBatch,
       populating: internal.literatureReview.workflowSteps.generateTable,
       generating_report: internal.literatureReview.workflowSteps.generateReport,
     };
