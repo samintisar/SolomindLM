@@ -210,6 +210,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const handleRefreshAll = useCallback(async () => {
     if (!noteId || isRefreshingAll || !canRefreshAll) return;
+    const refreshableCount = sources.filter((s) => s.remoteRefreshKind).length;
+    const confirmed = await confirm(
+      "Refresh sources",
+      `Re-fetch ${refreshableCount} remote source${refreshableCount === 1 ? "" : "s"}? Web pages and Google Drive imports will be updated.`,
+      { confirmText: "Refresh", cancelText: "Cancel", variant: "default" }
+    );
+    if (!confirmed) return;
     setIsRefreshingAll(true);
     try {
       const needsDrive = sources.some((s) => s.remoteRefreshKind === "drive");
@@ -253,6 +260,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     isRefreshingAll,
     canRefreshAll,
     sources,
+    confirm,
     refreshNotebookRemote,
     success,
     showInfo,
