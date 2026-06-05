@@ -51,6 +51,52 @@ describe("uncachedLlmCall structured responses", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("returns structuredJson from message content for json_schema", async () => {
+    const json = '{"topics":["A"],"summary":"Structured summary long enough for validation."}';
+    fetchMock.mockResolvedValue(
+      mockTogetherResponse({
+        choices: [{ message: { content: json }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+      })
+    );
+
+    const result = await uncachedLlmCall({
+      model: "openai/gpt-oss-120b",
+      messages: [{ role: "user", content: "summarize" }],
+      temperature: 0.3,
+      responseFormat: {
+        type: "json_schema",
+        json_schema: { name: "test_schema", schema: { type: "object" } },
+      },
+    });
+
+    expect(result.structuredJson).toBe(json);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns structuredJson extracted from reasoning when content is empty", async () => {
+    const json = '{"topics":["B"],"summary":"Reasoning-only JSON payload long enough here."}';
+    fetchMock.mockResolvedValue(
+      mockTogetherResponse({
+        choices: [
+          {
+            message: { content: "", reasoning: `Thinking...\n${json}` },
+            finish_reason: "stop",
+          },
+        ],
+      })
+    );
+
+    const result = await uncachedLlmCall({
+      model: "openai/gpt-oss-120b",
+      messages: [{ role: "user", content: "summarize" }],
+      temperature: 0.3,
+      responseFormat: { type: "json_object" },
+    });
+
+    expect(result.structuredJson).toBe(json);
+  });
+
   it("does not HTTP-retry when structured JSON payload is missing", async () => {
     fetchMock.mockResolvedValue(
       mockTogetherResponse({

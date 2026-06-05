@@ -119,6 +119,29 @@ describe("invokeMapStructuredOutput", () => {
     expect(formats[2]?.type).toBe("json_object");
   });
 
+  it("retries when uncachedLlmCall throws missing structured JSON payload", async () => {
+    vi.useFakeTimers();
+
+    uncachedLlmCall
+      .mockRejectedValueOnce(new Error("LLM API returned no JSON payload for structured response"))
+      .mockResolvedValueOnce({
+        content: "",
+        structuredJson: validMapPayload,
+      });
+
+    const resultPromise = invokeMapStructuredOutput({
+      systemPrompt: "sys",
+      userPrompt: "user",
+    });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result.topics).toEqual(["Patterns"]);
+    expect(uncachedLlmCall).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
   it("does not retry non-retriable LLM errors", async () => {
     uncachedLlmCall.mockRejectedValueOnce(new Error("LLM API error: 401 - unauthorized"));
 

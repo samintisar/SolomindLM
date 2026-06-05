@@ -11,18 +11,19 @@ import { withLanguageInstruction } from "../../_agents/_shared/languageInstructi
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { packChunks, validateChunks } from "../../_agents/ReportGraph";
-import { invokeMapStructuredOutput } from "../../_agents/report/structuredLlm";
 import {
   MAP_PROMPTS,
   MAP_STRUCTURED_SYSTEM_PROMPT,
   REDUCE_PROMPTS,
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/report/prompts";
+import { invokeMapStructuredOutput } from "../../_agents/report/structuredLlm";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { isFailedMapResult } from "./mapResultUtils.js";
 
 const CONFIG = {
   MAP_CHUNK_SIZE_TOKENS: 5_000,
@@ -343,13 +344,7 @@ IMPORTANT: Respond with a JSON object containing:
       : 0;
     const totalMaps = report.metadata?.totalMapTasks || totalChunks;
     const failedMaps = report.metadata?.mapResults
-      ? Object.values(report.metadata.mapResults).filter((r) => {
-          try {
-            return JSON.parse(String(r))?._error;
-          } catch {
-            return true;
-          }
-        }).length
+      ? Object.values(report.metadata.mapResults).filter((r) => isFailedMapResult(r)).length
       : 0;
 
     if (completedMaps >= totalMaps) {
@@ -422,12 +417,16 @@ export async function runFinalizeReportPhase(
     const failedCount = { count: 0 };
 
     for (const [, resultJson] of Object.entries(mapResults)) {
+      if (isFailedMapResult(resultJson)) {
+        failedCount.count++;
+        continue;
+      }
       try {
-        const parsed = JSON.parse(resultJson);
-        if (parsed._error) {
-          failedCount.count++;
-        } else {
+        const parsed = JSON.parse(resultJson) as { summary?: string };
+        if (typeof parsed.summary === "string") {
           successfulResults.push(parsed.summary);
+        } else {
+          failedCount.count++;
         }
       } catch {
         failedCount.count++;

@@ -47,6 +47,42 @@ describe("researchSourceBreadth", () => {
     expect(result.score).toBe(1);
   });
 
+  it("warns at exactly 7 unique sources", () => {
+    const chunks = Array.from({ length: 7 }, (_, i) => ({
+      id: `ev_${i}`,
+      sourceTitle: `Title ${i}`,
+      sourceUrl: `https://example.com/${i}`,
+      content: "body",
+    }));
+    const result = researchSourceBreadth(fixture, researchArtifact(chunks));
+    expect(result.status).toBe("warn");
+    expect(result.score).toBe(0.5);
+  });
+
+  it("warns at exactly 4 unique sources", () => {
+    const chunks = Array.from({ length: 4 }, (_, i) => ({
+      id: `ev_${i}`,
+      sourceTitle: `Title ${i}`,
+      sourceUrl: `https://example.com/${i}`,
+      content: "body",
+    }));
+    const result = researchSourceBreadth(fixture, researchArtifact(chunks));
+    expect(result.status).toBe("warn");
+    expect(result.score).toBe(0.5);
+  });
+
+  it("fails when many chunks share one URL (no breadth inflation)", () => {
+    const chunks = Array.from({ length: 8 }, (_, i) => ({
+      id: `ev_${i}`,
+      sourceTitle: `Title ${i}`,
+      sourceUrl: "https://example.com/same",
+      content: "body",
+    }));
+    const result = researchSourceBreadth(fixture, researchArtifact(chunks));
+    expect(result.status).toBe("fail");
+    expect(result.breakdown?.uniqueSourceCount).toBe(1);
+  });
+
   it("warns between 4 and 7 unique sources", () => {
     const chunks = Array.from({ length: 5 }, (_, i) => ({
       id: `ev_${i}`,

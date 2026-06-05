@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EvalFixture, EvalRunArtifact } from "../types";
-import { LlmJudgeParseError, llmJudgeCorrectness, parseJsonResponse } from "./llmJudge";
+import {
+  LlmJudgeParseError,
+  llmJudgeCorrectness,
+  parseJsonResponse,
+  requireJudgeScore,
+} from "./llmJudge";
 
 const judgeFixture: EvalFixture = {
   schemaVersion: 1,
@@ -37,16 +42,12 @@ describe("parseJsonResponse", () => {
   });
 
   it("strips markdown fences", () => {
-    const result = parseJsonResponse(
-      '```json\n{"score":0.7,"reasoning":"ok"}\n```'
-    );
+    const result = parseJsonResponse('```json\n{"score":0.7,"reasoning":"ok"}\n```');
     expect(result.score).toBe(0.7);
   });
 
   it("extracts JSON embedded in prose", () => {
-    const result = parseJsonResponse(
-      'Here is my evaluation:\n{"score":0.6,"reasoning":"partial"}'
-    );
+    const result = parseJsonResponse('Here is my evaluation:\n{"score":0.6,"reasoning":"partial"}');
     expect(result.score).toBe(0.6);
   });
 
@@ -56,6 +57,17 @@ describe("parseJsonResponse", () => {
 
   it("rejects JSON arrays", () => {
     expect(() => parseJsonResponse("[1,2,3]")).toThrow(LlmJudgeParseError);
+  });
+});
+
+describe("requireJudgeScore", () => {
+  it("rejects scores outside 0-1", () => {
+    expect(() => requireJudgeScore({ score: 1.5, reasoning: "high" })).toThrow(LlmJudgeParseError);
+    expect(() => requireJudgeScore({ score: -0.1, reasoning: "low" })).toThrow(/between 0 and 1/i);
+  });
+
+  it("accepts scores in range", () => {
+    expect(requireJudgeScore({ score: 0.85 })).toBe(0.85);
   });
 });
 

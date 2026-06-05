@@ -335,6 +335,7 @@ import type * as studio_quizzes_job from "../studio/quizzes/job.js";
 import type * as studio_quizzes_quizJobPhases from "../studio/quizzes/quizJobPhases.js";
 import type * as studio_reports_index from "../studio/reports/index.js";
 import type * as studio_reports_job from "../studio/reports/job.js";
+import type * as studio_reports_mapResultUtils from "../studio/reports/mapResultUtils.js";
 import type * as studio_reports_reportJobPhases from "../studio/reports/reportJobPhases.js";
 import type * as studio_scheduling_flashcards from "../studio/scheduling/flashcards.js";
 import type * as studio_scheduling_quizzes from "../studio/scheduling/quizzes.js";
@@ -684,6 +685,7 @@ declare const fullApi: ApiFromModules<{
   "studio/quizzes/quizJobPhases": typeof studio_quizzes_quizJobPhases;
   "studio/reports/index": typeof studio_reports_index;
   "studio/reports/job": typeof studio_reports_job;
+  "studio/reports/mapResultUtils": typeof studio_reports_mapResultUtils;
   "studio/reports/reportJobPhases": typeof studio_reports_reportJobPhases;
   "studio/scheduling/flashcards": typeof studio_scheduling_flashcards;
   "studio/scheduling/quizzes": typeof studio_scheduling_quizzes;

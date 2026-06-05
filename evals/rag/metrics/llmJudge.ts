@@ -198,11 +198,17 @@ export function parseJsonResponse(response: string): Record<string, unknown> {
   );
 }
 
-function requireJudgeScore(result: Record<string, unknown>): number {
+export function requireJudgeScore(result: Record<string, unknown>): number {
   const score = result.score;
   if (typeof score !== "number" || Number.isNaN(score)) {
     throw new LlmJudgeParseError(
       "Judge response missing numeric score field",
+      previewResponse(JSON.stringify(result))
+    );
+  }
+  if (score < 0 || score > 1) {
+    throw new LlmJudgeParseError(
+      `Judge score must be between 0 and 1 (got ${score})`,
       previewResponse(JSON.stringify(result))
     );
   }
