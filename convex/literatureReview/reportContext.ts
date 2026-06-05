@@ -17,6 +17,93 @@ export type ReportPaperRow = {
   rowData: Record<string, string>;
 };
 
+/** Citation-backed row keys; excluded from custom-column extraction prompts and alignment. */
+export const LITERATURE_METADATA_COLUMN_IDS = new Set(["title", "authors", "year", "summary"]);
+
+export type ExtractionColumnDef = { id: string; name: string };
+
+function normalizeColumnKey(key: string): string {
+  return key.toLowerCase().replace(/\s+/g, "_");
+}
+
+function compactColumnKey(key: string): string {
+  return normalizeColumnKey(key).replace(/_/g, "");
+}
+
+function isEmptyExtractionValue(value: string | undefined): boolean {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length === 0 || trimmed.toUpperCase() === "N/A";
+}
+
+const AMBIGUOUS_EXTRACTED_KEY = Symbol("ambiguousExtractedKey");
+
+type ExtractedKeyIndex = Map<string, string | typeof AMBIGUOUS_EXTRACTED_KEY>;
+
+/** Index LLM keys under normalized/compact/lowercase aliases; mark aliases with conflicting values ambiguous. */
+function indexExtractedDataByKey(extractedData: Record<string, string>): ExtractedKeyIndex {
+  const index: ExtractedKeyIndex = new Map();
+  for (const [key, value] of Object.entries(extractedData)) {
+    if (isEmptyExtractionValue(value)) continue;
+    const trimmed = value.trim();
+    for (const alias of [normalizeColumnKey(key), compactColumnKey(key), key.toLowerCase()]) {
+      const existing = index.get(alias);
+      if (existing === undefined) {
+        index.set(alias, trimmed);
+      } else if (existing !== AMBIGUOUS_EXTRACTED_KEY && existing !== trimmed) {
+        index.set(alias, AMBIGUOUS_EXTRACTED_KEY);
+      }
+    }
+  }
+  return index;
+}
+
+function lookupIndexedValue(index: ExtractedKeyIndex, alias: string): string | undefined {
+  const hit = index.get(alias);
+  if (hit === undefined || hit === AMBIGUOUS_EXTRACTED_KEY) return undefined;
+  return hit;
+}
+
+/**
+ * Map LLM extraction keys (often display names) onto configured column ids.
+ * The studio table reads `rowData[columnId]` only — mismatched keys show as empty cells.
+ */
+export function alignExtractedDataToColumns(
+  extractedData: Record<string, string>,
+  columns: ExtractionColumnDef[]
+): Record<string, string> {
+  const indexedKeys = indexExtractedDataByKey(extractedData);
+
+  const aligned: Record<string, string> = {};
+  for (const col of columns) {
+    if (LITERATURE_METADATA_COLUMN_IDS.has(col.id.toLowerCase())) continue;
+
+    // Prefer exact keys (column id, then display name) before fuzzy normalized/compact matching.
+    const directCandidates = [col.id, col.name, normalizeColumnKey(col.name)];
+    for (const candidate of directCandidates) {
+      const direct = extractedData[candidate];
+      if (!isEmptyExtractionValue(direct)) {
+        aligned[col.id] = direct!.trim();
+        break;
+      }
+    }
+    if (aligned[col.id]) continue;
+
+    const fuzzyHit =
+      lookupIndexedValue(indexedKeys, normalizeColumnKey(col.id)) ??
+      lookupIndexedValue(indexedKeys, compactColumnKey(col.id)) ??
+      lookupIndexedValue(indexedKeys, compactColumnKey(col.name));
+    if (fuzzyHit) {
+      aligned[col.id] = fuzzyHit;
+    }
+  }
+
+  return aligned;
+}
+
+export function columnsForExtraction<T extends ExtractionColumnDef>(columns: T[]): T[] {
+  return columns.filter((c) => !LITERATURE_METADATA_COLUMN_IDS.has(c.id.toLowerCase()));
+}
+
 export type LiteratureReportContext = {
   query: string;
   reviewTitle?: string;
@@ -229,18 +316,24 @@ export function fullReportHasOnlyTrivialContent(
   );
 }
 
+export type StudyTableColumnRef = string | ExtractionColumnDef;
+
+function resolveStudyTableColumns(columns: StudyTableColumnRef[]): ExtractionColumnDef[] {
+  return columns
+    .map((col) => (typeof col === "string" ? { id: col, name: col } : col))
+    .filter((col) => !LITERATURE_METADATA_COLUMN_IDS.has(col.id.toLowerCase()));
+}
+
 export function buildStudyCharacteristicsTable(
   papers: ReportPaperRow[],
-  columnNames: string[]
+  columns: StudyTableColumnRef[]
 ): string {
   if (papers.length === 0) {
     return "_No included studies._";
   }
 
-  const displayCols = columnNames.filter(
-    (n) => !["title", "authors", "year", "summary"].includes(n.toLowerCase())
-  );
-  const headers = ["Study", "Year", ...displayCols.slice(0, 4)];
+  const displayCols = resolveStudyTableColumns(columns).slice(0, 4);
+  const headers = ["Study", "Year", ...displayCols.map((c) => c.name)];
 
   const rows = papers.map((p) => {
     const authorLabel = p.authors.split(",")[0]?.trim() ?? "Unknown";
@@ -248,8 +341,9 @@ export function buildStudyCharacteristicsTable(
     const cells = [
       studyCell,
       p.year || "N/A",
-      ...displayCols.slice(0, 4).map((col) => {
-        const val = resolveStudyTableCellValue(p, col);
+      ...displayCols.map((col) => {
+        const val =
+          resolveStudyTableCellValue(p, col.id) || resolveStudyTableCellValue(p, col.name);
         const trimmed = val.slice(0, 120);
         return trimmed || "—";
       }),

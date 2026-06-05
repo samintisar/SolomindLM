@@ -57,9 +57,11 @@ import {
   compactRankedPapersForWorkflow,
 } from "./rankedPapersSnapshot.js";
 import {
+  alignExtractedDataToColumns,
   buildGroundedNumericSet,
   buildPrismaMethodsBlock,
   buildStudyCharacteristicsTable,
+  columnsForExtraction,
   getReportSectionsNeedingRegeneration,
   isTrivialReportSectionContent,
   mergeDeterministicReportSections,
@@ -606,21 +608,27 @@ async function extractPaperFieldsWithLlm(
   },
   columns: Array<{ id: string; name: string; instructions?: string }>,
   query: string | undefined,
-  smartModel: string | undefined
+  smartModel: string | undefined,
+  logger: ReturnType<typeof createServiceLogger>
 ): Promise<Record<string, string> | undefined> {
+  const extractionColumns = columnsForExtraction(columns);
+  if (extractionColumns.length === 0) {
+    return undefined;
+  }
+
   const llm = createLLM({
     apiKey: env.TOGETHER_AI_API_KEY,
-    mapModel: bulkLlmModel(),
+    mapModel: mapModelForLiteratureReview(smartModel),
     temperatures: 0.2,
-    maxTokens: 900,
-    phase: "fast",
+    maxTokens: 1_600,
+    phase: "smart",
   });
 
   const structuredLlm = llm.withStructuredOutput(ExtractDataOutputSchema, {
     name: "extract_data",
   });
 
-  const columnsText = columns
+  const columnsText = extractionColumns
     .map(
       (col) =>
         `- ${col.name} (id: ${col.id}): ${col.instructions || "Extract relevant information."}`
@@ -649,7 +657,15 @@ async function extractPaperFieldsWithLlm(
     "extractData"
   );
 
-  return response.extractedData;
+  const aligned = alignExtractedDataToColumns(response.extractedData, columns);
+  if (Object.keys(aligned).length === 0 && Object.keys(response.extractedData).length > 0) {
+    logger.warn("LLM extraction returned keys that did not map to configured columns", {
+      paperTitle: paper.title,
+      llmKeys: Object.keys(response.extractedData),
+      columnIds: columns.map((c) => c.id),
+    });
+  }
+  return Object.keys(aligned).length > 0 ? aligned : undefined;
 }
 
 /** One draft batch — separate action so extraction stays under Convex action limits. */
@@ -679,7 +695,8 @@ export async function extractDataBatchHandler(
           paper,
           args.columns,
           args.query,
-          args.smartModel
+          args.smartModel,
+          logger
         );
         return extractedData ? { ...paper, extractedData } : paper;
       } catch (error) {
@@ -918,7 +935,7 @@ export async function generateReportHandler(
       }
     );
     const provenance = sessionContext?.workflowProvenance ?? {};
-    const columnNames = table.columns.map((c) => c.name);
+    const reportTableColumns = table.columns.map((c) => ({ id: c.id, name: c.name }));
 
     const reportPapers: ReportPaperRow[] = [];
     for (let i = 0; i < drafts.length; i++) {
@@ -940,7 +957,7 @@ export async function generateReportHandler(
 
     const sessionMetadata = JSON.stringify(provenance, null, 2);
     const methodsBlock = buildPrismaMethodsBlock(provenance);
-    const studyTable = buildStudyCharacteristicsTable(reportPapers, columnNames);
+    const studyTable = buildStudyCharacteristicsTable(reportPapers, reportTableColumns);
     logger.info("Starting report generation", {
       paperCount: drafts.length,
       sectionCount: 6,

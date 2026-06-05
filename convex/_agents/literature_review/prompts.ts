@@ -229,7 +229,7 @@ Use the abstract and title as your primary sources. If the exact information is 
 Only use "N/A" as a last resort when the information is truly impossible to infer from the available text.
 Keep extractions concise but complete (1-3 sentences per cell).
 
-Respond in the following JSON format exactly (use one key per column id from EXTRACTION COLUMNS above):
+Respond in the following JSON format exactly. Each key in extractedData MUST be the exact column id string from EXTRACTION COLUMNS (e.g. framework_name), never the display name:
 
 {\n  "extractedData": {\n    "column_id_from_definitions": "Extracted value for that column",\n    "another_column_id": "Another extracted value"\n  }\n}
 
