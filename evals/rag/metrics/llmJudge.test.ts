@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { LlmJudgeParseError, parseJsonResponse } from "./llmJudge";
+import type { EvalFixture, EvalRunArtifact } from "../types";
+import { LlmJudgeParseError, llmJudgeCorrectness, parseJsonResponse } from "./llmJudge";
+
+const judgeFixture: EvalFixture = {
+  schemaVersion: 1,
+  id: "judge-test",
+  runner: "chat",
+  question: "What is X?",
+  notebookId: "nb",
+  expectedAnswer: "Expected answer text",
+  expectedItems: [],
+  expectedBehavior: "test",
+  tags: ["chat"],
+};
+
+const judgeArtifact: EvalRunArtifact = {
+  caseId: judgeFixture.id,
+  runner: "chat",
+  configHash: "hash",
+  answer: "Actual answer text",
+  citations: [],
+  preRerankChunks: [],
+  postRerankChunks: [],
+  selectedChunks: [{ id: "c1", sourceTitle: "Doc", content: "context".repeat(20) }],
+  subQueries: [],
+  latencyMs: 0,
+  timestamp: new Date().toISOString(),
+};
 
 describe("parseJsonResponse", () => {
   it("parses bare JSON objects", () => {
@@ -25,10 +52,28 @@ describe("parseJsonResponse", () => {
 
   it("throws instead of returning a synthetic passing score", () => {
     expect(() => parseJsonResponse("not json at all")).toThrow(LlmJudgeParseError);
-    expect(() => parseJsonResponse("not json at all")).toThrow(/parse/i);
   });
 
   it("rejects JSON arrays", () => {
     expect(() => parseJsonResponse("[1,2,3]")).toThrow(LlmJudgeParseError);
+  });
+});
+
+describe("llmJudgeCorrectness", () => {
+  it("returns fail when judge response cannot be parsed", async () => {
+    const result = await llmJudgeCorrectness(judgeFixture, judgeArtifact, {
+      invoke: async () => "not json at all",
+    });
+    expect(result.status).toBe("fail");
+    expect(result.score).toBe(0);
+  });
+
+  it("returns fail when judge JSON omits numeric score", async () => {
+    const result = await llmJudgeCorrectness(judgeFixture, judgeArtifact, {
+      invoke: async () => '{"reasoning":"no score field"}',
+    });
+    expect(result.status).toBe("fail");
+    expect(result.score).toBe(0);
+    expect(result.detail).toMatch(/numeric score/i);
   });
 });

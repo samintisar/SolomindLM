@@ -70,6 +70,25 @@ describe("researchSourceBreadth", () => {
     expect(result.score).toBe(0);
   });
 
+  it("excludes notebook chunks without external URLs from breadth count", () => {
+    const chunks = [
+      ...Array.from({ length: 8 }, (_, i) => ({
+        id: `ext_${i}`,
+        sourceTitle: `Web ${i}`,
+        sourceUrl: `https://example.com/${i}`,
+        content: "body",
+      })),
+      {
+        id: "nb_0",
+        sourceTitle: "Notebook doc",
+        content: "notebook chunk without external url",
+      },
+    ];
+    const result = researchSourceBreadth(fixture, researchArtifact(chunks));
+    expect(result.status).toBe("pass");
+    expect(result.breakdown?.uniqueSourceCount).toBe(8);
+  });
+
   it("skips breadth check for notebook-only policies", () => {
     const notebookFixture: EvalFixture = {
       ...fixture,

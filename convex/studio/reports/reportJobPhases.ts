@@ -244,7 +244,7 @@ export async function runProcessReportMapChunkPhase(
     let structuredPrompt = `${prompt}
 
 IMPORTANT: Respond with a JSON object containing:
-1. "topics": An array of 3-5 key topics this section covers
+1. "topics": An array of 1-5 key topics this section covers
 2. "summary": The complete structured summary as described above`;
     if (customFocus && reportType !== "custom") {
       structuredPrompt =
@@ -266,10 +266,8 @@ IMPORTANT: Respond with a JSON object containing:
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "ReportMap",
+      // Map retries live inside invokeMapStructuredOutput (json_schema → json_object fallback).
       retry: { maxAttempts: 1 },
-      onRetry: (attempt, error) => {
-        console.log(`[ReportJob] ${chunkId} Retry attempt ${attempt}/3: ${error.message}`);
-      },
     });
 
     const elapsed = Date.now() - startTime;

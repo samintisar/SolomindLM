@@ -52,7 +52,7 @@ export interface LLMOptions {
 
 export interface LLMResponse {
   content: string;
-  /** Populated for `json_schema` calls when a JSON object is found in content or reasoning. */
+  /** Populated for `json_schema` / `json_object` calls when a JSON object is found in content or reasoning. */
   structuredJson?: string;
   usage?: {
     promptTokens: number;
@@ -175,7 +175,8 @@ export function togetherStructuredJsonPayload(choice: TogetherCompletionChoice |
 
 /**
  * Best-effort assistant text from a Together / OpenAI-style chat completion choice.
- * Some responses use legacy `text`; hybrid models may place a JSON payload only in `reasoning`.
+ * Some responses use legacy `text`; hybrid models may place plain output in `reasoning`.
+ * For structured JSON extraction use {@link togetherStructuredJsonPayload} instead.
  */
 function togetherChoiceAssistantText(choice: TogetherCompletionChoice | undefined): string {
   if (!choice) return "";
@@ -302,11 +303,14 @@ async function executeTogetherLlmRequest(
         ? togetherStructuredJsonPayload(choice)
         : undefined;
 
-      if (!content.trim() && !structuredJson) {
-        logEmptyTogetherAssistant(options.model, choice);
-      } else if (wantsStructuredJson && !structuredJson) {
+      const hasStructuredJson = Boolean(structuredJson?.trim());
+
+      if (wantsStructuredJson && !hasStructuredJson) {
+        if (!content.trim()) {
+          logEmptyTogetherAssistant(options.model, choice);
+        }
         const msg = choice?.message;
-        console.warn("[Together LLM] json_schema response missing JSON payload", {
+        console.warn("[Together LLM] structured response missing JSON payload", {
           model: options.model,
           finishReason: choice?.finish_reason,
           contentPreview: messageContentToString(msg).slice(0, 120),
@@ -314,6 +318,10 @@ async function executeTogetherLlmRequest(
             typeof msg?.reasoning === "string" ? msg.reasoning.slice(0, 120) : undefined,
         });
         throw new Error("LLM API returned no JSON payload for structured response");
+      }
+
+      if (!content.trim() && !hasStructuredJson) {
+        logEmptyTogetherAssistant(options.model, choice);
       }
 
       const usageRaw = data.usage;
@@ -335,7 +343,11 @@ async function executeTogetherLlmRequest(
         usage,
       };
     } catch (e) {
-      if (e instanceof Error && e.message === "LLM API returned non-JSON body") {
+      if (
+        e instanceof Error &&
+        (e.message === "LLM API returned non-JSON body" ||
+          e.message === "LLM API returned no JSON payload for structured response")
+      ) {
         throw e;
       }
       const isOurApiError = e instanceof Error && e.message.startsWith("LLM API error:");

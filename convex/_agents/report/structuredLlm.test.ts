@@ -40,7 +40,24 @@ describe("invokeMapStructuredOutput", () => {
     expect(uncachedLlmCall).toHaveBeenCalledTimes(1);
   });
 
+  it("parses valid JSON from content when structuredJson is absent", async () => {
+    uncachedLlmCall.mockResolvedValueOnce({
+      content: validMapPayload,
+      structuredJson: undefined,
+    });
+
+    const result = await invokeMapStructuredOutput({
+      systemPrompt: "sys",
+      userPrompt: "user",
+    });
+
+    expect(result.topics).toEqual(["Patterns"]);
+    expect(uncachedLlmCall).toHaveBeenCalledTimes(1);
+  });
+
   it("retries on validation failure then succeeds", async () => {
+    vi.useFakeTimers();
+
     uncachedLlmCall
       .mockResolvedValueOnce({
         content: "",
@@ -51,13 +68,17 @@ describe("invokeMapStructuredOutput", () => {
         structuredJson: validMapPayload,
       });
 
-    const result = await invokeMapStructuredOutput({
+    const resultPromise = invokeMapStructuredOutput({
       systemPrompt: "sys",
       userPrompt: "user",
     });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
 
     expect(result.summary).toBe(validSummary);
     expect(uncachedLlmCall).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
   });
 
   it("throws after exhausting retriable attempts", async () => {

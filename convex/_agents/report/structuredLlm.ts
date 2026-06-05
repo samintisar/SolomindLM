@@ -36,6 +36,7 @@ export interface MapOutputInvoker {
 
 const MAP_STRUCTURED_SCHEMA_NAME = "extract_topics_and_summary";
 const MAP_STRUCTURED_MAX_ATTEMPTS = 3;
+const MAP_OUTPUT_JSON_SCHEMA = z.toJSONSchema(MapOutputSchema) as Record<string, unknown>;
 
 export type InvokeMapStructuredOutputOptions = {
   systemPrompt: string;
@@ -80,13 +81,13 @@ function isRetriableMapStructuredError(error: unknown): boolean {
 
 /**
  * Map-phase structured output via Together `json_schema` (not LangChain tool calling).
- * Uses Together `json_schema` / `json_object` with JSON extraction from content or reasoning.
+ * Up to 3 attempts with exponential backoff; final attempt falls back to `json_object`.
+ * Uses `uncachedLlmCall` at temperature 0.3 with reasoning disabled.
  */
 export async function invokeMapStructuredOutput(
   options: InvokeMapStructuredOutputOptions
 ): Promise<MapOutput> {
   const model = options.model ?? env.FAST_LLM;
-  const jsonSchema = z.toJSONSchema(MapOutputSchema) as Record<string, unknown>;
   const maxTokens = options.maxTokens ?? 16_384;
   const temperature = options.temperature ?? 0.3;
 
@@ -120,7 +121,7 @@ export async function invokeMapStructuredOutput(
               type: "json_schema",
               json_schema: {
                 name: MAP_STRUCTURED_SCHEMA_NAME,
-                schema: jsonSchema,
+                schema: MAP_OUTPUT_JSON_SCHEMA,
               },
             },
       });

@@ -11,7 +11,7 @@ import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 // ─── Types ─────────────────────────────────────────────────────────
 
 export interface LlmJudgeOptions {
-  /** LLM to use for judging (default: gpt-oss-20b) */
+  /** LLM to use for judging (default: openai/gpt-oss-20b) */
   model?: string;
   /** Optional custom LLM invocation function */
   invoke?: (prompt: string) => Promise<string>;
@@ -258,7 +258,7 @@ export async function llmJudgeCorrectness(
   }
 
   const invoke = options.invoke ?? defaultLlmInvoke;
-  const model = options.model ?? "gpt-oss-20b";
+  const model = options.model ?? "openai/gpt-oss-20b";
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   try {
@@ -321,7 +321,7 @@ export async function llmJudgeFaithfulness(
   options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   const invoke = options.invoke ?? defaultLlmInvoke;
-  const model = options.model ?? "gpt-oss-20b";
+  const model = options.model ?? "openai/gpt-oss-20b";
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   if (retrievedContext.length < 50) {
@@ -391,7 +391,7 @@ export async function llmJudgeCompleteness(
   options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   const invoke = options.invoke ?? defaultLlmInvoke;
-  const model = options.model ?? "gpt-oss-20b";
+  const model = options.model ?? "openai/gpt-oss-20b";
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   try {

@@ -42,7 +42,7 @@ export async function mapProcess(
   let structuredPrompt = `${prompt}
 
 IMPORTANT: Respond with a JSON object containing:
-1. "topics": An array of 3-5 key topics this section covers
+1. "topics": An array of 1-5 key topics this section covers
 2. "summary": The complete structured summary as described above`;
   if (customFocus && reportType !== "custom") {
     structuredPrompt =

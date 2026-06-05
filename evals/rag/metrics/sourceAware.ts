@@ -187,6 +187,7 @@ export function researchSourceBreadth(
 
   const uniqueUrls = new Set(
     artifact.selectedChunks
+      .filter((c) => inferSourceChannel(c.sourceUrl) !== "notebook")
       .map((c) => c.sourceUrl?.trim())
       .filter((url): url is string => Boolean(url))
   );
