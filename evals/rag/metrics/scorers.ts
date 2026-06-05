@@ -15,8 +15,7 @@ import {
   retrievalNdcgAtK,
   retrievalPrecisionAtK,
 } from "./index";
-import { scoreAllLlmJudgeMetrics, type LlmJudgeOptions } from "./llmJudge";
-import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
+import { type LlmJudgeOptions, scoreAllLlmJudgeMetrics } from "./llmJudge";
 import {
   externalSourceUtilization,
   researchSourceBreadth,
@@ -24,6 +23,7 @@ import {
   sourceRecallByChannel,
 } from "./sourceAware";
 import { scoreStudioMetrics } from "./studio";
+import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
   // Chat uses a chunk-based retrieval pipeline with pre/post-rerank stages.

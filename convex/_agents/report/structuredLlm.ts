@@ -3,8 +3,8 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import type { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { z } from "zod";
-import { extractJsonObjectString, uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { env } from "../../_lib/env";
+import { extractJsonObjectString, uncachedLlmCall } from "../_shared/cachedLlm.js";
 
 /**
  * Zod schema for structured map phase output.
@@ -127,9 +127,7 @@ export async function invokeMapStructuredOutput(
       });
 
       const jsonPayload =
-        response.structuredJson?.trim() ||
-        extractJsonObjectString(response.content) ||
-        "";
+        response.structuredJson?.trim() || extractJsonObjectString(response.content) || "";
       return parseMapStructuredContent(jsonPayload);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));

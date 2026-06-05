@@ -8,7 +8,8 @@ describe("extractJsonObjectString", () => {
   });
 
   it("extracts JSON from fenced blocks", () => {
-    const inner = '{"topics":["B"],"summary":"Another summary that is long enough for the schema."}';
+    const inner =
+      '{"topics":["B"],"summary":"Another summary that is long enough for the schema."}';
     expect(extractJsonObjectString(`Here is output:\n\`\`\`json\n${inner}\n\`\`\``)).toBe(inner);
   });
 
@@ -17,7 +18,8 @@ describe("extractJsonObjectString", () => {
   });
 
   it("extracts JSON from prose before a fenced block via brace slicing", () => {
-    const inner = '{"topics":["E"],"summary":"Brace slice summary that is long enough for validation."}';
+    const inner =
+      '{"topics":["E"],"summary":"Brace slice summary that is long enough for validation."}';
     expect(extractJsonObjectString(`Intro text\n${inner}\nDone.`)).toBe(inner);
   });
 });

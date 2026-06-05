@@ -146,7 +146,9 @@ export function extractJsonObjectString(text: string): string | null {
 }
 
 /** Prefer JSON in `content`; only use `reasoning` when it contains a parseable JSON object. */
-export function togetherStructuredJsonPayload(choice: TogetherCompletionChoice | undefined): string {
+export function togetherStructuredJsonPayload(
+  choice: TogetherCompletionChoice | undefined
+): string {
   if (!choice) return "";
 
   const msg = choice.message;
@@ -197,7 +199,10 @@ function togetherChoiceAssistantText(choice: TogetherCompletionChoice | undefine
   return "";
 }
 
-function logEmptyTogetherAssistant(model: string, choice: TogetherCompletionChoice | undefined): void {
+function logEmptyTogetherAssistant(
+  model: string,
+  choice: TogetherCompletionChoice | undefined
+): void {
   const msg = choice?.message;
   console.warn("[Together LLM] empty assistant text", {
     model,

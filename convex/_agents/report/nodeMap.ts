@@ -5,7 +5,7 @@ import { sanitizeUserInput } from "./inputValidation.js";
 import { invokeWithRetry, invokeWithTimeout } from "./invokeHelpers.js";
 import { MAP_PROMPTS, MAP_STRUCTURED_SYSTEM_PROMPT } from "./prompts.js";
 import type { ChunkProcessState, OverallStateType } from "./state.js";
-import { type MapOutput, invokeMapStructuredOutput } from "./structuredLlm.js";
+import { invokeMapStructuredOutput, type MapOutput } from "./structuredLlm.js";
 
 export async function mapProcess(
   state: ChunkProcessState,
