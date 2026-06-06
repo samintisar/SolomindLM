@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getIntentLandingPaths } from "@/features/landing/intentLandingPages";
 import { getPublicSeoPageByPath } from "./publicSeoPages";
+import { SEO_BASE_URL } from "./seoConstants";
 import { applySeoToHtml, canonicalUrl, seoPageToHeadInput } from "./seoHtml";
 
 const MINIMAL_HTML = `<!doctype html>
@@ -15,13 +16,11 @@ const MINIMAL_HTML = `<!doctype html>
 
 describe("canonicalUrl", () => {
   it("normalizes root path", () => {
-    expect(canonicalUrl("https://solomindlm.com", "/")).toBe("https://solomindlm.com/");
+    expect(canonicalUrl(SEO_BASE_URL, "/")).toBe(`${SEO_BASE_URL}/`);
   });
 
   it("joins nested paths", () => {
-    expect(canonicalUrl("https://solomindlm.com", "/privacy")).toBe(
-      "https://solomindlm.com/privacy"
-    );
+    expect(canonicalUrl(SEO_BASE_URL, "/privacy")).toBe(`${SEO_BASE_URL}/privacy`);
   });
 });
 
@@ -30,10 +29,10 @@ describe("applySeoToHtml", () => {
     const page = getPublicSeoPageByPath("/privacy");
     expect(page).toBeDefined();
 
-    const html = applySeoToHtml(MINIMAL_HTML, "https://solomindlm.com", seoPageToHeadInput(page!));
+    const html = applySeoToHtml(MINIMAL_HTML, SEO_BASE_URL, seoPageToHeadInput(page!));
 
     expect(html).toContain("<title>Privacy Policy - SolomindLM</title>");
-    expect(html).toContain('rel="canonical" href="https://solomindlm.com/privacy"');
+    expect(html).toContain(`rel="canonical" href="${SEO_BASE_URL}/privacy"`);
     expect(html).toContain('name="robots" content="index, follow"');
   });
 
@@ -41,7 +40,7 @@ describe("applySeoToHtml", () => {
     const page = getPublicSeoPageByPath("/");
     expect(page).toBeDefined();
 
-    const html = applySeoToHtml(MINIMAL_HTML, "https://solomindlm.com", seoPageToHeadInput(page!));
+    const html = applySeoToHtml(MINIMAL_HTML, SEO_BASE_URL, seoPageToHeadInput(page!));
 
     expect(html).toContain('type="application/ld+json"');
     expect(html).toContain('"@type":"FAQPage"');

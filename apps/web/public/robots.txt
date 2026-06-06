@@ -17,4 +17,4 @@ Disallow: /auth/
 Disallow: /api/
 
 # Sitemap reference
-Sitemap: https://solomindlm.com/sitemap.xml
+Sitemap: https://www.solomindlm.com/sitemap.xml

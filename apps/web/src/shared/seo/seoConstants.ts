@@ -1,4 +1,4 @@
-export const SEO_BASE_URL = "https://solomindlm.com";
+export const SEO_BASE_URL = "https://www.solomindlm.com";
 
 export const SEO_DEFAULT_TITLE = "SolomindLM - AI Research Tool & Learning Partner";
 
