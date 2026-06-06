@@ -27,6 +27,9 @@ import { CustomizeWrittenQuestionsModal } from "@/features/studio/components/Cus
 import { ToolGrid } from "@/features/studio/components/ToolGrid";
 import { STUDIO_TOOLS } from "@/shared/constants";
 
+/** Landing preview only — studio modals are visual; generation is not wired here. */
+const previewNoop = () => undefined;
+
 type HeroMode = "chat" | "studio";
 
 type DemoComposerMode = "chat" | "deepResearch" | "literatureReview";
@@ -251,7 +254,11 @@ export function LandingHeroMockup({
                           {s.title}
                         </h4>
                         <p className="mt-0.5 truncate font-sans text-[10px] leading-snug text-muted-foreground sm:text-[11px]">
-                          <span className={s.type === "YOUTUBE" ? "tracking-wide" : "uppercase tracking-wide"}>
+                          <span
+                            className={
+                              s.type === "YOUTUBE" ? "tracking-wide" : "uppercase tracking-wide"
+                            }
+                          >
                             {typeLabel}
                           </span>
                           <span> • {s.date}</span>
@@ -354,7 +361,9 @@ export function LandingHeroMockup({
                                 />
                               </span>
                             ) : null}
-                            <span className={step.done ? "" : "text-foreground/80"}>{step.label}</span>
+                            <span className={step.done ? "" : "text-foreground/80"}>
+                              {step.label}
+                            </span>
                           </div>
                         );
                       })}
@@ -500,49 +509,49 @@ export function LandingHeroMockup({
         embedded
         isOpen={studioModal === "reports"}
         onClose={closeStudioModal}
-        onSelectFormat={() => {}}
+        onSelectFormat={previewNoop}
       />
 
       <CustomizeFlashcardsModal
         embedded
         isOpen={studioModal === "flashcards"}
         onClose={closeStudioModal}
-        onGenerate={() => {}}
+        onGenerate={previewNoop}
       />
 
       <CustomizeQuizModal
         embedded
         isOpen={studioModal === "quiz"}
         onClose={closeStudioModal}
-        onGenerate={() => {}}
+        onGenerate={previewNoop}
       />
 
       <CustomizeAudioModal
         embedded
         isOpen={studioModal === "audio"}
         onClose={closeStudioModal}
-        onGenerate={() => {}}
+        onGenerate={previewNoop}
       />
 
       <CustomizeWrittenQuestionsModal
         embedded
         isOpen={studioModal === "writtenQuestions"}
         onClose={closeStudioModal}
-        onGenerate={() => {}}
+        onGenerate={previewNoop}
       />
 
       <CustomizeInfographicModal
         embedded
         isOpen={studioModal === "infographic"}
         onClose={closeStudioModal}
-        onGenerate={() => {}}
+        onGenerate={previewNoop}
       />
 
       <CustomizeSpreadsheetsModal
         embedded
         isOpen={studioModal === "spreadsheets"}
         onClose={closeStudioModal}
-        onGenerate={() => {}}
+        onGenerate={previewNoop}
       />
     </div>
   );

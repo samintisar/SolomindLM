@@ -21,9 +21,7 @@ const templateHtml = fs.readFileSync(indexPath, "utf-8");
 for (const page of getIndexablePublicSeoPages()) {
   const html = applySeoToHtml(templateHtml, SEO_BASE_URL, seoPageToHeadInput(page));
   const outPath =
-    page.path === "/"
-      ? indexPath
-      : path.join(distDir, page.path.slice(1), "index.html");
+    page.path === "/" ? indexPath : path.join(distDir, page.path.slice(1), "index.html");
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, html, "utf-8");

@@ -1,10 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import {
-  type AuthFormInitialMode,
-  AuthFormPanel,
-} from "@/features/auth/components/AuthFormPanel";
+import { type AuthFormInitialMode, AuthFormPanel } from "@/features/auth/components/AuthFormPanel";
 
 interface AuthModalProps {
   isOpen: boolean;

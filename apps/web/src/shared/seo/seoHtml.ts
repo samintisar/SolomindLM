@@ -1,5 +1,5 @@
-import { SEO_BASE_URL } from "./seoConstants";
 import type { PublicSeoPage } from "./publicSeoPages";
+import { SEO_BASE_URL } from "./seoConstants";
 
 export type SeoHeadInput = {
   title: string;

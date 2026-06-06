@@ -1,8 +1,4 @@
-import {
-  SEO_BASE_URL,
-  SEO_DEFAULT_DESCRIPTION,
-  SEO_DEFAULT_OG_IMAGE,
-} from "./seoConstants";
+import { SEO_BASE_URL, SEO_DEFAULT_DESCRIPTION, SEO_DEFAULT_OG_IMAGE } from "./seoConstants";
 
 export const generateFAQStructuredData = (faqs: Array<{ question: string; answer: string }>) => ({
   "@context": "https://schema.org",
