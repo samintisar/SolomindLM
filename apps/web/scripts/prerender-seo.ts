@@ -3,9 +3,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getIntentLandingPageByPath } from "../src/features/landing/intentLandingPages.ts";
+import { buildIntentLandingPrerenderBody } from "../src/shared/seo/intentLandingPrerenderHtml.ts";
 import { getIndexablePublicSeoPages } from "../src/shared/seo/publicSeoPages.ts";
 import { SEO_BASE_URL } from "../src/shared/seo/seoConstants.ts";
-import { applySeoToHtml, seoPageToHeadInput } from "../src/shared/seo/seoHtml.ts";
+import {
+  applySeoToHtml,
+  injectPrerenderBody,
+  seoPageToHeadInput,
+} from "../src/shared/seo/seoHtml.ts";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(scriptDir, "../dist");
@@ -19,7 +25,11 @@ if (!fs.existsSync(indexPath)) {
 const templateHtml = fs.readFileSync(indexPath, "utf-8");
 
 for (const page of getIndexablePublicSeoPages()) {
-  const html = applySeoToHtml(templateHtml, SEO_BASE_URL, seoPageToHeadInput(page));
+  let html = applySeoToHtml(templateHtml, SEO_BASE_URL, seoPageToHeadInput(page));
+  const intentPage = getIntentLandingPageByPath(page.path);
+  if (intentPage) {
+    html = injectPrerenderBody(html, buildIntentLandingPrerenderBody(intentPage));
+  }
   const outPath =
     page.path === "/" ? indexPath : path.join(distDir, page.path.slice(1), "index.html");
 

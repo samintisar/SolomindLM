@@ -4,6 +4,14 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "installCommand": "cd ../.. && bun install --frozen-lockfile",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "solomindlm.com" }],
+      "destination": "https://www.solomindlm.com/:path*",
+      "permanent": true
+    }
+  ],
   "routes": [
     { "handle": "filesystem" },
     {

@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { getIntentLandingPaths } from "@/features/landing/intentLandingPages";
+import {
+  getIntentLandingPageByPath,
+  getIntentLandingPaths,
+} from "@/features/landing/intentLandingPages";
+import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { getPublicSeoPageByPath } from "./publicSeoPages";
 import { SEO_BASE_URL } from "./seoConstants";
-import { applySeoToHtml, canonicalUrl, seoPageToHeadInput } from "./seoHtml";
+import {
+  applySeoToHtml,
+  canonicalUrl,
+  injectPrerenderBody,
+  seoPageToHeadInput,
+} from "./seoHtml";
 
 const MINIMAL_HTML = `<!doctype html>
 <html lang="en">
@@ -53,5 +62,28 @@ describe("intent landing SEO registry", () => {
     for (const path of getIntentLandingPaths()) {
       expect(getPublicSeoPageByPath(path)).toBeDefined();
     }
+  });
+});
+
+describe("injectPrerenderBody", () => {
+  it("injects static article HTML inside #root", () => {
+    const intentPage = getIntentLandingPageByPath("/students/ai-flashcards");
+    expect(intentPage).toBeDefined();
+
+    const bodyHtml = buildIntentLandingPrerenderBody(intentPage!);
+    const html = injectPrerenderBody(MINIMAL_HTML, bodyHtml);
+
+    expect(html).toContain('data-seo-prerender="true"');
+    expect(html).toContain(`<h1>${intentPage!.h1}</h1>`);
+    expect(html).toContain(intentPage!.faqs[0]!.answer);
+    expect(html).not.toMatch(/<div id="root"><\/div>/);
+  });
+
+  it("escapes HTML in intent page copy", () => {
+    const intentPage = getIntentLandingPageByPath("/students/ai-flashcards");
+    expect(intentPage).toBeDefined();
+
+    const bodyHtml = buildIntentLandingPrerenderBody(intentPage!);
+    expect(bodyHtml).not.toContain("<script");
   });
 });

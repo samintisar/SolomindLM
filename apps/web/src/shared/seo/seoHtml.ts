@@ -36,7 +36,7 @@ export function seoPageToHeadInput(page: PublicSeoPage): SeoHeadInput {
   };
 }
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -141,4 +141,14 @@ export function applySeoToHtml(
   }
 
   return out;
+}
+
+const ROOT_DIV_PATTERN = /<div id="root">\s*<\/div>/;
+
+/** Inject static crawlable content inside #root before React hydrates. */
+export function injectPrerenderBody(html: string, bodyHtml: string): string {
+  if (!ROOT_DIV_PATTERN.test(html)) {
+    throw new Error("injectPrerenderBody: expected <div id=\"root\"></div> in HTML template");
+  }
+  return html.replace(ROOT_DIV_PATTERN, `<div id="root">\n${bodyHtml}\n    </div>`);
 }
