@@ -49,6 +49,7 @@ describe("applySeoToHtml", () => {
     expect(html).toContain('type="application/ld+json"');
     expect(html).toContain('"@type":"FAQPage"');
     expect(html).not.toContain("SearchAction");
+    expect((html.match(/"@type":"FAQPage"/g) ?? []).length).toBe(1);
   });
 });
 

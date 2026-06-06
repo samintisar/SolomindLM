@@ -117,10 +117,17 @@ function setLinkTag(rel: string, href: string): void {
 
 const structuredDataScripts: HTMLScriptElement[] = [];
 
-function setStructuredData(data: Record<string, unknown> | Record<string, unknown>[]): void {
-  structuredDataScripts.splice(0, structuredDataScripts.length).forEach((script) => {
-    if (script.parentNode) script.parentNode.removeChild(script);
+function removeJsonLdScripts(): void {
+  document.querySelectorAll('script[type="application/ld+json"]').forEach((script) => {
+    script.remove();
   });
+}
+
+function setStructuredData(data: Record<string, unknown> | Record<string, unknown>[]): void {
+  // Prerendered pages ship JSON-LD in index.html; replace it instead of appending a second copy.
+  removeJsonLdScripts();
+  structuredDataScripts.length = 0;
+
   const items = Array.isArray(data) ? data : [data];
   items.forEach((item) => {
     const script = document.createElement("script");
