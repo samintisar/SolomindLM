@@ -110,11 +110,13 @@ bun run format                 # Biome format write
 bun run format:check           # Biome format check
 ```
 
-**Convex env push:**
+**Convex env sync:**
 
 ```bash
-bun run convex:env:push        # Push .env to convex dev
-bun run convex:env:push:prod   # Push to prod
+bun run convex:env:pull:dev    # Pull Convex dev → .env.local
+bun run convex:env:pull:prod   # Pull Convex prod → .env
+bun run convex:env:push        # Push .env.local → Convex dev
+bun run convex:env:push:prod   # Push .env → Convex prod
 bun run convex:env:push:dry    # Dry run
 ```
 
@@ -126,34 +128,34 @@ bun run convex:env:push:dry    # Dry run
 
 Bun workspaces monorepo:
 
-- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4 + Radix; React Router 7, Mind Elixir 5, react-flip-toolkit, react-markdown + KaTeX, DOMPurify, Stripe SDK
-- `apps/mobile/` — Expo 55 + React Native 0.83 (separate mobile app, not all web features ported)
+- `apps/web/` — React 19.2 + Vite 7 + TS + Tailwind 4; React Router 7, Mind Elixir 5, Streamdown + KaTeX, DOMPurify, Stripe SDK
+- `apps/mobile/` — Expo 55 + React Native 0.83 WebView shell (loads web routes; native auth, file upload, push notifications)
 - `convex/` — Convex backend (auth, schema, functions, agents)
 
-**Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/`, `billing/`, `chat/`, `landing/`, `legal/`, `notebooks/`, `sources/`, `studio/` (with `studio/components/views/` per content type — ReportView, FlashcardView, QuizView, etc.).
+**Web feature layout** (`apps/web/src/features/`): `audio/`, `auth/` (incl. output language), `billing/`, `chat/` (RAG, deep research, literature review, @mentions), `landing/`, `legal/`, `notebooks/`, `onboarding/`, `sources/` (paper import, academic discovery), `studio/` (`components/views/` — ReportView, FlashcardView, QuizView, MindMapView, InfographicView, LiteratureTableView, etc.).
 
 **Path aliases** (`tsconfig.json`): `@/*` → `./src/*`, `@convex/*` → `../../convex/*`.
 
-**Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workpool`.
+**Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workflow`.
 
-**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1536-dim vectors), `reports`, `audioOverviews`, `flashcards`, `quizzes`, `slides`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `stripeSubscriptions`, `stripePaymentHistory`, `cacheVersions`, `cacheMetrics`.
+**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1024-dim vectors, `intfloat/multilingual-e5-large-instruct`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripePaymentHistory`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
 
 **Convex directory layout** (`_` prefix = excluded from generated API):
 
-- `_agents/` — LangGraph agents per type (`chat/`, `report/`, `flashcard/`, …); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization
+- `_agents/` — LangGraph agents (`chat/`, `report/`, `flashcard/`, `quiz/`, `mindmap/`, `spreadsheet/`, `written_questions/`, `audio_overview/`, `research/`, `literature_review/`); `_agents/_shared/` for LLM factory, retry, timeout, validation, sanitization
 - `_lib/` — errors, limits, env helpers
 - `_model/` — data models
 - `_services/` — `ai/`, `search/`, `extraction/`, `processing/`, `grading/`, `cache/`
-- `auth/`, `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/` — domain functions
-- `studio/` — content generation per type
+- `notebooks/`, `folders/`, `documents/`, `chat/`, `notes/`, `billing/`, `literatureReview/`, `research/`, `onboarding/`, `push/`, `userPreferences/` — domain functions
+- `studio/` — content generation per type (audio, flashcards, infographic, literature_tables, mindmaps, quizzes, reports, spreadsheets, writtenQuestions)
 - `storage/` — vector store, chat history
-- root `*.ts` — schema, auth config, http actions
+- root `auth.ts`, `schema.ts`, `http.ts` — auth config (must be at root), schema, HTTP actions
 
 **AI services:** LLMs `openai/gpt-oss-120b` (smart) / `openai/gpt-oss-20b` (fast). Embeddings via LangChain (Together AI compatible). Reranking: ZeroEntropy. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
 
 **Pipelines:**
 
-- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1536-dim) → ZeroEntropy rerank
+- _Content:_ ingestion → Convex storage → extraction (Mistral OCR / Supadata transcripts) → smart per-type splitting → embed (1024-dim) → ZeroEntropy rerank
 - _Generation:_ user request → mutation schedules job via `ctx.scheduler.runAfter()` (no jobs table) → LangChain agent + RAG → persistent text streaming → delivery
 
 ---
@@ -168,7 +170,7 @@ Bun workspaces monorepo:
 
 ## Environment
 
-Bun 1.2+ required. Required env vars: `CONVEX_DEPLOYMENT` plus AI service keys (Together AI, OpenAI, Mistral, Tavily, Supadata, ZeroEntropy, …).
+Bun 1.2+ required. Required env vars: `CONVEX_DEPLOYMENT` plus AI service keys (Together AI, Mistral, Tavily, Supadata, ZeroEntropy, …). Dev backend env lives in `.env.local`; prod in `.env`.
 
 **Dev vs prod Convex URLs differ.** Local `apps/web/.env.local` uses dev URL; production hosting (Vercel) uses prod URL.
 
@@ -190,15 +192,15 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
 
 ## Gotchas
 
-- **`_` prefix excludes from API.** Functions in `convex/domain/index.ts` become `api.domain.index.*`.
+- **`_` prefix excludes from API.** Functions in `convex/notebooks/index.ts` become `api.notebooks.index.*` (no `convex/domain/` module).
 - **Auth file location.** `@convex-dev/auth` requires `convex/auth.ts` at root, not in a subdirectory.
 - **Vite cache after API path changes:** `rm -rf apps/web/node_modules/.vite` and hard-refresh (Ctrl+Shift+R).
 - **Validation gates** (in order):
   1. `bun run typecheck:web` + `typecheck:convex` — always
-  2. `bun run test:convex` — vitest + `convex-test`, ~332 tests, <2s. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
+  2. `bun run test:convex` — vitest + `convex-test`, ~990+ tests. Run on any change in `convex/_lib/`, `convex/_model/`, `convex/_agents/_shared/`, or new queries/mutations
   3. `bun run test:web` — vitest for web utilities
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
-  5. `bun run eval:rag --case=… / --runner=…` — agent or prompt changes (do NOT unit-test prompt outputs)
+  5. `bun run eval:rag --case=… / --runner=…` or `eval:studio` / `eval:literature-review` — agent or prompt changes (do NOT unit-test prompt outputs)
 - **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves.
 - **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
 - **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.

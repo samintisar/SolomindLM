@@ -37,7 +37,7 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 - **All-in-one research workspace** — Collect sources, chat with them, and generate content in one place
 - **Multi-source ingestion** — PDFs, images, audio, web pages, YouTube videos, social media posts
 - **RAG-powered chat** — Ask questions and get answers with citations from your sources
-- **Automated content generation** — Turn your research into reports, flashcards, quizzes, mind maps, slides, and more
+- **Automated content generation** — Turn your research into reports, flashcards, quizzes, mind maps, infographics, and more
 
 ---
 
@@ -46,17 +46,23 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 ### Content Ingestion
 
 - **Documents** — Upload PDFs, Word docs, images, and audio files
+- **Paper import** — BibTeX, Zotero, Mendeley, and DOI-based bibliography import
+- **Academic discovery** — Search Semantic Scholar, PubMed, and arXiv from the sources UI
 - **Web scraping** — Extract content from any web page
 - **Social media** — Import transcripts from YouTube, TikTok, Instagram, and X (Twitter)
 - **Web search** — Search and add sources via Tavily
 - **Google Drive** — Import files directly from Google Drive
+- **Source guide** — AI-generated overview of ingested source material
 
 ### RAG Chat
 
 - **Streaming conversations** — Real-time AI responses with smooth streaming
 - **Citations** — Every answer includes references to source materials
-- **Deep research mode** — Iterative sub-question exploration for thorough research
+- **Source @mentions** — Reference specific documents in chat prompts
+- **Deep research** — Multi-step research plans with evidence gathering and synthesis
+- **Literature review** — Systematic screening, ranking, and synthesis of academic papers
 - **External search** — Augment responses with web, academic, and news search
+- **Voice input** — Speech-to-text for chat messages
 
 ### Content Generation (Studio)
 
@@ -64,16 +70,21 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 - **Flashcards** — Study cards with questions and answers
 - **Quizzes** — Multiple-choice and open-ended questions
 - **Mind maps** — Visual knowledge maps
+- **Infographics** — Visual summaries generated via Together AI image models
 - **Audio overviews** — Podcast-style summaries via text-to-speech
-- **Slide decks** — Presentation slides
 - **Spreadsheets** — Structured data tables
 - **Written questions** — Short answer and essay prompts
+- **Literature tables & reports** — Structured outputs from literature review workflows
+- **Prompt library** — Curated, community-rated studio prompts (see [PROMPT_LIBRARY.md](PROMPT_LIBRARY.md))
 
 ### Organization
 
 - **Notebooks** — Organize research into projects
 - **Folders** — Group notebooks hierarchically
-- **Sharing** — Collaborate via share links or fork-only links
+- **Notes** — Saved chat excerpts and manual notes per notebook
+- **Sharing** — Collaborate via share links, members, or fork-only links
+- **Onboarding** — Guided first-run experience for new users
+- **Output language** — Per-user preference for generated content language
 - **History** — Persistent chat history and generated content
 
 ---
@@ -109,11 +120,11 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
           │
           └────────┬────────┬────────┬────────┬────────┐
                    │        │        │        │        │
-┌──────────────────▼──┐ ┌───▼───┐ ┌──▼───┐ ┌─▼────┐ ┌─▼────────┐
-│    Together AI      │ │Tavily │ │Mistral│ │Stripe│ │  OpenAI  │
-│ (LLMs, Embeddings,  │ │Search │ │ OCR   │ │Billing│ │ (Images  │
-│      TTS)           │ │       │ │       │ │       │ │  only)   │
-└─────────────────────┘ └───────┘ └───────┘ └──────┘ └──────────┘
+┌──────────────────▼──┐ ┌───▼───┐ ┌──▼───┐ ┌─▼────┐
+│    Together AI      │ │Tavily │ │Mistral│ │Stripe│
+│ (LLMs, Embeddings,  │ │Search │ │ OCR   │ │Billing│
+│  TTS, Images)       │ │       │ │       │ │       │
+└─────────────────────┘ └───────┘ └───────┘ └──────┘
 ┌──────────────────┐  ┌──────────┐  ┌──────────────────────┐
 │   Supadata       │  │ZeroEntropy│  │      Resend          │
 │ (Extraction)     │  │(Reranking)│  │    (Email OTP)       │
@@ -132,8 +143,8 @@ SolomindLM is an open-source AI research platform that helps you ingest content 
 
 | Layer          | Technology                                                |
 | -------------- | --------------------------------------------------------- |
-| **Frontend**   | React 19, Vite 7, TypeScript 5.9, TailwindCSS 4, Radix UI |
-| **Mobile**     | Expo 55, React Native 0.83                                |
+| **Frontend**   | React 19, Vite 7, TypeScript 5.9, TailwindCSS 4, Streamdown + KaTeX |
+| **Mobile**     | Expo 55, React Native 0.83 (WebView shell + native auth/push) |
 | **Backend**    | Convex 1.36, TypeScript                                   |
 | **AI/ML**      | LangChain, LangGraph, Together AI                         |
 | **Auth**       | @convex-dev/auth (Google OAuth + Password/OTP)            |
@@ -199,11 +210,12 @@ bun x convex dev
 **Backend (Convex):**
 
 ```bash
-# Copy the example environment file
-cp .env.example .env
+# Copy the example environment file (dev uses .env.local)
+cp .env.example .env.local
 
-# Edit .env and add your API keys
+# Edit .env.local and add your API keys
 # See Environment Variables section below for details
+# Pull from Convex: bun run convex:env:pull:dev
 ```
 
 **Frontend (Web):**
@@ -256,7 +268,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### Required Variables
 
-Create a `.env` file in the project root. See `.env.example` for the template.
+Create `.env.local` in the project root for dev (prod uses `.env`). See `.env.example` for the template. Use `bun run convex:env:pull:dev` to sync from your Convex dev deployment.
 
 #### Convex (Required)
 
@@ -285,6 +297,7 @@ Create a `.env` file in the project root. See `.env.example` for the template.
 | `MISTRAL_API_KEY`     | Mistral OCR API key           | [Mistral](https://mistral.ai)           |
 | `SUPADATA_API_KEY`    | Supadata extraction API key   | [Supadata](https://supadata.ai)         |
 | `ZEROENTROPY_API_KEY`     | ZeroEntropy reranking API key | [ZeroEntropy](https://zeroentropy.dev)  |
+| `ZEROENTROPY_RERANK_MODEL`| Rerank model (default `zerank-2`) | ZeroEntropy dashboard              |
 | `SEMANTIC_SCHOLAR_API_KEY`| Semantic Scholar (optional)   | [Semantic Scholar](https://www.semanticscholar.org/product/api) |
 | `PUBMED_EMAIL`            | PubMed API contact (optional) | Your team email                           |
 
@@ -329,7 +342,6 @@ REPORT_LLM=MiniMaxAI/MiniMax-M2.7
 FLASHCARDS_LLM=MiniMaxAI/MiniMax-M2.7
 QUIZ_LLM=MiniMaxAI/MiniMax-M2.7
 MINDMAP_LLM=MiniMaxAI/MiniMax-M2.7
-SLIDES_LLM=openai/gpt-oss-120b
 SPREADSHEET_LLM=MiniMaxAI/MiniMax-M2.7
 WRITTEN_QUESTIONS_LLM=MiniMaxAI/MiniMax-M2.7
 AUDIO_LLM=MiniMaxAI/MiniMax-M2.7
@@ -372,15 +384,19 @@ SolomindLM/
 │   ├── web/                    # React frontend
 │   │   ├── src/
 │   │   │   ├── features/       # Domain modules
-│   │   │   │   ├── auth/       # Authentication
-│   │   │   │   ├── chat/       # RAG chat interface
+│   │   │   │   ├── auth/       # Authentication + output language
+│   │   │   │   ├── audio/      # Audio playback utilities
+│   │   │   │   ├── billing/    # Subscription management
+│   │   │   │   ├── chat/       # RAG chat, deep research, literature review
+│   │   │   │   ├── landing/    # Marketing pages
+│   │   │   │   ├── legal/      # Terms, privacy
 │   │   │   │   ├── notebooks/  # Notebook management
-│   │   │   │   ├── sources/    # Content ingestion
-│   │   │   │   ├── studio/     # Content generation
-│   │   │   │   └── billing/    # Subscription management
+│   │   │   │   ├── onboarding/ # First-run onboarding
+│   │   │   │   ├── sources/    # Content ingestion + paper import
+│   │   │   │   └── studio/     # Content generation views
 │   │   │   └── shared/         # UI components, hooks, utils
 │   │   └── public/             # Static assets
-│   └── mobile/                 # Expo mobile app
+│   └── mobile/                 # Expo WebView shell (native auth, push)
 │       └── app/                # File-based routing
 ├── convex/                     # Convex backend
 │   ├── _agents/                # LangGraph agents
@@ -390,11 +406,11 @@ SolomindLM/
 │   │   ├── flashcard/          # Flashcard generation
 │   │   ├── quiz/               # Quiz generation
 │   │   ├── mindmap/            # Mind map generation
-│   │   ├── slides/             # Slide deck generation
 │   │   ├── spreadsheet/        # Spreadsheet generation
 │   │   ├── written_questions/  # Written question generation
 │   │   ├── audio_overview/     # Audio overview generation
-│   │   └── research/           # Deep research agent
+│   │   ├── research/           # Deep research agent
+│   │   └── literature_review/  # Literature review agent
 │   ├── _lib/                   # Utilities, errors, logging
 │   ├── _model/                 # Data models
 │   ├── _services/              # External integrations
@@ -404,12 +420,24 @@ SolomindLM/
 │   │   ├── processing/         # Document processing
 │   │   ├── grading/            # Content grading
 │   │   └── cache/              # Caching logic
-│   ├── auth.ts                 # Auth configuration
+│   ├── auth.ts                 # Auth configuration (must be at root)
+│   ├── chat/                   # Conversations, messages, voice
+│   ├── documents/              # Ingestion, chunks, bibliography
+│   ├── literatureReview/       # Literature review workflows
+│   ├── notebooks/              # Notebooks, sharing, fork
+│   ├── notes/                  # Saved chats + manual notes
+│   ├── onboarding/             # User onboarding state
+│   ├── push/                   # Mobile push tokens
+│   ├── research/               # Deep research plans/runs
 │   ├── schema.ts               # Database schema
-│   └── *.ts                    # Domain functions
+│   ├── studio/                 # Generation jobs per content type
+│   ├── storage/                # Vector store, chat history
+│   └── userPreferences/        # Output language, etc.
+├── docs/superpowers/           # Internal design specs (not user docs)
 ├── e2e/                        # Playwright E2E tests
-├── evals/                      # RAG evaluation suite
-└── docs/                       # Documentation
+├── evals/                      # RAG + studio eval suite (rag/, ragas/)
+├── flowcharts/                 # LangGraph flow diagrams
+└── PROMPT_LIBRARY.md           # Curated studio prompt seeds
 ```
 
 ### Available Scripts
@@ -439,10 +467,21 @@ bun run test:convex      # Run Convex unit tests
 bun run test:web         # Run web unit tests
 bun run test:e2e         # Run Playwright E2E tests
 
-# Convex
-bun run convex:env:push        # Push env vars to Convex dev
-bun run convex:env:push:prod   # Push env vars to Convex prod
+# Convex env sync
+bun run convex:env:pull        # Pull Convex env → local files
+bun run convex:env:pull:dev    # Dev only → .env.local
+bun run convex:env:pull:prod   # Prod only → .env
+bun run convex:env:push        # Push .env.local → Convex dev
+bun run convex:env:push:prod   # Push .env → Convex prod
 bun run convex:env:push:dry    # Dry run env push
+
+# Agent tooling
+bun run link:claude-skills     # Symlink .agents/skills → .claude/skills
+
+# E2E cleanup (Convex test data)
+bun run e2e:convex:cleanup
+bun run e2e:convex:cleanup-folders
+bun run e2e:convex:cleanup-notebooks
 ```
 
 **Web app:**
@@ -469,10 +508,12 @@ bun run test:coverage    # Run tests with coverage
 
 ### Unit Tests
 
-**Convex tests** (uses vitest + convex-test):
+**Convex tests** (uses vitest + convex-test, ~990+ tests):
 
 ```bash
 bun run test:convex
+bun run test:convex:watch   # Watch mode
+bun run test:integration    # Integration tests only
 ```
 
 **Web tests** (uses vitest):
@@ -498,15 +539,29 @@ bun run test:e2e:ui
 ### RAG Evaluation
 
 ```bash
-# Bootstrap environment
+# One-shot bootstrap (dev URL + secret)
 bun run eval:rag:bootstrap-env
 
-# Run RAG evaluation
+# Full eval suite
 bun run eval:rag
 
-# Run studio evaluation
+# Scoped runs (preferred for iteration)
+bun run eval:rag -- --case=chat-basic
+bun run eval:rag -- --runner=report
+
+# Studio tools (cross-cutting)
 bun run eval:studio
+bun run eval:literature-review
+
+# Dry runs (no Convex calls)
+bun run eval:rag:dry
+bun run eval:studio:dry
+
+# Python RAGAS metrics (requires conda env)
+bun run eval:ragas
 ```
+
+See `evals/rag/env.eval.example`, `evals/rag/fixtures/`, and `evals/ragas/README.md` for setup and runner details.
 
 ---
 
@@ -524,10 +579,12 @@ bun run eval:studio
 
 The `vercel.json` in `apps/web/` handles:
 
-- Building the project
-- Deploying Convex functions
-- Routing API requests to Convex
-- SPA fallback
+- **Production:** `convex deploy` + web build (deploys backend and frontend together)
+- **Preview:** web build only (avoids overwriting prod Convex — matches CI)
+- Monorepo install from repo root (`bun install --frozen-lockfile`)
+- API proxy (`/api/*` → Convex HTTP actions)
+- SPA fallback and security headers
+- SEO prerender and sitemap generation (via web `build` script)
 
 ### Manual Deployment
 
@@ -635,17 +692,17 @@ If you want to use SolomindLM in a proprietary SaaS product without open-sourcin
 | **Proprietary SaaS**   | **Commercial License** |
 | **White-label/resale** | **Commercial License** |
 
-Contact: sami@solo-mind.com for commercial licensing inquiries.
+Contact: [samintisardev@gmail.com](mailto:samintisardev@gmail.com) for commercial licensing inquiries (see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)).
 
 ---
 
 ## Acknowledgments
 
 - Built with [Convex](https://convex.dev) for the backend
-- AI powered by [Together AI](https://together.ai) (LLMs, embeddings, TTS)
-- Slide image generation via [OpenAI](https://openai.com) GPT-Image 1.5 (optional)
+- AI powered by [Together AI](https://together.ai) (LLMs, embeddings, TTS, infographics)
 - Search powered by [Tavily](https://tavily.com)
 - OCR powered by [Mistral](https://mistral.ai)
+- Reranking powered by [ZeroEntropy](https://zeroentropy.dev)
 
 ---
 

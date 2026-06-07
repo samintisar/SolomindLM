@@ -100,45 +100,35 @@ Curated public prompts organized by studio tool.
 
 ---
 
-## Slides
+## Infographic
 
-### Investor Pitch Deck
+### Concept Overview
 
-**Description:** Clean, data-driven slides optimized for pitching to investors or stakeholders.
+**Description:** A single visual that explains the core ideas from the source material at a glance.
 
 **Prompt:**
 
-> Create an investor pitch deck. Focus on: (1) Problem and market opportunity, (2) Solution and unique value proposition, (3) Market size and traction data, (4) Business model and revenue potential, (5) Competitive landscape and moats, (6) Team and execution plan, (7) The ask and use of funds. Use data-driven visuals, minimal text, and compelling narrative flow. Each slide should advance the investment case.
+> Create an infographic that explains the core concepts from the source material. Focus on: (1) One clear central theme, (2) 4–6 supporting ideas with short labels, (3) Visual hierarchy—most important ideas largest, (4) Simple icons or metaphors where helpful, (5) Minimal text per element. Optimize for quick scanning. Avoid dense paragraphs.
 
 ---
 
-### Training & Onboarding Deck
+### Process Flow
 
-**Description:** Educational slides with clear explanations, examples, and progressive complexity.
+**Description:** Step-by-step visual of a workflow, pipeline, or causal chain.
 
 **Prompt:**
 
-> Create a training presentation deck. Structure for learning: (1) Learning objectives upfront, (2) Foundational concepts with clear definitions, (3) Step-by-step processes with visual flow, (4) Concrete examples and case studies, (5) Common pitfalls and how to avoid them, (6) Practice scenarios or discussion questions, (7) Summary and next steps. Use progressive disclosure—start simple and build complexity. Include visual diagrams where helpful.
+> Create a process-flow infographic. Show: (1) Sequential steps in logical order, (2) Decision points or branches where the source describes alternatives, (3) Inputs and outputs at key stages, (4) Dependencies between steps. Use arrows and numbered stages. Keep each step to one short phrase plus optional sub-bullet.
 
 ---
 
-### Research Conference Presentation
+### Comparison Visual
 
-**Description:** Academic-style slides with methodology, results, and implications.
-
-**Prompt:**
-
-> Create a research conference presentation. Include: (1) Title and research question, (2) Background and literature context, (3) Methodology and approach, (4) Key findings with data visualizations, (5) Analysis and interpretation, (6) Implications for theory and practice, (7) Limitations and future work, (8) Conclusions. Use academic tone. Prioritize clarity of methodology and strength of evidence.
-
----
-
-### SMB Sales Deck
-
-**Description:** Client-facing slides highlighting product value, features, and ROI for small businesses.
+**Description:** Side-by-side comparison of methods, products, or approaches.
 
 **Prompt:**
 
-> Create a sales presentation for small business clients. Focus on: (1) Client pain points and challenges, (2) How the product/service solves those challenges, (3) Key features and benefits (not just features), (4) ROI and cost savings with concrete numbers, (5) Social proof and success stories, (6) Simple pricing or package options, (7) Clear next steps and call-to-action. Keep it benefit-oriented and jargon-free. Use client-centric language.
+> Create a comparison infographic. Structure around: (1) Two to four items being compared, (2) Shared comparison dimensions (pros, cons, use cases, requirements), (3) Balanced treatment—no item favored unless the source supports it, (4) A clear takeaway or "when to use which" summary. Use columns or quadrants. Ground every claim in the source material.
 
 ---
 

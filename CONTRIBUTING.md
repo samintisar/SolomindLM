@@ -53,8 +53,8 @@ This project adheres to a code of conduct. By participating, you are expected to
    ```
 6. **Configure environment variables:**
    ```bash
-   cp .env.example .env
-   # Edit .env with your API keys
+   cp .env.example .env.local
+   # Edit .env.local with your API keys (or: bun run convex:env:pull:dev)
    bun run convex:env:push
    ```
 7. **Verify everything works:**
@@ -169,9 +169,9 @@ Before submitting a PR, ensure:
 ### React
 
 - Use functional components with hooks
-- Follow the existing feature-based organization
-- Use Radix UI primitives for accessibility
-- Style with TailwindCSS utility classes
+- Follow the existing feature-based organization under `apps/web/src/features/`
+- Style with TailwindCSS utility classes; shared primitives live in `apps/web/src/shared/components/`
+- Render markdown via Streamdown (not raw `react-markdown`)
 
 ### Convex
 
@@ -296,7 +296,10 @@ test(convex): add tests for document processing
 
 - `README.md` — Project overview and setup
 - `CONTRIBUTING.md` — This file
-- `docs/` — Architecture decisions and specs
+- `AGENTS.md` / `CLAUDE.md` — AI agent workflow and architecture reference
+- `PROMPT_LIBRARY.md` — Curated studio prompt seeds
+- `docs/superpowers/` — Internal design specs and implementation plans (not end-user docs)
+- `evals/rag/README.md`, `evals/ragas/README.md` — RAG evaluation guides
 - Code comments — Inline documentation
 
 ## Questions?

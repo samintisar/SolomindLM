@@ -1,5 +1,7 @@
 # SlideDeckGraph - Professional Slide Deck Generation
 
+> **Deprecated:** Slides were removed in favor of **Infographic** generation (Together AI `openai/gpt-image-1.5`). This document is kept for historical reference only.
+
 ## Overview
 
 The SlideDeckGraph generates complete, professional presentation slides using a Map-Reduce architecture with ZhipuAI's glm-image model for text rendering.
