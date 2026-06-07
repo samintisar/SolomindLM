@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 import {
   FEATURES_MARQUEE_ROW_1_ORDER,
   FEATURES_MARQUEE_ROW_2_ORDER,
+  getLandingFeatureColor,
   LANDING_CONTENT,
   orderLandingFeatures,
 } from "../constants";
@@ -55,40 +56,9 @@ export const FeaturesGrid: React.FC = () => {
     }
   };
 
-  const getColorForFeature = (id: string) => {
-    switch (id) {
-      case "rag":
-        return "text-violet-600";
-      case "chat":
-        return "text-sky-700";
-      case "deepResearch":
-        return "text-indigo-700";
-      case "literatureReview":
-        return "text-blue-700";
-      case "audio":
-        return "text-purple-700";
-      case "mindmap":
-        return "text-fuchsia-600";
-      case "reports":
-        return "text-amber-600";
-      case "flashcards":
-        return "text-red-700";
-      case "quiz":
-        return "text-blue-700";
-      case "infographic":
-        return "text-violet-600";
-      case "writtenQuestions":
-        return "text-green-700";
-      case "spreadsheets":
-        return "text-cyan-600";
-      default:
-        return "text-primary";
-    }
-  };
-
   const renderCard = (feature: (typeof LANDING_CONTENT.features)[0]) => {
     const Icon = getIconForFeature(feature.id);
-    const colorClass = getColorForFeature(feature.id);
+    const colorClass = getLandingFeatureColor(feature.id);
     const intentPath = FEATURE_INTENT_PATHS[feature.id];
     return (
       <div

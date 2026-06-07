@@ -5,6 +5,12 @@ import {
   type IntentLandingPageConfig,
 } from "./intentLandingPages";
 
+export type ClusterHubGuideLink = {
+  path: string;
+  label: string;
+  description: string;
+};
+
 export type ClusterHubSection = {
   title: string;
   description: string;
@@ -21,6 +27,7 @@ export type ClusterHubPageConfig = {
   subheadline: string;
   summaryBullets: string[];
   sections: ClusterHubSection[];
+  guideLinks: ClusterHubGuideLink[];
   faqs: FAQItem[];
   ctaLabel: string;
   conversionPromise: string;
@@ -67,6 +74,26 @@ export const CLUSTER_HUB_PAGES: ClusterHubPageConfig[] = [
           "writtenQuestions",
           "spreadsheets",
         ],
+      },
+    ],
+    guideLinks: [
+      {
+        path: "/students/ai-written-questions",
+        label: "Written questions with feedback",
+        description:
+          "Practice short-answer and essay responses from your course material—distinct from multiple-choice quizzes.",
+      },
+      {
+        path: "/guides/how-to-study-from-pdfs-with-ai",
+        label: "How to study from PDFs with AI",
+        description:
+          "Step-by-step workflow for turning readings and lecture slides into flashcards, quizzes, mind maps, and study guides.",
+      },
+      {
+        path: "/compare/solomindlm-vs-notebooklm",
+        label: "SolomindLM vs NotebookLM",
+        description:
+          "Fair comparison of source-grounded study tools—outputs, pricing, and which workflow fits your classes.",
       },
     ],
     faqs: [
@@ -126,6 +153,20 @@ export const CLUSTER_HUB_PAGES: ClusterHubPageConfig[] = [
         description:
           "Work with your collection through chat, literature review, deep research, and citation formatting.",
         intentKeys: ["literatureReview", "chat", "deepResearch", "citationStyles"],
+      },
+    ],
+    guideLinks: [
+      {
+        path: "/guides/how-to-do-an-ai-literature-review",
+        label: "How to do an AI literature review",
+        description:
+          "Build a paper set, chat across sources, run literature review mode, and format citations.",
+      },
+      {
+        path: "/compare/solomindlm-vs-notebooklm",
+        label: "SolomindLM vs NotebookLM",
+        description:
+          "Compare academic import, literature review, and research outputs before you choose a notebook tool.",
       },
     ],
     faqs: [

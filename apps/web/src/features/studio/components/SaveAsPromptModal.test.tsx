@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SaveAsPromptModal } from "./SaveAsPromptModal";
@@ -298,8 +298,7 @@ describe("SaveAsPromptModal", () => {
     expect(titleInput).toHaveValue(max100); // Still 100 characters
   });
 
-  it("respects max length for description", async () => {
-    const user = userEvent.setup();
+  it("respects max length for description", () => {
     render(
       <SaveAsPromptModal
         isOpen={true}
@@ -312,7 +311,7 @@ describe("SaveAsPromptModal", () => {
     const descInput = screen.getByPlaceholderText(/Briefly describe/);
     const max300 = "y".repeat(300);
 
-    await user.type(descInput, max300);
+    fireEvent.change(descInput, { target: { value: max300 } });
 
     expect(descInput).toHaveValue(max300);
     expect(screen.getByText("300/300")).toBeInTheDocument();

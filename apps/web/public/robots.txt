@@ -4,6 +4,13 @@
 User-agent: *
 Allow: /
 
+# GEO / LLM helpers — explicit allow for crawler context files
+Allow: /llms.txt
+Allow: /llms-full.txt
+# https://llmstxt.org/
+# https://www.solomindlm.com/llms.txt
+# https://www.solomindlm.com/llms-full.txt
+
 # Disallow authenticated/protected routes
 Disallow: /home
 Disallow: /billing
@@ -18,7 +25,3 @@ Disallow: /api/
 
 # Sitemap reference
 Sitemap: https://www.solomindlm.com/sitemap.xml
-
-# LLM / AI crawler context
-# https://llmstxt.org/
-# https://www.solomindlm.com/llms.txt

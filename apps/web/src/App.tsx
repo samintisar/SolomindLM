@@ -23,6 +23,8 @@ import { FaqPage } from "./features/landing/FaqPage";
 import { IntentLandingPage } from "./features/landing/IntentLandingPage";
 import { INTENT_LANDING_PAGES, isIntentLandingPath } from "./features/landing/intentLandingPages";
 import { LandingPage } from "./features/landing/LandingPage";
+import { SeoContentPage } from "./features/landing/SeoContentPage";
+import { isSeoContentPath, SEO_CONTENT_PAGES } from "./features/landing/seoContentPages";
 import { PrivacyPolicy } from "./features/legal/components/PrivacyPolicy";
 import { TermsOfService } from "./features/legal/components/TermsOfService";
 import { HomePage } from "./features/notebooks/components/HomePage";
@@ -163,7 +165,8 @@ const AppContent: React.FC = () => {
     location.pathname === "/sign-in" ||
     location.pathname === "/faq" ||
     isIntentLandingPath(location.pathname) ||
-    isClusterHubPath(location.pathname);
+    isClusterHubPath(location.pathname) ||
+    isSeoContentPath(location.pathname);
   const isHomePage =
     location.pathname === "/home" ||
     location.pathname === "/billing" ||
@@ -407,6 +410,14 @@ const AppContent: React.FC = () => {
                 key={page.path}
                 path={page.path}
                 element={<IntentLandingPage pagePath={page.path} />}
+              />
+            ))}
+
+            {SEO_CONTENT_PAGES.map((page) => (
+              <Route
+                key={page.path}
+                path={page.path}
+                element={<SeoContentPage pagePath={page.path} />}
               />
             ))}
 

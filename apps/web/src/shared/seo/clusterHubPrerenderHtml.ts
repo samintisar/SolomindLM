@@ -30,6 +30,23 @@ ${childLinks}
     })
     .join("\n");
 
+  const guideLinks = page.guideLinks
+    .map(
+      (link) =>
+        `          <li><a href="${escapeHtml(link.path)}">${escapeHtml(link.label)}</a>: ${escapeHtml(link.description)}</li>`
+    )
+    .join("\n");
+
+  const guideSection =
+    page.guideLinks.length > 0
+      ? `      <section aria-labelledby="seo-prerender-guides">
+        <h2 id="seo-prerender-guides">Guides and comparisons</h2>
+        <ul>
+${guideLinks}
+        </ul>
+      </section>`
+      : "";
+
   const faqItems = page.faqs
     .map(
       (faq) =>
@@ -53,6 +70,7 @@ ${summaryItems}
         <h2 id="seo-prerender-tools">Tools</h2>
 ${sectionBlocks}
       </section>
+${guideSection}
       <section aria-labelledby="seo-prerender-faq">
         <h2 id="seo-prerender-faq">Frequently asked questions</h2>
 ${faqItems}

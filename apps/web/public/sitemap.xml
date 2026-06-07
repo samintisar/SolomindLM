@@ -22,6 +22,27 @@
   </url>
 
   <url>
+    <loc>https://www.solomindlm.com/faq</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://www.solomindlm.com/students</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://www.solomindlm.com/research</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
     <loc>https://www.solomindlm.com/students/upload-sources</loc>
     <lastmod>2026-06-07</lastmod>
     <changefreq>monthly</changefreq>
@@ -138,5 +159,26 @@
     <lastmod>2026-06-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://www.solomindlm.com/compare/solomindlm-vs-notebooklm</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>

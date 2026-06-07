@@ -56,6 +56,46 @@ export type BreadcrumbItem = {
   path: string;
 };
 
+export type ArticleStructuredDataParams = {
+  headline: string;
+  description: string;
+  path: string;
+  datePublished: string;
+  dateModified: string;
+  articleType?: "Article" | "TechArticle";
+};
+
+export const generateArticleStructuredData = ({
+  headline,
+  description,
+  path,
+  datePublished,
+  dateModified,
+  articleType = "Article",
+}: ArticleStructuredDataParams) => ({
+  "@context": "https://schema.org",
+  "@type": articleType,
+  headline,
+  description,
+  url: `${SEO_BASE_URL}${path}`,
+  datePublished,
+  dateModified,
+  author: {
+    "@type": "Organization",
+    name: "SolomindLM",
+    url: SEO_BASE_URL,
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "SolomindLM",
+    logo: {
+      "@type": "ImageObject",
+      url: SEO_DEFAULT_OG_IMAGE,
+    },
+  },
+  mainEntityOfPage: `${SEO_BASE_URL}${path}`,
+});
+
 export const generateBreadcrumbStructuredData = (items: BreadcrumbItem[]) => ({
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",

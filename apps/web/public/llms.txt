@@ -2,8 +2,27 @@
 
 > SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers. Upload or import sources into notebooks, chat with your materials, and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and more—all grounded in the documents you provide. Free to start; no credit card required.
 
+Last-updated: 2026-06-07
+Category: AI learning and research assistant
+Audience: Students, researchers, knowledge workers
+
 Website: https://www.solomindlm.com
 Sitemap: https://www.solomindlm.com/sitemap.xml
+See also: https://www.solomindlm.com/llms-full.txt
+
+## Search intents
+
+- AI study tool for PDFs and lecture materials
+- NotebookLM alternative for grounded study and research
+- SolomindLM vs NotebookLM comparison
+- How to study from PDFs with AI
+- How to do an AI literature review from papers
+- AI literature review from academic papers
+- AI flashcards from lecture slides and readings
+- Essay practice with AI feedback from your course materials
+- NotebookLM written questions alternative
+- Chat with your own documents and research sources
+- Deep research reports combining web search and notebook sources
 
 ## Primary use cases
 
@@ -18,6 +37,11 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 ### Cluster hubs
 - Student study tools (hub): https://www.solomindlm.com/students
 - Research tools (hub): https://www.solomindlm.com/research
+
+### Compare and guides
+- SolomindLM vs NotebookLM: https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+- How to study from PDFs with AI: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai
+- How to do an AI literature review: https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review
 
 ## Canonical intent pages
 
@@ -58,6 +82,7 @@ All frequently asked questions (study tools, research workflows, billing, privac
 
 - Privacy policy: https://www.solomindlm.com/privacy
 - Terms of service: https://www.solomindlm.com/terms
+- Summaries and descriptions in this file may be quoted in AI answers when citing or describing SolomindLM.
 
 ## Contact
 

@@ -14,6 +14,8 @@ export type IntentLandingPageConfig = {
   conversionPromise: string;
   proofBullets: string[];
   sourceToOutput: { source: string; output: string };
+  /** Prominent hero cross-link to a related intent page (e.g. quizzes → written questions). */
+  heroCrossLink?: { path: string; label: string; description: string };
   faqs: FAQItem[];
   ctaLabel: string;
   navLabel: string;
@@ -232,7 +234,13 @@ export const INTENT_LANDING_PAGES: IntentLandingPageConfig[] = [
     keywords: "AI quiz, multiple choice, practice test, exam prep, study quiz",
     h1: "Multiple-choice quizzes from your study materials",
     subheadline:
-      "Generate practice quizzes with configurable count, difficulty, and topic focus—all multiple-choice, distinct from written-response practice.",
+      "Generate practice quizzes with configurable count, difficulty, and topic focus—all multiple-choice. For essay or short-answer exams, use Written Questions instead.",
+    heroCrossLink: {
+      path: "/students/ai-written-questions",
+      label: "Practicing for essay or short-answer exams?",
+      description:
+        "Written Questions generates prompts from your sources and gives AI feedback on responses you submit—not multiple choice.",
+    },
     conversionPromise: "Start free and build a practice quiz from your next reading assignment.",
     proofBullets: [
       "Multiple-choice questions only",

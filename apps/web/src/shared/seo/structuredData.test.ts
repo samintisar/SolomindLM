@@ -4,7 +4,15 @@ import {
   getIntentBreadcrumbItems,
   getIntentLandingPageByPath,
 } from "@/features/landing/intentLandingPages";
-import { generateBreadcrumbStructuredData, generateFAQStructuredData } from "./structuredData";
+import {
+  getSeoContentBreadcrumbItems,
+  getSeoContentPageByPath,
+} from "@/features/landing/seoContentPages";
+import {
+  generateArticleStructuredData,
+  generateBreadcrumbStructuredData,
+  generateFAQStructuredData,
+} from "./structuredData";
 
 describe("generateFAQStructuredData", () => {
   it("returns a single FAQPage with all questions in mainEntity", () => {
@@ -51,5 +59,38 @@ describe("generateBreadcrumbStructuredData", () => {
         item: "https://www.solomindlm.com/students/ai-flashcards",
       },
     ]);
+  });
+});
+
+describe("generateArticleStructuredData", () => {
+  it("returns TechArticle with canonical URL for SEO content pages", () => {
+    const page = getSeoContentPageByPath("/guides/how-to-study-from-pdfs-with-ai");
+    expect(page).toBeDefined();
+
+    const data = generateArticleStructuredData({
+      headline: page!.h1,
+      description: page!.description,
+      path: page!.path,
+      datePublished: "2026-06-07",
+      dateModified: "2026-06-07",
+      articleType: page!.articleType,
+    });
+
+    expect(data["@type"]).toBe("TechArticle");
+    expect(data.url).toBe("https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai");
+    expect(data.headline).toBe(page!.h1);
+  });
+
+  it("returns BreadcrumbList for SEO content guide pages", () => {
+    const page = getSeoContentPageByPath("/guides/how-to-do-an-ai-literature-review");
+    expect(page).toBeDefined();
+
+    const data = generateBreadcrumbStructuredData(getSeoContentBreadcrumbItems(page!));
+
+    expect(data.itemListElement).toHaveLength(3);
+    expect(data.itemListElement[1]).toMatchObject({
+      name: "Guides",
+      item: "https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai",
+    });
   });
 });

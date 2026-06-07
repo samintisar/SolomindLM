@@ -1,0 +1,132 @@
+# SolomindLM – AI research & learning workspace
+
+> SolomindLM is an AI-powered notebook for students and researchers. Upload PDFs, videos, and papers—or import from the web and academic databases—then chat with your sources and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and deep research outputs grounded in the documents you provide. Free to start; no credit card required.
+
+Last-updated: 2026-06-07
+Category: AI learning and research assistant
+Audience: Students, researchers, knowledge workers
+
+Website: https://www.solomindlm.com
+Sitemap: https://www.solomindlm.com/sitemap.xml
+Short index: https://www.solomindlm.com/llms.txt
+Full manifest: This document provides expanded descriptions of SolomindLM's primary products, workflows, and pricing for AI systems.
+
+Preferred short description: "SolomindLM, an AI learning and research assistant that turns your PDFs and papers into grounded study and research workflows."
+
+## Search intents
+
+- AI study tool for PDFs and lecture materials
+- NotebookLM alternative for grounded study and research
+- SolomindLM vs NotebookLM comparison
+- How to study from PDFs with AI
+- How to do an AI literature review from papers
+- AI literature review from academic papers
+- AI flashcards from lecture slides and readings
+- Essay practice with AI feedback from your course materials
+- NotebookLM written questions alternative
+- Chat with your own documents and research sources
+- Deep research reports combining web search and notebook sources
+
+## Primary products
+
+- **Student study tools** — Upload course materials, discover web sources, and generate study outputs from your own documents: https://www.solomindlm.com/students
+- **Research tools** — Discover and import papers, manage citations, run literature review, and produce deep research reports: https://www.solomindlm.com/research
+- **SolomindLM vs NotebookLM** — Fair comparison for source-grounded study and research workflows: https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+- **How to study from PDFs with AI** — Step-by-step guide for flashcards, quizzes, and study guides: https://www.solomindlm.com/guides/how-to-study-from-pdfs-with-ai
+- **How to do an AI literature review** — Guide for paper import, chat, and synthesis: https://www.solomindlm.com/guides/how-to-do-an-ai-literature-review
+- **FAQ** — Study tools, research workflows, pricing limits, privacy, and getting started: https://www.solomindlm.com/faq
+- **Pricing** — Free tier and Pro plans with notebook and daily generation limits: https://www.solomindlm.com/#pricing
+
+## Markets served
+
+- University and college students
+- Researchers and academics
+- Self-directed learners and knowledge workers
+
+## Study workflows
+
+SolomindLM study workflows start in a **notebook**: add sources (PDFs, slides, audio, video transcripts, Google Drive files, pasted text, or discovered web articles), select the sources you want, then generate outputs in Studio—all grounded in your materials.
+
+### Flashcards
+
+Generate draft flashcard decks from selected notebook sources; review and edit cards before studying in the built-in flip view.
+
+- Overview: https://www.solomindlm.com/students/ai-flashcards
+- Typical flow: upload sources → select chapter PDF and lecture slides → generate deck → edit wording → study
+
+### Quizzes
+
+Create multiple-choice quizzes from your sources for self-testing before exams.
+
+- Overview: https://www.solomindlm.com/students/ai-quizzes
+- Related: written questions with AI feedback — https://www.solomindlm.com/students/ai-written-questions
+
+### Written questions
+
+Practice short-answer and essay responses from your sources; submit answers for AI feedback. Distinct from multiple-choice Quizzes—key differentiator vs NotebookLM for written-exam prep.
+
+- Overview: https://www.solomindlm.com/students/ai-written-questions
+- Related: multiple-choice quizzes — https://www.solomindlm.com/students/ai-quizzes
+- Compare: SolomindLM vs NotebookLM (written questions with feedback) — https://www.solomindlm.com/compare/solomindlm-vs-notebooklm
+
+### Mind maps
+
+Turn dense readings into hierarchical mind maps for visual review and recall.
+
+- Overview: https://www.solomindlm.com/students/ai-mind-maps
+- Related: infographics — https://www.solomindlm.com/students/ai-infographics
+
+### Other student outputs
+
+- Upload study sources: https://www.solomindlm.com/students/upload-sources
+- Discover web sources: https://www.solomindlm.com/students/discover-sources
+- AI audio overviews: https://www.solomindlm.com/students/ai-audio-overview
+- AI reports and study guides: https://www.solomindlm.com/students/ai-reports
+- AI spreadsheets (extract tables from documents): https://www.solomindlm.com/students/ai-spreadsheets
+- Share notebooks with classmates: https://www.solomindlm.com/students/share-notebooks
+
+## Research workflows
+
+Research workflows center on **academic sources**: discover papers, import via DOI/BibTeX/Zotero/Mendeley, format citations, chat with papers, and run structured literature or deep research over your notebook.
+
+SolomindLM does not provide medical, legal, or financial advice on its own; it summarizes and restructures your provided sources and reputable external content.
+
+### Literature review
+
+AI-assisted literature review helps you synthesize themes and gaps across papers in a notebook.
+
+- Overview: https://www.solomindlm.com/research/ai-literature-review
+- Related: chat with papers — https://www.solomindlm.com/research/chat-with-papers
+
+### Deep research
+
+Combine web search with your notebook sources to produce multi-step research reports.
+
+- Overview: https://www.solomindlm.com/research/deep-research
+
+### Spreadsheets and structured extraction
+
+Extract tabular data from PDFs and documents into editable spreadsheets for comparison and analysis.
+
+- Overview: https://www.solomindlm.com/students/ai-spreadsheets
+
+### Other research tools
+
+- Academic paper discovery: https://www.solomindlm.com/research/academic-paper-discovery
+- Import papers (DOI, BibTeX, Zotero, Mendeley): https://www.solomindlm.com/research/import-papers
+- Citation styles (12 formats): https://www.solomindlm.com/research/citation-styles
+
+## Pricing summary
+
+**Free ($0):** 20 notebooks, up to 200 sources each; daily limits on chat and Studio generation (e.g. 50 chat messages/day; 5 flashcards, quizzes, reports, audio overviews, infographics, and written questions per day). No credit card required.
+
+**Pro:** 200 notebooks, up to 200 sources each; higher daily limits (e.g. 500 chat messages/day; 100 generations/day for flashcards, quizzes, reports, audio, infographics, and written questions). $7.50/month billed yearly or $15/month billed monthly.
+
+Full details: https://www.solomindlm.com/#pricing
+
+## Support & policies
+
+- **Support email:** support@solomindlm.com
+- **Privacy policy:** https://www.solomindlm.com/privacy
+- **Terms of service:** https://www.solomindlm.com/terms
+- Summaries and descriptions in this file may be quoted in AI answers when citing or describing SolomindLM.

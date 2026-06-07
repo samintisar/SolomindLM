@@ -4,12 +4,14 @@ import {
   getIntentLandingPageByPath,
   getIntentLandingPaths,
 } from "@/features/landing/intentLandingPages";
+import { getSeoContentPageByPath, getSeoContentPaths } from "@/features/landing/seoContentPages";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { getPublicSeoPageByPath } from "./publicSeoPages";
 import { buildHomePrerenderBody, buildLegalPrerenderBody } from "./publicSeoPrerenderHtml";
 import { SEO_BASE_URL } from "./seoConstants";
+import { buildSeoContentPrerenderBody } from "./seoContentPrerenderHtml";
 import { applySeoToHtml, canonicalUrl, injectPrerenderBody, seoPageToHeadInput } from "./seoHtml";
 
 const MINIMAL_HTML = `<!doctype html>
@@ -72,6 +74,19 @@ describe("intent landing SEO registry", () => {
     const structuredData = page!.structuredData as Record<string, unknown>[];
     expect(structuredData.some((item) => item["@type"] === "BreadcrumbList")).toBe(true);
     expect(structuredData.some((item) => item["@type"] === "FAQPage")).toBe(true);
+  });
+
+  it("registers all SEO content pages in the SEO registry with article structured data", () => {
+    for (const path of getSeoContentPaths()) {
+      const page = getPublicSeoPageByPath(path);
+      expect(page).toBeDefined();
+      expect(page!.ogType).toBe("article");
+
+      const structuredData = page!.structuredData as Record<string, unknown>[];
+      expect(structuredData.some((item) => item["@type"] === "BreadcrumbList")).toBe(true);
+      expect(structuredData.some((item) => item["@type"] === "TechArticle")).toBe(true);
+      expect(structuredData.some((item) => item["@type"] === "FAQPage")).toBe(true);
+    }
   });
 
   it("registers all cluster hub pages in the SEO registry", () => {
@@ -141,6 +156,20 @@ describe("injectPrerenderBody", () => {
     expect(html).toContain('data-seo-prerender="true"');
   });
 
+  it("injects SEO content page with comparison table for crawlers", () => {
+    const seoPage = getSeoContentPageByPath("/compare/solomindlm-vs-notebooklm");
+    expect(seoPage).toBeDefined();
+
+    const bodyHtml = buildSeoContentPrerenderBody(seoPage!);
+    const html = injectPrerenderBody(MINIMAL_HTML, bodyHtml);
+
+    expect(html).toContain(`<h1>${seoPage!.h1}</h1>`);
+    expect(html).toContain("Quick answer");
+    expect(html).toContain("<table>");
+    expect(html).toContain(seoPage!.faqs[0]!.answer);
+    expect(html).toContain('href="/guides/how-to-study-from-pdfs-with-ai"');
+  });
+
   it("injects cluster hub page with child tool links for crawlers", () => {
     const hubPage = getClusterHubPageByPath("/students");
     expect(hubPage).toBeDefined();
@@ -150,6 +179,8 @@ describe("injectPrerenderBody", () => {
 
     expect(html).toContain(`<h1>${hubPage!.h1}</h1>`);
     expect(html).toContain('href="/students/ai-flashcards"');
+    expect(html).toContain('href="/guides/how-to-study-from-pdfs-with-ai"');
+    expect(html).toContain('href="/compare/solomindlm-vs-notebooklm"');
     expect(html).toContain(hubPage!.faqs[0]!.answer);
   });
 });

@@ -12,15 +12,23 @@ const LANDING_CHAT_TOOLS = [
     id: "literatureReview",
     label: "Literature Review",
     iconName: "FileText",
-    color: "text-blue-700",
+    color: "text-orange-600",
   },
 ] as const;
 
 const LANDING_TOOLS = [
-  { id: "rag", label: "Grounded RAG System", iconName: "Brain", color: "text-violet-600" },
+  { id: "rag", label: "Grounded RAG System", iconName: "Brain", color: "text-purple-700" },
   ...LANDING_CHAT_TOOLS,
   ...STUDIO_TOOLS,
 ];
+
+const LANDING_FEATURE_COLOR_BY_ID = new Map(
+  LANDING_TOOLS.map((tool) => [tool.id, tool.color] as const)
+);
+
+export function getLandingFeatureColor(id: string): string {
+  return LANDING_FEATURE_COLOR_BY_ID.get(id) ?? "text-primary";
+}
 
 export const LANDING_CONTENT = {
   hero: {

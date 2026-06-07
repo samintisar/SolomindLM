@@ -84,6 +84,7 @@ export function ClusterHubLandingPage({ pagePath }: ClusterHubLandingPageProps) 
         </section>
 
         <HubChildPagesSection page={page} />
+        <HubGuideLinksSection page={page} />
         <HubFaqSection
           page={page}
           openFaqIndex={openFaqIndex}
@@ -178,6 +179,50 @@ function HubChildPagesSection({ page }: { page: ClusterHubPageConfig }) {
             </div>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+function HubGuideLinksSection({ page }: { page: ClusterHubPageConfig }) {
+  if (page.guideLinks.length === 0) return null;
+
+  return (
+    <section className="px-6 md:px-8 py-16 md:py-20 border-t border-border/60">
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div className="text-center max-w-2xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-3">
+            Guides and comparisons
+          </h2>
+          <p className="text-muted-foreground">
+            Practical workflows and tool comparisons to help you choose the right approach for{" "}
+            {page.cluster === "students"
+              ? "studying from your materials"
+              : "managing your reading list"}
+            .
+          </p>
+        </div>
+        <ul className="grid gap-4 sm:grid-cols-2 max-w-4xl mx-auto">
+          {page.guideLinks.map((link) => (
+            <li key={link.path}>
+              <Link
+                to={link.path}
+                className="group flex flex-col h-full rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-sm transition-all"
+              >
+                <span className="font-medium text-foreground group-hover:text-primary transition-colors">
+                  {link.label}
+                </span>
+                <span className="mt-2 text-sm text-muted-foreground leading-relaxed flex-1">
+                  {link.description}
+                </span>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                  Learn more
+                  <ChevronRight className="w-4 h-4" aria-hidden />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

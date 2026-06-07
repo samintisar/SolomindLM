@@ -1,11 +1,13 @@
 import { getClusterHubPageByPath } from "@/features/landing/clusterHubPages";
 import { LANDING_FAQS } from "@/features/landing/faqRegistry";
 import { getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
+import { getSeoContentPageByPath } from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
+import { buildSeoContentPrerenderBody } from "./seoContentPrerenderHtml";
 import { escapeHtml } from "./seoHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
@@ -78,6 +80,11 @@ export function buildPublicSeoPrerenderBody(path: string): string | undefined {
   const intentPage = getIntentLandingPageByPath(path);
   if (intentPage) {
     return buildIntentLandingPrerenderBody(intentPage);
+  }
+
+  const seoContentPage = getSeoContentPageByPath(path);
+  if (seoContentPage) {
+    return buildSeoContentPrerenderBody(seoContentPage);
   }
 
   return undefined;

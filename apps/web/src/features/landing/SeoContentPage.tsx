@@ -7,20 +7,19 @@ import { Button } from "@/shared/components/ui/button";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { isNativeShell } from "@/utils/platformDetection";
 import { Footer } from "./components/Footer";
-import {
-  getIntentBreadcrumbItems,
-  getIntentLandingPageByPath,
-  getRelatedIntentPages,
-  type IntentLandingPageConfig,
-} from "./intentLandingPages";
 import { setSignupIntent } from "./landingSignup";
+import {
+  getSeoContentBreadcrumbItems,
+  getSeoContentPageByPath,
+  type SeoContentPageConfig,
+} from "./seoContentPages";
 
-type IntentLandingPageProps = {
+type SeoContentPageProps = {
   pagePath: string;
 };
 
-export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
-  const page = getIntentLandingPageByPath(pagePath);
+export function SeoContentPage({ pagePath }: SeoContentPageProps) {
+  const page = getSeoContentPageByPath(pagePath);
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -38,7 +37,7 @@ export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
   }
 
   const openSignup = () => {
-    setSignupIntent(page.intentKey);
+    setSignupIntent(page.signupIntentKey);
     setAuthModalOpen(true);
   };
 
@@ -49,17 +48,19 @@ export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
         title={page.title}
         description={page.description}
         keywords={page.keywords}
+        ogType="article"
       />
       <div className="min-h-screen landing-grid-pattern">
-        <IntentHeader />
-        <IntentHero page={page} onSignup={openSignup} />
-        <IntentFaqSection
+        <SeoContentHeader />
+        <SeoContentHero page={page} onSignup={openSignup} />
+        <SeoContentBody page={page} />
+        <SeoContentFaqSection
           page={page}
           openFaqIndex={openFaqIndex}
           onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
         />
-        <IntentRelatedFeaturesSection page={page} />
-        <IntentFinalCta page={page} onSignup={openSignup} />
+        <SeoContentRelatedSection page={page} />
+        <SeoContentFinalCta page={page} onSignup={openSignup} />
         <Footer />
       </div>
       <AuthModal
@@ -71,7 +72,7 @@ export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
   );
 }
 
-function IntentHeader() {
+function SeoContentHeader() {
   return (
     <header className="border-b border-border/60 bg-card/40 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-[1500px] mx-auto px-6 sm:px-8 lg:px-12 h-16 flex items-center justify-between">
@@ -96,82 +97,121 @@ function IntentHeader() {
   );
 }
 
-function IntentHero({ page, onSignup }: { page: IntentLandingPageConfig; onSignup: () => void }) {
-  const breadcrumbItems = getIntentBreadcrumbItems(page);
+function SeoContentHero({ page, onSignup }: { page: SeoContentPageConfig; onSignup: () => void }) {
+  const breadcrumbItems = getSeoContentBreadcrumbItems(page);
 
   return (
-    <section className="px-6 md:px-8 pt-16 pb-20 md:pt-24 md:pb-28">
-      <div className="max-w-5xl mx-auto space-y-12">
-        <div className="max-w-3xl mx-auto text-center space-y-8">
-          <IntentBreadcrumb items={breadcrumbItems} />
-          <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-tight">
-            {page.h1}
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-            {page.subheadline}
-          </p>
-          {page.heroCrossLink ? (
-            <div className="rounded-xl border border-primary/25 bg-primary/5 p-5 text-left max-w-xl mx-auto">
-              <p className="text-sm font-semibold text-foreground mb-1">
-                {page.heroCrossLink.label}
+    <section className="px-6 md:px-8 pt-16 pb-12 md:pt-24 md:pb-16">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <SeoContentBreadcrumb items={breadcrumbItems} />
+        <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-tight text-center">
+          {page.h1}
+        </h1>
+        <p className="text-lg md:text-xl text-muted-foreground leading-relaxed text-center">
+          {page.intro}
+        </p>
+        {page.quickAnswer ? (
+          <div className="rounded-xl border border-border bg-card p-6 md:p-8 space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Quick answer
+            </p>
+            {page.quickAnswer.chooseCompetitor ? (
+              <p className="text-sm text-foreground leading-relaxed">
+                <span className="font-medium">NotebookLM:</span> {page.quickAnswer.chooseCompetitor}
               </p>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                {page.heroCrossLink.description}
-              </p>
-              <Link
-                to={page.heroCrossLink.path}
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-              >
-                Written questions with feedback
-                <ChevronRight className="w-4 h-4" aria-hidden />
-              </Link>
-            </div>
-          ) : null}
+            ) : null}
+            <p className="text-sm text-foreground leading-relaxed">
+              <span className="font-medium">SolomindLM:</span> {page.quickAnswer.chooseSolomindlm}
+            </p>
+          </div>
+        ) : null}
+        <div className="flex justify-center">
           <Button size="lg" onClick={onSignup} className="font-semibold px-8">
             {page.ctaLabel}
           </Button>
-        </div>
-
-        {page.proofBullets.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-3">
-            {page.proofBullets.map((bullet, index) => (
-              <div
-                key={bullet}
-                className="rounded-xl border border-border bg-card/80 p-6 shadow-sm"
-              >
-                <p className="text-xs font-mono text-muted-foreground mb-2">
-                  {String(index + 1).padStart(2, "0")}
-                </p>
-                <p className="text-sm text-foreground leading-relaxed">{bullet}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="rounded-xl border border-border bg-card p-6 md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-            Example workflow
-          </p>
-          <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
-            <div className="rounded-lg bg-secondary/40 p-4">
-              <p className="text-xs text-muted-foreground mb-1">Source</p>
-              <p className="text-sm font-medium text-foreground">{page.sourceToOutput.source}</p>
-            </div>
-            <p className="text-center text-muted-foreground hidden md:block" aria-hidden>
-              →
-            </p>
-            <div className="rounded-lg bg-secondary/40 p-4">
-              <p className="text-xs text-muted-foreground mb-1">Output</p>
-              <p className="text-sm font-medium text-foreground">{page.sourceToOutput.output}</p>
-            </div>
-          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function IntentBreadcrumb({ items }: { items: ReturnType<typeof getIntentBreadcrumbItems> }) {
+function SeoContentBody({ page }: { page: SeoContentPageConfig }) {
+  return (
+    <section className="px-6 md:px-8 pb-16 md:pb-20">
+      <div className="max-w-3xl mx-auto space-y-12">
+        {page.comparisonTable ? <SeoContentComparisonTable rows={page.comparisonTable} /> : null}
+        {page.sections.map((section) => (
+          <article key={section.h2} className="space-y-4">
+            <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
+              {section.h2}
+            </h2>
+            {section.paragraphs.map((paragraph) => (
+              <p key={paragraph} className="text-muted-foreground leading-relaxed">
+                {paragraph}
+              </p>
+            ))}
+            {section.bullets && section.bullets.length > 0 ? (
+              <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+                {section.bullets.map((bullet) => (
+                  <li key={bullet} className="leading-relaxed">
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SeoContentComparisonTable({
+  rows,
+}: {
+  rows: NonNullable<SeoContentPageConfig["comparisonTable"]>;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="w-full min-w-[640px] text-sm bg-card">
+        <thead>
+          <tr className="border-b border-border bg-muted">
+            <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
+              Topic
+            </th>
+            <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
+              SolomindLM
+            </th>
+            <th scope="col" className="px-4 py-3 text-left font-semibold text-foreground">
+              NotebookLM
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.topic} className="border-b border-border/60 last:border-0">
+              <th scope="row" className="px-4 py-3 text-left font-medium text-foreground align-top">
+                {row.topic}
+              </th>
+              <td className="px-4 py-3 text-muted-foreground align-top leading-relaxed">
+                {row.solomindlm}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground align-top leading-relaxed">
+                {row.competitor}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SeoContentBreadcrumb({
+  items,
+}: {
+  items: ReturnType<typeof getSeoContentBreadcrumbItems>;
+}) {
   return (
     <nav aria-label="Breadcrumb" className="flex justify-center">
       <ol className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
@@ -199,34 +239,32 @@ function IntentBreadcrumb({ items }: { items: ReturnType<typeof getIntentBreadcr
   );
 }
 
-function IntentRelatedFeaturesSection({ page }: { page: IntentLandingPageConfig }) {
-  const relatedPages = getRelatedIntentPages(page);
-  if (relatedPages.length === 0) return null;
+function SeoContentRelatedSection({ page }: { page: SeoContentPageConfig }) {
+  if (page.relatedLinks.length === 0) return null;
 
   return (
     <section className="px-6 md:px-8 py-16 md:py-20 border-t border-border/60 bg-card/30">
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-3">
-            Related features
+            Related pages
           </h2>
           <p className="text-muted-foreground">
-            Explore other {page.cluster === "students" ? "study" : "research"} workflows in
-            SolomindLM.
+            Continue with SolomindLM study and research workflows.
           </p>
         </div>
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {relatedPages.map((relatedPage) => (
-            <li key={relatedPage.path}>
+          {page.relatedLinks.map((link) => (
+            <li key={link.path}>
               <Link
-                to={relatedPage.path}
+                to={link.path}
                 className="group flex flex-col h-full rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-sm transition-all"
               >
                 <span className="font-medium text-foreground group-hover:text-primary transition-colors">
-                  {relatedPage.navLabel}
+                  {link.label}
                 </span>
                 <span className="mt-2 text-sm text-muted-foreground leading-relaxed flex-1">
-                  {relatedPage.subheadline}
+                  {link.description}
                 </span>
                 <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
                   Learn more
@@ -241,12 +279,12 @@ function IntentRelatedFeaturesSection({ page }: { page: IntentLandingPageConfig 
   );
 }
 
-function IntentFaqSection({
+function SeoContentFaqSection({
   page,
   openFaqIndex,
   onToggleFaq,
 }: {
-  page: IntentLandingPageConfig;
+  page: SeoContentPageConfig;
   openFaqIndex: number | null;
   onToggleFaq: (index: number) => void;
 }) {
@@ -293,11 +331,11 @@ function IntentFaqSection({
   );
 }
 
-function IntentFinalCta({
+function SeoContentFinalCta({
   page,
   onSignup,
 }: {
-  page: IntentLandingPageConfig;
+  page: SeoContentPageConfig;
   onSignup: () => void;
 }) {
   return (

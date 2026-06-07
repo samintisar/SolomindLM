@@ -4,6 +4,11 @@ import {
   getIntentBreadcrumbItems,
   INTENT_LANDING_PAGES,
 } from "@/features/landing/intentLandingPages";
+import {
+  getSeoContentBreadcrumbItems,
+  SEO_CONTENT_LAST_UPDATED,
+  SEO_CONTENT_PAGES,
+} from "@/features/landing/seoContentPages";
 import { LEGAL_LAST_UPDATED_ISO } from "@/features/legal/legalMeta";
 import {
   SEO_DEFAULT_DESCRIPTION,
@@ -12,6 +17,7 @@ import {
   SEO_DEFAULT_TITLE,
 } from "./seoConstants";
 import {
+  generateArticleStructuredData,
   generateBreadcrumbStructuredData,
   generateFAQStructuredData,
   generateOrganizationStructuredData,
@@ -53,6 +59,29 @@ const CLUSTER_HUB_SEO_PAGES: PublicSeoPage[] = CLUSTER_HUB_PAGES.map((page) => (
   changefreq: page.changefreq ?? "weekly",
   priority: page.priority ?? 0.9,
   structuredData: generateFAQStructuredData(page.faqs),
+}));
+
+const SEO_CONTENT_SEO_PAGES: PublicSeoPage[] = SEO_CONTENT_PAGES.map((page) => ({
+  path: page.path,
+  title: page.title,
+  description: page.description,
+  keywords: page.keywords,
+  ogType: "article",
+  changefreq: page.changefreq ?? "monthly",
+  priority: page.priority ?? 0.8,
+  lastmod: SEO_CONTENT_LAST_UPDATED,
+  structuredData: [
+    generateBreadcrumbStructuredData(getSeoContentBreadcrumbItems(page)),
+    generateArticleStructuredData({
+      headline: page.h1,
+      description: page.description,
+      path: page.path,
+      datePublished: SEO_CONTENT_LAST_UPDATED,
+      dateModified: SEO_CONTENT_LAST_UPDATED,
+      articleType: page.articleType,
+    }),
+    generateFAQStructuredData(page.faqs),
+  ],
 }));
 
 const INTENT_SEO_PAGES: PublicSeoPage[] = INTENT_LANDING_PAGES.map((page) => ({
@@ -111,6 +140,7 @@ export const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
   },
   ...CLUSTER_HUB_SEO_PAGES,
   ...INTENT_SEO_PAGES,
+  ...SEO_CONTENT_SEO_PAGES,
 ];
 
 export function getPublicSeoPageByPath(path: string): PublicSeoPage | undefined {

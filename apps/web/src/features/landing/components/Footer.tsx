@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { getIntentPagesByCluster } from "../intentLandingPages";
+import { getComparisonPages } from "../seoContentPages";
 
 const FOOTER_TAGLINE =
   "SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers—flashcards, quizzes, reports, chat, and more, starting from the material you upload.";
@@ -81,12 +82,13 @@ export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const studentPages = getIntentPagesByCluster("students");
   const researchPages = getIntentPagesByCluster("research");
+  const comparisonPages = getComparisonPages();
 
   return (
     <footer className="border-t border-border/60 bg-card/40">
       <div className="max-w-[1500px] w-full mx-auto px-6 sm:px-8 lg:px-12 pt-16 pb-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-10">
-          <div className="sm:col-span-2 lg:col-span-4">
+          <div className="sm:col-span-2 lg:col-span-3">
             <Link to="/" className="inline-flex items-center gap-2.5 mb-5">
               <img
                 src="/SolomindLM_logo.png"
@@ -141,10 +143,20 @@ export const Footer: React.FC = () => {
             </FooterLinkColumn>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <FooterLinkColumn title="For Students">
               <FooterLink to="/students">All student tools</FooterLink>
               {studentPages.map((page) => (
+                <FooterLink key={page.path} to={page.path}>
+                  {page.navLabel}
+                </FooterLink>
+              ))}
+            </FooterLinkColumn>
+          </div>
+
+          <div className="lg:col-span-2">
+            <FooterLinkColumn title="Comparisons">
+              {comparisonPages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
                   {page.navLabel}
                 </FooterLink>

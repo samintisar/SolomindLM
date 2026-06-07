@@ -42,7 +42,12 @@ ${breadcrumbNav}
       </nav>
       <header>
         <h1>${escapeHtml(page.h1)}</h1>
-        <p>${escapeHtml(page.subheadline)}</p>
+        <p>${escapeHtml(page.subheadline)}</p>${
+          page.heroCrossLink
+            ? `
+        <p><strong>${escapeHtml(page.heroCrossLink.label)}</strong> ${escapeHtml(page.heroCrossLink.description)} <a href="${escapeHtml(page.heroCrossLink.path)}">Written questions with feedback</a></p>`
+            : ""
+        }
       </header>
       <section aria-labelledby="seo-prerender-highlights">
         <h2 id="seo-prerender-highlights">Why SolomindLM</h2>
