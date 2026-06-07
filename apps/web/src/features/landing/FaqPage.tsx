@@ -62,21 +62,20 @@ export function FaqPage() {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {category.faqs.map((faq) => (
-                    <FaqAccordionItem
-                      key={faq.question}
-                      faq={faq}
-                      itemKey={`${category.id}:${faq.question}`}
-                      isOpen={openKey === `${category.id}:${faq.question}`}
-                      onToggle={() =>
-                        setOpenKey((current) =>
-                          current === `${category.id}:${faq.question}`
-                            ? null
-                            : `${category.id}:${faq.question}`
-                        )
-                      }
-                    />
-                  ))}
+                  {category.faqs.map((faq, index) => {
+                    const itemId = `faq-${category.id}-${index}`;
+                    return (
+                      <FaqAccordionItem
+                        key={faq.question}
+                        faq={faq}
+                        itemId={itemId}
+                        isOpen={openKey === itemId}
+                        onToggle={() =>
+                          setOpenKey((current) => (current === itemId ? null : itemId))
+                        }
+                      />
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -136,12 +135,12 @@ function FaqHeader() {
 
 function FaqAccordionItem({
   faq,
-  itemKey,
+  itemId,
   isOpen,
   onToggle,
 }: {
   faq: RegisteredFaq;
-  itemKey: string;
+  itemId: string;
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -152,8 +151,8 @@ function FaqAccordionItem({
         onClick={onToggle}
         className="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-secondary/30 transition-colors"
         aria-expanded={isOpen}
-        id={`${itemKey}-trigger`}
-        aria-controls={`${itemKey}-panel`}
+        id={`${itemId}-trigger`}
+        aria-controls={`${itemId}-panel`}
       >
         <span className="font-medium text-foreground">{faq.question}</span>
         {isOpen ? (
@@ -164,9 +163,9 @@ function FaqAccordionItem({
       </button>
       {isOpen ? (
         <div
-          id={`${itemKey}-panel`}
+          id={`${itemId}-panel`}
           role="region"
-          aria-labelledby={`${itemKey}-trigger`}
+          aria-labelledby={`${itemId}-trigger`}
           className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed border-t border-border/50 pt-4 space-y-3"
         >
           <p>{faq.answer}</p>
