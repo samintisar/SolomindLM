@@ -43,8 +43,8 @@ export function FaqPage() {
               Frequently asked questions
             </h1>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Everything we answer about study tools, research workflows, billing, and privacy—organized
-              by topic.
+              Everything we answer about study tools, research workflows, billing, and
+              privacy—organized by topic.
             </p>
           </div>
         </section>
@@ -88,8 +88,8 @@ export function FaqPage() {
               Ready to try SolomindLM?
             </h2>
             <p className="text-muted-foreground">
-              Create a free account, upload your first sources, and generate study or research outputs
-              in minutes.
+              Create a free account, upload your first sources, and generate study or research
+              outputs in minutes.
             </p>
             <Button size="lg" onClick={openSignup} className="font-semibold px-8">
               Create free account

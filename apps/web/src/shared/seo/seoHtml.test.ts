@@ -5,9 +5,9 @@ import {
   getIntentLandingPaths,
 } from "@/features/landing/intentLandingPages";
 import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
+import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { getPublicSeoPageByPath } from "./publicSeoPages";
-import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { buildHomePrerenderBody, buildLegalPrerenderBody } from "./publicSeoPrerenderHtml";
 import { SEO_BASE_URL } from "./seoConstants";
 import { applySeoToHtml, canonicalUrl, injectPrerenderBody, seoPageToHeadInput } from "./seoHtml";

@@ -1,6 +1,6 @@
 import {
-  resolveHubSectionPages,
   type ClusterHubPageConfig,
+  resolveHubSectionPages,
 } from "@/features/landing/clusterHubPages";
 import { escapeHtml } from "./seoHtml";
 

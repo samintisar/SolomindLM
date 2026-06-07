@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { LANDING_FAQS } from "@/features/landing/faqRegistry";
-import { getIntentBreadcrumbItems, getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
+import {
+  getIntentBreadcrumbItems,
+  getIntentLandingPageByPath,
+} from "@/features/landing/intentLandingPages";
 import { generateBreadcrumbStructuredData, generateFAQStructuredData } from "./structuredData";
 
 describe("generateFAQStructuredData", () => {

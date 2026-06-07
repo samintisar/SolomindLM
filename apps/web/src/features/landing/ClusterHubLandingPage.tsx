@@ -6,12 +6,12 @@ import { useAuth } from "@/features/auth/useAuth";
 import { Button } from "@/shared/components/ui/button";
 import { SEOMeta } from "@/shared/seo/SEOMeta";
 import { isNativeShell } from "@/utils/platformDetection";
-import { Footer } from "./components/Footer";
 import {
+  type ClusterHubPageConfig,
   getClusterHubPageByPath,
   resolveHubSectionPages,
-  type ClusterHubPageConfig,
 } from "./clusterHubPages";
+import { Footer } from "./components/Footer";
 import { setSignupIntent } from "./landingSignup";
 
 type ClusterHubLandingPageProps = {
@@ -235,13 +235,7 @@ function HubFaqSection({
   );
 }
 
-function HubFinalCta({
-  page,
-  onSignup,
-}: {
-  page: ClusterHubPageConfig;
-  onSignup: () => void;
-}) {
+function HubFinalCta({ page, onSignup }: { page: ClusterHubPageConfig; onSignup: () => void }) {
   return (
     <section className="px-6 md:px-8 py-16 md:py-20">
       <div className="max-w-2xl mx-auto text-center space-y-6">

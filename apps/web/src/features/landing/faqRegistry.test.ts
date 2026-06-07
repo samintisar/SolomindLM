@@ -62,7 +62,9 @@ describe("faqRegistry", () => {
     const categorized = getFaqCategoriesWithItems();
     const all = categorized.flatMap((cat) => cat.faqs);
     const privacyFaq = all.find((faq) => faq.question === "How is my data used and protected?");
-    const uploadLimitFaq = all.find((faq) => faq.question === "Is there a limit on how much I can upload?");
+    const uploadLimitFaq = all.find(
+      (faq) => faq.question === "Is there a limit on how much I can upload?"
+    );
 
     expect(privacyFaq?.learnMoreLabel).toBe("Read privacy policy");
     expect(privacyFaq?.learnMorePath).toBe("/privacy");
