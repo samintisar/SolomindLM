@@ -50,3 +50,19 @@ export const generateSoftwareApplicationStructuredData = () => ({
     priceCurrency: "USD",
   },
 });
+
+export type BreadcrumbItem = {
+  name: string;
+  path: string;
+};
+
+export const generateBreadcrumbStructuredData = (items: BreadcrumbItem[]) => ({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: items.map((item, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    name: item.name,
+    item: `${SEO_BASE_URL}${item.path === "/" ? "" : item.path}`,
+  })),
+});

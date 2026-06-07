@@ -17,8 +17,11 @@ import { useSubscriptionStatus } from "./features/billing/services/subscriptionA
 import { ChatStreamingProvider } from "./features/chat/ChatStreamingContext";
 import { useChatStream } from "./features/chat/hooks/useChatStream";
 import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
+import { ClusterHubLandingPage } from "./features/landing/ClusterHubLandingPage";
+import { CLUSTER_HUB_PAGES, isClusterHubPath } from "./features/landing/clusterHubPages";
 import { IntentLandingPage } from "./features/landing/IntentLandingPage";
 import { INTENT_LANDING_PAGES, isIntentLandingPath } from "./features/landing/intentLandingPages";
+import { FaqPage } from "./features/landing/FaqPage";
 import { LandingPage } from "./features/landing/LandingPage";
 import { PrivacyPolicy } from "./features/legal/components/PrivacyPolicy";
 import { TermsOfService } from "./features/legal/components/TermsOfService";
@@ -43,6 +46,7 @@ import { LiteratureTablePage } from "./features/studio/components/LiteratureTabl
 import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
 import { StudioProvider } from "./features/studio/StudioContext";
 import { ProtectedRoute } from "./shared/components/ProtectedRoute";
+import { ScrollToTop } from "./shared/components/ScrollToTop";
 import { ToastContainer } from "./shared/components/ToastContainer";
 import { ThemeProvider } from "./shared/contexts/ThemeContext";
 import { ToastProvider } from "./shared/contexts/ToastContext";
@@ -157,7 +161,9 @@ const AppContent: React.FC = () => {
     location.pathname === "/privacy" ||
     location.pathname === "/terms" ||
     location.pathname === "/sign-in" ||
-    isIntentLandingPath(location.pathname);
+    location.pathname === "/faq" ||
+    isIntentLandingPath(location.pathname) ||
+    isClusterHubPath(location.pathname);
   const isHomePage =
     location.pathname === "/home" ||
     location.pathname === "/billing" ||
@@ -386,6 +392,15 @@ const AppContent: React.FC = () => {
             <Route path="/sign-in" element={<AuthPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/faq" element={<FaqPage />} />
+
+            {CLUSTER_HUB_PAGES.map((page) => (
+              <Route
+                key={page.path}
+                path={page.path}
+                element={<ClusterHubLandingPage pagePath={page.path} />}
+              />
+            ))}
 
             {INTENT_LANDING_PAGES.map((page) => (
               <Route
@@ -478,6 +493,7 @@ const App: React.FC = () => {
       <Analytics />
       <SpeedInsights />
       <BrowserRouter>
+        <ScrollToTop />
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>

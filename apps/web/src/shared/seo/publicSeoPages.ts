@@ -1,5 +1,9 @@
-import { LANDING_FAQS } from "@/features/landing/constants";
-import { INTENT_LANDING_PAGES } from "@/features/landing/intentLandingPages";
+import { CLUSTER_HUB_PAGES } from "@/features/landing/clusterHubPages";
+import { getAllFaqs, LANDING_FAQS } from "@/features/landing/faqRegistry";
+import {
+  getIntentBreadcrumbItems,
+  INTENT_LANDING_PAGES,
+} from "@/features/landing/intentLandingPages";
 import { LEGAL_LAST_UPDATED_ISO } from "@/features/legal/legalMeta";
 import {
   SEO_DEFAULT_DESCRIPTION,
@@ -8,6 +12,7 @@ import {
   SEO_DEFAULT_TITLE,
 } from "./seoConstants";
 import {
+  generateBreadcrumbStructuredData,
   generateFAQStructuredData,
   generateOrganizationStructuredData,
   generateSoftwareApplicationStructuredData,
@@ -40,6 +45,16 @@ const HOME_STRUCTURED_DATA = [
   generateFAQStructuredData(LANDING_FAQS),
 ];
 
+const CLUSTER_HUB_SEO_PAGES: PublicSeoPage[] = CLUSTER_HUB_PAGES.map((page) => ({
+  path: page.path,
+  title: page.title,
+  description: page.description,
+  keywords: page.keywords,
+  changefreq: page.changefreq ?? "weekly",
+  priority: page.priority ?? 0.9,
+  structuredData: generateFAQStructuredData(page.faqs),
+}));
+
 const INTENT_SEO_PAGES: PublicSeoPage[] = INTENT_LANDING_PAGES.map((page) => ({
   path: page.path,
   title: page.title,
@@ -47,7 +62,10 @@ const INTENT_SEO_PAGES: PublicSeoPage[] = INTENT_LANDING_PAGES.map((page) => ({
   keywords: page.keywords,
   changefreq: page.changefreq ?? "weekly",
   priority: page.priority ?? 0.8,
-  structuredData: generateFAQStructuredData(page.faqs),
+  structuredData: [
+    generateBreadcrumbStructuredData(getIntentBreadcrumbItems(page)),
+    generateFAQStructuredData(page.faqs),
+  ],
 }));
 
 export const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
@@ -80,6 +98,18 @@ export const PUBLIC_SEO_PAGES: PublicSeoPage[] = [
     priority: 0.3,
     lastmod: LEGAL_LAST_UPDATED_ISO,
   },
+  {
+    path: "/faq",
+    title: "FAQ | SolomindLM",
+    description:
+      "Answers about SolomindLM study tools, research workflows, pricing, privacy, and how to get started with notebooks and sources.",
+    keywords:
+      "SolomindLM FAQ, study tools help, research assistant questions, pricing limits, AI learning",
+    changefreq: "weekly",
+    priority: 0.7,
+    structuredData: generateFAQStructuredData(getAllFaqs()),
+  },
+  ...CLUSTER_HUB_SEO_PAGES,
   ...INTENT_SEO_PAGES,
 ];
 

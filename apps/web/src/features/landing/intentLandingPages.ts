@@ -814,3 +814,63 @@ export function getIntentLandingPaths(): string[] {
 export function isIntentLandingPath(path: string): boolean {
   return getIntentLandingPageByPath(path) !== undefined;
 }
+
+export const CLUSTER_HUB_PATHS: Record<IntentLandingCluster, string> = {
+  students: "/students",
+  research: "/research",
+};
+
+export const CLUSTER_HUB_LABELS: Record<IntentLandingCluster, string> = {
+  students: "Students",
+  research: "Research",
+};
+
+export type IntentBreadcrumbItem = {
+  name: string;
+  path: string;
+};
+
+export function getIntentBreadcrumbItems(page: IntentLandingPageConfig): IntentBreadcrumbItem[] {
+  return [
+    { name: "Home", path: "/" },
+    { name: CLUSTER_HUB_LABELS[page.cluster], path: CLUSTER_HUB_PATHS[page.cluster] },
+    { name: page.navLabel, path: page.path },
+  ];
+}
+
+function getClusterFeatureIntentKeys(cluster: IntentLandingCluster): string[] {
+  return Object.keys(FEATURE_INTENT_PATHS).filter((key) => {
+    const path = FEATURE_INTENT_PATHS[key];
+    if (!path) return false;
+    const intentPage = INTENT_LANDING_PAGES.find((entry) => entry.path === path);
+    return intentPage?.cluster === cluster;
+  });
+}
+
+export function getRelatedIntentPages(
+  page: IntentLandingPageConfig,
+  maxCount = 3
+): IntentLandingPageConfig[] {
+  const clusterKeys = getClusterFeatureIntentKeys(page.cluster);
+  const currentIndex = clusterKeys.indexOf(page.intentKey);
+  if (currentIndex === -1) return [];
+
+  const related: IntentLandingPageConfig[] = [];
+  for (let offset = 1; related.length < maxCount && offset < clusterKeys.length; offset++) {
+    for (const delta of [-offset, offset] as const) {
+      const index = currentIndex + delta;
+      if (index < 0 || index >= clusterKeys.length) continue;
+
+      const path = FEATURE_INTENT_PATHS[clusterKeys[index]!];
+      if (!path || path === page.path) continue;
+
+      const relatedPage = getIntentLandingPageByPath(path);
+      if (relatedPage && !related.some((entry) => entry.path === relatedPage.path)) {
+        related.push(relatedPage);
+        if (related.length >= maxCount) break;
+      }
+    }
+  }
+
+  return related;
+}

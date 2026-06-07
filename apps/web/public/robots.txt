@@ -18,3 +18,7 @@ Disallow: /api/
 
 # Sitemap reference
 Sitemap: https://www.solomindlm.com/sitemap.xml
+
+# LLM / AI crawler context
+# https://llmstxt.org/
+# https://www.solomindlm.com/llms.txt

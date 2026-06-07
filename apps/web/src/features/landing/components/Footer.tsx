@@ -8,7 +8,7 @@ const FOOTER_TAGLINE =
 const COMPANY_LINKS = [
   { label: "Features", to: "/#features" },
   { label: "Pricing", to: "/#pricing" },
-  { label: "FAQ", to: "/#faq" },
+  { label: "FAQ", to: "/faq" },
   { label: "Privacy Policy", to: "/privacy" },
   { label: "Terms", to: "/terms" },
 ] as const;
@@ -143,6 +143,7 @@ export const Footer: React.FC = () => {
 
           <div className="lg:col-span-3">
             <FooterLinkColumn title="For Students">
+              <FooterLink to="/students">All student tools</FooterLink>
               {studentPages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
                   {page.navLabel}
@@ -153,6 +154,7 @@ export const Footer: React.FC = () => {
 
           <div className="lg:col-span-3">
             <FooterLinkColumn title="For Research">
+              <FooterLink to="/research">All research tools</FooterLink>
               {researchPages.map((page) => (
                 <FooterLink key={page.path} to={page.path}>
                   {page.navLabel}

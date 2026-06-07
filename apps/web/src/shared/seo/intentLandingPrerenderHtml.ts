@@ -1,9 +1,29 @@
-import type { IntentLandingPageConfig } from "@/features/landing/intentLandingPages";
+import {
+  getIntentBreadcrumbItems,
+  getRelatedIntentPages,
+  type IntentLandingPageConfig,
+} from "@/features/landing/intentLandingPages";
 import { escapeHtml } from "./seoHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
 export function buildIntentLandingPrerenderBody(page: IntentLandingPageConfig): string {
-  const clusterLabel = page.cluster === "students" ? "For students" : "For researchers";
+  const breadcrumbItems = getIntentBreadcrumbItems(page);
+  const relatedPages = getRelatedIntentPages(page);
+  const breadcrumbNav = breadcrumbItems
+    .map((item, index) => {
+      const isLast = index === breadcrumbItems.length - 1;
+      const label = escapeHtml(item.name);
+      return isLast
+        ? `          <li>${label}</li>`
+        : `          <li><a href="${escapeHtml(item.path)}">${label}</a></li>`;
+    })
+    .join("\n");
+  const relatedLinks = relatedPages
+    .map(
+      (relatedPage) =>
+        `          <li><a href="${escapeHtml(relatedPage.path)}">${escapeHtml(relatedPage.navLabel)}</a></li>`
+    )
+    .join("\n");
   const proofItems = page.proofBullets
     .map((bullet) => `        <li>${escapeHtml(bullet)}</li>`)
     .join("\n");
@@ -15,8 +35,12 @@ export function buildIntentLandingPrerenderBody(page: IntentLandingPageConfig): 
     .join("\n");
 
   return `    <article data-seo-prerender="true" id="seo-prerender-content">
+      <nav aria-label="Breadcrumb">
+        <ol>
+${breadcrumbNav}
+        </ol>
+      </nav>
       <header>
-        <p>${escapeHtml(clusterLabel)}</p>
         <h1>${escapeHtml(page.h1)}</h1>
         <p>${escapeHtml(page.subheadline)}</p>
       </header>
@@ -38,7 +62,17 @@ ${faqItems}
       <section>
         <h2>${escapeHtml(page.conversionPromise)}</h2>
         <p>${escapeHtml(page.ctaLabel)}</p>
-      </section>
+      </section>${
+        relatedPages.length > 0
+          ? `
+      <section aria-labelledby="seo-prerender-related">
+        <h2 id="seo-prerender-related">Related features</h2>
+        <ul>
+${relatedLinks}
+        </ul>
+      </section>`
+          : ""
+      }
       <footer>
         <p><a href="/">SolomindLM home</a></p>
       </footer>

@@ -1,0 +1,64 @@
+# SolomindLM
+
+> SolomindLM is an AI learning and research assistant that helps you work with PDFs, videos, and papers. Upload or import sources into notebooks, chat with your materials, and generate flashcards, quizzes, mind maps, audio overviews, reports, literature reviews, and more—all grounded in the documents you provide. Free to start; no credit card required.
+
+Website: https://www.solomindlm.com
+Sitemap: https://www.solomindlm.com/sitemap.xml
+
+## Primary use cases
+
+### Students
+Study from course materials: upload lectures and readings, discover web sources, generate flashcards and quizzes, listen to audio overviews, build mind maps and infographics, practice written responses, extract spreadsheets, and share notebooks with classmates.
+
+### Researchers
+Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Mendeley), format citations in 12 styles, run AI-assisted literature review, chat with papers, and produce deep research reports that combine web search with your notebook sources.
+
+## Canonical pages
+
+### Cluster hubs
+- Student study tools (hub): https://www.solomindlm.com/students
+- Research tools (hub): https://www.solomindlm.com/research
+
+## Canonical intent pages
+
+### Students
+- Upload study sources: https://www.solomindlm.com/students/upload-sources
+- Discover web sources: https://www.solomindlm.com/students/discover-sources
+- Share notebooks: https://www.solomindlm.com/students/share-notebooks
+- AI flashcards: https://www.solomindlm.com/students/ai-flashcards
+- AI quizzes (multiple choice): https://www.solomindlm.com/students/ai-quizzes
+- AI audio overviews: https://www.solomindlm.com/students/ai-audio-overview
+- AI mind maps: https://www.solomindlm.com/students/ai-mind-maps
+- AI reports and study guides: https://www.solomindlm.com/students/ai-reports
+- AI infographics: https://www.solomindlm.com/students/ai-infographics
+- Written questions with feedback: https://www.solomindlm.com/students/ai-written-questions
+- AI spreadsheets: https://www.solomindlm.com/students/ai-spreadsheets
+
+### Researchers
+- Academic paper discovery: https://www.solomindlm.com/research/academic-paper-discovery
+- Import papers: https://www.solomindlm.com/research/import-papers
+- Citation styles: https://www.solomindlm.com/research/citation-styles
+- AI literature review: https://www.solomindlm.com/research/ai-literature-review
+- Chat with papers: https://www.solomindlm.com/research/chat-with-papers
+- Deep research: https://www.solomindlm.com/research/deep-research
+
+## Pricing
+
+Free tier ($0): 20 notebooks with up to 200 sources each; daily limits on chat and Studio generation (e.g. 50 chat messages/day, 5 flashcards/quizzes/reports/day, 5 audio overviews/day, 5 infographics/day, 5 written questions/day). No credit card required.
+
+Pro: 200 notebooks with up to 200 sources each; higher daily limits (e.g. 500 chat messages/day, 100 generations/day for flashcards, quizzes, reports, audio, infographics, and written questions). $7.50/month billed yearly or $15/month billed monthly.
+
+Full pricing: https://www.solomindlm.com/#pricing
+
+## FAQ
+
+All frequently asked questions (study tools, research workflows, billing, privacy): https://www.solomindlm.com/faq
+
+## Legal and policies
+
+- Privacy policy: https://www.solomindlm.com/privacy
+- Terms of service: https://www.solomindlm.com/terms
+
+## Contact
+
+Support: support@solomindlm.com

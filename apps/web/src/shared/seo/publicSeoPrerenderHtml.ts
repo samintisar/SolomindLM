@@ -1,6 +1,9 @@
-import { LANDING_FAQS } from "@/features/landing/constants";
+import { getClusterHubPageByPath } from "@/features/landing/clusterHubPages";
+import { LANDING_FAQS } from "@/features/landing/faqRegistry";
+import { buildFaqPrerenderBody } from "./faqPrerenderHtml";
 import { getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
+import { buildClusterHubPrerenderBody } from "./clusterHubPrerenderHtml";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
 import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
 import { escapeHtml } from "./seoHtml";
@@ -62,6 +65,14 @@ export function buildPublicSeoPrerenderBody(path: string): string | undefined {
   }
   if (path === "/terms") {
     return buildLegalPrerenderBody("Terms of Service", "/terms");
+  }
+  if (path === "/faq") {
+    return buildFaqPrerenderBody();
+  }
+
+  const hubPage = getClusterHubPageByPath(path);
+  if (hubPage) {
+    return buildClusterHubPrerenderBody(hubPage);
   }
 
   const intentPage = getIntentLandingPageByPath(path);

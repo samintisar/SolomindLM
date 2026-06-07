@@ -1,7 +1,8 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
-import { LANDING_FAQS } from "../constants";
+import { LANDING_FAQS } from "../faqRegistry";
 
 export const FAQSection: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -52,6 +53,15 @@ export const FAQSection: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              to="/faq"
+              className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
+            >
+              See all frequently asked questions
+            </Link>
           </div>
 
           {/* Still Have Questions CTA */}

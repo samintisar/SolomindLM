@@ -5,43 +5,6 @@ export interface FAQItem {
   answer: string;
 }
 
-export const LANDING_FAQS: FAQItem[] = [
-  {
-    question: "How accurate is the AI-generated content?",
-    answer:
-      "Generated content is based on the sources you add, but it should still be reviewed against the original material before you rely on it for studying or research.",
-  },
-  {
-    question: "What languages are supported?",
-    answer: "SolomindLM is currently focused on English-language study and research workflows.",
-  },
-  {
-    question: "What can I do with generated study materials?",
-    answer:
-      "You can create study outputs like flashcards, quizzes, mind maps, and audio overviews from your sources, then review them inside SolomindLM.",
-  },
-  {
-    question: "How is my data used and protected?",
-    answer:
-      "Your content is used to run the product you see—search, chat, and generation—and is handled as described in our Privacy Policy. We use trusted infrastructure and AI providers as subprocessors; we don't sell your personal information. The policy also covers analytics and email-based sign-in.",
-  },
-  {
-    question: "Is there a limit on how much I can upload?",
-    answer:
-      "The free plan includes 20 notebooks per account with up to 200 sources per notebook. Pro plans offer 200 notebooks per account with up to 200 sources per notebook. Each plan also includes daily limits on AI-generated content. Check our pricing section for details.",
-  },
-  {
-    question: "What makes SolomindLM different from Quizlet or Anki?",
-    answer:
-      "SolomindLM starts from your PDFs, videos, articles, and notes, then helps generate study materials from that source content instead of requiring you to create everything manually.",
-  },
-  {
-    question: "How long does it take to generate study materials?",
-    answer:
-      "Processing time depends on the source length, file type, and the output you choose to generate.",
-  },
-];
-
 const LANDING_CHAT_TOOLS = [
   { id: "chat", label: "AI Chat", iconName: "MessageCircle", color: "text-sky-700" },
   { id: "deepResearch", label: "Deep Research", iconName: "Telescope", color: "text-indigo-700" },
