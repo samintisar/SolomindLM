@@ -17,10 +17,6 @@ const modules = Object.fromEntries(
   Object.entries(rawModules).map(([key, loader]) => [key.replace(/^\/convex\//, "./"), loader])
 );
 
-function withAuth(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
-  return t.withIdentity({ subject: `${userId as string}|session1` });
-}
-
 async function seedUser(t: ReturnType<typeof convexTest>): Promise<Id<"users">> {
   return t.run(async (ctx) => ctx.db.insert("users", { name: "Test" }));
 }

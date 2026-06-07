@@ -13,7 +13,7 @@ export async function deleteNotebookByTitleFromHome(page: Page, title: string): 
   await page
     .getByRole("button", { name: "All" })
     .click()
-    .catch(() => {});
+    .catch(() => undefined);
 
   await page
     .getByRole("heading", { name: "My Notebooks" })

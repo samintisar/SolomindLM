@@ -25,9 +25,7 @@ import { type ChunkProcessState, OverallState, type OverallStateType } from "./s
 export class SpreadsheetGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
-  private maxTokens: number;
-
-  constructor(apiKey: string, mapModel: string, reduceModel: string, maxTokens: number = 64000) {
+  constructor(apiKey: string, mapModel: string, reduceModel: string) {
     // Fast model for map phase (parallel text extraction)
     this.fastLlm = new ChatTogetherAI({
       apiKey,
@@ -47,8 +45,6 @@ export class SpreadsheetGraph {
       maxTokens: GRAPH_CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
-
-    this.maxTokens = maxTokens;
   }
 
   private estimateTokens(text: string): number {

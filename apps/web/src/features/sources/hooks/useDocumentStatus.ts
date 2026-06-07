@@ -17,6 +17,6 @@ export function useDocumentStatus(documentId: string): UseDocumentStatusResult {
     status,
     isPolling: false,
     error: null,
-    refresh: async () => {},
+    refresh: async () => undefined,
   };
 }

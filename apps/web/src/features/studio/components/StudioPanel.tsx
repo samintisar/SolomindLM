@@ -257,8 +257,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             title={miniPlayerData.title}
             transcript={miniPlayerData.transcript}
             isVisible={miniPlayerVisible}
-            onClose={onCloseMiniPlayer || (() => {})}
-            onExpand={onExpandAudioPlayer || (() => {})}
+            onClose={onCloseMiniPlayer || (() => undefined)}
+            onExpand={onExpandAudioPlayer || (() => undefined)}
           />
         )}
       </>
@@ -358,8 +358,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
             title={miniPlayerData.title}
             transcript={miniPlayerData.transcript}
             isVisible={miniPlayerVisible}
-            onClose={onCloseMiniPlayer || (() => {})}
-            onExpand={onExpandAudioPlayer || (() => {})}
+            onClose={onCloseMiniPlayer || (() => undefined)}
+            onExpand={onExpandAudioPlayer || (() => undefined)}
           />
         )}
       </div>

@@ -18,5 +18,7 @@ export class TextSplitterService {
     return countTokens(text);
   }
 
-  static cleanup(): void {}
+  static cleanup(): void {
+    // No-op: splitter instances are stateless.
+  }
 }

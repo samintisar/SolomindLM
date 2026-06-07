@@ -54,7 +54,7 @@ export const planReview = internalAction({
       notebookId: args.notebookId,
       userId: args.userId,
       sourcePolicy: args.sourcePolicy,
-      onProgress: async () => {},
+      onProgress: async () => undefined,
     });
 
     const subQuestions = await agent.generatePlan(

@@ -56,13 +56,6 @@ export class MindMapGraph {
     });
   }
 
-  /**
-   * Typed wrapper for concept extraction
-   */
-  private async extractConcepts(content: string): Promise<ConceptExtraction> {
-    return runConceptExtraction(this.fastLlm, content);
-  }
-
   async mapProcess(state: ChunkStateType): Promise<Partial<OverallStateType> | Send> {
     const deps: MindMapMapProcessDeps = {
       extractConcepts: (c) => runConceptExtraction(this.fastLlm, c),

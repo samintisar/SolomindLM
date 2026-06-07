@@ -372,7 +372,7 @@ export function NotebookView() {
     return (
       <StudioPanel
         isOpen={true}
-        onClose={() => {}}
+        onClose={() => undefined}
         tools={STUDIO_TOOLS}
         width={390}
         isResizing={false}
@@ -449,7 +449,7 @@ export function NotebookView() {
             isResizing={isResizingLeft}
             userId={user?.id}
             noteId={urlNotebookId}
-            onDocumentUploaded={() => {}}
+            onDocumentUploaded={() => undefined}
             focusSourceRequest={sourceFocusRequest}
             onFocusSourceHandled={clearSourceFocusRequest}
             onDiscussTopic={handleDiscussSourceTopic}
@@ -502,12 +502,12 @@ export function NotebookView() {
             <div className="flex-1 w-full overflow-hidden">
               <SourcesPanel
                 isOpen={true}
-                onClose={() => {}}
+                onClose={() => undefined}
                 width={390}
                 isResizing={false}
                 userId={user?.id}
                 noteId={urlNotebookId}
-                onDocumentUploaded={() => {}}
+                onDocumentUploaded={() => undefined}
                 focusSourceRequest={sourceFocusRequest}
                 onFocusSourceHandled={clearSourceFocusRequest}
                 onDiscussTopic={handleDiscussSourceTopic}
@@ -520,8 +520,8 @@ export function NotebookView() {
               <ChatPanel
                 isLeftOpen={false}
                 isRightOpen={false}
-                toggleLeft={() => {}}
-                toggleRight={() => {}}
+                toggleLeft={() => undefined}
+                toggleRight={() => undefined}
                 notebookId={urlNotebookId}
                 notebookTitle={notebookTitle}
                 notebookIcon={activeNotebook?.icon}

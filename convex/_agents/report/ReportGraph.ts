@@ -21,14 +21,7 @@ export { packChunks, validateChunks } from "./chunkHelpers.js";
 export class ReportGraph {
   private mapModel: string;
   private smartLlm: ChatTogetherAI;
-  private maxTokens: number;
-
-  constructor(
-    apiKey: string,
-    mapModel: string,
-    reduceModel: string,
-    maxTokens: number = GRAPH_CONFIG.MAX_TOKENS
-  ) {
+  constructor(apiKey: string, mapModel: string, reduceModel: string) {
     this.mapModel = mapModel;
 
     this.smartLlm = new ChatTogetherAI({
@@ -39,8 +32,6 @@ export class ReportGraph {
       maxTokens: GRAPH_CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
-
-    this.maxTokens = maxTokens;
   }
 
   private estimateTokens(text: string): number {

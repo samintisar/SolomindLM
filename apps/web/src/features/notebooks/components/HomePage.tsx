@@ -58,7 +58,8 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   // Limit error handling
   const { handleLimitError } = useLimitErrorToast();
 
-  const deleteNotebookHandler: (id: string) => void = onDeleteNotebook ?? ((_id: string) => {});
+  const deleteNotebookHandler: (id: string) => void =
+    onDeleteNotebook ?? ((_id: string) => undefined);
 
   // Custom hooks for state and handlers
   const notebookHandlers = useNotebookHandlers({
@@ -301,7 +302,7 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
               // Folder handlers
               folderActiveMenuId={folderHandlers.folderActiveMenuId}
               onOpenFolderCustomize={folderHandlers.openFolderCustomize}
-              onDeleteFolder={onDeleteFolder ?? ((_id: string) => {})}
+              onDeleteFolder={onDeleteFolder ?? ((_id: string) => undefined)}
               setFolderActiveMenuId={folderHandlers.setFolderActiveMenuId}
               // Sorting
               getSortedNotebooks={getSortedNotebooks}

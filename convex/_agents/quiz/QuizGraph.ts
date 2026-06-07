@@ -29,7 +29,6 @@ export class QuizGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
   private fastLlmCandidateStructured: StructuredOutputInvoker<QuizCandidateResponse>;
-  private smartLlmQuestionStructured: StructuredOutputInvoker<QuizQuestion>;
   private expandLlm: ChatTogetherAI;
   private expandLlmQuestionStructured: StructuredOutputInvoker<QuizQuestion>;
 
@@ -62,11 +61,6 @@ export class QuizGraph {
       this.fastLlm,
       QuizCandidateArraySchema,
       "quiz_candidates"
-    );
-    this.smartLlmQuestionStructured = createStructuredLLM<QuizQuestion>(
-      this.smartLlm,
-      QuizQuestionSchema,
-      "quiz_question"
     );
     this.expandLlmQuestionStructured = createStructuredLLM<QuizQuestion>(
       this.expandLlm,

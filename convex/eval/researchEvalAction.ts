@@ -248,7 +248,7 @@ export const runResearchEval = action({
         );
         return loader.loadPaper(paper);
       },
-      onProgress: async () => {},
+      onProgress: async () => undefined,
     };
 
     const agent = new ResearchAgent(deps);

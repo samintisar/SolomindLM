@@ -79,8 +79,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       const syntheticEvent = {
-        preventDefault: () => {},
-        stopPropagation: () => {},
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
         currentTarget: document.createElement("div"),
         relatedTarget: null,
       } as unknown as React.DragEvent<HTMLDivElement>;
