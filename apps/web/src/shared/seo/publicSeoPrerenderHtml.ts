@@ -1,8 +1,8 @@
 import { LANDING_FAQS } from "@/features/landing/constants";
 import { getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
 import { LEGAL_LAST_UPDATED } from "@/features/legal/legalMeta";
-import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
 import { buildIntentLandingPrerenderBody } from "./intentLandingPrerenderHtml";
+import { SEO_DEFAULT_DESCRIPTION } from "./seoConstants";
 import { escapeHtml } from "./seoHtml";
 
 /** Static HTML body for crawlers — injected at build time into prerendered index.html. */
