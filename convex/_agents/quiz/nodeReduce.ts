@@ -26,7 +26,8 @@ import {
 } from "./prompts.js";
 import { detectSimilarQuestions, heuristicDedupe } from "./quizHeuristics.js";
 import type { OverallStateType } from "./state.js";
-import type { StructuredOutputInvoker } from "./structuredLlm.js";
+import { createStructuredLLM, type StructuredOutputInvoker } from "./structuredLlm.js";
+import { env } from "../../_lib/env.js";
 
 export interface ReduceQuizDeps {
   smartLlm: ChatTogetherAI;
@@ -138,9 +139,11 @@ export async function reduce(
     );
 
     try {
-      const structuredLlm = deps.smartLlm.withStructuredOutput<QuizCandidateIndexSelection>(
+      const reduceModel = (deps.smartLlm as { model?: string }).model ?? env.QUIZ_LLM;
+      const structuredLlm = createStructuredLLM<QuizCandidateIndexSelection>(
         QuizCandidateIndexSelectionSchema,
-        { name: "quiz_candidate_index_selection" }
+        "quiz_candidate_index_selection",
+        { model: reduceModel, reasoningEnabled: true, logPrefix: "QuizReduce" }
       );
 
       const selectionPrompt = getCandidateSelectionPrompt({

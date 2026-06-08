@@ -5,12 +5,11 @@
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { createStructuredLLM } from "../../_agents/quiz/structuredLlm";
 import { packChunks, validateChunks } from "../../_agents/QuizGraph";
 import {
   applySelectedCandidateIndices,
@@ -35,31 +34,6 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
-
-// Interface for the structured LLM to avoid deep type instantiation
-interface QuizCandidateOutputInvoker {
-  invoke(
-    messages: Array<SystemMessage | HumanMessage>,
-    config?: any
-  ): Promise<QuizCandidateResponse>;
-}
-
-interface QuizQuestionOutputInvoker {
-  invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<QuizQuestion>;
-}
-
-// Helper function to create a structured LLM without triggering deep type instantiation
-function createCandidateLLM(llm: ChatTogetherAI): QuizCandidateOutputInvoker {
-  return llm.withStructuredOutput(QuizCandidateArraySchema, {
-    name: "quiz_candidates",
-  });
-}
-
-function createQuestionLLM(llm: ChatTogetherAI): QuizQuestionOutputInvoker {
-  return llm.withStructuredOutput(QuizQuestionSchema, {
-    name: "quiz_question",
-  });
-}
 
 // ============================================================
 // CONFIGURATION
@@ -130,48 +104,6 @@ export type FinalizeQuizPhaseArgs = {
   difficulty: string;
   focus?: string;
 };
-
-// ============================================================
-// HELPER: Create structured LLM for map phase
-// ============================================================
-
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.4,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-    // Increased from 8000 to handle large chunks (19-22K chars = ~6-8K input tokens)
-    // Need room for 8 candidates × ~300 tokens each = ~2400 output tokens
-    // Total: ~6K input + ~2.4K output + ~1K prompt = ~10K tokens minimum
-    maxTokens: 16_000,
-  });
-}
-
-function createReduceLLM(): ChatTogetherAI {
-  const model = env.QUIZ_LLM;
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.3,
-    timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: 24_000,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
-
-function createExpandLLM(): ChatTogetherAI {
-  const model = env.QUIZ_LLM;
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.3,
-    timeout: CONFIG.EXPAND_TIMEOUT_MS,
-    maxTokens: 4_096,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
 
 // ============================================================
 // PHASE 1: Initialize & Schedule Map Tasks
@@ -371,9 +303,11 @@ export async function runProcessQuizMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    // Process with LLM using structured output
-    const llm = createMapLLM();
-    const structuredLLM = createCandidateLLM(llm);
+    const structuredLLM = createStructuredLLM<QuizCandidateResponse>(
+      QuizCandidateArraySchema,
+      "quiz_candidates",
+      { model: env.FAST_LLM, temperature: 0.4, maxTokens: 16_000 }
+    );
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
 
@@ -667,10 +601,16 @@ export async function runFinalizeQuizPhase(
     });
 
     // Selection phase: LLM returns 1-based candidate IDs (not full-object echo — reduces position bias)
-    const selectLLM = createReduceLLM();
-    const structuredSelectLLM = selectLLM.withStructuredOutput(QuizCandidateIndexSelectionSchema, {
-      name: "quiz_candidate_index_selection",
-    });
+    const structuredSelectLLM = createStructuredLLM<QuizCandidateIndexSelection>(
+      QuizCandidateIndexSelectionSchema,
+      "quiz_candidate_index_selection",
+      {
+        model: env.QUIZ_LLM,
+        maxTokens: 24_000,
+        temperature: 0.3,
+        reasoningEnabled: true,
+      }
+    );
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
     const selectionPrompt = getCandidateSelectionPrompt({
@@ -742,8 +682,16 @@ export async function runFinalizeQuizPhase(
     });
 
     // Expand candidates into full questions with distractors
-    const expandLLM = createExpandLLM();
-    const structuredExpandLLM = createQuestionLLM(expandLLM);
+    const structuredExpandLLM = createStructuredLLM<QuizQuestion>(
+      QuizQuestionSchema,
+      "quiz_question",
+      {
+        model: env.QUIZ_LLM,
+        maxTokens: 4_096,
+        temperature: 0.3,
+        reasoningEnabled: true,
+      }
+    );
 
     console.log(
       `[QuizJob] Expanding ${selectedCandidates.length} candidates with concurrency ${CONFIG.EXPAND_CONCURRENCY}`

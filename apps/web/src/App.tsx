@@ -343,12 +343,15 @@ const AppContent: React.FC = () => {
     () => ({
       notes: chatStream.displayNotes,
       onUpdateNote: noteCRUD.handleUpdateNote,
-      onUpdateNoteFull: noteCRUD.handleUpdateNoteFull,
-      onDeleteNote: noteCRUD.handleDeleteNote,
-      onAddNote: noteCRUD.handleAddNote,
+      onUpdateNoteFull: chatStream.updatePendingStudioNote,
+      onDeleteNote: async (id: string) => {
+        chatStream.removePendingStudioNote(id);
+        await noteCRUD.handleDeleteNote(id);
+      },
+      onAddNote: chatStream.addPendingStudioNote,
       onSaveReportContent: noteCRUD.handleSaveReportContent,
     }),
-    [chatStream.displayNotes, noteCRUD]
+    [chatStream, noteCRUD]
   );
 
   return (

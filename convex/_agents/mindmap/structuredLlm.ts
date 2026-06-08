@@ -1,11 +1,10 @@
 "use node";
 
-import type { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { z } from "zod";
-
+import { env } from "../../_lib/env";
 import { invokeWithTimeout } from "../_shared/index.js";
-
+import { invokeStructuredOutput } from "../_shared/structuredLlm.js";
 import { GRAPH_CONFIG } from "./config.js";
 import { MAP_PROMPT, MAP_SYSTEM_PROMPT } from "./prompts.js";
 import type { ConceptExtraction } from "./state.js";
@@ -17,23 +16,45 @@ export const ConceptExtractionSchema = z.object({
 });
 
 /**
- * Typed concept extraction using the fast LLM and structured output.
+ * Typed concept extraction using structured output (Together json_schema).
  */
 export async function extractConcepts(
-  fastLlm: ChatTogetherAI,
-  content: string
+  content: string,
+  options?: { model?: string; language?: string }
 ): Promise<ConceptExtraction> {
-  const structuredLlm = fastLlm.withStructuredOutput<ConceptExtraction>(ConceptExtractionSchema, {
-    name: "concept_extraction",
-  });
-
-  return await invokeWithTimeout(
+  return invokeWithTimeout(
     () =>
-      (structuredLlm as any).invoke([
-        new SystemMessage(MAP_SYSTEM_PROMPT),
-        new HumanMessage(MAP_PROMPT.replace("{content}", content)),
-      ]),
+      invokeStructuredOutput({
+        systemPrompt: MAP_SYSTEM_PROMPT,
+        userPrompt: MAP_PROMPT.replace("{content}", content),
+        schema: ConceptExtractionSchema,
+        schemaName: "concept_extraction",
+        model: options?.model ?? env.FAST_LLM,
+        logPrefix: "MindMapMap",
+      }),
     GRAPH_CONFIG.MAP_TIMEOUT_MS,
     "MindMapMap"
   );
+}
+
+/** @deprecated Use extractConcepts — kept for tests referencing message-style invoke. */
+export async function extractConceptsFromMessages(
+  messages: Array<SystemMessage | HumanMessage>
+): Promise<ConceptExtraction> {
+  const systemPrompt = messages
+    .filter((m) => m.getType() === "system")
+    .map((m) => (typeof m.content === "string" ? m.content : String(m.content)))
+    .join("\n");
+  const userPrompt = messages
+    .filter((m) => m.getType() === "human")
+    .map((m) => (typeof m.content === "string" ? m.content : String(m.content)))
+    .join("\n");
+
+  return invokeStructuredOutput({
+    systemPrompt,
+    userPrompt,
+    schema: ConceptExtractionSchema,
+    schemaName: "concept_extraction",
+    logPrefix: "MindMapMap",
+  });
 }

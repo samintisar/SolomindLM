@@ -58,14 +58,19 @@ export class QuizGraph {
     });
 
     this.fastLlmCandidateStructured = createStructuredLLM<QuizCandidateResponse>(
-      this.fastLlm,
       QuizCandidateArraySchema,
-      "quiz_candidates"
+      "quiz_candidates",
+      { model: mapModel, maxTokens: GRAPH_CONFIG.MAP_MAX_TOKENS, temperature: 0.4 }
     );
     this.expandLlmQuestionStructured = createStructuredLLM<QuizQuestion>(
-      this.expandLlm,
       QuizQuestionSchema,
-      "quiz_question_expand"
+      "quiz_question_expand",
+      {
+        model: reduceModel,
+        maxTokens: GRAPH_CONFIG.EXPAND_MAX_TOKENS,
+        temperature: 0.3,
+        reasoningEnabled: true,
+      }
     );
   }
 

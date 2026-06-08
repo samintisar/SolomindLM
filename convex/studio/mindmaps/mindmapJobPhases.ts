@@ -5,13 +5,13 @@
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { z } from "zod";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { validateWithPreset } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { invokeStructuredOutput } from "../../_agents/_shared/structuredLlm";
+import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
+import { ConceptExtractionSchema } from "../../_agents/mindmap/structuredLlm";
 import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
 import {
   MAP_PROMPT,
@@ -25,28 +25,6 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
-
-// ============================================================
-// SCHEMAS
-// ============================================================
-
-const ConceptExtractionSchema = z.object({
-  main_theme: z.string(),
-  summary: z.string(),
-  key_concepts: z.array(z.string()),
-});
-
-// Interface for the structured LLM to avoid deep type instantiation
-interface ConceptExtractionInvoker {
-  invoke(messages: Array<SystemMessage | HumanMessage>, config?: any): Promise<ConceptExtraction>;
-}
-
-// Helper function to create a structured LLM without triggering deep type instantiation
-function createConceptExtractionLLM(llm: ChatTogetherAI): ConceptExtractionInvoker {
-  return llm.withStructuredOutput(ConceptExtractionSchema, {
-    name: "concept_extraction",
-  });
-}
 
 // ============================================================
 // CONFIGURATION
@@ -79,33 +57,6 @@ export type FinalizeMindMapPhaseArgs = {
   userId: string;
   notebookId: Id<"notebooks">;
 };
-
-// ============================================================
-// HELPER: Create structured LLM for map phase
-// ============================================================
-
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.1,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-    maxTokens: 8000,
-  });
-}
-
-function createReduceLLM(): ChatTogetherAI {
-  const model = env.MINDMAP_LLM;
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.3,
-    timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: 16000,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
 
 // ============================================================
 // MARKDOWN PARSER
@@ -377,21 +328,23 @@ export async function runProcessMindMapMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    // Process with LLM using structured output
-    const llm = createMapLLM();
-    const structuredLLM = createConceptExtractionLLM(llm);
-
     const prompt = MAP_PROMPT.replace("{content}", chunk);
 
     console.log(`[MindMapJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
-    const response = await invokeStudioLlm({
+    const extraction = await invokeStudioLlm({
       invoke: () =>
-        (structuredLLM as any).invoke([
-          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-          new HumanMessage(prompt),
-        ]),
+        invokeStructuredOutput({
+          systemPrompt: withLanguageInstruction(MAP_SYSTEM_PROMPT, language),
+          userPrompt: prompt,
+          schema: ConceptExtractionSchema,
+          schemaName: "concept_extraction",
+          model: env.FAST_LLM,
+          temperature: 0.1,
+          maxTokens: 8000,
+          logPrefix: "MindMapMap",
+        }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "MindMapMap",
       onRetry: (attempt, error) => {
@@ -403,7 +356,6 @@ export async function runProcessMindMapMapChunkPhase(
     console.log(`[MindMapJob] ${chunkId} LLM completed in ${elapsed}ms`);
 
     // Store result
-    const extraction = response as ConceptExtraction;
     const result = {
       extraction,
       processingTimeMs: elapsed,
@@ -594,9 +546,6 @@ export async function runFinalizeMindMapPhase(
       },
     });
 
-    // Build the mind map using reduce phase
-    const llm = createReduceLLM();
-
     const inputData = allExtractions
       .map(
         (e) =>
@@ -614,19 +563,19 @@ export async function runFinalizeMindMapPhase(
 
     try {
       const startTime = Date.now();
-      const response = await invokeStudioLlm({
+      const markdown = await invokeStudioLlm({
         invoke: () =>
-          (llm as any).invoke([
-            new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-            new HumanMessage(REDUCE_PROMPT.replace("{extractions}", safeInput)),
-          ]),
+          invokeTogetherText({
+            systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+            userPrompt: REDUCE_PROMPT.replace("{extractions}", safeInput),
+            model: env.MINDMAP_LLM,
+            maxTokens: 16_000,
+            temperature: 0.3,
+            reasoningEnabled: true,
+          }),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "MindMapReduce",
       });
-
-      const markdown =
-        ((response as BaseMessage).content[0] as { text?: string })?.text ||
-        String((response as BaseMessage).content);
 
       const validation = validateWithPreset(markdown, "mindmap");
       if (!validation.isValid) {

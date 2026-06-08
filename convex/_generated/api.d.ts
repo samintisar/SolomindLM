@@ -38,6 +38,8 @@ import type * as _agents__shared_sanitization from "../_agents/_shared/sanitizat
 import type * as _agents__shared_stateUpdateHelpers from "../_agents/_shared/stateUpdateHelpers.js";
 import type * as _agents__shared_state_cleanup from "../_agents/_shared/state_cleanup.js";
 import type * as _agents__shared_state_factory from "../_agents/_shared/state_factory.js";
+import type * as _agents__shared_structuredLlm from "../_agents/_shared/structuredLlm.js";
+import type * as _agents__shared_studioTextLlm from "../_agents/_shared/studioTextLlm.js";
 import type * as _agents__shared_timeout from "../_agents/_shared/timeout.js";
 import type * as _agents__shared_tokenizer from "../_agents/_shared/tokenizer.js";
 import type * as _agents__shared_topic_extraction from "../_agents/_shared/topic_extraction.js";
@@ -285,6 +287,7 @@ import type * as notebooks__forkNotebook from "../notebooks/_forkNotebook.js";
 import type * as notebooks_index from "../notebooks/index.js";
 import type * as notebooks_sharing from "../notebooks/sharing.js";
 import type * as notes_index from "../notes/index.js";
+import type * as notes_listSummary from "../notes/listSummary.js";
 import type * as notes_userNotes from "../notes/userNotes.js";
 import type * as onboarding_constants from "../onboarding/constants.js";
 import type * as onboarding_mutations from "../onboarding/mutations.js";
@@ -389,6 +392,8 @@ declare const fullApi: ApiFromModules<{
   "_agents/_shared/stateUpdateHelpers": typeof _agents__shared_stateUpdateHelpers;
   "_agents/_shared/state_cleanup": typeof _agents__shared_state_cleanup;
   "_agents/_shared/state_factory": typeof _agents__shared_state_factory;
+  "_agents/_shared/structuredLlm": typeof _agents__shared_structuredLlm;
+  "_agents/_shared/studioTextLlm": typeof _agents__shared_studioTextLlm;
   "_agents/_shared/timeout": typeof _agents__shared_timeout;
   "_agents/_shared/tokenizer": typeof _agents__shared_tokenizer;
   "_agents/_shared/topic_extraction": typeof _agents__shared_topic_extraction;
@@ -636,6 +641,7 @@ declare const fullApi: ApiFromModules<{
   "notebooks/index": typeof notebooks_index;
   "notebooks/sharing": typeof notebooks_sharing;
   "notes/index": typeof notes_index;
+  "notes/listSummary": typeof notes_listSummary;
   "notes/userNotes": typeof notes_userNotes;
   "onboarding/constants": typeof onboarding_constants;
   "onboarding/mutations": typeof onboarding_mutations;

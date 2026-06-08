@@ -6,6 +6,12 @@ import { getReportSubtitle, normalizeReportTypeId } from "@/shared/types/reportT
 import { pickStudioGenerationFields } from "../utils/studioGenerationLabels";
 import { getSpreadsheetTypeLabel } from "./spreadsheetsApi";
 
+function arrayCount(data: unknown, summaryCount: unknown): number {
+  if (Array.isArray(data)) return data.length;
+  if (typeof summaryCount === "number" && Number.isFinite(summaryCount)) return summaryCount;
+  return 0;
+}
+
 function normalizeMindMapNodeData(rawData: any, fallbackTitle: string) {
   const maybeWrapped = rawData?.nodeData?.nodeData ?? rawData?.nodeData ?? rawData;
   const normalized = maybeWrapped && typeof maybeWrapped === "object" ? { ...maybeWrapped } : {};
@@ -44,7 +50,8 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case "flashcard":
+    case "flashcard": {
+      const cardCount = arrayCount(dbNote.cardsData, dbNote._cardsCount);
       return {
         id: dbNote._id,
         title: dbNote.title,
@@ -54,14 +61,16 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         status: dbNote.status,
         metadata: {
           difficulty: dbNote.metadata?.difficulty || "medium",
-          cardCount: dbNote.cardsData?.length || 0,
+          cardCount,
           topic: dbNote.metadata?.topic,
           error: dbNote.metadata?.error,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
+    }
 
-    case "quiz":
+    case "quiz": {
+      const questionCount = arrayCount(dbNote.questionsData, dbNote._questionsCount);
       return {
         id: dbNote._id,
         title: dbNote.title,
@@ -70,13 +79,14 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         questions: dbNote.questionsData || [],
         status: dbNote.status,
         metadata: {
-          questionCount: dbNote.questionsData?.length || 0,
+          questionCount,
           difficulty: dbNote.metadata?.difficulty || "medium",
           focusArea: dbNote.metadata?.focusArea,
           error: dbNote.metadata?.error,
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
+    }
 
     case "mindmap": {
       const nodeData = normalizeMindMapNodeData(dbNote.data, dbNote.title);
@@ -113,7 +123,7 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         title: dbNote.title,
         preview: getInfographicPreview(dbNote),
         type: "infographic",
-        imageUrl: dbNote.data?.imageUrl || "",
+        imageUrl: dbNote.data?.imageUrl || dbNote._imageUrl || "",
         prompt: dbNote.data?.prompt || "",
         status: dbNote.status,
         metadata: {
@@ -145,7 +155,8 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         },
       };
 
-    case "writtenQuestions":
+    case "writtenQuestions": {
+      const questionCount = arrayCount(dbNote.questionsData, dbNote._questionsCount);
       return {
         id: dbNote._id,
         title: dbNote.title,
@@ -154,7 +165,7 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
         questions: dbNote.questionsData || [],
         status: dbNote.status,
         metadata: {
-          questionCount: dbNote.questionsData?.length || 0,
+          questionCount,
           difficulty: dbNote.metadata?.difficulty || "medium",
           questionType: dbNote.questionType || "short",
           focusArea: dbNote.metadata?.focusArea,
@@ -163,6 +174,7 @@ export function mapDatabaseNoteToNote(dbNote: any): Note {
           ...pickStudioGenerationFields(dbNote.metadata),
         },
       };
+    }
 
     case "note":
       return {
@@ -206,7 +218,7 @@ function getReportPreview(dbNote: any): string {
 }
 
 function getFlashcardPreview(dbNote: any): string {
-  const count = dbNote.cardsData?.length || 0;
+  const count = arrayCount(dbNote.cardsData, dbNote._cardsCount);
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
   if (dbNote.status === "generating")
     return `${count} Flashcard${count !== 1 ? "s" : ""} · ${difficulty}`;
@@ -215,7 +227,7 @@ function getFlashcardPreview(dbNote: any): string {
 }
 
 function getQuizPreview(dbNote: any): string {
-  const count = dbNote.questionsData?.length || 0;
+  const count = arrayCount(dbNote.questionsData, dbNote._questionsCount);
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
   if (dbNote.status === "generating")
     return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
@@ -265,7 +277,7 @@ function getSpreadsheetPreview(dbNote: any): string {
 }
 
 function getWrittenQuestionsPreview(dbNote: any): string {
-  const count = dbNote.questionsData?.length || 0;
+  const count = arrayCount(dbNote.questionsData, dbNote._questionsCount);
   const difficulty = capitalizeDifficulty(dbNote.metadata?.difficulty);
   if (dbNote.status === "generating")
     return `${count} Question${count !== 1 ? "s" : ""} · ${difficulty}`;
@@ -311,11 +323,25 @@ export function useNoteCounts(notebookId: string | null) {
 }
 
 /**
- * Get a single note by type and ID
+ * Get a single note by type and ID (full payload).
  */
 export function useNote(type: string, noteId: string | null) {
   const note = useQuery(api.notes.index.get, noteId && type ? { type, id: noteId as any } : "skip");
   return note ? mapDatabaseNoteToNote(note) : null;
+}
+
+/**
+ * Load full studio note content when opening a saved item from the list.
+ */
+export function useNoteDetail(type: string | null, noteId: string | null) {
+  const note = useQuery(
+    api.notes.index.get,
+    type && noteId ? { type, id: noteId as any } : "skip"
+  );
+  return {
+    note: note ? mapDatabaseNoteToNote(note) : null,
+    isLoading: note === undefined && Boolean(type && noteId),
+  };
 }
 
 /**

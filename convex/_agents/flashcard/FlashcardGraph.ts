@@ -45,7 +45,10 @@ export class FlashcardGraph {
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
 
-    this.fastLlmStructured = createStructuredLLM(this.fastLlm, FlashcardArraySchema);
+    this.fastLlmStructured = createStructuredLLM(FlashcardArraySchema, {
+      model: mapModel,
+      temperature: 0.3,
+    });
   }
 
   private estimateTokens(text: string): number {

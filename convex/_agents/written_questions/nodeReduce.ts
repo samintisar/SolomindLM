@@ -17,7 +17,9 @@ import {
   type WrittenQuestionsResponse,
 } from "./prompts.js";
 import { detectSimilarQuestions } from "./questionHeuristics.js";
+import { env } from "../../_lib/env.js";
 import type { OverallStateType } from "./state.js";
+import { createStructuredLLM } from "./structuredLlm.js";
 
 export async function reduce(
   state: OverallStateType,
@@ -232,10 +234,12 @@ export async function reduce(
   }
 
   try {
-    const structuredLlm = smartLlm.withStructuredOutput<WrittenQuestionsResponse>(
-      WrittenQuestionsArraySchema,
-      { name: "written_questions_selection" }
-    );
+    const reduceModel = (smartLlm as { model?: string }).model ?? env.WRITTEN_QUESTIONS_LLM;
+    const structuredLlm = createStructuredLLM(WrittenQuestionsArraySchema, {
+      model: reduceModel,
+      schemaName: "written_questions_selection",
+      reasoningEnabled: true,
+    });
 
     const selectionPrompt = getSelectionPrompt({
       questions: questionsForLLM,

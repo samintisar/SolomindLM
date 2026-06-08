@@ -138,6 +138,19 @@ describe("mapDatabaseNoteToNote", () => {
     }
   });
 
+  it("maps spreadsheet preview from data_extraction metadata", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "spreadsheet",
+      data: "a,b\n1,2",
+      metadata: { spreadsheetType: "data_extraction" },
+    });
+    expect(result.preview).toBe("Spreadsheet · Data Table");
+    if (result.type === "spreadsheet") {
+      expect(result.metadata.spreadsheetType).toBe("data_extraction");
+    }
+  });
+
   it("maps spreadsheet type with object data", () => {
     const result = mapDatabaseNoteToNote({
       ...baseNote,

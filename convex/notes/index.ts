@@ -3,6 +3,7 @@ import { query } from "../_generated/server";
 import { assertCanReadNotebook } from "../_lib/notebookAccess";
 import * as NotesModel from "../_model/notes";
 import { getAuthUserId } from "../auth";
+import { summarizeListRow } from "./listSummary";
 
 /**
  * Unified query to fetch all note types for a notebook in a single request.
@@ -138,7 +139,11 @@ export const list = query({
     }
 
     const results = await Promise.all(queries);
-    const allNotes = results.flat();
+    const allNotes = results
+      .flat()
+      .map((item) => summarizeListRow(item as Record<string, unknown> & { _type: string })) as Array<
+      Record<string, unknown> & { updatedAt: number }
+    >;
 
     allNotes.sort((a, b) => b.updatedAt - a.updatedAt);
 

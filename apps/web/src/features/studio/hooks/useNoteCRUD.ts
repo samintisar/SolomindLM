@@ -135,16 +135,10 @@ export function useNoteCRUD({ activeNotebookId }: UseNoteCRUDProps) {
     [updateReport]
   );
 
-  const handleUpdateNoteFull = useCallback((_id: string, _note: Note) => undefined, []);
-
-  const handleAddNote = useCallback((_note: Note) => undefined, []);
-
   return {
     notes,
     handleUpdateNote,
     handleDeleteNote,
-    handleUpdateNoteFull,
-    handleAddNote,
     handleSaveReportContent,
   };
 }

@@ -317,8 +317,10 @@ export async function runProcessFlashcardMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM using structured output
-    const llm = createMapLLM();
-    const structuredLLM = createStructuredLLM(llm, FlashcardArraySchema);
+    const structuredLLM = createStructuredLLM(FlashcardArraySchema, {
+      model: env.FAST_LLM,
+      temperature: 0.3,
+    });
 
     const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
     const prompt = getMapPrompt({

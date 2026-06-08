@@ -14,8 +14,8 @@ import {
   validateChunks,
 } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import {
   type AudioLength,
   type AudioType,
@@ -83,28 +83,6 @@ const VOICES = {
 // ============================================================
 // HELPER: Create LLMs
 // ============================================================
-
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.3,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-  });
-}
-
-function createReduceLLM(): ChatTogetherAI {
-  const model = env.AUDIO_LLM;
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.6,
-    maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
-    timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
 
 // ============================================================
 // PHASE 1: Initialize & Schedule Map Tasks
@@ -284,7 +262,6 @@ export async function runProcessAudioMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM - extract dialogue beats
-    const llm = createMapLLM();
     const metadata = (audioOverview.metadata ?? {}) as {
       audioType?: AudioType;
       focus?: string;
@@ -299,12 +276,14 @@ export async function runProcessAudioMapChunkPhase(
     console.log(`[AudioJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
-    const response = await invokeStudioLlm({
+    const output = await invokeStudioLlm({
       invoke: () =>
-        (llm as any).invoke([
-          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-          new HumanMessage(prompt),
-        ]),
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(MAP_SYSTEM_PROMPT, language),
+          userPrompt: prompt,
+          model: env.FAST_LLM,
+          temperature: 0.3,
+        }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "AudioMap",
       onRetry: (attempt, error) => {
@@ -313,7 +292,6 @@ export async function runProcessAudioMapChunkPhase(
     });
 
     const elapsed = Date.now() - startTime;
-    const output = String((response as any).content);
 
     console.log(`[AudioJob] ${chunkId} LLM completed in ${elapsed}ms`);
 
@@ -541,7 +519,6 @@ export async function runFinalizeAudioOverviewPhase(
     const sanitizedFocus = storedMetadata.focus
       ? sanitizeUserInput(storedMetadata.focus)
       : undefined;
-    const llm = createReduceLLM();
     const targetLines = TARGET_LINE_COUNTS[length];
 
     let fullDialogueScript: DialogueLine[] = [];
@@ -562,41 +539,26 @@ export async function runFinalizeAudioOverviewPhase(
       `[AudioJob] Writing script single-pass (promptChars=${reducePrompt.length}, promptTokens=${countTokens(reducePrompt)}, targetLines=${targetLines})`
     );
 
-    const response = await invokeStudioLlm({
+    const responseText = await invokeStudioLlm({
       invoke: () =>
-        (llm as any).invoke([
-          new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-          new HumanMessage(reducePrompt),
-        ]),
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          userPrompt: reducePrompt,
+          model: env.AUDIO_LLM,
+          maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
+          temperature: 0.6,
+          reasoningEnabled: true,
+        }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "AudioReduce",
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
     });
 
-    const responseAny = response as any;
-    const responseContent = responseAny?.content;
-    const responseText =
-      typeof responseContent === "string"
-        ? responseContent
-        : Array.isArray(responseContent)
-          ? responseContent
-              .map((part: any) => {
-                if (typeof part === "string") return part;
-                if (part && typeof part === "object" && typeof part.text === "string")
-                  return part.text;
-                return "";
-              })
-              .join("")
-          : String(responseContent ?? "");
-    const finishReason =
-      responseAny?.response_metadata?.finish_reason ??
-      responseAny?.response_metadata?.finishReason ??
-      null;
     const jsonStart = responseText.indexOf("[");
     const jsonEnd = responseText.lastIndexOf("]");
 
     console.log(
-      `[AudioJob] Script response responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}, finishReason=${finishReason ?? "unknown"}`
+      `[AudioJob] Script response responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}`
     );
 
     // Try multiple parsing strategies
