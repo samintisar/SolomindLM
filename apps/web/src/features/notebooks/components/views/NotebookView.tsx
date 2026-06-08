@@ -139,6 +139,13 @@ export function NotebookView() {
     setMobileActiveTab("studio");
   }, []);
 
+  const handleOpenSavedSpreadsheet = useCallback((spreadsheetId: Id<"spreadsheets">) => {
+    window.dispatchEvent(new CustomEvent("setActiveNote", { detail: { noteId: spreadsheetId } }));
+    setActiveLiteratureView(null);
+    setIsStudioOpen(true);
+    setMobileActiveTab("studio");
+  }, []);
+
   const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
 
   const toggleStudio = useCallback(() => setIsStudioOpen((isOpen) => !isOpen), []);
@@ -177,6 +184,7 @@ export function NotebookView() {
           notebookId={urlNotebookId as Id<"notebooks">}
           onClose={handleCloseLiteratureView}
           onOpenSavedReport={handleOpenSavedReport}
+          onOpenSavedSpreadsheet={handleOpenSavedSpreadsheet}
         />
       );
     }
@@ -197,6 +205,7 @@ export function NotebookView() {
 
     handleCloseLiteratureView,
     handleOpenSavedReport,
+    handleOpenSavedSpreadsheet,
 
     isResizingRight,
 
@@ -365,6 +374,7 @@ export function NotebookView() {
           notebookId={urlNotebookId as Id<"notebooks">}
           onClose={handleCloseLiteratureView}
           onOpenSavedReport={handleOpenSavedReport}
+          onOpenSavedSpreadsheet={handleOpenSavedSpreadsheet}
         />
       );
     }
@@ -384,6 +394,7 @@ export function NotebookView() {
     activeLiteratureView,
     handleCloseLiteratureView,
     handleOpenSavedReport,
+    handleOpenSavedSpreadsheet,
     sources,
     urlNotebookId,
   ]);

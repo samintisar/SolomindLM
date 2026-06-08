@@ -27,6 +27,7 @@ export function getSpreadsheetTypeLabel(spreadsheetType: string): string {
     timeline: "Timeline",
     financial_summary: "Financial",
     custom: "Custom",
+    literature_review: "Literature Review",
   };
   return labels[spreadsheetType] || "Spreadsheet";
 }

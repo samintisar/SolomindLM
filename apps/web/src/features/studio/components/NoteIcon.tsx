@@ -1,5 +1,6 @@
 import {
   AudioLines,
+  BookOpen,
   FileText,
   GitFork,
   HelpCircle,
@@ -10,7 +11,8 @@ import {
   Table2,
 } from "lucide-react";
 import React from "react";
-import { Note } from "@/shared/types/index";
+import { isReportNote, Note } from "@/shared/types/index";
+import { isLiteratureReviewReportType } from "@/shared/types/reportTypes";
 
 interface NoteIconProps {
   note: Note;
@@ -26,6 +28,14 @@ export const NoteIcon: React.FC<NoteIconProps> = ({ note }) => {
     return (
       <div className="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
         <Loader2 className="w-4 h-4 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (isReportNote(note) && isLiteratureReviewReportType(note.metadata.reportType)) {
+    return (
+      <div className="shrink-0 w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center">
+        <BookOpen className="w-4 h-4 shrink-0" />
       </div>
     );
   }

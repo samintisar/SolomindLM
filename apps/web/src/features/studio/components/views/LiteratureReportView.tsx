@@ -2,9 +2,21 @@ import {
   normalizeLiteratureReportSectionContent,
   stripLeadingSectionHeadingLine,
 } from "@convex/literatureReview/reportContext";
-import { ArrowLeft, Check, Copy, Download, FileText, Loader2, Save, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Download,
+  FileDown,
+  FileText,
+  Loader2,
+  Printer,
+  Save,
+  X,
+} from "lucide-react";
 import React, { lazy, Suspense, useMemo, useState } from "react";
-import { sanitizeMarkdown } from "@/shared/utils";
+import { DropdownMenu } from "@/shared/ui/DropdownMenu";
+import { cn, sanitizeMarkdown } from "@/shared/utils";
 import { CitationStyle, CitationStylePicker } from "../CitationStylePicker";
 import { type PrismaFlowCounts, PrismaFlowDiagram } from "../PrismaFlowDiagram";
 
@@ -234,8 +246,32 @@ function exportToMarkdown(report: LiteratureReport, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-const REPORT_TOOLBAR_TEXT_BTN =
-  "hidden items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-normal text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50";
+const REPORT_TOOLBAR_BTN = cn(
+  "inline-flex shrink-0 items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-normal text-foreground transition-colors",
+  "hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+);
+
+function ExportMenuItem({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
 
 export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
   report,
@@ -258,6 +294,14 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
 
   const handleExportPdf = () => {
     window.print();
+  };
+
+  const handleExportMarkdown = () => {
+    if (onExport) {
+      onExport();
+      return;
+    }
+    exportToMarkdown(report, `${report.title.replace(/\s+/g, "_")}.md`);
   };
 
   const handleSaveAndEdit = async () => {
@@ -302,59 +346,68 @@ export const LiteratureReportView: React.FC<LiteratureReportViewProps> = ({
           <button
             type="button"
             onClick={handleCopyReport}
-            className={`${REPORT_TOOLBAR_TEXT_BTN} @min-[720px]/report-toolbar:inline-flex`}
+            className={REPORT_TOOLBAR_BTN}
             title={didCopyReport ? "Copied report" : "Copy with citations"}
+            aria-label={didCopyReport ? "Copied report" : "Copy with citations"}
           >
             {didCopyReport ? (
               <Check className="h-4 w-4 shrink-0" strokeWidth={2} />
             ) : (
               <Copy className="h-4 w-4 shrink-0" strokeWidth={2} />
             )}
-            <span>{didCopyReport ? "Copied" : "Copy with citations"}</span>
+            <span className="hidden @min-[520px]/report-toolbar:inline">
+              {didCopyReport ? "Copied" : "Copy with citations"}
+            </span>
           </button>
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            className={`${REPORT_TOOLBAR_TEXT_BTN} @min-[820px]/report-toolbar:inline-flex`}
-            title="Export PDF"
+          <DropdownMenu
+            trigger={
+              <button
+                type="button"
+                className={REPORT_TOOLBAR_BTN}
+                title="Export report"
+                aria-label="Export report"
+              >
+                <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
+              </button>
+            }
           >
-            <Download className="h-4 w-4 shrink-0" strokeWidth={2} />
-            <span>Export PDF</span>
-          </button>
+            <ExportMenuItem
+              icon={<Printer className="h-4 w-4" />}
+              label="Export PDF"
+              onClick={handleExportPdf}
+            />
+            <ExportMenuItem
+              icon={<FileDown className="h-4 w-4" />}
+              label="Export Markdown (.md)"
+              onClick={handleExportMarkdown}
+            />
+          </DropdownMenu>
           <button
             type="button"
             onClick={handleSaveAndEdit}
             disabled={!onSaveAndEdit || isSaving}
-            className={`${REPORT_TOOLBAR_TEXT_BTN} @min-[940px]/report-toolbar:inline-flex`}
+            className={REPORT_TOOLBAR_BTN}
             title="Save & Edit Document"
+            aria-label={isSaving ? "Saving document" : "Save and edit document"}
           >
             {isSaving ? (
               <Loader2 className="h-4 w-4 shrink-0 animate-spin" strokeWidth={2} />
             ) : (
               <Save className="h-4 w-4 shrink-0" strokeWidth={2} />
             )}
-            <span>{isSaving ? "Saving..." : "Save & Edit Document"}</span>
-          </button>
-          <button
-            onClick={
-              onExport
-                ? onExport
-                : () => exportToMarkdown(report, `${report.title.replace(/\s+/g, "_")}.md`)
-            }
-            className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-foreground transition-colors hover:bg-secondary @min-[720px]/report-toolbar:hidden"
-            aria-label="Export report as Markdown"
-            title="Export report as Markdown"
-          >
-            <Download className="w-4 h-4 shrink-0" />
+            <span className="hidden @min-[700px]/report-toolbar:inline">
+              {isSaving ? "Saving..." : "Save & Edit Document"}
+            </span>
           </button>
           {onBack && (
             <button
+              type="button"
               onClick={onBack}
-              className="inline-flex shrink-0 rounded-md p-1.5 text-foreground transition-colors hover:bg-secondary"
+              className={REPORT_TOOLBAR_BTN}
               aria-label={`Close ${toolbarLabel.toLowerCase()}`}
               title="Close"
             >
-              <X className="w-4 h-4 shrink-0" />
+              <X className="h-4 w-4 shrink-0" strokeWidth={2} />
             </button>
           )}
         </div>

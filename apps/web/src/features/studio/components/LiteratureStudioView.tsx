@@ -1,16 +1,19 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { Loader2 } from "lucide-react";
-import React from "react";
+import React, { useCallback, useState } from "react";
+import { useToast } from "@/shared/contexts/useToast";
 import {
   useLiteratureReportDetail,
   useLiteratureTable,
   useSaveLiteratureReportAsStudioReport,
+  useSaveLiteratureTableAsStudioSpreadsheet,
 } from "../services/literatureTablesApi";
 import type { ActiveLiteratureView } from "../types/literatureStudio";
 import { literatureReportToolbarLabel } from "../utils/literatureReportLabels";
 import type { CitationStyle } from "./CitationStylePicker";
 import { ResizeHandle } from "./ResizeHandle";
 import { LiteratureReportView } from "./views/LiteratureReportView";
+import type { LiteratureTable } from "./views/LiteratureTableView";
 import { LiteratureTableView } from "./views/LiteratureTableView";
 
 interface LiteratureStudioViewProps {
@@ -19,6 +22,7 @@ interface LiteratureStudioViewProps {
   notebookId: Id<"notebooks">;
   onClose: () => void;
   onOpenSavedReport?: (reportId: Id<"reports">) => void;
+  onOpenSavedSpreadsheet?: (spreadsheetId: Id<"spreadsheets">) => void;
 }
 
 export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
@@ -27,6 +31,7 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
   notebookId,
   onClose,
   onOpenSavedReport,
+  onOpenSavedSpreadsheet,
 }) => {
   if (view.kind === "table") {
     return (
@@ -35,6 +40,7 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
         notebookId={notebookId}
         width={width}
         onClose={onClose}
+        onOpenSavedSpreadsheet={onOpenSavedSpreadsheet}
       />
     );
   }
@@ -54,13 +60,44 @@ function LiteratureTableStudioShell({
   notebookId,
   width,
   onClose,
+  onOpenSavedSpreadsheet,
 }: {
   tableId: Id<"literatureTables">;
   notebookId: Id<"notebooks">;
   width: number;
   onClose: () => void;
+  onOpenSavedSpreadsheet?: (spreadsheetId: Id<"spreadsheets">) => void;
 }) {
   const table = useLiteratureTable(tableId);
+  const saveAsStudioSpreadsheet = useSaveLiteratureTableAsStudioSpreadsheet();
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = useCallback(
+    async (nextTable: LiteratureTable) => {
+      setIsSaving(true);
+      try {
+        const spreadsheetId = await saveAsStudioSpreadsheet({
+          tableId,
+          title: nextTable.title,
+          columns: nextTable.columns,
+          papers: nextTable.papers.map((paper) => ({
+            citationId: paper.citationId as Id<"citations">,
+            rowData: paper.rowData,
+            includeReason: paper.includeReason,
+            isIncluded: paper.isIncluded,
+          })),
+        });
+        toastSuccess("Table saved to Studio");
+        onOpenSavedSpreadsheet?.(spreadsheetId);
+      } catch (err) {
+        toastError(err instanceof Error ? err.message : "Failed to save table");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [onOpenSavedSpreadsheet, saveAsStudioSpreadsheet, tableId, toastError, toastSuccess]
+  );
 
   return (
     <PanelShell width={width} variant="table">
@@ -81,6 +118,8 @@ function LiteratureTableStudioShell({
           }}
           notebookId={notebookId}
           onBack={onClose}
+          onSave={handleSave}
+          isSaving={isSaving}
         />
       )}
     </PanelShell>
@@ -100,11 +139,17 @@ function LiteratureReportStudioShell({
 }) {
   const detail = useLiteratureReportDetail(reportId);
   const saveAsStudioReport = useSaveLiteratureReportAsStudioReport();
+  const { success: toastSuccess, error: toastError } = useToast();
 
-  const handleSaveAndEdit = async () => {
-    const savedReportId = await saveAsStudioReport({ reportId });
-    onOpenSavedReport?.(savedReportId);
-  };
+  const handleSaveAndEdit = useCallback(async () => {
+    try {
+      const savedReportId = await saveAsStudioReport({ reportId });
+      toastSuccess("Report saved to Studio");
+      onOpenSavedReport?.(savedReportId);
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Failed to save report");
+    }
+  }, [onOpenSavedReport, reportId, saveAsStudioReport, toastError, toastSuccess]);
 
   return (
     <PanelShell width={width}>

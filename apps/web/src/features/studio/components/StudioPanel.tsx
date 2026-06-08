@@ -126,8 +126,8 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
       const noteId = customEvent.detail?.noteId;
       if (noteId) {
         const note = notes.find((n) => n.id === noteId);
-        // Prevent setting generating notes as active
-        if (note && note.status !== "generating") {
+        // Allow selecting notes not yet in the list (e.g. right after first save)
+        if (!note || note.status !== "generating") {
           setActiveNoteId(noteId);
         }
       }

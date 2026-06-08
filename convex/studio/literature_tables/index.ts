@@ -11,6 +11,30 @@ import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
 import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
+import { literatureTableToCsv } from "./literatureTableCsv.js";
+
+const literatureTableColumnValidator = v.object({
+  id: v.string(),
+  name: v.string(),
+  type: v.union(
+    v.literal("paper_title"),
+    v.literal("authors"),
+    v.literal("year"),
+    v.literal("study_type"),
+    v.literal("custom")
+  ),
+  instructions: v.optional(v.string()),
+  isVisible: v.boolean(),
+  isSystem: v.boolean(),
+  order: v.number(),
+});
+
+const literatureTablePaperValidator = v.object({
+  citationId: v.id("citations"),
+  rowData: v.record(v.string(), v.string()),
+  includeReason: v.optional(v.string()),
+  isIncluded: v.boolean(),
+});
 
 /** Chat workflow tables/reports — never listed in the studio sidebar. */
 async function getChatLinkedLiteratureArtifactIds(
@@ -724,6 +748,83 @@ export const saveLiteratureReportAsStudioReport = mutation({
         sourceLiteratureTableId: report.tableId,
         citationStyle: report.citationStyle,
         citationIds: report.citationIds,
+      },
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const saveLiteratureTableAsStudioSpreadsheet = mutation({
+  args: {
+    tableId: v.id("literatureTables"),
+    title: v.string(),
+    columns: v.array(literatureTableColumnValidator),
+    papers: v.array(literatureTablePaperValidator),
+  },
+  returns: v.id("spreadsheets"),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+
+    const table = await ctx.db.get(args.tableId);
+    if (!table) throw new Error("Literature table not found");
+    if (table.userId !== userId) throw new Error("Not authorized to save this literature table");
+
+    await assertCanEditNotebook(ctx, table.notebookId, userId);
+
+    const now = Date.now();
+    await ctx.db.patch(args.tableId, {
+      title: args.title,
+      columns: args.columns,
+      papers: args.papers,
+      updatedAt: now,
+    });
+
+    const citationTitles = new Map<Id<"citations">, string>();
+    for (const paper of args.papers) {
+      const citation = await ctx.db.get(paper.citationId);
+      if (citation?.title) {
+        citationTitles.set(paper.citationId, citation.title);
+      }
+    }
+
+    const csv = literatureTableToCsv(args.columns, args.papers, citationTitles);
+
+    const existingSavedSpreadsheets = await ctx.db
+      .query("spreadsheets")
+      .withIndex("by_notebook_and_user", (q) =>
+        q.eq("notebookId", table.notebookId).eq("userId", userId)
+      )
+      .collect();
+    const existing = existingSavedSpreadsheets.find(
+      (saved) => saved.metadata?.sourceLiteratureTableId === args.tableId
+    );
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        title: args.title,
+        data: csv,
+        status: "completed",
+        metadata: {
+          ...existing.metadata,
+          spreadsheetType: "literature_review",
+          sourceLiteratureTableId: args.tableId,
+        },
+        updatedAt: now,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("spreadsheets", {
+      userId,
+      notebookId: table.notebookId,
+      title: args.title,
+      data: csv,
+      status: "completed",
+      metadata: {
+        spreadsheetType: "literature_review",
+        sourceLiteratureTableId: args.tableId,
       },
       createdAt: now,
       updatedAt: now,

@@ -49,6 +49,11 @@ export const REPORT_TYPES: Record<string, ReportTypeConfig> = {
     displayName: "Methodology Overview",
     description: "Methodology Overview",
   },
+  literature_review: {
+    id: "literature_review",
+    displayName: "Literature Review",
+    description: "Literature Review",
+  },
 };
 
 /**
@@ -89,8 +94,15 @@ export function getReportTypeDisplayName(reportTypeId: string): string {
  * @param reportTypeId - The report type ID
  * @returns The subtitle string in format "Report · {DisplayName}"
  */
+export function isLiteratureReviewReportType(reportTypeId: string): boolean {
+  return normalizeReportTypeId(reportTypeId) === "literature_review";
+}
+
 export function getReportSubtitle(reportTypeId: string): string {
   const normalized = normalizeReportTypeId(reportTypeId);
+  if (normalized === "literature_review") {
+    return "Literature Review";
+  }
   const displayName = getReportTypeDisplayName(normalized);
   return `Report · ${displayName}`;
 }
