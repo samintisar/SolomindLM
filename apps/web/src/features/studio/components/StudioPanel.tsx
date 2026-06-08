@@ -81,7 +81,16 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
     shouldLoadFullNote ? listNote!.type : null,
     shouldLoadFullNote ? activeNoteId : null
   );
-  const activeNote = fetchedNote ?? listNote;
+  const detailLoadFailed = shouldLoadFullNote && !isLoadingFullNote && fetchedNote === null;
+  const activeNote = fetchedNote ?? (shouldLoadFullNote ? null : listNote);
+  const headerNote = listNote ?? fetchedNote;
+
+  useEffect(() => {
+    if (detailLoadFailed) {
+      setActiveNoteId(null);
+      setIsEditingReportContent(false);
+    }
+  }, [detailLoadFailed]);
 
   const expandedSameNoteHidesMini =
     isOpen &&
@@ -291,7 +300,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
         {/* Header */}
         <StudioPanelHeader
-          activeNote={activeNote}
+          activeNote={activeNoteId ? headerNote : null}
           onBack={handleBack}
           onClose={onClose}
           editingId={noteActions.editingId}
@@ -323,26 +332,26 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
         <div
           className={`flex-1 w-full relative ${showDockedMiniPlayer ? "overflow-hidden" : "overflow-y-auto"}`}
         >
-          {activeNote ? (
-            isLoadingFullNote ? (
+          {activeNoteId ? (
+            isLoadingFullNote || !activeNote ? (
               <div className="flex h-full items-center justify-center text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
                 <span className="sr-only">Loading note…</span>
               </div>
             ) : (
-            <ActiveNoteView
-              activeNote={activeNote}
-              isMindMapExpanded={isMindMapExpanded}
-              onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
-              onUpdateNoteFull={onUpdateNoteFull}
-              isMobile={isMobile}
-              onBack={handleBack}
-              isEditingReportContent={isEditingReportContent}
-              onSaveReportContent={handleSaveReportContent}
-              onCancelEditReport={handleCancelEditReport}
-              registerInfographicControls={handleInfographicControlsRegister}
-              onInfographicFullscreenChange={setIsInfographicFullscreen}
-            />
+              <ActiveNoteView
+                activeNote={activeNote}
+                isMindMapExpanded={isMindMapExpanded}
+                onToggleMindMap={() => setIsMindMapExpanded(!isMindMapExpanded)}
+                onUpdateNoteFull={onUpdateNoteFull}
+                isMobile={isMobile}
+                onBack={handleBack}
+                isEditingReportContent={isEditingReportContent}
+                onSaveReportContent={handleSaveReportContent}
+                onCancelEditReport={handleCancelEditReport}
+                registerInfographicControls={handleInfographicControlsRegister}
+                onInfographicFullscreenChange={setIsInfographicFullscreen}
+              />
             )
           ) : (
             <NoteListView

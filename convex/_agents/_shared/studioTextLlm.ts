@@ -15,7 +15,7 @@ export type InvokeTogetherTextOptions = {
 
 /**
  * Plain-text LLM call via Together REST (not LangChain).
- * Reads assistant text from `content` or `reasoning` (GPT-OSS hybrid models).
+ * Assistant text via `uncachedLlmCall` (falls back to `reasoning` for GPT-OSS when `content` is empty).
  */
 export async function invokeTogetherText(options: InvokeTogetherTextOptions): Promise<string> {
   const response = await uncachedLlmCall({

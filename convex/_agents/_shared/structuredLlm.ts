@@ -59,7 +59,8 @@ function isRetriableStructuredError(error: unknown): boolean {
 /**
  * Structured output via Together `json_schema` (not LangChain tool calling).
  * Handles GPT-OSS models that return JSON in `reasoning` when `content` is empty.
- * Up to 3 attempts with exponential backoff; final attempt falls back to `json_object`.
+ * Retries parse/validation failures up to `maxAttempts` (default 3) with backoff;
+ * the final attempt falls back to `json_object`. Other errors fail immediately.
  */
 export async function invokeStructuredOutput<T>(
   options: InvokeStructuredOutputOptions<T>
@@ -83,7 +84,8 @@ export async function invokeStructuredOutput<T>(
         );
       }
 
-      const userPrompt = attempt === 0 ? options.userPrompt : `${options.userPrompt}${JSON_REMINDER}`;
+      const userPrompt =
+        attempt === 0 ? options.userPrompt : `${options.userPrompt}${JSON_REMINDER}`;
 
       const response = await uncachedLlmCall({
         model,

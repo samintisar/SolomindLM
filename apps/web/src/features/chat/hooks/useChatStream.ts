@@ -3,6 +3,10 @@ import { type Doc, Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  mergePendingStudioNotes,
+  prunePendingStudioNotes,
+} from "@/features/studio/utils/mergePendingStudioNotes";
+import {
   AgentGroundingCheck,
   ChatActivityPhase,
   ChatAgentTrace,
@@ -19,10 +23,6 @@ import {
   useSourceSuggestions,
 } from "../services/chatApi";
 import { useStartDeepResearch } from "../services/researchApi";
-import {
-  mergePendingStudioNotes,
-  prunePendingStudioNotes,
-} from "@/features/studio/utils/mergePendingStudioNotes";
 import {
   computeRemoteGenerationBlocksSend,
   researchProgressToStreamingActivity,
@@ -117,12 +117,8 @@ export function useChatStream({
 
   const displayNotes = useMemo(() => {
     const overlayNotebook = studioListOverlay.notebookId;
-    const pending =
-      overlayNotebook === activeNotebookId ? studioListOverlay.pending : [];
-    const withPending = mergePendingStudioNotes(
-      notes,
-      prunePendingStudioNotes(notes, pending)
-    );
+    const pending = overlayNotebook === activeNotebookId ? studioListOverlay.pending : [];
+    const withPending = mergePendingStudioNotes(notes, prunePendingStudioNotes(notes, pending));
     if (studioListOverlay.savedChat && overlayNotebook === activeNotebookId) {
       return [studioListOverlay.savedChat, ...withPending];
     }
@@ -213,7 +209,7 @@ export function useChatStream({
       // Only auto-release if:
       // 1. Generation is old (>5 min)
       // 2. We're not actively streaming locally
-      // 3. There's no assistant message waiting for this generation
+      // 3. Last message is already an assistant (generation lock stuck after persist)
       const last = messages[messages.length - 1];
       const isWaitingForAssistant = last?.role !== "assistant";
 

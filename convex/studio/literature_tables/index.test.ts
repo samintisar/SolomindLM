@@ -150,7 +150,6 @@ describe("saveLiteratureReportAsStudioReport", () => {
           _type: "report",
           title: "Literature Report",
           status: "completed",
-          content: "# Literature Report\n\nFindings with citations.",
           metadata: expect.objectContaining({
             reportType: "literature_review",
             sourceLiteratureReportId: literatureReportId,
@@ -159,6 +158,13 @@ describe("saveLiteratureReportAsStudioReport", () => {
         }),
       ])
     );
+    expect(savedReports[0]).not.toHaveProperty("content");
+
+    const fullReport = await withAuth(t, userId).query(api.notes.index.get, {
+      type: "report",
+      id: reportId,
+    });
+    expect(fullReport?.content).toBe("# Literature Report\n\nFindings with citations.");
   });
 });
 
@@ -244,7 +250,6 @@ describe("saveLiteratureTableAsStudioSpreadsheet", () => {
           _type: "spreadsheet",
           title: "Saved Literature Table",
           status: "completed",
-          data: expect.stringContaining("Updated result"),
           metadata: expect.objectContaining({
             spreadsheetType: "literature_review",
             sourceLiteratureTableId: literatureTableId,
@@ -252,5 +257,12 @@ describe("saveLiteratureTableAsStudioSpreadsheet", () => {
         }),
       ])
     );
+    expect(savedNotes[0]).not.toHaveProperty("data");
+
+    const fullSpreadsheet = await withAuth(t, userId).query(api.notes.index.get, {
+      type: "spreadsheet",
+      id: spreadsheetId,
+    });
+    expect(fullSpreadsheet?.data).toEqual(expect.stringContaining("Updated result"));
   });
 });
