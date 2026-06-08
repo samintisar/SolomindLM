@@ -177,3 +177,6 @@ test-results/
 
 # RAG eval exported artifacts (local)
 evals/rag/generated/
+
+# IndexNow pending URL queue (local / failed retries)
+apps/web/scripts/.indexnow-queue.json

@@ -6,7 +6,9 @@
   "scripts": {
     "kill-port": "bun run scripts/kill-port.ts",
     "dev": "bun run kill-port && vite",
-    "build": "vite build && bun run scripts/prerender-seo.ts && bun run scripts/generate-sitemap.ts",
+    "build": "vite build && bun run scripts/prerender-seo.ts && bun run scripts/generate-sitemap.ts && bun run scripts/indexnow-sync.ts",
+    "indexnow:flush": "bun run scripts/indexnow-flush.ts",
+    "indexnow:generate-key": "bun run scripts/generate-indexnow-key.ts",
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",

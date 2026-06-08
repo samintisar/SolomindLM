@@ -17,3 +17,23 @@ You can add a helper (e.g. `generateNotebookMetadata(notebook)`) in `SEOMeta.tsx
 
 - **Static pages**: `public/sitemap.xml` lists `/`, `/privacy`, `/terms`. Update `lastmod` when you change those pages; add new static feature or blog URLs with appropriate `changefreq` and `priority`.
 - **Dynamic content**: If you later have many public notebooks or blog posts, consider a server-generated sitemap or sitemap index (e.g. weekly for static, daily for dynamic).
+
+## IndexNow
+
+Public SEO URLs use the same canonical list as the sitemap (`getIndexablePublicSeoPages()` → `canonicalUrl()`).
+
+On each production build:
+
+1. `scripts/indexnow-sync.ts` diffs the registry against `scripts/indexnow-state.json`
+2. Added, materially updated (`lastmod` changed), and removed URLs are enqueued (deduped)
+3. The queue is flushed to `https://api.indexnow.org/indexnow` in batches
+4. `{INDEXNOW_KEY}.txt` is written to `dist/` for host verification
+
+Setup:
+
+1. `bun run --cwd apps/web indexnow:generate-key`
+2. Add `INDEXNOW_KEY` to Vercel production environment variables
+3. Deploy; confirm `https://www.solomindlm.com/{INDEXNOW_KEY}.txt` returns the raw key
+4. Verify submissions in Bing Webmaster Tools → IndexNow
+
+Only public marketing/docs URLs are submitted — never authenticated app routes. Preview builds skip submission unless `INDEXNOW_SUBMIT=true`.
