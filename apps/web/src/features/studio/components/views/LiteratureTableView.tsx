@@ -91,11 +91,13 @@ function exportToCSV(table: LiteratureTable, filename: string) {
   const dataColumns = table.columns.filter(isDataColumn).sort((a, b) => a.order - b.order);
   const headers = ["Paper", ...dataColumns.map((c) => c.name)];
 
-  const rows = table.papers.map((paper) => {
-    const title = getPaperTitle(paper, table.columns);
-    const values = dataColumns.map((col) => paper.rowData[col.id] || "");
-    return [title, ...values];
-  });
+  const rows = table.papers
+    .filter((paper) => paper.isIncluded)
+    .map((paper) => {
+      const title = getPaperTitle(paper, table.columns);
+      const values = dataColumns.map((col) => paper.rowData[col.id] || "");
+      return [title, ...values];
+    });
 
   const escapeCSV = (value: string) => {
     if (value.includes(",") || value.includes('"') || value.includes("\n")) {

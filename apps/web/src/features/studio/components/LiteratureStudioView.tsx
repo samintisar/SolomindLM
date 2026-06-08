@@ -8,12 +8,12 @@ import {
   useSaveLiteratureReportAsStudioReport,
   useSaveLiteratureTableAsStudioSpreadsheet,
 } from "../services/literatureTablesApi";
-import type { LiteratureTable } from "./views/LiteratureTableView";
 import type { ActiveLiteratureView } from "../types/literatureStudio";
 import { literatureReportToolbarLabel } from "../utils/literatureReportLabels";
 import type { CitationStyle } from "./CitationStylePicker";
 import { ResizeHandle } from "./ResizeHandle";
 import { LiteratureReportView } from "./views/LiteratureReportView";
+import type { LiteratureTable } from "./views/LiteratureTableView";
 import { LiteratureTableView } from "./views/LiteratureTableView";
 
 interface LiteratureStudioViewProps {
@@ -139,11 +139,17 @@ function LiteratureReportStudioShell({
 }) {
   const detail = useLiteratureReportDetail(reportId);
   const saveAsStudioReport = useSaveLiteratureReportAsStudioReport();
+  const { success: toastSuccess, error: toastError } = useToast();
 
-  const handleSaveAndEdit = async () => {
-    const savedReportId = await saveAsStudioReport({ reportId });
-    onOpenSavedReport?.(savedReportId);
-  };
+  const handleSaveAndEdit = useCallback(async () => {
+    try {
+      const savedReportId = await saveAsStudioReport({ reportId });
+      toastSuccess("Report saved to Studio");
+      onOpenSavedReport?.(savedReportId);
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Failed to save report");
+    }
+  }, [onOpenSavedReport, reportId, saveAsStudioReport, toastError, toastSuccess]);
 
   return (
     <PanelShell width={width}>

@@ -43,7 +43,8 @@ export function literatureTableToCsv(
       return [title, ...values];
     });
 
-  return [headers.map(escapeCSV).join(","), ...rows.map((row) => row.map(escapeCSV).join(","))].join(
-    "\n"
-  );
+  return [
+    headers.map(escapeCSV).join(","),
+    ...rows.map((row) => row.map(escapeCSV).join(",")),
+  ].join("\n");
 }
