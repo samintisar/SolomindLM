@@ -53,7 +53,8 @@ export interface LiteratureTableViewProps {
   table: LiteratureTable;
   notebookId: Id<"notebooks">;
   onBack?: () => void;
-  onSave?: (table: LiteratureTable) => void;
+  onSave?: (table: LiteratureTable) => void | Promise<void>;
+  isSaving?: boolean;
   onExport?: (format: "csv" | "excel") => void;
   onAddPapers?: () => void;
 }
@@ -155,6 +156,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   notebookId,
   onBack,
   onSave,
+  isSaving = false,
   onExport,
   onAddPapers,
 }) => {
@@ -356,12 +358,20 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => onSave?.(table)}
-            title="Save table"
+            onClick={() => void onSave?.(table)}
+            disabled={!onSave || isSaving}
+            title="Save table to Studio"
+            aria-label={isSaving ? "Saving table" : "Save table to Studio"}
             className={TABLE_TOOLBAR_BTN}
           >
-            <Save className="h-4 w-4 shrink-0" strokeWidth={2} />
-            <span className="hidden @min-[860px]/table-toolbar:inline">Save table</span>
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" strokeWidth={2} />
+            ) : (
+              <Save className="h-4 w-4 shrink-0" strokeWidth={2} />
+            )}
+            <span className="hidden @min-[860px]/table-toolbar:inline">
+              {isSaving ? "Saving..." : "Save table"}
+            </span>
           </button>
           <DropdownMenu
             trigger={

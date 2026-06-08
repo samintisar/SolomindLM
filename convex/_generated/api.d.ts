@@ -325,6 +325,7 @@ import type * as studio_jobMutations_reports from "../studio/jobMutations/report
 import type * as studio_jobMutations_spreadsheets from "../studio/jobMutations/spreadsheets.js";
 import type * as studio_jobMutations_writtenQuestions from "../studio/jobMutations/writtenQuestions.js";
 import type * as studio_literature_tables_index from "../studio/literature_tables/index.js";
+import type * as studio_literature_tables_literatureTableCsv from "../studio/literature_tables/literatureTableCsv.js";
 import type * as studio_mindmaps_index from "../studio/mindmaps/index.js";
 import type * as studio_mindmaps_job from "../studio/mindmaps/job.js";
 import type * as studio_mindmaps_mindmapJobPhases from "../studio/mindmaps/mindmapJobPhases.js";
@@ -675,6 +676,7 @@ declare const fullApi: ApiFromModules<{
   "studio/jobMutations/spreadsheets": typeof studio_jobMutations_spreadsheets;
   "studio/jobMutations/writtenQuestions": typeof studio_jobMutations_writtenQuestions;
   "studio/literature_tables/index": typeof studio_literature_tables_index;
+  "studio/literature_tables/literatureTableCsv": typeof studio_literature_tables_literatureTableCsv;
   "studio/mindmaps/index": typeof studio_mindmaps_index;
   "studio/mindmaps/job": typeof studio_mindmaps_job;
   "studio/mindmaps/mindmapJobPhases": typeof studio_mindmaps_mindmapJobPhases;

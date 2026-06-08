@@ -56,6 +56,66 @@ async function seedLiteratureReport(
   );
 }
 
+async function seedCitation(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">
+): Promise<Id<"citations">> {
+  return t.run(async (ctx) =>
+    ctx.db.insert("citations", {
+      paperId: `paper-${userId}`,
+      title: "Sample Paper",
+      authors: ["Ada Lovelace"],
+      year: 2024,
+      url: "https://example.com/paper",
+      sourceApi: "openalex",
+      citationKey: "lovelace2024sample",
+    })
+  );
+}
+
+async function seedLiteratureTable(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  notebookId: Id<"notebooks">,
+  citationId: Id<"citations">
+): Promise<Id<"literatureTables">> {
+  return t.run(async (ctx) =>
+    ctx.db.insert("literatureTables", {
+      userId,
+      notebookId,
+      title: "Literature Table",
+      status: "completed",
+      columns: [
+        {
+          id: "paper_title",
+          name: "Paper",
+          type: "paper_title",
+          isVisible: true,
+          isSystem: true,
+          order: 0,
+        },
+        {
+          id: "finding",
+          name: "Finding",
+          type: "custom",
+          isVisible: true,
+          isSystem: false,
+          order: 1,
+        },
+      ],
+      papers: [
+        {
+          citationId,
+          rowData: { finding: "Important result" },
+          isIncluded: true,
+        },
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+  );
+}
+
 describe("saveLiteratureReportAsStudioReport", () => {
   test("copies a literature report into the Studio saved reports list", async () => {
     const t = convexTest(schema, modules);
@@ -95,6 +155,99 @@ describe("saveLiteratureReportAsStudioReport", () => {
             reportType: "literature_review",
             sourceLiteratureReportId: literatureReportId,
             citationStyle: "apa7",
+          }),
+        }),
+      ])
+    );
+  });
+});
+
+describe("saveLiteratureTableAsStudioSpreadsheet", () => {
+  test("persists table edits and copies the table into the Studio spreadsheets list", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const citationId = await seedCitation(t, userId);
+    const literatureTableId = await seedLiteratureTable(t, userId, notebookId, citationId);
+
+    const saveLiteratureTableAsStudioSpreadsheet = (
+      api.studio.literature_tables.index as {
+        saveLiteratureTableAsStudioSpreadsheet: FunctionReference<
+          "mutation",
+          "public",
+          {
+            tableId: Id<"literatureTables">;
+            title: string;
+            columns: Array<{
+              id: string;
+              name: string;
+              type: "paper_title" | "authors" | "year" | "study_type" | "custom";
+              instructions?: string;
+              isVisible: boolean;
+              isSystem: boolean;
+              order: number;
+            }>;
+            papers: Array<{
+              citationId: Id<"citations">;
+              rowData: Record<string, string>;
+              includeReason?: string;
+              isIncluded: boolean;
+            }>;
+          },
+          Id<"spreadsheets">
+        >;
+      }
+    ).saveLiteratureTableAsStudioSpreadsheet;
+
+    const spreadsheetId = await withAuth(t, userId).mutation(
+      saveLiteratureTableAsStudioSpreadsheet,
+      {
+        tableId: literatureTableId,
+        title: "Saved Literature Table",
+        columns: [
+          {
+            id: "paper_title",
+            name: "Paper",
+            type: "paper_title",
+            isVisible: true,
+            isSystem: true,
+            order: 0,
+          },
+          {
+            id: "finding",
+            name: "Finding",
+            type: "custom",
+            isVisible: true,
+            isSystem: false,
+            order: 1,
+          },
+        ],
+        papers: [
+          {
+            citationId,
+            rowData: { finding: "Updated result" },
+            isIncluded: true,
+          },
+        ],
+      }
+    );
+
+    const savedNotes = await withAuth(t, userId).query(api.notes.index.list, {
+      notebookId,
+    });
+
+    expect(spreadsheetId).toBeTruthy();
+    expect(savedNotes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          _id: spreadsheetId,
+          _type: "spreadsheet",
+          title: "Saved Literature Table",
+          status: "completed",
+          data: expect.stringContaining("Updated result"),
+          metadata: expect.objectContaining({
+            spreadsheetType: "literature_review",
+            sourceLiteratureTableId: literatureTableId,
           }),
         }),
       ])

@@ -59,3 +59,7 @@ export function useRetryLiteratureReview() {
 export function useSaveLiteratureReportAsStudioReport() {
   return useMutation(api.studio.literature_tables.index.saveLiteratureReportAsStudioReport);
 }
+
+export function useSaveLiteratureTableAsStudioSpreadsheet() {
+  return useMutation(api.studio.literature_tables.index.saveLiteratureTableAsStudioSpreadsheet);
+}
