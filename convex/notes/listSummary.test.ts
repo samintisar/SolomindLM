@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  summarizeFlashcardRow,
-  summarizeReportRow,
-  summarizeUserNoteRow,
-} from "./listSummary";
+import { summarizeFlashcardRow, summarizeReportRow, summarizeUserNoteRow } from "./listSummary";
 
 describe("listSummary", () => {
   it("strips report content but keeps metadata", () => {

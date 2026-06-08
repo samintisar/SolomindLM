@@ -3,10 +3,9 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { Send } from "@langchain/langgraph";
-
+import { env } from "../../_lib/env.js";
 import { invokeWithRetry, invokeWithTimeout, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
-
 import { GRAPH_CONFIG } from "./config.js";
 import { callStatusUpdate } from "./nodeSplit.js";
 import { finalizeQuestions, getSelectionPrompt } from "./postprocess.js";
@@ -17,7 +16,6 @@ import {
   type WrittenQuestionsResponse,
 } from "./prompts.js";
 import { detectSimilarQuestions } from "./questionHeuristics.js";
-import { env } from "../../_lib/env.js";
 import type { OverallStateType } from "./state.js";
 import { createStructuredLLM } from "./structuredLlm.js";
 

@@ -9,7 +9,6 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
-import { createStructuredLLM } from "../../_agents/quiz/structuredLlm";
 import { packChunks, validateChunks } from "../../_agents/QuizGraph";
 import {
   applySelectedCandidateIndices,
@@ -29,6 +28,7 @@ import {
   QuizQuestionSchema,
   REDUCE_SELECT_SYSTEM_PROMPT,
 } from "../../_agents/quiz/prompts";
+import { createStructuredLLM } from "../../_agents/quiz/structuredLlm";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";

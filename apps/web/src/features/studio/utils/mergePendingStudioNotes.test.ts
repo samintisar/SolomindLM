@@ -36,10 +36,7 @@ describe("mergePendingStudioNotes", () => {
 describe("prunePendingStudioNotes", () => {
   it("removes pending rows once the query includes the same id", () => {
     const queryNotes = [report("real-id", "Report")];
-    const pendingNotes = [
-      report("placeholder", "Report"),
-      report("real-id", "Report"),
-    ];
+    const pendingNotes = [report("placeholder", "Report"), report("real-id", "Report")];
 
     expect(prunePendingStudioNotes(queryNotes, pendingNotes)).toEqual([
       report("placeholder", "Report"),

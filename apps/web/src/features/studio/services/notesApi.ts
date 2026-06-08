@@ -334,10 +334,7 @@ export function useNote(type: string, noteId: string | null) {
  * Load full studio note content when opening a saved item from the list.
  */
 export function useNoteDetail(type: string | null, noteId: string | null) {
-  const note = useQuery(
-    api.notes.index.get,
-    type && noteId ? { type, id: noteId as any } : "skip"
-  );
+  const note = useQuery(api.notes.index.get, type && noteId ? { type, id: noteId as any } : "skip");
   return {
     note: note ? mapDatabaseNoteToNote(note) : null,
     isLoading: note === undefined && Boolean(type && noteId),

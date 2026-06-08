@@ -11,7 +11,6 @@ import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
-import { createStructuredLLM } from "../../_agents/written_questions/structuredLlm";
 import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
   applySelectedQuestionIds,
@@ -26,6 +25,7 @@ import {
   WrittenQuestionsArraySchema,
   type WrittenQuestionsResponse,
 } from "../../_agents/written_questions/prompts";
+import { createStructuredLLM } from "../../_agents/written_questions/structuredLlm";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";

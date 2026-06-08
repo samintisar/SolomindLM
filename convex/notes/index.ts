@@ -141,9 +141,9 @@ export const list = query({
     const results = await Promise.all(queries);
     const allNotes = results
       .flat()
-      .map((item) => summarizeListRow(item as Record<string, unknown> & { _type: string })) as Array<
-      Record<string, unknown> & { updatedAt: number }
-    >;
+      .map((item) =>
+        summarizeListRow(item as Record<string, unknown> & { _type: string })
+      ) as Array<Record<string, unknown> & { updatedAt: number }>;
 
     allNotes.sort((a, b) => b.updatedAt - a.updatedAt);
 

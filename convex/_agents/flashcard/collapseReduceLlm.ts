@@ -2,12 +2,10 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-
+import { env } from "../../_lib/env.js";
 import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction";
 import type { JobLogger } from "../_shared/logging.js";
-
-import { env } from "../../_lib/env.js";
 import { FLASHCARD_CONFIG } from "./config.js";
 import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
 import { formatFlashcardsAsText } from "./formatFlashcards.js";

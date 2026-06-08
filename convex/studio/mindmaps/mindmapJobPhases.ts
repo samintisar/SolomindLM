@@ -11,7 +11,6 @@ import { withLanguageInstruction } from "../../_agents/_shared/languageInstructi
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { invokeStructuredOutput } from "../../_agents/_shared/structuredLlm";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
-import { ConceptExtractionSchema } from "../../_agents/mindmap/structuredLlm";
 import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
 import {
   MAP_PROMPT,
@@ -20,6 +19,7 @@ import {
   REDUCE_SYSTEM_PROMPT,
 } from "../../_agents/mindmap/prompts";
 import type { ConceptExtraction, FinalMindMap, MindMapNode } from "../../_agents/mindmap/state";
+import { ConceptExtractionSchema } from "../../_agents/mindmap/structuredLlm";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
