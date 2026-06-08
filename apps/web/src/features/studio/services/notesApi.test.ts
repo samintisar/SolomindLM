@@ -138,6 +138,19 @@ describe("mapDatabaseNoteToNote", () => {
     }
   });
 
+  it("maps spreadsheet preview from data_extraction metadata", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "spreadsheet",
+      data: "a,b\n1,2",
+      metadata: { spreadsheetType: "data_extraction" },
+    });
+    expect(result.preview).toBe("Spreadsheet · Data Table");
+    if (result.type === "spreadsheet") {
+      expect(result.metadata.spreadsheetType).toBe("data_extraction");
+    }
+  });
+
   it("maps spreadsheet type with object data", () => {
     const result = mapDatabaseNoteToNote({
       ...baseNote,
@@ -216,6 +229,63 @@ describe("mapDatabaseNoteToNote", () => {
     if (result.type === "flashcard") {
       expect(result.flashcards).toEqual([]);
       expect(result.metadata.cardCount).toBe(0);
+    }
+  });
+
+  it("maps flashcard list summary using _cardsCount when cardsData is stripped", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "flashcard",
+      _cardsCount: 12,
+      metadata: { difficulty: "hard" },
+    });
+    expect(result.type).toBe("flashcard");
+    if (result.type === "flashcard") {
+      expect(result.flashcards).toEqual([]);
+      expect(result.metadata.cardCount).toBe(12);
+      expect(result.preview).toBe("12 Flashcards · Hard");
+    }
+  });
+
+  it("maps quiz list summary using _questionsCount when questionsData is stripped", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "quiz",
+      _questionsCount: 5,
+      metadata: { difficulty: "easy" },
+    });
+    expect(result.type).toBe("quiz");
+    if (result.type === "quiz") {
+      expect(result.questions).toEqual([]);
+      expect(result.metadata.questionCount).toBe(5);
+      expect(result.preview).toContain("5");
+    }
+  });
+
+  it("maps infographic list summary using _imageUrl when data is stripped", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "infographic",
+      _imageUrl: "https://cdn.example.com/thumb.png",
+    });
+    expect(result.type).toBe("infographic");
+    if (result.type === "infographic") {
+      expect(result.imageUrl).toBe("https://cdn.example.com/thumb.png");
+      expect(result.preview).toBe("Infographic");
+    }
+  });
+
+  it("maps written questions list summary using _questionsCount", () => {
+    const result = mapDatabaseNoteToNote({
+      ...baseNote,
+      _type: "writtenQuestions",
+      _questionsCount: 3,
+      questionType: "essay",
+    });
+    expect(result.type).toBe("writtenQuestions");
+    if (result.type === "writtenQuestions") {
+      expect(result.questions).toEqual([]);
+      expect(result.metadata.questionCount).toBe(3);
     }
   });
 });

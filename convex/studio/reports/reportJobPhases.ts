@@ -4,12 +4,10 @@
  * Report generation phase implementations (invoked from thin `job.ts` registrations).
  */
 
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { packChunks, validateChunks } from "../../_agents/ReportGraph";
 import {
   MAP_PROMPTS,
@@ -33,19 +31,6 @@ const CONFIG = {
   MAX_OUTPUT_TOKENS: 32_000,
   MIN_SUMMARY_LENGTH: 50,
 } as const;
-
-function createReduceLLM(modelOverride?: string): ChatTogetherAI {
-  const model = modelOverride || env.REPORT_LLM;
-  console.log(`[ReportJob] Reduce model: ${model}`);
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.5,
-    timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: CONFIG.MAX_OUTPUT_TOKENS,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
 
 export type ReportGenerationPhaseArgs = {
   reportId: Id<"reports">;
@@ -464,7 +449,7 @@ export async function runFinalizeReportPhase(
       },
     });
 
-    const llm = createReduceLLM(smartLlm);
+    const reduceModel = smartLlm || env.REPORT_LLM;
     const promptTemplate = REDUCE_PROMPTS[reportType] || REDUCE_PROMPTS["custom"];
 
     let prompt = promptTemplate
@@ -481,22 +466,24 @@ export async function runFinalizeReportPhase(
     console.log(`[ReportJob] Reduce prompt: ${prompt.length} chars`);
 
     const startTime = Date.now();
-    const response = (await invokeStudioLlm({
+    let content = await invokeStudioLlm({
       invoke: () =>
-        (llm as any).invoke([
-          new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-          new HumanMessage(prompt),
-        ]),
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          userPrompt: prompt,
+          model: reduceModel,
+          maxTokens: CONFIG.MAX_OUTPUT_TOKENS,
+          temperature: 0.5,
+          reasoningEnabled: true,
+        }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "ReportReduce",
       onRetry: (attempt, error) => {
         console.log(`[ReportJob] Reduce retry ${attempt}/3: ${error.message}`);
       },
-    })) as { content: unknown };
+    });
 
     const elapsed = Date.now() - startTime;
-    let content =
-      typeof response.content === "string" ? response.content : String(response.content);
 
     if (failedCount.count > 0) {
       const omitted = failedCount.count === 1 ? "section" : "sections";

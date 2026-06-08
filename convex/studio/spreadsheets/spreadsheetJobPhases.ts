@@ -5,12 +5,11 @@
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
 import {
   COLLAPSE_PROMPTS,
@@ -65,52 +64,6 @@ export type FinalizeSpreadsheetPhaseArgs = {
   spreadsheetType: string;
   customPrompt: string;
 };
-
-// ============================================================
-// HELPER: Create LLMs
-// ============================================================
-
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.3,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-    maxTokens: 8_192,
-  });
-}
-
-function createReduceLLM(): ChatTogetherAI {
-  const model = env.SPREADSHEET_LLM;
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.5,
-    timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: 32_000,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
-
-// ============================================================
-// HELPER: Extract message content
-// ============================================================
-
-function getMessageContent(response: unknown): string {
-  if (typeof response === "object" && response !== null) {
-    const msg = response as { content?: unknown };
-    if (typeof msg.content === "string") {
-      return msg.content;
-    }
-    if (typeof msg.content === "object" && msg.content !== null) {
-      if (typeof (msg.content as { toString?: () => string }).toString === "function") {
-        return (msg.content as { toString: () => string }).toString();
-      }
-    }
-  }
-  return String(response);
-}
 
 // ============================================================
 // HELPER: Clean CSV output
@@ -374,9 +327,6 @@ export async function runProcessSpreadsheetMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    // Process with LLM (plain text output)
-    const llm = createMapLLM();
-
     // If customPrompt is provided, use the custom template
     // Otherwise, use the predefined template for the spreadsheet type
     const promptTemplate =
@@ -390,12 +340,15 @@ export async function runProcessSpreadsheetMapChunkPhase(
     console.log(`[SpreadsheetJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
-    const response = await invokeStudioLlm({
+    const mapOutput = await invokeStudioLlm({
       invoke: () =>
-        (llm as any).invoke([
-          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-          new HumanMessage(prompt),
-        ]),
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(MAP_SYSTEM_PROMPT, language),
+          userPrompt: prompt,
+          model: env.FAST_LLM,
+          maxTokens: 8_192,
+          temperature: 0.3,
+        }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "SpreadsheetMap",
       onRetry: (attempt, error) => {
@@ -404,7 +357,6 @@ export async function runProcessSpreadsheetMapChunkPhase(
     });
 
     const elapsed = Date.now() - startTime;
-    const mapOutput = getMessageContent(response);
 
     console.log(
       `[SpreadsheetJob] ${chunkId} LLM completed in ${elapsed}ms, output: ${mapOutput.length} chars`
@@ -641,7 +593,6 @@ export async function runFinalizeSpreadsheetPhase(
     });
 
     // Stage 2: Reduce (Generate CSV)
-    const reduceLLM = createReduceLLM();
     const combined = collapsedOutputs.join("\n\n---\n\n");
 
     // Get the reduce prompt based on spreadsheet type
@@ -657,25 +608,23 @@ export async function runFinalizeSpreadsheetPhase(
     console.log(`[SpreadsheetJob] Reduce prompt: ${prompt.length} chars`);
 
     const startTime = Date.now();
-    const response = await invokeStudioLlm({
+    const rawContent = await invokeStudioLlm({
       invoke: () =>
-        (reduceLLM as any).invoke([
-          new SystemMessage(withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language)),
-          new HumanMessage(prompt),
-        ]),
+        invokeTogetherText({
+          systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+          userPrompt: prompt,
+          model: env.SPREADSHEET_LLM,
+          maxTokens: 32_000,
+          temperature: 0.5,
+          reasoningEnabled: true,
+        }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "SpreadsheetReduce",
     });
 
-    const rawContent = getMessageContent(response);
     let finalOutput = cleanCsvOutput(rawContent);
 
-    // Handle truncation
-    const responseAny = response as any;
-    const metadata = responseAny.response_metadata || {};
-    const finishReason = metadata.finish_reason || metadata.tokenUsage?.finish_reason;
-
-    if (finishReason === "length") {
+    if (rawContent.length >= 31_000) {
       console.log("[SpreadsheetJob] CSV may be truncated, trimming incomplete last row");
       const lastNewline = finalOutput.lastIndexOf("\n");
       if (lastNewline > 0) {
@@ -717,6 +666,8 @@ export async function runFinalizeSpreadsheetPhase(
       spreadsheet: finalOutput,
       metadata: {
         title,
+        spreadsheetType: spreadsheetType || spreadsheet.metadata?.spreadsheetType || "custom",
+        customPrompt: customPrompt ?? spreadsheet.metadata?.customPrompt,
         phase: "completed",
         progress: 100,
         completedAt: Date.now(),
@@ -808,7 +759,6 @@ async function recursiveCollapse(
 
   console.log(`[SpreadsheetJob] Collapsing ${groups.length} token-aware groups`);
 
-  const reduceLLM = createReduceLLM();
   const collapsed = await allWithConcurrency(
     groups.map((group, idx) => {
       return async () => {
@@ -823,17 +773,19 @@ async function recursiveCollapse(
           .replace("{customPrompt}", sanitizeUserInput(customPrompt || ""));
 
         try {
-          const response = await invokeStudioLlm({
+          return await invokeStudioLlm({
             invoke: () =>
-              (reduceLLM as any).invoke([
-                new SystemMessage(withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language)),
-                new HumanMessage(prompt),
-              ]),
+              invokeTogetherText({
+                systemPrompt: withLanguageInstruction(COLLAPSE_SYSTEM_PROMPT, language),
+                userPrompt: prompt,
+                model: env.SPREADSHEET_LLM,
+                maxTokens: 32_000,
+                temperature: 0.5,
+                reasoningEnabled: true,
+              }),
             timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
             phaseLabel: "CollapseGroup",
           });
-
-          return getMessageContent(response);
         } catch (error) {
           console.log(`[SpreadsheetJob] Collapse group ${idx} failed: ${error}`);
           return combined; // Fallback: return uncollapsed

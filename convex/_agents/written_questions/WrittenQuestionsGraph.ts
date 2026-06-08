@@ -41,7 +41,11 @@ export class WrittenQuestionsGraph {
       modelKwargs: mergeModelKwargs(reduceModel, "smart"),
     });
 
-    this.fastLlmStructured = createStructuredLLM(this.fastLlm, WrittenQuestionsArraySchema);
+    this.fastLlmStructured = createStructuredLLM(WrittenQuestionsArraySchema, {
+      model: mapModel,
+      maxTokens: 16_000,
+      temperature: 0.3,
+    });
   }
 
   buildGraph() {

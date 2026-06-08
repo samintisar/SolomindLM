@@ -3,7 +3,7 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { Send } from "@langchain/langgraph";
-
+import { env } from "../../_lib/env.js";
 import {
   allWithConcurrency,
   invokeWithRetry,
@@ -11,7 +11,6 @@ import {
   withoutMapOutputs,
 } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
-
 import { GRAPH_CONFIG } from "./config.js";
 import { callStatusUpdate } from "./nodeSplit.js";
 import { expandQuestion, finalizeQuestions } from "./postprocess.js";
@@ -26,7 +25,7 @@ import {
 } from "./prompts.js";
 import { detectSimilarQuestions, heuristicDedupe } from "./quizHeuristics.js";
 import type { OverallStateType } from "./state.js";
-import type { StructuredOutputInvoker } from "./structuredLlm.js";
+import { createStructuredLLM, type StructuredOutputInvoker } from "./structuredLlm.js";
 
 export interface ReduceQuizDeps {
   smartLlm: ChatTogetherAI;
@@ -138,9 +137,11 @@ export async function reduce(
     );
 
     try {
-      const structuredLlm = deps.smartLlm.withStructuredOutput<QuizCandidateIndexSelection>(
+      const reduceModel = (deps.smartLlm as { model?: string }).model ?? env.QUIZ_LLM;
+      const structuredLlm = createStructuredLLM<QuizCandidateIndexSelection>(
         QuizCandidateIndexSelectionSchema,
-        { name: "quiz_candidate_index_selection" }
+        "quiz_candidate_index_selection",
+        { model: reduceModel, reasoningEnabled: true, logPrefix: "QuizReduce" }
       );
 
       const selectionPrompt = getCandidateSelectionPrompt({

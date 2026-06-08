@@ -5,13 +5,11 @@
  * @see ./job.ts for Convex `internalAction` registrations.
  */
 
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
-import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
@@ -27,6 +25,7 @@ import {
   WrittenQuestionsArraySchema,
   type WrittenQuestionsResponse,
 } from "../../_agents/written_questions/prompts";
+import { createStructuredLLM } from "../../_agents/written_questions/structuredLlm";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
@@ -37,39 +36,9 @@ import { invokeStudioLlm } from "../_job/invokeStudioLlm";
 // SCHEMAS
 // ============================================================
 
-// Interface for the structured LLM to avoid deep type instantiation
-interface WrittenQuestionsOutputInvoker {
-  invoke(
-    messages: Array<SystemMessage | HumanMessage>,
-    config?: any
-  ): Promise<WrittenQuestionsResponse>;
-}
-
-// Helper function to create a structured LLM without triggering deep type instantiation
-function createQuestionsLLM(llm: ChatTogetherAI): WrittenQuestionsOutputInvoker {
-  return llm.withStructuredOutput(WrittenQuestionsArraySchema, {
-    name: "written_questions",
-  });
-}
-
 const WrittenQuestionIdSelectionSchema = z.object({
   selectedIds: z.array(z.string()),
 });
-
-type WrittenQuestionIdSelectionResponse = z.infer<typeof WrittenQuestionIdSelectionSchema>;
-
-interface WrittenQuestionSelectionInvoker {
-  invoke(
-    messages: Array<SystemMessage | HumanMessage>,
-    config?: any
-  ): Promise<WrittenQuestionIdSelectionResponse>;
-}
-
-function createQuestionSelectionLLM(llm: ChatTogetherAI): WrittenQuestionSelectionInvoker {
-  return llm.withStructuredOutput(WrittenQuestionIdSelectionSchema, {
-    name: "written_question_id_selection",
-  });
-}
 
 // ============================================================
 // CONFIGURATION
@@ -118,33 +87,6 @@ export type FinalizeWrittenQuestionsPhaseArgs = {
   questionType: string;
   focus?: string;
 };
-
-// ============================================================
-// HELPER: Create structured LLM for map phase
-// ============================================================
-
-function createMapLLM(): ChatTogetherAI {
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model: env.FAST_LLM,
-    temperature: 0.4,
-    timeout: CONFIG.PER_CHUNK_TIMEOUT_MS,
-    modelKwargs: mergeModelKwargs(env.FAST_LLM, "fast"),
-    maxTokens: 8000,
-  });
-}
-
-function createReduceLLM(): ChatTogetherAI {
-  const model = env.WRITTEN_QUESTIONS_LLM;
-  return new ChatTogetherAI({
-    apiKey: env.TOGETHER_AI_API_KEY,
-    model,
-    temperature: 0.3,
-    timeout: CONFIG.REDUCE_TIMEOUT_MS,
-    maxTokens: 32_000,
-    modelKwargs: mergeModelKwargs(model, "smart"),
-  });
-}
 
 // ============================================================
 // PHASE 1: Initialize & Schedule Map Tasks
@@ -376,9 +318,12 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
-    // Process with LLM using structured output
-    const llm = createMapLLM();
-    const structuredLLM = createQuestionsLLM(llm);
+    // Process with LLM using structured output (Together json_schema — same as report map)
+    const structuredLLM = createStructuredLLM(WrittenQuestionsArraySchema, {
+      model: env.FAST_LLM,
+      temperature: 0.4,
+      maxTokens: 8000,
+    });
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
     const prompt = getMapPrompt({
@@ -657,8 +602,15 @@ export async function runFinalizeWrittenQuestionsPhase(
         `[WrittenQuestionsJob] Selecting ${questionCount} best questions from ${dedupedQuestions.length} deduped candidates`
       );
 
-      const reduceLLM = createReduceLLM();
-      const structuredSelectLLM = createQuestionSelectionLLM(reduceLLM);
+      const structuredSelectLLM = createStructuredLLM<
+        z.infer<typeof WrittenQuestionIdSelectionSchema>
+      >(WrittenQuestionIdSelectionSchema, {
+        model: env.WRITTEN_QUESTIONS_LLM,
+        schemaName: "written_question_id_selection",
+        maxTokens: 32_000,
+        temperature: 0.3,
+        reasoningEnabled: true,
+      });
       const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
       const selectionPrompt = getSelectionIdsPrompt({
         questions: dedupedQuestions,

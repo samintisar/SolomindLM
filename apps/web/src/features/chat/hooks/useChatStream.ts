@@ -3,6 +3,10 @@ import { type Doc, Id } from "@convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  mergePendingStudioNotes,
+  prunePendingStudioNotes,
+} from "@/features/studio/utils/mergePendingStudioNotes";
+import {
   AgentGroundingCheck,
   ChatActivityPhase,
   ChatAgentTrace,
@@ -23,6 +27,12 @@ import {
   computeRemoteGenerationBlocksSend,
   researchProgressToStreamingActivity,
 } from "../utils/chatStreamHelpers";
+
+type StudioListOverlayState = {
+  notebookId: string | null;
+  pending: Note[];
+  savedChat: Note | null;
+};
 
 interface UseChatStreamProps {
   activeNotebookId: string | null;
@@ -99,14 +109,65 @@ export function useChatStream({
   const streamStartedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const [optimisticSaveNote, setOptimisticSaveNote] = useState<{
-    notebookId: string;
-    note: Note;
-  } | null>(null);
+  const [studioListOverlay, setStudioListOverlay] = useState<StudioListOverlayState>({
+    notebookId: null,
+    pending: [],
+    savedChat: null,
+  });
+
   const displayNotes = useMemo(() => {
-    if (!optimisticSaveNote || optimisticSaveNote.notebookId !== activeNotebookId) return notes;
-    return [optimisticSaveNote.note, ...notes];
-  }, [notes, optimisticSaveNote, activeNotebookId]);
+    const overlayNotebook = studioListOverlay.notebookId;
+    const pending = overlayNotebook === activeNotebookId ? studioListOverlay.pending : [];
+    const withPending = mergePendingStudioNotes(notes, prunePendingStudioNotes(notes, pending));
+    if (studioListOverlay.savedChat && overlayNotebook === activeNotebookId) {
+      return [studioListOverlay.savedChat, ...withPending];
+    }
+    return withPending;
+  }, [notes, studioListOverlay, activeNotebookId]);
+
+  const addPendingStudioNote = useCallback(
+    (note: Note) => {
+      if (!activeNotebookId) return;
+      setStudioListOverlay((prev) => {
+        const basePending = prev.notebookId === activeNotebookId ? prev.pending : [];
+        return {
+          notebookId: activeNotebookId,
+          pending: [note, ...prunePendingStudioNotes(notes, basePending)],
+          savedChat: prev.notebookId === activeNotebookId ? prev.savedChat : null,
+        };
+      });
+    },
+    [activeNotebookId, notes]
+  );
+
+  const updatePendingStudioNote = useCallback((placeholderId: string, note: Note) => {
+    setStudioListOverlay((prev) => ({
+      ...prev,
+      pending: prev.pending.map((pending) => (pending.id === placeholderId ? note : pending)),
+    }));
+  }, []);
+
+  const removePendingStudioNote = useCallback((id: string) => {
+    setStudioListOverlay((prev) => ({
+      ...prev,
+      pending: prev.pending.filter((note) => note.id !== id),
+    }));
+  }, []);
+
+  const setOptimisticSaveNote = useCallback(
+    (payload: { notebookId: string; note: Note } | null) => {
+      if (payload === null) {
+        setStudioListOverlay((prev) => ({ ...prev, savedChat: null }));
+        return;
+      }
+      setStudioListOverlay((prev) => ({
+        notebookId: payload.notebookId,
+        pending: prev.notebookId === payload.notebookId ? prev.pending : [],
+        savedChat: payload.note,
+      }));
+    },
+    []
+  );
 
   const resetStreamingState = useCallback(() => {
     setIsChatStreaming(false);
@@ -148,7 +209,7 @@ export function useChatStream({
       // Only auto-release if:
       // 1. Generation is old (>5 min)
       // 2. We're not actively streaming locally
-      // 3. There's no assistant message waiting for this generation
+      // 3. Last message is already an assistant (generation lock stuck after persist)
       const last = messages[messages.length - 1];
       const isWaitingForAssistant = last?.role !== "assistant";
 
@@ -752,6 +813,9 @@ export function useChatStream({
     remoteChatGenerating: chatRemoteGenerating,
     remoteGenerationBlocksSend,
     displayNotes,
+    addPendingStudioNote,
+    updatePendingStudioNote,
+    removePendingStudioNote,
     handleSendMessage,
     handleClearChatHistory,
     setMessageFeedback,

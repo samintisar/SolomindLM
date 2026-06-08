@@ -2,11 +2,10 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-
+import { env } from "../../_lib/env.js";
 import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction";
 import type { JobLogger } from "../_shared/logging.js";
-
 import { FLASHCARD_CONFIG } from "./config.js";
 import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
 import { formatFlashcardsAsText } from "./formatFlashcards.js";
@@ -102,7 +101,12 @@ ${flashcardsText}
 
 Return the condensed flashcards as a JSON array with "front" and "back" fields.`;
 
-  const structuredLlm = createStructuredLLM(deps.smartLlm, FlashcardArraySchema);
+  const reduceModel = (deps.smartLlm as { model?: string }).model ?? env.SMART_LLM;
+  const structuredLlm = createStructuredLLM(FlashcardArraySchema, {
+    model: reduceModel,
+    reasoningEnabled: true,
+    maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
+  });
   const response = (await invokeWithRetry(
     () =>
       invokeWithTimeout(
@@ -195,7 +199,12 @@ ${flashcardsText}
 
 Return the complete selected flashcards as a JSON array. For each flashcard, include a "topic" field that categorizes the card (e.g., "Definitions", "Processes", "Timeline", "Concepts", etc.). This helps ensure topic diversity.`;
 
-  const structuredLlm = createStructuredLLM(deps.smartLlm, FlashcardArraySchema);
+  const reduceModel = (deps.smartLlm as { model?: string }).model ?? env.SMART_LLM;
+  const structuredLlm = createStructuredLLM(FlashcardArraySchema, {
+    model: reduceModel,
+    reasoningEnabled: true,
+    maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
+  });
   const response = await invokeWithRetry(
     () =>
       invokeWithTimeout(

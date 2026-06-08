@@ -1,6 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
+import { extractJsonObjectString, uncachedLlmCall } from "../../_agents/_shared/cachedLlm";
 import { invokeWithRetry } from "../../_agents/_shared/index";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { internal } from "../../_generated/api";
@@ -191,7 +192,7 @@ export const generateInfographicImage = internalAction({
       logger.phaseStart("content_analysis");
       const designResponse = await invokeWithRetry(
         () =>
-          togetherClient.chat.completions.create({
+          uncachedLlmCall({
             model: env.SMART_LLM,
             messages: [
               {
@@ -241,6 +242,8 @@ Return JSON: {
               },
             ],
             temperature: 0.7,
+            reasoningEnabled: true,
+            responseFormat: { type: "json_object" },
           }),
         {
           maxAttempts: 3,
@@ -255,7 +258,11 @@ Return JSON: {
         "InfographicDesignGen"
       );
 
-      const designContent = designResponse.choices[0]?.message?.content || "{}";
+      const designContent =
+        designResponse.structuredJson?.trim() ||
+        extractJsonObjectString(designResponse.content) ||
+        designResponse.content ||
+        "{}";
       const design = parseLlmJson(designContent) as Record<string, any>;
       if (!design.image_prompt) {
         throw new Error(

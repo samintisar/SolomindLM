@@ -3,10 +3,9 @@
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { Send } from "@langchain/langgraph";
-
+import { env } from "../../_lib/env.js";
 import { invokeWithRetry, invokeWithTimeout, withoutMapOutputs } from "../_shared/index.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
-
 import { GRAPH_CONFIG } from "./config.js";
 import { callStatusUpdate } from "./nodeSplit.js";
 import { finalizeQuestions, getSelectionPrompt } from "./postprocess.js";
@@ -18,6 +17,7 @@ import {
 } from "./prompts.js";
 import { detectSimilarQuestions } from "./questionHeuristics.js";
 import type { OverallStateType } from "./state.js";
+import { createStructuredLLM } from "./structuredLlm.js";
 
 export async function reduce(
   state: OverallStateType,
@@ -232,10 +232,12 @@ export async function reduce(
   }
 
   try {
-    const structuredLlm = smartLlm.withStructuredOutput<WrittenQuestionsResponse>(
-      WrittenQuestionsArraySchema,
-      { name: "written_questions_selection" }
-    );
+    const reduceModel = (smartLlm as { model?: string }).model ?? env.WRITTEN_QUESTIONS_LLM;
+    const structuredLlm = createStructuredLLM(WrittenQuestionsArraySchema, {
+      model: reduceModel,
+      schemaName: "written_questions_selection",
+      reasoningEnabled: true,
+    });
 
     const selectionPrompt = getSelectionPrompt({
       questions: questionsForLLM,

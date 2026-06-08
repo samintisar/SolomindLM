@@ -9,16 +9,21 @@ export const saveSpreadsheetResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const spreadsheet = await ctx.db.get(args.spreadsheetId);
+    if (!spreadsheet) return null;
+
     await ctx.db.patch(args.spreadsheetId, {
       data: args.spreadsheet,
       status: "completed",
       updatedAt: Date.now(),
       title: args.metadata?.title ?? "Spreadsheet",
       metadata: {
+        ...spreadsheet.metadata,
         ...args.metadata,
         completedAt: Date.now(),
       },
     });
+    return args.spreadsheetId;
   },
 });
 
@@ -42,14 +47,21 @@ export const updateSpreadsheetStatus = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const updates: any = {
+    const spreadsheet = await ctx.db.get(args.spreadsheetId);
+    if (!spreadsheet) return null;
+
+    const updates: Record<string, unknown> = {
       status: args.status,
       updatedAt: Date.now(),
     };
     if (args.metadata) {
-      updates.metadata = args.metadata;
+      updates.metadata = {
+        ...spreadsheet.metadata,
+        ...args.metadata,
+      };
     }
     await ctx.db.patch(args.spreadsheetId, updates);
+    return args.spreadsheetId;
   },
 });
 
@@ -60,6 +72,9 @@ export const markSpreadsheetFailed = internalMutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    const spreadsheet = await ctx.db.get(args.spreadsheetId);
+    if (!spreadsheet) return null;
+
     const errorMetadata = buildErrorMetadata(
       args.error,
       args.metadata?.phase || "unknown",
@@ -69,10 +84,12 @@ export const markSpreadsheetFailed = internalMutation({
       status: "failed",
       updatedAt: Date.now(),
       metadata: {
+        ...spreadsheet.metadata,
         ...args.metadata,
         ...errorMetadata,
       },
     });
+    return args.spreadsheetId;
   },
 });
 

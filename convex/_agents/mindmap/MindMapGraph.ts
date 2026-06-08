@@ -36,9 +36,11 @@ export { packChunks, validateChunks } from "./chunkHelpers.js";
 export class MindMapGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
+  private readonly mapModel: string;
   private readonly MAX_TOTAL_FAILURES = 5;
 
   constructor(apiKey: string, mapModel: string, reduceModel: string) {
+    this.mapModel = mapModel;
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
@@ -58,7 +60,7 @@ export class MindMapGraph {
 
   async mapProcess(state: ChunkStateType): Promise<Partial<OverallStateType> | Send> {
     const deps: MindMapMapProcessDeps = {
-      extractConcepts: (c) => runConceptExtraction(this.fastLlm, c),
+      extractConcepts: (c) => runConceptExtraction(c, { model: this.mapModel }),
       maxTotalFailures: this.MAX_TOTAL_FAILURES,
     };
     return mapProcess(state, deps);
