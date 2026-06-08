@@ -8,10 +8,7 @@ import {
   isValidIndexNowKey,
   submitIndexNowBatches,
 } from "../src/shared/seo/indexNow.ts";
-import {
-  drainIndexNowQueue,
-  type IndexNowQueueFile,
-} from "../src/shared/seo/indexNowQueue.ts";
+import { drainIndexNowQueue, type IndexNowQueueFile } from "../src/shared/seo/indexNowQueue.ts";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const queuePath = path.resolve(scriptDir, ".indexnow-queue.json");

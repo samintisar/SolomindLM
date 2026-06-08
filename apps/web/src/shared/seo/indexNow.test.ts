@@ -7,8 +7,8 @@ import {
   isValidIndexNowKey,
   submitIndexNow,
 } from "./indexNow";
-import { collectChangedCanonicalUrls, diffIndexNowUrls, entriesToState } from "./indexNowState";
 import { dedupeIndexNowUrls, drainIndexNowQueue, mergeIndexNowQueue } from "./indexNowQueue";
+import { collectChangedCanonicalUrls, diffIndexNowUrls, entriesToState } from "./indexNowState";
 import { SEO_BASE_URL } from "./seoConstants";
 import { canonicalUrl } from "./seoHtml";
 
@@ -27,12 +27,7 @@ describe("indexNow helpers", () => {
   it("filters URLs to the canonical host over https", () => {
     const privacyUrl = canonicalUrl(SEO_BASE_URL, "/privacy");
     const filtered = filterIndexableUrls(
-      [
-        privacyUrl,
-        "http://www.solomindlm.com/terms",
-        "https://evil.example/phish",
-        privacyUrl,
-      ],
+      [privacyUrl, "http://www.solomindlm.com/terms", "https://evil.example/phish", privacyUrl],
       "www.solomindlm.com"
     );
     expect(filtered).toEqual([privacyUrl]);

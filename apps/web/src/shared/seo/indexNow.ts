@@ -46,10 +46,7 @@ export function getPublicSeoCanonicalUrlEntries(buildDate?: string): IndexNowUrl
   }));
 }
 
-export function filterIndexableUrls(
-  urls: string[],
-  host: string = getIndexNowHost()
-): string[] {
+export function filterIndexableUrls(urls: string[], host: string = getIndexNowHost()): string[] {
   return [...new Set(urls)].filter((url) => {
     try {
       const parsed = new URL(url);

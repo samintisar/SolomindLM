@@ -11,16 +11,16 @@ import {
   submitIndexNowBatches,
 } from "../src/shared/seo/indexNow.ts";
 import {
+  drainIndexNowQueue,
+  type IndexNowQueueFile,
+  mergeIndexNowQueue,
+} from "../src/shared/seo/indexNowQueue.ts";
+import {
   collectChangedCanonicalUrls,
   diffIndexNowUrls,
   entriesToState,
   type IndexNowPersistedState,
 } from "../src/shared/seo/indexNowState.ts";
-import {
-  drainIndexNowQueue,
-  mergeIndexNowQueue,
-  type IndexNowQueueFile,
-} from "../src/shared/seo/indexNowQueue.ts";
 import { SEO_BASE_URL } from "../src/shared/seo/seoConstants.ts";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
