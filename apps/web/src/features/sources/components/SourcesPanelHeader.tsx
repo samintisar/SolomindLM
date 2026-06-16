@@ -110,17 +110,17 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {hasExternalSourceUrl(viewingSource) && (
-                    <a
-                      href={viewingSource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-md text-foreground/70 hover:text-foreground hover:bg-secondary transition-colors touch-manipulation"
-                      title="Open in new tab"
-                      aria-label="Open source in new tab"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
+                  <a
+                    href={viewingSource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-md text-foreground/70 hover:text-foreground hover:bg-secondary transition-colors touch-manipulation"
+                    title="Open in new tab"
+                    aria-label="Open source in new tab"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={onCopy}
@@ -220,17 +220,17 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {hasExternalSourceUrl(viewingSource) && (
-                    <a
-                      href={viewingSource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors touch-manipulation"
-                      title="Open in new tab"
-                      aria-label="Open source in new tab"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
+                  <a
+                    href={viewingSource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors touch-manipulation"
+                    title="Open in new tab"
+                    aria-label="Open source in new tab"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={onCopy}

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  extractYouTubeVideoId,
-  isYouTubeHostname,
-  youTubeEmbedSrc,
-} from "./youtubeEmbed";
+import { extractYouTubeVideoId, isYouTubeHostname, youTubeEmbedSrc } from "./youtubeEmbed";
 
 describe("isYouTubeHostname", () => {
   it("accepts youtube.com and subdomains", () => {
