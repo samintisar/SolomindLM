@@ -211,6 +211,82 @@ describe("SourceViewer source guide", () => {
     });
   });
 
+  test("shows YouTube embed preview below source guide for YouTube sources", () => {
+    const mockGenerate = vi.fn();
+    (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(mockGenerate);
+
+    renderViewer({
+      source: {
+        id: "doc-yt",
+        title: "ML Lecture",
+        type: "YOUTUBE",
+        date: "2024-01-15",
+        selected: true,
+        status: "completed",
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        sourceGuide: {
+          summary: "Lecture summary.",
+          topics: ["Preprocessing"],
+          generatedAt: Date.now(),
+        },
+      },
+    });
+
+    const guide = screen.getByRole("button", { name: /source guide/i });
+    const preview = screen.getByRole("region", { name: "YouTube video preview" });
+    expect(guide.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    expect(preview).toBeInTheDocument();
+    expect(screen.getByTitle("ML Lecture")).toHaveAttribute(
+      "src",
+      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+    );
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  test("shows unavailable message when YouTube url cannot be embedded", () => {
+    const mockGenerate = vi.fn().mockResolvedValue(undefined);
+    (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(mockGenerate);
+
+    renderViewer({
+      source: {
+        id: "doc-yt-bad",
+        title: "Bad Link",
+        type: "YOUTUBE",
+        date: "2024-01-15",
+        selected: true,
+        status: "completed",
+        url: "https://example.com/not-youtube",
+      },
+    });
+
+    expect(screen.queryByTestId("youtube-video-preview")).not.toBeInTheDocument();
+    expect(screen.getByTestId("youtube-embed-unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open video in a new tab" })).toHaveAttribute(
+      "href",
+      "https://example.com/not-youtube"
+    );
+  });
+
+  test("shows no YouTube preview when url is missing", () => {
+    const mockGenerate = vi.fn().mockResolvedValue(undefined);
+    (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(mockGenerate);
+
+    renderViewer({
+      source: {
+        id: "doc-yt-no-url",
+        title: "No URL",
+        type: "YOUTUBE",
+        date: "2024-01-15",
+        selected: true,
+        status: "completed",
+      },
+    });
+
+    expect(screen.queryByTestId("youtube-video-preview")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("youtube-embed-unavailable")).not.toBeInTheDocument();
+  });
+
   test("only generates once per mount", async () => {
     const mockGenerate = vi.fn().mockResolvedValue(undefined);
     (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(mockGenerate);
