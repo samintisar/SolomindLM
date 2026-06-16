@@ -13,6 +13,7 @@ import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
 import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
 import { PdfViewer } from "./PdfViewer";
+import { YouTubeVideoPreview } from "./YouTubeVideoPreview";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -197,6 +198,10 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
           <p className="text-xs text-destructive">{guideError}</p>
         </div>
+      ) : null}
+
+      {source.type === "YOUTUBE" && source.url ? (
+        <YouTubeVideoPreview url={source.url} title={source.title} />
       ) : null}
 
       {/* Error State */}

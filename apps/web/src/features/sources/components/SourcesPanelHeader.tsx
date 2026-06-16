@@ -108,7 +108,9 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {(viewingSource.type === "WEB" || viewingSource.type === "PAPER") &&
+                {(viewingSource.type === "WEB" ||
+                  viewingSource.type === "PAPER" ||
+                  viewingSource.type === "YOUTUBE") &&
                   viewingSource.url && (
                     <a
                       href={viewingSource.url}
@@ -219,7 +221,9 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {(viewingSource.type === "WEB" || viewingSource.type === "PAPER") &&
+                {(viewingSource.type === "WEB" ||
+                  viewingSource.type === "PAPER" ||
+                  viewingSource.type === "YOUTUBE") &&
                   viewingSource.url && (
                     <a
                       href={viewingSource.url}

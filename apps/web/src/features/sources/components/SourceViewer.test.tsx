@@ -211,6 +211,36 @@ describe("SourceViewer source guide", () => {
     });
   });
 
+  test("shows YouTube embed preview below source guide for YouTube sources", () => {
+    const mockGenerate = vi.fn();
+    (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(mockGenerate);
+
+    renderViewer({
+      source: {
+        id: "doc-yt",
+        title: "ML Lecture",
+        type: "YOUTUBE",
+        date: "2024-01-15",
+        selected: true,
+        status: "completed",
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        sourceGuide: {
+          summary: "Lecture summary.",
+          topics: ["Preprocessing"],
+          generatedAt: Date.now(),
+        },
+      },
+    });
+
+    const preview = screen.getByTestId("youtube-video-preview");
+    expect(preview).toBeInTheDocument();
+    expect(preview.querySelector("iframe")).toHaveAttribute(
+      "src",
+      "https://www.youtube.com/embed/dQw4w9WgXcQ"
+    );
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
   test("only generates once per mount", async () => {
     const mockGenerate = vi.fn().mockResolvedValue(undefined);
     (useGenerateSourceGuide as ReturnType<typeof vi.fn>).mockReturnValue(mockGenerate);
