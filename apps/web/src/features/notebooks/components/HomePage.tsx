@@ -1,5 +1,5 @@
 import { ArrowUpAZ, Calendar, CheckCircle2, ChevronDown, LayoutGrid, List } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
 import { FolderItem, NotebookItem } from "@/shared/types/index";
 import { useFolderHandlers, useNotebookHandlers, useNotebookSorting } from "../hooks";
@@ -51,6 +51,7 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
   const onDeleteFolder = ctx.deleteFolder;
   const onMoveNotebookToFolder = ctx.moveNotebookToFolder;
   const onRequireAuth = ctx.onRequireAuth;
+  const isAuthenticated = ctx.isAuthenticated;
 
   const [activeTab, setActiveTab] = useState("All");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -72,6 +73,22 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
     onUpdateFolder,
     onDeleteFolder,
   });
+
+  const handleCreateNotebookClick = useCallback(() => {
+    if (!isAuthenticated) {
+      onRequireAuth("Sign in to create a notebook.");
+      return;
+    }
+    notebookHandlers.openCreateNotebook();
+  }, [isAuthenticated, onRequireAuth, notebookHandlers.openCreateNotebook]);
+
+  const handleCreateFolderClick = useCallback(() => {
+    if (!isAuthenticated) {
+      onRequireAuth("Sign in to create a folder.");
+      return;
+    }
+    folderHandlers.openCreateFolder();
+  }, [isAuthenticated, onRequireAuth, folderHandlers.openCreateFolder]);
 
   // Convex hooks for mutations
   const createNotebookHook = useCreateNotebook();
@@ -289,8 +306,8 @@ export const HomePage: React.FC<HomePageProps> = (_props: HomePageProps) => {
               recentNotebooks={sortedRecentNotebooks}
               folders={folders}
               viewMode={viewMode}
-              onCreateNotebook={notebookHandlers.openCreateNotebook}
-              onCreateFolder={folderHandlers.openCreateFolder}
+              onCreateNotebook={handleCreateNotebookClick}
+              onCreateFolder={handleCreateFolderClick}
               onSelectNotebook={onSelectNotebook}
               onSelectFolder={onSelectFolder}
               // Notebook handlers
