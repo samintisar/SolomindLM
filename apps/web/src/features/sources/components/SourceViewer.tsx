@@ -12,8 +12,10 @@ import { Source } from "@/shared/types";
 import { sanitizeMarkdown } from "@/shared/utils";
 import { cn } from "@/shared/utils/cn";
 import { useGenerateSourceGuide, useGetSignedUrl } from "../services/documentsApi";
+import { isYouTubeSource } from "../utils/sourceTypes";
 import { PdfViewer } from "./PdfViewer";
-import { YouTubeVideoPreview } from "./YouTubeVideoPreview";
+import { YouTubeEmbedUnavailable, YouTubeVideoPreview } from "./YouTubeVideoPreview";
+import { extractYouTubeVideoId } from "@/shared/utils/youtubeEmbed";
 
 const MarkdownRenderer = lazy(() =>
   import("@/shared/components/MarkdownRenderer").then((m) => ({ default: m.default }))
@@ -102,6 +104,9 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
     guideError,
     generateSourceGuide,
   ]);
+
+  const youtubeVideoId =
+    isYouTubeSource(source) ? extractYouTubeVideoId(source.url) : null;
 
   return (
     <div className="p-6 space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
@@ -200,8 +205,16 @@ export const SourceViewer: React.FC<SourceViewerProps> = ({
         </div>
       ) : null}
 
-      {source.type === "YOUTUBE" && source.url ? (
-        <YouTubeVideoPreview url={source.url} title={source.title} />
+      {isYouTubeSource(source) ? (
+        youtubeVideoId ? (
+          <YouTubeVideoPreview
+            key={youtubeVideoId}
+            videoId={youtubeVideoId}
+            title={source.title}
+          />
+        ) : (
+          <YouTubeEmbedUnavailable url={source.url} />
+        )
       ) : null}
 
       {/* Error State */}

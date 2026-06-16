@@ -1,6 +1,7 @@
 import { ChevronLeft, Copy, Download, ExternalLink, FileStack } from "lucide-react";
 import React from "react";
 import { Source } from "@/shared/types";
+import { hasExternalSourceUrl } from "../utils/sourceTypes";
 
 interface SourcesPanelHeaderProps {
   viewingSource: Source | null;
@@ -108,10 +109,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {(viewingSource.type === "WEB" ||
-                  viewingSource.type === "PAPER" ||
-                  viewingSource.type === "YOUTUBE") &&
-                  viewingSource.url && (
+                {hasExternalSourceUrl(viewingSource) && (
                     <a
                       href={viewingSource.url}
                       target="_blank"
@@ -221,10 +219,7 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {(viewingSource.type === "WEB" ||
-                  viewingSource.type === "PAPER" ||
-                  viewingSource.type === "YOUTUBE") &&
-                  viewingSource.url && (
+                {hasExternalSourceUrl(viewingSource) && (
                     <a
                       href={viewingSource.url}
                       target="_blank"
