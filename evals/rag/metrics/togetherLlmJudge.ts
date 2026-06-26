@@ -103,11 +103,14 @@ export function createTogetherJudgeInvoker(
       });
 
       const content = response.choices[0]?.message?.content;
-      if (!content) {
+      const reasoning = (response.choices[0]?.message as { reasoning?: string } | undefined)
+        ?.reasoning;
+      const payload = content?.trim() ? content : reasoning;
+      if (!payload) {
         throw new Error("Empty response from LLM judge");
       }
 
-      return content;
+      return payload;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Together AI judge failed: ${message}`, { cause: err });

@@ -289,6 +289,7 @@ export function createConvexWrittenQuestionsInvoker(
           evalSecret: options.evalSecret,
           notebookId: context.notebookId as Id<"notebooks">,
           documentIds: context.documentIds as Id<"documents">[] | undefined,
+          documentTitleHint: context.studioParams?.documentTitleHint,
           questionCount: context.studioParams?.questionCount,
           difficulty: context.studioParams?.difficulty,
           focus: context.studioParams?.topic,

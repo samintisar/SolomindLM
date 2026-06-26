@@ -7,7 +7,7 @@
  *   prod deployment → .env
  *
  * Existing keys are updated in place; new Convex keys are appended.
- * Local-only keys (CONVEX_DEPLOYMENT, tuning vars, VITE_*, etc.) are kept.
+ * Local-only keys (CONVEX_DEPLOYMENT, tuning vars, VITE_*, RAG_EVAL_*, etc.) are kept.
  *
  * Usage:
  *   node scripts/pull-convex-env.mjs [--dev-only | --prod-only] [--no-sync-web]
@@ -16,7 +16,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { listConvexEnv, mergeEnvFile, syncWebFromRoot } from "./convex-env-utils.mjs";
+import {
+  filterPullVars,
+  listConvexEnv,
+  mergeEnvFile,
+  stripPullExcludedKeys,
+  syncWebFromRoot,
+} from "./convex-env-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -55,7 +61,7 @@ if (pullProd) {
 function pullOne({ label, prod, envPath, webPath }) {
   console.log(`\nPulling Convex ${label} env → ${path.relative(projectRoot, envPath)}`);
 
-  const remote = listConvexEnv({ prod });
+  const remote = filterPullVars(listConvexEnv({ prod }));
   if (remote.size === 0) {
     console.log("  No variables returned from Convex.");
     return { updated: 0, appended: 0 };
@@ -64,9 +70,10 @@ function pullOne({ label, prod, envPath, webPath }) {
   if (!fs.existsSync(envPath)) {
     console.log(`  Creating ${path.basename(envPath)} (was missing).`);
   }
-  const existing = fs.existsSync(envPath)
+  const rawExisting = fs.existsSync(envPath)
     ? fs.readFileSync(envPath, "utf8")
     : `# ${path.basename(envPath)} — synced from Convex ${label}\n`;
+  const existing = stripPullExcludedKeys(rawExisting);
 
   const before = new Set();
   for (const line of existing.split(/\r?\n/)) {

@@ -120,7 +120,7 @@ export const studioWrittenQuestionsAgentic20: EvalFixture = {
   expectedItems: sharedExpectedItems(),
   expectedBehavior:
     "Set should include open-ended questions exercising understanding of each pattern. Provide an expected-answer or rubric for each.",
-  studioParams: { questionCount: 20, difficulty: "medium" },
+  studioParams: { ...AGENTIC_20_STUDIO_PARAMS, questionCount: 20, difficulty: "medium" },
   expectedStructure: { minItems: 20 },
   tags: sharedTags("written-questions"),
 };

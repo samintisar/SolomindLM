@@ -6,6 +6,7 @@
  * 2. Generates a secure RAG_EVAL_SECRET
  * 3. Appends both to repo-root .env (local-only vars)
  * 4. Pushes RAG_EVALS_ENABLED=true and RAG_EVAL_SECRET to the dev Convex deployment
+ * 5. Strips RAG eval vars from .env.local so they do not override repo-root .env
  *
  * Usage:
  *   bun run eval:rag:bootstrap-env
@@ -19,6 +20,42 @@ const { execSync } = require("child_process");
 
 const WEB_ENV_PATH = path.join("apps", "web", ".env.local");
 const REPO_ENV_PATH = path.join(process.cwd(), ".env");
+const REPO_ENV_LOCAL_PATH = path.join(process.cwd(), ".env.local");
+
+/** Same rules as convex-env-utils shouldSkipPullKey — keep in sync. */
+function isRagEvalLocalKey(key) {
+  return key === "RAG_EVALS_ENABLED" || key.startsWith("RAG_EVAL_");
+}
+
+function stripRagEvalKeysFromEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  const lines = fs.readFileSync(filePath, "utf-8").split(/\r?\n/);
+  const kept = [];
+  let removed = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      kept.push(line);
+      continue;
+    }
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) {
+      kept.push(line);
+      continue;
+    }
+    const key = trimmed.slice(0, eq).trim();
+    if (isRagEvalLocalKey(key)) {
+      removed++;
+      continue;
+    }
+    kept.push(line);
+  }
+  if (removed === 0) return false;
+  let merged = kept.join("\n");
+  if (!merged.endsWith("\n")) merged += "\n";
+  fs.writeFileSync(filePath, merged, "utf-8");
+  return true;
+}
 
 function readViteConvexUrl() {
   if (!fs.existsSync(WEB_ENV_PATH)) {
@@ -92,6 +129,12 @@ function main() {
   console.log("\nPushing eval gate variables to Convex dev deployment...");
   setConvexEnv("RAG_EVALS_ENABLED", "true");
   setConvexEnv("RAG_EVAL_SECRET", secret);
+
+  if (stripRagEvalKeysFromEnvFile(REPO_ENV_LOCAL_PATH)) {
+    console.log(
+      `\nRemoved RAG eval vars from ${REPO_ENV_LOCAL_PATH} (eval CLI reads repo-root .env only).`
+    );
+  }
 
   console.log("\n=== Bootstrap complete ===");
   console.log("Next steps:");

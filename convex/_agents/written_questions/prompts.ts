@@ -133,3 +133,59 @@ ${typeSpecificInstructions}
 **Input Text:**
 ${chunk}`;
 };
+
+/** Follow-up when the model returned zero questions */
+export const getMapRecoveryPrompt = (params: {
+  chunk: string;
+  questionCount: number;
+  need: number;
+  difficulty: string;
+  questionType: string;
+  focus?: string;
+}): string => {
+  const { chunk, need, difficulty, questionType, focus } = params;
+  const isEssay = questionType === "essay";
+  const points = isEssay ? 12 : 5;
+
+  return `The previous attempt incorrectly returned zero written questions. You must fix this.
+
+Generate exactly ${need} distinct ${questionType.toUpperCase()} questions (difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ""}). The "questions" array MUST contain ${need} objects, each with questionType "${questionType}", rubric.maxPoints ${points}, a modelAnswer, and rubric.criteria.
+
+**HOW TO FIND MATERIAL:**
+• Definitions, theorems, assumptions, notation, and key terms in the excerpt.
+• Procedures, comparisons, cause-and-effect, and examples described in the text.
+• Slides or sparse pages: ask about any equation, bullet, or caption present.
+
+${MARKDOWN_MATH_NOTATION_FOR_APP}
+
+**Input Text:**
+${chunk}`;
+};
+
+/** Additional questions when the first pass returned too few */
+export const getMapTopUpPrompt = (params: {
+  chunk: string;
+  questionCount: number;
+  need: number;
+  difficulty: string;
+  questionType: string;
+  focus?: string;
+  existingQuestions: WrittenQuestion[];
+}): string => {
+  const { chunk, need, difficulty, questionType, focus, existingQuestions } = params;
+  const avoidList = existingQuestions
+    .map((q, i) => `${i + 1}. ${q.question.replace(/\s+/g, " ").trim().slice(0, 160)}`)
+    .join("\n");
+
+  return `You already drafted ${existingQuestions.length} written questions from this excerpt. Produce exactly ${need} **additional** distinct questions (type: ${questionType.toUpperCase()}, difficulty: ${difficulty.toUpperCase()}${focus ? `, focus: ${focus}` : ""}).
+
+**DO NOT** repeat or lightly rephrase these (cover different subtopics, concepts, or procedures):
+${avoidList}
+
+Return ONLY the ${need} new items in "questions" (same JSON shape as before).
+
+${MARKDOWN_MATH_NOTATION_FOR_APP}
+
+**Input Text (same excerpt):**
+${chunk}`;
+};

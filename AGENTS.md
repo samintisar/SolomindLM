@@ -81,6 +81,18 @@ You **MUST** use the following tools. Using built-in alternatives (`Grep`, `Read
 
 If you are unsure which skill applies, invoke `superpowers:brainstorming` first. **Do not guess.**
 
+## Prompt authoring (production agents)
+
+**Production prompts must be generalized.** Prompt text in `convex/_agents/`, `convex/studio/`, and any user-facing generation path must work for arbitrary user-uploaded sources—any topic, length, or format.
+
+**Strictly forbidden:**
+
+- Tuning prompts to pass RAG eval metrics (`expected_item_recall`, `written_questions_count_match`, LLM judge scores, etc.)
+- Referencing eval fixtures, golden notebooks, canonical expected-item lists, or test source filenames in prompts
+- Eval-specific examples in prompt copy (benchmark datasets, named pattern lists, notebook IDs, etc.)
+
+**When evals fail**, fix with pipeline engineering—chunking, buffer multipliers, multi-round map/recovery, deduplication, selection logic, padding, timeouts, retrieval scope—not eval-targeted instructions. Evals measure general behavior; they must not drive prompt content.
+
 ## Quick Start
 
 ```bash
