@@ -117,6 +117,49 @@ export function listConvexEnv({ prod = false } = {}) {
 /** Keys kept in .env.local for local tooling only — never upload to Convex. */
 const SKIP_PUSH_PREFIXES = ["LANGCHAIN_", "RAG_EVAL_"];
 
+/**
+ * RAG eval credentials live in repo-root `.env` (via eval:rag:bootstrap-env).
+ * convex:env:pull must not copy them into `.env.local` — Bun loads `.env.local`
+ * after `.env`, which would override the eval CLI secret and break eval runs.
+ */
+export function shouldSkipPullKey(key) {
+  if (key === "RAG_EVALS_ENABLED") return true;
+  return SKIP_PUSH_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+export function filterPullVars(vars) {
+  const filtered = new Map();
+  for (const [key, value] of vars) {
+    if (shouldSkipPullKey(key)) continue;
+    filtered.set(key, value);
+  }
+  return filtered;
+}
+
+/** Remove pull-excluded keys from an env file (cleans stale RAG eval lines). */
+export function stripPullExcludedKeys(content) {
+  const lines = content.split(/\r?\n/);
+  const result = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      result.push(line);
+      continue;
+    }
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) {
+      result.push(line);
+      continue;
+    }
+    const key = trimmed.slice(0, eq).trim();
+    if (shouldSkipPullKey(key)) continue;
+    result.push(line);
+  }
+  let merged = result.join("\n");
+  if (!merged.endsWith("\n")) merged += "\n";
+  return merged;
+}
+
 export function filterPushVars(vars) {
   const filtered = [];
   for (const [key, value] of vars) {
