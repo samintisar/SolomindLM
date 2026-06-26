@@ -1,8 +1,8 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { useAuthToken } from "@convex-dev/auth/react";
 import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
 import type { SendMessageCallbacks } from "./chatStream";
 import { CHAT_STREAM_URL, consumePersistentTextStream } from "./chatStream";
@@ -92,7 +92,7 @@ export function useSendMessage() {
   const sendMessageMutation = useMutation(api.chat.messages.sendMessageOptimistic);
   const releaseChatGeneration = useMutation(api.chat.messages.releaseChatGeneration);
   const { isAuthenticated } = useConvexAuth();
-  const authToken = useAuthToken();
+  const authToken = useHttpAuthToken();
 
   const abortControllerRef = useRef<AbortController | null>(null);
 

@@ -1,1 +1,0 @@
-export { buildConvexAuthFlushInjectScript } from "./authFlushScript";

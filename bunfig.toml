@@ -1,0 +1,6 @@
+# React Native / Expo need a flat node_modules layout (Metro + Android CMake path limits).
+# Isolated `.bun/.../node_modules/...` paths exceed Windows CMAKE_OBJECT_PATH_MAX (~250).
+# Use hoisted only — avoid `backend = "copyfile"` (can leave partial/corrupt packages on Windows).
+[install]
+linker = "hoisted"
+publicHoistPattern = ["*"]

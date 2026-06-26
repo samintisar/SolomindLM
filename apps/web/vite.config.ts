@@ -74,6 +74,9 @@ export default defineConfig(({ mode }) => {
       include: ["streamdown", "@streamdown/code", "@streamdown/math", "pdfjs-dist"],
     },
     server: {
+      // Allow WebView on phone/emulator to load the dev server via LAN IP (see apps/mobile/.env.local)
+      host: true,
+      allowedHosts: true,
       port: 5173,
       strictPort: true,
       // Google Identity Services popup flow can break without this opener policy.

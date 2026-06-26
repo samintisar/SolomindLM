@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "solomindlm",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -24,7 +23,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.solomindlm.app",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
         {
@@ -47,6 +45,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
+      "./plugins/withAndroidCmakePathFix",
+      [
+        "expo-build-properties",
+        {
+          "android": {}
+        }
+      ],
       "expo-router",
       [
         "expo-notifications",
@@ -62,7 +68,19 @@
           "cameraPermission": "Allow SolomindLM to use the camera for document capture."
         }
       ],
-      "@sentry/react-native/expo"
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "solomindlm",
+          "project": "react-native"
+        }
+      ],
+      "expo-audio",
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

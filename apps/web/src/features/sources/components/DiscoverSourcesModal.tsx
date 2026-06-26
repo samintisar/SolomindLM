@@ -587,7 +587,7 @@ export const DiscoverSourcesModal: React.FC<DiscoverSourcesModalProps> = ({
                 );
               })}
 
-              <div className="flex-1 min-w-[1rem]" />
+              <div className="flex-1 min-w-4" />
 
               <div ref={filterRef} className="relative">
                 <button
@@ -835,7 +835,7 @@ const ResultRow: React.FC<ResultRowProps> = ({
       }`}
     >
       <div
-        className={`w-4 h-4 mt-0.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+        className={`w-4 h-4 mt-0.5 rounded shrink-0 flex items-center justify-center border transition-colors ${
           isSelected ? "bg-primary border-primary" : "border-border"
         }`}
       >

@@ -3,15 +3,21 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { requestNativeGoogleSignIn, requestNativeSignOut } from "@/features/auth/nativeShellAuth";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
-import { getNativeWebViewBridge, isNativeShell } from "@/utils/platformDetection";
+import { isNativeShell } from "@/utils/platformDetection";
 import { AuthContext, User } from "./useAuth";
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+type AuthProviderContentProps = {
+  children: ReactNode;
+  signInGoogle: () => Promise<void>;
+  signOutUser: () => Promise<void>;
+};
+
+function AuthProviderContent({ children, signInGoogle, signOutUser }: AuthProviderContentProps) {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const currentUser = useQuery(api.auth.getCurrentUser);
-  const { signIn, signOut: authSignOut } = useAuthActions();
   const [authError, setAuthError] = useState<string | null>(null);
 
   const user: User | null = currentUser
@@ -21,19 +27,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async (): Promise<void> => {
     setAuthError(null);
     try {
-      await signIn("google", { redirectTo: "/home" });
+      await signInGoogle();
     } catch (error) {
       setAuthError(getConvexAuthUserMessage(error, "Google sign-in failed"));
+      throw error;
     }
   };
 
   const signOut = async (): Promise<void> => {
-    await authSignOut();
-    const bridge = getNativeWebViewBridge();
-    if (isNativeShell() && bridge) {
-      bridge.postMessage(JSON.stringify({ type: "convex-auth-clear" }));
-    }
-    navigate("/home", { replace: true });
+    await signOutUser();
+    navigate("/sign-in", { replace: true });
   };
 
   const clearAuthError = (): void => setAuthError(null);
@@ -53,4 +56,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+function AuthProviderWithConvexAuth({ children }: { children: ReactNode }) {
+  const { signIn, signOut: authSignOut } = useAuthActions();
+  return (
+    <AuthProviderContent
+      signInGoogle={async () => {
+        await signIn("google", { redirectTo: "/home" });
+      }}
+      signOutUser={authSignOut}
+    >
+      {children}
+    </AuthProviderContent>
+  );
+}
+
+/** Browser uses Convex Auth actions; native shell delegates OAuth/password flows to the host app. */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  if (isNativeShell()) {
+    return (
+      <AuthProviderContent
+        signInGoogle={async () => {
+          await requestNativeGoogleSignIn();
+        }}
+        signOutUser={requestNativeSignOut}
+      >
+        {children}
+      </AuthProviderContent>
+    );
+  }
+  return <AuthProviderWithConvexAuth>{children}</AuthProviderWithConvexAuth>;
 }

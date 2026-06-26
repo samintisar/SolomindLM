@@ -363,7 +363,7 @@ const AppContent: React.FC = () => {
       <div
         className={`w-full bg-background text-foreground font-serif ${isPublicPage ? "" : "flex flex-col h-screen overflow-hidden"}`}
       >
-        {!isPublicPage && !isNativeShell() && (
+        {!isPublicPage && (
           <Header
             title={notebookTitle}
             onRename={(newTitle: string) => {

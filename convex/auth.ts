@@ -7,6 +7,54 @@ import { type ActionCtx, type MutationCtx, type QueryCtx, query } from "./_gener
 import { ResendOTP } from "./ResendOTP";
 import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
 
+const MOBILE_DEV_WEB_ORIGINS = [
+  "http://10.0.2.2:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+];
+
+const LAN_VITE_ORIGIN = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?/;
+const NATIVE_APP_SCHEME = /^solomindlm:\/\//;
+const EXPO_DEV_SCHEME = /^exp:\/\//;
+
+function siteUrlBases(): string[] {
+  const raw = process.env.SITE_URL ?? "http://localhost:5173";
+  return raw
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
+function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
+  if (NATIVE_APP_SCHEME.test(redirectTo) || EXPO_DEV_SCHEME.test(redirectTo)) {
+    return true;
+  }
+
+  if (LAN_VITE_ORIGIN.test(redirectTo)) {
+    return true;
+  }
+
+  for (const origin of MOBILE_DEV_WEB_ORIGINS) {
+    if (redirectTo === origin || redirectTo.startsWith(`${origin}/`)) {
+      return true;
+    }
+  }
+
+  if (redirectTo.startsWith("?") || redirectTo.startsWith("/")) {
+    return true;
+  }
+
+  for (const base of bases) {
+    if (!redirectTo.startsWith(base)) continue;
+    const after = redirectTo[base.length];
+    if (after === undefined || after === "?" || after === "/") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Google({
@@ -15,6 +63,21 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     }),
     Password({ verify: ResendOTP, reset: ResendOTPPasswordReset }),
   ],
+  callbacks: {
+    async redirect({ redirectTo }) {
+      const bases = [...siteUrlBases(), ...MOBILE_DEV_WEB_ORIGINS];
+
+      if (!isAllowedRedirect(redirectTo, bases)) {
+        throw new Error(`Invalid redirectTo ${redirectTo} for SITE_URL ${process.env.SITE_URL}`);
+      }
+
+      if (redirectTo.startsWith("?") || redirectTo.startsWith("/")) {
+        return `${bases[0]}${redirectTo}`;
+      }
+
+      return redirectTo;
+    },
+  },
 });
 
 /**

@@ -2,8 +2,10 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { requestNativePasswordSignIn } from "@/features/auth/nativeShellAuth";
 import { useAuth } from "@/features/auth/useAuth";
 import { getConvexAuthUserMessage } from "@/features/auth/utils/authErrorMessage";
+import { isNativeShell } from "@/utils/platformDetection";
 
 export type AuthFormInitialMode = "signIn" | "signUp";
 
@@ -25,14 +27,19 @@ interface AuthFormPanelProps {
   className?: string;
 }
 
-export function AuthFormPanel({
+type AuthFormPanelContentProps = AuthFormPanelProps & {
+  /** Resolves true when the user is fully signed in, false when another step is needed (e.g. email verification). */
+  signInPassword: (formData: FormData) => Promise<boolean>;
+};
+
+function AuthFormPanelContent({
   authError,
   onAuthenticated,
   initialMode = "signIn",
   className,
-}: AuthFormPanelProps) {
+  signInPassword,
+}: AuthFormPanelContentProps) {
   const { signInWithGoogle } = useAuth();
-  const { signIn } = useAuthActions();
   const [step, setStep] = useState<AuthStep>(initialMode);
   const [error, setError] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -59,18 +66,29 @@ export function AuthFormPanel({
     }
   };
 
+  const runPasswordSignIn = async (
+    formData: FormData,
+    onSuccess: (authenticated: boolean) => void
+  ) => {
+    const authenticated = await signInPassword(formData);
+    onSuccess(authenticated);
+  };
+
   const handleEmailPasswordSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     setError("");
     setPasswordLoading(true);
-    void signIn("password", formData)
-      .then(() => {
-        setStep({
-          kind: "emailVerification",
-          email: formData.get("email") as string,
-        });
-      })
+    void runPasswordSignIn(formData, (authenticated) => {
+      if (authenticated) {
+        onAuthenticated();
+        return;
+      }
+      setStep({
+        kind: "emailVerification",
+        email: formData.get("email") as string,
+      });
+    })
       .catch((err) => {
         setError(getConvexAuthUserMessage(err, "Sign-in failed"));
       })
@@ -82,10 +100,9 @@ export function AuthFormPanel({
     const formData = new FormData(event.currentTarget);
     setError("");
     setPasswordLoading(true);
-    void signIn("password", formData)
-      .then(() => {
-        onAuthenticated();
-      })
+    void runPasswordSignIn(formData, (authenticated) => {
+      if (authenticated) onAuthenticated();
+    })
       .catch((err) => {
         setError(getConvexAuthUserMessage(err, "Verification failed"));
       })
@@ -97,13 +114,16 @@ export function AuthFormPanel({
     const formData = new FormData(event.currentTarget);
     setError("");
     setPasswordLoading(true);
-    void signIn("password", formData)
-      .then(() => {
-        setStep({
-          kind: "resetVerification",
-          email: formData.get("email") as string,
-        });
-      })
+    void runPasswordSignIn(formData, (authenticated) => {
+      if (authenticated) {
+        onAuthenticated();
+        return;
+      }
+      setStep({
+        kind: "resetVerification",
+        email: formData.get("email") as string,
+      });
+    })
       .catch((err) => {
         setError(getConvexAuthUserMessage(err, "Could not send reset code"));
       })
@@ -115,10 +135,9 @@ export function AuthFormPanel({
     const formData = new FormData(event.currentTarget);
     setError("");
     setPasswordLoading(true);
-    void signIn("password", formData)
-      .then(() => {
-        onAuthenticated();
-      })
+    void runPasswordSignIn(formData, (authenticated) => {
+      if (authenticated) onAuthenticated();
+    })
       .catch((err) => {
         setError(getConvexAuthUserMessage(err, "Could not reset password"));
       })
@@ -461,4 +480,33 @@ export function AuthFormPanel({
       </div>
     </div>
   );
+}
+
+function AuthFormPanelWithConvexAuth(props: AuthFormPanelProps) {
+  const { signIn } = useAuthActions();
+  return (
+    <AuthFormPanelContent
+      {...props}
+      signInPassword={async (formData) => {
+        const result = await signIn("password", formData);
+        return result.signingIn;
+      }}
+    />
+  );
+}
+
+/** Browser uses Convex Auth actions; native shell delegates password sign-in to the host WebView bridge. */
+export function AuthFormPanel(props: AuthFormPanelProps) {
+  if (isNativeShell()) {
+    return (
+      <AuthFormPanelContent
+        {...props}
+        signInPassword={async (formData) => {
+          const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+          return requestNativePasswordSignIn(params);
+        }}
+      />
+    );
+  }
+  return <AuthFormPanelWithConvexAuth {...props} />;
 }
