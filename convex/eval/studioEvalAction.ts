@@ -549,6 +549,7 @@ export const startWrittenQuestionsEval = action({
     evalSecret: v.string(),
     notebookId: v.id("notebooks"),
     documentIds: v.optional(v.array(v.id("documents"))),
+    documentTitleHint: v.optional(v.string()),
     questionCount: v.optional(v.number()),
     difficulty: v.optional(v.string()),
     questionType: v.optional(v.string()),
@@ -557,7 +558,13 @@ export const startWrittenQuestionsEval = action({
   handler: async (ctx, args): Promise<WrittenQuestionsEvalKickoff> => {
     assertRagEvalGate(args.evalSecret);
     const { userId } = await resolveNotebookOwner(ctx, args.notebookId);
-    const documentIds = await resolveDocumentIds(ctx, args.notebookId, userId, args.documentIds);
+    const documentIds = await resolveDocumentIds(
+      ctx,
+      args.notebookId,
+      userId,
+      args.documentIds,
+      args.documentTitleHint
+    );
     const questionCount = args.questionCount ?? 10;
     const difficulty = args.difficulty ?? "medium";
     const questionType = args.questionType ?? "short";

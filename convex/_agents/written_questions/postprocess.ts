@@ -80,20 +80,63 @@ Question Type: ${questionType}
 Return the complete selected questions as a JSON array.`;
 }
 
-export function dedupeQuestions(questions: WrittenQuestion[]): WrittenQuestion[] {
-  const normalizeQuestionText = (question: string): string => {
-    return question
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .replace(/[^\w\s]/g, "")
-      .trim();
-  };
+function questionDedupeKey(question: WrittenQuestion): string {
+  return question.question
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^\w\s]/g, "")
+    .trim();
+}
 
+/** Merge `incoming` into `acc` up to `cap`, skipping duplicate question stems. */
+export function appendUniqueWrittenQuestions(
+  acc: WrittenQuestion[],
+  incoming: WrittenQuestion[],
+  cap: number
+): void {
+  const seen = new Set(acc.map(questionDedupeKey));
+  for (const candidate of incoming) {
+    if (acc.length >= cap) return;
+    const key = questionDedupeKey(candidate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    acc.push(candidate);
+  }
+}
+
+/** Pad `selected` up to `targetCount` using `pool` (skipping duplicate ids and stems). */
+export function padQuestionsToTarget(
+  selected: WrittenQuestion[],
+  pool: WrittenQuestion[],
+  targetCount: number
+): WrittenQuestion[] {
+  if (selected.length >= targetCount) {
+    return selected.slice(0, targetCount);
+  }
+
+  const padded = [...selected];
+  const seenIds = new Set(padded.map((q) => q.id));
+  const seenTexts = new Set(padded.map(questionDedupeKey));
+
+  for (const candidate of pool) {
+    if (padded.length >= targetCount) break;
+    if (seenIds.has(candidate.id)) continue;
+    const textKey = questionDedupeKey(candidate);
+    if (seenTexts.has(textKey)) continue;
+    padded.push(candidate);
+    seenIds.add(candidate.id);
+    seenTexts.add(textKey);
+  }
+
+  return padded;
+}
+
+export function dedupeQuestions(questions: WrittenQuestion[]): WrittenQuestion[] {
   const dedupedQuestions: WrittenQuestion[] = [];
   const seenQuestions = new Set<string>();
 
   for (const question of questions) {
-    const normalizedQuestion = normalizeQuestionText(question.question);
+    const normalizedQuestion = questionDedupeKey(question);
     if (seenQuestions.has(normalizedQuestion)) {
       continue;
     }
@@ -135,18 +178,24 @@ export function getSelectionIdsPrompt(params: {
 
   return `You are an expert educator selecting the best written questions for an assessment.
 
-TASK:
-- Select exactly ${targetCount} question IDs from the provided candidates
-- Maximize concept diversity and avoid duplicates or near-duplicates
-- Prioritize clear, self-contained questions that match the requested format and difficulty
+TASK: Return exactly ${targetCount} question IDs from the candidate pool below.
+The count is non-negotiable — if fewer than ${targetCount} are ideal, still return
+${targetCount} IDs by including the strongest remaining candidates.
+
+PICKING ORDER (apply in this order, in one pass):
+1. Group candidates by which named source-item each question covers (use the topic
+   groups below as a hint, plus your own read of the question text).
+2. Pick the strongest one question per named item until every named item has one
+   (coverage floor — never drop a named item to avoid a surface-level duplicate).
+3. Keep filling until you reach ${targetCount}: prefer a second question for the
+   most central named items, then anything left in the pool.
+4. When two candidates cover the SAME named item and ask the same thing, keep the
+   one with clearer wording / a more complete rubric.
+
+RULES:
 - DO NOT rewrite questions, rubrics, or model answers
 - ONLY return IDs that appear in the candidate list
-
-Selection Criteria:
-1. Diversity: cover distinct ideas from the source material
-2. Quality: prefer precise, unambiguous questions
-3. Balance: match the requested difficulty and question type
-4. Relevance: prioritize important concepts over trivia
+- Prefer clear, self-contained questions matching the requested format and difficulty
 
 Requested Difficulty: ${difficulty}
 Requested Question Type: ${questionType}
@@ -171,6 +220,7 @@ export function applySelectedQuestionIds(
 
   const resolvedQuestions: WrittenQuestion[] = [];
   const seenIds = new Set<string>();
+  const seenTexts = new Set<string>();
 
   for (const selectedId of selectedIds) {
     const question = questionById.get(selectedId);
@@ -178,7 +228,13 @@ export function applySelectedQuestionIds(
       continue;
     }
 
+    const textKey = questionDedupeKey(question);
+    if (seenTexts.has(textKey)) {
+      continue;
+    }
+
     seenIds.add(selectedId);
+    seenTexts.add(textKey);
     resolvedQuestions.push(question);
 
     if (resolvedQuestions.length >= targetCount) {
@@ -191,7 +247,13 @@ export function applySelectedQuestionIds(
       continue;
     }
 
+    const textKey = questionDedupeKey(question);
+    if (seenTexts.has(textKey)) {
+      continue;
+    }
+
     seenIds.add(question.id);
+    seenTexts.add(textKey);
     resolvedQuestions.push(question);
 
     if (resolvedQuestions.length >= targetCount) {

@@ -69,6 +69,11 @@ describe("requireJudgeScore", () => {
   it("accepts scores in range", () => {
     expect(requireJudgeScore({ score: 0.85 })).toBe(0.85);
   });
+
+  it("coerces string scores and alternate field names", () => {
+    expect(requireJudgeScore({ score: "0.75" })).toBe(0.75);
+    expect(requireJudgeScore({ completeness_score: 0.6 })).toBe(0.6);
+  });
 });
 
 describe("llmJudgeCorrectness", () => {

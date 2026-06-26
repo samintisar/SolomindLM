@@ -90,20 +90,37 @@ function serializeQuiz(raw: unknown): string {
     .join("\n\n");
 }
 
-interface WrittenQuestion {
+interface WrittenQuestionSerialized {
   question?: string;
   prompt?: string;
+  modelAnswer?: string;
   expectedAnswer?: string;
-  rubric?: string;
+  rubric?: string | { criteria?: string[]; maxPoints?: number };
+}
+
+function formatWrittenQuestionRubric(
+  rubric: WrittenQuestionSerialized["rubric"]
+): string {
+  if (!rubric) return "";
+  if (typeof rubric === "string") return rubric;
+  const parts: string[] = [];
+  if (rubric.maxPoints != null) parts.push(`Max points: ${rubric.maxPoints}`);
+  if (rubric.criteria?.length) parts.push(`Criteria: ${rubric.criteria.join("; ")}`);
+  return parts.join("\n");
 }
 
 function serializeWrittenQuestions(raw: unknown): string {
-  const qs = (raw as { questions?: WrittenQuestion[] } | undefined)?.questions ?? [];
+  const qs =
+    (raw as { questions?: WrittenQuestionSerialized[] } | undefined)?.questions ?? [];
   return qs
     .map((q, i) => {
       const question = q.question ?? q.prompt ?? "";
-      const expected = q.expectedAnswer ?? q.rubric ?? "";
-      return `Q${i + 1}: ${question}${expected ? `\nExpected: ${expected}` : ""}`;
+      const answer = q.modelAnswer ?? q.expectedAnswer ?? "";
+      const rubric = formatWrittenQuestionRubric(q.rubric);
+      const lines = [`Q${i + 1}: ${question}`];
+      if (answer) lines.push(`Model answer: ${answer}`);
+      if (rubric) lines.push(`Rubric: ${rubric}`);
+      return lines.join("\n");
     })
     .join("\n\n");
 }

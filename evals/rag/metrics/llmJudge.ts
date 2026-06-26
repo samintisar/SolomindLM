@@ -199,8 +199,33 @@ export function parseJsonResponse(response: string): Record<string, unknown> {
 }
 
 export function requireJudgeScore(result: Record<string, unknown>): number {
-  const score = result.score;
-  if (typeof score !== "number" || Number.isNaN(score)) {
+  const raw =
+    result.score ??
+    result.completeness_score ??
+    result.completeness ??
+    result.rating ??
+    result.overall_score;
+
+  let score: number;
+  if (typeof raw === "number") {
+    score = raw;
+  } else if (typeof raw === "string") {
+    const parsed = Number.parseFloat(raw.trim());
+    if (Number.isNaN(parsed)) {
+      throw new LlmJudgeParseError(
+        "Judge response missing numeric score field",
+        previewResponse(JSON.stringify(result))
+      );
+    }
+    score = parsed;
+  } else {
+    throw new LlmJudgeParseError(
+      "Judge response missing numeric score field",
+      previewResponse(JSON.stringify(result))
+    );
+  }
+
+  if (Number.isNaN(score)) {
     throw new LlmJudgeParseError(
       "Judge response missing numeric score field",
       previewResponse(JSON.stringify(result))

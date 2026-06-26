@@ -13,12 +13,17 @@ import { withLanguageInstruction } from "../../_agents/_shared/languageInstructi
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
+  appendUniqueWrittenQuestions,
   applySelectedQuestionIds,
   dedupeQuestions,
   getSelectionIdsPrompt,
+  padQuestionsToTarget,
 } from "../../_agents/written_questions/postprocess";
+import { validateSelfContained } from "../../_agents/written_questions/questionHeuristics";
 import {
   getMapPrompt,
+  getMapRecoveryPrompt,
+  getMapTopUpPrompt,
   MAP_SYSTEM_PROMPT,
   REDUCE_SELECT_SYSTEM_PROMPT,
   type WrittenQuestion,
@@ -50,8 +55,36 @@ const CONFIG = {
   REDUCE_TIMEOUT_MS: 300_000, // 5 minutes
   MIN_QUESTIONS_PER_CHUNK: 2,
   MAX_QUESTIONS_PER_CHUNK: 30,
-  BUFFER_MULTIPLIER: 2.0,
+  // Match LangGraph routing.ts — 2.5× over-generation gives dedupe headroom to land at target
+  BUFFER_MULTIPLIER: 2.5,
+  /** Extra map rounds when the model returns empty or too few candidates */
+  MAP_MAX_ROUNDS: 4,
 } as const;
+
+function normalizeMapQuestions(
+  raw: WrittenQuestion[],
+  questionType: string
+): WrittenQuestion[] {
+  const expectedPoints = questionType === "short" ? 5 : 12;
+  const typed = questionType === "essay" ? "essay" : "short";
+
+  return raw
+    .filter(
+      (q) =>
+        q.question?.trim() &&
+        q.modelAnswer?.trim() &&
+        validateSelfContained(q)
+    )
+    .map((q) => ({
+      ...q,
+      id: randomUUID(),
+      questionType: typed,
+      rubric: {
+        ...q.rubric,
+        maxPoints: expectedPoints,
+      },
+    }));
+}
 
 export type WrittenQuestionsGenerationPhaseArgs = {
   writtenQuestionId: Id<"writtenQuestions">;
@@ -322,54 +355,90 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const structuredLLM = createStructuredLLM(WrittenQuestionsArraySchema, {
       model: env.FAST_LLM,
       temperature: 0.4,
-      maxTokens: 8000,
+      maxTokens: 16_000,
     });
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
-    const prompt = getMapPrompt({
-      chunk,
-      questionCount,
-      questionsPerChunk,
-      difficulty,
-      questionType,
-      focus: sanitizedFocus,
-    });
 
-    console.log(`[WrittenQuestionsJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
+    const candidates: WrittenQuestion[] = [];
+    let totalMapElapsedMs = 0;
 
-    const startTime = Date.now();
-    const response = await invokeStudioLlm({
-      invoke: () =>
-        (structuredLLM as any).invoke([
-          new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
-          new HumanMessage(prompt),
-        ]),
-      timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
-      phaseLabel: "WrittenQuestionsMap",
-      onRetry: (attempt, error) => {
-        console.log(
-          `[WrittenQuestionsJob] ${chunkId} Retry attempt ${attempt}/3: ${error.message}`
-        );
-      },
-    });
+    for (let round = 1; round <= CONFIG.MAP_MAX_ROUNDS; round++) {
+      const need = questionsPerChunk - candidates.length;
+      if (need <= 0) break;
 
-    const elapsed = Date.now() - startTime;
-    console.log(`[WrittenQuestionsJob] ${chunkId} LLM completed in ${elapsed}ms`);
+      const prompt =
+        round === 1
+          ? getMapPrompt({
+              chunk,
+              questionCount,
+              questionsPerChunk,
+              difficulty,
+              questionType,
+              focus: sanitizedFocus,
+            })
+          : candidates.length === 0
+            ? getMapRecoveryPrompt({
+                chunk,
+                questionCount,
+                need: questionsPerChunk,
+                difficulty,
+                questionType,
+                focus: sanitizedFocus,
+              })
+            : getMapTopUpPrompt({
+                chunk,
+                questionCount,
+                need,
+                difficulty,
+                questionType,
+                focus: sanitizedFocus,
+                existingQuestions: candidates,
+              });
 
-    // Assign fresh IDs per question so IDs are unique across parallel map chunks (models often repeat schemes like "1"–"5").
-    // Filter out empty or invalid questions.
-    const questions = (response as WrittenQuestionsResponse).questions
-      .filter(
-        (q) =>
-          q.question &&
-          q.question.trim().length > 0 &&
-          q.modelAnswer &&
-          q.modelAnswer.trim().length > 0
-      )
-      .map((q) => ({
-        ...q,
-        id: randomUUID(),
-      }));
+      console.log(
+        `[WrittenQuestionsJob] ${chunkId} Map round ${round}/${CONFIG.MAP_MAX_ROUNDS} — need ${need}, prompt ${prompt.length} chars`
+      );
+
+      const roundStart = Date.now();
+      const response = await invokeStudioLlm({
+        invoke: () =>
+          (structuredLLM as any).invoke([
+            new SystemMessage(withLanguageInstruction(MAP_SYSTEM_PROMPT, language)),
+            new HumanMessage(prompt),
+          ]),
+        timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
+        phaseLabel: "WrittenQuestionsMap",
+        onRetry: (attempt, error) => {
+          console.log(
+            `[WrittenQuestionsJob] ${chunkId} Retry attempt ${attempt}/3: ${error.message}`
+          );
+        },
+      });
+
+      const roundElapsed = Date.now() - roundStart;
+      totalMapElapsedMs += roundElapsed;
+
+      const incoming = normalizeMapQuestions(
+        (response as WrittenQuestionsResponse).questions ?? [],
+        questionType
+      );
+      const beforeLen = candidates.length;
+      appendUniqueWrittenQuestions(candidates, incoming, questionsPerChunk);
+
+      console.log(
+        `[WrittenQuestionsJob] ${chunkId} Round ${round} done in ${roundElapsed}ms — raw ${incoming.length}, merged ${beforeLen}→${candidates.length}/${questionsPerChunk}`
+      );
+
+      if (candidates.length >= questionsPerChunk) break;
+    }
+
+    const elapsed = totalMapElapsedMs;
+    console.log(
+      `[WrittenQuestionsJob] ${chunkId} Map phase total ${elapsed}ms, final questions: ${candidates.length}`
+    );
+
+    const questions = candidates;
     const result = {
       questions,
       processingTimeMs: elapsed,
@@ -609,7 +678,7 @@ export async function runFinalizeWrittenQuestionsPhase(
         schemaName: "written_question_id_selection",
         maxTokens: 32_000,
         temperature: 0.3,
-        reasoningEnabled: true,
+        reasoningEnabled: false,
       });
       const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
       const selectionPrompt = getSelectionIdsPrompt({
@@ -648,9 +717,30 @@ export async function runFinalizeWrittenQuestionsPhase(
         `[WrittenQuestionsJob] Selection completed in ${Date.now() - startTime}ms, selected ${finalQuestions.length} questions`
       );
     } else {
-      finalQuestions = dedupedQuestions;
+      finalQuestions = padQuestionsToTarget(dedupedQuestions, allQuestions, questionCount);
       console.log(
-        `[WrittenQuestionsJob] Using all ${finalQuestions.length} deduped questions (within limit)`
+        `[WrittenQuestionsJob] Using ${finalQuestions.length} questions (${dedupedQuestions.length} after dedupe, padded from raw pool of ${allQuestions.length})`
+      );
+    }
+
+    if (finalQuestions.length < questionCount) {
+      finalQuestions = padQuestionsToTarget(finalQuestions, allQuestions, questionCount);
+      console.log(
+        `[WrittenQuestionsJob] Padded final set to ${finalQuestions.length}/${questionCount} from raw pool`
+      );
+    }
+
+    const beforeFinalDedupe = finalQuestions.length;
+    finalQuestions = dedupeQuestions(finalQuestions);
+    if (finalQuestions.length < beforeFinalDedupe) {
+      console.log(
+        `[WrittenQuestionsJob] Final text dedupe removed ${beforeFinalDedupe - finalQuestions.length} duplicate(s); ${finalQuestions.length} remain`
+      );
+    }
+    if (finalQuestions.length < questionCount) {
+      finalQuestions = padQuestionsToTarget(finalQuestions, dedupedQuestions, questionCount);
+      console.log(
+        `[WrittenQuestionsJob] Re-padded after final dedupe to ${finalQuestions.length}/${questionCount}`
       );
     }
 
