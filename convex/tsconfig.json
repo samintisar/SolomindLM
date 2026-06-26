@@ -5,7 +5,7 @@
    */
   "compilerOptions": {
     /* TS 7 (tsgo): baseUrl removed; use paths for resolution. */
-  "typeRoots": ["../node_modules/@types"],
+    "typeRoots": ["../node_modules/@types"],
     /* Empty types: do not auto-include every @types/* package (e.g. stub @types/dompurify). */
     "types": [],
     "paths": {

@@ -1,7 +1,7 @@
-import { useShellWebConvexAuth } from "@/features/auth/hooks/useShellWebConvexAuth";
-import { NativeShellAuthListener } from "@/features/auth/components/NativeShellAuthListener";
 import { ConvexProviderWithAuth, type ConvexReactClient } from "convex/react";
 import { createContext, type ReactNode } from "react";
+import { NativeShellAuthListener } from "@/features/auth/components/NativeShellAuthListener";
+import { useShellWebConvexAuth } from "@/features/auth/hooks/useShellWebConvexAuth";
 
 export const ShellConvexClientContext = createContext<ConvexReactClient | null>(null);
 

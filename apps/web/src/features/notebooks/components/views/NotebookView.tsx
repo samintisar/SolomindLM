@@ -22,7 +22,6 @@ import { STUDIO_TOOLS } from "@/shared/constants";
 import { useToast } from "@/shared/contexts/useToast";
 import { usePanelResize } from "@/shared/hooks/usePanelResize";
 
-
 export function NotebookView() {
   const { user } = useAuth();
 

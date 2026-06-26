@@ -1,17 +1,17 @@
-import {
-  buildWebViewAuthInjectScript,
-  buildWebViewAuthPostMessageScript,
-} from "@mobile/components/web/buildWebViewAuthInjectScript";
+import { ConvexAuthProvider, useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import {
   buildNativeAuthResponseInjectScript,
   type NativeAuthResponsePayload,
 } from "@mobile/components/web/buildNativeAuthResponseInjectScript";
-import { completeNativeOAuthSignIn } from "@mobile/services/auth/nativeOAuthSignIn";
+import {
+  buildWebViewAuthInjectScript,
+  buildWebViewAuthPostMessageScript,
+} from "@mobile/components/web/buildWebViewAuthInjectScript";
 import { convexAuthSecureStorage } from "@mobile/services/auth/convexAuthSecureStorage";
 import { convexAuthStorageKeys } from "@mobile/services/auth/convexAuthStorageKeys";
+import { completeNativeOAuthSignIn } from "@mobile/services/auth/nativeOAuthSignIn";
 import { convexClient, convexDeploymentUrl } from "@mobile/services/convex/client";
 import { log } from "@mobile/utils/logger";
-import { ConvexAuthProvider, useAuthActions, useAuthToken } from "@convex-dev/auth/react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import type WebView from "react-native-webview";
 import { NativeConvexAuthBridgeContext } from "./useNativeConvexAuthBridge";
@@ -51,10 +51,7 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
   const webViewRef = useRef<WebView | null>(null);
   const pendingDeliveriesRef = useRef<Array<() => void>>([]);
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastInjectedRef = useRef<{ jwt: string | null; refresh: string | null }>({
-    jwt: null,
-    refresh: null,
-  });
+  const lastInjectedRef = useRef<{ jwt: string | null }>({ jwt: null });
   const webConvexDeploymentUrlRef = useRef<string | null>(null);
   const webViewDocumentReadyRef = useRef(false);
   const pendingAuthSyncRef = useRef(false);
@@ -72,7 +69,7 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
     (
       requestId: string,
       success: boolean,
-      options?: { error?: string; authenticated?: boolean },
+      options?: { error?: string; authenticated?: boolean }
     ) => {
       const payload: NativeAuthResponsePayload = {
         type: "native-auth:response",
@@ -96,72 +93,62 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
         }
       }
     },
-    [],
+    []
   );
 
-  const syncAuthToWebView = useCallback(async (options?: { force?: boolean }) => {
-    const ref = webViewRef.current;
-    if (!ref) {
-      pendingAuthSyncRef.current = true;
-      if (__DEV__) {
-        console.debug("[NativeAuth] Deferred token inject — WebView not mounted yet");
+  const syncAuthToWebView = useCallback(
+    async (options?: { force?: boolean }) => {
+      const ref = webViewRef.current;
+      if (!ref) {
+        pendingAuthSyncRef.current = true;
+        if (__DEV__) {
+          console.debug("[NativeAuth] Deferred token inject — WebView not mounted yet");
+        }
+        return;
       }
-      return;
-    }
 
-    if (!webViewDocumentReadyRef.current) {
-      pendingAuthSyncRef.current = true;
-      if (__DEV__) {
-        console.debug("[NativeAuth] Deferred token inject — document not ready");
+      if (!webViewDocumentReadyRef.current) {
+        pendingAuthSyncRef.current = true;
+        if (__DEV__) {
+          console.debug("[NativeAuth] Deferred token inject — document not ready");
+        }
+        return;
       }
-      return;
-    }
 
-    const injectDeploymentUrl =
-      webConvexDeploymentUrlRef.current ?? convexDeploymentUrl;
+      const injectDeploymentUrl = webConvexDeploymentUrlRef.current ?? convexDeploymentUrl;
 
-    if (
-      webConvexDeploymentUrlRef.current &&
-      webConvexDeploymentUrlRef.current !== convexDeploymentUrl
-    ) {
-      log.warn(
-        "[NativeAuth] Web/native Convex URL mismatch",
-        webConvexDeploymentUrlRef.current,
-        convexDeploymentUrl,
-      );
-    }
+      if (
+        webConvexDeploymentUrlRef.current &&
+        webConvexDeploymentUrlRef.current !== convexDeploymentUrl
+      ) {
+        log.warn(
+          "[NativeAuth] Web/native Convex URL mismatch",
+          webConvexDeploymentUrlRef.current,
+          convexDeploymentUrl
+        );
+      }
 
-    const [storedJwt, refresh] = await Promise.all([
-      convexAuthSecureStorage.getItem(keys.jwt),
-      convexAuthSecureStorage.getItem(keys.refresh),
-    ]);
-    const jwt = authToken ?? storedJwt ?? null;
+      const storedJwt = await convexAuthSecureStorage.getItem(keys.jwt);
+      const jwt = authToken ?? storedJwt ?? null;
 
-    if (
-      !options?.force &&
-      lastInjectedRef.current.jwt === (jwt ?? null) &&
-      lastInjectedRef.current.refresh === (refresh ?? null)
-    ) {
-      return;
-    }
-    pendingAuthSyncRef.current = false;
-    lastInjectedRef.current = { jwt: jwt ?? null, refresh: refresh ?? null };
+      if (!options?.force && lastInjectedRef.current.jwt === (jwt ?? null)) {
+        return;
+      }
+      pendingAuthSyncRef.current = false;
+      lastInjectedRef.current = { jwt: jwt ?? null };
 
-    if (__DEV__) {
-      console.debug("[NativeAuth] Injecting tokens into WebView", {
-        hasJwt: Boolean(jwt),
-        hasRefresh: Boolean(refresh),
-        deploymentUrl: injectDeploymentUrl,
-      });
-    }
+      if (__DEV__) {
+        console.debug("[NativeAuth] Injecting JWT into WebView", {
+          hasJwt: Boolean(jwt),
+          deploymentUrl: injectDeploymentUrl,
+        });
+      }
 
-    ref.injectJavaScript(
-      buildWebViewAuthPostMessageScript(injectDeploymentUrl, jwt ?? null, refresh ?? null),
-    );
-    ref.injectJavaScript(
-      buildWebViewAuthInjectScript(injectDeploymentUrl, jwt ?? null, refresh ?? null),
-    );
-  }, [authToken, keys.jwt, keys.refresh]);
+      ref.injectJavaScript(buildWebViewAuthPostMessageScript(injectDeploymentUrl, jwt ?? null));
+      ref.injectJavaScript(buildWebViewAuthInjectScript(injectDeploymentUrl, jwt ?? null));
+    },
+    [authToken, keys.jwt]
+  );
 
   useEffect(() => {
     if (syncDebounceRef.current) {
@@ -186,7 +173,7 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
       const jwt = await convexAuthSecureStorage.getItem(keys.jwt);
       return Boolean(jwt);
     },
-    [keys.jwt, signIn],
+    [keys.jwt, signIn]
   );
 
   const onWebViewMessage = useCallback(
@@ -265,7 +252,7 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
           if (msg.type === "native-auth:sign-out") {
             await signOut();
             convexClient.clearAuth();
-            lastInjectedRef.current = { jwt: null, refresh: null };
+            lastInjectedRef.current = { jwt: null };
             await syncAuthToWebView();
             respond(msg.requestId, true, { authenticated: false });
           }
@@ -277,20 +264,12 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
         }
       })();
     },
-    [
-      authToken,
-      handlePasswordSignIn,
-      keys.jwt,
-      respond,
-      signIn,
-      signOut,
-      syncAuthToWebView,
-    ],
+    [authToken, handlePasswordSignIn, keys.jwt, respond, signIn, signOut, syncAuthToWebView]
   );
 
   const onWebViewLoadStart = useCallback(() => {
     webViewDocumentReadyRef.current = false;
-    lastInjectedRef.current = { jwt: null, refresh: null };
+    lastInjectedRef.current = { jwt: null };
   }, []);
 
   const onWebViewLoadEnd = useCallback(() => {
@@ -306,12 +285,12 @@ function NativeAuthWebViewBridgeInner({ children }: { children: ReactNode }) {
         flushPendingDeliveries();
       }
     },
-    [flushPendingDeliveries],
+    [flushPendingDeliveries]
   );
 
   const ctx = useMemo(
     () => ({ onWebViewMessage, setWebViewRef, onWebViewLoadStart, onWebViewLoadEnd }),
-    [onWebViewMessage, onWebViewLoadEnd, onWebViewLoadStart, setWebViewRef],
+    [onWebViewMessage, onWebViewLoadEnd, onWebViewLoadStart, setWebViewRef]
   );
 
   return (

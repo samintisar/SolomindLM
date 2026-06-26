@@ -101,9 +101,7 @@ function postNativeAuthRequest(request: NativeAuthRequest): void {
   bridge.postMessage(JSON.stringify(request));
 }
 
-async function requestNativeAuth(
-  request: NativeAuthRequestWithoutId,
-): Promise<NativeAuthResponse> {
+async function requestNativeAuth(request: NativeAuthRequestWithoutId): Promise<NativeAuthResponse> {
   if (!isNativeShell()) {
     throw new Error("Native auth is only available in the mobile shell");
   }
@@ -172,7 +170,7 @@ export async function requestNativeGoogleSignIn(): Promise<boolean> {
 }
 
 export async function requestNativePasswordSignIn(
-  params: Record<string, string>,
+  params: Record<string, string>
 ): Promise<boolean> {
   const response = await requestNativeAuth({
     type: "native-auth:password-sign-in",

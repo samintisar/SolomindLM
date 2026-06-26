@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   computeRemoteGenerationBlocksSend,
   isStreamStillRelevant,
-  resolveConversationMessages,
   researchProgressToStreamingActivity,
+  resolveConversationMessages,
 } from "./chatStreamHelpers";
 
 describe("researchProgressToStreamingActivity", () => {

@@ -3,8 +3,8 @@
  * Run after bun install if `convex dev` reports missing @auth/core or convex.config.
  */
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -34,7 +34,7 @@ if (failed) {
   console.error(
     "\nnode_modules is incomplete or corrupted. From repo root run:\n" +
       "  Remove-Item -Recurse -Force node_modules, apps\\web\\node_modules, apps\\mobile\\node_modules\n" +
-      "  bun install --force\n",
+      "  bun install --force\n"
   );
   process.exit(1);
 }

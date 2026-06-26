@@ -1,11 +1,11 @@
+import { useCallback, useEffect, useState } from "react";
+import { requestNativeTokenSync } from "@/features/auth/nativeShellAuth";
 import {
   applyShellAuthTokens,
   getShellConvexDeploymentUrl,
   parseShellAuthTokenPayload,
   readShellJwt,
 } from "@/features/auth/shellAuthMirror";
-import { requestNativeTokenSync } from "@/features/auth/nativeShellAuth";
-import { useCallback, useEffect, useState } from "react";
 
 const NATIVE_SYNC_TIMEOUT_MS = 3000;
 
@@ -16,7 +16,9 @@ const NATIVE_SYNC_TIMEOUT_MS = 3000;
 export function useShellWebConvexAuth() {
   const deploymentUrl = getShellConvexDeploymentUrl();
   const [tokenVersion, setTokenVersion] = useState(0);
-  const [initialSyncDone, setInitialSyncDone] = useState(() => readShellJwt(deploymentUrl) !== null);
+  const [initialSyncDone, setInitialSyncDone] = useState(
+    () => readShellJwt(deploymentUrl) !== null
+  );
 
   const bumpTokenVersion = useCallback(() => {
     setTokenVersion((v) => v + 1);
@@ -29,7 +31,7 @@ export function useShellWebConvexAuth() {
     const onMessage = (event: Event) => {
       const payload = parseShellAuthTokenPayload((event as MessageEvent).data);
       if (!payload) return;
-      applyShellAuthTokens(payload.deploymentUrl, payload.jwt, payload.refresh);
+      applyShellAuthTokens(payload.deploymentUrl, payload.jwt);
       bumpTokenVersion();
     };
 
@@ -58,7 +60,7 @@ export function useShellWebConvexAuth() {
       }
       return readShellJwt(deploymentUrl);
     },
-    [deploymentUrl, tokenVersion],
+    [deploymentUrl, tokenVersion]
   );
 
   const mirroredJwt = readShellJwt(deploymentUrl);

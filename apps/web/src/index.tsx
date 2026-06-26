@@ -20,5 +20,5 @@ root.render(
     <ShellAwareConvexAuthProvider client={convex}>
       <App />
     </ShellAwareConvexAuthProvider>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

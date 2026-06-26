@@ -1,15 +1,13 @@
 /**
- * Injects Convex Auth tokens from the native shell into WebView localStorage.
- * The WebView mirrors JWT only — native ConvexAuthProvider owns refresh.
+ * Injects Convex Auth JWT from the native shell into WebView localStorage.
+ * Refresh tokens stay in native secure storage only.
  */
 export function buildWebViewAuthInjectScript(
   convexDeploymentUrl: string,
-  jwt: string | null,
-  refresh: string | null,
+  jwt: string | null
 ): string {
   const encodedUrl = JSON.stringify(convexDeploymentUrl);
   const encodedJwt = JSON.stringify(jwt);
-  const encodedRefresh = JSON.stringify(refresh);
   return `
 (function () {
   var CONVEX_URL = ${encodedUrl};
@@ -17,7 +15,6 @@ export function buildWebViewAuthInjectScript(
   var jwtKey = "__convexAuthJWT_" + ns;
   var refreshKey = "__convexAuthRefreshToken_" + ns;
   var jwt = ${encodedJwt};
-  var refresh = ${encodedRefresh};
   // Memory mirror first — available before localStorage on some Android loads.
   window.__SOLOMIND_SHELL_AUTH__ = { jwt: jwt, deploymentUrl: CONVEX_URL };
   window.dispatchEvent(new CustomEvent("solomindlm-native-auth-sync"));
@@ -28,11 +25,7 @@ export function buildWebViewAuthInjectScript(
     } else {
       localStorage.removeItem(jwtKey);
     }
-    if (refresh) {
-      localStorage.setItem(refreshKey, refresh);
-    } else {
-      localStorage.removeItem(refreshKey);
-    }
+    localStorage.removeItem(refreshKey);
     hasStoredJwt = jwt ? !!localStorage.getItem(jwtKey) : true;
   } catch (e) {
     hasStoredJwt = false;
@@ -51,17 +44,15 @@ true;
 `;
 }
 
-/** Dispatches token payload via MessageEvent (more reliable than inject alone on Android). */
+/** Dispatches JWT payload via MessageEvent (more reliable than inject alone on Android). */
 export function buildWebViewAuthPostMessageScript(
   convexDeploymentUrl: string,
-  jwt: string | null,
-  refresh: string | null,
+  jwt: string | null
 ): string {
   const payload = JSON.stringify({
     type: "native-auth:tokens",
     deploymentUrl: convexDeploymentUrl,
     jwt,
-    refresh,
   });
   return `
 (function () {

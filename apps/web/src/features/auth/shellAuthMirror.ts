@@ -6,7 +6,6 @@ export type ShellAuthTokenPayload = {
   type: "native-auth:tokens";
   deploymentUrl: string;
   jwt: string | null;
-  refresh: string | null;
 };
 
 export type ShellAuthInjectAck = {
@@ -51,12 +50,8 @@ export function readShellJwt(deploymentUrl = CONVEX_URL): string | null {
   }
 }
 
-/** Apply tokens from native inject or postMessage into WebView storage. */
-export function applyShellAuthTokens(
-  deploymentUrl: string,
-  jwt: string | null,
-  refresh: string | null,
-): void {
+/** Apply JWT from native inject or postMessage into WebView storage (refresh stays native-only). */
+export function applyShellAuthTokens(deploymentUrl: string, jwt: string | null): void {
   const keys = convexAuthStorageKeys(deploymentUrl);
   try {
     if (jwt) {
@@ -64,11 +59,7 @@ export function applyShellAuthTokens(
     } else {
       localStorage.removeItem(keys.jwt);
     }
-    if (refresh) {
-      localStorage.setItem(keys.refresh, refresh);
-    } else {
-      localStorage.removeItem(keys.refresh);
-    }
+    localStorage.removeItem(keys.refresh);
     window.__SOLOMIND_SHELL_AUTH__ = { jwt, deploymentUrl };
     window.dispatchEvent(new CustomEvent("solomindlm-native-auth-sync"));
   } catch {
@@ -77,7 +68,7 @@ export function applyShellAuthTokens(
 }
 
 export function clearShellAuthMirror(deploymentUrl = CONVEX_URL): void {
-  applyShellAuthTokens(deploymentUrl, null, null);
+  applyShellAuthTokens(deploymentUrl, null);
 }
 
 export function parseShellAuthTokenPayload(data: unknown): ShellAuthTokenPayload | null {

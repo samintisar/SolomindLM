@@ -66,7 +66,10 @@ function AuthFormPanelContent({
     }
   };
 
-  const runPasswordSignIn = async (formData: FormData, onSuccess: (authenticated: boolean) => void) => {
+  const runPasswordSignIn = async (
+    formData: FormData,
+    onSuccess: (authenticated: boolean) => void
+  ) => {
     const authenticated = await signInPassword(formData);
     onSuccess(authenticated);
   };

@@ -301,10 +301,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
   const shellClassName = cn(
     "flex flex-col min-w-0 bg-background",
     isFocusMode
-      ? cn(
-          "fixed z-[60] flex flex-col bg-background",
-          "top-14 left-0 right-0 bottom-0"
-        )
+      ? cn("fixed z-[60] flex flex-col bg-background", "top-14 left-0 right-0 bottom-0")
       : "h-full animate-in fade-in slide-in-from-right-4 duration-300"
   );
 

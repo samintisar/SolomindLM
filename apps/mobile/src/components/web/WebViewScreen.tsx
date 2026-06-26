@@ -1,6 +1,6 @@
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
-import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
 import { isConvexDeploymentConfigured } from "@mobile/services/convex/client";
+import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +31,7 @@ export function WebViewScreen({ path, onUrlChange }: WebViewScreenProps) {
       webViewRef.current = ref;
       setWebViewRef(ref);
     },
-    [setWebViewRef],
+    [setWebViewRef]
   );
 
   const setWebViewRefRef = useRef(setWebViewRef);
@@ -69,8 +69,8 @@ export function WebViewScreen({ path, onUrlChange }: WebViewScreenProps) {
         <Text style={{ textAlign: "center" }}>{loadError}</Text>
         <Text style={{ textAlign: "center", opacity: 0.7 }}>{uri}</Text>
         <Text style={{ textAlign: "center", opacity: 0.7 }}>
-          Run `bun run dev:web` on your PC. Emulator uses http://10.0.2.2:5173; physical devices need your LAN IP in
-          EXPO_PUBLIC_WEB_URL.
+          Run `bun run dev:web` on your PC. Emulator uses http://10.0.2.2:5173; physical devices
+          need your LAN IP in EXPO_PUBLIC_WEB_URL.
         </Text>
       </View>
     );

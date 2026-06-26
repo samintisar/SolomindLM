@@ -1,5 +1,4 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
 import {
   Download,
   FileText,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
+import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
 import {
   buildAcademicDiscoveryApiFilters,
   type DiscoveryAcademicFilterState,

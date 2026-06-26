@@ -4,17 +4,17 @@
  * @see https://github.com/facebook/react-native/issues/56287
  */
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, "..");
 
-const FOOJAY_OLD = /id\("org\.gradle\.toolchains\.foojay-resolver-convention"\)\.version\("0\.5\.0"\)/;
-const FOOJAY_NEW =
-  'id("org.gradle.toolchains.foojay-resolver-convention").version("1.0.0")';
+const FOOJAY_OLD =
+  /id\("org\.gradle\.toolchains\.foojay-resolver-convention"\)\.version\("0\.5\.0"\)/;
+const FOOJAY_NEW = 'id("org.gradle.toolchains.foojay-resolver-convention").version("1.0.0")';
 
 function resolveGradlePluginRoot() {
   const searchRoots = [projectRoot, path.resolve(projectRoot, "../..")];
@@ -24,7 +24,7 @@ function resolveGradlePluginRoot() {
       return path.dirname(
         require.resolve("@react-native/gradle-plugin/package.json", {
           paths: [path.dirname(reactNativePkg)],
-        }),
+        })
       );
     } catch {
       // try next root
@@ -53,7 +53,7 @@ export function patchRnGradlePlugin() {
 
   if (!FOOJAY_OLD.test(content)) {
     console.warn(
-      "[patch-rn-gradle-plugin] Unexpected settings.gradle.kts; foojay 0.5.0 not found.",
+      "[patch-rn-gradle-plugin] Unexpected settings.gradle.kts; foojay 0.5.0 not found."
     );
     return false;
   }

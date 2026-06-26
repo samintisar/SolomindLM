@@ -4,9 +4,9 @@
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { patchRnGradlePlugin } from "./patch-rn-gradle-plugin.mjs";
 
 const require = createRequire(import.meta.url);
@@ -146,11 +146,7 @@ function configureNodeWrapper(env, realNodeExecutable) {
   const shimDir = path.join(projectRoot, "scripts", ".node-shim");
   fs.mkdirSync(shimDir, { recursive: true });
   const shimPath = path.join(shimDir, "node.cmd");
-  fs.writeFileSync(
-    shimPath,
-    `@echo off\r\n"${realNodeExecutable}" "${wrapper}" %*\r\n`,
-    "utf8",
-  );
+  fs.writeFileSync(shimPath, `@echo off\r\n"${realNodeExecutable}" "${wrapper}" %*\r\n`, "utf8");
   prependPath(env, shimDir);
   return realNodeExecutable;
 }
@@ -191,7 +187,10 @@ function prependPath(env, segment) {
 
 function findJdkHome() {
   const fromEnv = process.env.JAVA_HOME;
-  if (fromEnv && fs.existsSync(path.join(fromEnv, "bin", process.platform === "win32" ? "java.exe" : "java"))) {
+  if (
+    fromEnv &&
+    fs.existsSync(path.join(fromEnv, "bin", process.platform === "win32" ? "java.exe" : "java"))
+  ) {
     return fromEnv;
   }
 
@@ -226,7 +225,7 @@ const nodeExecutable = findNodeExecutable();
 if (!nodeExecutable) {
   console.error(
     "[run-android] Node.js was not found. Gradle needs `node` on PATH.\n" +
-      "Install Node.js (https://nodejs.org) or ensure it is on PATH, then retry.",
+      "Install Node.js (https://nodejs.org) or ensure it is on PATH, then retry."
   );
   process.exit(1);
 }
@@ -241,7 +240,7 @@ if (jdk) {
   console.error(
     "[run-android] JAVA_HOME is not set and Android Studio JDK was not found.\n" +
       "Install Android Studio or set JAVA_HOME to its jbr folder, e.g.:\n" +
-      '  C:\\Program Files\\Android\\Android Studio\\jbr',
+      "  C:\\Program Files\\Android\\Android Studio\\jbr"
   );
   process.exit(1);
 }
@@ -255,7 +254,7 @@ if (androidHome) {
 if (!patchRnGradlePlugin()) {
   console.error(
     "[run-android] Failed to patch @react-native/gradle-plugin for Gradle 9.\n" +
-      "Run: node ./scripts/patch-rn-gradle-plugin.mjs from apps/mobile",
+      "Run: node ./scripts/patch-rn-gradle-plugin.mjs from apps/mobile"
   );
   process.exit(1);
 }
@@ -266,9 +265,18 @@ const mobileRoot = resolveMobileProjectRoot(env);
 configureGradleTempDirs(env, mobileRoot);
 
 // Gradle daemon may cache a bad PATH from an earlier failed attempt.
-const gradlew = path.join(mobileRoot, "android", process.platform === "win32" ? "gradlew.bat" : "gradlew");
+const gradlew = path.join(
+  mobileRoot,
+  "android",
+  process.platform === "win32" ? "gradlew.bat" : "gradlew"
+);
 if (fs.existsSync(gradlew)) {
-  spawnSync(gradlew, ["--stop"], { env, cwd: path.join(mobileRoot, "android"), stdio: "ignore", shell: process.platform === "win32" });
+  spawnSync(gradlew, ["--stop"], {
+    env,
+    cwd: path.join(mobileRoot, "android"),
+    stdio: "ignore",
+    shell: process.platform === "win32",
+  });
 }
 
 const expoCli = findExpoCli();

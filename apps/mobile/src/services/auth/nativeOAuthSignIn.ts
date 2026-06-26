@@ -6,7 +6,7 @@ maybeCompleteAuthSession();
 
 type SignInFn = (
   provider: string,
-  args?: { redirectTo?: string; code?: string } & Record<string, string>,
+  args?: { redirectTo?: string; code?: string } & Record<string, string>
 ) => Promise<{ redirect?: URL | null; signingIn?: boolean }>;
 
 /** App scheme from app.json — used for OAuth callback into the native shell. */
@@ -20,7 +20,7 @@ export function getNativeOAuthRedirectUri(): string {
  */
 export async function completeNativeOAuthSignIn(
   provider: "google",
-  signIn: SignInFn,
+  signIn: SignInFn
 ): Promise<void> {
   if (Platform.OS === "web") {
     throw new Error("Native OAuth is not available on web");

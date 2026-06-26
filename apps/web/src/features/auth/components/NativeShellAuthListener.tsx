@@ -1,7 +1,7 @@
+import { useEffect } from "react";
 import { notifyNativeWebViewReady } from "@/features/auth/nativeShellAuth";
 import { reportShellWebError } from "@/features/auth/shellAuthMirror";
 import { isNativeShell } from "@/utils/platformDetection";
-import { useEffect } from "react";
 
 /** Notifies native shell when WebView is ready; forwards web errors to native Sentry. */
 export function NativeShellAuthListener() {

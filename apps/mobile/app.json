@@ -15,9 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
-      "associatedDomains": [
-        "applinks:REPLACE_WITH_YOUR_DOMAIN"
-      ]
+      "associatedDomains": ["applinks:REPLACE_WITH_YOUR_DOMAIN"]
     },
     "android": {
       "adaptiveIcon": {
@@ -37,10 +35,7 @@
               "pathPrefix": "/notebook"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ]
     },
@@ -55,9 +50,7 @@
       [
         "expo-build-properties",
         {
-          "android": {
-            "usesCleartextTraffic": true
-          }
+          "android": {}
         }
       ],
       "expo-router",
