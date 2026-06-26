@@ -1,9 +1,8 @@
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { MobileConvexAuthBridge } from "./features/auth/components/MobileConvexAuthBridge";
+import { ShellAwareConvexAuthProvider } from "./features/auth/components/ShellAwareConvexAuthProvider";
 import "streamdown/styles.css";
 import "./index.css";
 
@@ -12,17 +11,14 @@ if (!convexUrl) throw new Error("VITE_CONVEX_URL is required");
 
 const convex = new ConvexReactClient(convexUrl);
 
-// React 19 entry point with Convex auth - plugins removed, testing hooks
-
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Could not find root element");
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ConvexAuthProvider client={convex}>
-      <MobileConvexAuthBridge />
+    <ShellAwareConvexAuthProvider client={convex}>
       <App />
-    </ConvexAuthProvider>
-  </React.StrictMode>
+    </ShellAwareConvexAuthProvider>
+  </React.StrictMode>,
 );

@@ -1,18 +1,16 @@
 import { useNativeConvexAuthBridge } from "@mobile/context/useNativeConvexAuthBridge";
-import { convexDeploymentUrl, isConvexDeploymentConfigured } from "@mobile/services/convex/client";
 import { NATIVE_SHELL_INJECT } from "@mobile/utils/constants";
+import { isConvexDeploymentConfigured } from "@mobile/services/convex/client";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
-import { createElement, useEffect, useMemo } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { buildConvexAuthFlushInjectScript } from "./authFlushScript";
+import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
 
 export type WebViewScreenProps = {
   path: string;
   onUrlChange?: (url: string) => void;
-  /** When false, skips Convex token flush injection (e.g. external pages). */
-  syncConvexAuth?: boolean;
 };
 
 function getWebBaseUrl(): string | null {
@@ -21,30 +19,63 @@ function getWebBaseUrl(): string | null {
   return url.replace(/\/+$/, "");
 }
 
-export function WebViewScreen({ path, onUrlChange, syncConvexAuth = true }: WebViewScreenProps) {
+export function WebViewScreen({ path, onUrlChange }: WebViewScreenProps) {
   const base = useMemo(() => getWebBaseUrl(), []);
-  const { onWebViewMessage } = useNativeConvexAuthBridge();
+  const { onWebViewMessage, setWebViewRef, onWebViewLoadStart, onWebViewLoadEnd } =
+    useNativeConvexAuthBridge();
+  const webViewRef = useRef<WebView>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const assignWebViewRef = useCallback(
+    (ref: WebView | null) => {
+      webViewRef.current = ref;
+      setWebViewRef(ref);
+    },
+    [setWebViewRef],
+  );
+
+  const setWebViewRefRef = useRef(setWebViewRef);
+  setWebViewRefRef.current = setWebViewRef;
+
+  useEffect(() => {
+    setLoadError(null);
+  }, [path, base]);
+
+  useEffect(() => {
+    return () => setWebViewRefRef.current(null);
+  }, []);
 
   const injectedJavaScriptBeforeContentLoaded = useMemo(() => {
-    const flush =
-      syncConvexAuth && isConvexDeploymentConfigured
-        ? buildConvexAuthFlushInjectScript(convexDeploymentUrl)
-        : "";
-    return `${NATIVE_SHELL_INJECT}\n${flush}`;
-  }, [syncConvexAuth]);
+    if (!isConvexDeploymentConfigured) return NATIVE_SHELL_INJECT;
+    return NATIVE_SHELL_INJECT;
+  }, []);
 
   if (!base) {
     return (
       <View style={[styles.loading, { padding: 24 }]}>
         <Text style={{ textAlign: "center" }}>
-          Set EXPO_PUBLIC_WEB_URL in apps/mobile/.env (copy from .env.example).
+          Set EXPO_PUBLIC_WEB_URL in apps/mobile/.env.local (see .env.local.example).
         </Text>
       </View>
     );
   }
+
   const uri = `${base}${path.startsWith("/") ? path : `/${path}`}`;
 
-  // `react-native-webview` does not support the web platform — use an iframe for Expo web preview.
+  if (loadError) {
+    return (
+      <View style={[styles.loading, { padding: 24, gap: 12 }]}>
+        <Text style={{ textAlign: "center", fontWeight: "600" }}>Could not load the web app</Text>
+        <Text style={{ textAlign: "center" }}>{loadError}</Text>
+        <Text style={{ textAlign: "center", opacity: 0.7 }}>{uri}</Text>
+        <Text style={{ textAlign: "center", opacity: 0.7 }}>
+          Run `bun run dev:web` on your PC. Emulator uses http://10.0.2.2:5173; physical devices need your LAN IP in
+          EXPO_PUBLIC_WEB_URL.
+        </Text>
+      </View>
+    );
+  }
+
   if (Platform.OS === "web") {
     return (
       <View style={styles.webview}>
@@ -55,14 +86,18 @@ export function WebViewScreen({ path, onUrlChange, syncConvexAuth = true }: WebV
 
   return (
     <WebView
+      ref={assignWebViewRef}
       source={{ uri }}
       style={styles.webview}
-      sharedCookiesEnabled={Platform.OS === "ios"}
+      sharedCookiesEnabled
+      thirdPartyCookiesEnabled={Platform.OS === "android"}
       javaScriptEnabled
       domStorageEnabled
       startInLoadingState
       injectedJavaScriptBeforeContentLoaded={injectedJavaScriptBeforeContentLoaded}
       onMessage={(event) => onWebViewMessage(event.nativeEvent.data)}
+      onLoadStart={() => onWebViewLoadStart()}
+      onLoadEnd={() => onWebViewLoadEnd()}
       renderLoading={() => (
         <View style={styles.loading}>
           <ActivityIndicator size="large" />
@@ -71,12 +106,24 @@ export function WebViewScreen({ path, onUrlChange, syncConvexAuth = true }: WebV
       onNavigationStateChange={(nav) => {
         if (nav.url) onUrlChange?.(nav.url);
       }}
-      onShouldStartLoadWithRequest={(req) => {
-        if (!req.url.startsWith(base)) {
-          void Linking.openURL(req.url);
-          return false;
+      onError={() => {
+        setLoadError("Network error reaching the dev server.");
+      }}
+      onHttpError={(event) => {
+        if (event.nativeEvent.statusCode >= 400) {
+          setLoadError(`HTTP ${event.nativeEvent.statusCode} from the dev server.`);
         }
-        return true;
+      }}
+      onShouldStartLoadWithRequest={(req) => {
+        // Allow scripts, stylesheets, fonts, etc. — only intercept top-level navigations.
+        if (!req.isTopFrame) {
+          return true;
+        }
+        if (shouldLoadUrlInWebView(req.url, base)) {
+          return true;
+        }
+        void Linking.openURL(req.url);
+        return false;
       }}
     />
   );
@@ -116,7 +163,7 @@ function WebShellIframe({ uri, onUrlChange, onMessage }: WebShellIframeProps) {
 const styles = StyleSheet.create({
   webview: { flex: 1 },
   loading: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },

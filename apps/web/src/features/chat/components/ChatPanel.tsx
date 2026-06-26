@@ -1,5 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
-import { useAuthToken } from "@convex-dev/auth/react";
+import { useHttpAuthToken } from "@/features/auth/hooks/useHttpAuthToken";
 import {
   Download,
   FileText,
@@ -176,7 +176,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const { success, error: toastError } = useToast();
   const saveChat = useSaveChat();
 
-  const authToken = useAuthToken();
+  const authToken = useHttpAuthToken();
 
   useEffect(() => {
     if (!historyOpen) return;

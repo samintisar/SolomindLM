@@ -8,8 +8,10 @@ import Constants from "expo-constants";
 const DEV_MISSING_CONVEX_URL = "https://__configure_expo_public_convex_url__.convex.cloud";
 
 function readConfiguredConvexUrl(): string | null {
-  const fromEnv = process.env.EXPO_PUBLIC_CONVEX_URL?.trim();
-  const fromExtra = Constants.expoConfig?.extra?.convexUrl as string | undefined;
+  const fromEnv = process.env.EXPO_PUBLIC_CONVEX_URL?.trim().replace(/^["']|["']$/g, "");
+  const fromExtra = (Constants.expoConfig?.extra?.convexUrl as string | undefined)
+    ?.trim()
+    .replace(/^["']|["']$/g, "");
   const url = fromEnv || fromExtra;
   return url ? url : null;
 }

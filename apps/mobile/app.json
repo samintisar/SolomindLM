@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "solomindlm",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -16,7 +15,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
-      "associatedDomains": ["applinks:REPLACE_WITH_YOUR_DOMAIN"]
+      "associatedDomains": [
+        "applinks:REPLACE_WITH_YOUR_DOMAIN"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +25,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.solomindlm.app",
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
         {
@@ -37,7 +37,10 @@
               "pathPrefix": "/notebook"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -47,6 +50,16 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
+      "./plugins/withAndroidCmakePathFix",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-notifications",
@@ -62,7 +75,19 @@
           "cameraPermission": "Allow SolomindLM to use the camera for document capture."
         }
       ],
-      "@sentry/react-native/expo"
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "solomindlm",
+          "project": "react-native"
+        }
+      ],
+      "expo-audio",
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

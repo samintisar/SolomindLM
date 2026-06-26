@@ -109,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-14 flex items-center justify-between px-4 border-b-2 border-border bg-background relative z-[70] transition-all duration-300">
+    <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b-2 border-border bg-background relative z-70 transition-all duration-300">
       {/* Hidden span for measuring text width */}
       <span
         ref={spanRef}
@@ -149,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         ) : (
           <>
-            <div className="h-4 w-[1px] bg-border shrink-0" aria-hidden />
+            <div className="h-4 w-px bg-border shrink-0" aria-hidden />
             {isEditing ? (
               <input
                 ref={inputRef}

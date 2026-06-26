@@ -1,9 +1,9 @@
 /**
- * Primary sign-in runs in the WebView; `MobileConvexAuthBridge` + `NativeConvexAuthBridgeProvider`
- * copy JWT + refresh into SecureStore so native Convex hooks match the web session.
+ * Native ConvexAuthProvider (expo-secure-store) is the auth source of truth.
+ * OAuth uses expo-web-browser + makeRedirectUri; WebView mirrors injected JWTs only.
  */
-export type NativeAuthStatus = "webview";
+export type NativeAuthStatus = "native";
 
 export function getNativeAuthStatus(): NativeAuthStatus {
-  return "webview";
+  return "native";
 }

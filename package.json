@@ -11,16 +11,18 @@
     "bun": ">=1.2.2"
   },
   "overrides": {
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
   },
   "scripts": {
     "dev": "bun run --elide-lines=0 --filter \"./apps/**\" dev",
     "dev:web": "bun run --cwd apps/web dev",
     "dev:mobile": "bun run --cwd apps/mobile dev",
+    "run:android": "bun run --cwd apps/mobile run:android",
     "build": "bun run --filter \"./apps/**\" build",
     "build:prod": "bun run --filter @solomindlm/web build",
     "typecheck:convex": "bun x tsgo --noEmit -p convex/tsconfig.json",
+    "verify:convex-deps": "node scripts/verify-convex-deps.mjs",
     "typecheck:web": "bun x tsgo --noEmit -p apps/web/tsconfig.json",
     "typecheck:mobile": "bun x tsgo --noEmit -p apps/mobile/tsconfig.json",
     "convex:env:pull": "node scripts/pull-convex-env.mjs",

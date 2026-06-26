@@ -63,10 +63,10 @@ export const FeaturesGrid: React.FC = () => {
     return (
       <div
         key={feature.id}
-        className="group flex-shrink-0 w-[300px] min-h-[220px] rounded-2xl bg-card border border-border shadow-sm p-12 flex flex-col items-center justify-center text-center mx-4"
+        className="group shrink-0 w-[300px] min-h-[220px] rounded-2xl bg-card border border-border shadow-sm p-12 flex flex-col items-center justify-center text-center mx-4"
       >
         <Icon
-          className={`w-10 h-10 flex-shrink-0 ${colorClass} mb-2 group-hover:scale-105 transition-transform duration-300`}
+          className={`w-10 h-10 shrink-0 ${colorClass} mb-2 group-hover:scale-105 transition-transform duration-300`}
         />
         <h3 className="text-lg font-display font-bold text-foreground mb-1 line-clamp-1">
           {feature.title}

@@ -31,5 +31,8 @@ export function getConvexAuthUserMessage(error: unknown, fallback: string): stri
   for (const [needle, message] of AUTH_ERROR_MESSAGES) {
     if (raw.includes(needle)) return message;
   }
+  if (raw.length > 0 && raw.length < 240 && !raw.includes("CONVEX")) {
+    return raw;
+  }
   return fallback;
 }

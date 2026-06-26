@@ -3,7 +3,7 @@
 // `@convex/_generated/api` fail to resolve.
 const path = require("path");
 const fs = require("fs");
-const { getDefaultConfig } = require("expo/metro-config");
+const { getSentryExpoConfig } = require("@sentry/react-native/metro");
 const { resolve: metroResolve } = require("metro-resolver");
 
 const projectRoot = __dirname;
@@ -11,7 +11,7 @@ const monorepoRoot = path.resolve(projectRoot, "../..");
 const convexRoot = path.join(monorepoRoot, "convex");
 
 /** @type {import('expo/metro-config').MetroConfig} */
-const config = getDefaultConfig(projectRoot);
+const config = getSentryExpoConfig(projectRoot);
 
 config.watchFolders = [monorepoRoot];
 

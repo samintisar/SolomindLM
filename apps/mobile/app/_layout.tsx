@@ -1,4 +1,3 @@
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
@@ -16,11 +15,20 @@ import { useColorScheme } from "@/components/useColorScheme";
 
 export { ErrorBoundary } from "expo-router";
 
+export const unstable_settings = {
+  initialRouteName: "index",
+};
+
 SplashScreen.preventAutoHideAsync();
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: __DEV__ ? "development" : "production",
+  debug: false,
+  tracesSampleRate: __DEV__ ? 1.0 : 0.2,
+  enableAutoSessionTracking: true,
+  attachStacktrace: true,
 });
 
 function PushNotificationsBootstrap() {
@@ -53,25 +61,28 @@ function DeepLinkBootstrap() {
   return null;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
-    ...FontAwesome.font,
   });
 
   useEffect(() => {
-    if (error) throw error;
+    if (error) {
+      console.warn("[SolomindLM] Font load failed; continuing without custom fonts.", error);
+      void SplashScreen.hideAsync();
+    }
   }, [error]);
 
   useEffect(() => {
     if (loaded) {
       void SplashScreen.hideAsync();
+      return;
     }
+    const timeout = setTimeout(() => {
+      void SplashScreen.hideAsync();
+    }, 2_000);
+    return () => clearTimeout(timeout);
   }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
 
   return (
     <NativeConvexAuthBridgeProvider>
@@ -98,3 +109,5 @@ function RootLayoutNav() {
     </ThemeProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);

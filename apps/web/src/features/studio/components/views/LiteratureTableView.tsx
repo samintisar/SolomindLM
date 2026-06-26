@@ -19,7 +19,6 @@ import { createPortal } from "react-dom";
 import { useBulkUpload, useGetExistingPapers } from "@/features/sources/services/documentsApi";
 import { useToast } from "@/shared/contexts/useToast";
 import { DropdownMenu } from "@/shared/ui/DropdownMenu";
-import { isNativeShell } from "@/utils/platformDetection";
 import type { TablePaperRow } from "../../utils/literatureTablePaper";
 import {
   citationToRankedPaper,
@@ -304,7 +303,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
     isFocusMode
       ? cn(
           "fixed z-[60] flex flex-col bg-background",
-          isNativeShell() ? "inset-0" : "top-14 left-0 right-0 bottom-0"
+          "top-14 left-0 right-0 bottom-0"
         )
       : "h-full animate-in fade-in slide-in-from-right-4 duration-300"
   );
@@ -315,7 +314,7 @@ export const LiteratureTableView: React.FC<LiteratureTableViewProps> = ({
         <div className="md:hidden flex h-14 shrink-0 items-center gap-2 px-4 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
           <button
             onClick={onBack}
-            className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors transition-transform text-foreground flex items-center justify-center shrink-0 touch-manipulation"
+            className="p-1.5 hover:bg-secondary active:bg-secondary/80 active:scale-[0.97] rounded-md transition-colors text-foreground flex items-center justify-center shrink-0 touch-manipulation"
             aria-label="Back to Studio"
           >
             <ArrowLeft className="w-5 h-5 shrink-0" />

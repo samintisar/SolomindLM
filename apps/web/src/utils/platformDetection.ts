@@ -2,6 +2,8 @@ declare global {
   interface Window {
     __IS_NATIVE_SHELL__?: boolean;
     __MOBILE_AUTH_TOKEN__?: string;
+    /** Latest JWT mirrored from native inject (read before localStorage on cold sync). */
+    __SOLOMIND_SHELL_AUTH__?: { jwt: string | null; deploymentUrl: string };
     /** Injected by `react-native-webview` when the page runs inside the mobile shell. */
     ReactNativeWebView?: { postMessage: (message: string) => void };
   }
