@@ -98,9 +98,7 @@ interface WrittenQuestionSerialized {
   rubric?: string | { criteria?: string[]; maxPoints?: number };
 }
 
-function formatWrittenQuestionRubric(
-  rubric: WrittenQuestionSerialized["rubric"]
-): string {
+function formatWrittenQuestionRubric(rubric: WrittenQuestionSerialized["rubric"]): string {
   if (!rubric) return "";
   if (typeof rubric === "string") return rubric;
   const parts: string[] = [];
@@ -110,8 +108,7 @@ function formatWrittenQuestionRubric(
 }
 
 function serializeWrittenQuestions(raw: unknown): string {
-  const qs =
-    (raw as { questions?: WrittenQuestionSerialized[] } | undefined)?.questions ?? [];
+  const qs = (raw as { questions?: WrittenQuestionSerialized[] } | undefined)?.questions ?? [];
   return qs
     .map((q, i) => {
       const question = q.question ?? q.prompt ?? "";

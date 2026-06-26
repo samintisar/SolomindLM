@@ -19,7 +19,6 @@ import {
   getSelectionIdsPrompt,
   padQuestionsToTarget,
 } from "../../_agents/written_questions/postprocess";
-import { validateSelfContained } from "../../_agents/written_questions/questionHeuristics";
 import {
   getMapPrompt,
   getMapRecoveryPrompt,
@@ -30,6 +29,7 @@ import {
   WrittenQuestionsArraySchema,
   type WrittenQuestionsResponse,
 } from "../../_agents/written_questions/prompts";
+import { validateSelfContained } from "../../_agents/written_questions/questionHeuristics";
 import { createStructuredLLM } from "../../_agents/written_questions/structuredLlm";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -61,20 +61,12 @@ const CONFIG = {
   MAP_MAX_ROUNDS: 4,
 } as const;
 
-function normalizeMapQuestions(
-  raw: WrittenQuestion[],
-  questionType: string
-): WrittenQuestion[] {
+function normalizeMapQuestions(raw: WrittenQuestion[], questionType: string): WrittenQuestion[] {
   const expectedPoints = questionType === "short" ? 5 : 12;
   const typed = questionType === "essay" ? "essay" : "short";
 
   return raw
-    .filter(
-      (q) =>
-        q.question?.trim() &&
-        q.modelAnswer?.trim() &&
-        validateSelfContained(q)
-    )
+    .filter((q) => q.question?.trim() && q.modelAnswer?.trim() && validateSelfContained(q))
     .map((q) => ({
       ...q,
       id: randomUUID(),
