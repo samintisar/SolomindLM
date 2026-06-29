@@ -8,12 +8,12 @@ import { env } from "../../_lib/env";
  */
 export const AVAILABLE_SMART_MODEL_IDS = [
   "openai/gpt-oss-120b",
-  "moonshotai/Kimi-K2.6",
+  "moonshotai/Kimi-K2.7-Code",
   "deepseek-ai/DeepSeek-V4-Pro",
-  "MiniMaxAI/MiniMax-M2.7",
+  "MiniMaxAI/MiniMax-M3",
   "google/gemma-4-31B-it",
   "Qwen/Qwen3.7-Max",
-  "zai-org/GLM-5.1",
+  "zai-org/GLM-5.2",
 ] as const;
 
 export type SmartModelId = (typeof AVAILABLE_SMART_MODEL_IDS)[number];

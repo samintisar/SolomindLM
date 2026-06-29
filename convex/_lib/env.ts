@@ -8,7 +8,7 @@ export const env = {
   TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY || "",
   FAST_LLM: process.env.FAST_LLM || "openai/gpt-oss-20b",
   SMART_LLM: process.env.SMART_LLM || "openai/gpt-oss-120b",
-  REPORT_LLM: process.env.REPORT_LLM || "MiniMaxAI/MiniMax-M2.7",
+  REPORT_LLM: process.env.REPORT_LLM || "MiniMaxAI/MiniMax-M3",
   FLASHCARDS_LLM: process.env.FLASHCARDS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   QUIZ_LLM: process.env.QUIZ_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
   MINDMAP_LLM: process.env.MINDMAP_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",

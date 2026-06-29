@@ -338,13 +338,13 @@ You can customize which models are used for different features. Models are hoste
 ```env
 FAST_LLM=openai/gpt-oss-20b
 SMART_LLM=openai/gpt-oss-120b
-REPORT_LLM=MiniMaxAI/MiniMax-M2.7
-FLASHCARDS_LLM=MiniMaxAI/MiniMax-M2.7
-QUIZ_LLM=MiniMaxAI/MiniMax-M2.7
-MINDMAP_LLM=MiniMaxAI/MiniMax-M2.7
-SPREADSHEET_LLM=MiniMaxAI/MiniMax-M2.7
-WRITTEN_QUESTIONS_LLM=MiniMaxAI/MiniMax-M2.7
-AUDIO_LLM=MiniMaxAI/MiniMax-M2.7
+REPORT_LLM=MiniMaxAI/MiniMax-M3
+FLASHCARDS_LLM=MiniMaxAI/MiniMax-M3
+QUIZ_LLM=MiniMaxAI/MiniMax-M3
+MINDMAP_LLM=MiniMaxAI/MiniMax-M3
+SPREADSHEET_LLM=MiniMaxAI/MiniMax-M3
+WRITTEN_QUESTIONS_LLM=MiniMaxAI/MiniMax-M3
+AUDIO_LLM=MiniMaxAI/MiniMax-M3
 ```
 
 ### Frontend Environment Variables

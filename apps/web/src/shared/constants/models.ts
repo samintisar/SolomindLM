@@ -30,9 +30,9 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "openai",
   },
   {
-    id: "moonshotai/Kimi-K2.6",
-    name: "Moonshot Kimi K2.6",
-    description: "Advanced reasoning with thinking chains",
+    id: "moonshotai/Kimi-K2.7-Code",
+    name: "Kimi K2.7 Code",
+    description: "Coding-focused agentic model with thinking mode",
     brand: "moonshot",
     isThinkingModel: true,
   },
@@ -43,9 +43,9 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "deepseek",
   },
   {
-    id: "MiniMaxAI/MiniMax-M2.7",
-    name: "MiniMax M2.7",
-    description: "High-performance multimodal model",
+    id: "MiniMaxAI/MiniMax-M3",
+    name: "MiniMax M3",
+    description: "Native multimodal model with 1M context",
     brand: "minimax",
   },
   {
@@ -61,9 +61,9 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "qwen",
   },
   {
-    id: "zai-org/GLM-5.1",
-    name: "GLM 5.1",
-    description: "Z.ai general-purpose chat with strong reasoning",
+    id: "zai-org/GLM-5.2",
+    name: "GLM 5.2",
+    description: "Long-horizon coding and agentic tasks with 1M context",
     brand: "zai",
   },
 ];

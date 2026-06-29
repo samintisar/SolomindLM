@@ -3,7 +3,7 @@ import { resolveSmartModel } from "./resolveSmartModel";
 
 describe("resolveSmartModel", () => {
   test("returns whitelisted model id when valid", () => {
-    expect(resolveSmartModel("moonshotai/Kimi-K2.6")).toBe("moonshotai/Kimi-K2.6");
+    expect(resolveSmartModel("moonshotai/Kimi-K2.7-Code")).toBe("moonshotai/Kimi-K2.7-Code");
   });
 
   test("falls back to default for unknown model", () => {
