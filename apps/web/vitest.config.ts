@@ -9,6 +9,10 @@ const require = createRequire(import.meta.url);
 // Single React instance (Bun monorepo on Linux CI otherwise bundles two copies → useState null)
 const reactRoot = path.dirname(require.resolve("react/package.json"));
 const reactDomRoot = path.dirname(require.resolve("react-dom/package.json"));
+// Node 25+ exposes experimental localStorage that can shadow jsdom Storage; --no-webstorage
+// disables it. Older CI Node (20/22/24) rejects the flag as unknown.
+const nodeMajor = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
+const webstorageExecArgv = nodeMajor >= 25 ? ["--no-webstorage"] : [];
 
 export default defineConfig({
   plugins: [react()],
@@ -34,9 +38,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
-    // Node 25+/26 exposes experimental localStorage; without --localstorage-file it
-    // warns and can shadow jsdom's Storage. Disable Node webstorage for these tests.
-    execArgv: ["--no-webstorage"],
+    execArgv: webstorageExecArgv,
     // CI has no apps/web .env; chatApi.ts validates CONVEX URL at import time
     env: {
       VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud",
