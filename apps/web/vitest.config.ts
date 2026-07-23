@@ -34,6 +34,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Node 25+/26 exposes experimental localStorage; without --localstorage-file it
+    // warns and can shadow jsdom's Storage. Disable Node webstorage for these tests.
+    execArgv: ["--no-webstorage"],
     // CI has no apps/web .env; chatApi.ts validates CONVEX URL at import time
     env: {
       VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud",
