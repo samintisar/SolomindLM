@@ -4,14 +4,7 @@
  */
 
 /** Vendor for picker icons (Simple Icons–style glyphs in the UI). */
-export type SmartModelBrand =
-  | "openai"
-  | "moonshot"
-  | "deepseek"
-  | "minimax"
-  | "google"
-  | "qwen"
-  | "zai";
+export type SmartModelBrand = "openai" | "deepseek" | "minimax" | "google" | "qwen" | "zai";
 
 export interface SmartModel {
   id: string;
@@ -19,7 +12,6 @@ export interface SmartModel {
   description: string;
   /** Shown beside the model name in chat model picker */
   brand: SmartModelBrand;
-  isThinkingModel?: boolean;
 }
 
 export const AVAILABLE_SMART_MODELS: SmartModel[] = [
@@ -30,16 +22,9 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "openai",
   },
   {
-    id: "moonshotai/Kimi-K2.7-Code",
-    name: "Kimi K2.7 Code",
-    description: "Coding-focused agentic model with thinking mode",
-    brand: "moonshot",
-    isThinkingModel: true,
-  },
-  {
-    id: "deepseek-ai/DeepSeek-V4-Pro",
-    name: "DeepSeek V4-Pro",
-    description: "High-quality reasoning and synthesis",
+    id: "deepseek-ai/DeepSeek-V4-Flash-0731",
+    name: "DeepSeek V4 Flash",
+    description: "Fast reasoning and synthesis",
     brand: "deepseek",
   },
   {
