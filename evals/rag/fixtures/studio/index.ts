@@ -11,6 +11,7 @@ import {
 } from "../agentic-patterns-20";
 
 import { studioFlashcardsAgentic20 } from "./flashcards";
+import { ML_STUDIO_FIXTURES } from "./mlNotebook";
 
 const sharedExpectedItems = (): string[] => [...AGENTIC_20_ITEMS];
 
@@ -235,6 +236,7 @@ export const STUDIO_FIXTURES: EvalFixture[] = [
   studioAudioScriptOnlyShort,
   studioAudioScriptOnlyDefault,
   studioAudioScriptOnlyLong,
+  ...ML_STUDIO_FIXTURES,
 ];
 
 export { studioFlashcardsAgentic20 };

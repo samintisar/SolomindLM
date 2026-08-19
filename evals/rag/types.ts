@@ -23,6 +23,9 @@ export type StudioRunnerKind =
 
 export type LiteratureReviewRunnerKind = "literatureReview";
 
+/** Dataset split for offline eval loops (smoke = fast gate, train = iterate, holdout = rare confirm). */
+export type EvalSplit = "smoke" | "train" | "holdout";
+
 /** All runner kinds (RAG + studio). `"both"` is a fixture-side directive that expands into multiple runs. */
 export type RunnerKind =
   | "chat"
@@ -120,6 +123,8 @@ export interface EvalFixture {
   expectedStructure?: ExpectedStructure;
   /** Source filter configuration for testing retrieval across different channels */
   sourcePolicy?: SourcePolicyConfig;
+  /** Dataset split; when omitted, resolved by evals/rag/splits.ts */
+  split?: EvalSplit;
 }
 
 // ─── Runner Artifacts ────────────────────────────────────────
@@ -234,7 +239,10 @@ export type FailureCategory =
   | "literature_review_search"
   | "literature_review_screening"
   | "literature_review_extraction"
-  | "literature_review_report";
+  | "literature_review_report"
+  | "studio_structure"
+  | "studio_grounding"
+  | "studio_generation";
 
 export interface FailureGroup {
   category: FailureCategory;
@@ -257,12 +265,39 @@ export interface EvalReport {
   commitSha: string;
   /** Number of cases run */
   totalCases: number;
+  /** Split filter used for this run, if any */
+  split?: EvalSplit;
   /** Overall pass/fail counts */
   summary: { pass: number; fail: number; warn: number; info: number };
   /** All metric results */
   metrics: MetricResult[];
   /** Grouped failures for coding agent consumption */
   failureGroups: FailureGroup[];
+}
+
+/** Pairwise comparison of two eval artifact sets (no re-generation). */
+export interface CompareCaseResult {
+  caseId: string;
+  runner: ConcreteRunnerKind;
+  /** A wins | B wins | tie */
+  winner: "a" | "b" | "tie";
+  reason: string;
+}
+
+export interface CompareReport {
+  timestamp: string;
+  commitSha: string;
+  judgeModel: string;
+  pathA: string;
+  pathB: string;
+  casesCompared: number;
+  winsA: number;
+  winsB: number;
+  ties: number;
+  /** Win rate for B vs A (ties count half toward each) */
+  winRateB: number;
+  byRunner: Record<string, { winsA: number; winsB: number; ties: number; winRateB: number }>;
+  cases: CompareCaseResult[];
 }
 
 // ─── Config Hash ─────────────────────────────────────────────

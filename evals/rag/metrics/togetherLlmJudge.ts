@@ -25,8 +25,8 @@ export interface TogetherJudgeConfig {
   temperature?: number;
 }
 
-/** Default judge model: project's smart model for high-quality evaluation */
-const DEFAULT_JUDGE_MODEL = "openai/gpt-oss-120b";
+/** Default judge model for eval binary judges and pairwise compare */
+const DEFAULT_JUDGE_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731";
 
 /** Cheaper alternative for quick iterations */
 const FAST_JUDGE_MODEL = "meta-llama/Llama-3.3-8B-Instruct-Turbo";
@@ -123,7 +123,7 @@ export function createTogetherJudgeInvoker(
 // ============================================================
 
 export const JUDGE_PRESETS: Record<string, TogetherJudgeConfig> = {
-  /** Default: GPT-OSS 120B for high-quality evaluation */
+  /** Default: DeepSeek V4 Flash for eval judges */
   default: {
     model: DEFAULT_JUDGE_MODEL,
     temperature: 0.1,
@@ -144,7 +144,14 @@ export const JUDGE_PRESETS: Record<string, TogetherJudgeConfig> = {
     maxTokens: 2048,
   },
 
-  /** GPT-OSS 20B: faster alternative for quick iterations */
+  /** GPT-OSS 120B: legacy Likert judges */
+  gptOss120b: {
+    model: "openai/gpt-oss-120b",
+    temperature: 0.1,
+    maxTokens: 1024,
+  },
+
+  /** GPT-OSS 20B: cheaper alternative */
   gptOss20b: {
     model: "openai/gpt-oss-20b",
     temperature: 0.1,

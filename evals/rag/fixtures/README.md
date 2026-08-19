@@ -76,7 +76,20 @@ export const mlBasicsFixtures = createFixtureBatch({
 });
 ```
 
-## Finding Your Notebook ID
+## Dataset splits
+
+Fixtures use `smoke` (fast daily gate), `train` (iteration), or `holdout` (rare confirm). Set `split` on the fixture or rely on [`splits.ts`](../../splits.ts) defaults.
+
+```bash
+bun run eval:rag -- --split smoke          # live default
+bun run eval:rag:dry                     # validate all fixtures (CI)
+bun run eval:holdout                     # holdout only
+bun run eval:rag -- --case agentic-patterns-20 --export-artifacts --artifacts-dir evals/rag/generated/run-a
+bun run eval:compare -- evals/rag/generated/run-a evals/rag/generated/run-b
+```
+
+Do not coach enumeration in `customPrompt` (no “list the 20 names”). Use product-like user requests; keep expected items for metrics only.
+
 
 1. Open your app and navigate to the notebook
 2. Check the URL: `.../notebooks/[NOTEBOOK_ID]/...`

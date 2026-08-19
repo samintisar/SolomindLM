@@ -144,6 +144,16 @@ export async function runResearchEval(
       postRerankChunks: [],
       selectedChunks: evidenceChunks,
       subQueries: result.subQuestions.map((sq) => sq.question),
+      researchPlan: {
+        query: fixture.question,
+        subQuestions: result.subQuestions.map((sq) => ({ id: sq.id, question: sq.question })),
+      },
+      evidence: result.evidence.map((row) => ({
+        subQuestionId: row.subQuestionId,
+        sourceTitle: row.sourceTitle,
+        relevanceScore: row.relevanceScore,
+        content: row.content,
+      })),
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
       sourcePolicy: result.sourcePolicy,
