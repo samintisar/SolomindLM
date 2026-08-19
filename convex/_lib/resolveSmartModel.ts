@@ -6,8 +6,7 @@ import { env } from "./env.js";
  */
 export const AVAILABLE_SMART_MODEL_IDS = [
   "openai/gpt-oss-120b",
-  "moonshotai/Kimi-K2.7-Code",
-  "deepseek-ai/DeepSeek-V4-Pro",
+  "deepseek-ai/DeepSeek-V4-Flash-0731",
   "MiniMaxAI/MiniMax-M3",
   "google/gemma-4-31B-it",
   "Qwen/Qwen3.7-Max",
@@ -18,8 +17,8 @@ export type SmartModelId = (typeof AVAILABLE_SMART_MODEL_IDS)[number];
 
 /** Validate notebook/chat model selection; fall back to env default. */
 export function resolveSmartModel(candidate?: string | null): SmartModelId {
-  const validModelIds = new Set(AVAILABLE_SMART_MODEL_IDS);
-  if (candidate && validModelIds.has(candidate as SmartModelId)) {
+  const validModelIds = new Set<string>(AVAILABLE_SMART_MODEL_IDS);
+  if (candidate && validModelIds.has(candidate)) {
     return candidate as SmartModelId;
   }
   return (env.SMART_LLM ?? "openai/gpt-oss-120b") as SmartModelId;
