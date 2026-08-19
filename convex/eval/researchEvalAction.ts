@@ -17,6 +17,7 @@ import { Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { env } from "../_lib/env";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { sourcesFromDiscoverResult } from "./_discoverResult";
 import { assertRagEvalGate } from "./_gate";
 
 export const researchEvalActionArgs = {
@@ -197,7 +198,7 @@ export const runResearchEval = action({
                 internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
                 { query: refinedQuery, maxResults: maxPerChannel }
               );
-              channelResults = results.sources.map((r: any) => ({
+              channelResults = sourcesFromDiscoverResult(results).map((r) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
                 snippet: r.snippet ?? r.abstract ?? "",
@@ -219,7 +220,7 @@ export const runResearchEval = action({
                   searchDepth: "advanced",
                 }
               );
-              channelResults = results.sources.map((r: any) => ({
+              channelResults = sourcesFromDiscoverResult(results).map((r) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
                 snippet: r.snippet ?? r.content ?? "",

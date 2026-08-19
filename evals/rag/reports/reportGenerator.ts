@@ -1,9 +1,11 @@
-import type { MetricResult, EvalReport } from "../types";
+import type { EvalReport, MetricResult } from "../types";
 import { groupFailures } from "./failureGrouper";
 
 export interface GenerateReportOptions {
   /** Commit SHA to include in the report */
   commitSha: string;
+  /** Split filter used for this run */
+  split?: import("../types").EvalSplit;
   /** Include warnings in failure groups (default: true) */
   includeWarnings?: boolean;
   /** Group results by source policy for A/B comparison */
@@ -33,6 +35,7 @@ export function generateReport(
     timestamp: new Date().toISOString(),
     commitSha: options.commitSha,
     totalCases: uniqueCases.size,
+    split: options.split,
     summary,
     metrics,
     failureGroups,
@@ -60,7 +63,9 @@ export function formatReport(report: EvalReport): string {
   ];
 
   // Source Policy Comparison (if source-matrix was used)
-  const sourcePolicyMetrics = report.metrics.filter((m) => m.metric === "expected_item_recall" && m.caseId.includes("--src"));
+  const sourcePolicyMetrics = report.metrics.filter(
+    (m) => m.metric === "expected_item_recall" && m.caseId.includes("--src")
+  );
   if (sourcePolicyMetrics.length > 0) {
     lines.push("  Source Policy Comparison:");
     lines.push("  " + "-".repeat(50));

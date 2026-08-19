@@ -51,6 +51,7 @@ export const AGENTIC_20_STUDIO_PARAMS = {
 export const agenticPatterns20: EvalFixture = {
   schemaVersion: 1,
   id: "agentic-patterns-20",
+  split: "smoke",
   question: "What are the 20 agentic patterns?",
   expectedItems: [...AGENTIC_20_ITEMS],
   expectedBehavior:

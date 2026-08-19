@@ -12,16 +12,26 @@ import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
+import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
 import { formatReport, generateReport } from "./reports";
-import { createConvexChatInvoker, createConvexStudioInvokers, runEval } from "./runners";
+import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
+import {
+  createConvexChatInvoker,
+  createConvexLiteratureReviewInvoker,
+  createConvexStudioInvokers,
+  runEval,
+} from "./runners";
 import type { ChatAgentInvoker } from "./runners/chatRunner";
 import { createConvexResearchInvoker } from "./runners/convexResearchInvoker";
 import type { StudioInvoker } from "./runners/convexStudioInvoker";
+import type { LiteratureReviewInvoker } from "./runners/literatureReviewRunner";
 import type { ResearchAgentInvoker } from "./runners/researchRunner";
+import { filterFixtureIdsBySplit } from "./splits";
 import type {
   EvalBaseline,
   EvalFixture,
   EvalRunArtifact,
+  EvalSplit,
   MetricResult,
   RunnerKind,
   SourcePolicyConfig,
@@ -36,6 +46,8 @@ interface CliOptions {
   idPrefix?: string;
   /** Restrict to fixtures whose `runner` matches one of these kinds */
   runners?: RunnerKind[];
+  /** Dataset split filter (default smoke for live runs) */
+  split?: EvalSplit;
   dryRun: boolean;
   full: boolean;
   verbose: boolean;
@@ -48,11 +60,19 @@ interface CliOptions {
   sourceMatrix?: string;
   /** Override the smart LLM model for studio agent reduce phases */
   smartLlm?: string;
+  /** Enable legacy Likert 0–1 LLM judges */
+  likertJudges: boolean;
+  /** Judge model for binary judges (default DeepSeek Flash) */
+  judgeModel?: string;
+  /** Pairwise compare two artifact directories and exit */
+  compareA?: string;
+  compareB?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
   "chat",
   "research",
+  "literatureReview",
   "both",
   "report",
   "flashcards",
@@ -85,6 +105,7 @@ function parseArgs(args: string[]): CliOptions {
     verbose: false,
     exportArtifacts: false,
     artifactsDir: "evals/rag/generated",
+    likertJudges: false,
   };
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -97,6 +118,14 @@ function parseArgs(args: string[]): CliOptions {
       case "--runner":
         opts.runners = parseRunners(args[++i]);
         break;
+      case "--split": {
+        const split = args[++i] as EvalSplit;
+        if (split !== "smoke" && split !== "train" && split !== "holdout") {
+          throw new Error(`Invalid --split "${split}". Use smoke, train, or holdout.`);
+        }
+        opts.split = split;
+        break;
+      }
       case "--dry-run":
         opts.dryRun = true;
         break;
@@ -123,6 +152,16 @@ function parseArgs(args: string[]): CliOptions {
       case "--smart-llm":
         opts.smartLlm = args[++i];
         break;
+      case "--likert-judges":
+        opts.likertJudges = true;
+        break;
+      case "--judge-model":
+        opts.judgeModel = args[++i];
+        break;
+      case "--compare":
+        opts.compareA = args[++i];
+        opts.compareB = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -142,15 +181,19 @@ Usage:
 Options:
   --case <id>              Run a specific fixture by id
   --prefix <str>           Run fixtures whose id starts with prefix (e.g. ml-)
-  --runner <kinds>         Comma-separated runner filter (chat,research,flashcards,…)
+  --runner <kinds>         Comma-separated runner filter (chat,research,literatureReview,…)
+  --split <smoke|train|holdout>  Filter fixtures by dataset split (live default: smoke)
   --dry-run                Validate fixtures without running agents
   --full                   Run all fixtures with verbose output
   --verbose, -v            Show detailed metric output
   --output, -o <path>      Write JSON report to file
-  --export-artifacts       Export Ragas-compatible artifacts alongside report
+  --export-artifacts       Export per-case JSON (for --compare) and Ragas jsonl
   --artifacts-dir <dir>    Directory for exported artifacts (default: evals/rag/generated)
-  --source-matrix <combos>  Test fixture against multiple channel combinations (e.g. "notebook,web+academic")
-  --smart-llm <model>      Override smart LLM for studio agent reduce phases (e.g. meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8)
+  --source-matrix <combos>  Test fixture against multiple channel combinations
+  --smart-llm <model>      Override smart LLM for studio agent reduce phases
+  --likert-judges          Enable legacy Likert 0–1 LLM judges (default: binary only)
+  --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
+  --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -233,6 +276,26 @@ function exportRagasArtifacts(
 async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
 
+  if (opts.compareA && opts.compareB) {
+    const commitSha = await getCommitSha();
+    const report = await compareArtifactDirs({
+      pathA: opts.compareA,
+      pathB: opts.compareB,
+      judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      commitSha,
+    });
+    console.log(JSON.stringify(report, null, 2));
+    if (opts.output) {
+      mkdirSync(dirname(opts.output), { recursive: true });
+      writeFileSync(opts.output, JSON.stringify(report, null, 2));
+    }
+    return;
+  }
+
+  if (!opts.dryRun && !opts.caseId && !opts.split) {
+    opts.split = "smoke";
+  }
+
   let fixtureIds: string[];
   if (opts.caseId) {
     fixtureIds = [opts.caseId];
@@ -245,6 +308,9 @@ async function main(): Promise<void> {
       const allowed = new Set(opts.runners);
       fixtureIds = fixtureIds.filter((id) => allowed.has(getFixture(id).runner));
     }
+    if (opts.split) {
+      fixtureIds = filterFixtureIdsBySplit(fixtureIds, opts.split);
+    }
   }
   if (opts.caseId && opts.idPrefix) {
     console.warn("Warning: --prefix is ignored when --case is set.");
@@ -252,11 +318,14 @@ async function main(): Promise<void> {
   if (opts.caseId && opts.runners) {
     console.warn("Warning: --runner is ignored when --case is set.");
   }
-  console.log(`Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}\n`);
+  console.log(
+    `Running ${fixtureIds.length} fixture(s)...${opts.dryRun ? " (dry-run)" : ""}${opts.split ? ` [split=${opts.split}]` : ""}\n`
+  );
 
   // Real mode runs against your dev Convex deployment (never rely on accidental prod URLs)
   let chatInvoker: ChatAgentInvoker | undefined;
   let researchInvoker: ResearchAgentInvoker | undefined;
+  let literatureReviewInvoker: LiteratureReviewInvoker | undefined;
   let studioInvokers: Partial<Record<StudioRunnerKind, StudioInvoker>> | undefined;
   if (!opts.dryRun) {
     const convexUrl = process.env.RAG_EVAL_CONVEX_URL?.trim();
@@ -281,6 +350,7 @@ async function main(): Promise<void> {
     console.log(`Using Convex at ${convexUrl} (eval mode)`);
     chatInvoker = createConvexChatInvoker(convexUrl, { evalSecret });
     researchInvoker = createConvexResearchInvoker(convexUrl, { evalSecret });
+    literatureReviewInvoker = createConvexLiteratureReviewInvoker(convexUrl, { evalSecret });
     studioInvokers = createConvexStudioInvokers(convexUrl, { evalSecret });
   }
 
@@ -324,6 +394,7 @@ async function main(): Promise<void> {
         dryRun: opts.dryRun,
         chatInvoker,
         researchInvoker,
+        literatureReviewInvoker,
         studioInvokers,
       });
     } catch (err) {
@@ -371,7 +442,11 @@ async function main(): Promise<void> {
         );
       }
 
-      const metrics = await scoreAllMetrics(fixture, artifact, baseline);
+      const metrics = await scoreAllMetrics(fixture, artifact, baseline, {
+        likertJudges: opts.likertJudges,
+        dryRun: opts.dryRun,
+        judgeModel: opts.judgeModel ?? DEFAULT_JUDGE_MODEL,
+      });
       allMetrics.push(...metrics);
 
       if (opts.verbose || opts.full) {
@@ -395,6 +470,7 @@ async function main(): Promise<void> {
     commitSha,
     includeWarnings: true,
     groupBySourcePolicy: !!opts.sourceMatrix,
+    split: opts.split,
   });
 
   console.log(formatReport(report));
@@ -406,11 +482,14 @@ async function main(): Promise<void> {
     console.log(`\nReport written to ${opts.output}`);
   }
 
-  // Export Ragas-compatible artifacts
   if (opts.exportArtifacts && allArtifacts.length > 0) {
+    exportEvalRunArtifacts(opts.artifactsDir, allArtifacts);
     const outPath = exportRagasArtifacts(fixtureMeta, allArtifacts, opts.artifactsDir);
-    console.log(`\nRagas artifacts exported to ${outPath}`);
-    console.log(`  Run: python evals/ragas/run_ragas.py --dataset ${outPath}`);
+    console.log(
+      `\nEval artifacts exported to ${opts.artifactsDir} (${allArtifacts.length} case file(s))`
+    );
+    console.log(`  Compare: bun run eval:compare -- ${opts.artifactsDir} <other-run-dir>`);
+    console.log(`  Ragas:   python evals/ragas/run_ragas.py --dataset ${outPath}`);
   }
 
   if (runtimeErrorCount > 0) {
@@ -419,6 +498,10 @@ async function main(): Promise<void> {
         `These are NOT scored as metric failures and would otherwise be hidden.`
     );
     process.exit(2);
+  }
+
+  if (opts.dryRun) {
+    process.exit(0);
   }
 
   if (report.summary.fail > 0) {

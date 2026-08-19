@@ -1,11 +1,9 @@
 /**
  * Aggregator that runs all deterministic metrics and returns a flat
  * MetricResult[] for a single fixture/artifact pair.
- *
- * Runner-aware: studio runners produce no chunks/citations, so the
- * retrieval-only metrics are skipped and studio-specific scorers run instead.
  */
 import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
+import { type BinaryJudgeOptions, scoreBinaryJudgeMetrics } from "./binaryJudges";
 import {
   abstentionCorrectness,
   citationValidity,
@@ -15,6 +13,10 @@ import {
   retrievalNdcgAtK,
   retrievalPrecisionAtK,
 } from "./index";
+import {
+  scoreLiteratureReviewLlmJudgeMetrics,
+  scoreLiteratureReviewMetrics,
+} from "./literatureReview";
 import { type LlmJudgeOptions, scoreAllLlmJudgeMetrics } from "./llmJudge";
 import {
   externalSourceUtilization,
@@ -23,12 +25,20 @@ import {
   sourceRecallByChannel,
 } from "./sourceAware";
 import { scoreStudioMetrics } from "./studio";
-import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
+import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
+
+export interface ScoreAllMetricsOptions {
+  /** Run legacy Likert 0–1 LLM judges (default false). */
+  likertJudges?: boolean;
+  /** Skip all LLM judges (dry-run stub artifacts). */
+  dryRun?: boolean;
+  /** Override judge model for binary + Likert judges. */
+  judgeModel?: string;
+  /** Custom judge invoker (tests). */
+  judgeInvoke?: LlmJudgeOptions["invoke"];
+}
 
 function isChunkRetrievalRunner(runner: EvalRunArtifact["runner"]): boolean {
-  // Chat uses a chunk-based retrieval pipeline with pre/post-rerank stages.
-  // Research uses an evidence-based pipeline (plan → gather → synthesize)
-  // where chunk-retrieval metrics don't map cleanly.
   return runner === "chat";
 }
 
@@ -36,25 +46,37 @@ function isRagRunner(runner: EvalRunArtifact["runner"]): boolean {
   return runner === "chat" || runner === "research";
 }
 
+function isStudioRunnerKind(runner: EvalRunArtifact["runner"]): boolean {
+  return runner !== "chat" && runner !== "research" && runner !== "literatureReview";
+}
+
+function judgeInvoker(options: ScoreAllMetricsOptions): LlmJudgeOptions["invoke"] | undefined {
+  if (options.judgeInvoke) {
+    return options.judgeInvoke;
+  }
+  if (!process.env.TOGETHER_AI_API_KEY?.trim()) {
+    return undefined;
+  }
+  return createTogetherJudgeInvoker({
+    model: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+  });
+}
+
 /**
- * Run every deterministic metric for a single eval case.
- *
- * Returns a flat array of MetricResult entries. Metrics that produce
- * multiple results (e.g. retrievalItemRecall returns 3) are flattened.
+ * Run every metric for a single eval case.
  */
 export async function scoreAllMetrics(
   fixture: EvalFixture,
   artifact: EvalRunArtifact,
-  baseline?: EvalBaseline
+  baseline?: EvalBaseline,
+  options: ScoreAllMetricsOptions = {}
 ): Promise<MetricResult[]> {
   const results: MetricResult[] = [];
 
-  // Always-on: text-level recall and latency/cost.
   results.push(expectedItemRecall(fixture, artifact, baseline));
   results.push(latencyCostBudget(fixture, artifact, baseline));
 
   if (isChunkRetrievalRunner(artifact.runner)) {
-    // Chunk-retrieval metrics: only meaningful for chat's staged pipeline.
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
     results.push(retrievalNdcgAtK(fixture, artifact, baseline));
     results.push(abstentionCorrectness(fixture, artifact, baseline));
@@ -62,10 +84,8 @@ export async function scoreAllMetrics(
   }
 
   if (isRagRunner(artifact.runner)) {
-    // Citation and source metrics apply to both chat and research.
     results.push(citationValidity(fixture, artifact, baseline));
 
-    // Source-aware metrics (only for runs with sourcePolicy configured)
     if (artifact.sourcePolicy) {
       results.push(sourceDiversityScore(fixture, artifact, baseline));
       results.push(...sourceRecallByChannel(fixture, artifact, baseline));
@@ -74,21 +94,36 @@ export async function scoreAllMetrics(
         results.push(researchSourceBreadth(fixture, artifact, baseline));
       }
     }
-  } else {
-    // Studio runners: structural scorers keyed on studioOutput.
+  } else if (artifact.runner === "literatureReview") {
+    results.push(...scoreLiteratureReviewMetrics(fixture, artifact, baseline));
+  } else if (isStudioRunnerKind(artifact.runner)) {
     const studioResults = await scoreStudioMetrics(fixture, artifact, baseline);
     results.push(...studioResults);
   }
 
-  // LLM-as-a-judge metrics: semantic correctness, faithfulness, completeness.
-  // Correctness only runs when fixture.expectedAnswer is set.
-  // Literature review has its own dedicated LLM judge metrics (report quality, completeness, extraction quality).
-  if (artifact.runner !== "literatureReview") {
-    const judgeOptions: LlmJudgeOptions = process.env.TOGETHER_AI_API_KEY?.trim()
-      ? { invoke: createTogetherJudgeInvoker() }
-      : {};
-    const judgeResults = await scoreAllLlmJudgeMetrics(fixture, artifact, judgeOptions);
-    results.push(...judgeResults);
+  const invoke = options.dryRun ? undefined : judgeInvoker(options);
+  const binaryOptions: BinaryJudgeOptions = {
+    invoke,
+    model: options.judgeModel ?? DEFAULT_JUDGE_MODEL,
+    enabled: !options.dryRun && invoke !== undefined,
+  };
+  const binaryResults = await scoreBinaryJudgeMetrics(fixture, artifact, baseline, binaryOptions);
+  results.push(...binaryResults);
+
+  if (options.likertJudges && !options.dryRun && invoke) {
+    const likertModel = options.judgeModel ?? "openai/gpt-oss-120b";
+    const likertInvoke = options.judgeInvoke ?? createTogetherJudgeInvoker({ model: likertModel });
+
+    if (artifact.runner === "literatureReview") {
+      results.push(...(await scoreLiteratureReviewLlmJudgeMetrics(fixture, artifact, baseline)));
+    } else {
+      results.push(
+        ...(await scoreAllLlmJudgeMetrics(fixture, artifact, {
+          invoke: likertInvoke,
+          model: likertModel,
+        }))
+      );
+    }
   }
 
   return results;

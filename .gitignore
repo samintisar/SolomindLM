@@ -13,8 +13,9 @@ lerna-debug.log*
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# Eval pipeline run outputs (per-iteration reports + python pycache)
-evals/rag/reports/
+# Eval pipeline run outputs (per-iteration JSON/logs + python pycache)
+evals/rag/reports/*.json
+evals/rag/reports/*.log
 evals/ragas/__pycache__/
 
 # Local lint/build debug artifacts

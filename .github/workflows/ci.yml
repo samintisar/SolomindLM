@@ -95,6 +95,9 @@ jobs:
       - name: Run Web Tests
         run: bun run test:web
 
+      - name: RAG eval fixture dry-run
+        run: bun run eval:rag:dry
+
   test-coverage:
     name: Coverage Report
     if: github.ref == 'refs/heads/main'
