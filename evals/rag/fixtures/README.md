@@ -83,22 +83,10 @@ Fixtures use `smoke` (fast daily gate), `train` (iteration), or `holdout` (rare 
 ```bash
 bun run eval:rag -- --split smoke          # live default
 bun run eval:rag:dry                     # validate all fixtures (CI)
-bun run eval:rag:train                   # broader iteration split (slow)
 bun run eval:holdout                     # holdout only
 bun run eval:rag -- --case agentic-patterns-20 --export-artifacts --artifacts-dir evals/rag/generated/run-a
 bun run eval:compare -- evals/rag/generated/run-a evals/rag/generated/run-b
 ```
-
-### How to use the loop
-
-1. **Daily gate:** `bun run eval:rag:smoke`. Infographic vision judging is off until `EVAL_VISION_JUDGE=true` and a VL model is configured.
-2. **After a pipeline change:** export artifacts (`--export-artifacts --artifacts-dir evals/rag/generated/<label>`) and compare with `bun run eval:compare -- <before> <after>`.
-3. **Train snapshot (once, then on demand):** `bun run eval:rag:train:snapshot`. Do not put the 70 train cases in the daily gate.
-4. **Holdout:** rare confirmation only (`bun run eval:holdout`).
-
-Likert / RAGAS judges are secondary. Do not enable `--likert-judges` on smoke.
-
-After a live smoke, `evals/rag/generated/judge-queue.json` holds up to 20 binary-judge rows for human calibration. Do not label until that file has 20 items.
 
 ### Loop 1 — quality ops
 
@@ -112,10 +100,6 @@ After a live smoke, `evals/rag/generated/judge-queue.json` holds up to 20 binary
    Grounding/structure fails block ship. `expected_item_recall` does not.
 5. Do not start Loop 3 (prompt compile) until the judge-queue scorer prints
    `readyForPromptCompile: true`.
-
-### Known agent-quality gap (not prompt-tuned)
-
-`agentic-patterns-20` can fail `binary_judge_chat_grounding` when the answer lists a different 20-pattern taxonomy than the notebook (parametric knowledge). Fix via retrieval/selection coverage, not by coaching `customPrompt` with the expected names.
 
 Do not coach enumeration in `customPrompt` (no “list the 20 names”). Use product-like user requests; keep expected items for metrics only.
 
