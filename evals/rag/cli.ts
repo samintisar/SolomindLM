@@ -13,7 +13,7 @@ import { dirname, join } from "path";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
-import { formatReport, generateReport } from "./reports";
+import { checkHoldoutPromotion, formatReport, generateReport } from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import {
   createConvexChatInvoker,
@@ -30,6 +30,7 @@ import { filterFixtureIdsBySplit } from "./splits";
 import type {
   EvalBaseline,
   EvalFixture,
+  EvalReport,
   EvalRunArtifact,
   EvalSplit,
   MetricResult,
@@ -69,6 +70,9 @@ interface CliOptions {
   compareB?: string;
   /** Score a labeled judge-queue.json and exit */
   scoreJudgeQueue?: string;
+  /** Holdout promotion check: before/after EvalReport JSON paths */
+  promotionCheckBefore?: string;
+  promotionCheckAfter?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
@@ -167,6 +171,10 @@ function parseArgs(args: string[]): CliOptions {
       case "--score-judge-queue":
         opts.scoreJudgeQueue = args[++i];
         break;
+      case "--promotion-check":
+        opts.promotionCheckBefore = args[++i];
+        opts.promotionCheckAfter = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -200,6 +208,7 @@ Options:
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
   --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
+  --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -291,6 +300,14 @@ async function main(): Promise<void> {
     if (score.readyForPromptCompile) process.exit(0);
     if (score.labeled < 20) process.exit(2);
     process.exit(1);
+  }
+
+  if (opts.promotionCheckBefore && opts.promotionCheckAfter) {
+    const before = JSON.parse(readFileSync(opts.promotionCheckBefore, "utf-8")) as EvalReport;
+    const after = JSON.parse(readFileSync(opts.promotionCheckAfter, "utf-8")) as EvalReport;
+    const decision = checkHoldoutPromotion(before, after);
+    console.log(JSON.stringify(decision, null, 2));
+    process.exit(decision.ok ? 0 : 1);
   }
 
   if (opts.compareA && opts.compareB) {
