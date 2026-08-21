@@ -49,6 +49,8 @@
     "eval:rag": "bun --env-file=.env run evals/rag/cli.ts",
     "eval:rag:dry": "bun run evals/rag/cli.ts --dry-run",
     "eval:rag:smoke": "bun --env-file=.env run evals/rag/cli.ts --split smoke",
+    "eval:rag:train": "bun --env-file=.env run evals/rag/cli.ts --split train",
+    "eval:rag:train:snapshot": "bun --env-file=.env run evals/rag/cli.ts --split train --export-artifacts --artifacts-dir evals/rag/generated/train-snapshot",
     "eval:rag:judge-queue": "bun --env-file=.env run evals/rag/cli.ts --score-judge-queue evals/rag/generated/judge-queue.json",
     "eval:holdout": "bun --env-file=.env run evals/rag/cli.ts --split holdout",
     "eval:compare": "bun --env-file=.env run evals/rag/cli.ts --compare",

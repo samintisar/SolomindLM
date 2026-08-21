@@ -13,7 +13,12 @@ import { dirname, join } from "path";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
-import { checkHoldoutPromotion, formatReport, generateReport } from "./reports";
+import {
+  buildJudgeCalibrationQueue,
+  checkHoldoutPromotion,
+  formatReport,
+  generateReport,
+} from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import {
   createConvexChatInvoker,
@@ -514,6 +519,34 @@ async function main(): Promise<void> {
     mkdirSync(dirname(opts.output), { recursive: true });
     writeFileSync(opts.output, JSON.stringify(report, null, 2));
     console.log(`\nReport written to ${opts.output}`);
+  }
+
+  if (!opts.dryRun) {
+    const queue = buildJudgeCalibrationQueue(allMetrics, { limit: 20 });
+    if (queue.length > 0) {
+      const queuePath = join("evals/rag/generated", "judge-queue.json");
+      mkdirSync(dirname(queuePath), { recursive: true });
+      writeFileSync(
+        queuePath,
+        `${JSON.stringify(
+          {
+            instruction:
+              "For each item, set humanAgree to true if you agree with the model verdict, false if you disagree.",
+            items: queue,
+          },
+          null,
+          2
+        )}\n`
+      );
+      console.log(`\nJudge calibration queue (${queue.length} items): ${queuePath}`);
+      if (queue.length >= 20) {
+        console.log("Ready for human labeling — fill humanAgree on each item.");
+      } else {
+        console.log(
+          `Need ${20 - queue.length} more binary-judge rows before a 20-verdict calibration.`
+        );
+      }
+    }
   }
 
   if (opts.exportArtifacts && allArtifacts.length > 0) {
