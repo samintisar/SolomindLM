@@ -23,6 +23,7 @@ export interface ChatAgentInvoker {
     selectedChunks: ReferenceChunk[];
     latencyMs: number;
     tokenUsage?: { prompt: number; completion: number; total: number };
+    tokenUsageSource?: "provider" | "estimated";
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
 }
@@ -165,6 +166,7 @@ export async function runChatEval(
       subQueries: result.subQueries,
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
+      tokenUsageSource: result.tokenUsageSource ?? "estimated",
       sourcePolicy: result.sourcePolicy,
       sourceEvidence,
       timestamp: new Date().toISOString(),

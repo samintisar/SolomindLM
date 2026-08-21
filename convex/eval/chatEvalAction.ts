@@ -76,6 +76,7 @@ export interface ChatEvalResult {
   selectedChunks: ReferenceChunk[];
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
+  tokenUsageSource?: "provider" | "estimated";
   sourcePolicy?: {
     channels: string[];
     maxResultsPerChannel?: number;
@@ -451,6 +452,7 @@ export const runChatEval = action({
       selectedChunks,
       latencyMs: Date.now() - startTime,
       tokenUsage: estimateChatTokenUsage(args.question, answer, selectedChunks),
+      tokenUsageSource: "estimated",
       sourcePolicy: args.sourcePolicy,
     };
   },

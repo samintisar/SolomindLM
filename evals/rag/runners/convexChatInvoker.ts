@@ -59,6 +59,7 @@ export function createConvexChatInvoker(
         selectedChunks: result.selectedChunks as ReferenceChunk[],
         latencyMs: result.latencyMs,
         tokenUsage: result.tokenUsage,
+        tokenUsageSource: result.tokenUsageSource ?? "estimated",
         sourcePolicy: result.sourcePolicy,
       };
     },
