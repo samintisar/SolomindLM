@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
+import { LIST_QUERY_MAX_SELECTED_CHUNKS } from "./chatConfig.js";
 import {
   chunkDedupKey,
   chunkRankingScore,
@@ -106,4 +107,8 @@ describe("selectChunksByTokenBudgetWithReservation", () => {
     expect(selected.some((c) => c.sourceId.startsWith("e"))).toBe(true);
     expect(selected.some((c) => c.sourceId === "n1")).toBe(true);
   });
+});
+
+it("keeps a list-query cap large enough for long enumerations", () => {
+  expect(LIST_QUERY_MAX_SELECTED_CHUNKS).toBeGreaterThanOrEqual(24);
 });
