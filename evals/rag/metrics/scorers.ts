@@ -24,6 +24,7 @@ import {
   sourceDiversityScore,
   sourceRecallByChannel,
 } from "./sourceAware";
+import { contextTokenBudgetRatio, stageTokenShare } from "./stageBudget";
 import { scoreStudioMetrics } from "./studio";
 import { createTogetherJudgeInvoker, DEFAULT_JUDGE_MODEL } from "./togetherLlmJudge";
 
@@ -75,6 +76,8 @@ export async function scoreAllMetrics(
 
   results.push(expectedItemRecall(fixture, artifact, baseline));
   results.push(latencyCostBudget(fixture, artifact, baseline));
+  results.push(contextTokenBudgetRatio(fixture, artifact, baseline));
+  results.push(stageTokenShare(fixture, artifact, baseline));
 
   if (isChunkRetrievalRunner(artifact.runner)) {
     results.push(retrievalPrecisionAtK(fixture, artifact, baseline));
