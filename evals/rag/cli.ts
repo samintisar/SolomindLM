@@ -67,6 +67,8 @@ interface CliOptions {
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
+  /** Score a labeled judge-queue.json and exit */
+  scoreJudgeQueue?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
@@ -162,6 +164,9 @@ function parseArgs(args: string[]): CliOptions {
         opts.compareA = args[++i];
         opts.compareB = args[++i];
         break;
+      case "--score-judge-queue":
+        opts.scoreJudgeQueue = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -194,6 +199,7 @@ Options:
   --likert-judges          Enable legacy Likert 0–1 LLM judges (default: binary only)
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
+  --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -275,6 +281,17 @@ function exportRagasArtifacts(
 
 async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
+
+  if (opts.scoreJudgeQueue) {
+    const { loadJudgeQueueFile } = await import("./reports/judgeQueueFile");
+    const { scoreJudgeCalibration } = await import("./reports/judgeCalibration");
+    const items = loadJudgeQueueFile(opts.scoreJudgeQueue);
+    const score = scoreJudgeCalibration(items);
+    console.log(JSON.stringify(score, null, 2));
+    if (score.readyForPromptCompile) process.exit(0);
+    if (score.labeled < 20) process.exit(2);
+    process.exit(1);
+  }
 
   if (opts.compareA && opts.compareB) {
     const commitSha = await getCommitSha();

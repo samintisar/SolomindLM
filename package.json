@@ -49,6 +49,7 @@
     "eval:rag": "bun --env-file=.env run evals/rag/cli.ts",
     "eval:rag:dry": "bun run evals/rag/cli.ts --dry-run",
     "eval:rag:smoke": "bun --env-file=.env run evals/rag/cli.ts --split smoke",
+    "eval:rag:judge-queue": "bun --env-file=.env run evals/rag/cli.ts --score-judge-queue evals/rag/generated/judge-queue.json",
     "eval:holdout": "bun --env-file=.env run evals/rag/cli.ts --split holdout",
     "eval:compare": "bun --env-file=.env run evals/rag/cli.ts --compare",
     "eval:studio": "bun --env-file=.env run evals/rag/cli.ts --runner report,flashcards,quiz,mindmap,infographic,spreadsheet,writtenQuestions,audioScript",
