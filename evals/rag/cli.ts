@@ -13,7 +13,12 @@ import { dirname, join } from "path";
 import { getFixture, listFixtureIds, withSourceMatrix } from "./fixtures";
 import { scoreAllMetrics } from "./metrics/scorers";
 import { DEFAULT_JUDGE_MODEL } from "./metrics/togetherLlmJudge";
-import { formatReport, generateReport } from "./reports";
+import {
+  buildJudgeCalibrationQueue,
+  checkHoldoutPromotion,
+  formatReport,
+  generateReport,
+} from "./reports";
 import { compareArtifactDirs, exportEvalRunArtifacts } from "./reports/compare";
 import {
   createConvexChatInvoker,
@@ -30,6 +35,7 @@ import { filterFixtureIdsBySplit } from "./splits";
 import type {
   EvalBaseline,
   EvalFixture,
+  EvalReport,
   EvalRunArtifact,
   EvalSplit,
   MetricResult,
@@ -67,6 +73,11 @@ interface CliOptions {
   /** Pairwise compare two artifact directories and exit */
   compareA?: string;
   compareB?: string;
+  /** Score a labeled judge-queue.json and exit */
+  scoreJudgeQueue?: string;
+  /** Holdout promotion check: before/after EvalReport JSON paths */
+  promotionCheckBefore?: string;
+  promotionCheckAfter?: string;
 }
 
 const ALL_RUNNERS: ReadonlySet<RunnerKind> = new Set<RunnerKind>([
@@ -162,6 +173,13 @@ function parseArgs(args: string[]): CliOptions {
         opts.compareA = args[++i];
         opts.compareB = args[++i];
         break;
+      case "--score-judge-queue":
+        opts.scoreJudgeQueue = args[++i];
+        break;
+      case "--promotion-check":
+        opts.promotionCheckBefore = args[++i];
+        opts.promotionCheckAfter = args[++i];
+        break;
       case "--help":
       case "-h":
         printHelp();
@@ -194,6 +212,8 @@ Options:
   --likert-judges          Enable legacy Likert 0–1 LLM judges (default: binary only)
   --judge-model <model>    Judge model (default: ${DEFAULT_JUDGE_MODEL})
   --compare <dirA> <dirB>  Pairwise compare artifact dirs (no agent runs)
+  --score-judge-queue <path>  Score labeled judge-queue.json and exit 0/1/2
+  --promotion-check <before.json> <after.json>  Fail on new grounding/structure judge fails
   --help, -h               Show this help
 
 Real runs (non --dry-run) require env:
@@ -275,6 +295,25 @@ function exportRagasArtifacts(
 
 async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
+
+  if (opts.scoreJudgeQueue) {
+    const { loadJudgeQueueFile } = await import("./reports/judgeQueueFile");
+    const { scoreJudgeCalibration } = await import("./reports/judgeCalibration");
+    const items = loadJudgeQueueFile(opts.scoreJudgeQueue);
+    const score = scoreJudgeCalibration(items);
+    console.log(JSON.stringify(score, null, 2));
+    if (score.readyForPromptCompile) process.exit(0);
+    if (score.labeled < 20) process.exit(2);
+    process.exit(1);
+  }
+
+  if (opts.promotionCheckBefore && opts.promotionCheckAfter) {
+    const before = JSON.parse(readFileSync(opts.promotionCheckBefore, "utf-8")) as EvalReport;
+    const after = JSON.parse(readFileSync(opts.promotionCheckAfter, "utf-8")) as EvalReport;
+    const decision = checkHoldoutPromotion(before, after);
+    console.log(JSON.stringify(decision, null, 2));
+    process.exit(decision.ok ? 0 : 1);
+  }
 
   if (opts.compareA && opts.compareB) {
     const commitSha = await getCommitSha();
@@ -480,6 +519,34 @@ async function main(): Promise<void> {
     mkdirSync(dirname(opts.output), { recursive: true });
     writeFileSync(opts.output, JSON.stringify(report, null, 2));
     console.log(`\nReport written to ${opts.output}`);
+  }
+
+  if (!opts.dryRun) {
+    const queue = buildJudgeCalibrationQueue(allMetrics, { limit: 20 });
+    if (queue.length > 0) {
+      const queuePath = join("evals/rag/generated", "judge-queue.json");
+      mkdirSync(dirname(queuePath), { recursive: true });
+      writeFileSync(
+        queuePath,
+        `${JSON.stringify(
+          {
+            instruction:
+              "For each item, set humanAgree to true if you agree with the model verdict, false if you disagree.",
+            items: queue,
+          },
+          null,
+          2
+        )}\n`
+      );
+      console.log(`\nJudge calibration queue (${queue.length} items): ${queuePath}`);
+      if (queue.length >= 20) {
+        console.log("Ready for human labeling — fill humanAgree on each item.");
+      } else {
+        console.log(
+          `Need ${20 - queue.length} more binary-judge rows before a 20-verdict calibration.`
+        );
+      }
+    }
   }
 
   if (opts.exportArtifacts && allArtifacts.length > 0) {

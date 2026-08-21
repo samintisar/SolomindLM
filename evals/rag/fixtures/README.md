@@ -88,6 +88,19 @@ bun run eval:rag -- --case agentic-patterns-20 --export-artifacts --artifacts-di
 bun run eval:compare -- evals/rag/generated/run-a evals/rag/generated/run-b
 ```
 
+### Loop 1 — quality ops
+
+1. Daily: `bun run eval:rag:smoke` (writes `evals/rag/generated/judge-queue.json`).
+2. Label 20 rows (`humanAgree: true|false`). Then:
+   `bun run eval:rag -- --score-judge-queue evals/rag/generated/judge-queue.json`
+3. After a pipeline change: snapshot train (`bun run eval:rag:train:snapshot`) and
+   `bun run eval:compare -- <before-dir> <after-dir>`.
+4. Promotion: run holdout, then
+   `bun run eval:rag -- --promotion-check <before-report.json> <after-report.json>`.
+   Grounding/structure fails block ship. `expected_item_recall` does not.
+5. Do not start Loop 3 (prompt compile) until the judge-queue scorer prints
+   `readyForPromptCompile: true`.
+
 Do not coach enumeration in `customPrompt` (no “list the 20 names”). Use product-like user requests; keep expected items for metrics only.
 
 

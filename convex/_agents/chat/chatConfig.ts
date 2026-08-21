@@ -36,7 +36,7 @@ export const MAX_CHUNKS_HARD_LIMIT = parseInt(env.CHAT_MAX_CHUNKS_HARD_LIMIT, 10
 export const LIST_QUERY_RELEVANCE_THRESHOLD = MIN_RELEVANCE_THRESHOLD;
 
 /** Max chunks passed to the LLM for list/enumeration questions after global rerank. */
-export const LIST_QUERY_MAX_SELECTED_CHUNKS = 12;
+export const LIST_QUERY_MAX_SELECTED_CHUNKS = 24;
 
 /** Tighter context budget for lists — many short chunks were packing 30+ passages before the chunk cap. */
 export const LIST_QUERY_CONTEXT_TOKEN_BUDGET = 5200;
