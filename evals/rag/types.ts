@@ -158,6 +158,23 @@ export interface StudioOutput {
   raw: unknown;
 }
 
+export type AgentStageName =
+  | "retrieve"
+  | "rerank"
+  | "select"
+  | "map"
+  | "reduce"
+  | "parse"
+  | "tts";
+
+export interface AgentStageSpan {
+  stage: AgentStageName;
+  latencyMs: number;
+  tokenUsage?: { prompt: number; completion: number; total: number };
+}
+
+export type TokenUsageSource = "provider" | "estimated";
+
 /** Artifact captured by an eval runner for a single case */
 export interface EvalRunArtifact {
   /** Which case this artifact belongs to */
@@ -204,6 +221,8 @@ export interface EvalRunArtifact {
   latencyMs: number;
   /** Token usage if available */
   tokenUsage?: { prompt: number; completion: number; total: number };
+  tokenUsageSource?: TokenUsageSource;
+  stageSpans?: AgentStageSpan[];
   /** Timestamp */
   timestamp: string;
 }
