@@ -12,7 +12,7 @@ export const mlFactoidFixtures: EvalFixture[] = [
     schemaVersion: 1,
     id: "ml-factoid-decision-stump",
     question: "What is a decision stump in the context of machine learning?",
-    expectedItems: [],
+    expectedItems: ["decision stump", "decision tree", "one split"],
     expectedAnswer:
       "A decision stump is a decision tree that has only one split, meaning it is limited to a depth of 1.",
     expectedBehavior:

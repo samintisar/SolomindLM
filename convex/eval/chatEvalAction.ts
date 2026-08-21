@@ -18,13 +18,13 @@ import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
 import { HybridSearchHandler } from "../_agents/chat/hybrid_search.js";
 import { cachedRerank, RerankDocument } from "../_agents/chat/rerankCache.js";
 import { refineWebSearchQuery } from "../_agents/chat/searchQueryRefiner";
-import type { VectorSearchRawResult } from "../_agents/chat/vector_search";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { env } from "../_lib/env";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
+import { createChatVectorSearchRunner } from "../chat/_streamSearch";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
 
@@ -82,11 +82,6 @@ export interface ChatEvalResult {
   };
 }
 
-interface VectorSearchHit {
-  _id: Id<"documentChunks">;
-  _score: number;
-}
-
 // ─── Action ──────────────────────────────────────────────────
 
 export const runChatEval = action({
@@ -114,59 +109,7 @@ export const runChatEval = action({
 
     const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
 
-    // ── Vector search runner (matches convex/chat/stream.ts) ──
-
-    const vectorSearchRunner = async (
-      embedding: number[],
-      limit: number,
-      docIds?: string[]
-    ): Promise<VectorSearchRawResult[]> => {
-      const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
-
-      const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
-        vector: embedding,
-        limit: limitToFetch,
-        filter: (q) => q.eq("notebookId", notebookIdTyped),
-      });
-
-      const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
-      if (chunkIds.length === 0) return [];
-
-      const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
-
-      const chunkMap = new Map(
-        (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map((c) => [
-          c._id,
-          c,
-        ]) as [Id<"documentChunks">, Record<string, unknown>][]
-      );
-
-      const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
-      const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
-
-      const rows: VectorSearchRawResult[] = [];
-      for (const r of results as VectorSearchHit[]) {
-        const chunk = chunkMap.get(r._id);
-        if (!chunk) continue;
-
-        // Filter by document IDs if specified
-        if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
-        // Apply threshold
-        const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
-        if (r._score < threshold) continue;
-
-        rows.push({
-          _id: r._id,
-          _score: r._score,
-          content: chunk.content as string,
-          chunkIndex: chunk.chunkIndex as number,
-          documentId: chunk.documentId as Id<"documents">,
-          sourceTitle: "",
-          sourceUrl: "",
-        });
-      }
-      return rows.slice(0, limit);
-    };
+    const vectorSearchRunner = createChatVectorSearchRunner(ctx, notebookIdTyped);
 
     // ── Keyword search runner ──
 
@@ -410,7 +353,7 @@ export const runChatEval = action({
     const preRerankChunks: ReferenceChunk[] = capturedPreRerankDocs.map((doc, i) => ({
       id: doc.id,
       sourceId: doc.id.split(":")[0],
-      sourceTitle: "",
+      sourceTitle: "Document",
       content: doc.content,
       chunkIndex: i,
     }));
@@ -428,8 +371,12 @@ export const runChatEval = action({
         similarity: rerankScores.get(c.id),
       }));
 
-    // Selected chunks = references from the stream
-    const selectedChunks = references;
+    // Selected chunks = references from the stream. Empty titles look like empty
+    // context to the grounding judge, so keep a visible fallback label.
+    const selectedChunks = references.map((chunk) => ({
+      ...chunk,
+      sourceTitle: chunk.sourceTitle?.trim() || "Document",
+    }));
 
     // Extract citations from markdown (e.g. [1], [2])
     const citationPattern = /\[(\d+)\]/g;

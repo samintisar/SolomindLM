@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EvalRunArtifact } from "../types";
-import { formatResearchEvidence, parseBinaryResponse } from "./binaryJudges";
+import {
+  combineChunkContents,
+  formatResearchEvidence,
+  packChunksForJudge,
+  parseBinaryResponse,
+} from "./binaryJudges";
 
 function stubResearchArtifact(overrides: Partial<EvalRunArtifact>): EvalRunArtifact {
   return {
@@ -76,5 +81,61 @@ describe("formatResearchEvidence", () => {
     );
     expect(text).toContain("Evidence paper");
     expect(text).not.toContain("Ignored chunk");
+  });
+});
+
+describe("combineChunkContents", () => {
+  it("labels untitled chunks so the judge does not treat them as empty", () => {
+    const text = combineChunkContents([
+      { id: "1", sourceTitle: "", content: "Routing decomposes a task into specialists." },
+      { id: "2", sourceTitle: "   ", content: "Parallelization fans work out to workers." },
+    ]);
+    expect(text).toContain("chunk 1");
+    expect(text).toContain("Routing decomposes a task into specialists.");
+    expect(text).not.toMatch(/^\[\]\n/m);
+  });
+
+  it("keeps later chunks when packing into a small judge window", () => {
+    const text = packChunksForJudge(
+      [
+        { id: "1", sourceTitle: "First", content: "ALPHA".repeat(200) },
+        { id: "2", sourceTitle: "Last", content: "OMEGA unique-tail-token " + "z".repeat(200) },
+      ],
+      400
+    );
+    expect(text).toContain("First");
+    expect(text).toContain("Last");
+    expect(text).toContain("unique-tail-token");
+    expect(text.length).toBeLessThanOrEqual(400);
+  });
+});
+
+describe("formatResearchEvidence ranking", () => {
+  it("puts higher-relevance evidence first and skips cookie-wall scrapes", () => {
+    const text = formatResearchEvidence(
+      stubResearchArtifact({
+        evidence: [
+          {
+            subQuestionId: "q1",
+            sourceTitle: "Cookie wall",
+            relevanceScore: 0.65,
+            content:
+              "This website utilizes technologies such as cookies to enable essential site functionality",
+          },
+          {
+            subQuestionId: "q2",
+            sourceTitle: "Monetary policy responses to the post-pandemic inflation - CEPR",
+            relevanceScore: 0.84,
+            content: "Central banks raised policy rates, including the Bank of England to 5.25%.",
+          },
+        ],
+      })
+    );
+    const ceprAt = text.indexOf("CEPR");
+    const cookieAt = text.indexOf("Cookie wall");
+    expect(ceprAt).toBeGreaterThanOrEqual(0);
+    expect(cookieAt).toBe(-1);
+    expect(text).toContain("Bank of England");
+    expect(text).not.toContain("enable essential site functionality");
   });
 });

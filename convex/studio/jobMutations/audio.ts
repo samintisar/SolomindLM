@@ -6,7 +6,7 @@ import { buildErrorMetadata } from "./jobErrorUtils";
 export const saveAudioOverviewResults = internalMutation({
   args: {
     audioOverviewId: v.id("audioOverviews"),
-    audioUrl: v.string(),
+    audioUrl: v.optional(v.string()),
     transcript: v.string(),
     metadata: v.any(),
   },
@@ -15,7 +15,7 @@ export const saveAudioOverviewResults = internalMutation({
 
     await ctx.db.patch(args.audioOverviewId, {
       transcript: normalizedTranscript,
-      audioUrl: args.audioUrl,
+      ...(args.audioUrl !== undefined ? { audioUrl: args.audioUrl } : {}),
       status: "completed",
       updatedAt: Date.now(),
       title: args.metadata?.title ?? "Audio Overview",

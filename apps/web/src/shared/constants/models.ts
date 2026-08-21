@@ -4,7 +4,7 @@
  */
 
 /** Vendor for picker icons (Simple Icons–style glyphs in the UI). */
-export type SmartModelBrand = "openai" | "deepseek" | "minimax" | "google" | "qwen" | "zai";
+export type SmartModelBrand = "openai" | "deepseek" | "minimax" | "google" | "qwen";
 
 export interface SmartModel {
   id: string;
@@ -40,16 +40,10 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "google",
   },
   {
-    id: "Qwen/Qwen3.7-Max",
-    name: "Qwen3.7 Max",
+    id: "Qwen/Qwen3.7-Plus",
+    name: "Qwen3.7 Plus",
     description: "Latest Qwen flagship with very long context",
     brand: "qwen",
-  },
-  {
-    id: "zai-org/GLM-5.2",
-    name: "GLM 5.2",
-    description: "Long-horizon coding and agentic tasks with 1M context",
-    brand: "zai",
   },
 ];
 
@@ -59,5 +53,6 @@ export type SmartModelId = (typeof AVAILABLE_SMART_MODELS)[number]["id"];
  * Find a model by its ID.
  */
 export function findSmartModelById(id: string | undefined): SmartModel | undefined {
-  return AVAILABLE_SMART_MODELS.find((model) => model.id === id);
+  const resolvedId = id === "Qwen/Qwen3.7-Max" ? "Qwen/Qwen3.7-Plus" : id;
+  return AVAILABLE_SMART_MODELS.find((model) => model.id === resolvedId);
 }

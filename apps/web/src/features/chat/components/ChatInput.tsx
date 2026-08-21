@@ -661,7 +661,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     </div>
                     <div className="p-1">
                       {AVAILABLE_SMART_MODELS.map((model) => {
-                        const isActive = chatSettings?.smartModel === model.id;
+                        const isActive = currentModel?.id === model.id;
                         return (
                           <button
                             key={model.id}

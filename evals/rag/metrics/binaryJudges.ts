@@ -36,8 +36,37 @@ function baseMetric(
   };
 }
 
-function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
-  return chunks.map((c) => `[${c.sourceTitle}]\n${c.content}`).join("\n\n---\n\n");
+export function combineChunkContents(chunks: EvalRunArtifact["selectedChunks"]): string {
+  return chunks
+    .map((chunk) => {
+      const title = chunk.sourceTitle?.trim() || `chunk ${chunk.id}`;
+      return `[${title}]\n${chunk.content}`;
+    })
+    .join("\n\n---\n\n");
+}
+
+const JUDGE_CONTEXT_MAX_CHARS = 12000;
+
+/** Pack every chunk into the judge window so later evidence is not dropped by a prefix slice. */
+export function packChunksForJudge(
+  chunks: EvalRunArtifact["selectedChunks"],
+  maxChars = JUDGE_CONTEXT_MAX_CHARS
+): string {
+  if (chunks.length === 0) return "";
+  const labeled = chunks.map((chunk) => ({
+    title: chunk.sourceTitle?.trim() || `chunk ${chunk.id}`,
+    content: chunk.content ?? "",
+  }));
+  const separator = "\n\n---\n\n";
+  const wrapperOverhead =
+    labeled.reduce((sum, row) => sum + row.title.length + 4, 0) +
+    separator.length * Math.max(0, labeled.length - 1);
+  const contentBudget = Math.max(labeled.length * 80, maxChars - wrapperOverhead);
+  const perChunk = Math.max(80, Math.floor(contentBudget / labeled.length));
+  const packed = labeled
+    .map((row) => `[${row.title}]\n${row.content.slice(0, perChunk)}`)
+    .join(separator);
+  return packed.length <= maxChars ? packed : packed.slice(0, maxChars);
 }
 
 function parseBinaryResponse(raw: string): BinaryJudgeResult {
@@ -77,13 +106,13 @@ async function runBinaryJudge(
 }
 
 function chatGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
-  const context = combineChunkContents(artifact.selectedChunks);
+  const context = packChunksForJudge(artifact.selectedChunks);
   return `You are a strict RAG evaluator. Decide if the answer is grounded in the retrieved chunks.
 
 Question: ${fixture.question}
 
 Retrieved chunks:
-${context.slice(0, 12000)}
+${context}
 
 Answer:
 ${artifact.answer.slice(0, 8000)}
@@ -107,13 +136,18 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
 export function formatResearchEvidence(artifact: EvalRunArtifact): string {
+  const cookieWall =
+    /this website utilizes technologies such as cookies|enable essential site functionality/i;
+
   const fromEvidence = (artifact.evidence ?? [])
-    .filter((row) => row.content.trim())
+    .filter((row) => row.content.trim() && !cookieWall.test(row.content))
+    .toSorted((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
     .map((row) => `[${row.sourceTitle}] ${row.content.slice(0, 500)}`);
   if (fromEvidence.length > 0) {
     return fromEvidence.join("\n");
   }
   return artifact.selectedChunks
+    .filter((chunk) => chunk.content.trim() && !cookieWall.test(chunk.content))
     .map((chunk) => `[${chunk.sourceTitle}] ${chunk.content.slice(0, 500)}`)
     .join("\n");
 }
@@ -162,7 +196,7 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 }
 
 function studioGroundingPrompt(fixture: EvalFixture, artifact: EvalRunArtifact): string {
-  const context = combineChunkContents(artifact.selectedChunks);
+  const context = packChunksForJudge(artifact.selectedChunks);
   if (!context.trim()) {
     return `No chunks available — pass if output is coherent for: ${fixture.question}
 Output: ${artifact.answer.slice(0, 4000)}
@@ -173,7 +207,7 @@ Respond JSON only: {"pass": boolean, "reason": string}`;
 Question: ${fixture.question}
 
 Chunks:
-${context.slice(0, 12000)}
+${context}
 
 Output:
 ${artifact.answer.slice(0, 8000)}

@@ -21,9 +21,10 @@ const HOLDOUT_IDS = new Set<string>([
   "studio-ml-mindmap-holdout",
 ]);
 
-/** Smoke suite: fast gate — one chat, research, LR case + agentic studio. */
+/** Smoke suite: fast gate — easy chat factoid + hard list, research, LR, agentic studio. */
 const SMOKE_IDS = new Set<string>([
   "agentic-patterns-20",
+  "ml-factoid-decision-stump",
   "research-001-inflation-factors",
   "literature-review-001-rag-evaluation",
   "studio-report-agentic-patterns-20",

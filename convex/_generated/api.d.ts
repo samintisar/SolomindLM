@@ -266,6 +266,7 @@ import type * as documents_resolveDoi from "../documents/resolveDoi.js";
 import type * as documents_sourceGuide from "../documents/sourceGuide.js";
 import type * as e2e_cleanupNotebooks from "../e2e/cleanupNotebooks.js";
 import type * as e2e_seedFlashcards from "../e2e/seedFlashcards.js";
+import type * as eval__discoverResult from "../eval/_discoverResult.js";
 import type * as eval__gate from "../eval/_gate.js";
 import type * as eval__studioRowCreators from "../eval/_studioRowCreators.js";
 import type * as eval_chatEvalAction from "../eval/chatEvalAction.js";
@@ -620,6 +621,7 @@ declare const fullApi: ApiFromModules<{
   "documents/sourceGuide": typeof documents_sourceGuide;
   "e2e/cleanupNotebooks": typeof e2e_cleanupNotebooks;
   "e2e/seedFlashcards": typeof e2e_seedFlashcards;
+  "eval/_discoverResult": typeof eval__discoverResult;
   "eval/_gate": typeof eval__gate;
   "eval/_studioRowCreators": typeof eval__studioRowCreators;
   "eval/chatEvalAction": typeof eval_chatEvalAction;
