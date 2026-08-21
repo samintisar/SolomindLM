@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EvalFixture, EvalRunArtifact } from "../types";
-import { researchSourceBreadth } from "./sourceAware";
+import { inferSourceChannel, researchSourceBreadth, sourceRecallByChannel } from "./sourceAware";
 
 const fixture: EvalFixture = {
   schemaVersion: 1,
@@ -125,6 +125,14 @@ describe("researchSourceBreadth", () => {
     expect(result.breakdown?.uniqueSourceCount).toBe(8);
   });
 
+  it("classifies DOI and PMC URLs as academic", () => {
+    expect(inferSourceChannel("https://doi.org/10.1111/twec.13585")).toBe("academic");
+    expect(inferSourceChannel("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC13099827/")).toBe(
+      "academic"
+    );
+    expect(inferSourceChannel("https://www.nber.org/papers/w32859")).toBe("academic");
+  });
+
   it("skips breadth check for notebook-only policies", () => {
     const notebookFixture: EvalFixture = {
       ...fixture,
@@ -139,5 +147,57 @@ describe("researchSourceBreadth", () => {
     );
     expect(result.status).toBe("pass");
     expect(result.detail).toContain("Notebook-only");
+  });
+});
+
+describe("sourceRecallByChannel", () => {
+  it("does not fail a channel that retrieved zero chunks", () => {
+    const recallFixture: EvalFixture = {
+      ...fixture,
+      expectedItems: ["inflation", "central banks", "monetary policy"],
+      sourcePolicy: { channels: ["notebook", "web", "academic"], maxResultsPerChannel: 8 },
+    };
+    const results = sourceRecallByChannel(
+      recallFixture,
+      researchArtifact(
+        [
+          {
+            id: "ev_0",
+            sourceTitle: "CEPR",
+            sourceUrl: "https://cepr.org/paper",
+            content: "Inflation and monetary policy at central banks.",
+          },
+        ],
+        recallFixture.sourcePolicy
+      )
+    );
+    const notebook = results.find((r) => r.metric === "source_recall_notebook");
+    expect(notebook?.status).toBe("info");
+    expect(notebook?.breakdown?.chunkCount).toBe(0);
+  });
+
+  it("scores academic recall using DOI-hosted papers", () => {
+    const recallFixture: EvalFixture = {
+      ...fixture,
+      expectedItems: ["inflation", "central banks"],
+      sourcePolicy: { channels: ["academic"], maxResultsPerChannel: 8 },
+    };
+    const results = sourceRecallByChannel(
+      recallFixture,
+      researchArtifact(
+        [
+          {
+            id: "ev_0",
+            sourceTitle: "World Economy",
+            sourceUrl: "https://doi.org/10.1111/twec.13585",
+            content: "Inflation and central banks after the pandemic.",
+          },
+        ],
+        recallFixture.sourcePolicy
+      )
+    );
+    expect(results[0]?.metric).toBe("source_recall_academic");
+    expect(results[0]?.status).toBe("pass");
+    expect(results[0]?.breakdown?.chunkCount).toBe(1);
   });
 });

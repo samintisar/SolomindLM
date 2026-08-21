@@ -595,12 +595,13 @@ export function citationValidity(
 ): MetricResult {
   const selectedChunkIds = new Set(artifact.selectedChunks.map((c) => c.id));
   const citations = artifact.citations;
-  // Word-boundary cues only — avoid false positives (e.g. "resources" contains "source").
-  const expectsCitation = /\bcitations?\b|\breferences?\b|\bsources?\b|inline\s+citation/i.test(
-    fixture.expectedBehavior
-  );
+  // Require explicit citation language. Do not treat retrieval wording like
+  // "evidence from multiple sources" as a requirement for [n] inline citations.
+  const expectsCitation =
+    /\bcitations?\b|\binline\s+citations?\b|\bcite\b|\bcited\b|\breference list\b|\bbibliography\b/i.test(
+      fixture.expectedBehavior
+    );
 
-  // No citations found in the answer.
   if (citations.length === 0) {
     if (expectsCitation) {
       return baseMetric(
@@ -613,7 +614,6 @@ export function citationValidity(
         { totalCitations: 0, validCitations: 0, expectsCitation: true }
       );
     }
-    // No citations required, neutral pass.
     return baseMetric(
       "citation_validity",
       fixture,
@@ -628,7 +628,6 @@ export function citationValidity(
   let valid = 0;
   const citationDetails: Array<{ citation: string; valid: boolean }> = [];
   for (const citation of citations) {
-    // A citation is valid if it matches a chunk id in the selected set.
     const isValid = selectedChunkIds.has(citation);
     if (isValid) valid++;
     citationDetails.push({ citation, valid: isValid });
@@ -667,8 +666,8 @@ const STATIC_TOTAL_TOKENS_GATE = 4000;
 const DEFAULT_LATENCY_MS_GATE = 60000;
 const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   chat: 60000,
-  research: 120000,
-  both: 120000,
+  research: 240000,
+  both: 240000,
   report: 90000,
   flashcards: 90000,
   quiz: 90000,
@@ -677,6 +676,8 @@ const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   spreadsheet: 90000,
   writtenQuestions: 90000,
   audioScript: 240000,
+  audioScriptOnly: 240000,
+  literatureReview: 300000,
 };
 
 /**

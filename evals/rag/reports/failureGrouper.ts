@@ -3,7 +3,25 @@ import type { ConcreteRunnerKind, FailureCategory, FailureGroup, MetricResult } 
 /**
  * Map metric names and breakdown categories to failure categories.
  */
-function classifyFailure(metric: MetricResult): FailureCategory {
+const SELECTED_RECALL_OK = 0.7;
+
+function siblingScore(caseMetrics: MetricResult[], metricName: string): number | undefined {
+  return caseMetrics.find((row) => row.metric === metricName)?.score;
+}
+
+/** Grounding failures follow retrieval stage scores when those metrics exist. */
+function classifyChatGrounding(caseMetrics: MetricResult[]): FailureCategory {
+  const selectedRow = caseMetrics.find((row) => row.metric === "retrieval_item_recall_selected");
+  if (!selectedRow) return "prompt_answering";
+  const selected = selectedRow.score;
+  const pre = siblingScore(caseMetrics, "retrieval_item_recall_pre_rerank") ?? 0;
+  const post = siblingScore(caseMetrics, "retrieval_item_recall_post_rerank") ?? 0;
+  if (selected >= SELECTED_RECALL_OK) return "prompt_answering";
+  if (pre >= SELECTED_RECALL_OK || post >= SELECTED_RECALL_OK) return "context_selection";
+  return "retrieval";
+}
+
+function classifyFailure(metric: MetricResult, caseMetrics: MetricResult[]): FailureCategory {
   if (metric.metric.startsWith("binary_judge_studio_structure")) {
     return "studio_structure";
   }
@@ -68,7 +86,7 @@ function classifyFailure(metric: MetricResult): FailureCategory {
   }
 
   if (metric.metric.startsWith("binary_judge_chat_grounding")) {
-    return "context_selection";
+    return classifyChatGrounding(caseMetrics);
   }
   if (metric.metric.startsWith("binary_judge_citation")) {
     return "citation";
@@ -82,7 +100,7 @@ function classifyFailure(metric: MetricResult): FailureCategory {
 
   if (metric.metric === "citation_validity") return "citation";
   if (metric.metric === "latency_cost_budget") return "latency_cost";
-  if (metric.metric === "expected_item_recall") return "retrieval";
+  if (metric.metric === "expected_item_recall") return "prompt_answering";
 
   return "prompt_answering";
 }
@@ -218,7 +236,10 @@ export function groupFailures(
   >();
 
   for (const metric of failures) {
-    const category = classifyFailure(metric);
+    const siblings = metrics.filter(
+      (row) => row.caseId === metric.caseId && row.runner === metric.runner
+    );
+    const category = classifyFailure(metric, siblings);
     const key = `${category}::${metric.runner}`;
 
     if (!groups.has(key)) {

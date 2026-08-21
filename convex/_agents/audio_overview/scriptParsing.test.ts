@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildFallbackDialogueScriptFromBeats, parseDialogueScriptResponse } from "./scriptParsing";
+import {
+  buildFallbackDialogueScriptFromBeats,
+  parseDialogueScriptResponse,
+  resolveDialogueScript,
+} from "./scriptParsing";
 
 describe("parseDialogueScriptResponse", () => {
   it("parses a valid dialogue JSON array from surrounding text", () => {
@@ -76,5 +80,39 @@ describe("buildFallbackDialogueScriptFromBeats", () => {
 
   it("returns null when there are no usable beats", () => {
     expect(buildFallbackDialogueScriptFromBeats(" --- \n\n", 6)).toBeNull();
+  });
+});
+
+describe("resolveDialogueScript", () => {
+  it("parses JSON even when reasoning text contains an earlier bracket", () => {
+    const script = resolveDialogueScript(
+      '[internal draft]\nHere is the script:\n[{"speaker":"host_a","text":"Routing splits work across specialists."},{"speaker":"host_b","text":"And then you merge the results."}]',
+      "",
+      8
+    );
+    expect(script).toHaveLength(2);
+    expect(script[0].text).toContain("Routing splits work");
+  });
+
+  it("falls back to extracted beats instead of a generic stub", () => {
+    const script = resolveDialogueScript(
+      "I cannot emit JSON this time.",
+      [
+        "CLAIM: Retrieval quality improved by 18% after reranking.",
+        "PUSHBACK: That lift may not hold for small notebooks.",
+      ].join("\n"),
+      8
+    );
+    expect(script.length).toBeGreaterThanOrEqual(8);
+    expect(script.map((line) => line.text).join(" ")).toContain("Retrieval quality improved");
+    expect(script.map((line) => line.text).join(" ")).not.toContain(
+      "I've analyzed the content you provided"
+    );
+  });
+
+  it("throws when neither JSON nor beats can produce a script", () => {
+    expect(() => resolveDialogueScript("no json", " --- \n\n", 8)).toThrow(
+      /Dialogue script generation failed/
+    );
   });
 });

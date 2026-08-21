@@ -25,6 +25,7 @@ import {
   REDUCE_SYSTEM_PROMPT,
   TARGET_LINE_COUNTS,
 } from "../../_agents/audio_overview/prompts";
+import { resolveDialogueScript } from "../../_agents/audio_overview/scriptParsing";
 import type { DialogueLine } from "../../_agents/audio_overview/state";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -513,6 +514,7 @@ export async function runFinalizeAudioOverviewPhase(
       audioType?: AudioType;
       length?: AudioLength;
       focus?: string;
+      skipTts?: boolean;
     };
     const audioType: AudioType = storedMetadata.audioType || "deep_dive";
     const length: AudioLength = storedMetadata.length || "default";
@@ -520,8 +522,6 @@ export async function runFinalizeAudioOverviewPhase(
       ? sanitizeUserInput(storedMetadata.focus)
       : undefined;
     const targetLines = TARGET_LINE_COUNTS[length];
-
-    let fullDialogueScript: DialogueLine[] = [];
 
     console.log(
       `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`
@@ -554,81 +554,49 @@ export async function runFinalizeAudioOverviewPhase(
       retry: { maxAttempts: 2, baseDelayMs: 1000 },
     });
 
-    const jsonStart = responseText.indexOf("[");
-    const jsonEnd = responseText.lastIndexOf("]");
+    console.log(`[AudioJob] Script response responseChars=${responseText.length}`);
 
-    console.log(
-      `[AudioJob] Script response responseChars=${responseText.length}, jsonStart=${jsonStart}, jsonEnd=${jsonEnd}`
-    );
-
-    // Try multiple parsing strategies
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      // Strategy 1: Parse the full JSON array
-      try {
-        const parsed = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1)) as DialogueLine[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          fullDialogueScript = parsed;
-          console.log(`[AudioJob] Parsed ${fullDialogueScript.length} lines via full JSON parse`);
-        }
-      } catch (error) {
-        console.log(
-          `[AudioJob] Full JSON parse failed: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-
-      // Strategy 2: If full parse failed, try extracting individual objects
-      if (fullDialogueScript.length === 0) {
-        console.log(`[AudioJob] Attempting object-by-object recovery`);
-        const objectRegex =
-          /\{\s*"speaker"\s*:\s*"(host_a|host_b)"\s*,\s*"text"\s*:\s*"([^"]*)"\s*\}/g;
-        let match;
-        const recoveredLines: DialogueLine[] = [];
-        while ((match = objectRegex.exec(responseText)) !== null) {
-          recoveredLines.push({ speaker: match[1] as "host_a" | "host_b", text: match[2] });
-        }
-        if (recoveredLines.length > 0) {
-          fullDialogueScript = recoveredLines;
-          console.log(
-            `[AudioJob] Recovered ${fullDialogueScript.length} lines via regex extraction`
-          );
-        }
-      }
-
-      // Strategy 3: Try parsing truncated JSON by finding the last complete object
-      if (fullDialogueScript.length === 0) {
-        console.log(`[AudioJob] Attempting truncated JSON recovery`);
-        const truncated = responseText.substring(jsonStart, jsonEnd + 1);
-        // Try to find the last valid complete object and close the array
-        const lastCompleteObject = truncated.lastIndexOf('"},');
-        if (lastCompleteObject > 0) {
-          const fixedJson = truncated.substring(0, lastCompleteObject + 2) + "\n]";
-          try {
-            const parsed = JSON.parse(fixedJson) as DialogueLine[];
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              fullDialogueScript = parsed;
-              console.log(
-                `[AudioJob] Recovered ${fullDialogueScript.length} lines via truncation fix`
-              );
-            }
-          } catch (_e) {
-            // Ignore
-          }
-        }
-      }
-    }
-
-    if (fullDialogueScript.length === 0) {
-      console.log(
-        `[AudioJob] Dialogue generation returned no parsable JSON, using fallback script. Response preview: ${responseText.slice(0, 500)}`
-      );
-      fullDialogueScript = [
-        { speaker: "host_a", text: "I've analyzed the content you provided." },
-        { speaker: "host_b", text: "What did you find most interesting?" },
-        { speaker: "host_a", text: "There were several key points worth discussing." },
-      ];
-    }
+    const fullDialogueScript = resolveDialogueScript(responseText, combined, targetLines);
 
     console.log(`[AudioJob] Generated ${fullDialogueScript.length} dialogue lines`);
+
+    if (storedMetadata.skipTts) {
+      const transcript = fullDialogueScript.map((line) => line.text).join("\n");
+      let title = "Audio Overview";
+      try {
+        title = await ctx.runAction(internal._services.ai.titleGenerator.generateTitle, {
+          chunk: combined.substring(0, 2000),
+        });
+      } catch (_e) {
+        console.log("[AudioJob] Title generation failed, using default");
+      }
+
+      await ctx.runMutation(internal.studio.jobMutations.audio.saveAudioOverviewResults, {
+        audioOverviewId,
+        transcript,
+        metadata: {
+          title,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          skipTts: true,
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+          dialogueLines: fullDialogueScript.length,
+        },
+      });
+      await ctx.runMutation(internal.studio.jobMutations.audio.clearAudioOverviewMapData, {
+        audioOverviewId,
+      });
+      logger.jobComplete({
+        title,
+        transcriptLength: transcript.length,
+        skipTts: true,
+        mapSuccess: Object.keys(mapResults).length - failedCount.count,
+        mapFailed: failedCount.count,
+      });
+      return;
+    }
 
     // Update status for audio synthesis
     await ctx.runMutation(internal.studio.jobMutations.audio.updateAudioOverviewStatus, {
