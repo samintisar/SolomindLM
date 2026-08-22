@@ -31,11 +31,12 @@ function artifact(partial: Partial<EvalRunArtifact> = {}): EvalRunArtifact {
 }
 
 describe("contextTokenBudgetRatio", () => {
-  it("is selected tokens divided by 8000", () => {
+  it("is selected tokens divided by the production list budget of 5200", () => {
     const result = contextTokenBudgetRatio(fixture, artifact());
     expect(result.metric).toBe("context_token_budget_ratio");
     expect(result.status).toBe("info");
-    expect(result.score).toBeCloseTo(100 / 8000, 5);
+    expect(result.breakdown?.budget).toBe(5200);
+    expect(result.score).toBeCloseTo(100 / 5200, 5);
   });
 });
 

@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { addTokenUsage } from "./usageAggregate";
+import { addTokenUsage, fromProviderUsage } from "./usageAggregate";
+
+describe("fromProviderUsage", () => {
+  it("maps provider usage fields", () => {
+    expect(
+      fromProviderUsage({
+        promptTokens: 11,
+        completionTokens: 7,
+        totalTokens: 18,
+      })
+    ).toEqual({ prompt: 11, completion: 7, total: 18 });
+  });
+
+  it("returns undefined when usage is missing", () => {
+    expect(fromProviderUsage(undefined)).toBeUndefined();
+  });
+});
 
 describe("addTokenUsage", () => {
   it("sums two usages", () => {
