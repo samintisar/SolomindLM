@@ -663,7 +663,6 @@ export function citationValidity(
  * inherent latency floors are well above chat. The gate per runner reflects observed steady-state
  * cost so a healthy run reads "pass", not "fail-by-design".
  */
-const STATIC_TOTAL_TOKENS_GATE = 4000;
 const DEFAULT_LATENCY_MS_GATE = 60000;
 const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   chat: 60000,
@@ -678,12 +677,27 @@ const PER_RUNNER_LATENCY_MS_GATE: Record<string, number> = {
   writtenQuestions: 90000,
   audioScript: 240000,
 };
+const PER_RUNNER_TOKEN_GATE: Record<string, number> = {
+  chat: 8000,
+  research: 20000,
+  both: 20000,
+  report: 25000,
+  flashcards: 20000,
+  quiz: 20000,
+  mindmap: 20000,
+  infographic: 15000,
+  spreadsheet: 20000,
+  writtenQuestions: 20000,
+  audioScript: 15000,
+  audioScriptOnly: 8000,
+  literatureReview: 30000,
+};
 
 /**
  * Checks latency and token cost against a baseline or static gates.
  *
  * If a baseline is provided: pass if within 1.2x, warn if within 2x, fail otherwise.
- * If no baseline: pass if latency < 8000ms AND total tokens < 4000, warn if within 2x, fail otherwise.
+ * If no baseline: pass if within per-runner latency and token gates, warn if within 2x, fail otherwise.
  */
 export function latencyCostBudget(
   fixture: EvalFixture,
@@ -723,19 +737,20 @@ export function latencyCostBudget(
 
   // No baseline: use static gates (per-runner where defined).
   const latencyGate = PER_RUNNER_LATENCY_MS_GATE[artifact.runner] ?? DEFAULT_LATENCY_MS_GATE;
+  const tokenGate = PER_RUNNER_TOKEN_GATE[artifact.runner] ?? 8000;
   const latencyOk = latencyMs <= latencyGate;
-  const tokensOk = totalTokens <= STATIC_TOTAL_TOKENS_GATE;
+  const tokensOk = totalTokens <= tokenGate;
 
   let status: MetricStatus;
   if (latencyOk && tokensOk) status = "pass";
-  else if (latencyMs <= latencyGate * 2 && totalTokens <= STATIC_TOTAL_TOKENS_GATE * 2)
+  else if (latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2)
     status = "warn";
   else status = "fail";
 
   const score =
     latencyOk && tokensOk
       ? 1
-      : latencyMs <= latencyGate * 2 && totalTokens <= STATIC_TOTAL_TOKENS_GATE * 2
+      : latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2
         ? 0.5
         : 0;
 
@@ -745,12 +760,12 @@ export function latencyCostBudget(
     artifact,
     status,
     score,
-    `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${STATIC_TOTAL_TOKENS_GATE}). No baseline.`,
+    `Latency ${latencyMs}ms (gate ${latencyGate}ms), tokens ${totalTokens} (gate ${tokenGate}). No baseline.`,
     {
       latencyMs,
       totalTokens,
       latencyGate,
-      tokenGate: STATIC_TOTAL_TOKENS_GATE,
+      tokenGate,
       latencyOk,
       tokensOk,
       hasBaseline: false,

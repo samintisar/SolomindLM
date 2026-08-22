@@ -23,6 +23,7 @@ export interface ResearchAgentInvoker {
     }>;
     latencyMs: number;
     tokenUsage?: { prompt: number; completion: number; total: number };
+    tokenUsageSource?: "provider" | "estimated";
     iterations: number;
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
@@ -156,6 +157,7 @@ export async function runResearchEval(
       })),
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
+      tokenUsageSource: result.tokenUsageSource ?? "estimated",
       sourcePolicy: result.sourcePolicy,
       sourceEvidence,
       timestamp: new Date().toISOString(),

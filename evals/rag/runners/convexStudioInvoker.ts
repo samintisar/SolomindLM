@@ -32,6 +32,7 @@ export interface StudioInvokeResult {
   latencyMs: number;
   /** Optional token usage if the action returned it */
   tokenUsage?: { prompt: number; completion: number; total: number };
+  tokenUsageSource?: "provider" | "estimated";
 }
 
 export interface StudioInvoker {
