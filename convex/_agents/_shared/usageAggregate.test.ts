@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addTokenUsage, fromProviderUsage } from "./usageAggregate";
+import { addTokenUsage, fromProviderUsage, resolveEvalTokenUsage } from "./usageAggregate";
 
 describe("fromProviderUsage", () => {
   it("maps provider usage fields", () => {
@@ -43,5 +43,38 @@ describe("addTokenUsage", () => {
       completion: 0,
       total: 0,
     });
+  });
+});
+
+describe("resolveEvalTokenUsage", () => {
+  const estimated = { prompt: 100, completion: 50, total: 150 };
+
+  it("prefers provider when total > 0", () => {
+    const provider = { prompt: 11, completion: 7, total: 18 };
+    expect(resolveEvalTokenUsage({ provider, estimated })).toEqual({
+      tokenUsage: provider,
+      tokenUsageSource: "provider",
+    });
+  });
+
+  it("falls back to estimated when provider is undefined", () => {
+    expect(resolveEvalTokenUsage({ estimated })).toEqual({
+      tokenUsage: estimated,
+      tokenUsageSource: "estimated",
+    });
+  });
+
+  it("falls back to estimated when provider.total is 0", () => {
+    const provider = { prompt: 0, completion: 0, total: 0 };
+    expect(resolveEvalTokenUsage({ provider, estimated })).toEqual({
+      tokenUsage: estimated,
+      tokenUsageSource: "estimated",
+    });
+  });
+
+  it("does not mutate the estimated object", () => {
+    const estimatedCopy = { ...estimated };
+    resolveEvalTokenUsage({ estimated });
+    expect(estimated).toEqual(estimatedCopy);
   });
 });

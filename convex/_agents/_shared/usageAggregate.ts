@@ -16,3 +16,15 @@ export function fromProviderUsage(usage?: {
   if (!usage) return undefined;
   return { prompt: usage.promptTokens, completion: usage.completionTokens, total: usage.totalTokens };
 }
+
+export type TokenUsageSource = "provider" | "estimated";
+
+export function resolveEvalTokenUsage(input: {
+  provider?: TokenUsage;
+  estimated: TokenUsage;
+}): { tokenUsage: TokenUsage; tokenUsageSource: TokenUsageSource } {
+  if (input.provider !== undefined && input.provider.total > 0) {
+    return { tokenUsage: input.provider, tokenUsageSource: "provider" };
+  }
+  return { tokenUsage: input.estimated, tokenUsageSource: "estimated" };
+}
