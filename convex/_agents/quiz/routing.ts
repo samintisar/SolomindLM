@@ -1,6 +1,8 @@
 "use node";
 
 import { Send } from "@langchain/langgraph";
+import { selectStudioMapBatches } from "../_shared/studioExecutionMode.js";
+import { countTokens } from "../_shared/tokenizer.js";
 import { packChunks, validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
@@ -20,7 +22,17 @@ export function routeToMap(state: OverallStateType, deps: RouteToMapDeps): Send[
   }
 
   const validatedChunks = validateChunks(state.chunks);
-  const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS);
+  const { mode, batches: packedChunks } = selectStudioMapBatches({
+    documentCount: state.documentIds?.length || 0,
+    chunks: validatedChunks,
+    estimateTokens: countTokens,
+    pack: (chunks) => packChunks(chunks, GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS),
+  });
+
+  if (packedChunks.length === 0) {
+    console.warn("[QuizGraph] No map batches after skip-map planning, routing to collapse");
+    return "collapse";
+  }
 
   const MIN_QUESTIONS_PER_CHUNK = GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK;
   const BUFFER_MULTIPLIER = 1.2;
@@ -43,6 +55,7 @@ export function routeToMap(state: OverallStateType, deps: RouteToMapDeps): Send[
         originalChunks: state.chunks.length,
         validatedChunks: validatedChunks.length,
         packedChunks: packedChunks.length,
+        executionMode: mode,
         targetQuestionCount: state.questionCount,
         questionsPerChunk,
         difficulty: state.difficulty,

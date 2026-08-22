@@ -15,6 +15,7 @@ import { uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
+import { fromTogetherUsage } from "../_shared/usageAggregate.js";
 import { buildGroundingPrompt, estimateTokens, isComplexQuery } from "./chat_llm_grounding.js";
 import {
   buildNotebookChatInstructionBlock,
@@ -432,11 +433,30 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         temperature: 0.1,
         stream: true,
         max_tokens: 8192,
+        // Together's SDK types omit OpenAI-compatible stream_options; usage is
+        // returned on a final chunk when include_usage is set.
+        ...({ stream_options: { include_usage: true } } as object),
       });
 
-      // Accumulate streaming chunks
+      // Accumulate streaming chunks. Together sends usage on a final chunk when
+      // stream_options.include_usage is set (OpenAI-compatible).
       const chunks: string[] = [];
+      let providerUsage: ReturnType<typeof fromTogetherUsage>;
       for await (const chunk of stream) {
+        const mapped = fromTogetherUsage(
+          (
+            chunk as {
+              usage?: {
+                prompt_tokens?: number;
+                completion_tokens?: number;
+                total_tokens?: number;
+              } | null;
+            }
+          ).usage
+        );
+        if (mapped) {
+          providerUsage = mapped;
+        }
         const token = chunk.choices[0]?.delta?.content || "";
         if (token) {
           chunks.push(token);
@@ -455,7 +475,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         // Try to salvage partial JSON or raw text
         const salvaged = this.salvageResponse(fullResponse);
         if (salvaged) {
-          return salvaged;
+          return providerUsage ? { ...salvaged, tokenUsage: providerUsage } : salvaged;
         }
         return {
           answer_markdown: "I encountered an error processing the response. Please try again.",
@@ -475,7 +495,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         const salvaged = this.salvageResponse(parsedResponse);
         if (salvaged) {
           console.log("[ChatLLMWrapper] Successfully salvaged response after validation failure");
-          return salvaged;
+          return providerUsage ? { ...salvaged, tokenUsage: providerUsage } : salvaged;
         }
 
         return {
@@ -498,6 +518,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       return {
         answer_markdown: cleanedMarkdown,
         confidence: validated.data.confidence ?? "low",
+        ...(providerUsage ? { tokenUsage: providerUsage } : {}),
       } as ChatResponse;
     } catch (error) {
       console.error("[ChatLLMWrapper] Streaming structured output generation failed:", error);

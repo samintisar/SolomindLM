@@ -27,6 +27,7 @@ import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
+import { buildChatEvalTelemetry } from "./chatEvalTelemetry";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ export interface ChatEvalResult {
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: "provider" | "estimated";
+  stageSpans?: import("../_agents/_shared/stageSpans").AgentStageSpan[];
   sourcePolicy?: {
     channels: string[];
     maxResultsPerChannel?: number;
@@ -115,6 +117,14 @@ export const runChatEval = action({
 
     const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
 
+    let retrieveStartedAt: number | undefined;
+    let retrieveEndedAt: number | undefined;
+    let rerankStartedAt: number | undefined;
+    let rerankEndedAt: number | undefined;
+    let selectStartedAt: number | undefined;
+    let selectEndedAt: number | undefined;
+    let providerUsage: { prompt: number; completion: number; total: number } | undefined;
+
     // ── Vector search runner (matches convex/chat/stream.ts) ──
 
     const vectorSearchRunner = async (
@@ -122,63 +132,72 @@ export const runChatEval = action({
       limit: number,
       docIds?: string[]
     ): Promise<VectorSearchRawResult[]> => {
-      const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
+      retrieveStartedAt ??= Date.now();
+      try {
+        const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
 
-      const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
-        vector: embedding,
-        limit: limitToFetch,
-        filter: (q) => q.eq("notebookId", notebookIdTyped),
-      });
-
-      const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
-      if (chunkIds.length === 0) return [];
-
-      const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
-
-      const chunkMap = new Map(
-        (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map((c) => [
-          c._id,
-          c,
-        ]) as [Id<"documentChunks">, Record<string, unknown>][]
-      );
-
-      const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
-      const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
-
-      const rows: VectorSearchRawResult[] = [];
-      for (const r of results as VectorSearchHit[]) {
-        const chunk = chunkMap.get(r._id);
-        if (!chunk) continue;
-
-        // Filter by document IDs if specified
-        if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
-        // Apply threshold
-        const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
-        if (r._score < threshold) continue;
-
-        rows.push({
-          _id: r._id,
-          _score: r._score,
-          content: chunk.content as string,
-          chunkIndex: chunk.chunkIndex as number,
-          documentId: chunk.documentId as Id<"documents">,
-          sourceTitle: "",
-          sourceUrl: "",
+        const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
+          vector: embedding,
+          limit: limitToFetch,
+          filter: (q) => q.eq("notebookId", notebookIdTyped),
         });
+
+        const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
+        if (chunkIds.length === 0) return [];
+
+        const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
+
+        const chunkMap = new Map(
+          (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map(
+            (c) => [c._id, c]
+          ) as [Id<"documentChunks">, Record<string, unknown>][]
+        );
+
+        const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
+        const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
+
+        const rows: VectorSearchRawResult[] = [];
+        for (const r of results as VectorSearchHit[]) {
+          const chunk = chunkMap.get(r._id);
+          if (!chunk) continue;
+
+          // Filter by document IDs if specified
+          if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
+          // Apply threshold
+          const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
+          if (r._score < threshold) continue;
+
+          rows.push({
+            _id: r._id,
+            _score: r._score,
+            content: chunk.content as string,
+            chunkIndex: chunk.chunkIndex as number,
+            documentId: chunk.documentId as Id<"documents">,
+            sourceTitle: "",
+            sourceUrl: "",
+          });
+        }
+        return rows.slice(0, limit);
+      } finally {
+        retrieveEndedAt = Date.now();
       }
-      return rows.slice(0, limit);
     };
 
     // ── Keyword search runner ──
 
     const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
-      return ctx.runQuery(internal.documents.internal.keywordSearch, {
-        notebookId: notebookIdTyped,
-        userId: keywordSearchChunkUserId,
-        query,
-        limit,
-        documentIds: docIds as Id<"documents">[] | undefined,
-      });
+      retrieveStartedAt ??= Date.now();
+      try {
+        return await ctx.runQuery(internal.documents.internal.keywordSearch, {
+          notebookId: notebookIdTyped,
+          userId: keywordSearchChunkUserId,
+          query,
+          limit,
+          documentIds: docIds as Id<"documents">[] | undefined,
+        });
+      } finally {
+        retrieveEndedAt = Date.now();
+      }
     };
 
     // ── Services ──
@@ -196,9 +215,14 @@ export const runChatEval = action({
 
     const spyGlobalRerankFn: GlobalRerankFn = async (query, documents) => {
       capturedPreRerankDocs = [...documents];
-      const result = await rerankFn(query, documents);
-      capturedRerankOutput = result;
-      return result;
+      rerankStartedAt = Date.now();
+      try {
+        const result = await rerankFn(query, documents);
+        capturedRerankOutput = result;
+        return result;
+      } finally {
+        rerankEndedAt = Date.now();
+      }
     };
 
     // ── Construct agent ──
@@ -377,6 +401,8 @@ export const runChatEval = action({
           break;
         case "references":
           references = chunk.data ?? [];
+          selectStartedAt ??= rerankEndedAt ?? retrieveEndedAt ?? startTime;
+          selectEndedAt = Date.now();
           break;
         case "tool_call": {
           const tc = chunk.data as { tool?: string; query?: string; status?: string };
@@ -394,7 +420,17 @@ export const runChatEval = action({
             (typeof chunk.data === "string" ? chunk.data : "Agent stream emitted error chunk");
           throw new Error(`Agent stream error: ${msg}`);
         }
-        case "done":
+        case "done": {
+          const usage = (
+            chunk.data as
+              | { tokenUsage?: { prompt: number; completion: number; total: number } }
+              | undefined
+          )?.tokenUsage;
+          if (usage && typeof usage.total === "number" && usage.total > 0) {
+            providerUsage = usage;
+          }
+          break;
+        }
         case "warning":
         case "grounding_check":
         case "grounding_warn":
@@ -443,6 +479,23 @@ export const runChatEval = action({
       }
     }
 
+    const telemetry = buildChatEvalTelemetry({
+      retrieveMs:
+        retrieveStartedAt !== undefined && retrieveEndedAt !== undefined
+          ? retrieveEndedAt - retrieveStartedAt
+          : undefined,
+      rerankMs:
+        rerankStartedAt !== undefined && rerankEndedAt !== undefined
+          ? rerankEndedAt - rerankStartedAt
+          : undefined,
+      selectMs:
+        selectStartedAt !== undefined && selectEndedAt !== undefined
+          ? selectEndedAt - selectStartedAt
+          : undefined,
+      provider: providerUsage,
+      estimated: estimateChatTokenUsage(args.question, answer, selectedChunks),
+    });
+
     return {
       answer,
       citations: Array.from(citationSet),
@@ -451,8 +504,9 @@ export const runChatEval = action({
       postRerankChunks,
       selectedChunks,
       latencyMs: Date.now() - startTime,
-      tokenUsage: estimateChatTokenUsage(args.question, answer, selectedChunks),
-      tokenUsageSource: "estimated",
+      tokenUsage: telemetry.tokenUsage,
+      tokenUsageSource: telemetry.tokenUsageSource,
+      stageSpans: telemetry.stageSpans,
       sourcePolicy: args.sourcePolicy,
     };
   },

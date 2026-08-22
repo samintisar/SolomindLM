@@ -1,7 +1,8 @@
 "use node";
 
 import { Send } from "@langchain/langgraph";
-
+import { selectStudioMapBatches } from "../_shared/studioExecutionMode.js";
+import { countTokens } from "../_shared/tokenizer.js";
 import type { OverallStateType } from "./state.js";
 
 export function routeToMap(state: OverallStateType): Send[] | "collapse" {
@@ -14,7 +15,21 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
     return "collapse";
   }
 
-  const chunkCount = state.chunks.length;
+  const { mode, batches } = selectStudioMapBatches({
+    documentCount: state.documentIds?.length || 0,
+    chunks: state.chunks,
+    estimateTokens: countTokens,
+    pack: (chunks) => chunks,
+  });
+
+  if (batches.length === 0) {
+    console.warn(
+      "[WrittenQuestionsGraph] No map batches after skip-map planning, routing to collapse"
+    );
+    return "collapse";
+  }
+
+  const chunkCount = batches.length;
   const MIN_QUESTIONS_PER_CHUNK = 3;
   // 2.5× over-generation gives the heuristic + LLM dedup steps enough headroom
   // to land at or above `questionCount`. With 1.5× we routinely shrank to ~13
@@ -55,7 +70,9 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
     `[WrittenQuestionsGraph] Creating ${chunkCount} parallel map tasks (~${questionsPerChunk} questions/chunk)`
   );
 
-  return state.chunks.map((chunk, idx) => {
+  console.log(`[WrittenQuestionsGraph] Execution mode ${mode}: creating ${chunkCount} map task(s)`);
+
+  return batches.map((chunk, idx) => {
     const preview = chunk.substring(0, 100).replace(/\n/g, " ");
     console.log(`  [Task ${idx + 1}/${chunkCount}] ${preview}... (${chunk.length} chars)`);
     return new Send("map_process", {

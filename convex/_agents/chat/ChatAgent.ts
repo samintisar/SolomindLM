@@ -889,6 +889,11 @@ export class ChatAgent {
       yield { type: "followups", data: followUps };
     }
 
-    yield { type: "done" };
+    yield {
+      type: "done",
+      ...(structuredResponse.tokenUsage
+        ? { data: { tokenUsage: structuredResponse.tokenUsage } }
+        : {}),
+    };
   }
 }

@@ -24,6 +24,7 @@ export interface ChatAgentInvoker {
     latencyMs: number;
     tokenUsage?: { prompt: number; completion: number; total: number };
     tokenUsageSource?: "provider" | "estimated";
+    stageSpans?: import("../types").AgentStageSpan[];
     sourcePolicy?: import("../types").SourcePolicyConfig;
   }>;
 }
@@ -167,6 +168,7 @@ export async function runChatEval(
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
       tokenUsageSource: result.tokenUsageSource ?? "estimated",
+      stageSpans: result.stageSpans,
       sourcePolicy: result.sourcePolicy,
       sourceEvidence,
       timestamp: new Date().toISOString(),

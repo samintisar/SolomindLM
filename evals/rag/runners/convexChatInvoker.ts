@@ -60,6 +60,7 @@ export function createConvexChatInvoker(
         latencyMs: result.latencyMs,
         tokenUsage: result.tokenUsage,
         tokenUsageSource: result.tokenUsageSource ?? "estimated",
+        stageSpans: result.stageSpans,
         sourcePolicy: result.sourcePolicy,
       };
     },

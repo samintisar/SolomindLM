@@ -11,6 +11,8 @@ import { createTogetherTtsClient } from "../../_services/ai/togetherTts.js";
 import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
+import { selectStudioMapBatches } from "../_shared/studioExecutionMode.js";
+import { countTokens } from "../_shared/tokenizer.js";
 import { packChunks, validateChunks } from "./chunkHelpers.js";
 import { collapse } from "./nodeCollapse.js";
 import { extractBeats } from "./nodeExtractBeats.js";
@@ -56,11 +58,25 @@ export class AudioOverviewGraph {
     }
 
     const validatedChunks = validateChunks(state.chunks);
-    const packedChunks = packChunks(validatedChunks);
+    const { mode, batches: packedChunks } = selectStudioMapBatches({
+      documentCount: 1,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: packChunks,
+    });
+
+    if (packedChunks.length === 0) {
+      logger.warn("No map batches after skip-map planning, routing to collapse", {
+        agent: "AudioOverviewGraph",
+        phase: "route_to_map",
+      });
+      return "collapse";
+    }
 
     logger.info(`Creating ${packedChunks.length} parallel map tasks`, {
       agent: "AudioOverviewGraph",
       phase: "route_to_map",
+      executionMode: mode,
       originalChunks: state.chunks.length,
       validatedChunks: validatedChunks.length,
       packedChunks: packedChunks.length,

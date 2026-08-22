@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { addTokenUsage, fromProviderUsage, resolveEvalTokenUsage } from "./usageAggregate";
+import {
+  addTokenUsage,
+  fromProviderUsage,
+  fromTogetherUsage,
+  resolveEvalTokenUsage,
+} from "./usageAggregate";
 
 describe("fromProviderUsage", () => {
   it("maps provider usage fields", () => {
@@ -76,5 +81,25 @@ describe("resolveEvalTokenUsage", () => {
     const estimatedCopy = { ...estimated };
     resolveEvalTokenUsage({ estimated });
     expect(estimated).toEqual(estimatedCopy);
+  });
+});
+
+describe("fromTogetherUsage", () => {
+  it("maps snake_case Together usage fields", () => {
+    expect(
+      fromTogetherUsage({
+        prompt_tokens: 11,
+        completion_tokens: 7,
+        total_tokens: 18,
+      })
+    ).toEqual({ prompt: 11, completion: 7, total: 18 });
+  });
+
+  it("returns undefined when usage is missing or all zeros", () => {
+    expect(fromTogetherUsage(undefined)).toBeUndefined();
+    expect(fromTogetherUsage(null)).toBeUndefined();
+    expect(
+      fromTogetherUsage({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 })
+    ).toBeUndefined();
   });
 });
