@@ -1,4 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { extractBeatsMock } = vi.hoisted(() => ({
+  extractBeatsMock: vi.fn(),
+}));
+
+vi.mock("./nodeExtractBeats.js", () => ({
+  extractBeats: extractBeatsMock,
+}));
+
 import { AudioOverviewGraph } from "./AudioOverviewGraph";
 import type { OverallStateType } from "./state";
 
@@ -33,5 +42,36 @@ describe("AudioOverviewGraph.routeToMap", () => {
       throw new Error(`Expected Send[] but received ${result}`);
     }
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe("AudioOverviewGraph.skipMap", () => {
+  beforeEach(() => {
+    extractBeatsMock.mockReset();
+  });
+
+  it("extracts beats once before writing the script", async () => {
+    extractBeatsMock.mockResolvedValue({ mapOutputs: ["Beat 1\nBeat 2"] });
+
+    const graph = Object.assign(Object.create(AudioOverviewGraph.prototype), {
+      fastLlm: { invoke: vi.fn() },
+    }) as AudioOverviewGraph & { fastLlm: { invoke: ReturnType<typeof vi.fn> } };
+
+    const result = await graph.skipMap(makeState());
+
+    expect(extractBeatsMock).toHaveBeenCalledTimes(1);
+    expect(extractBeatsMock).toHaveBeenCalledWith(
+      {
+        chunk: `${chunkA}\n\n${chunkB}`,
+        chunkIndex: 0,
+        totalChunks: 1,
+        audioType: "deep_dive",
+        length: "default",
+        focus: undefined,
+      },
+      graph.fastLlm
+    );
+    expect(result.collapsedOutputs).toEqual(["Beat 1\nBeat 2"]);
+    expect(result.status).toBe("writing_script");
   });
 });

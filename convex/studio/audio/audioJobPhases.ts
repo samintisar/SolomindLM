@@ -165,60 +165,35 @@ export async function runAudioOverviewGenerationPhase(
       `[AudioJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
-      await ctx.runMutation(internal.studio.jobMutations.audio.initAudioOverviewMapPhase, {
-        audioOverviewId,
-        totalMapTasks: 1,
-      });
+    const scheduledChunks = mapPlan.skipMapContent ? [mapPlan.skipMapContent] : mapPlan.mapChunks;
 
-      await ctx.runMutation(internal.studio.jobMutations.audio.storeAudioOverviewMapResult, {
-        audioOverviewId,
-        chunkIndex: 0,
-        result: JSON.stringify({
-          beats: mapPlan.skipMapContent,
-          processingTimeMs: 0,
-        }),
-      });
-
-      await ctx.scheduler.runAfter(0, internal.studio.audio.job.finalizeAudioOverviewPhase, {
-        audioOverviewId,
-        userId,
-        notebookId,
-      });
-
-      logger.info("Map phase skipped", {
-        totalMapTasks: 1,
-        executionMode: mapPlan.mode,
-      });
-      return;
-    }
-
-    if (mapPlan.mapChunks.length === 0) {
+    if (scheduledChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.audio.initAudioOverviewMapPhase, {
       audioOverviewId,
-      totalMapTasks: mapPlan.mapChunks.length,
+      totalMapTasks: scheduledChunks.length,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
+    for (let i = 0; i < scheduledChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.audio.job.processAudioMapChunk, {
         audioOverviewId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: mapPlan.mapChunks.length,
-        chunk: mapPlan.mapChunks[i],
+        totalChunks: scheduledChunks.length,
+        chunk: scheduledChunks[i],
       });
-      console.log(`[AudioJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
+      console.log(`[AudioJob] Scheduled map task ${i + 1}/${scheduledChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: mapPlan.mapChunks.length,
-      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
+      totalMapTasks: scheduledChunks.length,
+      executionMode: mapPlan.mode,
+      chunkSizes: scheduledChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");

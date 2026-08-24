@@ -105,10 +105,24 @@ export class AudioOverviewGraph {
     );
   }
 
-  skipMap(state: OverallStateType): Partial<OverallStateType> {
+  async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
     const joinedChunks = validateChunks(state.chunks).join("\n\n");
+    const beatExtraction = joinedChunks
+      ? await extractBeats(
+          {
+            chunk: joinedChunks,
+            chunkIndex: 0,
+            totalChunks: 1,
+            audioType: state.audioType,
+            length: state.length,
+            focus: state.focus,
+          },
+          this.fastLlm
+        )
+      : { mapOutputs: [] };
+
     return {
-      collapsedOutputs: joinedChunks ? [joinedChunks] : [],
+      collapsedOutputs: beatExtraction.mapOutputs ?? [],
       status: "writing_script",
       progress: {
         phase: "skip_map",
