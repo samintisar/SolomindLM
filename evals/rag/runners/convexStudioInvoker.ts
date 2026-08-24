@@ -13,7 +13,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { EvalFixture, StudioRunnerKind } from "../types";
+import type { AgentStageSpan, EvalFixture, StudioRunnerKind } from "../types";
 
 export interface ConvexStudioInvokerOptions {
   evalSecret: string;
@@ -33,6 +33,21 @@ export interface StudioInvokeResult {
   /** Optional token usage if the action returned it */
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: "provider" | "estimated";
+  stageSpans?: AgentStageSpan[];
+}
+
+export function pickStudioInvokeTelemetry(status: {
+  tokenUsage?: { prompt: number; completion: number; total: number };
+  tokenUsageSource?: "provider" | "estimated";
+  stageSpans?: AgentStageSpan[];
+}): Pick<StudioInvokeResult, "tokenUsage" | "tokenUsageSource" | "stageSpans"> {
+  return {
+    ...(status.tokenUsage !== undefined ? { tokenUsage: status.tokenUsage } : {}),
+    ...(status.tokenUsageSource !== undefined
+      ? { tokenUsageSource: status.tokenUsageSource }
+      : {}),
+    ...(status.stageSpans !== undefined ? { stageSpans: status.stageSpans } : {}),
+  };
 }
 
 export interface StudioInvoker {
@@ -93,6 +108,7 @@ export function createConvexReportInvoker(
       return {
         raw: { reportId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -129,6 +145,7 @@ export function createConvexFlashcardsInvoker(
       return {
         raw: { flashcardId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -164,6 +181,7 @@ export function createConvexQuizInvoker(
       return {
         raw: { quizId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -196,6 +214,7 @@ export function createConvexMindmapInvoker(
       return {
         raw: { mindmapId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -232,6 +251,7 @@ export function createConvexInfographicInvoker(
       return {
         raw: { infographicId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -268,6 +288,7 @@ export function createConvexSpreadsheetInvoker(
       return {
         raw: { spreadsheetId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -307,6 +328,7 @@ export function createConvexWrittenQuestionsInvoker(
       return {
         raw: { writtenQuestionId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -345,6 +367,7 @@ export function createConvexAudioScriptInvoker(
       return {
         raw: { audioOverviewId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
@@ -383,6 +406,7 @@ export function createConvexAudioScriptOnlyInvoker(
       return {
         raw: { audioOverviewId, ...populated },
         latencyMs: Date.now() - startTime,
+        ...pickStudioInvokeTelemetry(populated),
       };
     },
   };
