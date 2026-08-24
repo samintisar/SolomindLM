@@ -7,10 +7,12 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
+import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import { countTokens } from "../../_agents/_shared/tokenizer";
 import { packChunks, validateChunks } from "../../_agents/FlashcardGraph";
 import {
   recursiveCollapse,
@@ -179,13 +181,19 @@ export async function runFlashcardGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
+    const scheduledChunks = mapPlan.skipMapContent ? [mapPlan.skipMapContent] : mapPlan.mapChunks;
 
     console.log(
-      `[FlashcardJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[FlashcardJob] Planned ${validatedChunks.length} validated chunks into ${scheduledChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (scheduledChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
@@ -194,7 +202,7 @@ export async function runFlashcardGenerationPhase(
       CONFIG.MIN_CARDS_PER_CHUNK,
       Math.min(
         CONFIG.MAX_CARDS_PER_CHUNK,
-        Math.ceil((cardCount / packedChunks.length) * CONFIG.BUFFER_MULTIPLIER)
+        Math.ceil((cardCount / scheduledChunks.length) * CONFIG.BUFFER_MULTIPLIER)
       )
     );
 
@@ -203,34 +211,35 @@ export async function runFlashcardGenerationPhase(
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.flashcards.initFlashcardMapPhase, {
       flashcardId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: scheduledChunks.length,
       cardCount,
       difficulty,
       topic,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < scheduledChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.flashcards.job.processFlashcardMapChunk, {
         flashcardId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: scheduledChunks.length,
+        chunk: scheduledChunks[i],
         cardCount,
         cardsPerChunk,
         difficulty,
         topic,
         smartLlm,
       });
-      console.log(`[FlashcardJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[FlashcardJob] Scheduled map task ${i + 1}/${scheduledChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: scheduledChunks.length,
+      chunkSizes: scheduledChunks.map((c) => c.length),
       cardsPerChunk,
+      executionMode: mapPlan.mode,
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");

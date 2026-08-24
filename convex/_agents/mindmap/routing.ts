@@ -14,7 +14,7 @@ import type { OverallStateType } from "./state.js";
 /**
  * Creates parallel map tasks from input chunks.
  */
-export function createMapTasks(state: OverallStateType): Send[] {
+export function createMapTasks(state: OverallStateType): Send[] | "skip_map" {
   const logger = createAgentGraphLogger("MindMapGraph", "mindmap");
   const validated = validateChunks(state.allChunks);
 
@@ -23,7 +23,7 @@ export function createMapTasks(state: OverallStateType): Send[] {
   }
 
   const { mode, batches: packed } = selectStudioMapBatches({
-    documentCount: 1,
+    documentCount: state.documentIds?.length ?? 0,
     chunks: validated,
     estimateTokens: countTokens,
     pack: (chunks) => packChunks(chunks, GRAPH_CONFIG.OPTIMAL_CHUNK_SIZE_TOKENS),
@@ -31,6 +31,17 @@ export function createMapTasks(state: OverallStateType): Send[] {
 
   if (packed.length === 0) {
     throw new Error("No map batches after skip-map planning");
+  }
+
+  if (mode === "single_pass") {
+    logger.info("Routing directly to skip_map", {
+      agent: "MindMapGraph",
+      phase: "fan_out",
+      executionMode: mode,
+      originalChunks: state.allChunks.length,
+      packedChunks: packed.length,
+    });
+    return "skip_map";
   }
 
   logger.info(`Fanning out to ${packed.length} map nodes`, {

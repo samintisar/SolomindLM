@@ -8,6 +8,7 @@ import { countTokens } from "../_shared/index.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 import { createAgentGraphLogger } from "../_shared/logging.js";
 
+import { validateChunks } from "./chunkHelpers.js";
 import {
   type CollapseReduceDeps,
   recursiveCollapse,
@@ -55,6 +56,35 @@ export class FlashcardGraph {
     return countTokens(text);
   }
 
+  async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    const joinedChunk = validateChunks(state.chunks).join("\n\n");
+    const cardsPerChunk = Math.max(
+      2,
+      Math.min(30, Math.ceil(state.cardCount * 1.5))
+    );
+    const mapResult = await mapProcess(
+      {
+        chunk: joinedChunk,
+        chunkIndex: 0,
+        cardCount: state.cardCount,
+        difficulty: state.difficulty,
+        topic: state.topic,
+        cardsPerChunk,
+      },
+      this.fastLlmStructured
+    );
+
+    return {
+      collapsedOutputs: mapResult.mapOutputs ?? [],
+      status: "reducing",
+      progress: {
+        phase: "skip_map",
+        percentage: 60,
+        message: "Skipping map fan-out for single document",
+      },
+    };
+  }
+
   buildGraph() {
     const builder = new StateGraph(OverallState);
     const collapseReduceDeps: CollapseReduceDeps = {
@@ -65,6 +95,7 @@ export class FlashcardGraph {
 
     builder.addNode("split_chunks", (s: OverallStateType) => splitChunks(s));
     builder.addNode("map_process", (s: ChunkProcessState) => mapProcess(s, this.fastLlmStructured));
+    builder.addNode("skip_map", (s: OverallStateType) => this.skipMap(s));
     builder.addNode("collapse", (s: OverallStateType) =>
       collapse(s, {
         estimateTokens: this.estimateTokens.bind(this),
@@ -82,13 +113,13 @@ export class FlashcardGraph {
     builder.addEdge(START, "split_chunks" as any);
     builder.addConditionalEdges("split_chunks" as any, (s: OverallStateType) => routeToMap(s), {
       map_process: "map_process",
+      skip_map: "skip_map",
       collapse: "collapse",
     } as any);
 
     builder.addEdge("map_process" as any, "collapse" as any);
-
+    builder.addEdge("skip_map" as any, "reduce" as any);
     builder.addEdge("collapse" as any, "reduce" as any);
-
     builder.addEdge("reduce" as any, END as any);
 
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });

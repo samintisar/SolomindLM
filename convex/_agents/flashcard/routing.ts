@@ -7,7 +7,7 @@ import { packChunks, validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
 
-export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+export function routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[FlashcardGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -59,6 +59,11 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
       2
     )
   );
+
+  if (mode === "single_pass") {
+    console.log("[FlashcardGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
+  }
 
   console.log(
     `[FlashcardGraph] Creating ${packedChunks.length} parallel map tasks (~${cardsPerChunk} cards/chunk)`

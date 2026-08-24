@@ -5,7 +5,7 @@ import { selectStudioMapBatches } from "../_shared/studioExecutionMode.js";
 import { countTokens } from "../_shared/tokenizer.js";
 import type { OverallStateType } from "./state.js";
 
-export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+export function routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[WrittenQuestionsGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -31,10 +31,6 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
 
   const chunkCount = batches.length;
   const MIN_QUESTIONS_PER_CHUNK = 3;
-  // 2.5× over-generation gives the heuristic + LLM dedup steps enough headroom
-  // to land at or above `questionCount`. With 1.5× we routinely shrank to ~13
-  // for a target of 20 on list-style sources, because near-duplicate
-  // wordings collapse aggressively after dedupe.
   const BUFFER_MULTIPLIER = 2.5;
   const MAX_QUESTIONS_PER_CHUNK = 20;
 
@@ -62,6 +58,11 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
       2
     )
   );
+
+  if (mode === "single_pass") {
+    console.log("[WrittenQuestionsGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
+  }
 
   console.log(
     `[WrittenQuestionsGraph] Processing all ${chunkCount} chunks for ${state.questionCount} target questions`

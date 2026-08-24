@@ -9,7 +9,9 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
+import { countTokens } from "../../_agents/_shared/tokenizer";
 import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
 import {
   COLLAPSE_PROMPTS,
@@ -209,42 +211,79 @@ export async function runSpreadsheetGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
 
     console.log(
-      `[SpreadsheetJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[SpreadsheetJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
+      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
+        spreadsheetId,
+        totalMapTasks: 1,
+        spreadsheetType: spreadsheetType || "custom",
+        customPrompt: customPrompt || "",
+      });
+
+      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
+        spreadsheetId,
+        chunkIndex: 0,
+        result: JSON.stringify({
+          output: mapPlan.skipMapContent,
+          processingTimeMs: 0,
+        }),
+      });
+
+      await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.finalizeSpreadsheetPhase, {
+        spreadsheetId,
+        userId,
+        notebookId,
+        spreadsheetType: spreadsheetType || "custom",
+        customPrompt: customPrompt || "",
+      });
+
+      logger.info("Map phase skipped", {
+        totalMapTasks: 1,
+        executionMode: mapPlan.mode,
+      });
+      return;
+    }
+
+    if (mapPlan.mapChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
       spreadsheetId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: mapPlan.mapChunks.length,
       spreadsheetType: spreadsheetType || "custom",
       customPrompt: customPrompt || "",
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.processSpreadsheetMapChunk, {
         spreadsheetId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: mapPlan.mapChunks.length,
+        chunk: mapPlan.mapChunks[i],
         spreadsheetType: spreadsheetType || "custom",
         customPrompt: customPrompt || "",
       });
-      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: mapPlan.mapChunks.length,
+      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");

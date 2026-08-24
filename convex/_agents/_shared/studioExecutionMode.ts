@@ -1,4 +1,4 @@
-export type StudioExecutionMode = "map_reduce" | "single_pass";
+export type StudioExecutionMode = "single_pass" | "map_reduce";
 
 export function decideStudioExecutionMode(input: {
   documentCount: number;
@@ -41,4 +41,39 @@ export function selectStudioMapBatches(input: {
   }
 
   return { mode, batches: input.pack(chunks) };
+}
+
+export function planStudioJobMapPhase(input: {
+  documentCount: number;
+  chunks: string[];
+  estimateTokens: (text: string) => number;
+  pack: (chunks: string[]) => string[];
+}): { mode: StudioExecutionMode; mapChunks: string[]; skipMapContent?: string } {
+  const { chunks } = input;
+  if (chunks.length === 0) {
+    return { mode: "map_reduce", mapChunks: [] };
+  }
+
+  const estimatedContextTokens = chunks.reduce(
+    (sum, chunk) => sum + input.estimateTokens(chunk),
+    0
+  );
+  const mode = decideStudioExecutionMode({
+    documentCount: input.documentCount,
+    selectedChunkCount: chunks.length,
+    estimatedContextTokens,
+  });
+
+  if (mode === "single_pass") {
+    return {
+      mode,
+      mapChunks: [],
+      skipMapContent: chunks.join("\n\n"),
+    };
+  }
+
+  return {
+    mode,
+    mapChunks: input.pack(chunks),
+  };
 }

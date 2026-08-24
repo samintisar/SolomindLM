@@ -7,7 +7,6 @@ import { packChunks, validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
 
-// Generate a short hash for identifying chunks in logs
 function chunkHash(chunk: string): string {
   const start = chunk.substring(0, PROCESSING_CONFIG.HASH_START_LENGTH).replace(/\n/g, " ");
   const end = chunk
@@ -16,8 +15,7 @@ function chunkHash(chunk: string): string {
   return `[${chunk.length} chars] "${start}..."..."${end}"`;
 }
 
-// Conditional routing function - returns Send objects for fan-out or 'collapse' string
-export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+export function routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[SpreadsheetGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -62,6 +60,11 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
   if (packedChunks.length === 0) {
     console.warn("[SpreadsheetGraph] No map batches after skip-map planning, routing to collapse");
     return "collapse";
+  }
+
+  if (mode === "single_pass") {
+    console.log("[SpreadsheetGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
   }
 
   console.log(

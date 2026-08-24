@@ -43,10 +43,7 @@ export class AudioOverviewGraph {
     this.together = createTogetherTtsClient();
   }
 
-  /**
-   * Route to map phase - creates Send objects for parallel processing.
-   */
-  routeToMap(state: OverallStateType): Send[] | "collapse" {
+  routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
     const logger = createAgentGraphLogger("AudioOverviewGraph", "audio");
 
     if (state.chunks.length === 0) {
@@ -59,7 +56,7 @@ export class AudioOverviewGraph {
 
     const validatedChunks = validateChunks(state.chunks);
     const { mode, batches: packedChunks } = selectStudioMapBatches({
-      documentCount: 1,
+      documentCount: state.documentIds?.length ?? 0,
       chunks: validatedChunks,
       estimateTokens: countTokens,
       pack: packChunks,
@@ -71,6 +68,17 @@ export class AudioOverviewGraph {
         phase: "route_to_map",
       });
       return "collapse";
+    }
+
+    if (mode === "single_pass") {
+      logger.info("Routing directly to skip_map", {
+        agent: "AudioOverviewGraph",
+        phase: "route_to_map",
+        executionMode: mode,
+        originalChunks: state.chunks.length,
+        validatedChunks: validatedChunks.length,
+      });
+      return "skip_map";
     }
 
     logger.info(`Creating ${packedChunks.length} parallel map tasks`, {
@@ -97,20 +105,31 @@ export class AudioOverviewGraph {
     );
   }
 
-  /**
-   * Build the state graph for audio overview generation.
-   */
+  skipMap(state: OverallStateType): Partial<OverallStateType> {
+    const joinedChunks = validateChunks(state.chunks).join("\n\n");
+    return {
+      collapsedOutputs: joinedChunks ? [joinedChunks] : [],
+      status: "writing_script",
+      progress: {
+        phase: "skip_map",
+        percentage: 55,
+        message: "Skipping map fan-out for single document",
+      },
+    };
+  }
 
   buildGraph(): CompiledStateGraph<OverallStateType, any, any, any, any, any, any, any, any> {
     const builder = new StateGraph(OverallState);
 
     builder.addNode("extract_beats", (s: ChunkProcessState) => extractBeats(s, this.fastLlm));
+    builder.addNode("skip_map", (s: OverallStateType) => this.skipMap(s));
     builder.addNode("collapse", (s: OverallStateType) => collapse(s));
     builder.addNode("write_script", (s: OverallStateType) => writeScript(s, this.smartLlm));
     builder.addNode("synthesize_audio", (s: OverallStateType) => this.synthesizeAudio(s));
 
     builder.addConditionalEdges(START, (s: OverallStateType) => this.routeToMap(s));
     builder.addEdge("extract_beats" as never, "collapse" as never);
+    builder.addEdge("skip_map" as never, "write_script" as never);
     builder.addEdge("collapse" as never, "write_script" as never);
     builder.addEdge("write_script" as never, "synthesize_audio" as never);
     builder.addEdge("synthesize_audio" as never, END as never);
@@ -118,9 +137,6 @@ export class AudioOverviewGraph {
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });
   }
 
-  /**
-   * Synthesize audio from dialogue script (TTS phase).
-   */
   async synthesizeAudio(state: OverallStateType): Promise<Partial<OverallStateType>> {
     return synthesizeAudioNode(state, { together: this.together });
   }

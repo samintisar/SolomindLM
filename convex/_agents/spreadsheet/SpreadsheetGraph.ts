@@ -1,10 +1,5 @@
 "use node";
 
-/**
- * SpreadsheetGraph class that orchestrates spreadsheet generation.
- * Uses simplified map-reduce: Map extracts text, Collapse consolidates, Reduce generates CSV.
- */
-
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { END, type Send, START, StateGraph } from "@langchain/langgraph";
 
@@ -13,6 +8,7 @@ import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.j
 import { countTokens } from "../_shared/index.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 
+import { validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG } from "./config.js";
 import { validateInput } from "./inputValidation.js";
 import { collapse as collapsePhase } from "./nodeCollapse.js";
@@ -26,7 +22,6 @@ export class SpreadsheetGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
   constructor(apiKey: string, mapModel: string, reduceModel: string) {
-    // Fast model for map phase (parallel text extraction)
     this.fastLlm = new ChatTogetherAI({
       apiKey,
       model: mapModel,
@@ -36,7 +31,6 @@ export class SpreadsheetGraph {
       modelKwargs: mergeModelKwargs(mapModel, "fast"),
     });
 
-    // Smart model for collapse/reduce phases (consolidation and CSV generation)
     this.smartLlm = new ChatTogetherAI({
       apiKey,
       model: reduceModel,
@@ -51,19 +45,29 @@ export class SpreadsheetGraph {
     return countTokens(text);
   }
 
-  routeToMap(state: OverallStateType): Send[] | "collapse" {
+  routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
     return routeToMapPhase(state);
   }
 
-  /**
-   * Route to map phase - creates Send objects for parallel processing.
-   */
-  routeToMapPublic(state: OverallStateType): Send[] | "collapse" {
+  routeToMapPublic(state: OverallStateType): Send[] | "collapse" | "skip_map" {
     return this.routeToMap(state);
   }
 
   async mapProcess(state: ChunkProcessState): Promise<Partial<OverallStateType>> {
     return mapProcessPhase(state, { fastLlm: this.fastLlm });
+  }
+
+  async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    const joinedChunks = validateChunks(state.chunks).join("\n\n");
+    return {
+      collapsedOutputs: joinedChunks ? [joinedChunks] : [],
+      status: "reducing",
+      progress: {
+        phase: "skip_map",
+        percentage: 70,
+        message: "Skipping map fan-out for single document",
+      },
+    };
   }
 
   async collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {
@@ -81,14 +85,12 @@ export class SpreadsheetGraph {
     return mergeResultsPhase(state);
   }
 
-  /**
-   * Build the state graph for spreadsheet generation.
-   */
   buildGraph() {
     const builder = new StateGraph(OverallState);
 
     builder.addNode("validate_input", (s: OverallStateType) => validateInput(s));
     builder.addNode("map_process", (s: ChunkProcessState) => this.mapProcess(s));
+    builder.addNode("skip_map", (s: OverallStateType) => this.skipMap(s));
     builder.addNode("collapse", (s: OverallStateType) => this.collapse(s));
     builder.addNode("reduce", (s: OverallStateType) => this.reduce(s));
     builder.addNode("merge_results", (s: OverallStateType) => this.mergeResults(s));
@@ -103,6 +105,7 @@ export class SpreadsheetGraph {
     });
 
     builder.addEdge("map_process" as never, "collapse" as never);
+    builder.addEdge("skip_map" as never, "reduce" as never);
     builder.addEdge("collapse" as never, "reduce" as never);
     builder.addEdge("reduce" as never, "merge_results" as never);
     builder.addEdge("merge_results" as never, END as never);

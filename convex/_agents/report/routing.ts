@@ -7,7 +7,7 @@ import { chunkHash, packChunks, validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
 
-export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+export function routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[ReportGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -52,6 +52,11 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
   if (packedChunks.length === 0) {
     console.warn("[ReportGraph] No map batches after skip-map planning, routing to collapse");
     return "collapse";
+  }
+
+  if (mode === "single_pass") {
+    console.log("[ReportGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
   }
 
   console.log(`[ReportGraph] Execution mode ${mode}: creating ${packedChunks.length} map task(s)`);

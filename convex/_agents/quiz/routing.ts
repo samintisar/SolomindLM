@@ -11,7 +11,10 @@ export interface RouteToMapDeps {
   estimateTokens: (text: string) => number;
 }
 
-export function routeToMap(state: OverallStateType, deps: RouteToMapDeps): Send[] | "collapse" {
+export function routeToMap(
+  state: OverallStateType,
+  deps: RouteToMapDeps
+): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[QuizGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -38,7 +41,6 @@ export function routeToMap(state: OverallStateType, deps: RouteToMapDeps): Send[
   const BUFFER_MULTIPLIER = 1.2;
   const MAX_QUESTIONS_PER_CHUNK = GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK;
 
-  // Calculate questions per chunk
   const questionsPerChunk = Math.max(
     MIN_QUESTIONS_PER_CHUNK,
     Math.min(
@@ -65,6 +67,11 @@ export function routeToMap(state: OverallStateType, deps: RouteToMapDeps): Send[
       2
     )
   );
+
+  if (mode === "single_pass") {
+    console.log("[QuizGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
+  }
 
   console.log(
     `[QuizGraph] Creating ${packedChunks.length} parallel map tasks (~${questionsPerChunk} questions/chunk)`

@@ -7,12 +7,9 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import {
-  countTokens,
-  packChunks,
-  sanitizeUserInput,
-  validateChunks,
-} from "../../_agents/_shared/index";
+import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_shared/index";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import { countTokens } from "../../_agents/_shared/tokenizer";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
@@ -151,43 +148,77 @@ export async function runAudioOverviewGenerationPhase(
       maxChunkLength: 50000,
       agentName: "AudioOverviewJob",
     });
-    const packedChunks = packChunks(validatedChunks, {
-      targetSize: CONFIG.MAP_CHUNK_SIZE_TOKENS,
-      minChunkLength: 50,
-      maxChunkLength: 50000,
-      agentName: "AudioOverviewJob",
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) =>
+        packChunks(chunks, {
+          targetSize: CONFIG.MAP_CHUNK_SIZE_TOKENS,
+          minChunkLength: 50,
+          maxChunkLength: 50000,
+          agentName: "AudioOverviewJob",
+        }),
     });
 
     console.log(
-      `[AudioJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[AudioJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
+      await ctx.runMutation(internal.studio.jobMutations.audio.initAudioOverviewMapPhase, {
+        audioOverviewId,
+        totalMapTasks: 1,
+      });
+
+      await ctx.runMutation(internal.studio.jobMutations.audio.storeAudioOverviewMapResult, {
+        audioOverviewId,
+        chunkIndex: 0,
+        result: JSON.stringify({
+          beats: mapPlan.skipMapContent,
+          processingTimeMs: 0,
+        }),
+      });
+
+      await ctx.scheduler.runAfter(0, internal.studio.audio.job.finalizeAudioOverviewPhase, {
+        audioOverviewId,
+        userId,
+        notebookId,
+      });
+
+      logger.info("Map phase skipped", {
+        totalMapTasks: 1,
+        executionMode: mapPlan.mode,
+      });
+      return;
+    }
+
+    if (mapPlan.mapChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.audio.initAudioOverviewMapPhase, {
       audioOverviewId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: mapPlan.mapChunks.length,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.audio.job.processAudioMapChunk, {
         audioOverviewId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: mapPlan.mapChunks.length,
+        chunk: mapPlan.mapChunks[i],
       });
-      console.log(`[AudioJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[AudioJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: mapPlan.mapChunks.length,
+      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");

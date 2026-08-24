@@ -29,10 +29,6 @@ import { extractConcepts as runConceptExtraction } from "./structuredLlm.js";
 
 export { packChunks, validateChunks } from "./chunkHelpers.js";
 
-/**
- * MindMapGraph class that orchestrates mind map generation.
- * This is the main class that users interact with.
- */
 export class MindMapGraph {
   private fastLlm: ChatTogetherAI;
   private smartLlm: ChatTogetherAI;
@@ -66,6 +62,25 @@ export class MindMapGraph {
     return mapProcess(state, deps);
   }
 
+  async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    const joinedSource = validateChunks(state.allChunks).join("\n\n");
+    return {
+      extractedConcepts: [
+        {
+          main_theme: "Source",
+          summary: joinedSource,
+          key_concepts: [],
+        },
+      ],
+      status: "reducing",
+      progress: {
+        phase: "skip_map",
+        percentage: 60,
+        message: "Skipping map fan-out for single document",
+      },
+    };
+  }
+
   async reduceNode(state: OverallStateType): Promise<Partial<OverallStateType>> {
     return reduceNode(state, this.smartLlm);
   }
@@ -78,10 +93,7 @@ export class MindMapGraph {
     return buildSmartFallbackTree(extractions);
   }
 
-  /**
-   * Public API method with input validation.
-   */
-  async generate(chunks: string[]): Promise<FinalMindMap> {
+  async generate(chunks: string[], documentIds: string[] = []): Promise<FinalMindMap> {
     if (!chunks || chunks.length === 0) {
       throw new Error("No chunks provided for mind map generation");
     }
@@ -97,12 +109,14 @@ export class MindMapGraph {
       phase: "initialize",
       inputChunks: chunks.length,
       validChunks: validated.length,
+      documentCount: documentIds.length,
     });
 
     const graph = this.buildGraph();
 
     try {
       const result = await graph.invoke({
+        documentIds,
         allChunks: chunks,
         status: "generating",
       });
@@ -121,18 +135,20 @@ export class MindMapGraph {
     }
   }
 
-  /**
-   * Build Graph - using correct LangGraph map-reduce pattern.
-   */
   buildGraph() {
     const builder = new StateGraph(OverallState);
 
     builder.addNode(NODES.MAP_PROCESS, (s: ChunkStateType) => this.mapProcess(s));
+    builder.addNode("skip_map", (s: OverallStateType) => this.skipMap(s));
     builder.addNode(NODES.REDUCE_NODE, (s: OverallStateType) => this.reduceNode(s));
 
-    builder.addConditionalEdges(START, createMapTasks);
+    builder.addConditionalEdges(START, createMapTasks, {
+      skip_map: "skip_map",
+      [NODES.MAP_PROCESS]: NODES.MAP_PROCESS,
+    } as any);
 
     builder.addEdge(NODES.MAP_PROCESS as any, NODES.REDUCE_NODE as any);
+    builder.addEdge("skip_map" as any, NODES.REDUCE_NODE as any);
     builder.addEdge(NODES.REDUCE_NODE as any, END);
 
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });
