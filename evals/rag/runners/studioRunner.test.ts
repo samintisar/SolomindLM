@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { snapshotRetrievalConfig } from "./config";
-import { runStudioEval } from "./studioRunner";
-import type { StudioInvoker } from "./convexStudioInvoker";
 import type { EvalFixture } from "../types";
+import { snapshotRetrievalConfig } from "./config";
+import type { StudioInvoker } from "./convexStudioInvoker";
+import { runStudioEval } from "./studioRunner";
 
 const fixture: EvalFixture = {
   schemaVersion: 1,

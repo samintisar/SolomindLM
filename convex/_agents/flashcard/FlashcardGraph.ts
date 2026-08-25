@@ -58,10 +58,7 @@ export class FlashcardGraph {
 
   async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
     const joinedChunk = validateChunks(state.chunks).join("\n\n");
-    const cardsPerChunk = Math.max(
-      2,
-      Math.min(30, Math.ceil(state.cardCount * 1.5))
-    );
+    const cardsPerChunk = Math.max(2, Math.min(30, Math.ceil(state.cardCount * 1.5)));
     const mapResult = await mapProcess(
       {
         chunk: joinedChunk,

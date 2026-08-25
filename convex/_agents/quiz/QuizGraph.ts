@@ -87,10 +87,7 @@ export class QuizGraph {
     const joinedChunk = validateChunks(state.chunks).join("\n\n");
     const questionsPerChunk = Math.max(
       GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
-      Math.min(
-        GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK,
-        Math.ceil(state.questionCount * 1.2)
-      )
+      Math.min(GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK, Math.ceil(state.questionCount * 1.2))
     );
     const mapResult = await this.mapProcess({
       chunk: joinedChunk,

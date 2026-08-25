@@ -43,9 +43,7 @@ export function pickStudioInvokeTelemetry(status: {
 }): Pick<StudioInvokeResult, "tokenUsage" | "tokenUsageSource" | "stageSpans"> {
   return {
     ...(status.tokenUsage !== undefined ? { tokenUsage: status.tokenUsage } : {}),
-    ...(status.tokenUsageSource !== undefined
-      ? { tokenUsageSource: status.tokenUsageSource }
-      : {}),
+    ...(status.tokenUsageSource !== undefined ? { tokenUsageSource: status.tokenUsageSource } : {}),
     ...(status.stageSpans !== undefined ? { stageSpans: status.stageSpans } : {}),
   };
 }

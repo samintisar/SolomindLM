@@ -278,7 +278,9 @@ export const runChatEval = action({
           rawContent?: string;
         }> = [];
 
-        const webChannels = externalChannels.filter((ch) => ["web", "news", "finance"].includes(ch));
+        const webChannels = externalChannels.filter((ch) =>
+          ["web", "news", "finance"].includes(ch)
+        );
         const academicChannels = externalChannels.filter((ch) => ch === "academic");
 
         if (webChannels.length > 0) {

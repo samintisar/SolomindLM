@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { JudgeCalibrationItem } from "./judgeQueue";
 import { scoreJudgeCalibration } from "./judgeCalibration";
+import type { JudgeCalibrationItem } from "./judgeQueue";
 
 function item(
   partial: Partial<JudgeCalibrationItem> & Pick<JudgeCalibrationItem, "humanAgree">

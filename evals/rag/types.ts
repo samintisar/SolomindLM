@@ -158,14 +158,7 @@ export interface StudioOutput {
   raw: unknown;
 }
 
-export type AgentStageName =
-  | "retrieve"
-  | "rerank"
-  | "select"
-  | "map"
-  | "reduce"
-  | "parse"
-  | "tts";
+export type AgentStageName = "retrieve" | "rerank" | "select" | "map" | "reduce" | "parse" | "tts";
 
 export interface AgentStageSpan {
   stage: AgentStageName;

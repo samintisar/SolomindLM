@@ -743,8 +743,7 @@ export function latencyCostBudget(
 
   let status: MetricStatus;
   if (latencyOk && tokensOk) status = "pass";
-  else if (latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2)
-    status = "warn";
+  else if (latencyMs <= latencyGate * 2 && totalTokens <= tokenGate * 2) status = "warn";
   else status = "fail";
 
   const score =

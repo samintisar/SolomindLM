@@ -19,8 +19,7 @@ export function createRetrieveClock({ now = Date.now }: { now?: () => number } =
   const getSpan = (): RetrieveSpan => ({
     startedAt,
     endedAt,
-    durationMs:
-      startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
+    durationMs: startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
   });
 
   return {

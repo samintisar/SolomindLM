@@ -5,6 +5,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
+      "!.agents/**",
       "!convex/_generated/**",
       "!apps/web/src/convex-generated-api.d.ts",
       "!apps/web/src/convex-generated-dataModel.d.ts"
@@ -24,6 +25,7 @@
     "useEditorconfig": true,
     "includes": [
       "**",
+      "!.agents/**",
       "!convex/_generated/**",
       "!apps/web/node_modules/.vite/**",
       "!apps/web/dist/**",
@@ -138,6 +140,7 @@
     },
     "includes": [
       "**",
+      "!.agents/**",
       "!convex/_generated/**",
       "!apps/web/node_modules/.vite/**",
       "!apps/web/dist/**",

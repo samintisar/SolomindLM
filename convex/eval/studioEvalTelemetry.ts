@@ -27,8 +27,7 @@ export function pickStudioEvalTelemetry(row: StudioTelemetryCarrier): {
   tokenUsageSource?: TokenUsageSource;
   stageSpans?: AgentStageSpan[];
 } {
-  const tokenUsage =
-    parseTokenUsage(row.tokenUsage) ?? parseTokenUsage(row.metadata?.tokenUsage);
+  const tokenUsage = parseTokenUsage(row.tokenUsage) ?? parseTokenUsage(row.metadata?.tokenUsage);
   const tokenUsageSource =
     parseTokenUsageSource(row.tokenUsageSource) ??
     parseTokenUsageSource(row.metadata?.tokenUsageSource);

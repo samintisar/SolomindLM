@@ -17,11 +17,11 @@
 
 import type { GenericActionCtx } from "convex/server";
 import { v } from "convex/values";
+import type { AgentStageSpan } from "../_agents/_shared/stageSpans";
+import type { TokenUsage, TokenUsageSource } from "../_agents/_shared/usageAggregate";
 import { internal } from "../_generated/api";
 import { DataModel, Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
-import type { AgentStageSpan } from "../_agents/_shared/stageSpans";
-import type { TokenUsage, TokenUsageSource } from "../_agents/_shared/usageAggregate";
 import { assertRagEvalGate } from "./_gate";
 import { pickStudioEvalTelemetry } from "./studioEvalTelemetry";
 

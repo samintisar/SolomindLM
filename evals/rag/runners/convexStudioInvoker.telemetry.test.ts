@@ -71,35 +71,34 @@ describe("STUDIO_INVOKER_FACTORIES telemetry", () => {
     vi.clearAllMocks();
   });
 
-  it.each(registeredFactories)(
-    "copies token usage, token usage source, and stage spans for %s",
-    async (kind, factory) => {
-      const kickoffIdField = kickoffIdFields[kind as keyof typeof kickoffIdFields];
-      const kickoffId = `${kind}-id`;
-      const client = factory("https://convex.example", { evalSecret: "secret" });
-      const mockHttpClient = convexBrowserMock.convexHttpClients.at(-1);
+  it.each(
+    registeredFactories
+  )("copies token usage, token usage source, and stage spans for %s", async (kind, factory) => {
+    const kickoffIdField = kickoffIdFields[kind as keyof typeof kickoffIdFields];
+    const kickoffId = `${kind}-id`;
+    const client = factory("https://convex.example", { evalSecret: "secret" });
+    const mockHttpClient = convexBrowserMock.convexHttpClients.at(-1);
 
-      expect(mockHttpClient).toBeDefined();
+    expect(mockHttpClient).toBeDefined();
 
-      mockHttpClient?.action
-        .mockResolvedValueOnce({ [kickoffIdField]: kickoffId })
-        .mockResolvedValueOnce({
-          status: "completed",
-          title: `${kind} title`,
-          content: `${kind} body`,
-          ...telemetry,
-        });
-
-      const result = await client.invoke({ notebookId: "nb" });
-
-      expect(result.tokenUsage).toEqual(telemetry.tokenUsage);
-      expect(result.tokenUsageSource).toBe("provider");
-      expect(result.stageSpans).toEqual(telemetry.stageSpans);
-      expect(result.raw).toMatchObject({
-        [kickoffIdField]: kickoffId,
+    mockHttpClient?.action
+      .mockResolvedValueOnce({ [kickoffIdField]: kickoffId })
+      .mockResolvedValueOnce({
+        status: "completed",
+        title: `${kind} title`,
+        content: `${kind} body`,
         ...telemetry,
       });
-      expect(mockHttpClient?.action).toHaveBeenCalledTimes(2);
-    }
-  );
+
+    const result = await client.invoke({ notebookId: "nb" });
+
+    expect(result.tokenUsage).toEqual(telemetry.tokenUsage);
+    expect(result.tokenUsageSource).toBe("provider");
+    expect(result.stageSpans).toEqual(telemetry.stageSpans);
+    expect(result.raw).toMatchObject({
+      [kickoffIdField]: kickoffId,
+      ...telemetry,
+    });
+    expect(mockHttpClient?.action).toHaveBeenCalledTimes(2);
+  });
 });

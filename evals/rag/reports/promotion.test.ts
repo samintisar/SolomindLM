@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { EvalReport, MetricResult } from "../types";
 import { checkHoldoutPromotion } from "./promotion";
 
-function metric(partial: Partial<MetricResult> & Pick<MetricResult, "metric" | "status">): MetricResult {
+function metric(
+  partial: Partial<MetricResult> & Pick<MetricResult, "metric" | "status">
+): MetricResult {
   return {
     caseId: "h1",
     runner: "chat",

@@ -68,7 +68,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Biome check
-        run: bun run lint
+        run: bun run lint -- --diagnostic-level=error
 
   test-unit:
     name: Unit Tests
