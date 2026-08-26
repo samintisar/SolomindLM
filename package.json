@@ -32,7 +32,7 @@
     "convex:env:push:prod": "node scripts/push-convex-env.mjs --prod",
     "convex:env:push:dry": "node scripts/push-convex-env.mjs --dry-run",
     "link:claude-skills": "node scripts/link-claude-skills.js",
-    "lint": "biome check .",
+    "lint": "biome check . --max-diagnostics=50",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",

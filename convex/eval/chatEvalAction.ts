@@ -27,6 +27,8 @@ import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
+import { buildChatEvalTelemetry } from "./chatEvalTelemetry";
+import { createRetrieveClock } from "./retrieveClock";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -77,6 +79,7 @@ export interface ChatEvalResult {
   latencyMs: number;
   tokenUsage?: { prompt: number; completion: number; total: number };
   tokenUsageSource?: "provider" | "estimated";
+  stageSpans?: import("../_agents/_shared/stageSpans").AgentStageSpan[];
   sourcePolicy?: {
     channels: string[];
     maxResultsPerChannel?: number;
@@ -115,6 +118,13 @@ export const runChatEval = action({
 
     const documentIdStrings = args.documentIds as Id<"documents">[] | undefined;
 
+    const retrieveClock = createRetrieveClock();
+    let rerankStartedAt: number | undefined;
+    let rerankEndedAt: number | undefined;
+    let selectStartedAt: number | undefined;
+    let selectEndedAt: number | undefined;
+    let providerUsage: { prompt: number; completion: number; total: number } | undefined;
+
     // ── Vector search runner (matches convex/chat/stream.ts) ──
 
     const vectorSearchRunner = async (
@@ -122,63 +132,72 @@ export const runChatEval = action({
       limit: number,
       docIds?: string[]
     ): Promise<VectorSearchRawResult[]> => {
-      const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
+      retrieveClock.markNotebookStart();
+      try {
+        const limitToFetch = docIds?.length ? Math.max(limit * 3, 75) : limit;
 
-      const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
-        vector: embedding,
-        limit: limitToFetch,
-        filter: (q) => q.eq("notebookId", notebookIdTyped),
-      });
-
-      const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
-      if (chunkIds.length === 0) return [];
-
-      const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
-
-      const chunkMap = new Map(
-        (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map((c) => [
-          c._id,
-          c,
-        ]) as [Id<"documentChunks">, Record<string, unknown>][]
-      );
-
-      const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
-      const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
-
-      const rows: VectorSearchRawResult[] = [];
-      for (const r of results as VectorSearchHit[]) {
-        const chunk = chunkMap.get(r._id);
-        if (!chunk) continue;
-
-        // Filter by document IDs if specified
-        if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
-        // Apply threshold
-        const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
-        if (r._score < threshold) continue;
-
-        rows.push({
-          _id: r._id,
-          _score: r._score,
-          content: chunk.content as string,
-          chunkIndex: chunk.chunkIndex as number,
-          documentId: chunk.documentId as Id<"documents">,
-          sourceTitle: "",
-          sourceUrl: "",
+        const results = await ctx.vectorSearch("documentChunks", "by_embedding", {
+          vector: embedding,
+          limit: limitToFetch,
+          filter: (q) => q.eq("notebookId", notebookIdTyped),
         });
+
+        const chunkIds = (results as VectorSearchHit[]).map((r) => r._id);
+        if (chunkIds.length === 0) return [];
+
+        const fullChunks = await ctx.runQuery(internal.documents.chunks.getChunks, { chunkIds });
+
+        const chunkMap = new Map(
+          (fullChunks as Array<{ _id: Id<"documentChunks"> } & Record<string, unknown>>).map(
+            (c) => [c._id, c]
+          ) as [Id<"documentChunks">, Record<string, unknown>][]
+        );
+
+        const VECTOR_MATCH_THRESHOLD = parseFloat(env.CHAT_VECTOR_MATCH_THRESHOLD);
+        const docIdSet = docIds ? new Set(docIds as Id<"documents">[]) : null;
+
+        const rows: VectorSearchRawResult[] = [];
+        for (const r of results as VectorSearchHit[]) {
+          const chunk = chunkMap.get(r._id);
+          if (!chunk) continue;
+
+          // Filter by document IDs if specified
+          if (docIdSet && !docIdSet.has(chunk.documentId as Id<"documents">)) continue;
+          // Apply threshold
+          const threshold = docIdSet ? VECTOR_MATCH_THRESHOLD * 0.5 : VECTOR_MATCH_THRESHOLD;
+          if (r._score < threshold) continue;
+
+          rows.push({
+            _id: r._id,
+            _score: r._score,
+            content: chunk.content as string,
+            chunkIndex: chunk.chunkIndex as number,
+            documentId: chunk.documentId as Id<"documents">,
+            sourceTitle: "",
+            sourceUrl: "",
+          });
+        }
+        return rows.slice(0, limit);
+      } finally {
+        retrieveClock.markNotebookEnd();
       }
-      return rows.slice(0, limit);
     };
 
     // ── Keyword search runner ──
 
     const keywordSearchRunner = async (query: string, limit: number, docIds?: string[]) => {
-      return ctx.runQuery(internal.documents.internal.keywordSearch, {
-        notebookId: notebookIdTyped,
-        userId: keywordSearchChunkUserId,
-        query,
-        limit,
-        documentIds: docIds as Id<"documents">[] | undefined,
-      });
+      retrieveClock.markNotebookStart();
+      try {
+        return await ctx.runQuery(internal.documents.internal.keywordSearch, {
+          notebookId: notebookIdTyped,
+          userId: keywordSearchChunkUserId,
+          query,
+          limit,
+          documentIds: docIds as Id<"documents">[] | undefined,
+        });
+      } finally {
+        retrieveClock.markNotebookEnd();
+      }
     };
 
     // ── Services ──
@@ -196,9 +215,14 @@ export const runChatEval = action({
 
     const spyGlobalRerankFn: GlobalRerankFn = async (query, documents) => {
       capturedPreRerankDocs = [...documents];
-      const result = await rerankFn(query, documents);
-      capturedRerankOutput = result;
-      return result;
+      rerankStartedAt = Date.now();
+      try {
+        const result = await rerankFn(query, documents);
+        capturedRerankOutput = result;
+        return result;
+      } finally {
+        rerankEndedAt = Date.now();
+      }
     };
 
     // ── Construct agent ──
@@ -242,113 +266,120 @@ export const runChatEval = action({
     const externalChannels = sourcePolicyChannels.filter((ch) => ch !== "notebook");
 
     if (externalChannels.length > 0) {
-      const maxPerChannel = Math.ceil(5 / externalChannels.length);
-      const allResults: Array<{
-        title: string;
-        url: string;
-        snippet: string;
-        sourceType: string;
-        score?: number;
-        rawContent?: string;
-      }> = [];
+      retrieveClock.markExternalStart();
+      try {
+        const maxPerChannel = Math.ceil(5 / externalChannels.length);
+        const allResults: Array<{
+          title: string;
+          url: string;
+          snippet: string;
+          sourceType: string;
+          score?: number;
+          rawContent?: string;
+        }> = [];
 
-      const webChannels = externalChannels.filter((ch) => ["web", "news", "finance"].includes(ch));
-      const academicChannels = externalChannels.filter((ch) => ch === "academic");
+        const webChannels = externalChannels.filter((ch) =>
+          ["web", "news", "finance"].includes(ch)
+        );
+        const academicChannels = externalChannels.filter((ch) => ch === "academic");
 
-      if (webChannels.length > 0) {
-        const refinedQuery = await refineWebSearchQuery(args.question);
-        const channelToTopic = (ch: string) => (ch === "web" ? "general" : ch);
+        if (webChannels.length > 0) {
+          const refinedQuery = await refineWebSearchQuery(args.question);
+          const channelToTopic = (ch: string) => (ch === "web" ? "general" : ch);
 
-        for (const channel of webChannels) {
+          for (const channel of webChannels) {
+            try {
+              const results = await ctx.runAction(
+                internal._services.search.TavilySearchService.discoverSourcesInternal,
+                {
+                  query: refinedQuery,
+                  maxResults: maxPerChannel,
+                  topic: channelToTopic(channel),
+                  searchDepth: "basic",
+                }
+              );
+              allResults.push(
+                ...results.map((r: any) => ({
+                  title: r.title ?? "Untitled",
+                  url: r.url ?? "",
+                  snippet: r.snippet ?? r.content ?? "",
+                  sourceType: channel,
+                  score: r.score,
+                  rawContent: r.rawContent ?? undefined,
+                }))
+              );
+            } catch (e: unknown) {
+              console.warn("[ChatEval] Web search failed:", channel, String(e));
+            }
+          }
+        }
+
+        if (academicChannels.length > 0) {
+          const academicQuery = await refineWebSearchQuery(args.question);
           try {
-            const results = await ctx.runAction(
-              internal._services.search.TavilySearchService.discoverSourcesInternal,
+            const academicPayload = await ctx.runAction(
+              internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
               {
-                query: refinedQuery,
+                query: academicQuery,
                 maxResults: maxPerChannel,
-                topic: channelToTopic(channel),
-                searchDepth: "basic",
               }
             );
             allResults.push(
-              ...results.map((r: any) => ({
+              ...academicDiscoverSources(academicPayload).map((r: any) => ({
                 title: r.title ?? "Untitled",
                 url: r.url ?? "",
-                snippet: r.snippet ?? r.content ?? "",
-                sourceType: channel,
+                snippet: r.snippet ?? r.abstract ?? "",
+                sourceType: "academic",
                 score: r.score,
                 rawContent: r.rawContent ?? undefined,
               }))
             );
           } catch (e: unknown) {
-            console.warn("[ChatEval] Web search failed:", channel, String(e));
+            console.warn("[ChatEval] Academic search failed:", String(e));
           }
         }
-      }
 
-      if (academicChannels.length > 0) {
-        const academicQuery = await refineWebSearchQuery(args.question);
-        try {
-          const academicPayload = await ctx.runAction(
-            internal._services.search.AcademicSearchService.discoverAcademicPapersInternal,
-            {
-              query: academicQuery,
-              maxResults: maxPerChannel,
+        // Sort by score and convert to chunks
+        allResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        const topResults = allResults.slice(0, 5);
+
+        externalChunks = topResults
+          .filter((r) => {
+            const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
+            const hasSnippet = r.snippet && r.snippet.trim().length > 50;
+            return hasRawContent || hasSnippet;
+          })
+          .map((r, i) => {
+            // Prefer rawContent when available, fallback to snippet
+            const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
+            const raw = hasRawContent ? r.rawContent!.trim() : r.snippet.trim();
+
+            const CHUNK_SIZE = 3000;
+            const pieces: string[] = [];
+            for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
+              pieces.push(raw.slice(start, start + CHUNK_SIZE));
             }
-          );
-          allResults.push(
-            ...academicDiscoverSources(academicPayload).map((r: any) => ({
-              title: r.title ?? "Untitled",
-              url: r.url ?? "",
-              snippet: r.snippet ?? r.abstract ?? "",
-              sourceType: "academic",
-              score: r.score,
-              rawContent: r.rawContent ?? undefined,
-            }))
-          );
-        } catch (e: unknown) {
-          console.warn("[ChatEval] Academic search failed:", String(e));
-        }
+            const content = pieces.slice(0, 2).join("\n\n---\n\n") || raw;
+            return {
+              id: `ext_${i}`,
+              sourceId: `ext_${i}`,
+              sourceTitle: r.title,
+              sourceUrl: r.url,
+              content,
+              chunkIndex: 0,
+              similarity: 0.5,
+              metadata: {
+                sectionTitle: `${r.sourceType === "academic" ? "Academic" : "Web"} source (${r.sourceType})`,
+              },
+            } as ReferenceChunk;
+          });
+
+        console.log(
+          `[ChatEval] External search complete: ${topResults.length} sources, ${externalChunks.length} chunks`
+        );
+      } finally {
+        retrieveClock.markExternalEnd();
       }
-
-      // Sort by score and convert to chunks
-      allResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-      const topResults = allResults.slice(0, 5);
-
-      externalChunks = topResults
-        .filter((r) => {
-          const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
-          const hasSnippet = r.snippet && r.snippet.trim().length > 50;
-          return hasRawContent || hasSnippet;
-        })
-        .map((r, i) => {
-          // Prefer rawContent when available, fallback to snippet
-          const hasRawContent = r.rawContent && r.rawContent.trim().length > 100;
-          const raw = hasRawContent ? r.rawContent!.trim() : r.snippet.trim();
-
-          const CHUNK_SIZE = 3000;
-          const pieces: string[] = [];
-          for (let start = 0; start < raw.length; start += CHUNK_SIZE) {
-            pieces.push(raw.slice(start, start + CHUNK_SIZE));
-          }
-          const content = pieces.slice(0, 2).join("\n\n---\n\n") || raw;
-          return {
-            id: `ext_${i}`,
-            sourceId: `ext_${i}`,
-            sourceTitle: r.title,
-            sourceUrl: r.url,
-            content,
-            chunkIndex: 0,
-            similarity: 0.5,
-            metadata: {
-              sectionTitle: `${r.sourceType === "academic" ? "Academic" : "Web"} source (${r.sourceType})`,
-            },
-          } as ReferenceChunk;
-        });
-
-      console.log(
-        `[ChatEval] External search complete: ${topResults.length} sources, ${externalChunks.length} chunks`
-      );
     }
 
     for await (const chunk of agent.streamResponse(
@@ -377,6 +408,8 @@ export const runChatEval = action({
           break;
         case "references":
           references = chunk.data ?? [];
+          selectStartedAt ??= rerankEndedAt ?? retrieveClock.getSpan().endedAt ?? startTime;
+          selectEndedAt = Date.now();
           break;
         case "tool_call": {
           const tc = chunk.data as { tool?: string; query?: string; status?: string };
@@ -394,7 +427,17 @@ export const runChatEval = action({
             (typeof chunk.data === "string" ? chunk.data : "Agent stream emitted error chunk");
           throw new Error(`Agent stream error: ${msg}`);
         }
-        case "done":
+        case "done": {
+          const usage = (
+            chunk.data as
+              | { tokenUsage?: { prompt: number; completion: number; total: number } }
+              | undefined
+          )?.tokenUsage;
+          if (usage && typeof usage.total === "number" && usage.total > 0) {
+            providerUsage = usage;
+          }
+          break;
+        }
         case "warning":
         case "grounding_check":
         case "grounding_warn":
@@ -443,6 +486,22 @@ export const runChatEval = action({
       }
     }
 
+    const retrieveSpan = retrieveClock.getSpan();
+
+    const telemetry = buildChatEvalTelemetry({
+      retrieveMs: retrieveSpan.durationMs,
+      rerankMs:
+        rerankStartedAt !== undefined && rerankEndedAt !== undefined
+          ? rerankEndedAt - rerankStartedAt
+          : undefined,
+      selectMs:
+        selectStartedAt !== undefined && selectEndedAt !== undefined
+          ? selectEndedAt - selectStartedAt
+          : undefined,
+      provider: providerUsage,
+      estimated: estimateChatTokenUsage(args.question, answer, selectedChunks),
+    });
+
     return {
       answer,
       citations: Array.from(citationSet),
@@ -451,8 +510,9 @@ export const runChatEval = action({
       postRerankChunks,
       selectedChunks,
       latencyMs: Date.now() - startTime,
-      tokenUsage: estimateChatTokenUsage(args.question, answer, selectedChunks),
-      tokenUsageSource: "estimated",
+      tokenUsage: telemetry.tokenUsage,
+      tokenUsageSource: telemetry.tokenUsageSource,
+      stageSpans: telemetry.stageSpans,
       sourcePolicy: args.sourcePolicy,
     };
   },

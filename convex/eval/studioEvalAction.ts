@@ -17,12 +17,21 @@
 
 import type { GenericActionCtx } from "convex/server";
 import { v } from "convex/values";
+import type { AgentStageSpan } from "../_agents/_shared/stageSpans";
+import type { TokenUsage, TokenUsageSource } from "../_agents/_shared/usageAggregate";
 import { internal } from "../_generated/api";
 import { DataModel, Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { assertRagEvalGate } from "./_gate";
+import { pickStudioEvalTelemetry } from "./studioEvalTelemetry";
 
 type EvalActionCtx = GenericActionCtx<DataModel>;
+
+interface StudioEvalTelemetry {
+  tokenUsage?: TokenUsage;
+  tokenUsageSource?: TokenUsageSource;
+  stageSpans?: AgentStageSpan[];
+}
 
 // ─── Shared helpers ──────────────────────────────────────────
 
@@ -126,7 +135,7 @@ export interface ReportEvalKickoff {
   startedAt: number;
 }
 
-export interface ReportEvalStatus {
+export interface ReportEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   content: unknown;
@@ -195,6 +204,7 @@ export const getReportEvalStatus = action({
       title: populated.title,
       content: populated.content,
       reportType: populated.reportType ?? "summary",
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -206,7 +216,7 @@ export interface FlashcardsEvalKickoff {
   startedAt: number;
 }
 
-export interface FlashcardsEvalStatus {
+export interface FlashcardsEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   cards: Array<Record<string, unknown>>;
@@ -269,6 +279,7 @@ export const getFlashcardsEvalStatus = action({
       status: populated.status,
       title: populated.title,
       cards: Array.isArray(populated.cardsData) ? populated.cardsData : [],
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -280,7 +291,7 @@ export interface QuizEvalKickoff {
   startedAt: number;
 }
 
-export interface QuizEvalStatus {
+export interface QuizEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   questions: Array<Record<string, unknown>>;
@@ -337,6 +348,7 @@ export const getQuizEvalStatus = action({
       status: populated.status,
       title: populated.title,
       questions: Array.isArray(populated.questionsData) ? populated.questionsData : [],
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -348,7 +360,7 @@ export interface MindmapEvalKickoff {
   startedAt: number;
 }
 
-export interface MindmapEvalStatus {
+export interface MindmapEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   data: unknown;
@@ -397,6 +409,7 @@ export const getMindmapEvalStatus = action({
       status: populated.status,
       title: populated.title,
       data: populated.data,
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -408,7 +421,7 @@ export interface InfographicEvalKickoff {
   startedAt: number;
 }
 
-export interface InfographicEvalStatus {
+export interface InfographicEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   data: unknown;
@@ -459,6 +472,7 @@ export const getInfographicEvalStatus = action({
       status: populated.status,
       title: populated.title,
       data: populated.data,
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -470,7 +484,7 @@ export interface SpreadsheetEvalKickoff {
   startedAt: number;
 }
 
-export interface SpreadsheetEvalStatus {
+export interface SpreadsheetEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   data: unknown;
@@ -527,6 +541,7 @@ export const getSpreadsheetEvalStatus = action({
       status: populated.status,
       title: populated.title,
       data: populated.data,
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -538,7 +553,7 @@ export interface WrittenQuestionsEvalKickoff {
   startedAt: number;
 }
 
-export interface WrittenQuestionsEvalStatus {
+export interface WrittenQuestionsEvalStatus extends StudioEvalTelemetry {
   status: string;
   title: string;
   questions: Array<Record<string, unknown>>;
@@ -610,6 +625,7 @@ export const getWrittenQuestionsEvalStatus = action({
       status: populated.status,
       title: populated.title,
       questions: Array.isArray(populated.questionsData) ? populated.questionsData : [],
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -624,6 +640,20 @@ export interface AudioScriptEvalResult {
   transcript: string;
   audioUrl?: string;
   latencyMs: number;
+}
+
+export interface AudioScriptEvalStatus extends StudioEvalTelemetry {
+  status: string;
+  title: string;
+  transcript: string;
+  audioUrl?: string;
+}
+
+export interface AudioScriptOnlyEvalStatus extends StudioEvalTelemetry {
+  status: string;
+  title: string;
+  transcript: string;
+  audioUrl?: string;
 }
 
 // Audio script generation + TTS routinely runs 2–5 minutes. The Convex HTTP
@@ -676,15 +706,7 @@ export const getAudioScriptEvalStatus = action({
     evalSecret: v.string(),
     audioOverviewId: v.id("audioOverviews"),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{
-    status: string;
-    title: string;
-    transcript: string;
-    audioUrl?: string;
-  }> => {
+  handler: async (ctx, args): Promise<AudioScriptEvalStatus> => {
     assertRagEvalGate(args.evalSecret);
     const populated = await ctx.runQuery(internal.studio.audio.index.getInternal, {
       id: args.audioOverviewId,
@@ -697,6 +719,7 @@ export const getAudioScriptEvalStatus = action({
       title: populated.title,
       transcript: populated.transcript ?? "",
       audioUrl: populated.audioUrl,
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });
@@ -751,15 +774,7 @@ export const getAudioScriptOnlyEvalStatus = action({
     evalSecret: v.string(),
     audioOverviewId: v.id("audioOverviews"),
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{
-    status: string;
-    title: string;
-    transcript: string;
-    audioUrl?: string;
-  }> => {
+  handler: async (ctx, args): Promise<AudioScriptOnlyEvalStatus> => {
     assertRagEvalGate(args.evalSecret);
     const populated = await ctx.runQuery(internal.studio.audio.index.getInternal, {
       id: args.audioOverviewId,
@@ -772,6 +787,7 @@ export const getAudioScriptOnlyEvalStatus = action({
       title: populated.title,
       transcript: populated.transcript ?? "",
       audioUrl: populated.audioUrl,
+      ...pickStudioEvalTelemetry(populated),
     };
   },
 });

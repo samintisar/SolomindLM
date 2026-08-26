@@ -7,7 +7,14 @@
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/ReportGraph";
 import {
   MAP_PROMPTS,
@@ -114,41 +121,80 @@ export async function runReportGenerationPhase(
     logger.phaseComplete("loading_documents", { chunkCount: rawChunks.length });
 
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
 
     console.log(
-      `[ReportJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[ReportJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
+      await ctx.runMutation(internal.studio.jobMutations.reports.initReportMapPhase, {
+        reportId,
+        totalMapTasks: 1,
+        reportType: reportType || "summary",
+        customPrompt,
+      });
+
+      await ctx.runMutation(internal.studio.jobMutations.reports.storeReportMapResult, {
+        reportId,
+        chunkIndex: 0,
+        result: JSON.stringify({
+          topics: [],
+          summary: mapPlan.skipMapContent,
+          processingTimeMs: 0,
+        }),
+      });
+
+      await ctx.scheduler.runAfter(0, internal.studio.reports.job.finalizeReportPhase, {
+        reportId,
+        userId,
+        notebookId,
+        reportType: reportType || "summary",
+        customPrompt,
+        smartLlm,
+      });
+
+      logger.info("Map phase skipped", {
+        totalMapTasks: 1,
+        executionMode: mapPlan.mode,
+      });
+      return;
+    }
+
+    if (mapPlan.mapChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     await ctx.runMutation(internal.studio.jobMutations.reports.initReportMapPhase, {
       reportId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: mapPlan.mapChunks.length,
       reportType: reportType || "summary",
       customPrompt,
     });
 
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.reports.job.processReportMapChunk, {
         reportId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: mapPlan.mapChunks.length,
+        chunk: mapPlan.mapChunks[i],
         reportType: reportType || "summary",
         customPrompt,
         smartLlm,
       });
-      console.log(`[ReportJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[ReportJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: mapPlan.mapChunks.length,
+      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -241,6 +287,7 @@ IMPORTANT: Respond with a JSON object containing:
     console.log(`[ReportJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const mapOutput = await invokeStudioLlm({
       invoke: () =>
         invokeMapStructuredOutput({
@@ -249,6 +296,9 @@ IMPORTANT: Respond with a JSON object containing:
           model: env.FAST_LLM,
           maxTokens: CONFIG.MAP_MAX_OUTPUT_TOKENS,
           temperature: 0.3,
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "ReportMap",
@@ -263,6 +313,7 @@ IMPORTANT: Respond with a JSON object containing:
       topics: mapOutput.topics,
       summary: mapOutput.summary,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.reports.storeReportMapResult, {
@@ -466,6 +517,7 @@ export async function runFinalizeReportPhase(
     console.log(`[ReportJob] Reduce prompt: ${prompt.length} chars`);
 
     const startTime = Date.now();
+    let reduceUsage: TokenUsage | undefined;
     let content = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -475,6 +527,9 @@ export async function runFinalizeReportPhase(
           maxTokens: CONFIG.MAX_OUTPUT_TOKENS,
           temperature: 0.5,
           reasoningEnabled: true,
+          onUsage: (usage) => {
+            reduceUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "ReportReduce",
@@ -506,14 +561,20 @@ export async function runFinalizeReportPhase(
     await ctx.runMutation(internal.studio.jobMutations.reports.saveReportResults, {
       reportId,
       content,
-      metadata: {
-        title,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: successfulResults.length,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: successfulResults.length,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: elapsed, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     await ctx.runMutation(internal.studio.jobMutations.reports.clearReportMapData, { reportId });

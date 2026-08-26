@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { env } from "../../_lib/env";
 import { extractJsonObjectString, uncachedLlmCall } from "./cachedLlm.js";
+import { fromProviderUsage, type TokenUsage } from "./usageAggregate.js";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const JSON_REMINDER =
@@ -21,6 +22,7 @@ export type InvokeStructuredOutputOptions<T> = {
   maxAttempts?: number;
   /** Prefix for retry / fallback log lines (e.g. `WrittenQuestionsMap`). */
   logPrefix?: string;
+  onUsage?: (usage: TokenUsage) => void;
 };
 
 function parseStructuredContent<T>(raw: string, schema: z.ZodType<T>): T {
@@ -109,7 +111,12 @@ export async function invokeStructuredOutput<T>(
 
       const jsonPayload =
         response.structuredJson?.trim() || extractJsonObjectString(response.content) || "";
-      return parseStructuredContent(jsonPayload, options.schema);
+      const parsed = parseStructuredContent(jsonPayload, options.schema);
+      const usage = fromProviderUsage(response.usage);
+      if (usage) {
+        options.onUsage?.(usage);
+      }
+      return parsed;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < maxAttempts - 1 && isRetriableStructuredError(error)) {

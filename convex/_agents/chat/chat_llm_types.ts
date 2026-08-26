@@ -12,6 +12,8 @@ export interface ChatResponse {
   answer_markdown: string;
   /** Confidence level based on source coverage */
   confidence: "high" | "medium" | "low";
+  /** Provider token counts when available. Not part of ChatResponseSchema. */
+  tokenUsage?: { prompt: number; completion: number; total: number };
 }
 
 /** Remove accidental "Confidence: high|medium|low" leaked into visible markdown. */

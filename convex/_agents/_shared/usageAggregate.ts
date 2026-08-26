@@ -14,5 +14,36 @@ export function fromProviderUsage(usage?: {
   totalTokens: number;
 }): TokenUsage | undefined {
   if (!usage) return undefined;
-  return { prompt: usage.promptTokens, completion: usage.completionTokens, total: usage.totalTokens };
+  return {
+    prompt: usage.promptTokens,
+    completion: usage.completionTokens,
+    total: usage.totalTokens,
+  };
+}
+
+export function fromTogetherUsage(
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  } | null
+): TokenUsage | undefined {
+  if (!usage) return undefined;
+  const prompt = usage.prompt_tokens ?? 0;
+  const completion = usage.completion_tokens ?? 0;
+  const total = usage.total_tokens ?? prompt + completion;
+  if (total <= 0) return undefined;
+  return { prompt, completion, total };
+}
+
+export type TokenUsageSource = "provider" | "estimated";
+
+export function resolveEvalTokenUsage(input: { provider?: TokenUsage; estimated: TokenUsage }): {
+  tokenUsage: TokenUsage;
+  tokenUsageSource: TokenUsageSource;
+} {
+  if (input.provider !== undefined && input.provider.total > 0) {
+    return { tokenUsage: input.provider, tokenUsageSource: "provider" };
+  }
+  return { tokenUsage: input.estimated, tokenUsageSource: "estimated" };
 }

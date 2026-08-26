@@ -1,2 +1,25 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Force LF in the working tree on every OS. `text=auto` alone still lets
+# Windows core.autocrlf check out CRLF, which fails Biome (`lineEnding: "lf"`)
+# and skips unit tests because the lint job is a required CI gate.
+* text=auto eol=lf
+
+# Windows cmd wrappers must keep CRLF or cmd.exe misparses them.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.zip binary
+*.pdf binary
+*.mp3 binary
+*.mp4 binary
+*.wasm binary

@@ -7,10 +7,17 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { countTokens, sanitizeUserInput } from "../../_agents/_shared/index";
+import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/FlashcardGraph";
 import {
   recursiveCollapse,
@@ -179,13 +186,19 @@ export async function runFlashcardGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
+    const scheduledChunks = mapPlan.skipMapContent ? [mapPlan.skipMapContent] : mapPlan.mapChunks;
 
     console.log(
-      `[FlashcardJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[FlashcardJob] Planned ${validatedChunks.length} validated chunks into ${scheduledChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (scheduledChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
@@ -194,7 +207,7 @@ export async function runFlashcardGenerationPhase(
       CONFIG.MIN_CARDS_PER_CHUNK,
       Math.min(
         CONFIG.MAX_CARDS_PER_CHUNK,
-        Math.ceil((cardCount / packedChunks.length) * CONFIG.BUFFER_MULTIPLIER)
+        Math.ceil((cardCount / scheduledChunks.length) * CONFIG.BUFFER_MULTIPLIER)
       )
     );
 
@@ -203,34 +216,35 @@ export async function runFlashcardGenerationPhase(
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.flashcards.initFlashcardMapPhase, {
       flashcardId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: scheduledChunks.length,
       cardCount,
       difficulty,
       topic,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < scheduledChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.flashcards.job.processFlashcardMapChunk, {
         flashcardId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: scheduledChunks.length,
+        chunk: scheduledChunks[i],
         cardCount,
         cardsPerChunk,
         difficulty,
         topic,
         smartLlm,
       });
-      console.log(`[FlashcardJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[FlashcardJob] Scheduled map task ${i + 1}/${scheduledChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: scheduledChunks.length,
+      chunkSizes: scheduledChunks.map((c) => c.length),
       cardsPerChunk,
+      executionMode: mapPlan.mode,
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -317,9 +331,13 @@ export async function runProcessFlashcardMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM using structured output
+    let tokenUsage: TokenUsage | undefined;
     const structuredLLM = createStructuredLLM(FlashcardArraySchema, {
       model: env.FAST_LLM,
       temperature: 0.3,
+      onUsage: (usage) => {
+        tokenUsage = usage;
+      },
     });
 
     const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
@@ -362,6 +380,7 @@ export async function runProcessFlashcardMapChunkPhase(
     const result = {
       flashcards: cleanedFlashcards,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.flashcards.storeFlashcardMapResult, {
@@ -562,10 +581,14 @@ export async function runFinalizeFlashcardPhase(
     // Collapse and reduce with the shared flashcard pipeline helpers
     const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
     const llm = createReduceLLM(smartLlm);
+    let reduceUsage: TokenUsage | undefined;
     const collapseReduceDeps = {
       smartLlm: llm,
       estimateTokens: countTokens,
       logger,
+      onUsage: (usage: TokenUsage) => {
+        reduceUsage = addTokenUsage(reduceUsage, usage);
+      },
     };
 
     const startTime = Date.now();
@@ -630,15 +653,21 @@ export async function runFinalizeFlashcardPhase(
     await ctx.runMutation(internal.studio.jobMutations.flashcards.saveFlashcardResults, {
       flashcardId,
       flashcards: finalFlashcards,
-      metadata: {
-        title,
-        cardCount: finalFlashcards.length,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          cardCount: finalFlashcards.length,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: elapsed, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data

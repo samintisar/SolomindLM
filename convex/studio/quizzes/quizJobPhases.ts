@@ -9,6 +9,13 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/QuizGraph";
 import {
   applySelectedCandidateIndices,
@@ -170,13 +177,19 @@ export async function runQuizGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
+    const scheduledChunks = mapPlan.skipMapContent ? [mapPlan.skipMapContent] : mapPlan.mapChunks;
 
     console.log(
-      `[QuizJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[QuizJob] Planned ${validatedChunks.length} validated chunks into ${scheduledChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (scheduledChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
@@ -185,7 +198,7 @@ export async function runQuizGenerationPhase(
       CONFIG.MIN_QUESTIONS_PER_CHUNK,
       Math.min(
         CONFIG.MAX_QUESTIONS_PER_CHUNK,
-        Math.ceil((questionCount / packedChunks.length) * CONFIG.BUFFER_MULTIPLIER)
+        Math.ceil((questionCount / scheduledChunks.length) * CONFIG.BUFFER_MULTIPLIER)
       )
     );
 
@@ -194,33 +207,34 @@ export async function runQuizGenerationPhase(
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.quizzes.initQuizMapPhase, {
       quizId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: scheduledChunks.length,
       questionCount,
       difficulty,
       focus,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < scheduledChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.quizzes.job.processQuizMapChunk, {
         quizId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: scheduledChunks.length,
+        chunk: scheduledChunks[i],
         questionCount,
         questionsPerChunk,
         difficulty,
         focus,
       });
-      console.log(`[QuizJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[QuizJob] Scheduled map task ${i + 1}/${scheduledChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: scheduledChunks.length,
+      chunkSizes: scheduledChunks.map((c) => c.length),
       questionsPerChunk,
+      executionMode: mapPlan.mode,
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -303,10 +317,18 @@ export async function runProcessQuizMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
+    let tokenUsage: TokenUsage | undefined;
     const structuredLLM = createStructuredLLM<QuizCandidateResponse>(
       QuizCandidateArraySchema,
       "quiz_candidates",
-      { model: env.FAST_LLM, temperature: 0.4, maxTokens: 16_000 }
+      {
+        model: env.FAST_LLM,
+        temperature: 0.4,
+        maxTokens: 16_000,
+        onUsage: (usage) => {
+          tokenUsage = addTokenUsage(tokenUsage, usage);
+        },
+      }
     );
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
@@ -411,6 +433,7 @@ export async function runProcessQuizMapChunkPhase(
     const result = {
       candidates,
       processingTimeMs: totalMapElapsedMs,
+      ...(tokenUsage !== undefined && tokenUsage.total > 0 ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.quizzes.storeQuizMapResult, {
@@ -601,6 +624,7 @@ export async function runFinalizeQuizPhase(
     });
 
     // Selection phase: LLM returns 1-based candidate IDs (not full-object echo — reduces position bias)
+    let reduceUsage: TokenUsage | undefined;
     const structuredSelectLLM = createStructuredLLM<QuizCandidateIndexSelection>(
       QuizCandidateIndexSelectionSchema,
       "quiz_candidate_index_selection",
@@ -609,6 +633,9 @@ export async function runFinalizeQuizPhase(
         maxTokens: 24_000,
         temperature: 0.3,
         reasoningEnabled: true,
+        onUsage: (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        },
       }
     );
 
@@ -690,6 +717,9 @@ export async function runFinalizeQuizPhase(
         maxTokens: 4_096,
         temperature: 0.3,
         reasoningEnabled: true,
+        onUsage: (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        },
       }
     );
 
@@ -724,6 +754,7 @@ export async function runFinalizeQuizPhase(
     );
 
     const finalQuestions = expandedResults.filter((q): q is QuizQuestion => q !== null);
+    const reduceLatencyMs = Date.now() - startTime;
     console.log(
       `[QuizJob] Expanded ${finalQuestions.length} questions (${expandedResults.length - finalQuestions.length} failed)`
     );
@@ -761,15 +792,21 @@ export async function runFinalizeQuizPhase(
     await ctx.runMutation(internal.studio.jobMutations.quizzes.saveQuizResults, {
       quizId,
       questions: finalQuestions,
-      metadata: {
-        title,
-        questionCount: finalQuestions.length,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          questionCount: finalQuestions.length,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data

@@ -41,6 +41,7 @@ export type InvokeMapStructuredOutputOptions = {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  onUsage?: (usage: import("../_shared/usageAggregate").TokenUsage) => void;
 };
 
 /**

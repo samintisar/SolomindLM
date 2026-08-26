@@ -1,7 +1,4 @@
 "use node";
-/**
- * QuizGraph — thin orchestration over split/map/collapse/reduce modules.
- */
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { END, START, StateGraph } from "@langchain/langgraph";
@@ -10,6 +7,7 @@ import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.j
 import { countTokens } from "../_shared/index.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 
+import { validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG } from "./config.js";
 import { collapse } from "./nodeCollapse.js";
 import { mapProcess as runMapProcess } from "./nodeMap.js";
@@ -78,12 +76,37 @@ export class QuizGraph {
     return countTokens(text);
   }
 
-  /** Public entry for phased / out-of-graph map execution (same as graph node). */
   async mapProcess(state: ChunkProcessState): Promise<Partial<OverallStateType>> {
     return runMapProcess(state, {
       fastLlmCandidateStructured: this.fastLlmCandidateStructured,
       estimateTokens: this.estimateTokens.bind(this),
     });
+  }
+
+  async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    const joinedChunk = validateChunks(state.chunks).join("\n\n");
+    const questionsPerChunk = Math.max(
+      GRAPH_CONFIG.MIN_QUESTIONS_PER_CHUNK,
+      Math.min(GRAPH_CONFIG.MAX_QUESTIONS_PER_CHUNK, Math.ceil(state.questionCount * 1.2))
+    );
+    const mapResult = await this.mapProcess({
+      chunk: joinedChunk,
+      chunkIndex: 0,
+      questionCount: state.questionCount,
+      difficulty: state.difficulty,
+      focus: state.focus,
+      questionsPerChunk,
+    });
+
+    return {
+      collapsedOutputs: mapResult.mapOutputs ?? [],
+      status: "reducing",
+      progress: {
+        phase: "skip_map",
+        percentage: 60,
+        message: "Skipping map fan-out for single document",
+      },
+    };
   }
 
   buildGraph() {
@@ -105,6 +128,7 @@ export class QuizGraph {
 
     builder.addNode("split_chunks", (s: OverallStateType) => splitChunks(s));
     builder.addNode("map_process", (s: ChunkProcessState) => runMapProcess(s, mapDeps));
+    builder.addNode("skip_map", (s: OverallStateType) => this.skipMap(s));
     builder.addNode("collapse", (s: OverallStateType) => collapse(s, collapseDeps));
     builder.addNode("reduce", (s: OverallStateType) => reduce(s, reduceDeps));
 
@@ -113,13 +137,12 @@ export class QuizGraph {
     builder.addConditionalEdges(
       "split_chunks" as any,
       (s: OverallStateType) => routeToMap(s, { estimateTokens: this.estimateTokens.bind(this) }),
-      { map_process: "map_process", collapse: "collapse" } as any
+      { map_process: "map_process", skip_map: "skip_map", collapse: "collapse" } as any
     );
 
     builder.addEdge("map_process" as any, "collapse" as any);
-
+    builder.addEdge("skip_map" as any, "reduce" as any);
     builder.addEdge("collapse" as any, "reduce" as any);
-
     builder.addEdge("reduce" as any, END as any);
 
     return builder.compile().withConfig({ recursionLimit: AGENT_LANGGRAPH_RECURSION_LIMIT });

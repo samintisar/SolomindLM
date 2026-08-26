@@ -1,10 +1,11 @@
 "use node";
 
 import { Send } from "@langchain/langgraph";
-
+import { selectStudioMapBatches } from "../_shared/studioExecutionMode.js";
+import { countTokens } from "../_shared/tokenizer.js";
 import type { OverallStateType } from "./state.js";
 
-export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+export function routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[WrittenQuestionsGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -14,12 +15,22 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
     return "collapse";
   }
 
-  const chunkCount = state.chunks.length;
+  const { mode, batches } = selectStudioMapBatches({
+    documentCount: state.documentIds?.length || 0,
+    chunks: state.chunks,
+    estimateTokens: countTokens,
+    pack: (chunks) => chunks,
+  });
+
+  if (batches.length === 0) {
+    console.warn(
+      "[WrittenQuestionsGraph] No map batches after skip-map planning, routing to collapse"
+    );
+    return "collapse";
+  }
+
+  const chunkCount = batches.length;
   const MIN_QUESTIONS_PER_CHUNK = 3;
-  // 2.5× over-generation gives the heuristic + LLM dedup steps enough headroom
-  // to land at or above `questionCount`. With 1.5× we routinely shrank to ~13
-  // for a target of 20 on list-style sources, because near-duplicate
-  // wordings collapse aggressively after dedupe.
   const BUFFER_MULTIPLIER = 2.5;
   const MAX_QUESTIONS_PER_CHUNK = 20;
 
@@ -48,6 +59,11 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
     )
   );
 
+  if (mode === "single_pass") {
+    console.log("[WrittenQuestionsGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
+  }
+
   console.log(
     `[WrittenQuestionsGraph] Processing all ${chunkCount} chunks for ${state.questionCount} target questions`
   );
@@ -55,7 +71,9 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
     `[WrittenQuestionsGraph] Creating ${chunkCount} parallel map tasks (~${questionsPerChunk} questions/chunk)`
   );
 
-  return state.chunks.map((chunk, idx) => {
+  console.log(`[WrittenQuestionsGraph] Execution mode ${mode}: creating ${chunkCount} map task(s)`);
+
+  return batches.map((chunk, idx) => {
     const preview = chunk.substring(0, 100).replace(/\n/g, " ");
     console.log(`  [Task ${idx + 1}/${chunkCount}] ${preview}... (${chunk.length} chars)`);
     return new Send("map_process", {

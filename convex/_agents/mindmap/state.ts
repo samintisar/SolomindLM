@@ -7,10 +7,6 @@
 
 import { Annotation } from "@langchain/langgraph";
 
-// ============================================================
-// TYPES
-// ============================================================
-
 export interface ConceptExtraction {
   main_theme: string;
   summary: string;
@@ -26,10 +22,6 @@ export interface FinalMindMap {
   nodeData: MindMapNode;
 }
 
-// ============================================================
-// STATE DEFINITIONS
-// ============================================================
-
 export const ChunkState = Annotation.Root({
   content: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "" }),
   retryCount: Annotation<number>({ reducer: (x, y) => y ?? x, default: () => 0 }),
@@ -38,8 +30,8 @@ export const ChunkState = Annotation.Root({
 });
 
 export const OverallState = Annotation.Root({
+  documentIds: Annotation<string[]>({ reducer: (x, y) => y ?? x, default: () => [] }),
   allChunks: Annotation<string[]>({ reducer: (x, y) => y ?? x, default: () => [] }),
-  /** Count of chunks that failed permanently after retries (summed across parallel map workers). */
   permanentMapFailures: Annotation<number>({
     reducer: (a, b) => a + (b ?? 0),
     default: () => 0,

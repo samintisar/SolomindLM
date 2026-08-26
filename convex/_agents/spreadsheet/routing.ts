@@ -1,11 +1,12 @@
 "use node";
 
 import { Send } from "@langchain/langgraph";
+import { selectStudioMapBatches } from "../_shared/studioExecutionMode.js";
+import { countTokens } from "../_shared/tokenizer.js";
 import { packChunks, validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG, PROCESSING_CONFIG } from "./config.js";
 import type { OverallStateType } from "./state.js";
 
-// Generate a short hash for identifying chunks in logs
 function chunkHash(chunk: string): string {
   const start = chunk.substring(0, PROCESSING_CONFIG.HASH_START_LENGTH).replace(/\n/g, " ");
   const end = chunk
@@ -14,8 +15,7 @@ function chunkHash(chunk: string): string {
   return `[${chunk.length} chars] "${start}..."..."${end}"`;
 }
 
-// Conditional routing function - returns Send objects for fan-out or 'collapse' string
-export function routeToMap(state: OverallStateType): Send[] | "collapse" {
+export function routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
   console.log("\n" + "=".repeat(80));
   console.log("[SpreadsheetGraph] ===== ROUTE TO MAP PHASE =====");
   console.log("=".repeat(80));
@@ -50,9 +50,26 @@ export function routeToMap(state: OverallStateType): Send[] | "collapse" {
   }
 
   const validatedChunks = validateChunks(state.chunks);
-  const packedChunks = packChunks(validatedChunks, GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS);
+  const { mode, batches: packedChunks } = selectStudioMapBatches({
+    documentCount: state.documentIds?.length || 0,
+    chunks: validatedChunks,
+    estimateTokens: countTokens,
+    pack: (chunks) => packChunks(chunks, GRAPH_CONFIG.MAP_CHUNK_SIZE_TOKENS),
+  });
 
-  console.log(`[SpreadsheetGraph] Creating ${packedChunks.length} parallel map tasks`);
+  if (packedChunks.length === 0) {
+    console.warn("[SpreadsheetGraph] No map batches after skip-map planning, routing to collapse");
+    return "collapse";
+  }
+
+  if (mode === "single_pass") {
+    console.log("[SpreadsheetGraph] Execution mode single_pass: routing directly to skip_map");
+    return "skip_map";
+  }
+
+  console.log(
+    `[SpreadsheetGraph] Execution mode ${mode}: creating ${packedChunks.length} map task(s)`
+  );
 
   return packedChunks.map((chunk, idx) => {
     const preview = chunk.substring(0, 100).replace(/\n/g, " ");

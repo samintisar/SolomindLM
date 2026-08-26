@@ -11,6 +11,13 @@ import { z } from "zod";
 import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
   appendUniqueWrittenQuestions,
@@ -194,13 +201,19 @@ export async function runWrittenQuestionsGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
+    const scheduledChunks = mapPlan.skipMapContent ? [mapPlan.skipMapContent] : mapPlan.mapChunks;
 
     console.log(
-      `[WrittenQuestionsJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[WrittenQuestionsJob] Planned ${validatedChunks.length} validated chunks into ${scheduledChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (scheduledChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
@@ -209,7 +222,7 @@ export async function runWrittenQuestionsGenerationPhase(
       CONFIG.MIN_QUESTIONS_PER_CHUNK,
       Math.min(
         CONFIG.MAX_QUESTIONS_PER_CHUNK,
-        Math.ceil((questionCount / packedChunks.length) * CONFIG.BUFFER_MULTIPLIER)
+        Math.ceil((questionCount / scheduledChunks.length) * CONFIG.BUFFER_MULTIPLIER)
       )
     );
 
@@ -220,7 +233,7 @@ export async function runWrittenQuestionsGenerationPhase(
       internal.studio.jobMutations.writtenQuestions.initWrittenQuestionsMapPhase,
       {
         writtenQuestionId,
-        totalMapTasks: packedChunks.length,
+        totalMapTasks: scheduledChunks.length,
         questionCount,
         difficulty,
         questionType: questionType === "short" || questionType === "essay" ? questionType : "short",
@@ -229,7 +242,7 @@ export async function runWrittenQuestionsGenerationPhase(
     );
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < scheduledChunks.length; i++) {
       await ctx.scheduler.runAfter(
         0,
         internal.studio.writtenQuestions.job.processWrittenQuestionsMapChunk,
@@ -238,8 +251,8 @@ export async function runWrittenQuestionsGenerationPhase(
           userId,
           notebookId,
           chunkIndex: i,
-          totalChunks: packedChunks.length,
-          chunk: packedChunks[i],
+          totalChunks: scheduledChunks.length,
+          chunk: scheduledChunks[i],
           questionCount,
           questionsPerChunk,
           difficulty,
@@ -248,13 +261,14 @@ export async function runWrittenQuestionsGenerationPhase(
           focus,
         }
       );
-      console.log(`[WrittenQuestionsJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[WrittenQuestionsJob] Scheduled map task ${i + 1}/${scheduledChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: scheduledChunks.length,
+      chunkSizes: scheduledChunks.map((c) => c.length),
       questionsPerChunk,
+      executionMode: mapPlan.mode,
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -344,10 +358,14 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM using structured output (Together json_schema — same as report map)
+    let tokenUsage: TokenUsage | undefined;
     const structuredLLM = createStructuredLLM(WrittenQuestionsArraySchema, {
       model: env.FAST_LLM,
       temperature: 0.4,
       maxTokens: 16_000,
+      onUsage: (usage) => {
+        tokenUsage = addTokenUsage(tokenUsage, usage);
+      },
     });
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
@@ -434,6 +452,7 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const result = {
       questions,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined && tokenUsage.total > 0 ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(
@@ -657,6 +676,8 @@ export async function runFinalizeWrittenQuestionsPhase(
     );
 
     let finalQuestions: WrittenQuestion[];
+    let reduceUsage: TokenUsage | undefined;
+    let reduceLatencyMs = 0;
 
     if (dedupedQuestions.length > questionCount) {
       console.log(
@@ -671,6 +692,9 @@ export async function runFinalizeWrittenQuestionsPhase(
         maxTokens: 32_000,
         temperature: 0.3,
         reasoningEnabled: false,
+        onUsage: (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        },
       });
       const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
       const selectionPrompt = getSelectionIdsPrompt({
@@ -705,8 +729,9 @@ export async function runFinalizeWrittenQuestionsPhase(
         throw new Error("LLM returned zero valid selected question IDs");
       }
 
+      reduceLatencyMs = Date.now() - startTime;
       console.log(
-        `[WrittenQuestionsJob] Selection completed in ${Date.now() - startTime}ms, selected ${finalQuestions.length} questions`
+        `[WrittenQuestionsJob] Selection completed in ${reduceLatencyMs}ms, selected ${finalQuestions.length} questions`
       );
     } else {
       finalQuestions = padQuestionsToTarget(dedupedQuestions, allQuestions, questionCount);
@@ -772,15 +797,23 @@ export async function runFinalizeWrittenQuestionsPhase(
       {
         writtenQuestionId,
         questions: finalQuestions,
-        metadata: {
-          title,
-          questionCount: finalQuestions.length,
-          phase: "completed",
-          progress: 100,
-          completedAt: Date.now(),
-          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-          mapFailedCount: failedCount.count,
-        },
+        metadata: withStudioTelemetryMetadata(
+          {
+            title,
+            questionCount: finalQuestions.length,
+            phase: "completed",
+            progress: 100,
+            completedAt: Date.now(),
+            mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+            mapFailedCount: failedCount.count,
+          },
+          aggregateStudioJobTelemetry({
+            mapResults: Object.values(mapResults),
+            ...(reduceLatencyMs > 0 || reduceUsage !== undefined
+              ? { reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage } }
+              : {}),
+          })
+        ),
       }
     );
 

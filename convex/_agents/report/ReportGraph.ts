@@ -7,6 +7,7 @@ import { AGENT_LANGGRAPH_RECURSION_LIMIT } from "../_shared/agent_graph_limits.j
 import { countTokens } from "../_shared/index.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
 
+import { validateChunks } from "./chunkHelpers.js";
 import { GRAPH_CONFIG } from "./config.js";
 import { validateInput } from "./inputValidation.js";
 import { collapse as collapsePhase } from "./nodeCollapse.js";
@@ -38,16 +39,29 @@ export class ReportGraph {
     return countTokens(text);
   }
 
-  routeToMap(state: OverallStateType): Send[] | "collapse" {
+  routeToMap(state: OverallStateType): Send[] | "collapse" | "skip_map" {
     return routeToMapPhase(state);
   }
 
-  routeToMapPublic(state: OverallStateType): Send[] | "collapse" {
+  routeToMapPublic(state: OverallStateType): Send[] | "collapse" | "skip_map" {
     return this.routeToMap(state);
   }
 
   async mapProcess(state: ChunkProcessState): Promise<Partial<OverallStateType>> {
     return mapProcessPhase(state, this.mapModel);
+  }
+
+  async skipMap(state: OverallStateType): Promise<Partial<OverallStateType>> {
+    const joinedChunks = validateChunks(state.chunks).join("\n\n");
+    return {
+      collapsedOutputs: joinedChunks ? [joinedChunks] : [],
+      status: "reducing",
+      progress: {
+        phase: "skip_map",
+        percentage: 70,
+        message: "Skipping map fan-out for single document",
+      },
+    };
   }
 
   async collapse(state: OverallStateType): Promise<Partial<OverallStateType>> {
@@ -70,6 +84,7 @@ export class ReportGraph {
 
     builder.addNode("validate_input", (s: OverallStateType) => validateInput(s));
     builder.addNode("map_process", (s: ChunkProcessState) => this.mapProcess(s));
+    builder.addNode("skip_map", (s: OverallStateType) => this.skipMap(s));
     builder.addNode("collapse", (s: OverallStateType) => this.collapse(s));
     builder.addNode("reduce", (s: OverallStateType) => this.reduce(s));
     builder.addNode("merge_results", (s: OverallStateType) => this.mergeResults(s));
@@ -84,6 +99,7 @@ export class ReportGraph {
     });
 
     builder.addEdge("map_process" as never, "collapse" as never);
+    builder.addEdge("skip_map" as never, "reduce" as never);
     builder.addEdge("collapse" as never, "reduce" as never);
     builder.addEdge("reduce" as never, "merge_results" as never);
     builder.addEdge("merge_results" as never, END as never);

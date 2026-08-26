@@ -291,7 +291,8 @@ export async function runStudioEval(
       studioOutput,
       latencyMs: result.latencyMs,
       tokenUsage: result.tokenUsage,
-      tokenUsageSource: result.tokenUsageSource ?? "estimated",
+      tokenUsageSource: result.tokenUsageSource,
+      stageSpans: result.stageSpans,
       timestamp: new Date().toISOString(),
     };
     return { artifact, errors };

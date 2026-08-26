@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { snapshotRetrievalConfig } from "./config";
-import { runResearchEval } from "./researchRunner";
-import type { ResearchAgentInvoker } from "./researchRunner";
 import type { EvalFixture } from "../types";
+import { snapshotRetrievalConfig } from "./config";
+import type { ResearchAgentInvoker } from "./researchRunner";
+import { runResearchEval } from "./researchRunner";
 
 const fixture: EvalFixture = {
   schemaVersion: 1,

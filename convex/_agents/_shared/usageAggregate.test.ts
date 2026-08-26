@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { addTokenUsage, fromProviderUsage } from "./usageAggregate";
+import {
+  addTokenUsage,
+  fromProviderUsage,
+  fromTogetherUsage,
+  resolveEvalTokenUsage,
+} from "./usageAggregate";
 
 describe("fromProviderUsage", () => {
   it("maps provider usage fields", () => {
@@ -43,5 +48,58 @@ describe("addTokenUsage", () => {
       completion: 0,
       total: 0,
     });
+  });
+});
+
+describe("resolveEvalTokenUsage", () => {
+  const estimated = { prompt: 100, completion: 50, total: 150 };
+
+  it("prefers provider when total > 0", () => {
+    const provider = { prompt: 11, completion: 7, total: 18 };
+    expect(resolveEvalTokenUsage({ provider, estimated })).toEqual({
+      tokenUsage: provider,
+      tokenUsageSource: "provider",
+    });
+  });
+
+  it("falls back to estimated when provider is undefined", () => {
+    expect(resolveEvalTokenUsage({ estimated })).toEqual({
+      tokenUsage: estimated,
+      tokenUsageSource: "estimated",
+    });
+  });
+
+  it("falls back to estimated when provider.total is 0", () => {
+    const provider = { prompt: 0, completion: 0, total: 0 };
+    expect(resolveEvalTokenUsage({ provider, estimated })).toEqual({
+      tokenUsage: estimated,
+      tokenUsageSource: "estimated",
+    });
+  });
+
+  it("does not mutate the estimated object", () => {
+    const estimatedCopy = { ...estimated };
+    resolveEvalTokenUsage({ estimated });
+    expect(estimated).toEqual(estimatedCopy);
+  });
+});
+
+describe("fromTogetherUsage", () => {
+  it("maps snake_case Together usage fields", () => {
+    expect(
+      fromTogetherUsage({
+        prompt_tokens: 11,
+        completion_tokens: 7,
+        total_tokens: 18,
+      })
+    ).toEqual({ prompt: 11, completion: 7, total: 18 });
+  });
+
+  it("returns undefined when usage is missing or all zeros", () => {
+    expect(fromTogetherUsage(undefined)).toBeUndefined();
+    expect(fromTogetherUsage(null)).toBeUndefined();
+    expect(
+      fromTogetherUsage({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 })
+    ).toBeUndefined();
   });
 });

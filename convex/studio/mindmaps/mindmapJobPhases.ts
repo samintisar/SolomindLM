@@ -10,7 +10,14 @@ import { validateWithPreset } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { invokeStructuredOutput } from "../../_agents/_shared/structuredLlm";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
 import {
   MAP_PROMPT,
@@ -25,6 +32,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { conceptsFromSource, createSmartFallback } from "./mindmapFallback";
 
 // ============================================================
 // CONFIGURATION
@@ -121,46 +129,6 @@ function cleanLeafNodes(node: MindMapNode): void {
   }
 }
 
-/**
- * Creates a meaningful fallback tree
- */
-function createSmartFallback(extractions: ConceptExtraction[]): FinalMindMap {
-  const themeCounts: Record<string, number> = {};
-  extractions.forEach((e) => {
-    const t = e.main_theme || "Unknown";
-    themeCounts[t] = (themeCounts[t] || 0) + 1;
-  });
-
-  const rootTitle =
-    Object.entries(themeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "Knowledge Map";
-
-  const seenThemes = new Set<string>();
-  const children: MindMapNode[] = [];
-
-  for (const ex of extractions) {
-    const theme = ex.main_theme || "Misc";
-    if (seenThemes.has(theme)) continue;
-    seenThemes.add(theme);
-
-    const branchName = theme === rootTitle ? "Overview" : theme;
-
-    children.push({
-      topic: branchName,
-      children: ex.key_concepts.map((c) => ({
-        topic: c,
-        children: null,
-      })),
-    });
-  }
-
-  return {
-    nodeData: {
-      topic: rootTitle,
-      children: children.length > 0 ? children : null,
-    },
-  };
-}
-
 // ============================================================
 // PHASE 1: Initialize & Schedule Map Tasks
 // ============================================================
@@ -223,38 +191,75 @@ export async function runMindmapGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
 
     console.log(
-      `[MindMapJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[MindMapJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
+      await ctx.runMutation(internal.studio.jobMutations.mindmaps.initMindMapMapPhase, {
+        mindmapId,
+        totalMapTasks: 1,
+      });
+
+      await ctx.runMutation(internal.studio.jobMutations.mindmaps.storeMindMapMapResult, {
+        mindmapId,
+        chunkIndex: 0,
+        result: JSON.stringify({
+          extraction: {
+            main_theme: "Source",
+            summary: mapPlan.skipMapContent,
+            key_concepts: conceptsFromSource(mapPlan.skipMapContent),
+          },
+          processingTimeMs: 0,
+        }),
+      });
+
+      await ctx.scheduler.runAfter(0, internal.studio.mindmaps.job.finalizeMindMapPhase, {
+        mindmapId,
+        userId,
+        notebookId,
+      });
+
+      logger.info("Map phase skipped", {
+        totalMapTasks: 1,
+        executionMode: mapPlan.mode,
+      });
+      return;
+    }
+
+    if (mapPlan.mapChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.initMindMapMapPhase, {
       mindmapId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: mapPlan.mapChunks.length,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.mindmaps.job.processMindMapMapChunk, {
         mindmapId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: mapPlan.mapChunks.length,
+        chunk: mapPlan.mapChunks[i],
       });
-      console.log(`[MindMapJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[MindMapJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: mapPlan.mapChunks.length,
+      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -333,6 +338,7 @@ export async function runProcessMindMapMapChunkPhase(
     console.log(`[MindMapJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const extraction = await invokeStudioLlm({
       invoke: () =>
         invokeStructuredOutput({
@@ -344,6 +350,9 @@ export async function runProcessMindMapMapChunkPhase(
           temperature: 0.1,
           maxTokens: 8000,
           logPrefix: "MindMapMap",
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "MindMapMap",
@@ -359,6 +368,7 @@ export async function runProcessMindMapMapChunkPhase(
     const result = {
       extraction,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.storeMindMapMapResult, {
@@ -560,6 +570,8 @@ export async function runFinalizeMindMapPhase(
     );
 
     let finalMindMap: FinalMindMap;
+    let reduceUsage: TokenUsage | undefined;
+    let reduceLatencyMs = 0;
 
     try {
       const startTime = Date.now();
@@ -572,6 +584,9 @@ export async function runFinalizeMindMapPhase(
             maxTokens: 16_000,
             temperature: 0.3,
             reasoningEnabled: true,
+            onUsage: (usage) => {
+              reduceUsage = usage;
+            },
           }),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "MindMapReduce",
@@ -583,10 +598,10 @@ export async function runFinalizeMindMapPhase(
       }
 
       const parsedTree = parseMarkdownToTree(markdown);
-      const elapsed = Date.now() - startTime;
+      reduceLatencyMs = Date.now() - startTime;
 
       console.log(
-        `[MindMapJob] Reduce completed in ${elapsed}ms, root: "${parsedTree.topic}", branches: ${parsedTree.children?.length || 0}`
+        `[MindMapJob] Reduce completed in ${reduceLatencyMs}ms, root: "${parsedTree.topic}", branches: ${parsedTree.children?.length || 0}`
       );
 
       finalMindMap = { nodeData: parsedTree };
@@ -624,16 +639,22 @@ export async function runFinalizeMindMapPhase(
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.saveMindMapResults, {
       mindmapId,
       mindmap: finalMindMap,
-      metadata: {
-        title,
-        nodeCount: 0,
-        edgeCount: 0,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          nodeCount: 0,
+          edgeCount: 0,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data

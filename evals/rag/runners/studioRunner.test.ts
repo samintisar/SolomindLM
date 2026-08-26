@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { snapshotRetrievalConfig } from "./config";
-import { runStudioEval } from "./studioRunner";
-import type { StudioInvoker } from "./convexStudioInvoker";
 import type { EvalFixture } from "../types";
+import { snapshotRetrievalConfig } from "./config";
+import type { StudioInvoker } from "./convexStudioInvoker";
+import { runStudioEval } from "./studioRunner";
 
 const fixture: EvalFixture = {
   schemaVersion: 1,
@@ -16,7 +16,7 @@ const fixture: EvalFixture = {
 };
 
 describe("runStudioEval tokenUsageSource", () => {
-  it("defaults to estimated when the invoker omits the field", async () => {
+  it("omits tokenUsageSource when the invoker does not report one", async () => {
     const invoker: StudioInvoker = {
       kind: "report",
       invoke: async () => ({
@@ -32,6 +32,35 @@ describe("runStudioEval tokenUsageSource", () => {
     );
 
     expect(errors).toEqual([]);
-    expect(artifact.tokenUsageSource).toBe("estimated");
+    expect(artifact.tokenUsageSource).toBeUndefined();
+    expect(artifact.tokenUsage).toEqual({ prompt: 1, completion: 2, total: 3 });
+  });
+
+  it("copies provider token usage source and stage spans from the invoker", async () => {
+    const invoker: StudioInvoker = {
+      kind: "report",
+      invoke: async () => ({
+        raw: { title: "T", content: "body" },
+        latencyMs: 12,
+        tokenUsage: { prompt: 1, completion: 2, total: 3 },
+        tokenUsageSource: "provider",
+        stageSpans: [
+          { stage: "retrieve", latencyMs: 20 },
+          { stage: "reduce", latencyMs: 40 },
+        ],
+      }),
+    };
+
+    const { artifact, errors } = await runStudioEval(
+      { fixture, config: snapshotRetrievalConfig(), kind: "report" },
+      invoker
+    );
+
+    expect(errors).toEqual([]);
+    expect(artifact.tokenUsageSource).toBe("provider");
+    expect(artifact.stageSpans).toEqual([
+      { stage: "retrieve", latencyMs: 20 },
+      { stage: "reduce", latencyMs: 40 },
+    ]);
   });
 });

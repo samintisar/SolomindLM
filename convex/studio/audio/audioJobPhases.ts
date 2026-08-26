@@ -7,15 +7,17 @@
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import {
-  countTokens,
-  packChunks,
-  sanitizeUserInput,
-  validateChunks,
-} from "../../_agents/_shared/index";
+import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
   type AudioLength,
   type AudioType,
@@ -151,43 +153,52 @@ export async function runAudioOverviewGenerationPhase(
       maxChunkLength: 50000,
       agentName: "AudioOverviewJob",
     });
-    const packedChunks = packChunks(validatedChunks, {
-      targetSize: CONFIG.MAP_CHUNK_SIZE_TOKENS,
-      minChunkLength: 50,
-      maxChunkLength: 50000,
-      agentName: "AudioOverviewJob",
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) =>
+        packChunks(chunks, {
+          targetSize: CONFIG.MAP_CHUNK_SIZE_TOKENS,
+          minChunkLength: 50,
+          maxChunkLength: 50000,
+          agentName: "AudioOverviewJob",
+        }),
     });
 
     console.log(
-      `[AudioJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[AudioJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    const scheduledChunks = mapPlan.skipMapContent ? [mapPlan.skipMapContent] : mapPlan.mapChunks;
+
+    if (scheduledChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.audio.initAudioOverviewMapPhase, {
       audioOverviewId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: scheduledChunks.length,
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < scheduledChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.audio.job.processAudioMapChunk, {
         audioOverviewId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: scheduledChunks.length,
+        chunk: scheduledChunks[i],
       });
-      console.log(`[AudioJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[AudioJob] Scheduled map task ${i + 1}/${scheduledChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: scheduledChunks.length,
+      executionMode: mapPlan.mode,
+      chunkSizes: scheduledChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -276,6 +287,7 @@ export async function runProcessAudioMapChunkPhase(
     console.log(`[AudioJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const output = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -283,6 +295,9 @@ export async function runProcessAudioMapChunkPhase(
           userPrompt: prompt,
           model: env.FAST_LLM,
           temperature: 0.3,
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "AudioMap",
@@ -299,6 +314,7 @@ export async function runProcessAudioMapChunkPhase(
     const result = {
       beats: output,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.audio.storeAudioOverviewMapResult, {
@@ -539,6 +555,8 @@ export async function runFinalizeAudioOverviewPhase(
       `[AudioJob] Writing script single-pass (promptChars=${reducePrompt.length}, promptTokens=${countTokens(reducePrompt)}, targetLines=${targetLines})`
     );
 
+    let reduceUsage: TokenUsage | undefined;
+    const reduceStartTime = Date.now();
     const responseText = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -548,6 +566,9 @@ export async function runFinalizeAudioOverviewPhase(
           maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
           temperature: 0.6,
           reasoningEnabled: true,
+          onUsage: (usage) => {
+            reduceUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "AudioReduce",
@@ -641,6 +662,8 @@ export async function runFinalizeAudioOverviewPhase(
       },
     });
 
+    const reduceLatencyMs = Date.now() - reduceStartTime;
+    const ttsStartTime = Date.now();
     const ttsClient = createTogetherTtsClient();
     const results: { index: number; buffer: Buffer | null }[] = [];
     const BATCH_SIZE = 5;
@@ -737,15 +760,22 @@ export async function runFinalizeAudioOverviewPhase(
       audioOverviewId,
       audioUrl,
       transcript,
-      metadata: {
-        title,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-        dialogueLines: successCount,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+          dialogueLines: successCount,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
+          extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
+        })
+      ),
     });
 
     // Clear intermediate data

@@ -7,7 +7,7 @@
  */
 
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+
 import Together from "together-ai";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 
@@ -15,6 +15,9 @@ import { uncachedLlmCall } from "../_shared/cachedLlm.js";
 import { extractUniqueSortedCitationIndices } from "../_shared/citationExtract.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction.js";
 import { mergeModelKwargs } from "../_shared/llm_factory.js";
+import { invokeStructuredOutput } from "../_shared/structuredLlm.js";
+import { createTokenUsageAccumulator } from "../_shared/tokenUsageAccumulator.js";
+import { fromProviderUsage, fromTogetherUsage } from "../_shared/usageAggregate.js";
 import { buildGroundingPrompt, estimateTokens, isComplexQuery } from "./chat_llm_grounding.js";
 import {
   buildNotebookChatInstructionBlock,
@@ -52,6 +55,7 @@ export class ChatLLMWrapper {
   /** Together AI SDK client for streaming with structured output */
   private togetherClient: Together;
   private readonly outputLanguage?: string;
+  private readonly tokenUsage = createTokenUsageAccumulator();
 
   constructor(config: LLMWrapperConfig) {
     // Smart vs fast: `mergeModelKwargs` — GPT-OSS uses reasoning_effort; Qwen-style uses chat_template thinking.
@@ -78,6 +82,10 @@ export class ChatLLMWrapper {
     this.outputLanguage = config.outputLanguage;
   }
 
+  consumeTokenUsage() {
+    return this.tokenUsage.consume();
+  }
+
   /**
    * Generates a direct conversational response without RAG context.
    * Used when the deterministic router decides no document search is needed
@@ -101,18 +109,24 @@ export class ChatLLMWrapper {
       systemPrompt += buildNotebookChatInstructionBlock(chatSettings);
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
-    const messages = [
-      new SystemMessage(systemPrompt),
-      ...conversationHistory
-        .slice(-4)
-        .map((t) => (t.role === "user" ? new HumanMessage(t.content) : new AIMessage(t.content))),
-      new HumanMessage(userMessage),
-    ];
     try {
-      const response = await this.fastLlm.invoke(messages);
-      return typeof response.content === "string"
-        ? response.content.trim()
-        : String(response.content).trim();
+      const response = await uncachedLlmCall({
+        model: this.fastLlmModelId,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...conversationHistory.slice(-4).map((turn) => ({
+            role: (turn.role === "user" ? "user" : "assistant") as "user" | "assistant",
+            content: turn.content,
+          })),
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.1,
+        maxTokens: 1024,
+        reasoningEnabled: false,
+        toolChoice: "none",
+      });
+      this.tokenUsage.add(fromProviderUsage(response.usage));
+      return response.content.trim();
     } catch (error) {
       console.warn("[ChatLLMWrapper] Direct response failed:", error);
       return "I'm here to help! Ask me anything about your study materials.";
@@ -145,6 +159,7 @@ Question: ${query}`;
         reasoningEnabled: false,
         toolChoice: "none",
       });
+      this.tokenUsage.add(fromProviderUsage(response.usage));
       const text = response.content.trim();
       console.log("[ChatLLMWrapper] HyDE document:", text.slice(0, 200));
       return text || query;
@@ -178,6 +193,7 @@ Question: ${query}`;
         reasoningEnabled: false,
         toolChoice: "none",
       });
+      this.tokenUsage.add(fromProviderUsage(response.usage));
       const text = response.content.trim();
       // Strip Qwen-style <redacted_thinking>...</redacted_thinking> reasoning blocks before parsing
       const stripped = text
@@ -269,6 +285,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         reasoningEnabled: false,
         toolChoice: "none",
       });
+      this.tokenUsage.add(fromProviderUsage(response.usage));
       return parseRetrievalSubqueriesFromLlmContent(response.content);
     };
 
@@ -432,11 +449,30 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         temperature: 0.1,
         stream: true,
         max_tokens: 8192,
+        // Together's SDK types omit OpenAI-compatible stream_options; usage is
+        // returned on a final chunk when include_usage is set.
+        ...({ stream_options: { include_usage: true } } as object),
       });
 
-      // Accumulate streaming chunks
+      // Accumulate streaming chunks. Together sends usage on a final chunk when
+      // stream_options.include_usage is set (OpenAI-compatible).
       const chunks: string[] = [];
+      let providerUsage: ReturnType<typeof fromTogetherUsage>;
       for await (const chunk of stream) {
+        const mapped = fromTogetherUsage(
+          (
+            chunk as {
+              usage?: {
+                prompt_tokens?: number;
+                completion_tokens?: number;
+                total_tokens?: number;
+              } | null;
+            }
+          ).usage
+        );
+        if (mapped) {
+          providerUsage = mapped;
+        }
         const token = chunk.choices[0]?.delta?.content || "";
         if (token) {
           chunks.push(token);
@@ -444,6 +480,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       }
 
       const fullResponse = chunks.join("");
+      this.tokenUsage.add(providerUsage);
       console.log("[ChatLLMWrapper] Streaming complete, parsing JSON...");
 
       // Parse the accumulated JSON
@@ -455,7 +492,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         // Try to salvage partial JSON or raw text
         const salvaged = this.salvageResponse(fullResponse);
         if (salvaged) {
-          return salvaged;
+          return providerUsage ? { ...salvaged, tokenUsage: providerUsage } : salvaged;
         }
         return {
           answer_markdown: "I encountered an error processing the response. Please try again.",
@@ -475,7 +512,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
         const salvaged = this.salvageResponse(parsedResponse);
         if (salvaged) {
           console.log("[ChatLLMWrapper] Successfully salvaged response after validation failure");
-          return salvaged;
+          return providerUsage ? { ...salvaged, tokenUsage: providerUsage } : salvaged;
         }
 
         return {
@@ -498,6 +535,7 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       return {
         answer_markdown: cleanedMarkdown,
         confidence: validated.data.confidence ?? "low",
+        ...(providerUsage ? { tokenUsage: providerUsage } : {}),
       } as ChatResponse;
     } catch (error) {
       console.error("[ChatLLMWrapper] Streaming structured output generation failed:", error);
@@ -542,19 +580,30 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
     }
     systemPrompt = withLanguageInstruction(systemPrompt, this.outputLanguage);
 
-    const structuredLlm = (this.llm as any).withStructuredOutput(ChatResponseSchema, {
-      name: "chat_response",
-    });
-
     const groundedPrompt = buildGroundingPrompt(chunks, userMessage, conversationHistory);
-    const messages = [new SystemMessage(systemPrompt), new HumanMessage(groundedPrompt)];
     try {
-      const response: any = await structuredLlm.invoke(messages);
-      const validated = ChatResponseSchema.safeParse(response);
+      let fallbackUsage: ReturnType<typeof fromProviderUsage>;
+      const parsed = await invokeStructuredOutput({
+        systemPrompt,
+        userPrompt: groundedPrompt,
+        schema: ChatResponseSchema,
+        schemaName: "chat_response",
+        model: this.smartLlmModelId,
+        temperature: 0.1,
+        maxTokens: 8192,
+        logPrefix: "ChatStructuredFallback",
+        onUsage: (usage) => {
+          fallbackUsage = usage;
+          this.tokenUsage.add(usage);
+        },
+      });
+      const validated = ChatResponseSchema.safeParse(parsed);
 
       if (!validated.success) {
-        const salvaged = this.salvageResponse(response);
-        if (salvaged) return salvaged;
+        const salvaged = this.salvageResponse(parsed);
+        if (salvaged) {
+          return fallbackUsage ? { ...salvaged, tokenUsage: fallbackUsage } : salvaged;
+        }
         return {
           answer_markdown: "I encountered an error. Please rephrase your question or try again.",
           confidence: "low",
@@ -564,9 +613,10 @@ Reply with ONLY valid JSON: {"subqueries": string[], "rerankQuery"?: string}`;
       return {
         answer_markdown: stripLeakedConfidenceFromMarkdown(validated.data.answer_markdown ?? ""),
         confidence: validated.data.confidence ?? "low",
+        ...(fallbackUsage ? { tokenUsage: fallbackUsage } : {}),
       } as ChatResponse;
     } catch (error) {
-      console.error("[ChatLLMWrapper] LangChain fallback failed:", error);
+      console.error("[ChatLLMWrapper] Structured fallback failed:", error);
       return {
         answer_markdown:
           "I apologize, but I encountered an error generating a response. Please try again.",

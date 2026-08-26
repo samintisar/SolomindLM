@@ -48,6 +48,11 @@ import { sliceParagraphForStream } from "./streamSlice.js";
 
 export class ChatAgent {
   private llmWrapper: ChatLLMWrapper;
+
+  private doneChunk(): StreamChunk {
+    const tokenUsage = this.llmWrapper.consumeTokenUsage();
+    return tokenUsage !== undefined ? { type: "done", data: { tokenUsage } } : { type: "done" };
+  }
   private vectorSearch: VectorSearchHandler;
   private embeddingService: EmbeddingService;
   private globalRerankFn?: GlobalRerankFn;
@@ -427,7 +432,7 @@ export class ChatAgent {
     if (route.type === "clarify") {
       logger.info("Router decision: clarify", { question: route.question });
       yield { type: "clarification", data: { question: route.question } };
-      yield { type: "done" };
+      yield this.doneChunk();
       return;
     }
 
@@ -447,7 +452,7 @@ export class ChatAgent {
           }
         }
       }
-      yield { type: "done" };
+      yield this.doneChunk();
       return;
     }
 
@@ -660,7 +665,7 @@ export class ChatAgent {
           }
         }
       }
-      yield { type: "done" };
+      yield this.doneChunk();
       return;
     }
 
@@ -889,6 +894,6 @@ export class ChatAgent {
       yield { type: "followups", data: followUps };
     }
 
-    yield { type: "done" };
+    yield this.doneChunk();
   }
 }

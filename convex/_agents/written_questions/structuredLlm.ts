@@ -33,6 +33,7 @@ export function createStructuredLLM<T = WrittenQuestionsResponse>(
     temperature?: number;
     schemaName?: string;
     reasoningEnabled?: boolean;
+    onUsage?: (usage: import("../_shared/usageAggregate").TokenUsage) => void;
   }
 ): { invoke(messages: Array<SystemMessage | HumanMessage>): Promise<T> } {
   const model = options?.model ?? env.FAST_LLM;
@@ -51,6 +52,7 @@ export function createStructuredLLM<T = WrittenQuestionsResponse>(
         temperature: options?.temperature,
         reasoningEnabled: options?.reasoningEnabled,
         logPrefix: "WrittenQuestionsStructured",
+        onUsage: options?.onUsage,
       }) as Promise<T>;
     },
   };

@@ -9,7 +9,14 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
+import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/SpreadsheetGraph";
 import {
   COLLAPSE_PROMPTS,
@@ -209,42 +216,79 @@ export async function runSpreadsheetGenerationPhase(
 
     // Validate and pack chunks
     const validatedChunks = validateChunks(rawChunks);
-    const packedChunks = packChunks(validatedChunks, CONFIG.MAP_CHUNK_SIZE_TOKENS);
+    const mapPlan = planStudioJobMapPhase({
+      documentCount: documentIds.length,
+      chunks: validatedChunks,
+      estimateTokens: countTokens,
+      pack: (chunks) => packChunks(chunks, CONFIG.MAP_CHUNK_SIZE_TOKENS),
+    });
 
     console.log(
-      `[SpreadsheetJob] Packed ${rawChunks.length} chunks into ${packedChunks.length} map tasks`
+      `[SpreadsheetJob] Planned ${validatedChunks.length} validated chunks into ${mapPlan.mapChunks.length} map tasks (${mapPlan.mode})`
     );
 
-    if (packedChunks.length === 0) {
+    if (mapPlan.mode === "single_pass" && mapPlan.skipMapContent) {
+      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
+        spreadsheetId,
+        totalMapTasks: 1,
+        spreadsheetType: spreadsheetType || "custom",
+        customPrompt: customPrompt || "",
+      });
+
+      await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
+        spreadsheetId,
+        chunkIndex: 0,
+        result: JSON.stringify({
+          output: mapPlan.skipMapContent,
+          processingTimeMs: 0,
+        }),
+      });
+
+      await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.finalizeSpreadsheetPhase, {
+        spreadsheetId,
+        userId,
+        notebookId,
+        spreadsheetType: spreadsheetType || "custom",
+        customPrompt: customPrompt || "",
+      });
+
+      logger.info("Map phase skipped", {
+        totalMapTasks: 1,
+        executionMode: mapPlan.mode,
+      });
+      return;
+    }
+
+    if (mapPlan.mapChunks.length === 0) {
       throw new Error("No valid chunks to process");
     }
 
     // Initialize map phase metadata
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.initSpreadsheetMapPhase, {
       spreadsheetId,
-      totalMapTasks: packedChunks.length,
+      totalMapTasks: mapPlan.mapChunks.length,
       spreadsheetType: spreadsheetType || "custom",
       customPrompt: customPrompt || "",
     });
 
     // Schedule each map task as a separate action
-    for (let i = 0; i < packedChunks.length; i++) {
+    for (let i = 0; i < mapPlan.mapChunks.length; i++) {
       await ctx.scheduler.runAfter(0, internal.studio.spreadsheets.job.processSpreadsheetMapChunk, {
         spreadsheetId,
         userId,
         notebookId,
         chunkIndex: i,
-        totalChunks: packedChunks.length,
-        chunk: packedChunks[i],
+        totalChunks: mapPlan.mapChunks.length,
+        chunk: mapPlan.mapChunks[i],
         spreadsheetType: spreadsheetType || "custom",
         customPrompt: customPrompt || "",
       });
-      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${packedChunks.length}`);
+      console.log(`[SpreadsheetJob] Scheduled map task ${i + 1}/${mapPlan.mapChunks.length}`);
     }
 
     logger.info("Map phase initialized", {
-      totalMapTasks: packedChunks.length,
-      chunkSizes: packedChunks.map((c) => c.length),
+      totalMapTasks: mapPlan.mapChunks.length,
+      chunkSizes: mapPlan.mapChunks.map((c) => c.length),
     });
   } catch (error) {
     const errorMeta = createErrorMetadata(error, "initializing");
@@ -340,6 +384,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     console.log(`[SpreadsheetJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const mapOutput = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -348,6 +393,9 @@ export async function runProcessSpreadsheetMapChunkPhase(
           model: env.FAST_LLM,
           maxTokens: 8_192,
           temperature: 0.3,
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "SpreadsheetMap",
@@ -366,6 +414,7 @@ export async function runProcessSpreadsheetMapChunkPhase(
     const result = {
       output: mapOutput,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.storeSpreadsheetMapResult, {
@@ -559,6 +608,7 @@ export async function runFinalizeSpreadsheetPhase(
 
     // Stage 1: Collapse (if needed)
     let collapsedOutputs: string[];
+    let reduceUsage: TokenUsage | undefined;
 
     // Estimate total tokens
     const estimateTokens = (text: string) => Math.ceil(text.length / 3);
@@ -577,7 +627,10 @@ export async function runFinalizeSpreadsheetPhase(
         allOutputs,
         spreadsheetType,
         customPrompt,
-        language
+        language,
+        (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        }
       );
     }
 
@@ -617,6 +670,9 @@ export async function runFinalizeSpreadsheetPhase(
           maxTokens: 32_000,
           temperature: 0.5,
           reasoningEnabled: true,
+          onUsage: (usage) => {
+            reduceUsage = addTokenUsage(reduceUsage, usage);
+          },
         }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "SpreadsheetReduce",
@@ -664,16 +720,22 @@ export async function runFinalizeSpreadsheetPhase(
     await ctx.runMutation(internal.studio.jobMutations.spreadsheets.saveSpreadsheetResults, {
       spreadsheetId,
       spreadsheet: finalOutput,
-      metadata: {
-        title,
-        spreadsheetType: spreadsheetType || spreadsheet.metadata?.spreadsheetType || "custom",
-        customPrompt: customPrompt ?? spreadsheet.metadata?.customPrompt,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          spreadsheetType: spreadsheetType || spreadsheet.metadata?.spreadsheetType || "custom",
+          customPrompt: customPrompt ?? spreadsheet.metadata?.customPrompt,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: elapsed, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data
@@ -726,7 +788,8 @@ async function recursiveCollapse(
   textOutputs: string[],
   spreadsheetType: string,
   customPrompt: string,
-  language?: string
+  language?: string,
+  onUsage?: (usage: TokenUsage) => void
 ): Promise<string[]> {
   const TARGET_TOKENS = CONFIG.REDUCE_CHUNK_SIZE_TOKENS;
 
@@ -782,6 +845,7 @@ async function recursiveCollapse(
                 maxTokens: 32_000,
                 temperature: 0.5,
                 reasoningEnabled: true,
+                onUsage,
               }),
             timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
             phaseLabel: "CollapseGroup",
@@ -795,5 +859,5 @@ async function recursiveCollapse(
     CONFIG.COLLAPSE_CONCURRENCY
   );
 
-  return recursiveCollapse(collapsed, spreadsheetType, customPrompt, language);
+  return recursiveCollapse(collapsed, spreadsheetType, customPrompt, language, onUsage);
 }
