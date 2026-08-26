@@ -4,6 +4,11 @@ import { v } from "convex/values";
 import { extractJsonObjectString, uncachedLlmCall } from "../../_agents/_shared/cachedLlm";
 import { invokeWithRetry } from "../../_agents/_shared/index";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
+import { fromProviderUsage } from "../../_agents/_shared/usageAggregate";
 import { internal } from "../../_generated/api";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
@@ -190,6 +195,7 @@ export const generateInfographicImage = internalAction({
 
       // Extract key concepts and design visual infographic
       logger.phaseStart("content_analysis");
+      const designStartTime = Date.now();
       const designResponse = await invokeWithRetry(
         () =>
           uncachedLlmCall({
@@ -264,6 +270,8 @@ Return JSON: {
         designResponse.content ||
         "{}";
       const design = parseLlmJson(designContent) as Record<string, any>;
+      const designUsage = fromProviderUsage(designResponse.usage);
+      const designLatencyMs = Date.now() - designStartTime;
       if (!design.image_prompt) {
         throw new Error(
           "LLM design step did not return an image_prompt — cannot generate a meaningful infographic"
@@ -369,14 +377,24 @@ Return JSON: {
           imageUrl: publicUrl,
           title: finalTitle,
           prompt: imagePrompt,
-          metadata: {
-            sourceDocumentIds: documentIds,
-            generatedAt: Date.now(),
-            customPrompt,
-            orientation,
-            visualStyle,
-            detailLevel,
-          },
+          metadata: withStudioTelemetryMetadata(
+            {
+              sourceDocumentIds: documentIds,
+              generatedAt: Date.now(),
+              customPrompt,
+              orientation,
+              visualStyle,
+              detailLevel,
+            },
+            aggregateStudioJobTelemetry({
+              mapResults: [
+                {
+                  processingTimeMs: designLatencyMs,
+                  ...(designUsage !== undefined ? { tokenUsage: designUsage } : {}),
+                },
+              ],
+            })
+          ),
         },
       });
 

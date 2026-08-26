@@ -16,7 +16,7 @@ const fixture: EvalFixture = {
 };
 
 describe("runStudioEval tokenUsageSource", () => {
-  it("defaults to estimated when the invoker omits the field", async () => {
+  it("omits tokenUsageSource when the invoker does not report one", async () => {
     const invoker: StudioInvoker = {
       kind: "report",
       invoke: async () => ({
@@ -32,7 +32,8 @@ describe("runStudioEval tokenUsageSource", () => {
     );
 
     expect(errors).toEqual([]);
-    expect(artifact.tokenUsageSource).toBe("estimated");
+    expect(artifact.tokenUsageSource).toBeUndefined();
+    expect(artifact.tokenUsage).toEqual({ prompt: 1, completion: 2, total: 3 });
   });
 
   it("copies provider token usage source and stage spans from the invoker", async () => {

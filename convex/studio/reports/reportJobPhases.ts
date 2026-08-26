@@ -8,8 +8,13 @@ import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/ReportGraph";
 import {
   MAP_PROMPTS,
@@ -282,6 +287,7 @@ IMPORTANT: Respond with a JSON object containing:
     console.log(`[ReportJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const mapOutput = await invokeStudioLlm({
       invoke: () =>
         invokeMapStructuredOutput({
@@ -290,6 +296,9 @@ IMPORTANT: Respond with a JSON object containing:
           model: env.FAST_LLM,
           maxTokens: CONFIG.MAP_MAX_OUTPUT_TOKENS,
           temperature: 0.3,
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "ReportMap",
@@ -304,6 +313,7 @@ IMPORTANT: Respond with a JSON object containing:
       topics: mapOutput.topics,
       summary: mapOutput.summary,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.reports.storeReportMapResult, {
@@ -507,6 +517,7 @@ export async function runFinalizeReportPhase(
     console.log(`[ReportJob] Reduce prompt: ${prompt.length} chars`);
 
     const startTime = Date.now();
+    let reduceUsage: TokenUsage | undefined;
     let content = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -516,6 +527,9 @@ export async function runFinalizeReportPhase(
           maxTokens: CONFIG.MAX_OUTPUT_TOKENS,
           temperature: 0.5,
           reasoningEnabled: true,
+          onUsage: (usage) => {
+            reduceUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "ReportReduce",
@@ -547,14 +561,20 @@ export async function runFinalizeReportPhase(
     await ctx.runMutation(internal.studio.jobMutations.reports.saveReportResults, {
       reportId,
       content,
-      metadata: {
-        title,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: successfulResults.length,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: successfulResults.length,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: elapsed, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     await ctx.runMutation(internal.studio.jobMutations.reports.clearReportMapData, { reportId });

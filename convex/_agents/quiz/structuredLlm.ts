@@ -36,6 +36,7 @@ export function createStructuredLLM<T>(
     temperature?: number;
     reasoningEnabled?: boolean;
     logPrefix?: string;
+    onUsage?: (usage: import("../_shared/usageAggregate").TokenUsage) => void;
   }
 ): StructuredOutputInvoker<T> {
   const model = options?.model ?? env.FAST_LLM;
@@ -53,6 +54,7 @@ export function createStructuredLLM<T>(
         temperature: options?.temperature,
         reasoningEnabled: options?.reasoningEnabled,
         logPrefix: options?.logPrefix ?? "QuizStructured",
+        onUsage: options?.onUsage,
       }) as Promise<T>;
     },
   };

@@ -11,8 +11,13 @@ import { packChunks, sanitizeUserInput, validateChunks } from "../../_agents/_sh
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
   type AudioLength,
   type AudioType,
@@ -282,6 +287,7 @@ export async function runProcessAudioMapChunkPhase(
     console.log(`[AudioJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const output = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -289,6 +295,9 @@ export async function runProcessAudioMapChunkPhase(
           userPrompt: prompt,
           model: env.FAST_LLM,
           temperature: 0.3,
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "AudioMap",
@@ -305,6 +314,7 @@ export async function runProcessAudioMapChunkPhase(
     const result = {
       beats: output,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.audio.storeAudioOverviewMapResult, {
@@ -545,6 +555,8 @@ export async function runFinalizeAudioOverviewPhase(
       `[AudioJob] Writing script single-pass (promptChars=${reducePrompt.length}, promptTokens=${countTokens(reducePrompt)}, targetLines=${targetLines})`
     );
 
+    let reduceUsage: TokenUsage | undefined;
+    const reduceStartTime = Date.now();
     const responseText = await invokeStudioLlm({
       invoke: () =>
         invokeTogetherText({
@@ -554,6 +566,9 @@ export async function runFinalizeAudioOverviewPhase(
           maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
           temperature: 0.6,
           reasoningEnabled: true,
+          onUsage: (usage) => {
+            reduceUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
       phaseLabel: "AudioReduce",
@@ -647,6 +662,8 @@ export async function runFinalizeAudioOverviewPhase(
       },
     });
 
+    const reduceLatencyMs = Date.now() - reduceStartTime;
+    const ttsStartTime = Date.now();
     const ttsClient = createTogetherTtsClient();
     const results: { index: number; buffer: Buffer | null }[] = [];
     const BATCH_SIZE = 5;
@@ -743,15 +760,22 @@ export async function runFinalizeAudioOverviewPhase(
       audioOverviewId,
       audioUrl,
       transcript,
-      metadata: {
-        title,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-        dialogueLines: successCount,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+          dialogueLines: successCount,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
+          extraSpans: [{ stage: "tts", latencyMs: Date.now() - ttsStartTime }],
+        })
+      ),
     });
 
     // Clear intermediate data

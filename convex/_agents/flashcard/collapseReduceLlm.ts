@@ -6,6 +6,7 @@ import { env } from "../../_lib/env.js";
 import { invokeWithRetry, invokeWithTimeout } from "../_shared/index.js";
 import { withLanguageInstruction } from "../_shared/languageInstruction";
 import type { JobLogger } from "../_shared/logging.js";
+import type { TokenUsage } from "../_shared/usageAggregate.js";
 import { FLASHCARD_CONFIG } from "./config.js";
 import { detectSimilarFlashcards, groupFlashcardsByTopic } from "./flashcardHeuristics.js";
 import { formatFlashcardsAsText } from "./formatFlashcards.js";
@@ -22,6 +23,7 @@ export interface CollapseReduceDeps {
   smartLlm: ChatTogetherAI;
   estimateTokens: (text: string) => number;
   logger: JobLogger;
+  onUsage?: (usage: TokenUsage) => void;
 }
 
 export async function recursiveCollapse(
@@ -106,6 +108,7 @@ Return the condensed flashcards as a JSON array with "front" and "back" fields.`
     model: reduceModel,
     reasoningEnabled: true,
     maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
+    onUsage: deps.onUsage,
   });
   const response = (await invokeWithRetry(
     () =>
@@ -204,6 +207,7 @@ Return the complete selected flashcards as a JSON array. For each flashcard, inc
     model: reduceModel,
     reasoningEnabled: true,
     maxTokens: FLASHCARD_CONFIG.REDUCE_MAX_TOKENS,
+    onUsage: deps.onUsage,
   });
   const response = await invokeWithRetry(
     () =>

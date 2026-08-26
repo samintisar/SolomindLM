@@ -2,6 +2,7 @@
 
 import { env } from "../../_lib/env";
 import { uncachedLlmCall } from "./cachedLlm.js";
+import { fromProviderUsage, type TokenUsage } from "./usageAggregate.js";
 
 export type InvokeTogetherTextOptions = {
   systemPrompt: string;
@@ -11,6 +12,7 @@ export type InvokeTogetherTextOptions = {
   temperature?: number;
   /** Default false for map phases; true for reduce/synthesis with smart models. */
   reasoningEnabled?: boolean;
+  onUsage?: (usage: TokenUsage) => void;
 };
 
 /**
@@ -32,6 +34,10 @@ export async function invokeTogetherText(options: InvokeTogetherTextOptions): Pr
   const text = response.content.trim();
   if (!text) {
     throw new Error("LLM returned empty text response");
+  }
+  const usage = fromProviderUsage(response.usage);
+  if (usage) {
+    options.onUsage?.(usage);
   }
   return text;
 }

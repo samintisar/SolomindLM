@@ -36,6 +36,7 @@ export function createStructuredLLM(
     temperature?: number;
     schemaName?: string;
     reasoningEnabled?: boolean;
+    onUsage?: (usage: import("../_shared/usageAggregate").TokenUsage) => void;
   }
 ): FlashcardOutputInvoker {
   const model = options?.model ?? env.FAST_LLM;
@@ -54,6 +55,7 @@ export function createStructuredLLM(
         temperature: options?.temperature,
         reasoningEnabled: options?.reasoningEnabled,
         logPrefix: "FlashcardStructured",
+        onUsage: options?.onUsage,
       }) as Promise<FlashcardResponse>;
     },
   };

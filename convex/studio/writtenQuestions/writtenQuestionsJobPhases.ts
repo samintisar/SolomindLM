@@ -12,7 +12,12 @@ import { sanitizeUserInput } from "../../_agents/_shared/index";
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/WrittenQuestionsGraph";
 import {
   appendUniqueWrittenQuestions,
@@ -353,10 +358,14 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM using structured output (Together json_schema — same as report map)
+    let tokenUsage: TokenUsage | undefined;
     const structuredLLM = createStructuredLLM(WrittenQuestionsArraySchema, {
       model: env.FAST_LLM,
       temperature: 0.4,
       maxTokens: 16_000,
+      onUsage: (usage) => {
+        tokenUsage = addTokenUsage(tokenUsage, usage);
+      },
     });
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
@@ -443,6 +452,7 @@ export async function runProcessWrittenQuestionsMapChunkPhase(
     const result = {
       questions,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined && tokenUsage.total > 0 ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(
@@ -666,6 +676,8 @@ export async function runFinalizeWrittenQuestionsPhase(
     );
 
     let finalQuestions: WrittenQuestion[];
+    let reduceUsage: TokenUsage | undefined;
+    let reduceLatencyMs = 0;
 
     if (dedupedQuestions.length > questionCount) {
       console.log(
@@ -680,6 +692,9 @@ export async function runFinalizeWrittenQuestionsPhase(
         maxTokens: 32_000,
         temperature: 0.3,
         reasoningEnabled: false,
+        onUsage: (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        },
       });
       const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
       const selectionPrompt = getSelectionIdsPrompt({
@@ -714,8 +729,9 @@ export async function runFinalizeWrittenQuestionsPhase(
         throw new Error("LLM returned zero valid selected question IDs");
       }
 
+      reduceLatencyMs = Date.now() - startTime;
       console.log(
-        `[WrittenQuestionsJob] Selection completed in ${Date.now() - startTime}ms, selected ${finalQuestions.length} questions`
+        `[WrittenQuestionsJob] Selection completed in ${reduceLatencyMs}ms, selected ${finalQuestions.length} questions`
       );
     } else {
       finalQuestions = padQuestionsToTarget(dedupedQuestions, allQuestions, questionCount);
@@ -781,15 +797,23 @@ export async function runFinalizeWrittenQuestionsPhase(
       {
         writtenQuestionId,
         questions: finalQuestions,
-        metadata: {
-          title,
-          questionCount: finalQuestions.length,
-          phase: "completed",
-          progress: 100,
-          completedAt: Date.now(),
-          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-          mapFailedCount: failedCount.count,
-        },
+        metadata: withStudioTelemetryMetadata(
+          {
+            title,
+            questionCount: finalQuestions.length,
+            phase: "completed",
+            progress: 100,
+            completedAt: Date.now(),
+            mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+            mapFailedCount: failedCount.count,
+          },
+          aggregateStudioJobTelemetry({
+            mapResults: Object.values(mapResults),
+            ...(reduceLatencyMs > 0 || reduceUsage !== undefined
+              ? { reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage } }
+              : {}),
+          })
+        ),
       }
     );
 

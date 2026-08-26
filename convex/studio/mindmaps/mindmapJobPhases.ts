@@ -11,8 +11,13 @@ import { withLanguageInstruction } from "../../_agents/_shared/languageInstructi
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { invokeStructuredOutput } from "../../_agents/_shared/structuredLlm";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
+import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/MindMapGraph";
 import {
   MAP_PROMPT,
@@ -27,6 +32,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { env } from "../../_lib/env";
 import { invokeStudioLlm } from "../_job/invokeStudioLlm";
+import { conceptsFromSource, createSmartFallback } from "./mindmapFallback";
 
 // ============================================================
 // CONFIGURATION
@@ -123,46 +129,6 @@ function cleanLeafNodes(node: MindMapNode): void {
   }
 }
 
-/**
- * Creates a meaningful fallback tree
- */
-function createSmartFallback(extractions: ConceptExtraction[]): FinalMindMap {
-  const themeCounts: Record<string, number> = {};
-  extractions.forEach((e) => {
-    const t = e.main_theme || "Unknown";
-    themeCounts[t] = (themeCounts[t] || 0) + 1;
-  });
-
-  const rootTitle =
-    Object.entries(themeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "Knowledge Map";
-
-  const seenThemes = new Set<string>();
-  const children: MindMapNode[] = [];
-
-  for (const ex of extractions) {
-    const theme = ex.main_theme || "Misc";
-    if (seenThemes.has(theme)) continue;
-    seenThemes.add(theme);
-
-    const branchName = theme === rootTitle ? "Overview" : theme;
-
-    children.push({
-      topic: branchName,
-      children: ex.key_concepts.map((c) => ({
-        topic: c,
-        children: null,
-      })),
-    });
-  }
-
-  return {
-    nodeData: {
-      topic: rootTitle,
-      children: children.length > 0 ? children : null,
-    },
-  };
-}
-
 // ============================================================
 // PHASE 1: Initialize & Schedule Map Tasks
 // ============================================================
@@ -249,7 +215,7 @@ export async function runMindmapGenerationPhase(
           extraction: {
             main_theme: "Source",
             summary: mapPlan.skipMapContent,
-            key_concepts: [],
+            key_concepts: conceptsFromSource(mapPlan.skipMapContent),
           },
           processingTimeMs: 0,
         }),
@@ -372,6 +338,7 @@ export async function runProcessMindMapMapChunkPhase(
     console.log(`[MindMapJob] ${chunkId} Calling LLM (${prompt.length} chars)`);
 
     const startTime = Date.now();
+    let tokenUsage: TokenUsage | undefined;
     const extraction = await invokeStudioLlm({
       invoke: () =>
         invokeStructuredOutput({
@@ -383,6 +350,9 @@ export async function runProcessMindMapMapChunkPhase(
           temperature: 0.1,
           maxTokens: 8000,
           logPrefix: "MindMapMap",
+          onUsage: (usage) => {
+            tokenUsage = usage;
+          },
         }),
       timeoutMs: CONFIG.PER_CHUNK_TIMEOUT_MS,
       phaseLabel: "MindMapMap",
@@ -398,6 +368,7 @@ export async function runProcessMindMapMapChunkPhase(
     const result = {
       extraction,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.storeMindMapMapResult, {
@@ -599,6 +570,8 @@ export async function runFinalizeMindMapPhase(
     );
 
     let finalMindMap: FinalMindMap;
+    let reduceUsage: TokenUsage | undefined;
+    let reduceLatencyMs = 0;
 
     try {
       const startTime = Date.now();
@@ -611,6 +584,9 @@ export async function runFinalizeMindMapPhase(
             maxTokens: 16_000,
             temperature: 0.3,
             reasoningEnabled: true,
+            onUsage: (usage) => {
+              reduceUsage = usage;
+            },
           }),
         timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
         phaseLabel: "MindMapReduce",
@@ -622,10 +598,10 @@ export async function runFinalizeMindMapPhase(
       }
 
       const parsedTree = parseMarkdownToTree(markdown);
-      const elapsed = Date.now() - startTime;
+      reduceLatencyMs = Date.now() - startTime;
 
       console.log(
-        `[MindMapJob] Reduce completed in ${elapsed}ms, root: "${parsedTree.topic}", branches: ${parsedTree.children?.length || 0}`
+        `[MindMapJob] Reduce completed in ${reduceLatencyMs}ms, root: "${parsedTree.topic}", branches: ${parsedTree.children?.length || 0}`
       );
 
       finalMindMap = { nodeData: parsedTree };
@@ -663,16 +639,22 @@ export async function runFinalizeMindMapPhase(
     await ctx.runMutation(internal.studio.jobMutations.mindmaps.saveMindMapResults, {
       mindmapId,
       mindmap: finalMindMap,
-      metadata: {
-        title,
-        nodeCount: 0,
-        edgeCount: 0,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          nodeCount: 0,
+          edgeCount: 0,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data

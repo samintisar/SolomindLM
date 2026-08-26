@@ -12,7 +12,12 @@ import { withLanguageInstruction } from "../../_agents/_shared/languageInstructi
 import { mergeModelKwargs } from "../../_agents/_shared/llm_factory";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/FlashcardGraph";
 import {
   recursiveCollapse,
@@ -326,9 +331,13 @@ export async function runProcessFlashcardMapChunkPhase(
     const language = userPrefs?.outputLanguage;
 
     // Process with LLM using structured output
+    let tokenUsage: TokenUsage | undefined;
     const structuredLLM = createStructuredLLM(FlashcardArraySchema, {
       model: env.FAST_LLM,
       temperature: 0.3,
+      onUsage: (usage) => {
+        tokenUsage = usage;
+      },
     });
 
     const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
@@ -371,6 +380,7 @@ export async function runProcessFlashcardMapChunkPhase(
     const result = {
       flashcards: cleanedFlashcards,
       processingTimeMs: elapsed,
+      ...(tokenUsage !== undefined ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.flashcards.storeFlashcardMapResult, {
@@ -571,10 +581,14 @@ export async function runFinalizeFlashcardPhase(
     // Collapse and reduce with the shared flashcard pipeline helpers
     const sanitizedTopic = topic ? sanitizeUserInput(topic) : undefined;
     const llm = createReduceLLM(smartLlm);
+    let reduceUsage: TokenUsage | undefined;
     const collapseReduceDeps = {
       smartLlm: llm,
       estimateTokens: countTokens,
       logger,
+      onUsage: (usage: TokenUsage) => {
+        reduceUsage = addTokenUsage(reduceUsage, usage);
+      },
     };
 
     const startTime = Date.now();
@@ -639,15 +653,21 @@ export async function runFinalizeFlashcardPhase(
     await ctx.runMutation(internal.studio.jobMutations.flashcards.saveFlashcardResults, {
       flashcardId,
       flashcards: finalFlashcards,
-      metadata: {
-        title,
-        cardCount: finalFlashcards.length,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          cardCount: finalFlashcards.length,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: elapsed, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data

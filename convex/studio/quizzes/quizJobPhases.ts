@@ -10,7 +10,12 @@ import { allWithConcurrency, sanitizeUserInput } from "../../_agents/_shared/ind
 import { withLanguageInstruction } from "../../_agents/_shared/languageInstruction";
 import { createErrorMetadata, createJobLogger } from "../../_agents/_shared/logging";
 import { planStudioJobMapPhase } from "../../_agents/_shared/studioExecutionMode";
+import {
+  aggregateStudioJobTelemetry,
+  withStudioTelemetryMetadata,
+} from "../../_agents/_shared/studioJobTelemetry";
 import { countTokens } from "../../_agents/_shared/tokenizer";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import { packChunks, validateChunks } from "../../_agents/QuizGraph";
 import {
   applySelectedCandidateIndices,
@@ -312,10 +317,18 @@ export async function runProcessQuizMapChunkPhase(
     }
     const language = userPrefs?.outputLanguage;
 
+    let tokenUsage: TokenUsage | undefined;
     const structuredLLM = createStructuredLLM<QuizCandidateResponse>(
       QuizCandidateArraySchema,
       "quiz_candidates",
-      { model: env.FAST_LLM, temperature: 0.4, maxTokens: 16_000 }
+      {
+        model: env.FAST_LLM,
+        temperature: 0.4,
+        maxTokens: 16_000,
+        onUsage: (usage) => {
+          tokenUsage = addTokenUsage(tokenUsage, usage);
+        },
+      }
     );
 
     const sanitizedFocus = focus ? sanitizeUserInput(focus) : undefined;
@@ -420,6 +433,7 @@ export async function runProcessQuizMapChunkPhase(
     const result = {
       candidates,
       processingTimeMs: totalMapElapsedMs,
+      ...(tokenUsage !== undefined && tokenUsage.total > 0 ? { tokenUsage } : {}),
     };
 
     await ctx.runMutation(internal.studio.jobMutations.quizzes.storeQuizMapResult, {
@@ -610,6 +624,7 @@ export async function runFinalizeQuizPhase(
     });
 
     // Selection phase: LLM returns 1-based candidate IDs (not full-object echo — reduces position bias)
+    let reduceUsage: TokenUsage | undefined;
     const structuredSelectLLM = createStructuredLLM<QuizCandidateIndexSelection>(
       QuizCandidateIndexSelectionSchema,
       "quiz_candidate_index_selection",
@@ -618,6 +633,9 @@ export async function runFinalizeQuizPhase(
         maxTokens: 24_000,
         temperature: 0.3,
         reasoningEnabled: true,
+        onUsage: (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        },
       }
     );
 
@@ -699,6 +717,9 @@ export async function runFinalizeQuizPhase(
         maxTokens: 4_096,
         temperature: 0.3,
         reasoningEnabled: true,
+        onUsage: (usage) => {
+          reduceUsage = addTokenUsage(reduceUsage, usage);
+        },
       }
     );
 
@@ -733,6 +754,7 @@ export async function runFinalizeQuizPhase(
     );
 
     const finalQuestions = expandedResults.filter((q): q is QuizQuestion => q !== null);
+    const reduceLatencyMs = Date.now() - startTime;
     console.log(
       `[QuizJob] Expanded ${finalQuestions.length} questions (${expandedResults.length - finalQuestions.length} failed)`
     );
@@ -770,15 +792,21 @@ export async function runFinalizeQuizPhase(
     await ctx.runMutation(internal.studio.jobMutations.quizzes.saveQuizResults, {
       quizId,
       questions: finalQuestions,
-      metadata: {
-        title,
-        questionCount: finalQuestions.length,
-        phase: "completed",
-        progress: 100,
-        completedAt: Date.now(),
-        mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
-        mapFailedCount: failedCount.count,
-      },
+      metadata: withStudioTelemetryMetadata(
+        {
+          title,
+          questionCount: finalQuestions.length,
+          phase: "completed",
+          progress: 100,
+          completedAt: Date.now(),
+          mapSuccessCount: Object.keys(mapResults).length - failedCount.count,
+          mapFailedCount: failedCount.count,
+        },
+        aggregateStudioJobTelemetry({
+          mapResults: Object.values(mapResults),
+          reduce: { latencyMs: reduceLatencyMs, tokenUsage: reduceUsage },
+        })
+      ),
     });
 
     // Clear intermediate data
