@@ -8,6 +8,7 @@
 import { env } from "../../_lib/env";
 import type { ServiceLogger } from "../../_lib/logging/serviceLogger";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
+import { resolveSmartModel } from "../../_lib/resolveSmartModel";
 import { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { countTokens } from "../_shared/tokenizer";
@@ -59,7 +60,7 @@ export class ChatAgent {
   private fetchDocumentFn?: ChatAgentOptions["fetchDocumentFn"];
 
   constructor(options?: ChatAgentOptions) {
-    const smartModel = options?.smartModel || env.SMART_LLM || "openai/gpt-oss-120b";
+    const smartModel = resolveSmartModel(options?.smartModel);
     this.llmWrapper = new ChatLLMWrapper({
       apiKey: env.TOGETHER_AI_API_KEY,
       model: smartModel,

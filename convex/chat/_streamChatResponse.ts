@@ -1,13 +1,13 @@
 "use node";
 
 import { ChatAgent, type GlobalRerankFn } from "../_agents/ChatAgent";
-import { AVAILABLE_SMART_MODEL_IDS, type SmartModelId } from "../_agents/chat/chatConfig.js";
 import { budgetConversationHistory } from "../_agents/chat/chatHistoryBudget";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
+import { resolveSmartModel } from "../_lib/resolveSmartModel";
 import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
 import {
   createChatVectorSearchRunner,
@@ -91,13 +91,7 @@ export async function streamChatResponse(
       }
     | undefined;
 
-  // Validate model ID against whitelist, fall back to env default
-  const validModelIds = new Set(AVAILABLE_SMART_MODEL_IDS);
-  const resolvedSmartModel =
-    notebookChatSettings?.smartModel &&
-    validModelIds.has(notebookChatSettings.smartModel as SmartModelId)
-      ? (notebookChatSettings.smartModel as SmartModelId)
-      : ((env.SMART_LLM ?? "openai/gpt-oss-120b") as SmartModelId);
+  const resolvedSmartModel = resolveSmartModel(notebookChatSettings?.smartModel);
 
   // Merge chat settings
   const conversationDoc = await ctx.runQuery(internal.chat.conversations.getInternal, {
