@@ -17,11 +17,18 @@ export type SmartModelId = (typeof AVAILABLE_SMART_MODEL_IDS)[number];
 
 export { DEFAULT_SMART_MODEL_ID };
 
+/** Saved picker IDs that were replaced; map to the successor still in the catalog. */
+const LEGACY_SMART_MODEL_ALIASES: Record<string, SmartModelId> = {
+  "zai-org/GLM-5.2": "zai-org/GLM-5.3-Flash",
+};
+
 /** Validate notebook/chat model selection; fall back to DeepSeek V4 Flash. */
 export function resolveSmartModel(candidate?: string | null): SmartModelId {
   const validModelIds = new Set<string>(AVAILABLE_SMART_MODEL_IDS);
-  if (candidate && validModelIds.has(candidate)) {
-    return candidate as SmartModelId;
+  const aliased = candidate ? LEGACY_SMART_MODEL_ALIASES[candidate] : undefined;
+  const normalized = aliased ?? candidate;
+  if (normalized && validModelIds.has(normalized)) {
+    return normalized as SmartModelId;
   }
   return DEFAULT_SMART_MODEL_ID;
 }

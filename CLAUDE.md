@@ -163,7 +163,7 @@ Bun workspaces monorepo:
 - `storage/` — vector store, chat history
 - root `auth.ts`, `schema.ts`, `http.ts` — auth config (must be at root), schema, HTTP actions
 
-**AI services:** LLMs `openai/gpt-oss-120b` (smart) / `openai/gpt-oss-20b` (fast). Embeddings via LangChain (Together AI compatible). Reranking: ZeroEntropy. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
+**AI services:** LLMs `deepseek-ai/DeepSeek-V4-Flash-0731` (smart) / `openai/gpt-oss-20b` (fast). Embeddings via LangChain (Together AI compatible). Reranking: ZeroEntropy. OCR: Mistral. Web search: Tavily. Content extraction: Supadata (YouTube, TikTok, Instagram, X, web). TTS / embeddings / images / video / evaluations: Together AI. Audio voices via `AUDIO_VOICE_HOST_*` env vars.
 
 **Pipelines:**
 
