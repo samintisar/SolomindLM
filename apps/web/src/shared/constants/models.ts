@@ -14,18 +14,21 @@ export interface SmartModel {
   brand: SmartModelBrand;
 }
 
+/** Default RAG chat model when the notebook has no saved selection. */
+export const DEFAULT_SMART_MODEL_ID = "deepseek-ai/DeepSeek-V4-Flash-0731";
+
 export const AVAILABLE_SMART_MODELS: SmartModel[] = [
+  {
+    id: DEFAULT_SMART_MODEL_ID,
+    name: "DeepSeek V4 Flash",
+    description: "Fast reasoning and synthesis",
+    brand: "deepseek",
+  },
   {
     id: "openai/gpt-oss-120b",
     name: "GPT-OSS 120B",
     description: "Fast, reliable general-purpose model",
     brand: "openai",
-  },
-  {
-    id: "deepseek-ai/DeepSeek-V4-Flash-0731",
-    name: "DeepSeek V4 Flash",
-    description: "Fast reasoning and synthesis",
-    brand: "deepseek",
   },
   {
     id: "MiniMaxAI/MiniMax-M3",
@@ -46,9 +49,9 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "qwen",
   },
   {
-    id: "zai-org/GLM-5.2",
-    name: "GLM 5.2",
-    description: "Long-horizon coding and agentic tasks with 1M context",
+    id: "zai-org/GLM-5.3-Flash",
+    name: "GLM 5.3 Flash",
+    description: "Fast GLM reasoning for coding and agentic tasks",
     brand: "zai",
   },
 ];

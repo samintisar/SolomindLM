@@ -337,14 +337,14 @@ You can customize which models are used for different features. Models are hoste
 
 ```env
 FAST_LLM=openai/gpt-oss-20b
-SMART_LLM=openai/gpt-oss-120b
-REPORT_LLM=MiniMaxAI/MiniMax-M3
-FLASHCARDS_LLM=MiniMaxAI/MiniMax-M3
-QUIZ_LLM=MiniMaxAI/MiniMax-M3
-MINDMAP_LLM=MiniMaxAI/MiniMax-M3
-SPREADSHEET_LLM=MiniMaxAI/MiniMax-M3
-WRITTEN_QUESTIONS_LLM=MiniMaxAI/MiniMax-M3
-AUDIO_LLM=MiniMaxAI/MiniMax-M3
+SMART_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+REPORT_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+FLASHCARDS_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+QUIZ_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+MINDMAP_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+SPREADSHEET_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+WRITTEN_QUESTIONS_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+AUDIO_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
 ```
 
 ### Frontend Environment Variables

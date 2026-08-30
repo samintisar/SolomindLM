@@ -7,12 +7,12 @@ import { env } from "../../_lib/env";
  * Used for validation on the backend. Keep in sync with AVAILABLE_SMART_MODELS in apps/web/src/shared/constants/models.ts
  */
 export const AVAILABLE_SMART_MODEL_IDS = [
-  "openai/gpt-oss-120b",
   "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "openai/gpt-oss-120b",
   "MiniMaxAI/MiniMax-M3",
   "google/gemma-4-31B-it",
   "Qwen/Qwen3.7-Max",
-  "zai-org/GLM-5.2",
+  "zai-org/GLM-5.3-Flash",
 ] as const;
 
 export type SmartModelId = (typeof AVAILABLE_SMART_MODEL_IDS)[number];

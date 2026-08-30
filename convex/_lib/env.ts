@@ -3,19 +3,21 @@
  * Centralized config to avoid circular dependencies
  */
 
+import { DEFAULT_SMART_MODEL_ID } from "./defaultSmartModel.js";
+
 export const env = {
   // Together AI
   TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY || "",
   FAST_LLM: process.env.FAST_LLM || "openai/gpt-oss-20b",
-  SMART_LLM: process.env.SMART_LLM || "openai/gpt-oss-120b",
-  REPORT_LLM: process.env.REPORT_LLM || "MiniMaxAI/MiniMax-M3",
-  FLASHCARDS_LLM: process.env.FLASHCARDS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  QUIZ_LLM: process.env.QUIZ_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  MINDMAP_LLM: process.env.MINDMAP_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  SPREADSHEET_LLM: process.env.SPREADSHEET_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
+  SMART_LLM: process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
+  REPORT_LLM: process.env.REPORT_LLM || DEFAULT_SMART_MODEL_ID,
+  FLASHCARDS_LLM: process.env.FLASHCARDS_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
+  QUIZ_LLM: process.env.QUIZ_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
+  MINDMAP_LLM: process.env.MINDMAP_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
+  SPREADSHEET_LLM: process.env.SPREADSHEET_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
   WRITTEN_QUESTIONS_LLM:
-    process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
-  AUDIO_LLM: process.env.AUDIO_LLM || process.env.SMART_LLM || "openai/gpt-oss-120b",
+    process.env.WRITTEN_QUESTIONS_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
+  AUDIO_LLM: process.env.AUDIO_LLM || process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
   /** Together AI TTS model (e.g. Kokoro). */
   AUDIO_TTS_MODEL: process.env.AUDIO_TTS_MODEL || "hexgrad/Kokoro-82M",
   /** Kokoro voice IDs — see Together text-to-speech docs. Override via AUDIO_VOICE_HOST_A / _B env vars. */

@@ -28,7 +28,11 @@ import {
   type DiscoveryAcademicFilterState,
 } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
 import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
-import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
+import {
+  AVAILABLE_SMART_MODELS,
+  DEFAULT_SMART_MODEL_ID,
+  findSmartModelById,
+} from "@/shared/constants/models";
 import type { ChatSettings } from "@/shared/types";
 import { cn } from "@/shared/utils/cn";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
@@ -245,7 +249,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     onError: (message) => onVoiceError?.(message) ?? console.error(message),
   });
 
-  const currentModel = findSmartModelById(chatSettings?.smartModel);
+  const selectedModelId = chatSettings?.smartModel ?? DEFAULT_SMART_MODEL_ID;
+  const currentModel = findSmartModelById(selectedModelId);
   const modeMeta = COMPOSER_MODES.find((m) => m.id === mode) ?? COMPOSER_MODES[0];
   const ModeIcon = modeMeta.icon;
 
@@ -623,16 +628,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     openMenu === "model" && "bg-muted/40 text-foreground"
                   )}
                   title={currentModel?.name ?? "Choose model"}
-                  aria-label={`Model: ${currentModel?.name ?? "Choose model"}`}
+                  aria-label={`Model: ${currentModel?.name ?? "DeepSeek V4 Flash"}`}
                 >
-                  <ModelBrandIcon brand={currentModel?.brand ?? "openai"} />
+                  <ModelBrandIcon brand={currentModel?.brand ?? "deepseek"} />
                   <span
                     className={cn(
                       "min-w-0 max-w-36 truncate",
                       hideModelButtonLabel ? "sr-only" : "@max-4xl/chat-input:sr-only"
                     )}
                   >
-                    {currentModel?.name ?? "GPT-OSS 120B"}
+                    {currentModel?.name ?? "DeepSeek V4 Flash"}
                   </span>
                   <ChevronDown
                     className={[
@@ -661,7 +666,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     </div>
                     <div className="p-1">
                       {AVAILABLE_SMART_MODELS.map((model) => {
-                        const isActive = chatSettings?.smartModel === model.id;
+                        const isActive = selectedModelId === model.id;
                         return (
                           <button
                             key={model.id}
