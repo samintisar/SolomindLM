@@ -8,7 +8,6 @@ interface NoteListViewProps {
   tools: StudioTool[];
   notes: Note[];
   activeNoteId: string | null;
-  width: number;
   onToolClick: (toolId: string) => void;
   onNoteClick: (note: Note) => void;
   onDeleteNote: (note: Note) => void;
@@ -30,7 +29,6 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
   tools,
   notes,
   activeNoteId: _activeNoteId,
-  width,
   onToolClick,
   onNoteClick,
   onDeleteNote,
@@ -67,7 +65,7 @@ export const NoteListView: React.FC<NoteListViewProps> = ({
 
   return (
     <div className="p-4 space-y-8">
-      <ToolGrid tools={tools} onToolClick={onToolClick} width={width} />
+      <ToolGrid tools={tools} onToolClick={onToolClick} />
 
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">

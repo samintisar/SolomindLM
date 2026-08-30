@@ -13,7 +13,6 @@ export { NoteIcon } from "./NoteIcon";
 export { NoteItem } from "./NoteItem";
 export { NoteListView } from "./NoteListView";
 // Sub-components (extracted from StudioPanel)
-export { ResizeHandle } from "./ResizeHandle";
 export { StudioPanel } from "./StudioPanel";
 export { StudioPanelHeader } from "./StudioPanelHeader";
 export { ToolGrid } from "./ToolGrid";

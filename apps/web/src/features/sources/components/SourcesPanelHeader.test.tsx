@@ -29,7 +29,6 @@ function renderHeader(overrides: Partial<ComponentProps<typeof SourcesPanelHeade
     renameValue: viewingSource.title,
     onRenameChange: vi.fn(),
     onRenameSubmit: vi.fn(),
-    onResizeStart: vi.fn(),
     ...overrides,
   };
 

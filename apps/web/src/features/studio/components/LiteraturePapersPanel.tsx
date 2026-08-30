@@ -24,21 +24,16 @@ import { formatAuthorsLine, rankedPaperKey, sourceLabel } from "../types/rankedP
 import { exportPapersToBibtex, exportPapersToCsv, exportPapersToExcel } from "../utils/paperExport";
 import { isPaperInNotebook, rankedPaperToBulkUpload } from "../utils/rankedPaperMappers";
 import { CitePaperModal } from "./CitePaperModal";
-import { ResizeHandle } from "./ResizeHandle";
 
 interface LiteraturePapersPanelProps {
   sessionId: Id<"literatureReviewSessions">;
   notebookId: Id<"notebooks">;
-  width: number;
-  isResizing: boolean;
   onClose: () => void;
 }
 
 export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
   sessionId,
   notebookId,
-  width,
-  isResizing: _isResizing,
   onClose,
 }) => {
   const { success: toastSuccess, error: toastError } = useToast();
@@ -142,12 +137,7 @@ export const LiteraturePapersPanel: React.FC<LiteraturePapersPanelProps> = ({
 
   return (
     <>
-      <div
-        style={{ width }}
-        className="relative shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col overflow-hidden"
-      >
-        <ResizeHandle width={width} position="left" />
-
+      <div className="relative h-full w-full min-w-0 bg-sidebar border-l-2 border-border flex flex-col overflow-hidden">
         <PapersPanelHeader
           exportDisabled={papers.length === 0}
           exportFilenameBase={exportFilenameBase}

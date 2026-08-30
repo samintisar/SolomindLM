@@ -23,7 +23,6 @@ import { CustomizeReportModal } from "./CustomizeReportModal";
 import { CustomizeSpreadsheetsModal } from "./CustomizeSpreadsheetsModal";
 import { CustomizeWrittenQuestionsModal } from "./CustomizeWrittenQuestionsModal";
 import { NoteListView } from "./NoteListView";
-import { ResizeHandle } from "./ResizeHandle";
 import { StudioPanelHeader } from "./StudioPanelHeader";
 import type { InfographicViewControls } from "./views/InfographicView";
 
@@ -41,8 +40,6 @@ interface StudioPanelProps {
   isOpen: boolean;
   onClose: () => void;
   tools: StudioTool[];
-  width: number;
-  isResizing: boolean;
   sources?: any[];
   notebookId?: string | null;
 }
@@ -55,8 +52,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
   isOpen,
   onClose,
   tools,
-  width,
-  isResizing: _isResizing,
   sources = [],
   notebookId,
 }) => {
@@ -284,20 +279,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
 
   return (
     <>
-      <div
-        style={{
-          width: isMobile ? "100%" : width,
-        }}
-        className={`
-          relative shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col
-          overflow-hidden
-          opacity-100
-          md:w-auto w-full max-w-full
-        `}
-      >
-        {/* Resize Handle */}
-        <ResizeHandle width={width} position="left" />
-
+      <div className="relative h-full w-full min-w-0 bg-sidebar border-l-2 border-border flex flex-col overflow-hidden opacity-100">
         {/* Header */}
         <StudioPanelHeader
           activeNote={activeNoteId ? headerNote : null}
@@ -358,7 +340,6 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               tools={tools}
               notes={notes}
               activeNoteId={activeNoteId}
-              width={width}
               onToolClick={handleToolClick}
               onNoteClick={handleNoteClick}
               onDeleteNote={noteActions.handleDeleteNote}

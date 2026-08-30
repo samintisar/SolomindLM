@@ -14,7 +14,6 @@ import { StudioTool } from "@/shared/types/index";
 interface ToolGridProps {
   tools: StudioTool[];
   onToolClick: (toolId: string) => void;
-  width: number;
   /** When set, that tool card shows a selection ring (e.g. marketing preview). */
   activeToolId?: string | null;
 }
@@ -34,13 +33,17 @@ const IconMap: Record<string, React.FC<any>> = {
 /**
  * ToolGrid component displays creation tool cards in a responsive grid.
  */
-export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, width, activeToolId }) => {
+export const ToolGrid: React.FC<ToolGridProps> = ({ tools, onToolClick, activeToolId }) => {
   return (
-    <div className="space-y-3" data-onboarding="studio-tool-grid" data-testid="studio-tool-grid">
+    <div
+      className="@container space-y-3"
+      data-onboarding="studio-tool-grid"
+      data-testid="studio-tool-grid"
+    >
       <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 font-display">
         Create
       </h3>
-      <div className={`grid gap-3 ${width > 450 ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className="grid grid-cols-2 gap-3 @min-[450px]:grid-cols-3">
         {tools.map((tool) => {
           const Icon = IconMap[tool.iconName] || FileText;
           const isActive = activeToolId != null && activeToolId === tool.id;

@@ -17,7 +17,6 @@ interface SourcesPanelHeaderProps {
   renameValue: string;
   onRenameChange: (value: string) => void;
   onRenameSubmit: (id: string, newTitle: string) => void;
-  onResizeStart: (e: React.MouseEvent) => void;
 }
 
 export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
@@ -34,16 +33,9 @@ export const SourcesPanelHeader: React.FC<SourcesPanelHeaderProps> = ({
   renameValue,
   onRenameChange,
   onRenameSubmit,
-  onResizeStart,
 }) => {
   return (
     <>
-      {/* Resize Handle (desktop only) */}
-      <div
-        className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 z-50 transition-colors active:bg-primary/70 hidden md:block"
-        onMouseDown={onResizeStart}
-      />
-
       {/* Mobile Header */}
       <div className="flex md:hidden flex-col border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20 shrink-0 h-14">
         {viewingSource ? (
