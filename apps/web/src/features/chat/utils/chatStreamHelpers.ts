@@ -37,7 +37,22 @@ export function isStreamStillRelevant(
   streamConversationId: string | null,
   activeConversationId: string | null
 ): boolean {
-  return streamConversationId === activeConversationId;
+  if (streamConversationId === activeConversationId) return true;
+  // Mutation resolved the thread before React selected it — keep applying tokens.
+  if (streamConversationId != null && activeConversationId == null) return true;
+  return false;
+}
+
+/**
+ * Abort the HTTP stream only when the user actually switches threads.
+ * Auto-selecting a conversation after send (null → id) must not kill the in-flight fetch.
+ */
+export function shouldResetStreamOnConversationChange(
+  streamOwnerConversationId: string | null,
+  nextActiveConversationId: string | null
+): boolean {
+  if (streamOwnerConversationId == null) return false;
+  return streamOwnerConversationId !== nextActiveConversationId;
 }
 
 export function computeRemoteGenerationBlocksSend(

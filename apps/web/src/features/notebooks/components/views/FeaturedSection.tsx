@@ -1,5 +1,6 @@
 import { Globe } from "lucide-react";
 import React from "react";
+import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { NotebookItem } from "@/shared/types/index";
 import { ListHeader } from "../ListHeader";
 
@@ -32,7 +33,9 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
               className="group relative aspect-16/10 rounded-2xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ring-1 ring-border/50"
             >
               {/* Background Image/Color */}
-              <div className={`absolute inset-0 ${nb.coverColor} transition-opacity`}>
+              <div
+                className={`absolute inset-0 ${coverFillClass(nb.coverColor)} transition-opacity`}
+              >
                 <div
                   className="absolute inset-0 opacity-30 mix-blend-multiply"
                   style={{
@@ -76,11 +79,9 @@ export const FeaturedSection: React.FC<FeaturedSectionProps> = ({
             >
               <div className="flex items-center gap-4 min-w-0">
                 <div
-                  className={`w-10 h-10 rounded-lg ${nb.coverColor} bg-opacity-[3%] flex items-center justify-center shrink-0`}
+                  className={`w-10 h-10 rounded-lg ${coverFillClass(nb.coverColor)} flex items-center justify-center shrink-0`}
                 >
-                  <Globe
-                    className={`w-5 h-5 ${(nb.coverColor || "").replace("bg-", "text-")} opacity-50 shrink-0`}
-                  />
+                  <Globe className={`w-5 h-5 ${COVER_ICON_CLASS} shrink-0`} />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-bold text-foreground font-serif truncate">{nb.title}</span>

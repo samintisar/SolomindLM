@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import React from "react";
+import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { NotebookItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
@@ -153,10 +154,10 @@ export function NotebookCardGrid(props: SharedNotebookCardProps) {
         {/* Top Decorative Half */}
         <div
           onClick={() => onSelectNotebook(notebook)}
-          className={`h-[55%] ${notebook.coverColor} bg-opacity-[4%] group-hover:bg-opacity-[6%] transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
+          className={`h-[55%] ${coverFillClass(notebook.coverColor)} transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
         >
           <Icon
-            className={`w-10 h-10 ${(notebook.coverColor || "").replace("bg-", "text-")} opacity-55 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`}
+            className={`w-10 h-10 ${COVER_ICON_CLASS} group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`}
           />
 
           {!notebook.isSharedNotebook ? (
@@ -230,11 +231,9 @@ export function NotebookCardListInFolder(props: SharedNotebookCardProps) {
         {/* Left: Icon + Title */}
         <div className="flex items-center gap-2 min-w-0 flex-1 z-10 pointer-events-none">
           <div
-            className={`rounded ${notebook.coverColor} bg-opacity-[3%] flex items-center justify-center shrink-0 w-7 h-7`}
+            className={`rounded ${coverFillClass(notebook.coverColor)} flex items-center justify-center shrink-0 w-7 h-7`}
           >
-            <Icon
-              className={`${(notebook.coverColor || "").replace("bg-", "text-")} opacity-50 w-3.5 h-3.5`}
-            />
+            <Icon className={`${COVER_ICON_CLASS} w-3.5 h-3.5`} />
           </div>
           <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-sm">
             {notebook.title}
@@ -310,11 +309,9 @@ export function NotebookCardList({ showAuthor = false, ...props }: NotebookCardL
         {/* Title Column */}
         <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">
           <div
-            className={`rounded-md ${notebook.coverColor} bg-opacity-[3%] flex items-center justify-center shrink-0 w-9 h-9`}
+            className={`rounded-md ${coverFillClass(notebook.coverColor)} flex items-center justify-center shrink-0 w-9 h-9`}
           >
-            <Icon
-              className={`${(notebook.coverColor || "").replace("bg-", "text-")} opacity-50 w-4 h-4`}
-            />
+            <Icon className={`${COVER_ICON_CLASS} w-4 h-4`} />
           </div>
           <span className="font-medium text-foreground font-serif truncate group-hover:text-primary transition-colors text-base">
             {notebook.title}

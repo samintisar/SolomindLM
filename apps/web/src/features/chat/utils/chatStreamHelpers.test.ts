@@ -4,6 +4,7 @@ import {
   isStreamStillRelevant,
   researchProgressToStreamingActivity,
   resolveConversationMessages,
+  shouldResetStreamOnConversationChange,
 } from "./chatStreamHelpers";
 
 describe("researchProgressToStreamingActivity", () => {
@@ -54,11 +55,33 @@ describe("resolveConversationMessages", () => {
 });
 
 describe("isStreamStillRelevant", () => {
-  it("is true only when stream and active conversation match", () => {
+  it("is true when stream and active conversation match", () => {
     expect(isStreamStillRelevant("conv_a", "conv_a")).toBe(true);
-    expect(isStreamStillRelevant("conv_a", "conv_b")).toBe(false);
     expect(isStreamStillRelevant(null, null)).toBe(true);
-    expect(isStreamStillRelevant("conv_a", null)).toBe(false);
+  });
+
+  it("is false when the user switches to a different thread", () => {
+    expect(isStreamStillRelevant("conv_a", "conv_b")).toBe(false);
+  });
+
+  it("stays relevant while the UI has not selected the stream's conversation yet", () => {
+    expect(isStreamStillRelevant("conv_a", null)).toBe(true);
+  });
+});
+
+describe("shouldResetStreamOnConversationChange", () => {
+  it("does not reset when the selected thread is the stream owner", () => {
+    expect(shouldResetStreamOnConversationChange("conv_a", "conv_a")).toBe(false);
+  });
+
+  it("does not reset when a stream started before a conversation was selected", () => {
+    expect(shouldResetStreamOnConversationChange(null, "conv_a")).toBe(false);
+    expect(shouldResetStreamOnConversationChange(null, null)).toBe(false);
+  });
+
+  it("resets when the user switches to a different thread", () => {
+    expect(shouldResetStreamOnConversationChange("conv_a", "conv_b")).toBe(true);
+    expect(shouldResetStreamOnConversationChange("conv_a", null)).toBe(true);
   });
 });
 

@@ -71,7 +71,15 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), katexFonts(), pdfjsWorker()],
     optimizeDeps: {
-      include: ["streamdown", "@streamdown/code", "@streamdown/math", "pdfjs-dist"],
+      include: [
+        "react",
+        "react-dom",
+        "react-resizable-panels",
+        "streamdown",
+        "@streamdown/code",
+        "@streamdown/math",
+        "pdfjs-dist",
+      ],
     },
     server: {
       // Allow WebView on phone/emulator to load the dev server via LAN IP (see apps/mobile/.env.local)
@@ -116,7 +124,10 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
         "@convex": path.resolve(__dirname, "../../convex"),
+        react: path.resolve(rootDir, "node_modules/react"),
+        "react-dom": path.resolve(rootDir, "node_modules/react-dom"),
       },
+      dedupe: ["react", "react-dom"],
     },
     build: {
       chunkSizeWarningLimit: 500,

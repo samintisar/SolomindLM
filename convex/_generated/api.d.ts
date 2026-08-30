@@ -175,6 +175,7 @@ import type * as _agents_written_questions_state from "../_agents/written_questi
 import type * as _agents_written_questions_structuredLlm from "../_agents/written_questions/structuredLlm.js";
 import type * as _lib_arxivThrottle from "../_lib/arxivThrottle.js";
 import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
+import type * as _lib_defaultSmartModel from "../_lib/defaultSmartModel.js";
 import type * as _lib_e5Embedding from "../_lib/e5Embedding.js";
 import type * as _lib_env from "../_lib/env.js";
 import type * as _lib_errors from "../_lib/errors.js";
@@ -539,6 +540,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/written_questions/structuredLlm": typeof _agents_written_questions_structuredLlm;
   "_lib/arxivThrottle": typeof _lib_arxivThrottle;
   "_lib/conversationAccess": typeof _lib_conversationAccess;
+  "_lib/defaultSmartModel": typeof _lib_defaultSmartModel;
   "_lib/e5Embedding": typeof _lib_e5Embedding;
   "_lib/env": typeof _lib_env;
   "_lib/errors": typeof _lib_errors;

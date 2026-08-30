@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { NotebookItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -114,9 +115,9 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
         <div className="p-6 flex justify-center bg-secondary/10">
           <div className="w-48 aspect-16/10 rounded-xl bg-card border border-border shadow-md flex flex-col ring-1 ring-border/50 overflow-hidden">
             <div
-              className={`h-[55%] ${selectedColor} bg-opacity-25 flex items-center justify-center`}
+              className={`h-[55%] ${coverFillClass(selectedColor)} flex items-center justify-center`}
             >
-              <CurrentIcon className={`w-10 h-10 ${selectedColor.replace("bg-", "text-")}`} />
+              <CurrentIcon className={`w-10 h-10 ${COVER_ICON_CLASS}`} />
             </div>
             <div className="h-[45%] p-3 bg-card">
               <div className="h-2 w-2/3 bg-muted rounded-full mb-2" />

@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import React from "react";
+import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { FolderItem } from "@/shared/types/index";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
@@ -78,10 +79,10 @@ export const FolderCard: React.FC<FolderCardProps> = ({
             {/* Top Decorative Half */}
             <div
               onClick={() => onSelectFolder()}
-              className={`h-[55%] ${folder.color || "bg-vintage-brown-300"} bg-opacity-[4%] group-hover:bg-opacity-[6%] transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
+              className={`h-[55%] ${coverFillClass(folder.color)} transition-colors p-5 relative flex items-start justify-between rounded-t-2xl`}
             >
               <FolderIcon
-                className={`w-10 h-10 ${(folder.color || "").replace("bg-", "text-")} opacity-55 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`}
+                className={`w-10 h-10 ${COVER_ICON_CLASS} group-hover:scale-110 transition-transform duration-300 drop-shadow-sm`}
               />
 
               <div className="relative folder-kebab-menu z-20" onClick={(e) => e.stopPropagation()}>
@@ -153,11 +154,9 @@ export const FolderCard: React.FC<FolderCardProps> = ({
           {/* Title Column */}
           <div className="flex items-center gap-3 min-w-0 z-10 pointer-events-none">
             <div
-              className={`w-9 h-9 rounded-md ${folder.color || "bg-vintage-brown-300"} bg-opacity-[3%] flex items-center justify-center shrink-0`}
+              className={`w-9 h-9 rounded-md ${coverFillClass(folder.color)} flex items-center justify-center shrink-0`}
             >
-              <FolderIcon
-                className={`w-4 h-4 ${(folder.color || "").replace("bg-", "text-")} opacity-50`}
-              />
+              <FolderIcon className={`w-4 h-4 ${COVER_ICON_CLASS}`} />
             </div>
 
             <div className="min-w-0">

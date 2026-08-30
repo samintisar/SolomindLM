@@ -108,6 +108,8 @@ export interface SendMessageCallbacks {
   onError: (error: string | ChatError) => void;
   /** Called when stream is stopped by user */
   onStopped?: () => void;
+  /** Conversation created or resolved by sendMessageOptimistic, before the HTTP stream starts. */
+  onConversationReady?: (conversationId: string) => void;
 }
 
 function mergeToolCallsFromLines(lines: string[]): MessageToolCall[] {

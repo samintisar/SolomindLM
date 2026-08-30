@@ -119,6 +119,7 @@ const AppContent: React.FC = () => {
     sources: sourceManager.sources,
     notes: noteCRUD.notes,
     documents,
+    onConversationEnsured: setActiveConversationId,
   });
   const notebookCRUD = useNotebookCRUD({
     isAuthenticated,

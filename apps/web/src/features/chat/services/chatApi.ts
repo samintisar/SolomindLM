@@ -108,6 +108,7 @@ export function useSendMessage() {
       attachedDocumentIds?: string[]
     ) => {
       let tempMessageId: string | null;
+      let resolvedConversationId: string | undefined = conversationId;
 
       // Check authentication and token availability
       if (!isAuthenticated || !authToken) {
@@ -130,7 +131,9 @@ export function useSendMessage() {
         try {
           await releaseChatGeneration({
             notebookId: notebookId as Id<"notebooks">,
-            conversationId: conversationId ? (conversationId as Id<"conversations">) : undefined,
+            conversationId: resolvedConversationId
+              ? (resolvedConversationId as Id<"conversations">)
+              : undefined,
           });
         } catch {
           // Best-effort: server job may have already decremented the refcount
@@ -149,6 +152,8 @@ export function useSendMessage() {
 
         tempMessageId = result.tempMessageId;
         void tempMessageId; // Reserved for optimistic UI; satisfy noUnusedLocals
+        resolvedConversationId = result.conversationId as string;
+        callbacks.onConversationReady?.(resolvedConversationId);
 
         // Step 2: Get auth token for cross-origin requests
         // HTTP actions require JWT token via Authorization header (cookies don't work cross-origin)
@@ -167,7 +172,7 @@ export function useSendMessage() {
             notebookId,
             message,
             documentIds,
-            conversationId: conversationId || undefined,
+            conversationId: resolvedConversationId,
             userMessageId: result.messageId,
             deepResearch: deepResearch || undefined,
             sourcePolicy: sourcePolicy ?? undefined,

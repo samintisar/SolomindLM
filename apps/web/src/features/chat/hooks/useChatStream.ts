@@ -27,6 +27,7 @@ import {
   computeRemoteGenerationBlocksSend,
   isStreamStillRelevant,
   researchProgressToStreamingActivity,
+  shouldResetStreamOnConversationChange,
 } from "../utils/chatStreamHelpers";
 
 type StudioListOverlayState = {
@@ -41,6 +42,7 @@ interface UseChatStreamProps {
   sources: Source[];
   notes: Note[];
   documents: Doc<"documents">[];
+  onConversationEnsured?: (conversationId: string) => void;
 }
 
 const SKEW_MS = 120_000;
@@ -51,6 +53,7 @@ export function useChatStream({
   sources,
   notes,
   documents,
+  onConversationEnsured,
 }: UseChatStreamProps) {
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
@@ -197,8 +200,20 @@ export function useChatStream({
     streamStartedAtRef.current = null;
   }, []);
 
-  // Reset streaming state when switching to a different conversation
+  // Reset streaming state when switching to a different conversation.
+  // Do not abort when auto-select binds the thread we just created/sent on.
   useEffect(() => {
+    if (
+      !shouldResetStreamOnConversationChange(
+        streamOwnerConversationIdRef.current,
+        activeConversationId
+      )
+    ) {
+      if (streamOwnerConversationIdRef.current == null && activeConversationId) {
+        streamOwnerConversationIdRef.current = activeConversationId;
+      }
+      return;
+    }
     // Abort any in-flight research stream for the previous conversation
     // so its callbacks do not leak into the new chat's UI state.
     if (abortControllerRef.current) {
@@ -424,6 +439,10 @@ export function useChatStream({
                 resetStreamingState();
                 abortControllerRef.current = null;
               },
+              onConversationReady: (conversationId) => {
+                streamOwnerConversationIdRef.current = conversationId;
+                onConversationEnsured?.(conversationId);
+              },
             },
             selectedDocumentIds.length > 0 ? selectedDocumentIds : [],
             deepResearch,
@@ -445,6 +464,7 @@ export function useChatStream({
       startDeepResearch,
       resetStreamingState,
       shouldApplyStreamUpdate,
+      onConversationEnsured,
     ]
   );
 

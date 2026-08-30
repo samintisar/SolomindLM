@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import React from "react";
+import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { FolderItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -76,11 +77,9 @@ export const MoveToFolderModal: React.FC<MoveToFolderModalProps> = ({
                 className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left"
               >
                 <div
-                  className={`w-10 h-10 rounded-lg ${folder.color || "bg-vintage-brown-300"} bg-opacity-20 flex items-center justify-center`}
+                  className={`w-10 h-10 rounded-lg ${coverFillClass(folder.color)} flex items-center justify-center`}
                 >
-                  <FolderIcon
-                    className={`w-5 h-5 ${(folder.color || "").replace("bg-", "text-")}`}
-                  />
+                  <FolderIcon className={`w-5 h-5 ${COVER_ICON_CLASS}`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-foreground truncate">{folder.name}</div>
