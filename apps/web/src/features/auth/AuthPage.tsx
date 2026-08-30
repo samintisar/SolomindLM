@@ -363,7 +363,6 @@ function AuthHeroMockup() {
                     <ToolGrid
                       tools={STUDIO_TOOLS}
                       onToolClick={handleStudioToolClick}
-                      width={420}
                       activeToolId={studioModal}
                     />
                   </div>

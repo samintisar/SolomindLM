@@ -11,14 +11,12 @@ import {
 import type { ActiveLiteratureView } from "../types/literatureStudio";
 import { literatureReportToolbarLabel } from "../utils/literatureReportLabels";
 import type { CitationStyle } from "./CitationStylePicker";
-import { ResizeHandle } from "./ResizeHandle";
 import { LiteratureReportView } from "./views/LiteratureReportView";
 import type { LiteratureTable } from "./views/LiteratureTableView";
 import { LiteratureTableView } from "./views/LiteratureTableView";
 
 interface LiteratureStudioViewProps {
   view: Exclude<ActiveLiteratureView, { kind: "papers" } | { kind: "screening" }>;
-  width: number;
   notebookId: Id<"notebooks">;
   onClose: () => void;
   onOpenSavedReport?: (reportId: Id<"reports">) => void;
@@ -27,7 +25,6 @@ interface LiteratureStudioViewProps {
 
 export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
   view,
-  width,
   notebookId,
   onClose,
   onOpenSavedReport,
@@ -38,7 +35,6 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
       <LiteratureTableStudioShell
         tableId={view.tableId}
         notebookId={notebookId}
-        width={width}
         onClose={onClose}
         onOpenSavedSpreadsheet={onOpenSavedSpreadsheet}
       />
@@ -48,7 +44,6 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
   return (
     <LiteratureReportStudioShell
       reportId={view.reportId}
-      width={width}
       onClose={onClose}
       onOpenSavedReport={onOpenSavedReport}
     />
@@ -58,13 +53,11 @@ export const LiteratureStudioView: React.FC<LiteratureStudioViewProps> = ({
 function LiteratureTableStudioShell({
   tableId,
   notebookId,
-  width,
   onClose,
   onOpenSavedSpreadsheet,
 }: {
   tableId: Id<"literatureTables">;
   notebookId: Id<"notebooks">;
-  width: number;
   onClose: () => void;
   onOpenSavedSpreadsheet?: (spreadsheetId: Id<"spreadsheets">) => void;
 }) {
@@ -100,7 +93,7 @@ function LiteratureTableStudioShell({
   );
 
   return (
-    <PanelShell width={width} variant="table">
+    <PanelShell variant="table">
       {!table ? (
         <LoadingState />
       ) : (
@@ -128,12 +121,10 @@ function LiteratureTableStudioShell({
 
 function LiteratureReportStudioShell({
   reportId,
-  width,
   onClose,
   onOpenSavedReport,
 }: {
   reportId: Id<"literatureReports">;
-  width: number;
   onClose: () => void;
   onOpenSavedReport?: (reportId: Id<"reports">) => void;
 }) {
@@ -152,7 +143,7 @@ function LiteratureReportStudioShell({
   }, [onOpenSavedReport, reportId, saveAsStudioReport, toastError, toastSuccess]);
 
   return (
-    <PanelShell width={width}>
+    <PanelShell>
       {!detail ? (
         <LoadingState />
       ) : (
@@ -176,22 +167,19 @@ function LiteratureReportStudioShell({
 }
 
 function PanelShell({
-  width,
   children,
   variant = "default",
 }: {
-  width: number;
   children: React.ReactNode;
   variant?: "default" | "table";
 }) {
   const shellClass =
     variant === "table"
-      ? "relative shrink-0 bg-background border-l border-border/70 h-full flex flex-col overflow-hidden"
-      : "relative shrink-0 bg-sidebar border-l-2 border-border h-full flex flex-col overflow-hidden";
+      ? "relative h-full w-full min-w-0 bg-background border-l border-border/70 flex flex-col overflow-hidden"
+      : "relative h-full w-full min-w-0 bg-sidebar border-l-2 border-border flex flex-col overflow-hidden";
 
   return (
-    <div style={{ width }} className={shellClass}>
-      <ResizeHandle width={width} position="left" />
+    <div className={shellClass}>
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">{children}</div>
     </div>
   );

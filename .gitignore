@@ -142,8 +142,9 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
-# VSCode and Cursor
-.vscode/
+# VSCode and Cursor (keep shared workspace EOL settings tracked)
+.vscode/*
+!.vscode/settings.json
 .cursor/*
 !.cursor/hooks.json
 !.cursor/hooks/

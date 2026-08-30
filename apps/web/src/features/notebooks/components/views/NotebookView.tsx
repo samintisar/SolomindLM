@@ -1,8 +1,8 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Group, Panel, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
-
 import { useAuth } from "@/features/auth/useAuth";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { useChatStreamingContext } from "@/features/chat/useChatStreaming";
@@ -20,7 +20,7 @@ import type { ActiveLiteratureView } from "@/features/studio/types/literatureStu
 import { useStudioContext } from "@/features/studio/useStudioContext";
 import { STUDIO_TOOLS } from "@/shared/constants";
 import { useToast } from "@/shared/contexts/useToast";
-import { usePanelResize } from "@/shared/hooks/usePanelResize";
+import { NotebookPanelSeparator } from "./NotebookPanelSeparator";
 
 export function NotebookView() {
   const { user } = useAuth();
@@ -45,19 +45,8 @@ export function NotebookView() {
 
   const { error: toastError } = useToast();
 
-  const {
-    leftWidth,
-
-    rightWidth,
-
-    isResizingLeft,
-
-    isResizingRight,
-
-    startResizingLeft,
-
-    startResizingRight,
-  } = usePanelResize();
+  const sourcesPanelRef = usePanelRef();
+  const [studioDefaultSize, setStudioDefaultSize] = useState(420);
 
   const [mobileActiveTab, setMobileActiveTab] = useState<"sources" | "chat" | "studio">("sources");
 
@@ -144,7 +133,15 @@ export function NotebookView() {
     setMobileActiveTab("studio");
   }, []);
 
-  const toggleSources = () => setIsSourcesOpen(!isSourcesOpen);
+  const toggleSources = () => {
+    if (isSourcesOpen) {
+      sourcesPanelRef.current?.collapse();
+      setIsSourcesOpen(false);
+    } else {
+      sourcesPanelRef.current?.expand();
+      setIsSourcesOpen(true);
+    }
+  };
 
   const toggleStudio = useCallback(() => setIsStudioOpen((isOpen) => !isOpen), []);
 
@@ -156,8 +153,6 @@ export function NotebookView() {
         <LiteraturePapersPanel
           sessionId={activeLiteratureView.sessionId}
           notebookId={urlNotebookId as Id<"notebooks">}
-          width={rightWidth}
-          isResizing={isResizingRight}
           onClose={handleCloseLiteratureView}
         />
       );
@@ -167,8 +162,6 @@ export function NotebookView() {
       return (
         <LiteratureScreeningPanel
           sessionId={activeLiteratureView.sessionId}
-          width={rightWidth}
-          isResizing={isResizingRight}
           onClose={handleCloseLiteratureView}
         />
       );
@@ -178,7 +171,6 @@ export function NotebookView() {
       return (
         <LiteratureStudioView
           view={activeLiteratureView}
-          width={rightWidth}
           notebookId={urlNotebookId as Id<"notebooks">}
           onClose={handleCloseLiteratureView}
           onOpenSavedReport={handleOpenSavedReport}
@@ -192,8 +184,6 @@ export function NotebookView() {
         isOpen={isStudioOpen}
         onClose={toggleStudio}
         tools={STUDIO_TOOLS}
-        width={rightWidth}
-        isResizing={isResizingRight}
         sources={sources}
         notebookId={urlNotebookId}
       />
@@ -205,11 +195,7 @@ export function NotebookView() {
     handleOpenSavedReport,
     handleOpenSavedSpreadsheet,
 
-    isResizingRight,
-
     isStudioOpen,
-
-    rightWidth,
 
     sources,
     toggleStudio,
@@ -346,8 +332,6 @@ export function NotebookView() {
         <LiteraturePapersPanel
           sessionId={activeLiteratureView.sessionId}
           notebookId={urlNotebookId as Id<"notebooks">}
-          width={390}
-          isResizing={false}
           onClose={handleCloseLiteratureView}
         />
       );
@@ -357,8 +341,6 @@ export function NotebookView() {
       return (
         <LiteratureScreeningPanel
           sessionId={activeLiteratureView.sessionId}
-          width={390}
-          isResizing={false}
           onClose={handleCloseLiteratureView}
         />
       );
@@ -368,7 +350,6 @@ export function NotebookView() {
       return (
         <LiteratureStudioView
           view={activeLiteratureView}
-          width={390}
           notebookId={urlNotebookId as Id<"notebooks">}
           onClose={handleCloseLiteratureView}
           onOpenSavedReport={handleOpenSavedReport}
@@ -382,8 +363,6 @@ export function NotebookView() {
         isOpen={true}
         onClose={() => undefined}
         tools={STUDIO_TOOLS}
-        width={390}
-        isResizing={false}
         sources={sources}
         notebookId={urlNotebookId}
       />
@@ -443,54 +422,84 @@ export function NotebookView() {
 
         {/* Desktop Layout */}
 
-        <div className="hidden md:flex min-h-0 min-w-0 w-full flex-1 overflow-x-auto overflow-y-hidden">
-          <SourcesPanel
-            isOpen={isSourcesOpen}
-            onClose={toggleSources}
-            width={leftWidth}
-            isResizing={isResizingLeft}
-            userId={user?.id}
-            noteId={urlNotebookId}
-            onDocumentUploaded={() => undefined}
-            focusSourceRequest={sourceFocusRequest}
-            onFocusSourceHandled={clearSourceFocusRequest}
-            onDiscussTopic={handleDiscussSourceTopic}
-          />
+        <div className="hidden md:flex min-h-0 min-w-0 w-full flex-1 overflow-hidden">
+          <Group
+            id="notebook-desktop-panels"
+            orientation="horizontal"
+            className="h-full min-h-0 min-w-0 w-full"
+          >
+            <Panel
+              id="notebook-sources"
+              panelRef={sourcesPanelRef}
+              collapsible={true}
+              collapsedSize={0}
+              defaultSize="360px"
+              minSize="220px"
+              maxSize="70%"
+              className="min-h-0 min-w-0"
+              onResize={() => {
+                const collapsed = sourcesPanelRef.current?.isCollapsed() ?? false;
+                setIsSourcesOpen(!collapsed);
+              }}
+            >
+              <SourcesPanel
+                isOpen={isSourcesOpen}
+                onClose={toggleSources}
+                userId={user?.id}
+                noteId={urlNotebookId}
+                onDocumentUploaded={() => undefined}
+                focusSourceRequest={sourceFocusRequest}
+                onFocusSourceHandled={clearSourceFocusRequest}
+                onDiscussTopic={handleDiscussSourceTopic}
+              />
+            </Panel>
 
-          {isSourcesOpen && (
-            <div
-              className="w-1 hover:w-1.5 -ml-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
-              onMouseDown={startResizingLeft}
+            <NotebookPanelSeparator
+              disabled={!isSourcesOpen}
+              data-testid="notebook-sources-separator"
             />
-          )}
 
-          <div className="flex min-h-0 min-w-70 flex-1 flex-col overflow-hidden">
-            <ChatPanel
-              isLeftOpen={isSourcesOpen}
-              isRightOpen={isStudioOpen}
-              toggleLeft={toggleSources}
-              toggleRight={toggleStudio}
-              notebookId={urlNotebookId as Id<"notebooks"> | null}
-              notebookTitle={notebookTitle}
-              notebookIcon={activeNotebook?.icon}
-              notebookCoverColor={activeNotebook?.coverColor}
-              chatSettings={activeNotebook?.chatSettings}
-              onOpenNotebookSource={handleOpenNotebookSourceFromChat}
-              onOpenLiteratureTable={handleOpenLiteratureTable}
-              onOpenLiteratureReport={handleOpenLiteratureReport}
-              onOpenRankedPapers={handleOpenRankedPapers}
-              onOpenScreeningDecisions={handleOpenScreeningDecisions}
-            />
-          </div>
+            <Panel id="notebook-chat" minSize="280px" className="min-h-0 min-w-0">
+              <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                <ChatPanel
+                  isLeftOpen={isSourcesOpen}
+                  isRightOpen={isStudioOpen}
+                  toggleLeft={toggleSources}
+                  toggleRight={toggleStudio}
+                  notebookId={urlNotebookId as Id<"notebooks"> | null}
+                  notebookTitle={notebookTitle}
+                  notebookIcon={activeNotebook?.icon}
+                  notebookCoverColor={activeNotebook?.coverColor}
+                  chatSettings={activeNotebook?.chatSettings}
+                  onOpenNotebookSource={handleOpenNotebookSourceFromChat}
+                  onOpenLiteratureTable={handleOpenLiteratureTable}
+                  onOpenLiteratureReport={handleOpenLiteratureReport}
+                  onOpenRankedPapers={handleOpenRankedPapers}
+                  onOpenScreeningDecisions={handleOpenScreeningDecisions}
+                />
+              </div>
+            </Panel>
 
-          {isStudioOpen && (
-            <div
-              className="w-1 hover:w-1.5 -mr-0.5 z-50 cursor-col-resize shrink-0 hover:bg-primary/50 transition-colors select-none"
-              onMouseDown={startResizingRight}
-            />
-          )}
-
-          {renderRightPanel()}
+            {isStudioOpen && urlNotebookId ? (
+              <>
+                <NotebookPanelSeparator data-testid="notebook-studio-separator" />
+                <Panel
+                  id="notebook-studio"
+                  defaultSize={`${studioDefaultSize}px`}
+                  minSize="220px"
+                  maxSize="70%"
+                  className="min-h-0 min-w-0"
+                  onResize={(size) => {
+                    if (size.inPixels > 0) {
+                      setStudioDefaultSize(size.inPixels);
+                    }
+                  }}
+                >
+                  {renderRightPanel()}
+                </Panel>
+              </>
+            ) : null}
+          </Group>
         </div>
 
         {/* Mobile Layout */}
@@ -501,8 +510,6 @@ export function NotebookView() {
               <SourcesPanel
                 isOpen={true}
                 onClose={() => undefined}
-                width={390}
-                isResizing={false}
                 userId={user?.id}
                 noteId={urlNotebookId}
                 onDocumentUploaded={() => undefined}

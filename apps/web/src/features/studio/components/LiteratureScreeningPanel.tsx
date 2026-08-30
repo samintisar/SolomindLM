@@ -20,12 +20,9 @@ import {
 } from "../services/literatureTablesApi";
 import type { LiteratureScreeningDecision } from "../types/literatureScreening";
 import { formatAuthorsLine } from "../types/rankedPaper";
-import { ResizeHandle } from "./ResizeHandle";
 
 interface LiteratureScreeningPanelProps {
   sessionId: Id<"literatureReviewSessions">;
-  width: number;
-  isResizing: boolean;
   onClose: () => void;
 }
 
@@ -57,8 +54,6 @@ const LLM_BENCHMARK_SCREENING_CRITERIA = [
 
 export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> = ({
   sessionId,
-  width,
-  isResizing: _isResizing,
   onClose,
 }) => {
   const [expandedDecisionKeys, setExpandedDecisionKeys] = useState<Set<number>>(new Set());
@@ -99,12 +94,7 @@ export const LiteratureScreeningPanel: React.FC<LiteratureScreeningPanelProps> =
   }, [session?.reviewTitle, sortedDecisions]);
 
   return (
-    <div
-      style={{ width }}
-      className="relative flex h-full shrink-0 flex-col overflow-hidden border-l-2 border-border bg-background"
-    >
-      <ResizeHandle width={width} position="left" />
-
+    <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden border-l-2 border-border bg-background">
       <ScreeningPanelHeader
         title="Screening Decisions and Outcome Summary"
         canExport={total > 0}

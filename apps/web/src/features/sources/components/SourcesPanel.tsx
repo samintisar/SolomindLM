@@ -29,8 +29,6 @@ export type SourcesPanelFocusRequest = { documentId: string; seq: number };
 interface SourcesPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  width: number;
-  isResizing: boolean;
   userId?: string | null;
   noteId?: string | null;
   onDocumentUploaded?: (documentId: string) => void;
@@ -43,7 +41,6 @@ interface SourcesPanelProps {
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   isOpen,
   onClose,
-  width,
   userId,
   noteId,
   onDocumentUploaded,
@@ -67,7 +64,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -150,16 +146,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   }, [viewingSourceId, documentContent, viewingSource?.status]);
 
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-
-  // Mobile detection
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   useEffect(() => {
     if (!focusSourceRequest) return;
@@ -350,56 +336,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
   };
 
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const startX = e.clientX;
-    const startWidth = width;
-    let animationFrameId: number | null = null;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      animationFrameId = requestAnimationFrame(() => {
-        const delta = moveEvent.clientX - startX;
-        const maxWidth = Math.min(window.innerWidth * 0.7, 1400);
-        const newWidth = Math.max(220, Math.min(maxWidth, startWidth + delta));
-        window.dispatchEvent(
-          new CustomEvent("resizeSourcesPanel", { detail: { width: newWidth } })
-        );
-      });
-    };
-
-    const handleMouseUp = () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-    };
-
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "col-resize";
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
-
   return (
     <>
       <div
-        style={{
-          width: isOpen ? (isMobile ? "100%" : width) : 0,
-        }}
         className={`
-          relative shrink-0 bg-sidebar border-r-2 border-border h-full flex flex-col
+          relative h-full w-full min-w-0 bg-sidebar border-r-2 border-border flex flex-col
           overflow-hidden
           ${isOpen ? "opacity-100" : "opacity-0"}
-          md:w-auto w-full max-w-full
         `}
       >
         <SourcesPanelHeader
@@ -416,7 +359,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           renameValue={renameValue}
           onRenameChange={setRenameValue}
           onRenameSubmit={handleRenameSource}
-          onResizeStart={handleResizeStart}
         />
 
         <div className="flex-1 overflow-y-auto w-full">
@@ -450,7 +392,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
               openMenuId={openMenuId}
               onMenuOpen={handleMenuOpen}
               onStartRename={handleStartRename}
-              width={width}
               onAddSource={() => setIsAddModalOpen(true)}
               onDiscoverClick={() => setIsDiscoverOpen(true)}
               selectedCount={selectedCount}

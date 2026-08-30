@@ -499,7 +499,6 @@ export function LandingHeroMockup({
           <ToolGrid
             tools={STUDIO_TOOLS}
             onToolClick={handleStudioToolClick}
-            width={480}
             activeToolId={studioModal}
           />
         </div>

@@ -21,7 +21,6 @@ interface SourceListProps {
   openMenuId: string | null;
   onMenuOpen: (id: string) => void;
   onStartRename: (sourceId: string) => void;
-  width: number;
   onAddSource: () => void;
   onDiscoverClick: () => void;
   selectedCount: number;
@@ -49,7 +48,6 @@ export const SourceList: React.FC<SourceListProps> = ({
   openMenuId,
   onMenuOpen,
   onStartRename,
-  width,
   onAddSource,
   onDiscoverClick,
   selectedCount,
@@ -68,13 +66,8 @@ export const SourceList: React.FC<SourceListProps> = ({
     onMenuOpen("");
   };
 
-  /** Below 300px: icon-only. 300–399px: single-line abbreviations so labels never wrap. */
-  const actionIconsOnly = width < 300;
-  const actionAbbrevLabels = width >= 300 && width < 400;
-  const showActionLabels = width >= 300;
-
   return (
-    <div className="p-3 space-y-4">
+    <div className="@container p-3 space-y-4">
       {/* Action Bar */}
       <div className="flex flex-col gap-2 p-1.5 bg-background/50 border border-border rounded-lg shadow-inner">
         <div className="flex gap-2">
@@ -82,28 +75,30 @@ export const SourceList: React.FC<SourceListProps> = ({
             type="button"
             data-onboarding="add-source-button"
             onClick={onAddSource}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? "px-3" : ""}`}
-            title={actionIconsOnly || actionAbbrevLabels ? "Add Source" : ""}
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-3 @min-[300px]:px-4 bg-primary text-primary-foreground rounded-md shadow-sm hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0"
+            title="Add Source"
           >
             <Plus className="w-4 h-4 shrink-0" />
-            {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">
-                {actionAbbrevLabels ? "ADD…" : "Add Source"}
-              </span>
-            )}
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
+              ADD…
+            </span>
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
+              Add Source
+            </span>
           </button>
           <button
             type="button"
             onClick={onDiscoverClick}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-card border border-border text-foreground rounded-md shadow-xs hover:bg-secondary hover:border-primary/30 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0 ${actionIconsOnly ? "px-3" : ""}`}
-            title={actionIconsOnly || actionAbbrevLabels ? "Discover sources" : ""}
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-3 @min-[300px]:px-4 bg-card border border-border text-foreground rounded-md shadow-xs hover:bg-secondary hover:border-primary/30 transition-all font-display font-bold text-[13px] uppercase tracking-wider min-w-0"
+            title="Discover sources"
           >
             <Search className="w-4 h-4 text-primary shrink-0" />
-            {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">
-                {actionAbbrevLabels ? "DISC…" : "Discover"}
-              </span>
-            )}
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
+              DISC…
+            </span>
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
+              Discover
+            </span>
           </button>
         </div>
         <div className="flex gap-2">
@@ -111,29 +106,31 @@ export const SourceList: React.FC<SourceListProps> = ({
             type="button"
             onClick={onDeleteSelected}
             disabled={selectedCount === 0}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-card/80 border border-border/70 text-destructive/90 rounded-md shadow-none hover:bg-destructive/10 hover:border-border hover:text-destructive transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0 ${actionIconsOnly ? "px-2" : ""}`}
-            title={actionIconsOnly || actionAbbrevLabels ? "Delete selected" : ""}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-2 @min-[300px]:px-3 bg-card/80 border border-border/70 text-destructive/90 rounded-md shadow-none hover:bg-destructive/10 hover:border-border hover:text-destructive transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0"
+            title="Delete selected"
           >
             <Trash2 className="w-4 h-4 shrink-0" />
-            {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">
-                {actionAbbrevLabels ? "DEL…" : "Delete"}
-              </span>
-            )}
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
+              DEL…
+            </span>
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
+              Delete
+            </span>
           </button>
           <button
             type="button"
             onClick={onRefreshAll}
             disabled={!canRefreshAll || isRefreshing}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-card/80 border border-border/70 text-muted-foreground rounded-md shadow-none hover:bg-secondary/80 hover:border-border hover:text-foreground transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0 ${actionIconsOnly ? "px-2" : ""}`}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-2 @min-[300px]:px-3 bg-card/80 border border-border/70 text-muted-foreground rounded-md shadow-none hover:bg-secondary/80 hover:border-border hover:text-foreground transition-all font-display font-medium text-[13px] uppercase tracking-wide disabled:opacity-40 disabled:pointer-events-none min-w-0"
             title="Re-fetch web pages and Google Drive imports"
           >
             <RefreshCw className={`w-4 h-4 shrink-0 ${isRefreshing ? "animate-spin" : ""}`} />
-            {showActionLabels && (
-              <span className="min-w-0 whitespace-nowrap truncate">
-                {actionAbbrevLabels ? "REFRESH…" : "Refresh all"}
-              </span>
-            )}
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
+              REFRESH…
+            </span>
+            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
+              Refresh all
+            </span>
           </button>
         </div>
       </div>
