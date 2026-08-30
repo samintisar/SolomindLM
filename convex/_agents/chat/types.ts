@@ -58,7 +58,7 @@ export interface ChatAgentOptions {
   vectorSearchHandler?: VectorSearchHandler;
   /** Single cached rerank over merged candidates */
   globalRerankFn?: GlobalRerankFn;
-  /** Override the smart model (instead of using env.SMART_LLM) */
+  /** Override the chat model; validated by resolveSmartModel. */
   smartModel?: string;
   /** Fetch full document content for single-document list queries */
   fetchDocumentFn?: (documentId: string) => Promise<{

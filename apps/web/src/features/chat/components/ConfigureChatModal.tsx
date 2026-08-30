@@ -1,6 +1,6 @@
+import { resolveSmartModel } from "@convex/_lib/resolveSmartModel";
 import { Check, GraduationCap, MessageSquare, PenLine, X } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
-import { DEFAULT_SMART_MODEL_ID } from "@/shared/constants/models";
 import type { ChatSettings } from "@/shared/types";
 
 const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 10000;
@@ -47,7 +47,7 @@ const RESPONSE_LENGTHS = [
 function normalizeSavedSettings(settings?: ChatSettings): ChatSettings {
   const instructionMode = settings?.instructionMode ?? "default";
   const responseLength = settings?.responseLength ?? "default";
-  const smartModel = settings?.smartModel ?? DEFAULT_SMART_MODEL_ID;
+  const smartModel = resolveSmartModel(settings?.smartModel);
   const out: ChatSettings = { instructionMode, responseLength, smartModel };
   if (instructionMode === "custom") {
     const t = (settings?.customInstructions ?? "").trim();

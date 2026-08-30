@@ -1,3 +1,4 @@
+import { resolveSmartModel } from "@convex/_lib/resolveSmartModel";
 import { describe, expect, test } from "vitest";
 import { AVAILABLE_SMART_MODELS, DEFAULT_SMART_MODEL_ID, findSmartModelById } from "./models";
 
@@ -10,6 +11,12 @@ describe("smart model catalog", () => {
   test("lists GLM 5.3 Flash instead of GLM 5.2", () => {
     expect(findSmartModelById("zai-org/GLM-5.3-Flash")?.id).toBe("zai-org/GLM-5.3-Flash");
     expect(findSmartModelById("zai-org/GLM-5.2")).toBeUndefined();
+  });
+
+  test("picker row for a saved GLM 5.2 notebook is GLM 5.3 Flash", () => {
+    expect(findSmartModelById(resolveSmartModel("zai-org/GLM-5.2"))?.id).toBe(
+      "zai-org/GLM-5.3-Flash"
+    );
   });
 });
 

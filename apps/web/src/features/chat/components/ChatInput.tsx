@@ -1,4 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
+import { resolveSmartModel } from "@convex/_lib/resolveSmartModel";
 import {
   ArrowUp,
   Atom,
@@ -28,11 +29,7 @@ import {
   type DiscoveryAcademicFilterState,
 } from "@/features/sources/components/AcademicDiscoveryFiltersSection";
 import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
-import {
-  AVAILABLE_SMART_MODELS,
-  DEFAULT_SMART_MODEL_ID,
-  findSmartModelById,
-} from "@/shared/constants/models";
+import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
 import type { ChatSettings } from "@/shared/types";
 import { cn } from "@/shared/utils/cn";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
@@ -249,7 +246,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     onError: (message) => onVoiceError?.(message) ?? console.error(message),
   });
 
-  const selectedModelId = chatSettings?.smartModel ?? DEFAULT_SMART_MODEL_ID;
+  const selectedModelId = resolveSmartModel(chatSettings?.smartModel);
   const currentModel = findSmartModelById(selectedModelId);
   const modeMeta = COMPOSER_MODES.find((m) => m.id === mode) ?? COMPOSER_MODES[0];
   const ModeIcon = modeMeta.icon;
