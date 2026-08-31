@@ -16,6 +16,7 @@ const packages = [
   "@convex-dev/rate-limiter/convex.config.js",
   "@convex-dev/stripe/convex.config.js",
   "@convex-dev/workflow/convex.config.js",
+  "@convex-dev/resend/convex.config.js",
   "convex/server",
 ];
 

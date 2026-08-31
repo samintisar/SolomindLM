@@ -309,8 +309,12 @@ Create `.env.local` in the project root for dev (prod uses `.env`). See `.env.ex
 | `STRIPE_WEBHOOK_SECRET`       | Stripe webhook secret  | Billing webhooks         |
 | `STRIPE_PRO_MONTHLY_PRICE_ID` | Stripe price ID        | Pro plan (monthly)       |
 | `STRIPE_PRO_YEARLY_PRICE_ID`  | Stripe price ID        | Pro plan (yearly)        |
-| `RESEND_API_KEY`              | Resend email API key   | Email OTP/password reset |
-| `AUTH_RESEND_FROM`            | From email address     | Email sending            |
+| `RESEND_API_KEY`              | Resend email API key   | Email OTP, billing, Automations events |
+| `AUTH_RESEND_FROM`            | OTP From address (e.g. `Solomind <notify@notify.solomindlm.com>`) | Auth verification and password reset |
+| `RESEND_TRANSACTIONAL_FROM` | Billing From address (can match `AUTH_RESEND_FROM`) | Receipts, dunning, cancel emails |
+| `RESEND_LIFECYCLE_FROM`     | Lifecycle From (e.g. `Solomind <hello@mail.solomindlm.com>`) | Resend Automations (welcome / onboarding) |
+| `RESEND_WEBHOOK_SECRET`     | Resend webhook signing secret | Bounce/complaint webhooks at `/resend-webhook` |
+| `RESEND_TEST_MODE`          | `true` in dev (default). Set `false` in production | Convex Resend component test-address restriction |
 | `LANGCHAIN_API_KEY`           | LangSmith API key (local only, not pushed) | Tracing when running CLI/tools locally |
 | `LANGCHAIN_PROJECT`           | LangSmith project name                     | Tracing organization                 |
 
