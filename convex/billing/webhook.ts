@@ -1,10 +1,20 @@
 "use node";
 
+import { render } from "@react-email/components";
 import { v } from "convex/values";
 import Stripe from "stripe";
 import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
+import { EMAIL_EVENTS } from "../email/events";
+import { PaymentFailed, paymentFailedText } from "../email/templates/PaymentFailed";
+import { PaymentReceipt, paymentReceiptText } from "../email/templates/PaymentReceipt";
+import {
+  SubscriptionCanceled,
+  subscriptionCanceledText,
+} from "../email/templates/SubscriptionCanceled";
+import { formatInvoiceAmount } from "./stripeEmailJobs";
 
 export const handleWebhook = internalAction({
   args: {
@@ -38,6 +48,10 @@ export const handleWebhook = internalAction({
 
         case "invoice.paid":
           await handleInvoicePaid(ctx, event);
+          break;
+
+        case "invoice.payment_failed":
+          await handleInvoicePaymentFailed(ctx, event);
           break;
 
         default:
@@ -146,6 +160,15 @@ async function handleCheckoutCompleted(
     amount,
     currency,
   });
+
+  const email = await resolveUserEmail(ctx, userId);
+  if (email) {
+    await ctx.scheduler.runAfter(0, internal.email.emit.emit, {
+      event: EMAIL_EVENTS.subscriptionStarted,
+      email,
+      payload: { userId: String(userId) },
+    });
+  }
 }
 
 async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object: any } }) {
@@ -186,6 +209,27 @@ async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object
 async function handleSubscriptionDeleted(ctx: ActionCtx, event: { data: { object: any } }) {
   const subscription = event.data.object as any;
   const subscriptionId = subscription.id;
+
+  const existing = await ctx.runQuery(internal.billing.index.getByStripeSubscriptionIdInternal, {
+    stripeSubscriptionId: subscriptionId,
+  });
+  if (existing?.userId) {
+    const email = await resolveUserEmail(ctx, existing.userId);
+    if (email) {
+      const html = await render(SubscriptionCanceled());
+      await ctx.runMutation(internal.email.sendTransactional.enqueue, {
+        to: email,
+        subject: "Your SolomindLM subscription was canceled",
+        html,
+        text: subscriptionCanceledText(),
+      });
+      await ctx.scheduler.runAfter(0, internal.email.emit.emit, {
+        event: EMAIL_EVENTS.subscriptionCanceled,
+        email,
+        payload: { userId: String(existing.userId) },
+      });
+    }
+  }
 
   await ctx.runMutation(internal.billing.index.deleteSubscription, {
     stripeSubscriptionId: subscriptionId,
@@ -228,5 +272,73 @@ async function handleInvoicePaid(ctx: ActionCtx, event: { data: { object: any } 
     interval: existing.interval,
     amount: invoice.amount_paid ?? 0,
     currency: invoice.currency ?? "usd",
+  });
+
+  const email = (await resolveUserEmail(ctx, existing.userId)) ?? invoiceCustomerEmail(invoice);
+  if (email) {
+    const amountFormatted = formatInvoiceAmount(
+      invoice.amount_paid ?? 0,
+      invoice.currency ?? "usd"
+    );
+    const html = await render(PaymentReceipt({ amountFormatted }));
+    await ctx.runMutation(internal.email.sendTransactional.enqueue, {
+      to: email,
+      subject: "Your SolomindLM receipt",
+      html,
+      text: paymentReceiptText(amountFormatted),
+    });
+    await ctx.scheduler.runAfter(0, internal.email.emit.emit, {
+      event: EMAIL_EVENTS.invoicePaid,
+      email,
+      payload: { userId: String(existing.userId) },
+    });
+  }
+}
+
+async function handleInvoicePaymentFailed(ctx: ActionCtx, event: { data: { object: any } }) {
+  const invoice = event.data.object as any & {
+    subscription?: string | { id: string };
+    amount_due?: number;
+    currency?: string;
+    customer?: string | { id: string };
+    customer_email?: string | null;
+  };
+  const subscriptionId =
+    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+
+  let userId: string | undefined;
+  if (subscriptionId) {
+    const existing = await ctx.runQuery(internal.billing.index.getByStripeSubscriptionIdInternal, {
+      stripeSubscriptionId: subscriptionId,
+    });
+    userId = existing?.userId;
+  }
+
+  const email =
+    (userId ? await resolveUserEmail(ctx, userId) : null) ?? invoiceCustomerEmail(invoice);
+  if (!email) return;
+
+  const amountFormatted = formatInvoiceAmount(invoice.amount_due ?? 0, invoice.currency ?? "usd");
+  const html = await render(PaymentFailed({ amountFormatted }));
+  await ctx.runMutation(internal.email.sendTransactional.enqueue, {
+    to: email,
+    subject: "SolomindLM payment failed",
+    html,
+    text: paymentFailedText(amountFormatted),
+  });
+  await ctx.scheduler.runAfter(0, internal.email.emit.emit, {
+    event: EMAIL_EVENTS.invoicePaymentFailed,
+    email,
+    payload: userId ? { userId: String(userId) } : {},
+  });
+}
+
+function invoiceCustomerEmail(invoice: { customer_email?: string | null }): string | null {
+  return invoice.customer_email ?? null;
+}
+
+async function resolveUserEmail(ctx: ActionCtx, userId: string): Promise<string | null> {
+  return await ctx.runQuery(internal.email.milestones.getEmailForUser, {
+    userId: userId as Id<"users">,
   });
 }

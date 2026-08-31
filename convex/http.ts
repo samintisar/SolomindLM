@@ -3,6 +3,7 @@ import { httpRouter } from "convex/server";
 import { components, internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
+import { resend } from "./email/client";
 
 const http = httpRouter();
 
@@ -97,6 +98,18 @@ http.route({
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
+  }),
+});
+
+// ============================================================
+// Resend Webhook (bounces, complaints, delivery events)
+// ============================================================
+
+http.route({
+  path: "/resend-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    return await resend.handleResendEventWebhook(ctx, req);
   }),
 });
 

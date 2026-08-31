@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { emitArtifactGeneratedIfNeeded } from "../../email/milestones";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const updateWrittenQuestionsTitle = internalMutation({
@@ -36,6 +37,8 @@ export const saveWrittenQuestionsResults = internalMutation({
         completedAt: Date.now(),
       },
     });
+    const row = await ctx.db.get(args.writtenQuestionId);
+    if (row) await emitArtifactGeneratedIfNeeded(ctx, row.userId);
   },
 });
 

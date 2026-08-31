@@ -1,7 +1,10 @@
 import Resend from "@auth/core/providers/resend";
 import { generateRandomString, RandomReader } from "@oslojs/crypto/random";
+import { render } from "@react-email/components";
 import { Resend as ResendAPI } from "resend";
+import { resolveAuthResendFrom } from "./_lib/authResendFrom";
 import { throwOnResendSendError } from "./_lib/resendSendError";
+import { VerifyEmail, verifyEmailText } from "./email/templates/VerifyEmail";
 
 /**
  * Email verification OTP for Password provider `verify:` (sign-up / unverified sign-in).
@@ -23,14 +26,20 @@ export const ResendOTP = Resend({
     return generateRandomString(random, alphabet, length);
   },
   async sendVerificationRequest({ identifier: email, provider, token }) {
+    const from = resolveAuthResendFrom();
+    if (!from) return;
     const resend = new ResendAPI(provider.apiKey as string);
-    const from = process.env.AUTH_RESEND_FROM ?? "Solomind <onboarding@resend.dev>";
-    const { error } = await resend.emails.send({
-      from,
-      to: [email],
-      subject: "Verify your email for Solomind",
-      text: `Your verification code is: ${token}\n\nIf you did not request this, you can ignore this email.`,
-    });
+    const html = await render(VerifyEmail({ token }));
+    const { error } = await resend.emails.send(
+      {
+        from,
+        to: [email],
+        subject: "Verify your email for Solomind",
+        html,
+        text: verifyEmailText(token),
+      },
+      { idempotencyKey: `otp-verify:${email}:${token}` }
+    );
     if (error) {
       throwOnResendSendError(error);
     }

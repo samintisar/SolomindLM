@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
+import { emitArtifactGeneratedIfNeeded } from "../../email/milestones";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveAudioOverviewResults = internalMutation({
@@ -24,6 +25,8 @@ export const saveAudioOverviewResults = internalMutation({
         completedAt: Date.now(),
       },
     });
+    const row = await ctx.db.get(args.audioOverviewId);
+    if (row) await emitArtifactGeneratedIfNeeded(ctx, row.userId);
   },
 });
 

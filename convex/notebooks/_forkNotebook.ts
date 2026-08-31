@@ -1,5 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { emitNotebookCreatedIfNeeded, emitSourceAddedIfNeeded } from "../email/milestones";
 
 const MAX_FORK_DOCUMENTS = 200;
 const MAX_FORK_CHUNKS = 10_000;
@@ -28,6 +29,7 @@ export async function performNotebookFork(
     createdAt: now,
     updatedAt: now,
   });
+  await emitNotebookCreatedIfNeeded(ctx, forkUserId);
 
   const docs = await ctx.db
     .query("documents")
@@ -73,6 +75,10 @@ export async function performNotebookFork(
       updatedAt: now,
     });
     docIdMap.set(d._id, newDocId);
+  }
+
+  if (docs.length > 0) {
+    await emitSourceAddedIfNeeded(ctx, forkUserId);
   }
 
   const chunks = await ctx.db

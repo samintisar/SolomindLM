@@ -86,6 +86,21 @@ describe("getOrCreateOnboardingRow", () => {
     });
   });
 
+  test("sets emittedUserCreated when the user has an email", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { name: "Fresh", email: "fresh@example.com" })
+    );
+    await withAuth(t, userId).mutation(api.onboarding.state.getOrCreateOnboardingRow, {});
+    const row = await t.run(async (ctx) =>
+      ctx.db
+        .query("userOnboarding")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique()
+    );
+    expect(row?.emittedUserCreated).toBe(true);
+  });
+
   test("creates pending row for user without row regardless of age", async () => {
     const t = convexTest(schema, modules);
     const userId = await insertLegacyUser(t, "Legacy");

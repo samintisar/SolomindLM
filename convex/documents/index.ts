@@ -18,6 +18,7 @@ import {
 } from "../_lib/notebookAccess";
 import { MAX_USER_WIDE_DOCUMENTS } from "../_lib/queryCaps";
 import { getAuthUserId } from "../auth";
+import { emitSourceAddedIfNeeded } from "../email/milestones";
 import { deriveFulltextStatus, paperRecordValidator, primaryLinkUrlForPaper } from "./paperRecord";
 
 /**
@@ -158,6 +159,8 @@ export const upload = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    await emitSourceAddedIfNeeded(ctx, userId);
 
     // Schedule embedding job; stagger YouTube jobs to avoid Supadata "Limit Exceeded" when uploading multiple at once
     const delayMs = args.type === "youtube" ? Math.floor(Math.random() * 8000) : 0;
@@ -1026,6 +1029,10 @@ export const addExternalSources = mutation({
         notebookId: args.notebookId,
         userId,
       });
+    }
+
+    if (createdIds.length > 0) {
+      await emitSourceAddedIfNeeded(ctx, userId);
     }
 
     logger.operationComplete({

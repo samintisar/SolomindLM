@@ -1,7 +1,10 @@
 import Resend from "@auth/core/providers/resend";
 import { generateRandomString, RandomReader } from "@oslojs/crypto/random";
+import { render } from "@react-email/components";
 import { Resend as ResendAPI } from "resend";
+import { resolveAuthResendFrom } from "./_lib/authResendFrom";
 import { throwOnResendSendError } from "./_lib/resendSendError";
+import { ResetPassword, resetPasswordText } from "./email/templates/ResetPassword";
 
 /**
  * Password reset OTP for Password provider `reset:`.
@@ -23,14 +26,20 @@ export const ResendOTPPasswordReset = Resend({
     return generateRandomString(random, alphabet, length);
   },
   async sendVerificationRequest({ identifier: email, provider, token }) {
+    const from = resolveAuthResendFrom();
+    if (!from) return;
     const resend = new ResendAPI(provider.apiKey as string);
-    const from = process.env.AUTH_RESEND_FROM ?? "Solomind <onboarding@resend.dev>";
-    const { error } = await resend.emails.send({
-      from,
-      to: [email],
-      subject: "Reset your Solomind password",
-      text: `Your password reset code is: ${token}\n\nIf you did not request a reset, you can ignore this email.`,
-    });
+    const html = await render(ResetPassword({ token }));
+    const { error } = await resend.emails.send(
+      {
+        from,
+        to: [email],
+        subject: "Reset your Solomind password",
+        html,
+        text: resetPasswordText(token),
+      },
+      { idempotencyKey: `otp-reset:${email}:${token}` }
+    );
     if (error) {
       throwOnResendSendError(error);
     }

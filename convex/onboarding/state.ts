@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { emitUserCreatedIfNeeded } from "../email/milestones";
 
 const onboardingRowValidator = v.object({
   _id: v.id("userOnboarding"),
@@ -24,6 +25,11 @@ const onboardingRowValidator = v.object({
   checklistDismissed: v.boolean(),
   startedAt: v.optional(v.number()),
   completedAt: v.optional(v.number()),
+  emittedUserCreated: v.optional(v.boolean()),
+  emittedNotebookCreated: v.optional(v.boolean()),
+  emittedSourceAdded: v.optional(v.boolean()),
+  emittedArtifactGenerated: v.optional(v.boolean()),
+  emittedOnboardingCompleted: v.optional(v.boolean()),
 });
 
 const defaultStateValidator = v.object({
@@ -64,10 +70,16 @@ export const getOrCreateOnboardingRow = mutation({
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError("User not found");
 
-    return await ctx.db.insert("userOnboarding", {
+    const email = user.email ?? null;
+    const rowId = await ctx.db.insert("userOnboarding", {
       userId,
       tourStatus: "pending",
       checklistDismissed: false,
+      emittedUserCreated: email ? true : undefined,
     });
+    if (email) {
+      await emitUserCreatedIfNeeded(ctx, userId);
+    }
+    return rowId;
   },
 });

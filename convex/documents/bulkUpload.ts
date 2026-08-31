@@ -5,6 +5,7 @@ import { mutation } from "../_generated/server";
 import { checkSourceLimit } from "../_lib/limits";
 import { assertCanEditNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { emitSourceAddedIfNeeded } from "../email/milestones";
 import { deriveFulltextStatus, primaryLinkUrlForPaper } from "./paperRecord";
 
 const MAX_PAPERS = 100;
@@ -143,6 +144,10 @@ export const bulkUpload = mutation({
         failed++;
         console.error("Failed to import paper:", error);
       }
+    }
+
+    if (imported > 0) {
+      await emitSourceAddedIfNeeded(ctx, userId);
     }
 
     return { imported, skipped, failed, documentIds };

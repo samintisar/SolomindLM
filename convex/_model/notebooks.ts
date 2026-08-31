@@ -1,5 +1,6 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { emitNotebookCreatedIfNeeded } from "../email/milestones";
 
 /**
  * Database operations for notebooks.
@@ -49,7 +50,7 @@ export async function createNotebook(
   data: NotebookCreate
 ): Promise<Id<"notebooks">> {
   const now = Date.now();
-  return await ctx.db.insert("notebooks", {
+  const notebookId = await ctx.db.insert("notebooks", {
     userId: data.userId,
     title: data.title.trim(),
     coverColor: data.coverColor,
@@ -59,6 +60,8 @@ export async function createNotebook(
     createdAt: now,
     updatedAt: now,
   });
+  await emitNotebookCreatedIfNeeded(ctx, data.userId);
+  return notebookId;
 }
 
 export type ChatSettings = {

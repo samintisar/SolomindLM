@@ -64,6 +64,11 @@ export default defineSchema({
     checklistDismissed: v.boolean(),
     startedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+    emittedUserCreated: v.optional(v.boolean()),
+    emittedNotebookCreated: v.optional(v.boolean()),
+    emittedSourceAdded: v.optional(v.boolean()),
+    emittedArtifactGenerated: v.optional(v.boolean()),
+    emittedOnboardingCompleted: v.optional(v.boolean()),
   }).index("by_user", ["userId"]),
 
   userPreferences: defineTable({
@@ -992,4 +997,11 @@ export default defineSchema({
   semanticScholarThrottle: defineTable({
     lastRequestAt: v.number(),
   }),
+
+  emailSuppressions: defineTable({
+    email: v.string(),
+    reason: v.union(v.literal("bounce"), v.literal("complaint")),
+    emailId: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_email", ["email"]),
 });

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { emitArtifactGeneratedIfNeeded } from "../../email/milestones";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveReportResults = internalMutation({
@@ -28,6 +29,7 @@ export const saveReportResults = internalMutation({
         completedAt: Date.now(),
       },
     });
+    await emitArtifactGeneratedIfNeeded(ctx, report.userId);
     return args.reportId;
   },
 });

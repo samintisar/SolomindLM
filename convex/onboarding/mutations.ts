@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import { mutation } from "../_generated/server";
 import { getAuthUserId } from "../auth";
+import { emitOnboardingCompletedIfNeeded } from "../email/milestones";
 import { nextStepId } from "./constants";
 
 const stepIdValidator = v.union(
@@ -69,6 +70,9 @@ export const advanceTourStep = mutation({
       patch.tourNotebookId = args.tourNotebookId;
     }
     await ctx.db.patch(row._id, patch);
+    if (next === null) {
+      await emitOnboardingCompletedIfNeeded(ctx, row.userId);
+    }
     return null;
   },
 });
@@ -96,6 +100,7 @@ export const completeTour = mutation({
       currentStepId: undefined,
       completedAt: Date.now(),
     });
+    await emitOnboardingCompletedIfNeeded(ctx, row.userId);
     return null;
   },
 });

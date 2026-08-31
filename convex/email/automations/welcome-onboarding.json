@@ -1,0 +1,76 @@
+{
+  "name": "Welcome / first-run onboarding",
+  "status": "disabled",
+  "steps": [
+    {
+      "key": "trigger_user_created",
+      "type": "trigger",
+      "config": { "eventName": "user.created" }
+    },
+    {
+      "key": "send_welcome",
+      "type": "send_email",
+      "config": {
+        "from": "{{RESEND_LIFECYCLE_FROM}}",
+        "template": { "id": "{{TEMPLATE_WELCOME_ID}}" }
+      }
+    },
+    {
+      "key": "wait_notebook",
+      "type": "wait_for_event",
+      "config": { "eventName": "notebook.created", "timeout": "24h" }
+    },
+    {
+      "key": "send_create_notebook",
+      "type": "send_email",
+      "config": {
+        "from": "{{RESEND_LIFECYCLE_FROM}}",
+        "template": { "id": "{{TEMPLATE_CREATE_NOTEBOOK_ID}}" }
+      }
+    },
+    {
+      "key": "wait_source",
+      "type": "wait_for_event",
+      "config": { "eventName": "source.added", "timeout": "72h" }
+    },
+    {
+      "key": "send_add_source",
+      "type": "send_email",
+      "config": {
+        "from": "{{RESEND_LIFECYCLE_FROM}}",
+        "template": { "id": "{{TEMPLATE_ADD_SOURCE_ID}}" }
+      }
+    },
+    {
+      "key": "wait_artifact",
+      "type": "wait_for_event",
+      "config": { "eventName": "artifact.generated", "timeout": "7d" }
+    },
+    {
+      "key": "send_generate_artifact",
+      "type": "send_email",
+      "config": {
+        "from": "{{RESEND_LIFECYCLE_FROM}}",
+        "template": { "id": "{{TEMPLATE_GENERATE_ARTIFACT_ID}}" }
+      }
+    },
+    {
+      "key": "wait_onboarding_done",
+      "type": "wait_for_event",
+      "config": { "eventName": "onboarding.completed" }
+    }
+  ],
+  "connections": [
+    { "from": "trigger_user_created", "to": "send_welcome", "type": "default" },
+    { "from": "send_welcome", "to": "wait_notebook", "type": "default" },
+    { "from": "wait_notebook", "to": "wait_source", "type": "event_received" },
+    { "from": "wait_notebook", "to": "send_create_notebook", "type": "timeout" },
+    { "from": "send_create_notebook", "to": "wait_source", "type": "default" },
+    { "from": "wait_source", "to": "wait_artifact", "type": "event_received" },
+    { "from": "wait_source", "to": "send_add_source", "type": "timeout" },
+    { "from": "send_add_source", "to": "wait_artifact", "type": "default" },
+    { "from": "wait_artifact", "to": "wait_onboarding_done", "type": "event_received" },
+    { "from": "wait_artifact", "to": "send_generate_artifact", "type": "timeout" },
+    { "from": "send_generate_artifact", "to": "wait_onboarding_done", "type": "default" }
+  ]
+}

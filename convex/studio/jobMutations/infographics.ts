@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
+import { emitArtifactGeneratedIfNeeded } from "../../email/milestones";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveInfographicResults = internalMutation({
@@ -19,6 +20,8 @@ export const saveInfographicResults = internalMutation({
         completedAt: Date.now(),
       },
     });
+    const row = await ctx.db.get(args.infographicId);
+    if (row) await emitArtifactGeneratedIfNeeded(ctx, row.userId);
   },
 });
 
