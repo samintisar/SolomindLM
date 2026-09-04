@@ -1,6 +1,6 @@
 import type { Id } from "@convex/_generated/dataModel";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Group, Panel, usePanelRef } from "react-resizable-panels";
+import { Group, Panel, useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AudioPlayerProvider } from "@/features/audio/AudioPlayerContext";
 import { useAuth } from "@/features/auth/useAuth";
@@ -46,13 +46,21 @@ export function NotebookView() {
   const { error: toastError } = useToast();
 
   const sourcesPanelRef = usePanelRef();
-  const [studioDefaultSize, setStudioDefaultSize] = useState(420);
 
   const [mobileActiveTab, setMobileActiveTab] = useState<"sources" | "chat" | "studio">("sources");
 
   const [isSourcesOpen, setIsSourcesOpen] = useState(true);
 
   const [isStudioOpen, setIsStudioOpen] = useState(true);
+
+  const desktopPanelIds =
+    isStudioOpen && urlNotebookId
+      ? ["notebook-sources", "notebook-chat", "notebook-studio"]
+      : ["notebook-sources", "notebook-chat"];
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "notebook-desktop-panels",
+    panelIds: desktopPanelIds,
+  });
 
   const [sourceFocusRequest, setSourceFocusRequest] = useState<SourcesPanelFocusRequest | null>(
     null
@@ -426,6 +434,8 @@ export function NotebookView() {
           <Group
             id="notebook-desktop-panels"
             orientation="horizontal"
+            defaultLayout={defaultLayout}
+            onLayoutChanged={onLayoutChanged}
             className="h-full min-h-0 min-w-0 w-full"
           >
             <Panel
@@ -485,15 +495,10 @@ export function NotebookView() {
                 <NotebookPanelSeparator data-testid="notebook-studio-separator" />
                 <Panel
                   id="notebook-studio"
-                  defaultSize={`${studioDefaultSize}px`}
+                  defaultSize="420px"
                   minSize="220px"
                   maxSize="70%"
                   className="min-h-0 min-w-0"
-                  onResize={(size) => {
-                    if (size.inPixels > 0) {
-                      setStudioDefaultSize(size.inPixels);
-                    }
-                  }}
                 >
                   {renderRightPanel()}
                 </Panel>
