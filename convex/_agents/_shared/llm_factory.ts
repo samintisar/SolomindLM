@@ -67,11 +67,14 @@ export interface LLMInstances {
 export type TogetherModelPhase = "fast" | "smart";
 
 /**
- * Kwargs for Together chat/completions: GPT-OSS uses `reasoning_effort`; hybrid
- * Qwen / DeepSeek-style models use `chat_template_kwargs.thinking`.
- * `chat_template_kwargs` is not applied to `openai/*` (ignored for GPT-OSS).
+ * Kwargs for Together chat/completions: GPT-OSS uses `reasoning_effort`; Qwen
+ * models use `reasoning.enabled`; other hybrid models use
+ * `chat_template_kwargs.thinking`. `chat_template_kwargs` is not applied to
+ * `openai/*` (ignored for GPT-OSS).
  *
  * GPT-OSS: fast → `low`, smart → `medium` (Together’s balanced default).
+ * Qwen 3.5 9B is always non-reasoning; Qwen 3.8 Flash reasons only in smart
+ * phase requests, which is used by the chat model picker.
  *
  * @see .agents/skills/together-chat-completions/references/reasoning-models.md
  */
@@ -79,6 +82,12 @@ export function mergeModelKwargs(
   model: string,
   phase: TogetherModelPhase
 ): Record<string, unknown> {
+  if (model === "Qwen/Qwen3.5-9B") {
+    return { reasoning: { enabled: false } };
+  }
+  if (model === "Qwen/Qwen3.8-Flash") {
+    return { reasoning: { enabled: phase === "smart" } };
+  }
   if (model.startsWith("openai/gpt-oss-")) {
     return { reasoning_effort: phase === "fast" ? "low" : "medium" };
   }
@@ -220,7 +229,7 @@ export function createLLMsFromEnv(
 
   return createLLMs({
     apiKey,
-    mapModel: options.mapModel || env.FAST_LLM || "gpt-oss-20b",
+    mapModel: options.mapModel || env.FAST_LLM || "Qwen/Qwen3.5-9B",
     reduceModel: options.reduceModel || env.SMART_LLM,
     temperatures: {
       map: options.mapTemperature,

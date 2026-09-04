@@ -7,6 +7,7 @@
 
 import Together from "together-ai";
 import type { LlmJudgeOptions } from "./llmJudge";
+import { DEFAULT_LLM_JUDGE_MODEL } from "./llmJudge";
 
 // ============================================================
 // Configuration
@@ -151,9 +152,9 @@ export const JUDGE_PRESETS: Record<string, TogetherJudgeConfig> = {
     maxTokens: 1024,
   },
 
-  /** GPT-OSS 20B: cheaper alternative */
-  gptOss20b: {
-    model: "openai/gpt-oss-20b",
+  /** Qwen 3.5 9B: fast alternative */
+  qwen35_9b: {
+    model: DEFAULT_LLM_JUDGE_MODEL,
     temperature: 0.1,
     maxTokens: 1024,
   },

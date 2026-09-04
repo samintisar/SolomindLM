@@ -15,6 +15,7 @@ import type {
   MetricResult,
   MetricStatus,
 } from "../types";
+import { DEFAULT_LLM_JUDGE_MODEL } from "./llmJudge";
 import { createTogetherJudgeInvoker } from "./togetherLlmJudge";
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -675,7 +676,7 @@ ${reportSample}
 Respond with JSON: {"score": number, "reasoning": string}`;
 
   try {
-    const invoker = createTogetherJudgeInvoker({ model: "openai/gpt-oss-20b" });
+    const invoker = createTogetherJudgeInvoker({ model: DEFAULT_LLM_JUDGE_MODEL });
     const response = await invoker(prompt);
     const judged = parseJudgeResponse(response);
 
@@ -762,7 +763,7 @@ If the report covers the major categories/approaches implied by the question, it
 Respond with JSON: {"score": number, "reasoning": string}`;
 
   try {
-    const invoker = createTogetherJudgeInvoker({ model: "openai/gpt-oss-20b" });
+    const invoker = createTogetherJudgeInvoker({ model: DEFAULT_LLM_JUDGE_MODEL });
     const response = await invoker(prompt);
     const judged = parseJudgeResponse(response);
 
@@ -817,7 +818,7 @@ export async function lrLlmJudgeExtractionQuality(
     );
   }
 
-  const invoker = createTogetherJudgeInvoker({ model: "openai/gpt-oss-20b" });
+  const invoker = createTogetherJudgeInvoker({ model: DEFAULT_LLM_JUDGE_MODEL });
   const judgments: Array<{ sample: string; score: number; reasoning: string }> = [];
 
   for (const sample of samples.slice(0, 3)) {

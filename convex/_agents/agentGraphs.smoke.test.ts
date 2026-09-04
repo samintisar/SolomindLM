@@ -25,7 +25,7 @@ vi.mock("../_services/ai/togetherTts.js", () => ({
 }));
 
 const DUMMY_KEY = "test-api-key";
-const MAP_MODEL = "openai/gpt-oss-20b";
+const MAP_MODEL = "Qwen/Qwen3.5-9B";
 const REDUCE_MODEL = "openai/gpt-oss-120b";
 
 type GraphFactory = {

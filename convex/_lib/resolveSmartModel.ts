@@ -9,7 +9,7 @@ export const AVAILABLE_SMART_MODEL_IDS = [
   "openai/gpt-oss-120b",
   "MiniMaxAI/MiniMax-M3",
   "google/gemma-4-31B-it",
-  "Qwen/Qwen3.7-Max",
+  "Qwen/Qwen3.8-Flash",
   "zai-org/GLM-5.3-Flash",
 ] as const;
 
@@ -20,6 +20,7 @@ export { DEFAULT_SMART_MODEL_ID };
 /** Saved picker IDs that were replaced; map to the successor still in the catalog. */
 const LEGACY_SMART_MODEL_ALIASES: Record<string, SmartModelId> = {
   "zai-org/GLM-5.2": "zai-org/GLM-5.3-Flash",
+  "Qwen/Qwen3.7-Max": "Qwen/Qwen3.8-Flash",
 };
 
 /** Validate notebook/chat model selection; fall back to DeepSeek V4 Flash. */

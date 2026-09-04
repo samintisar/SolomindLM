@@ -333,7 +333,7 @@ export interface JobLogger {
  * const documents = await retrieveDocuments(ctx, documentIds);
  * logger.phaseComplete('document_retrieval', { chunkCount: 45 });
  *
- * logger.phaseStart('llm_generation', { model: 'gpt-oss-20b' });
+ * logger.phaseStart('llm_generation', { model: 'Qwen/Qwen3.5-9B' });
  * try {
  *   const result = await generateWithLLM(prompt);
  *   logger.phaseComplete('llm_generation', { tokensUsed: usage });

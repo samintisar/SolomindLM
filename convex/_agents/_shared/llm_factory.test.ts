@@ -20,6 +20,21 @@ describe("mergeModelKwargs", () => {
     });
   });
 
+  it("uses non-reasoning Qwen 3.5 and reasoning-enabled Qwen 3.8 Flash", () => {
+    expect(mergeModelKwargs("Qwen/Qwen3.5-9B", "fast")).toEqual({
+      reasoning: { enabled: false },
+    });
+    expect(mergeModelKwargs("Qwen/Qwen3.5-9B", "smart")).toEqual({
+      reasoning: { enabled: false },
+    });
+    expect(mergeModelKwargs("Qwen/Qwen3.8-Flash", "fast")).toEqual({
+      reasoning: { enabled: false },
+    });
+    expect(mergeModelKwargs("Qwen/Qwen3.8-Flash", "smart")).toEqual({
+      reasoning: { enabled: true },
+    });
+  });
+
   it("returns empty object for other openai/ models", () => {
     expect(mergeModelKwargs("openai/gpt-4o", "fast")).toEqual({});
     expect(mergeModelKwargs("openai/gpt-4o", "smart")).toEqual({});
@@ -43,7 +58,7 @@ describe("createLLMs", () => {
   it("creates fast and smart LLMs with separate models", () => {
     const result = createLLMs({
       apiKey: "test-key",
-      mapModel: "openai/gpt-oss-20b",
+      mapModel: "Qwen/Qwen3.5-9B",
       reduceModel: "openai/gpt-oss-120b",
       temperatures: { map: 0.3, reduce: 0.6 },
       maxTokens: { map: 1000, reduce: 2000 },
@@ -54,10 +69,10 @@ describe("createLLMs", () => {
     const fastCall = vi.mocked(ChatTogetherAI).mock.calls[0];
     expect(fastCall[0]).toMatchObject({
       apiKey: "test-key",
-      model: "openai/gpt-oss-20b",
+      model: "Qwen/Qwen3.5-9B",
       temperature: 0.3,
       maxTokens: 1000,
-      modelKwargs: { reasoning_effort: "low" },
+      modelKwargs: { reasoning: { enabled: false } },
     });
 
     const smartCall = vi.mocked(ChatTogetherAI).mock.calls[1];
@@ -116,15 +131,15 @@ describe("createLLM", () => {
   it("creates a single LLM with fast phase by default", () => {
     createLLM({
       apiKey: "test-key",
-      mapModel: "openai/gpt-oss-20b",
+      mapModel: "Qwen/Qwen3.5-9B",
     });
 
     const call = vi.mocked(ChatTogetherAI).mock.calls[0];
     expect(call[0]).toMatchObject({
       apiKey: "test-key",
-      model: "openai/gpt-oss-20b",
+      model: "Qwen/Qwen3.5-9B",
       temperature: 0.3,
-      modelKwargs: { reasoning_effort: "low" },
+      modelKwargs: { reasoning: { enabled: false } },
     });
   });
 

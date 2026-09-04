@@ -333,10 +333,10 @@ Run `bun run eval:rag:bootstrap-env` once to wire dev URL + secret.
 
 #### LLM Model Configuration
 
-You can customize which models are used for different features. Models are hosted on Together AI (the `openai/` prefix indicates the model family, not the API provider):
+You can customize which models are used for different features. Models are hosted on Together AI using their published model identifiers:
 
 ```env
-FAST_LLM=openai/gpt-oss-20b
+FAST_LLM=Qwen/Qwen3.5-9B
 SMART_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
 REPORT_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
 FLASHCARDS_LLM=deepseek-ai/DeepSeek-V4-Flash-0731

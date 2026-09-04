@@ -10,8 +10,10 @@ import type { EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 
 // ─── Types ─────────────────────────────────────────────────────────
 
+export const DEFAULT_LLM_JUDGE_MODEL = "Qwen/Qwen3.5-9B";
+
 export interface LlmJudgeOptions {
-  /** LLM to use for judging (default: openai/gpt-oss-20b) */
+  /** LLM to use for judging (default: Qwen/Qwen3.5-9B) */
   model?: string;
   /** Optional custom LLM invocation function */
   invoke?: (prompt: string) => Promise<string>;
@@ -248,7 +250,7 @@ export function requireJudgeScore(result: Record<string, unknown>): number {
  */
 async function defaultLlmInvoke(
   prompt: string,
-  model: string = "openai/gpt-oss-20b"
+  model: string = DEFAULT_LLM_JUDGE_MODEL
 ): Promise<string> {
   // Try to use Together AI via dynamic import (for eval scripts outside Convex)
   try {
@@ -289,7 +291,7 @@ export async function llmJudgeCorrectness(
   }
 
   const invoke = options.invoke ?? defaultLlmInvoke;
-  const model = options.model ?? "openai/gpt-oss-20b";
+  const model = options.model ?? DEFAULT_LLM_JUDGE_MODEL;
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   try {
@@ -352,7 +354,7 @@ export async function llmJudgeFaithfulness(
   options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   const invoke = options.invoke ?? defaultLlmInvoke;
-  const model = options.model ?? "openai/gpt-oss-20b";
+  const model = options.model ?? DEFAULT_LLM_JUDGE_MODEL;
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   if (retrievedContext.length < 50) {
@@ -422,7 +424,7 @@ export async function llmJudgeCompleteness(
   options: LlmJudgeOptions = {}
 ): Promise<MetricResult> {
   const invoke = options.invoke ?? defaultLlmInvoke;
-  const model = options.model ?? "openai/gpt-oss-20b";
+  const model = options.model ?? DEFAULT_LLM_JUDGE_MODEL;
   const retrievedContext = combineChunkContents(artifact.selectedChunks);
 
   try {

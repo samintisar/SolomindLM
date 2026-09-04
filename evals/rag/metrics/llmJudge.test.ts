@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EvalFixture, EvalRunArtifact } from "../types";
 import {
+  DEFAULT_LLM_JUDGE_MODEL,
   LlmJudgeParseError,
   llmJudgeCorrectness,
   parseJsonResponse,
@@ -77,6 +78,14 @@ describe("requireJudgeScore", () => {
 });
 
 describe("llmJudgeCorrectness", () => {
+  it("records Qwen 3.5 as the default judge model", async () => {
+    const result = await llmJudgeCorrectness(judgeFixture, judgeArtifact, {
+      invoke: async () => '{"score":0.9,"reasoning":"good","hallucinations":[],"missing":[]}',
+    });
+
+    expect(result.breakdown).toMatchObject({ model: DEFAULT_LLM_JUDGE_MODEL });
+  });
+
   it("returns fail when judge response cannot be parsed", async () => {
     const result = await llmJudgeCorrectness(judgeFixture, judgeArtifact, {
       invoke: async () => "not json at all",

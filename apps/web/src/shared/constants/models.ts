@@ -4,7 +4,14 @@
  */
 
 /** Vendor for picker icons (Simple Icons–style glyphs in the UI). */
-export type SmartModelBrand = "openai" | "deepseek" | "minimax" | "google" | "qwen" | "zai";
+export type SmartModelBrand =
+  | "openai"
+  | "deepseek"
+  | "minimax"
+  | "moonshot"
+  | "google"
+  | "qwen"
+  | "zai";
 
 export interface SmartModel {
   id: string;
@@ -43,9 +50,9 @@ export const AVAILABLE_SMART_MODELS: SmartModel[] = [
     brand: "google",
   },
   {
-    id: "Qwen/Qwen3.7-Max",
-    name: "Qwen3.7 Max",
-    description: "Latest Qwen flagship with very long context",
+    id: "Qwen/Qwen3.8-Flash",
+    name: "Qwen3.8 Flash",
+    description: "Hybrid reasoning model with 1M context",
     brand: "qwen",
   },
   {
