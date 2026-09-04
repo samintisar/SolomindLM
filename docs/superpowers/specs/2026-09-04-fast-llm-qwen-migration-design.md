@@ -7,7 +7,9 @@
 
 Replace the deprecated `openai/gpt-oss-20b` fast-model default with
 `Qwen/Qwen3.5-9B` across SolomindLM's executable configuration, tests,
-evaluators, operator documentation, and deployed Convex environments.
+evaluators, operator documentation, and deployed Convex environments. Replace
+the Qwen chat-picker option `Qwen/Qwen3.7-Max` with
+`Qwen/Qwen3.8-Flash`.
 
 ## Scope
 
@@ -18,6 +20,8 @@ evaluators, operator documentation, and deployed Convex environments.
 - Current repository instructions in `AGENTS.md` and `CLAUDE.md`.
 - Fast/map-model fixture values and assertions in Convex agent tests.
 - Default or hard-coded GPT-OSS evaluator models in `evals/rag/metrics/`.
+- The Qwen entry in `apps/web/src/shared/constants/models.ts` and its catalog
+  test.
 - The development and production Convex `FAST_LLM` environment variables.
 
 ### Excluded
@@ -41,12 +45,21 @@ Qwen/Qwen3.5-9B
 Together AI documents this identifier for the Chat Completions API and shows
 fast-path requests with `reasoning: { enabled: false }`.
 
-`mergeModelKwargs` will gain a Qwen 3.5 branch. It will return
-`{ reasoning: { enabled: false } }` for the fast phase and
-`{ reasoning: { enabled: true } }` when Qwen is explicitly used in the smart
-phase. The existing GPT-OSS branch remains to preserve compatibility for a
-deliberately configured legacy `FAST_LLM` value until the provider removes it.
-All other model handling remains unchanged.
+`mergeModelKwargs` will gain model-specific Qwen branches. Qwen 3.5 9B always
+uses `{ reasoning: { enabled: false } }` because it is the non-reasoning fast
+model. Qwen 3.8 Flash uses `{ reasoning: { enabled: true } }` in the smart
+phase used by chat and `{ reasoning: { enabled: false } }` in the fast phase.
+The existing GPT-OSS branch remains to preserve compatibility for a deliberately
+configured legacy `FAST_LLM` value until the provider removes it. All other
+model handling remains unchanged.
+
+## Chat model selection
+
+The chat picker continues to use smart-phase model construction. Its Qwen
+option changes from Qwen 3.7 Max to Qwen 3.8 Flash and displays a name and
+description that identify it as a reasoning-capable, long-context model.
+Selecting it saves `Qwen/Qwen3.8-Flash`; the chat wrapper then passes the smart
+phase to `mergeModelKwargs`, enabling reasoning for that request.
 
 ## Deployment Flow
 
@@ -73,9 +86,11 @@ an authenticated CLI or dashboard session if that restriction remains.
 
 ## Verification
 
-- Unit-test the Qwen fast and smart argument mappings, while retaining the
-  legacy GPT-OSS mapping test.
+- Unit-test Qwen 3.5's non-reasoning fast mapping and Qwen 3.8 Flash's
+  reasoning-enabled chat mapping, while retaining the legacy GPT-OSS mapping
+  test.
 - Run the agent graph smoke test using the Qwen fast model.
+- Run the web model-catalog test to prove Qwen 3.8 Flash is selectable.
 - Run `bun run typecheck:convex`, `bun run typecheck:web`, `bun run lint`, and
   `bun run test:convex`.
 - Confirm the dev and production `FAST_LLM` variables have the Qwen value
