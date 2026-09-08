@@ -52,6 +52,24 @@ jobs:
       - name: Typecheck Convex
         run: bun run typecheck:convex
 
+  typecheck-web:
+    name: Typecheck (Web)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.2"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck Web
+        run: bun run typecheck:web
+
   lint:
     name: Lint (Biome)
     runs-on: ubuntu-latest
@@ -143,7 +161,7 @@ jobs:
 
   build-web:
     name: Build (Web, PR parity)
-    needs: [typecheck-convex, typecheck-mobile]
+    needs: [typecheck-convex, typecheck-web, typecheck-mobile]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -165,7 +183,7 @@ jobs:
 
   build-web-main:
     name: Build web (main, prod Convex URL — no deploy)
-    needs: [typecheck-convex, typecheck-mobile]
+    needs: [typecheck-convex, typecheck-web, typecheck-mobile]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
