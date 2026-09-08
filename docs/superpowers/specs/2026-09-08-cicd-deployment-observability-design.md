@@ -239,9 +239,8 @@ new `scripts/check-convex-env-drift.mjs`, new
 
 #### 3.0 Spike — Convex preview deployments (timeboxed, ~half day)
 
-Investigate and record findings in
-`docs/superpowers/specs/2026-09-08-cicd-deployment-observability-design.md`
-(append a "Spike outcome" section) or a short sibling doc:
+Investigate and record findings in a short sibling doc,
+`docs/superpowers/specs/2026-09-08-convex-preview-spike-outcome.md`:
 
 - Convex plan tier for this project (preview deployments require a paid plan).
 - Whether a **preview deploy key** can be generated (Convex dashboard →
