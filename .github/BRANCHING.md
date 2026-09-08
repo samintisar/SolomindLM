@@ -126,7 +126,7 @@ Jobs:
 6. **Unit Tests** - Convex + web vitest suites
 7. **Build (Web, PR parity)** - Builds the React frontend
 
-E2E runs on PRs but is not a required check (see Phase 3 of the CI/CD deployment plan).
+E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it is not a required check. Phase 3 of the CI/CD deployment plan wires it to run against the Vercel preview deployment.
 
 ## Best Practices
 
