@@ -86,13 +86,13 @@ describe("getFeatureLimit", () => {
   });
 
   it("returns free limits when isPro=false", () => {
-    expect(getFeatureLimit("chat", false)).toBe(50);
-    expect(getFeatureLimit("audio", false)).toBe(1);
-    expect(getFeatureLimit("infographic", false)).toBe(5);
+    expect(getFeatureLimit("chat", false)).toBe(10);
+    expect(getFeatureLimit("audio", false)).toBe(2);
+    expect(getFeatureLimit("infographic", false)).toBe(2);
   });
 
   it("getFreeLimit and getProLimit return correct values", () => {
-    expect(getFreeLimit("flashcard")).toBe(5);
+    expect(getFreeLimit("flashcard")).toBe(2);
     expect(getProLimit("flashcard")).toBe(100);
   });
 });

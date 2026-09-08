@@ -315,7 +315,7 @@ describe("getUpgradeMessage", () => {
       limitType: "notebook",
       isPro: false,
     });
-    expect(msg).toContain("100 notebooks");
+    expect(msg).toContain("200 notebooks");
   });
 
   it("returns source-specific message for free users on source limit", () => {

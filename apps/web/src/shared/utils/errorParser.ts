@@ -299,7 +299,7 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
   }
 
   if (limitType === "notebook") {
-    return "Upgrade for up to 100 notebooks.";
+    return "Upgrade for up to 200 notebooks.";
   }
 
   if (limitType === "source") {

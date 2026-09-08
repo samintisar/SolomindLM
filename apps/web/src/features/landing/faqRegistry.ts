@@ -82,7 +82,7 @@ const CORE_GENERAL_FAQS: RegisteredFaq[] = [
     category: "billing",
     question: "Is there a limit on how much I can upload?",
     answer:
-      "The free plan includes 20 notebooks per account with up to 200 sources per notebook. Pro plans offer 200 notebooks per account with up to 200 sources per notebook. Each plan also includes daily limits on AI-generated content. Check our pricing section for details.",
+      "The free plan includes 5 notebooks per account with up to 20 sources per notebook. Pro plans offer 200 notebooks per account with up to 200 sources per notebook. Each plan also includes daily limits on AI-generated content. Check our pricing section for details.",
     learnMorePath: "/#pricing",
     learnMoreLabel: "See pricing",
   },

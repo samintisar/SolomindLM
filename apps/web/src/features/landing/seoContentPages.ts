@@ -139,7 +139,7 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
       {
         topic: "Pricing model",
         solomindlm:
-          "Free ($0): 5 notebooks, 200 sources per notebook, daily generation caps. Pro ($7.50/mo billed yearly or $15/mo monthly): 100 notebooks, 200 sources per notebook, higher daily limits.",
+          "Free ($0): 5 notebooks, 20 sources per notebook, daily generation caps. Pro ($7.50/mo billed yearly or $15/mo monthly): 200 notebooks, 200 sources per notebook, higher daily limits.",
         competitor:
           "Free, Plus, Pro, and Ultra tiers; source limits of 50, 100, 300, and 600 per notebook respectively.",
       },

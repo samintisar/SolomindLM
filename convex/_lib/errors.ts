@@ -193,14 +193,14 @@ export function getProLimit(feature: DailyFeature): number {
  */
 export function getFreeLimit(feature: DailyFeature): number {
   const limits: Record<DailyFeature, number> = {
-    chat: 50,
-    flashcard: 5,
-    quiz: 5,
-    report: 5,
-    audio: 1,
-    writtenQuestion: 5,
-    spreadsheet: 5,
-    infographic: 5,
+    chat: 10,
+    flashcard: 2,
+    quiz: 2,
+    report: 2,
+    audio: 2,
+    writtenQuestion: 2,
+    spreadsheet: 2,
+    infographic: 2,
     sourceGuide: 50,
   };
   return limits[feature];

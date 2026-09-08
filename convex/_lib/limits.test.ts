@@ -119,21 +119,21 @@ describe("checkNotebookLimit", () => {
     );
   });
 
-  test("allows up to 100 notebooks for pro users", async () => {
+  test("allows up to 200 notebooks for pro users", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     await seedSubscription(t, userId);
-    await seedNotebook(t, userId, 99);
+    await seedNotebook(t, userId, 199);
     const asUser = withAuth(t, userId);
 
     await expect(asUser.run(async (ctx) => checkNotebookLimit(ctx))).resolves.toBeNull();
   });
 
-  test("throws when pro user reaches 100 notebooks", async () => {
+  test("throws when pro user reaches 200 notebooks", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     await seedSubscription(t, userId);
-    await seedNotebook(t, userId, 100);
+    await seedNotebook(t, userId, 200);
     const asUser = withAuth(t, userId);
 
     await expect(asUser.run(async (ctx) => checkNotebookLimit(ctx))).rejects.toThrow(
@@ -158,13 +158,13 @@ describe("checkSourceLimit", () => {
     await expect(asUser.run(async (ctx) => checkSourceLimit(ctx, notebookId))).resolves.toBeNull();
   });
 
-  test("throws when at source limit (200 documents)", async () => {
+  test("throws when at free source limit (20 documents)", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
     const [notebookId] = await seedNotebook(t, userId);
 
-    // Seed 200 documents
-    for (let i = 0; i < 200; i++) {
+    // Seed 20 documents (the free-tier cap)
+    for (let i = 0; i < 20; i++) {
       await seedDocument(t, userId, notebookId);
     }
 
@@ -172,6 +172,21 @@ describe("checkSourceLimit", () => {
     await expect(asUser.run(async (ctx) => checkSourceLimit(ctx, notebookId))).rejects.toThrow(
       "Source limit reached"
     );
+  });
+
+  test("allows up to 200 sources per notebook for pro users", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedSubscription(t, userId);
+    const [notebookId] = await seedNotebook(t, userId);
+
+    // Seed 21 documents — over the free cap but under the pro cap
+    for (let i = 0; i < 21; i++) {
+      await seedDocument(t, userId, notebookId);
+    }
+
+    const asUser = withAuth(t, userId);
+    await expect(asUser.run(async (ctx) => checkSourceLimit(ctx, notebookId))).resolves.toBeNull();
   });
 
   test("throws unauthenticated when no user", async () => {
@@ -193,9 +208,9 @@ describe("getSubscriptionLimit", () => {
   });
 
   test("returns free limits when isPro=false", () => {
-    expect(getSubscriptionLimit("chat", false)).toBe(50);
-    expect(getSubscriptionLimit("flashcard", false)).toBe(5);
-    expect(getSubscriptionLimit("audio", false)).toBe(1);
+    expect(getSubscriptionLimit("chat", false)).toBe(10);
+    expect(getSubscriptionLimit("flashcard", false)).toBe(2);
+    expect(getSubscriptionLimit("audio", false)).toBe(2);
   });
 });
 

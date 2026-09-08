@@ -12,14 +12,14 @@ const DAY = 24 * HOUR;
 // Pro tier limits will be handled by checking subscription and using separate limits
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Free tier daily limits
-  chatFree: { kind: "fixed window", rate: 50, period: DAY },
-  flashcardFree: { kind: "fixed window", rate: 5, period: DAY },
-  quizFree: { kind: "fixed window", rate: 5, period: DAY },
-  reportFree: { kind: "fixed window", rate: 5, period: DAY },
-  audioFree: { kind: "fixed window", rate: 5, period: DAY },
-  writtenQuestionFree: { kind: "fixed window", rate: 5, period: DAY },
-  spreadsheetFree: { kind: "fixed window", rate: 5, period: DAY },
-  infographicFree: { kind: "fixed window", rate: 5, period: DAY },
+  chatFree: { kind: "fixed window", rate: 10, period: DAY },
+  flashcardFree: { kind: "fixed window", rate: 2, period: DAY },
+  quizFree: { kind: "fixed window", rate: 2, period: DAY },
+  reportFree: { kind: "fixed window", rate: 2, period: DAY },
+  audioFree: { kind: "fixed window", rate: 2, period: DAY },
+  writtenQuestionFree: { kind: "fixed window", rate: 2, period: DAY },
+  spreadsheetFree: { kind: "fixed window", rate: 2, period: DAY },
+  infographicFree: { kind: "fixed window", rate: 2, period: DAY },
   sourceGuideFree: { kind: "fixed window", rate: 50, period: DAY },
 
   // Pro tier daily limits
@@ -44,14 +44,14 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
  */
 export function getFreeLimit(feature: DailyFeature): number {
   const limits: Record<DailyFeature, number> = {
-    chat: 50,
-    flashcard: 5,
-    quiz: 5,
-    report: 5,
-    audio: 5,
-    writtenQuestion: 5,
-    spreadsheet: 5,
-    infographic: 5,
+    chat: 10,
+    flashcard: 2,
+    quiz: 2,
+    report: 2,
+    audio: 2,
+    writtenQuestion: 2,
+    spreadsheet: 2,
+    infographic: 2,
     sourceGuide: 50,
   };
   return limits[feature];
