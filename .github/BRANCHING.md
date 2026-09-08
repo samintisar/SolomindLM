@@ -103,7 +103,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex/Web/Mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -126,7 +126,7 @@ Jobs:
 6. **Unit Tests** - Convex + web vitest suites
 7. **Build (Web, PR parity)** - Builds the React frontend
 
-E2E runs on PRs but is not a required check (see Phase 3).
+E2E runs on PRs but is not a required check (see Phase 3 of the CI/CD deployment plan).
 
 ## Best Practices
 

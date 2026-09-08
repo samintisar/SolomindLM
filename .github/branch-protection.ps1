@@ -28,7 +28,8 @@ $json = @{
         require_code_owner_reviews = $false
         required_approving_review_count = 1
     }
-    # NOTE: E2E is intentionally not a required check. Phase 3 moves it to a
+    # NOTE: E2E is intentionally not a required check. Phase 3 of the CI/CD deployment plan
+    # (docs/superpowers/plans/2026-09-08-cicd-deployment-observability.md) moves it to a
     # deployment_status-triggered advisory job; promote to required only once stable.
     required_status_checks = @{
         strict = $true

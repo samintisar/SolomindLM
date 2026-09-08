@@ -140,7 +140,7 @@ git checkout -b docs/api-documentation
 
 4. **Address review feedback** promptly
 
-5. **Wait for CI** to pass — Typecheck (Convex/Web/Mobile), Lint (Biome), Lint (Workflows), Unit Tests, Build (Web).
+5. **Wait for CI** to pass — Typecheck (Convex), Typecheck (Web), Typecheck (Expo mobile), Lint (Biome), Lint (Workflows), Unit Tests, Build (Web, PR parity).
 
 6. **Squash merge** when approved
 
