@@ -2,6 +2,7 @@ import { PersistentTextStreaming } from "@convex-dev/persistent-text-streaming";
 import { httpRouter } from "convex/server";
 import { components, internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import { allowedOrigins } from "./_lib/allowedOrigins";
 import { auth } from "./auth";
 
 const http = httpRouter();
@@ -12,29 +13,11 @@ const streaming = new PersistentTextStreaming(components.persistentTextStreaming
 // Add Convex Auth HTTP routes
 auth.addHttpRoutes(http);
 
-// CORS configuration - dev origins + SITE_URL from Convex (e.g. https://www.solomindlm.com, comma-separated for multiple).
-const DEV_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174",
-  // Android emulator → host machine (Vite dev server)
-  "http://10.0.2.2:5173",
-];
-
-const getAllowedOrigins = (): string[] => {
-  const siteUrl = process.env.SITE_URL || "http://localhost:5173";
-  const fromEnv = siteUrl
-    .split(",")
-    .map((url) => url.trim())
-    .filter(Boolean);
-  return [...new Set([...DEV_ORIGINS, ...fromEnv])];
-};
-
-// CORS for non-auth routes (health, chat/stream)
+// CORS for non-auth routes (health, chat/stream). Allowlist = dev origins +
+// SITE_URL (single canonical origin) + CORS_EXTRA_ORIGINS — see convex/_lib/allowedOrigins.ts.
 const getCorsHeaders = (origin?: string | null): Record<string, string> => {
-  const allowedOrigins = getAllowedOrigins();
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  const allowed = allowedOrigins();
+  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0];
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
