@@ -227,6 +227,16 @@ jobs:
         total: [2]
         shard: [1, 2]
     steps:
+      - name: Require E2E secrets
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: |
+          if [ -z "${E2E_TEST_EMAIL}" ] || [ -z "${E2E_TEST_PASSWORD}" ]; then
+            echo "::error::E2E_TEST_EMAIL / E2E_TEST_PASSWORD repo secrets are not set — E2E is NOT running. This job is a no-op until Phase 3 wires E2E to the Vercel preview. Set the secrets or expect this to fail."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
