@@ -18,11 +18,22 @@ export const handleWebhook = internalAction({
 
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+    const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+
+    console.log(`[Stripe webhook] Event type: ${event.type}, ID: ${event.id}`);
+
+    // Idempotency: Stripe retries deliveries and can send duplicates. Skip any
+    // event id we've already fully processed.
+    const { alreadyProcessed } = await ctx.runMutation(internal.billing.index.claimWebhookEvent, {
+      stripeEventId: event.id,
+      eventType: event.type,
+    });
+    if (alreadyProcessed) {
+      console.log(`[Stripe webhook] Duplicate event ${event.id}, skipping`);
+      return;
+    }
+
     try {
-      const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-
-      console.log(`[Stripe webhook] Event type: ${event.type}, ID: ${event.id}`);
-
       switch (event.type) {
         case "checkout.session.completed":
           await handleCheckoutCompleted(ctx, event, stripe);
@@ -43,8 +54,16 @@ export const handleWebhook = internalAction({
         default:
           console.log(`[Stripe webhook] Unhandled event type: ${event.type}`);
       }
+
+      await ctx.runMutation(internal.billing.index.markWebhookEventProcessed, {
+        stripeEventId: event.id,
+      });
     } catch (error) {
       console.error("[Stripe webhook] Error processing event:", error);
+      await ctx.runMutation(internal.billing.index.markWebhookEventFailed, {
+        stripeEventId: event.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   },
@@ -156,22 +175,20 @@ async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object
   };
   const subscriptionId = raw.id;
   const customerId = typeof raw.customer === "string" ? raw.customer : raw.customer?.id;
-  const userId = raw.metadata?.userId;
-
-  if (!userId || !customerId) {
-    console.error("[Stripe webhook] Missing userId or customerId in subscription.updated");
-    return;
-  }
+  // Portal- and dashboard-initiated updates don't carry the metadata we set at
+  // checkout. applyWebhookSubscriptionUpdate resolves a missing userId/customerId
+  // from the stored subscription row.
+  const userId = raw.metadata?.userId as string | undefined;
 
   const priceId = raw.items?.data?.[0]?.price?.id ?? "";
   const amount = raw.items?.data?.[0]?.price?.unit_amount ?? 0;
   const currency = (raw.items?.data?.[0]?.price?.currency as string) ?? "usd";
   const interval = (raw.items?.data?.[0]?.price?.recurring?.interval as string) ?? "month";
 
-  await ctx.runMutation(internal.billing.index.upsertSubscription, {
-    userId: userId as any,
+  await ctx.runMutation(internal.billing.index.applyWebhookSubscriptionUpdate, {
     stripeSubscriptionId: subscriptionId,
-    stripeCustomerId: customerId,
+    userId,
+    stripeCustomerId: typeof customerId === "string" ? customerId : undefined,
     stripePriceId: priceId,
     status: raw.status,
     currentPeriodStart: raw.current_period_start * 1000,

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, query } from "../_generated/server";
 import { getAuthUserId } from "../auth";
 
@@ -171,6 +172,153 @@ export const upsertSubscription = internalMutation({
       });
       return await ctx.db.get(subscriptionId);
     }
+  },
+});
+
+/**
+ * Apply a `customer.subscription.updated` webhook to the stored subscription.
+ *
+ * Portal- and dashboard-initiated changes fire this event without the metadata
+ * we set at checkout, so `userId` / `stripeCustomerId` may be absent. When they
+ * are, fall back to the values already stored for this Stripe subscription id.
+ * If neither the event nor a stored row can supply them, skip silently rather
+ * than dropping a real subscription change on the floor.
+ */
+export const applyWebhookSubscriptionUpdate = internalMutation({
+  args: {
+    stripeSubscriptionId: v.string(),
+    userId: v.optional(v.string()),
+    stripeCustomerId: v.optional(v.string()),
+    stripePriceId: v.string(),
+    status: v.string(),
+    currentPeriodStart: v.number(),
+    currentPeriodEnd: v.number(),
+    cancelAtPeriodEnd: v.boolean(),
+    interval: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("stripeSubscriptions")
+      .withIndex("stripe_subscription", (q) =>
+        q.eq("stripeSubscriptionId", args.stripeSubscriptionId)
+      )
+      .first();
+
+    const userId = (args.userId ?? existing?.userId) as Id<"users"> | undefined;
+    const stripeCustomerId = args.stripeCustomerId ?? existing?.stripeCustomerId;
+
+    if (!userId || !stripeCustomerId) {
+      console.error(
+        "[Stripe webhook] Could not resolve userId/customerId for subscription.updated",
+        { stripeSubscriptionId: args.stripeSubscriptionId }
+      );
+      return null;
+    }
+
+    const now = Date.now();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: args.status,
+        currentPeriodStart: args.currentPeriodStart,
+        currentPeriodEnd: args.currentPeriodEnd,
+        cancelAtPeriodEnd: args.cancelAtPeriodEnd,
+        updatedAt: now,
+      });
+      return await ctx.db.get(existing._id);
+    }
+
+    const id = await ctx.db.insert("stripeSubscriptions", {
+      userId,
+      stripeSubscriptionId: args.stripeSubscriptionId,
+      stripeCustomerId,
+      stripePriceId: args.stripePriceId,
+      status: args.status,
+      currentPeriodStart: args.currentPeriodStart,
+      currentPeriodEnd: args.currentPeriodEnd,
+      cancelAtPeriodEnd: args.cancelAtPeriodEnd,
+      interval: args.interval,
+      amount: args.amount,
+      currency: args.currency,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return await ctx.db.get(id);
+  },
+});
+
+/**
+ * Claim a Stripe webhook event for processing (idempotency guard).
+ *
+ * Stripe retries deliveries and can send duplicates. Returns
+ * `{ alreadyProcessed: true }` when this event id has already been fully
+ * handled so the caller can skip it. A recorded-but-unprocessed event (a prior
+ * attempt that crashed mid-flight) is allowed to run again — all handlers are
+ * idempotent.
+ */
+export const claimWebhookEvent = internalMutation({
+  args: {
+    stripeEventId: v.string(),
+    eventType: v.string(),
+  },
+  returns: v.object({ alreadyProcessed: v.boolean() }),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("stripeWebhookEvents")
+      .withIndex("stripe_event", (q) => q.eq("stripeEventId", args.stripeEventId))
+      .first();
+
+    if (existing) {
+      return { alreadyProcessed: existing.processed };
+    }
+
+    await ctx.db.insert("stripeWebhookEvents", {
+      stripeEventId: args.stripeEventId,
+      eventType: args.eventType,
+      processed: false,
+      createdAt: Date.now(),
+    });
+    return { alreadyProcessed: false };
+  },
+});
+
+/**
+ * Mark a Stripe webhook event as fully processed.
+ */
+export const markWebhookEventProcessed = internalMutation({
+  args: { stripeEventId: v.string() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("stripeWebhookEvents")
+      .withIndex("stripe_event", (q) => q.eq("stripeEventId", args.stripeEventId))
+      .first();
+    if (!row) return;
+    await ctx.db.patch(row._id, {
+      processed: true,
+      processedAt: Date.now(),
+      errorMessage: undefined,
+    });
+  },
+});
+
+/**
+ * Record that processing a Stripe webhook event failed. Leaves `processed`
+ * false so a later retry of the same event id is allowed to run again.
+ */
+export const markWebhookEventFailed = internalMutation({
+  args: {
+    stripeEventId: v.string(),
+    errorMessage: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("stripeWebhookEvents")
+      .withIndex("stripe_event", (q) => q.eq("stripeEventId", args.stripeEventId))
+      .first();
+    if (!row) return;
+    await ctx.db.patch(row._id, { errorMessage: args.errorMessage });
   },
 });
 
