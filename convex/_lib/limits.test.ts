@@ -214,6 +214,37 @@ describe("getSubscriptionLimit", () => {
   });
 });
 
+describe("daily limit tables — single source of truth", () => {
+  const FEATURES = [
+    "chat",
+    "flashcard",
+    "quiz",
+    "report",
+    "audio",
+    "writtenQuestion",
+    "spreadsheet",
+    "infographic",
+    "sourceGuide",
+  ] as const;
+
+  test("errors.ts and rateLimits.ts expose the same accessor functions", async () => {
+    const errorsModule = await import("./errors");
+    expect(rateLimitsModule.getFreeLimit).toBe(errorsModule.getFreeLimit);
+    expect(rateLimitsModule.getProLimit).toBe(errorsModule.getProLimit);
+  });
+
+  test("every rate-limiter window is derived from the same accessor value", () => {
+    for (const feature of FEATURES) {
+      expect(rateLimitsModule.RATE_LIMIT_CONFIG[`${feature}Free`].rate).toBe(
+        rateLimitsModule.getFreeLimit(feature)
+      );
+      expect(rateLimitsModule.RATE_LIMIT_CONFIG[`${feature}Pro`].rate).toBe(
+        rateLimitsModule.getProLimit(feature)
+      );
+    }
+  });
+});
+
 describe("checkDailyLimit", () => {
   test("does not throw when under daily limit", async () => {
     const t = convexTest(schema, modules);

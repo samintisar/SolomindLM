@@ -65,7 +65,7 @@ describe("webhook idempotency", () => {
       eventType: "customer.subscription.updated",
     });
 
-    expect(result).toEqual({ alreadyProcessed: false });
+    expect(result).toEqual({ status: "new" });
 
     const row = await t.run(async (ctx) =>
       ctx.db
@@ -93,23 +93,25 @@ describe("webhook idempotency", () => {
       eventType: "invoice.paid",
     });
 
-    expect(second).toEqual({ alreadyProcessed: true });
+    expect(second).toEqual({ status: "processed" });
   });
 
-  test("claimWebhookEvent allows a retry when a prior attempt never completed", async () => {
+  test("claimWebhookEvent reports a fresh unprocessed claim as in_flight (concurrent redelivery)", async () => {
     const t = convexTest(schema, modules);
 
-    await t.mutation(internal.billing.index.claimWebhookEvent, {
+    const first = await t.mutation(internal.billing.index.claimWebhookEvent, {
       stripeEventId: "evt_retry",
       eventType: "invoice.paid",
     });
+    expect(first).toEqual({ status: "new" });
 
+    // A second delivery of the same event arrives while the first attempt is
+    // still running — do not run the handlers again concurrently.
     const second = await t.mutation(internal.billing.index.claimWebhookEvent, {
       stripeEventId: "evt_retry",
       eventType: "invoice.paid",
     });
-
-    expect(second).toEqual({ alreadyProcessed: false });
+    expect(second).toEqual({ status: "in_flight" });
 
     const rows = await t.run(async (ctx) =>
       ctx.db
@@ -118,6 +120,52 @@ describe("webhook idempotency", () => {
         .collect()
     );
     expect(rows).toHaveLength(1);
+  });
+
+  test("claimWebhookEvent allows an immediate retry once a failure has been recorded", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.mutation(internal.billing.index.claimWebhookEvent, {
+      stripeEventId: "evt_failed_then_retry",
+      eventType: "invoice.paid",
+    });
+    await t.mutation(internal.billing.index.markWebhookEventFailed, {
+      stripeEventId: "evt_failed_then_retry",
+      errorMessage: "transient",
+    });
+
+    // A recorded failure means the prior attempt is finished (not in flight),
+    // so Stripe's retry may run again without waiting out the in-flight window.
+    const retry = await t.mutation(internal.billing.index.claimWebhookEvent, {
+      stripeEventId: "evt_failed_then_retry",
+      eventType: "invoice.paid",
+    });
+    expect(retry).toEqual({ status: "new" });
+  });
+
+  test("claimWebhookEvent allows a retry once a stale unprocessed claim has aged out", async () => {
+    const t = convexTest(schema, modules);
+
+    await t.mutation(internal.billing.index.claimWebhookEvent, {
+      stripeEventId: "evt_stale",
+      eventType: "invoice.paid",
+    });
+
+    // Simulate a prior attempt that crashed hard (no failure recorded) well
+    // outside the in-flight window.
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("stripeWebhookEvents")
+        .withIndex("stripe_event", (q) => q.eq("stripeEventId", "evt_stale"))
+        .first();
+      if (row) await ctx.db.patch(row._id, { createdAt: Date.now() - 60 * 60 * 1000 });
+    });
+
+    const second = await t.mutation(internal.billing.index.claimWebhookEvent, {
+      stripeEventId: "evt_stale",
+      eventType: "invoice.paid",
+    });
+    expect(second).toEqual({ status: "new" });
   });
 
   test("markWebhookEventProcessed sets processed and a processedAt timestamp", async () => {
@@ -188,6 +236,42 @@ describe("applyWebhookSubscriptionUpdate", () => {
     expect(row?.currentPeriodEnd).toBe(UPDATE_FIELDS.currentPeriodEnd);
   });
 
+  test("persists a plan change (price, amount, interval, currency) onto the stored row", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    await seedSubscription(t, userId, {
+      stripeSubscriptionId: "sub_planchange",
+      status: "active",
+      amount: 1500,
+    });
+
+    // User switches from a $15/mo plan to a $144/yr plan via the customer portal.
+    await t.mutation(internal.billing.index.applyWebhookSubscriptionUpdate, {
+      stripeSubscriptionId: "sub_planchange",
+      userId: userId as string,
+      stripeCustomerId: "cus_planchange",
+      stripePriceId: "price_yearly",
+      status: "active",
+      currentPeriodStart: UPDATE_FIELDS.currentPeriodStart,
+      currentPeriodEnd: UPDATE_FIELDS.currentPeriodEnd,
+      cancelAtPeriodEnd: false,
+      interval: "year",
+      amount: 14400,
+      currency: "eur",
+    });
+
+    const row = await t.run(async (ctx) =>
+      ctx.db
+        .query("stripeSubscriptions")
+        .withIndex("stripe_subscription", (q) => q.eq("stripeSubscriptionId", "sub_planchange"))
+        .first()
+    );
+    expect(row?.stripePriceId).toBe("price_yearly");
+    expect(row?.amount).toBe(14400);
+    expect(row?.interval).toBe("year");
+    expect(row?.currency).toBe("eur");
+  });
+
   test("falls back to the stored row's userId when the event has no metadata", async () => {
     const t = convexTest(schema, modules);
     const userId = await seedUser(t);
@@ -209,13 +293,19 @@ describe("applyWebhookSubscriptionUpdate", () => {
     expect(row?.status).toBe("past_due");
   });
 
-  test("is a no-op when there is no metadata and no stored subscription", async () => {
+  test("throws (so Stripe retries) when it cannot resolve a user and no row exists", async () => {
     const t = convexTest(schema, modules);
 
-    await t.mutation(internal.billing.index.applyWebhookSubscriptionUpdate, {
-      stripeSubscriptionId: "sub_unknown",
-      ...UPDATE_FIELDS,
-    });
+    // No metadata on the event and no stored subscription: the correlating
+    // checkout.session.completed may simply not have landed yet. Silently
+    // dropping this (and letting the caller mark the event processed) would
+    // lose the change permanently, so the mutation must fail loudly.
+    await expect(
+      t.mutation(internal.billing.index.applyWebhookSubscriptionUpdate, {
+        stripeSubscriptionId: "sub_unknown",
+        ...UPDATE_FIELDS,
+      })
+    ).rejects.toThrow();
 
     const rows = await t.run(async (ctx) => ctx.db.query("stripeSubscriptions").collect());
     expect(rows).toHaveLength(0);

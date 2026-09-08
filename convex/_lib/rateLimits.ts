@@ -1,90 +1,49 @@
 /**
  * Rate limiting configuration using @convex-dev/rate-limiter.
  * Defines daily limits for content generation features.
+ *
+ * The per-feature limit numbers are NOT defined here — they live in
+ * `./errors` (`FREE_DAILY_LIMITS` / `PRO_DAILY_LIMITS`) and both the accessors
+ * and the rate-limiter window config below are derived from them.
  */
 
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
+import { type DailyFeature, FREE_DAILY_LIMITS, PRO_DAILY_LIMITS } from "./errors";
+
+export type { DailyFeature } from "./errors";
+export { getFreeLimit, getProLimit } from "./errors";
 
 const DAY = 24 * HOUR;
 
-// Define all rate limits (free tier limits)
-// Pro tier limits will be handled by checking subscription and using separate limits
-export const rateLimiter = new RateLimiter(components.rateLimiter, {
-  // Free tier daily limits
-  chatFree: { kind: "fixed window", rate: 10, period: DAY },
-  flashcardFree: { kind: "fixed window", rate: 2, period: DAY },
-  quizFree: { kind: "fixed window", rate: 2, period: DAY },
-  reportFree: { kind: "fixed window", rate: 2, period: DAY },
-  audioFree: { kind: "fixed window", rate: 2, period: DAY },
-  writtenQuestionFree: { kind: "fixed window", rate: 2, period: DAY },
-  spreadsheetFree: { kind: "fixed window", rate: 2, period: DAY },
-  infographicFree: { kind: "fixed window", rate: 2, period: DAY },
-  sourceGuideFree: { kind: "fixed window", rate: 50, period: DAY },
+type FixedWindow = { kind: "fixed window"; rate: number; period: number };
 
-  // Pro tier daily limits
-  chatPro: { kind: "fixed window", rate: 500, period: DAY },
-  flashcardPro: { kind: "fixed window", rate: 100, period: DAY },
-  quizPro: { kind: "fixed window", rate: 100, period: DAY },
-  reportPro: { kind: "fixed window", rate: 100, period: DAY },
-  audioPro: { kind: "fixed window", rate: 100, period: DAY },
-  writtenQuestionPro: { kind: "fixed window", rate: 100, period: DAY },
-  spreadsheetPro: { kind: "fixed window", rate: 100, period: DAY },
-  infographicPro: { kind: "fixed window", rate: 100, period: DAY },
-  sourceGuidePro: { kind: "fixed window", rate: 200, period: DAY },
+/** Build `{ chatFree: {...}, flashcardFree: {...}, ... }` from a limit map. */
+function tierWindows<S extends string>(
+  limits: Record<DailyFeature, number>,
+  suffix: S
+): Record<`${DailyFeature}${S}`, FixedWindow> {
+  return Object.fromEntries(
+    Object.entries(limits).map(([feature, rate]) => [
+      `${feature}${suffix}`,
+      { kind: "fixed window", rate, period: DAY } satisfies FixedWindow,
+    ])
+  ) as Record<`${DailyFeature}${S}`, FixedWindow>;
+}
+
+/**
+ * Full rate-limiter config. Exported so tests can assert every window is
+ * derived from the canonical limit maps.
+ */
+export const RATE_LIMIT_CONFIG = {
+  // Free + Pro daily content-generation limits, derived from the canonical maps.
+  ...tierWindows(FREE_DAILY_LIMITS, "Free"),
+  ...tierWindows(PRO_DAILY_LIMITS, "Pro"),
 
   /** Joining notebooks via share link (per user, per hour) */
   shareRedeem: { kind: "fixed window", rate: 60, period: HOUR },
   /** Forking a notebook from a fork link (per user, per hour) */
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
-});
+} satisfies Record<string, FixedWindow>;
 
-/**
- * Get the free tier limit for a feature
- */
-export function getFreeLimit(feature: DailyFeature): number {
-  const limits: Record<DailyFeature, number> = {
-    chat: 10,
-    flashcard: 2,
-    quiz: 2,
-    report: 2,
-    audio: 2,
-    writtenQuestion: 2,
-    spreadsheet: 2,
-    infographic: 2,
-    sourceGuide: 50,
-  };
-  return limits[feature];
-}
-
-/**
- * Get the pro tier limit for a feature
- */
-export function getProLimit(feature: DailyFeature): number {
-  const limits: Record<DailyFeature, number> = {
-    chat: 500,
-    flashcard: 100,
-    quiz: 100,
-    report: 100,
-    audio: 100,
-    writtenQuestion: 100,
-    spreadsheet: 100,
-    infographic: 100,
-    sourceGuide: 200,
-  };
-  return limits[feature];
-}
-
-/**
- * Type for features with daily limits
- */
-export type DailyFeature =
-  | "chat"
-  | "flashcard"
-  | "quiz"
-  | "report"
-  | "audio"
-  | "writtenQuestion"
-  | "spreadsheet"
-  | "infographic"
-  | "sourceGuide";
+export const rateLimiter = new RateLimiter(components.rateLimiter, RATE_LIMIT_CONFIG);

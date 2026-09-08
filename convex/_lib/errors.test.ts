@@ -44,6 +44,11 @@ describe("createSourceLimitError", () => {
     expect(err.limit).toBe(20);
     expect(err.isPro).toBe(true);
   });
+
+  it("free-tier message surfaces the higher Pro per-notebook source cap", () => {
+    const err = createSourceLimitError(20, 20, false);
+    expect(err.message).toContain("200 sources per notebook");
+  });
 });
 
 describe("createDailyLimitError", () => {

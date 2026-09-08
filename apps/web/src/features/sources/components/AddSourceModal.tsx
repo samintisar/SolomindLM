@@ -68,7 +68,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   onFileSelect,
 }) => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const { sourceLimit: maxSources } = useUserLimits();
+  const { sourceLimit: maxSources, isLoading: limitsLoading } = useUserLimits();
 
   // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
   // onDragLeave is recreated each render, so [isOpen, onDragLeave] would retrigger after setState).
@@ -88,9 +88,13 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
     }
   }, [isOpen]);
 
-  const canUpload = Boolean(userId && noteId && sourcesCount < maxSources);
+  // While the subscription is still loading the cap is not known — don't gate on
+  // it (the server enforces the real limit); a Pro user would otherwise briefly
+  // see the free cap and a "limit reached" state.
+  const limitReached = !limitsLoading && sourcesCount >= maxSources;
+  const canUpload = Boolean(userId && noteId && !limitReached);
   const showAuthWarning = !userId || !noteId;
-  const showLimitWarning = sourcesCount >= maxSources;
+  const showLimitWarning = limitReached;
 
   if (!isOpen) return null;
 
@@ -342,17 +346,21 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
           <div className="flex-1 h-2 bg-secondary/50 rounded-xl overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                sourcesCount >= maxSources ? "bg-destructive" : "bg-primary"
+                limitReached ? "bg-destructive" : "bg-primary"
               }`}
-              style={{ width: `${Math.min((sourcesCount / maxSources) * 100, 100)}%` }}
+              style={{
+                width: limitsLoading
+                  ? "0%"
+                  : `${Math.min((sourcesCount / maxSources) * 100, 100)}%`,
+              }}
             />
           </div>
           <span
             className={`font-mono font-medium ${
-              sourcesCount >= maxSources ? "text-destructive" : "text-muted-foreground"
+              limitReached ? "text-destructive" : "text-muted-foreground"
             }`}
           >
-            {sourcesCount} / {maxSources}
+            {sourcesCount} / {limitsLoading ? "…" : maxSources}
           </span>
         </div>
       </div>

@@ -303,7 +303,7 @@ export function getUpgradeMessage(parsedError: ParsedLimitError): string {
   }
 
   if (limitType === "source") {
-    return "Upgrade for more notebooks and higher daily generation limits. To add a source, remove one from this notebook first.";
+    return "Upgrade to Pro for up to 200 sources per notebook, or remove a source from this notebook to add another.";
   }
 
   if (limitType === "daily" && feature) {
