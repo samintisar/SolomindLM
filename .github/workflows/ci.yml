@@ -97,7 +97,9 @@ jobs:
 
       - name: Run Convex Tests
         env:
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          # No TAVILY_API_KEY: test:convex does not need it (env.ts defaults to ""),
+          # and providing it flips on describeIfKey blocks in DiscoveryService.test.ts
+          # that make live Tavily / academic-search API calls. Keep the suite hermetic.
           TOGETHER_AI_API_KEY: test-key-for-ci
         run: bun run test:convex
 
