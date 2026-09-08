@@ -21,7 +21,7 @@ test.describe("Billing page", () => {
     await expect(page.getByText("$15").first()).toBeVisible();
 
     // Feature lists
-    await expect(page.getByText("20 notebooks per account").first()).toBeVisible();
+    await expect(page.getByText("5 notebooks per account").first()).toBeVisible();
     await expect(page.getByText("200 notebooks per account").first()).toBeVisible();
   });
 
@@ -77,9 +77,9 @@ test.describe("Billing page", () => {
     await page.waitForLoadState("networkidle");
 
     // Free features - just check they exist somewhere on page
-    await expect(page.getByText("50 chat messages/day").first()).toBeVisible();
-    await expect(page.getByText("5 flashcards/day").first()).toBeVisible();
-    await expect(page.getByText("5 quizzes/day").first()).toBeVisible();
+    await expect(page.getByText("10 chat messages/day").first()).toBeVisible();
+    await expect(page.getByText("2 flashcards/day").first()).toBeVisible();
+    await expect(page.getByText("2 quizzes/day").first()).toBeVisible();
 
     // Pro features - just check they exist somewhere on page
     await expect(page.getByText("500 chat messages/day").first()).toBeVisible();

@@ -123,7 +123,7 @@ export function createSourceLimitError(
 ): LimitError {
   const message = isPro
     ? `Source limit reached (${current}/${limit} sources per notebook). Remove a source to add another.`
-    : `Source limit reached (${current}/${limit} sources per notebook). Remove a source to add another, or upgrade for higher notebook limits and more features.`;
+    : `Source limit reached (${current}/${limit} sources per notebook). Upgrade to Pro for up to 200 sources per notebook, or remove a source to add another.`;
   return new LimitError(
     ErrorCode.SOURCE_LIMIT_REACHED,
     message,
@@ -171,39 +171,46 @@ export function createDailyLimitError(
 }
 
 /**
+ * Canonical daily per-feature limits. This is the single source of truth —
+ * `rateLimits.ts` derives both its accessors and the rate-limiter window
+ * config from these maps, so the numbers live in exactly one place.
+ */
+export const PRO_DAILY_LIMITS: Record<DailyFeature, number> = {
+  chat: 500,
+  flashcard: 100,
+  quiz: 100,
+  report: 100,
+  audio: 100,
+  writtenQuestion: 100,
+  spreadsheet: 100,
+  infographic: 100,
+  sourceGuide: 200,
+};
+
+export const FREE_DAILY_LIMITS: Record<DailyFeature, number> = {
+  chat: 10,
+  flashcard: 2,
+  quiz: 2,
+  report: 2,
+  audio: 2,
+  writtenQuestion: 2,
+  spreadsheet: 2,
+  infographic: 2,
+  sourceGuide: 50,
+};
+
+/**
  * Get the pro tier limit for a feature
  */
 export function getProLimit(feature: DailyFeature): number {
-  const limits: Record<DailyFeature, number> = {
-    chat: 500,
-    flashcard: 100,
-    quiz: 100,
-    report: 100,
-    audio: 100,
-    writtenQuestion: 100,
-    spreadsheet: 100,
-    infographic: 100,
-    sourceGuide: 200,
-  };
-  return limits[feature];
+  return PRO_DAILY_LIMITS[feature];
 }
 
 /**
  * Get the free tier limit for a feature
  */
 export function getFreeLimit(feature: DailyFeature): number {
-  const limits: Record<DailyFeature, number> = {
-    chat: 50,
-    flashcard: 5,
-    quiz: 5,
-    report: 5,
-    audio: 1,
-    writtenQuestion: 5,
-    spreadsheet: 5,
-    infographic: 5,
-    sourceGuide: 50,
-  };
-  return limits[feature];
+  return FREE_DAILY_LIMITS[feature];
 }
 
 /**

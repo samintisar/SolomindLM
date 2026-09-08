@@ -74,6 +74,26 @@ export function useSourceUpload({
 
   // Use provided limit or get from subscription
   const maxSources = sourceLimit ?? userLimits.sourceLimit;
+  // Until the subscription resolves the cap isn't known; don't block client-side
+  // (the server still enforces it) so a Pro user isn't gated on the free cap.
+  const limitKnown = sourceLimit !== undefined || !userLimits.isLoading;
+  const atSourceLimit = limitKnown && sourcesCount >= maxSources;
+
+  // Shared "source limit reached" toast. Upgrading to Pro raises the per-notebook
+  // source cap 20 -> 200, so free users are told that; Pro users only hear the
+  // remove-a-source path.
+  const emitSourceLimitReached = () => {
+    const upgradeHint = userLimits.isPremium
+      ? "Remove a source to add another."
+      : "Upgrade to Pro for up to 200 sources per notebook, or remove a source to add another.";
+    return handleLimitError(
+      new Error(`Source limit reached (${sourcesCount}/${maxSources}). ${upgradeHint}`),
+      {
+        errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
+        upgradeMessage: `This notebook allows up to ${maxSources} sources. ${upgradeHint}`,
+      }
+    );
+  };
 
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -103,16 +123,8 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= maxSources) {
-      await handleLimitError(
-        new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
-        ),
-        {
-          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
-        }
-      );
+    if (atSourceLimit) {
+      await emitSourceLimitReached();
       return;
     }
 
@@ -149,16 +161,8 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= maxSources) {
-      await handleLimitError(
-        new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
-        ),
-        {
-          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
-        }
-      );
+    if (atSourceLimit) {
+      await emitSourceLimitReached();
       return;
     }
 
@@ -211,16 +215,8 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= maxSources) {
-      await handleLimitError(
-        new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
-        ),
-        {
-          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
-        }
-      );
+    if (atSourceLimit) {
+      await emitSourceLimitReached();
       return;
     }
 
@@ -273,16 +269,8 @@ export function useSourceUpload({
       return;
     }
 
-    if (sourcesCount >= maxSources) {
-      await handleLimitError(
-        new Error(
-          `Source limit reached (${sourcesCount}/${maxSources}). Remove a source to add more, or upgrade for other premium benefits.`
-        ),
-        {
-          errorMessage: `You've reached your source limit (${sourcesCount}/${maxSources}).`,
-          upgradeMessage: `This notebook allows up to ${maxSources} sources. Remove one to add another; upgrade for more notebooks and higher daily limits.`,
-        }
-      );
+    if (atSourceLimit) {
+      await emitSourceLimitReached();
       return;
     }
 
@@ -311,7 +299,7 @@ export function useSourceUpload({
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    if (userId && noteId && sourcesCount < maxSources) {
+    if (userId && noteId && !atSourceLimit) {
       setIsDragging(true);
     }
   };
@@ -335,7 +323,7 @@ export function useSourceUpload({
     e.stopPropagation();
     setIsDragging(false);
 
-    if (!userId || !noteId || sourcesCount >= maxSources) {
+    if (!userId || !noteId || atSourceLimit) {
       return;
     }
 

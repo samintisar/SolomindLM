@@ -17,7 +17,7 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
       hasSubscription: false,
       plan: "free",
       notebookLimit: 5,
-      sourceLimit: 200,
+      sourceLimit: 20,
       currentPeriodEnd: undefined,
       cancelAtPeriodEnd: false,
     };
@@ -61,8 +61,8 @@ export function useSubscriptionStatus(): SubscriptionStatusResponse {
     hasSubscription: subscription.status === "active",
     status: subscription.status as any,
     plan: subscription.status === "active" ? "premium" : "free",
-    notebookLimit: subscription.status === "active" ? 100 : 5,
-    sourceLimit: 200,
+    notebookLimit: subscription.status === "active" ? 200 : 5,
+    sourceLimit: subscription.status === "active" ? 200 : 20,
     currentPeriodEnd: currentPeriodEndIso ?? undefined,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     interval: subscription.interval as SubscriptionInterval,
@@ -141,18 +141,24 @@ export function useIsSubscribed(): boolean {
  */
 export function useUserLimits() {
   const subscription = useQuery(api.billing.index.getCurrent);
+  // `useQuery` is `undefined` until the subscription query resolves. Callers
+  // must not treat the free cap as authoritative during this window (it would
+  // flash "limit reached" at a Pro user); they gate on `isLoading` instead.
+  const isLoading = subscription === undefined;
 
   if (subscription?.status === "active") {
     return {
-      notebookLimit: 100,
+      notebookLimit: 200,
       sourceLimit: 200,
       isPremium: true,
+      isLoading: false,
     };
   }
 
   return {
     notebookLimit: 5,
-    sourceLimit: 200,
+    sourceLimit: 20,
     isPremium: false,
+    isLoading,
   };
 }

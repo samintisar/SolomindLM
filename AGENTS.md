@@ -150,7 +150,7 @@ Bun workspaces monorepo:
 
 **Convex modules:** `@convex-dev/auth`, `@convex-dev/stripe`, `@convex-dev/persistent-text-streaming`, `@convex-dev/action-cache`, `@convex-dev/rate-limiter`, `@convex-dev/workflow`.
 
-**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1024-dim vectors, `intfloat/multilingual-e5-large-instruct`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripePaymentHistory`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
+**Convex schema highlights:** `notebooks`, `folders`, `documents`, `documentChunks` (1024-dim vectors, `intfloat/multilingual-e5-large-instruct`), `reports`, `audioOverviews`, `flashcards`, `mindmaps`, `quizzes`, `infographics`, `spreadsheets`, `writtenQuestions`, `conversations`, `messages`, `notes`, `researchPlans`/`researchRuns`, `literatureTables`/`literatureReports`/`literatureReviewSessions`, `studioPrompts` (+ saves/ratings), `stripeSubscriptions`, `stripeWebhookEvents`, `cacheVersions`, `cacheMetrics`. See `convex/schema.ts` for the full list.
 
 **Convex directory layout** (`_` prefix = excluded from generated API):
 

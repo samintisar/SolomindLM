@@ -16,14 +16,13 @@ import {
   Youtube,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import { useUserLimits } from "@/features/billing/services/subscriptionApi";
 import { BibtexImportModal } from "./BibtexImportModal";
 import { DoiInputModal } from "./DoiInputModal";
 import { isGoogleDrivePickerConfigured } from "./GoogleDrivePicker";
 import { ManualPaperModal } from "./ManualPaperModal";
 import { MendeleyImportModal } from "./MendeleyImportModal";
 import { ZoteroImportModal } from "./ZoteroImportModal";
-
-const MAX_SOURCES = 200;
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -69,6 +68,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
   onFileSelect,
 }) => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const { sourceLimit: maxSources, isLoading: limitsLoading } = useUserLimits();
 
   // Keep ref to latest onDragLeave so we don't need it in the effect deps (avoids infinite loop:
   // onDragLeave is recreated each render, so [isOpen, onDragLeave] would retrigger after setState).
@@ -88,9 +88,13 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
     }
   }, [isOpen]);
 
-  const canUpload = Boolean(userId && noteId && sourcesCount < MAX_SOURCES);
+  // While the subscription is still loading the cap is not known — don't gate on
+  // it (the server enforces the real limit); a Pro user would otherwise briefly
+  // see the free cap and a "limit reached" state.
+  const limitReached = !limitsLoading && sourcesCount >= maxSources;
+  const canUpload = Boolean(userId && noteId && !limitReached);
   const showAuthWarning = !userId || !noteId;
-  const showLimitWarning = sourcesCount >= MAX_SOURCES;
+  const showLimitWarning = limitReached;
 
   if (!isOpen) return null;
 
@@ -325,8 +329,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               <div className="flex-1">
                 <p className="text-sm font-medium text-destructive">Source limit reached</p>
                 <p className="text-xs text-destructive/80 mt-1">
-                  You've reached the maximum of {MAX_SOURCES} sources. Remove some sources to add
-                  new ones.
+                  You've reached the maximum of {maxSources} sources. Remove some sources to add new
+                  ones.
                 </p>
               </div>
             </div>
@@ -342,17 +346,21 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
           <div className="flex-1 h-2 bg-secondary/50 rounded-xl overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                sourcesCount >= MAX_SOURCES ? "bg-destructive" : "bg-primary"
+                limitReached ? "bg-destructive" : "bg-primary"
               }`}
-              style={{ width: `${Math.min((sourcesCount / MAX_SOURCES) * 100, 100)}%` }}
+              style={{
+                width: limitsLoading
+                  ? "0%"
+                  : `${Math.min((sourcesCount / maxSources) * 100, 100)}%`,
+              }}
             />
           </div>
           <span
             className={`font-mono font-medium ${
-              sourcesCount >= MAX_SOURCES ? "text-destructive" : "text-muted-foreground"
+              limitReached ? "text-destructive" : "text-muted-foreground"
             }`}
           >
-            {sourcesCount} / {MAX_SOURCES}
+            {sourcesCount} / {limitsLoading ? "…" : maxSources}
           </span>
         </div>
       </div>

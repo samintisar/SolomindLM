@@ -315,7 +315,7 @@ describe("getUpgradeMessage", () => {
       limitType: "notebook",
       isPro: false,
     });
-    expect(msg).toContain("100 notebooks");
+    expect(msg).toContain("200 notebooks");
   });
 
   it("returns source-specific message for free users on source limit", () => {
@@ -327,7 +327,10 @@ describe("getUpgradeMessage", () => {
       limitType: "source",
       isPro: false,
     });
-    expect(msg).toContain("remove one from this notebook");
+    // Upgrading to Pro raises the per-notebook source cap 20 -> 200, so the
+    // free-tier message must surface that rather than only telling the user to
+    // delete sources.
+    expect(msg).toContain("200 sources per notebook");
   });
 
   it("returns daily pro limits for free daily limit (chat)", () => {

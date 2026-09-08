@@ -18,11 +18,27 @@ export const handleWebhook = internalAction({
 
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+    const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+
+    console.log(`[Stripe webhook] Event type: ${event.type}, ID: ${event.id}`);
+
+    // Idempotency: Stripe retries deliveries, sends duplicates, and can
+    // redeliver while a previous attempt is still running.
+    const { status } = await ctx.runMutation(internal.billing.index.claimWebhookEvent, {
+      stripeEventId: event.id,
+      eventType: event.type,
+    });
+    if (status === "processed") {
+      console.log(`[Stripe webhook] Duplicate event ${event.id}, skipping`);
+      return;
+    }
+    if (status === "in_flight") {
+      // Another delivery of this event is being handled right now. Fail so
+      // Stripe retries later instead of running the handlers concurrently.
+      throw new Error(`[Stripe webhook] Event ${event.id} already in flight, retry later`);
+    }
+
     try {
-      const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-
-      console.log(`[Stripe webhook] Event type: ${event.type}, ID: ${event.id}`);
-
       switch (event.type) {
         case "checkout.session.completed":
           await handleCheckoutCompleted(ctx, event, stripe);
@@ -43,8 +59,16 @@ export const handleWebhook = internalAction({
         default:
           console.log(`[Stripe webhook] Unhandled event type: ${event.type}`);
       }
+
+      await ctx.runMutation(internal.billing.index.markWebhookEventProcessed, {
+        stripeEventId: event.id,
+      });
     } catch (error) {
       console.error("[Stripe webhook] Error processing event:", error);
+      await ctx.runMutation(internal.billing.index.markWebhookEventFailed, {
+        stripeEventId: event.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   },
@@ -92,13 +116,24 @@ async function handleCheckoutCompleted(
 
   const interval = subscription.metadata?.interval ?? session.metadata?.interval;
 
-  if (!subscriptionId || !customerId || !userId) {
-    console.error("[Stripe webhook] Missing required data in checkout.session.completed", {
-      hasSubscriptionId: !!subscriptionId,
-      hasCustomerId: !!customerId,
-      hasUserId: !!userId,
-    });
+  if (!subscriptionId || !customerId) {
+    // Not a subscription checkout (or a malformed session) — nothing to store,
+    // and retrying will not change that.
+    console.log(
+      "[Stripe webhook] checkout.session.completed without subscription/customer, ignoring",
+      { hasSubscriptionId: !!subscriptionId, hasCustomerId: !!customerId }
+    );
     return;
+  }
+
+  if (!userId) {
+    // We have a paid subscription but cannot map it to a user yet (checkout
+    // metadata / customer.convexUserId may still be propagating). Throw so the
+    // webhook layer records the failure and Stripe retries rather than marking
+    // this event permanently processed.
+    throw new Error(
+      `[Stripe webhook] checkout.session.completed could not resolve userId for subscription ${subscriptionId}`
+    );
   }
 
   if (!interval) {
@@ -156,22 +191,20 @@ async function handleSubscriptionUpdated(ctx: ActionCtx, event: { data: { object
   };
   const subscriptionId = raw.id;
   const customerId = typeof raw.customer === "string" ? raw.customer : raw.customer?.id;
-  const userId = raw.metadata?.userId;
-
-  if (!userId || !customerId) {
-    console.error("[Stripe webhook] Missing userId or customerId in subscription.updated");
-    return;
-  }
+  // Portal- and dashboard-initiated updates don't carry the metadata we set at
+  // checkout. applyWebhookSubscriptionUpdate resolves a missing userId/customerId
+  // from the stored subscription row.
+  const userId = raw.metadata?.userId as string | undefined;
 
   const priceId = raw.items?.data?.[0]?.price?.id ?? "";
   const amount = raw.items?.data?.[0]?.price?.unit_amount ?? 0;
   const currency = (raw.items?.data?.[0]?.price?.currency as string) ?? "usd";
   const interval = (raw.items?.data?.[0]?.price?.recurring?.interval as string) ?? "month";
 
-  await ctx.runMutation(internal.billing.index.upsertSubscription, {
-    userId: userId as any,
+  await ctx.runMutation(internal.billing.index.applyWebhookSubscriptionUpdate, {
     stripeSubscriptionId: subscriptionId,
-    stripeCustomerId: customerId,
+    userId,
+    stripeCustomerId: typeof customerId === "string" ? customerId : undefined,
     stripePriceId: priceId,
     status: raw.status,
     currentPeriodStart: raw.current_period_start * 1000,
@@ -209,7 +242,14 @@ async function handleInvoicePaid(ctx: ActionCtx, event: { data: { object: any } 
     stripeSubscriptionId: subscriptionId,
   });
 
-  if (!existing?.userId) return;
+  if (!existing?.userId) {
+    // The subscription row is not in our table yet — the correlating
+    // checkout.session.completed may not have been processed. Throw so Stripe
+    // retries this invoice.paid instead of it being marked processed and lost.
+    throw new Error(
+      `[Stripe webhook] invoice.paid for unknown subscription ${subscriptionId}, retrying`
+    );
+  }
 
   const stripeCustomerId =
     typeof invoice.customer === "string"

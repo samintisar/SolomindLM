@@ -437,23 +437,6 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("stripe_event", ["stripeEventId"]),
 
-  stripePaymentHistory: defineTable({
-    userId: v.id("users"),
-    subscriptionId: v.id("stripeSubscriptions"),
-    stripeInvoiceId: v.string(),
-    stripePaymentIntentId: v.optional(v.string()),
-    status: v.string(),
-    amount: v.number(),
-    currency: v.string(),
-    dueDate: v.optional(v.number()),
-    paidAt: v.optional(v.number()),
-    metadata: v.optional(v.any()),
-    createdAt: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_subscription", ["subscriptionId"])
-    .index("stripe_invoice", ["stripeInvoiceId"]),
-
   // Rate limiting
   rateLimits: defineTable({
     userId: v.id("users"),

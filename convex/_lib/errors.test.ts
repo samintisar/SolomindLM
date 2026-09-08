@@ -44,6 +44,11 @@ describe("createSourceLimitError", () => {
     expect(err.limit).toBe(20);
     expect(err.isPro).toBe(true);
   });
+
+  it("free-tier message surfaces the higher Pro per-notebook source cap", () => {
+    const err = createSourceLimitError(20, 20, false);
+    expect(err.message).toContain("200 sources per notebook");
+  });
 });
 
 describe("createDailyLimitError", () => {
@@ -86,13 +91,13 @@ describe("getFeatureLimit", () => {
   });
 
   it("returns free limits when isPro=false", () => {
-    expect(getFeatureLimit("chat", false)).toBe(50);
-    expect(getFeatureLimit("audio", false)).toBe(1);
-    expect(getFeatureLimit("infographic", false)).toBe(5);
+    expect(getFeatureLimit("chat", false)).toBe(10);
+    expect(getFeatureLimit("audio", false)).toBe(2);
+    expect(getFeatureLimit("infographic", false)).toBe(2);
   });
 
   it("getFreeLimit and getProLimit return correct values", () => {
-    expect(getFreeLimit("flashcard")).toBe(5);
+    expect(getFreeLimit("flashcard")).toBe(2);
     expect(getProLimit("flashcard")).toBe(100);
   });
 });

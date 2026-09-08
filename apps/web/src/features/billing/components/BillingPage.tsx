@@ -12,14 +12,14 @@ interface BillingPageProps {
 }
 
 const freeFeatures = [
-  "20 notebooks per account",
-  "200 sources per notebook",
-  "50 chat messages/day",
-  "5 flashcards/day",
-  "5 quizzes/day",
-  "5 reports/day",
-  "5 audio overviews/day",
-  "5 written questions/day",
+  "5 notebooks per account",
+  "20 sources per notebook",
+  "10 chat messages/day",
+  "2 flashcards/day",
+  "2 quizzes/day",
+  "2 reports/day",
+  "2 audio overviews/day",
+  "2 written questions/day",
 ];
 
 const proFeatures = [
