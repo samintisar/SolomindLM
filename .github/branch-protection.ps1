@@ -23,10 +23,13 @@ Write-Host "Applying branch protection rules to $repo..." -ForegroundColor Cyan
 
 # Create JSON file for branch protection
 $json = @{
+    # required_approving_review_count = 0: a PR is still required (no direct pushes to
+    # main), CI checks are still enforced, but the author can merge without a separate
+    # approval. Suits a solo maintainer. Raise to 1 once there's a second reviewer.
     required_pull_request_reviews = @{
         dismiss_stale_reviews = $false
         require_code_owner_reviews = $false
-        required_approving_review_count = 1
+        required_approving_review_count = 0
     }
     # NOTE: E2E is intentionally not a required check. Phase 3 of the CI/CD deployment plan
     # (docs/superpowers/plans/2026-09-08-cicd-deployment-observability.md) moves it to a
@@ -64,7 +67,7 @@ try {
     Write-Host ""
     Write-Host "Summary of rules applied:" -ForegroundColor Cyan
     Write-Host "  - Branch: main"
-    Write-Host "  - Require pull request reviews: Yes (1 reviewer)"
+    Write-Host "  - Require pull request reviews: Yes (0 approvals - PR required, CI enforced)"
     Write-Host "  - Require status checks: Yes (Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Build Web)"
     Write-Host "  - Require branches to be up to date: Yes"
     Write-Host "  - Admin enforcement: Yes"
