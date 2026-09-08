@@ -28,12 +28,19 @@ $json = @{
         require_code_owner_reviews = $false
         required_approving_review_count = 1
     }
+    # NOTE: E2E is intentionally not a required check. Phase 3 of the CI/CD deployment plan
+    # (docs/superpowers/plans/2026-09-08-cicd-deployment-observability.md) moves it to a
+    # deployment_status-triggered advisory job; promote to required only once stable.
     required_status_checks = @{
         strict = $true
         checks = @(
-            @{ context = "Type Check (API)" }
-            @{ context = "Build (Web)" }
-            @{ context = "Build (API)" }
+            @{ context = "Typecheck (Convex)" }
+            @{ context = "Typecheck (Web)" }
+            @{ context = "Typecheck (Expo mobile)" }
+            @{ context = "Lint (Biome)" }
+            @{ context = "Lint (Workflows)" }
+            @{ context = "Unit Tests" }
+            @{ context = "Build (Web, PR parity)" }
         )
     }
     enforce_admins = $true
@@ -58,7 +65,7 @@ try {
     Write-Host "Summary of rules applied:" -ForegroundColor Cyan
     Write-Host "  - Branch: main"
     Write-Host "  - Require pull request reviews: Yes (1 reviewer)"
-    Write-Host "  - Require status checks: Yes (Type Check, Build Web, Build API)"
+    Write-Host "  - Require status checks: Yes (Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Build Web)"
     Write-Host "  - Require branches to be up to date: Yes"
     Write-Host "  - Admin enforcement: Yes"
     Write-Host "  - Allow force pushes: No"

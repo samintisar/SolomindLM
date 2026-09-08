@@ -43,9 +43,10 @@ git push -u origin feature/your-feature-name
 
 ### 4. CI Checks Run Automatically
 
-- Type Check (API)
-- Build (Web)
-- Build (API)
+- Typecheck (Convex), Typecheck (Web), Typecheck (Expo mobile)
+- Lint (Biome), Lint (Workflows)
+- Unit Tests
+- Build (Web, PR parity)
 
 ### 5. Review & Merge
 
@@ -102,7 +103,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Build (Web)`, `Type Check` (as configured) |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -117,8 +118,15 @@ The `.github/workflows/ci.yml` runs on:
 
 Jobs:
 
-1. **Build (Web)** - Builds the React frontend
-2. **Type Check** - Validates TypeScript (when configured)
+1. **Typecheck (Convex)** - Validates Convex backend TypeScript
+2. **Typecheck (Web)** - Validates web TypeScript
+3. **Typecheck (Expo mobile)** - Validates mobile TypeScript
+4. **Lint (Biome)** - Biome lint + format check
+5. **Lint (Workflows)** - actionlint on GitHub workflow files
+6. **Unit Tests** - Convex + web vitest suites
+7. **Build (Web, PR parity)** - Builds the React frontend
+
+E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it is not a required check. Phase 3 of the CI/CD deployment plan wires it to run against the Vercel preview deployment.
 
 ## Best Practices
 

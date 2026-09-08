@@ -52,6 +52,24 @@ jobs:
       - name: Typecheck Convex
         run: bun run typecheck:convex
 
+  typecheck-web:
+    name: Typecheck (Web)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.2"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck Web
+        run: bun run typecheck:web
+
   lint:
     name: Lint (Biome)
     runs-on: ubuntu-latest
@@ -69,6 +87,18 @@ jobs:
 
       - name: Biome check
         run: bun run lint -- --diagnostic-level=error
+
+  workflow-lint:
+    name: Lint (Workflows)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
 
   test-unit:
     name: Unit Tests
@@ -143,7 +173,7 @@ jobs:
 
   build-web:
     name: Build (Web, PR parity)
-    needs: [typecheck-convex, typecheck-mobile]
+    needs: [typecheck-convex, typecheck-web, typecheck-mobile]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
@@ -165,7 +195,7 @@ jobs:
 
   build-web-main:
     name: Build web (main, prod Convex URL — no deploy)
-    needs: [typecheck-convex, typecheck-mobile]
+    needs: [typecheck-convex, typecheck-web, typecheck-mobile]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -199,28 +229,46 @@ jobs:
         total: [2]
         shard: [1, 2]
     steps:
+      - name: Check for E2E secrets
+        id: e2e_secrets
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: |
+          if [ -z "${E2E_TEST_EMAIL}" ] || [ -z "${E2E_TEST_PASSWORD}" ]; then
+            echo "::warning::E2E_TEST_EMAIL / E2E_TEST_PASSWORD repo secrets are not set — E2E suite skipped. Phase 3 wires E2E to the Vercel preview deployment."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.e2e_secrets.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Bun
+        if: steps.e2e_secrets.outputs.run == 'true'
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: "1.2.2"
 
       - name: Install dependencies
+        if: steps.e2e_secrets.outputs.run == 'true'
         run: bun install --frozen-lockfile
 
       - name: Install Playwright browsers
+        if: steps.e2e_secrets.outputs.run == 'true'
         run: bunx playwright install --with-deps chromium
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/${{ matrix.total }})
+        if: steps.e2e_secrets.outputs.run == 'true'
         env:
           E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: bunx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }}
 
       - name: Upload test results
-        if: failure()
+        if: failure() && steps.e2e_secrets.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results-shard-${{ matrix.shard }}
