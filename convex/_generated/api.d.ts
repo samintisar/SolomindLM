@@ -173,6 +173,7 @@ import type * as _agents_written_questions_questionHeuristics from "../_agents/w
 import type * as _agents_written_questions_routing from "../_agents/written_questions/routing.js";
 import type * as _agents_written_questions_state from "../_agents/written_questions/state.js";
 import type * as _agents_written_questions_structuredLlm from "../_agents/written_questions/structuredLlm.js";
+import type * as _lib_allowedOrigins from "../_lib/allowedOrigins.js";
 import type * as _lib_arxivThrottle from "../_lib/arxivThrottle.js";
 import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
 import type * as _lib_defaultSmartModel from "../_lib/defaultSmartModel.js";
@@ -538,6 +539,7 @@ declare const fullApi: ApiFromModules<{
   "_agents/written_questions/routing": typeof _agents_written_questions_routing;
   "_agents/written_questions/state": typeof _agents_written_questions_state;
   "_agents/written_questions/structuredLlm": typeof _agents_written_questions_structuredLlm;
+  "_lib/allowedOrigins": typeof _lib_allowedOrigins;
   "_lib/arxivThrottle": typeof _lib_arxivThrottle;
   "_lib/conversationAccess": typeof _lib_conversationAccess;
   "_lib/defaultSmartModel": typeof _lib_defaultSmartModel;

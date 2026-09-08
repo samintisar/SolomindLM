@@ -277,7 +277,8 @@ Create `.env.local` in the project root for dev (prod uses `.env`). See `.env.ex
 | `CONVEX_DEPLOYMENT` | Your Convex deployment name | Created automatically by `convex dev` |
 | `CONVEX_URL`        | Your Convex deployment URL  | Found in Convex dashboard             |
 | `CONVEX_SITE_URL`   | Your Convex HTTP site URL   | Found in Convex dashboard             |
-| `SITE_URL`          | Your production site URL    | Your domain                           |
+| `SITE_URL`          | Single canonical site origin (Convex Auth builds email links from it — never comma-joined) | Your domain |
+| `CORS_EXTRA_ORIGINS` | Optional. Extra origins allowed for CORS + auth redirects, comma-separated | e.g. apex domain alongside `www`, staging |
 
 #### Authentication (Required on Convex)
 
