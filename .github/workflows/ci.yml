@@ -89,7 +89,7 @@ jobs:
         run: bun run lint -- --diagnostic-level=error
 
   workflow-lint:
-    name: Workflow Lint
+    name: Lint (Workflows)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
