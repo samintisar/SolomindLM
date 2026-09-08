@@ -127,24 +127,30 @@ git commit -m "ci: add web typecheck job and gate builds on it"
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
+Job id `workflow-lint`; display name `Lint (Workflows)` to match the file's
+`<Verb> (<Scope>)` naming convention (`Lint (Biome)`, `Typecheck (Web)`, …).
+Run actionlint via its pinned official Docker image — there is no
+`raszi/actionlint` action and `rhysd/actionlint` publishes no JS/composite
+action, only the container. The image bundles `shellcheck`, so it also lints
+every `run:` block in the workflows.
+
 - [ ] **Step 1: Add the job**
 
 Insert after the `lint:` job block:
 
 ```yaml
   workflow-lint:
-    name: Workflow Lint
+    name: Lint (Workflows)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Run actionlint
-        uses: raszi/actionlint@v1
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
 ```
-
-(If `raszi/actionlint@v1` cannot be resolved, use the container form instead:
-`run: docker run --rm -v "$PWD":/repo --workdir /repo rhysd/actionlint:latest -color`.)
 
 - [ ] **Step 2: Commit**
 
@@ -153,32 +159,77 @@ git add .github/workflows/ci.yml
 git commit -m "ci: lint workflow files with actionlint"
 ```
 
-### Task 3: Make the E2E job fail loudly when secrets are missing
+### Task 3: Make the E2E job skip visibly (not silently, not red) when secrets are missing
 
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Add a guard step**
+Rationale: a hard `exit 1` when the `E2E_TEST_*` secrets are absent leaves a red
+check on every PR until Phase 3, which reads as a broken pipeline and trains
+reviewers to ignore red. Instead the job ends green with a `::warning::`
+annotation and skips its real steps. When the secrets are set (or Phase 3
+replaces this job), E2E runs for real. This whole `test-e2e` job is removed in
+Phase 3 Task 15.
 
-In the `test-e2e` job, insert as the **first** step (before `Checkout`):
+- [ ] **Step 1: Add a gate step and guard the real steps**
+
+In the `test-e2e` job, insert a gate step as the **first** step (before `Checkout`)
+and add `if: steps.e2e_secrets.outputs.run == 'true'` to every subsequent step:
 
 ```yaml
-      - name: Require E2E secrets
+      - name: Check for E2E secrets
+        id: e2e_secrets
         env:
           E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
           E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
         run: |
           if [ -z "${E2E_TEST_EMAIL}" ] || [ -z "${E2E_TEST_PASSWORD}" ]; then
-            echo "::error::E2E_TEST_EMAIL / E2E_TEST_PASSWORD repo secrets are not set — E2E is NOT running. This job is a no-op until Phase 3 wires E2E to the Vercel preview. Set the secrets or expect this to fail."
-            exit 1
+            echo "::warning::E2E_TEST_EMAIL / E2E_TEST_PASSWORD repo secrets are not set — E2E suite skipped. Phase 3 wires E2E to the Vercel preview deployment."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Checkout
+        if: steps.e2e_secrets.outputs.run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        if: steps.e2e_secrets.outputs.run == 'true'
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.2"
+
+      - name: Install dependencies
+        if: steps.e2e_secrets.outputs.run == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        if: steps.e2e_secrets.outputs.run == 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run E2E tests (shard ${{ matrix.shard }}/${{ matrix.total }})
+        if: steps.e2e_secrets.outputs.run == 'true'
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: bunx playwright test --shard=${{ matrix.shard }}/${{ matrix.total }}
+
+      - name: Upload test results
+        if: failure() && steps.e2e_secrets.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-shard-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
-git commit -m "ci: fail E2E job loudly when test secrets are absent"
+git commit -m "ci: skip E2E with a warning when secrets are absent instead of failing"
 ```
 
 ### Task 4: Fix branch-protection status-check contexts
@@ -198,7 +249,7 @@ In `.github/branch-protection.ps1`, replace the `required_status_checks` block:
             @{ context = "Typecheck (Web)" }
             @{ context = "Typecheck (Expo mobile)" }
             @{ context = "Lint (Biome)" }
-            @{ context = "Workflow Lint" }
+            @{ context = "Lint (Workflows)" }
             @{ context = "Unit Tests" }
             @{ context = "Build (Web, PR parity)" }
         )
@@ -207,11 +258,12 @@ In `.github/branch-protection.ps1`, replace the `required_status_checks` block:
 
 - [ ] **Step 2: Update the summary echo lines**
 
-Change the `Write-Host "  - Require status checks: ..."` line to list: `Typecheck (Convex/Web/Mobile), Lint, Workflow Lint, Unit Tests, Build (Web)`.
+Change the `Write-Host "  - Require status checks: ..."` line to list: `Typecheck Convex/Web/Mobile, Lint Biome/Workflows, Unit Tests, Build Web`.
 Add a comment above the `checks` array:
 
 ```powershell
-    # NOTE: E2E is intentionally not a required check. Phase 3 moves it to a
+    # NOTE: E2E is intentionally not a required check. Phase 3 of the CI/CD deployment plan
+    # (docs/superpowers/plans/2026-09-08-cicd-deployment-observability.md) moves it to a
     # deployment_status-triggered advisory job; promote to required only once stable.
 ```
 
@@ -243,16 +295,16 @@ Then in GitHub → Settings → Branches → `main`, confirm the seven checks ab
 - In "### 4. CI Checks Run Automatically", replace the bullet list (`Type Check (API)` / `Build (Web)` / `Build (API)`) with:
   ```
   - Typecheck (Convex), Typecheck (Web), Typecheck (Expo mobile)
-  - Lint (Biome), Workflow Lint
+  - Lint (Biome), Lint (Workflows)
   - Unit Tests
   - Build (Web, PR parity)
   ```
-- In "## CI Pipeline Details" → "Jobs:", replace the two-item list with the same seven-check list, plus a line: "E2E runs on PRs but is not a required check (see Phase 3)."
-- In "### Option 2: Manual Setup via GitHub UI", update the "Require status checks to pass" row value to `Typecheck (Convex/Web/Mobile), Lint (Biome), Workflow Lint, Unit Tests, Build (Web, PR parity)`.
+- In "## CI Pipeline Details" → "Jobs:", replace the two-item list with the same seven-check list, plus a line: "E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it is not a required check. Phase 3 wires it to run against the Vercel preview deployment."
+- In "### Option 2: Manual Setup via GitHub UI", update the "Require status checks to pass" row value to spell out all seven exact names: `` `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)` `` (operators type these literally into the GitHub UI — no shorthand).
 
 - [ ] **Step 2: `CONTRIBUTING.md`**
 
-Find the line under the PR steps that reads "**Wait for CI** to pass (typecheck, build, tests)" and expand to: "**Wait for CI** to pass — Typecheck (Convex/Web/Mobile), Lint (Biome), Workflow Lint, Unit Tests, Build (Web)."
+Find the line under the PR steps that reads "**Wait for CI** to pass (typecheck, build, tests)" and expand it to spell out the exact check names: "**Wait for CI** to pass — Typecheck (Convex), Typecheck (Web), Typecheck (Expo mobile), Lint (Biome), Lint (Workflows), Unit Tests, Build (Web, PR parity)."
 
 - [ ] **Step 3: Commit**
 
@@ -273,12 +325,12 @@ gh pr create --fill --base main --title "ci: Phase 1 — correctness (web typech
 - [ ] **Step 2: Observe the Actions run on the PR**
 
 Run: `gh pr checks --watch`
-Expected job list on the PR: `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Workflow Lint`, `Unit Tests`, `Build (Web, PR parity)`, `E2E Tests (1/2)`, `E2E Tests (2/2)`.
-Expected outcome: all green **except** the two `E2E Tests` shards, which fail at "Require E2E secrets" **if** the repo secrets are unset (that is the intended interim behaviour). If the secrets are set, E2E will still fail later (no server) — that is fixed in Phase 3; note it in the PR description.
+Expected job list on the PR: `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)`, `E2E Tests (1/2)`, `E2E Tests (2/2)`.
+Expected outcome: **every check green.** When the `E2E_TEST_*` secrets are unset, the two `E2E Tests` shards pass with a `::warning::` annotation and their real steps skipped (`Check for E2E secrets` succeeds, everything after is skipped). `Coverage Report` and `Build web (main, …)` show as skipped (main-only). Confirm `gh pr view <n> --json mergeStateStatus` is `CLEAN`.
 
 - [ ] **Step 3: Merge**
 
-Squash-merge once required checks are green. E2E is not required, so a red E2E does not block.
+Squash-merge once all required checks are green.
 
 ---
 
@@ -358,7 +410,7 @@ and replace with a single step:
 
 Keep every job's own remaining steps unchanged. For `typecheck-convex`, the `Assert Vercel production build runs convex deploy` step must stay and must come **after** `- uses: ./.github/actions/setup` is fine, but it does not need the workspace — leave it where it is (it only needs the checkout, which the composite now provides, so it must move to after the `Setup` step). Put `Setup` first, then the assert step, then `Typecheck Convex`.
 
-For `test-e2e`, keep the Task 3 `Require E2E secrets` step first, then `Setup`, then the Playwright steps.
+For `test-e2e`, keep the Task 3 `Check for E2E secrets` gate step first, then `Setup`, then the Playwright steps (all still carrying `if: steps.e2e_secrets.outputs.run == 'true'`).
 
 - [ ] **Step 2: Verify no stray `oven-sh/setup-bun@v1` remain**
 
@@ -1057,7 +1109,7 @@ gh pr create --fill --base main --title "ci: Phase 3 — deployment safety (prev
 
 - [ ] **Step 2: Verify on the PR run**
 
-- `gh pr checks --watch` — required checks green; `Workflow Lint` passes the three new workflow files.
+- `gh pr checks --watch` — required checks green; `Lint (Workflows)` passes the three new workflow files.
 - Run: `bun test scripts/` — expected PASS.
 - Run: `bun run typecheck:convex` and `bun run typecheck:web` — expected PASS.
 
@@ -1667,6 +1719,6 @@ Once the `bun audit` baseline is triaged, flip `continue-on-error` to `false` in
 
 **Placeholder scan** — the `<measured>` / `<fill>` / `<...>` markers in Tasks 12, 17, 22, 24, 29 are deliberate operator-supplied values (dashboard facts, measured numbers), each with an explicit instruction on how to obtain them, not deferred work. No "add error handling" / "similar to Task N" / bare TODO instances.
 
-**Type / name consistency** — `parseConvexEnvList` and `diffEnv` signatures match between `envDrift.test.mjs` (Task 17 Step 2), `envDrift.mjs` (Task 17 Step 4), and the CLI wrapper (Task 18 Step 1). `captureException(err, context?)` signature matches between both implementation variants (Task 22 Step 2a/2b) and the call site (Task 22 Step 3). Job names used in branch protection (Task 4) — `Typecheck (Web)`, `Workflow Lint`, `Unit Tests`, `Build (Web, PR parity)` — match the `name:` values set in Tasks 1, 2 and the existing `ci.yml`. Composite action path `./.github/actions/setup` is consistent across Tasks 8, 18, and referenced (with rationale for not using it) in Task 15.
+**Type / name consistency** — `parseConvexEnvList` and `diffEnv` signatures match between `envDrift.test.mjs` (Task 17 Step 2), `envDrift.mjs` (Task 17 Step 4), and the CLI wrapper (Task 18 Step 1). `captureException(err, context?)` signature matches between both implementation variants (Task 22 Step 2a/2b) and the call site (Task 22 Step 3). Job names used in branch protection (Task 4) — `Typecheck (Web)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)` — match the `name:` values set in Tasks 1, 2 and the existing `ci.yml`. Composite action path `./.github/actions/setup` is consistent across Tasks 8, 18, and referenced (with rationale for not using it) in Task 15.
 
 **Conditional tasks** — Tasks 13 and 14 execute only if Task 12's spike returns VIABLE; both say so in their titles. Task 15 Step 4 and Task 22 branch on the same spike outcome. This is inherent to the spec's design (§3.0 decision branches), not an unresolved gap.
