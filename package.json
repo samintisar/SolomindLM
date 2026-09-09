@@ -99,7 +99,7 @@
     "@supadata/js": "^1.4.0",
     "@tavily/core": "^0.7.8",
     "convex-helpers": "0.1.120",
-    "langsmith": "^0.4.12",
+    "langsmith": "^0.10.2",
     "p-limit": "^7.3.1",
     "resend": "^4.8.0",
     "stripe": "^20.4.1",
