@@ -539,7 +539,9 @@ Create `docs/superpowers/specs/2026-09-08-convex-preview-spike-outcome.md` with 
 
 ## Chosen approach
 <one of:>
-- VIABLE: per-PR Convex backend via `convex deploy --preview-create`. Tasks 13–14 apply.
+- VIABLE: per-branch Convex preview backend, auto-targeted by a preview
+  `CONVEX_DEPLOY_KEY` in Vercel Preview scope (no `--preview-create`, no
+  `VERCEL_ENV` branching). Tasks 13–14 apply.
 - NOT VIABLE: previews point at a dedicated non-prod Convex dev deployment
   `<deployment name>` via Vercel Preview env vars. Task 13 skipped; Task 14 (guard) skipped.
 
@@ -560,23 +562,33 @@ git commit -m "docs: record Convex preview-deployment spike outcome"
 **Files:**
 - Modify: `apps/web/vercel.json`
 
-- [ ] **Step 1: Update the preview branch of `buildCommand`**
+**Approach (revised per the spike outcome).** `convex@1.42.3` `convex deploy`
+auto-targets a per-branch preview deployment whenever `CONVEX_DEPLOY_KEY` is a
+**preview** key in Vercel CI — no `--preview-create` / `--preview-name` flag, no
+`VERCEL_ENV` branching. A preview key cannot deploy to production, so that scope
+alone is the safeguard. See
+`docs/superpowers/specs/2026-09-08-convex-preview-spike-outcome.md`.
 
-In `apps/web/vercel.json`, change `buildCommand` so the preview branch creates a preview deployment:
+- [ ] **Step 1: Collapse `buildCommand` to one branch**
+
+In `apps/web/vercel.json`, `buildCommand` becomes identical for production and
+preview:
 
 ```json
-  "buildCommand": "cd ../.. && if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun x convex deploy --preview-create \"$VERCEL_GIT_COMMIT_REF\" --cmd \"bun run build:prod\" --cmd-url-env-var-name VITE_CONVEX_URL; else bun x convex deploy --cmd \"bun run build:prod\" --cmd-url-env-var-name VITE_CONVEX_URL; fi",
+  "buildCommand": "cd ../.. && bun x convex deploy --cmd \"bun run build:prod\" --cmd-url-env-var-name VITE_CONVEX_URL",
 ```
 
 - [ ] **Step 2: [OPERATOR] Set the Vercel Preview deploy key**
 
-In Vercel → Project → Settings → Environment Variables: set `CONVEX_DEPLOY_KEY` scoped to **Preview** only to the Convex **Preview** deploy key. Confirm the **Production** `CONVEX_DEPLOY_KEY` (Production scope) is unchanged.
+In Vercel → Project → Settings → Environment Variables: set `CONVEX_DEPLOY_KEY`
+scoped to **Preview** only to the Convex **Preview** deploy key. Leave the
+**Production**-scoped `CONVEX_DEPLOY_KEY` unchanged.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add apps/web/vercel.json
-git commit -m "ci: create a per-PR Convex preview backend on Vercel preview builds"
+git commit -m "ci: deploy an isolated Convex preview backend on Vercel preview builds"
 ```
 
 ### Task 14: Update the `vercel.json` guard test — **only if Task 13 ran**
@@ -586,27 +598,33 @@ git commit -m "ci: create a per-PR Convex preview backend on Vercel preview buil
 
 - [ ] **Step 1: Rewrite the assertions**
 
-In the `typecheck-convex` job, replace the `Assert Vercel production build runs convex deploy` step's script with:
+In the `typecheck-convex` job, replace the `Assert Vercel production build runs
+convex deploy` step. The `VERCEL_ENV` / `preview` build-only assertions are
+obsolete (routing is by key scope now); assert instead that `convex deploy` runs
+and pins the built bundle to the deployment it pushed to:
 
-```bash
-          set -e
-          f=apps/web/vercel.json
-          grep -qF 'convex deploy' "$f" || { echo "::error::$f buildCommand must run convex deploy"; exit 1; }
-          grep -qF 'VERCEL_ENV' "$f" || { echo "::error::$f buildCommand must branch on VERCEL_ENV"; exit 1; }
-          grep -qF 'preview-create' "$f" || { echo "::error::preview branch must use convex deploy --preview-create so previews never touch prod Convex"; exit 1; }
-          # Non-preview branch must NOT use --preview-create
-          node -e '
-            const c = require("./apps/web/vercel.json").buildCommand;
-            const elseBranch = c.split("else")[1] || "";
-            if (elseBranch.includes("preview-create")) { console.error("::error::non-preview build must not use --preview-create"); process.exit(1); }
-          '
+```yaml
+      - name: Assert Vercel build runs convex deploy
+        run: |
+          # Preview vs production is routed by the CONVEX_DEPLOY_KEY scope in Vercel
+          # (a preview key targets an isolated per-branch preview deployment and
+          # cannot deploy to prod), not by the build command. See
+          # docs/superpowers/specs/2026-09-08-convex-preview-spike-outcome.md
+          if ! grep -qF 'convex deploy' apps/web/vercel.json; then
+            echo "::error::apps/web/vercel.json buildCommand must run 'convex deploy' so Convex and the Vite bundle deploy together"
+            exit 1
+          fi
+          if ! grep -qF 'cmd-url-env-var-name VITE_CONVEX_URL' apps/web/vercel.json; then
+            echo "::error::convex deploy must pass --cmd-url-env-var-name VITE_CONVEX_URL so the built bundle targets the deployment it just pushed to"
+            exit 1
+          fi
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
-git commit -m "ci: guard test now requires preview-create on the preview branch only"
+git commit -m "ci: guard test asserts convex deploy + URL pin (preview routed by key scope)"
 ```
 
 ### Task 15: E2E against the Vercel preview deployment
