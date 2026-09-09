@@ -29,18 +29,18 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Assert Vercel production build runs convex deploy
+      - name: Assert Vercel build runs convex deploy
         run: |
+          # Preview vs production is routed by the CONVEX_DEPLOY_KEY scope in Vercel
+          # (a preview key targets an isolated per-branch preview deployment and
+          # cannot deploy to prod), not by the build command. See
+          # docs/superpowers/specs/2026-09-08-convex-preview-spike-outcome.md
           if ! grep -qF 'convex deploy' apps/web/vercel.json; then
-            echo "::error::apps/web/vercel.json buildCommand must include convex deploy for non-preview, or production Convex and Vite can drift"
+            echo "::error::apps/web/vercel.json buildCommand must run 'convex deploy' so Convex and the Vite bundle deploy together"
             exit 1
           fi
-          if ! grep -qF 'VERCEL_ENV' apps/web/vercel.json; then
-            echo "::error::buildCommand should branch on VERCEL_ENV (preview = build only, else = convex deploy + build)"
-            exit 1
-          fi
-          if ! grep -qF 'preview' apps/web/vercel.json; then
-            echo "::error::buildCommand should keep preview on build-only to avoid preview overwriting prod Convex"
+          if ! grep -qF 'cmd-url-env-var-name VITE_CONVEX_URL' apps/web/vercel.json; then
+            echo "::error::convex deploy must pass --cmd-url-env-var-name VITE_CONVEX_URL so the built bundle targets the deployment it just pushed to"
             exit 1
           fi
 
