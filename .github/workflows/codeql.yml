@@ -1,0 +1,44 @@
+# CodeQL JS/TS static analysis (advanced setup — workflow-driven, not default setup)
+# so analysis can be scoped with paths-ignore: .worktrees/ holds full checkouts of
+# other branches and must never be scanned. JS/TS is an interpreted language, so
+# build-mode is "none" and there is no Autobuild step. Findings surface under
+# Security > Code scanning. Weekly schedule catches advisories on untouched code.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 6 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          config: |
+            paths-ignore:
+              - convex/_generated
+              - .worktrees
+              - apps/mobile
+              - docs
+              - "**/*.test.ts"
+              - "**/*.test.tsx"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
