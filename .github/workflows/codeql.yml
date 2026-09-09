@@ -3,6 +3,8 @@
 # other branches and must never be scanned. JS/TS is an interpreted language, so
 # build-mode is "none" and there is no Autobuild step. Findings surface under
 # Security > Code scanning. Weekly schedule catches advisories on untouched code.
+# Repo Settings > Code security > Code scanning must stay on "Advanced" (workflow) —
+# if "Default setup" is enabled there, these advanced-config runs fail to process.
 
 name: CodeQL
 
@@ -14,10 +16,15 @@ on:
   schedule:
     - cron: "23 6 * * 1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze (javascript-typescript)
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     permissions:
       security-events: write
       actions: read
