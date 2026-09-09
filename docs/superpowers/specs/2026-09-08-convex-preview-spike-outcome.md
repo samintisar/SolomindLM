@@ -62,16 +62,29 @@ Set `CONVEX_DEPLOY_KEY` = the preview deploy key in Vercel → Project → Setti
 Environment Variables, scoped to **Preview only**. Do not change the
 Production-scoped `CONVEX_DEPLOY_KEY`.
 
-## Known follow-up (not blocking)
+## `VITE_CONVEX_SITE_URL` on previews — resolved
 
-`VITE_CONVEX_SITE_URL` (used by the `/api/*` proxy route in `vercel.json`) is set
-separately in Vercel env and is **not** rewritten by `convex deploy
---cmd-url-env-var-name` (which only sets the `.convex.cloud` URL). If the Preview
-scope's `VITE_CONVEX_SITE_URL` points at the production `.convex.site`, a preview
-deployment's `/api/*` calls would hit production HTTP actions. Verify the Preview
-scope value after the first preview deploy; derive it from the preview
-`VITE_CONVEX_URL` (`.cloud` → `.site`) if Vercel supports a reference, or accept
-that preview `/api` uses a fixed non-prod Convex site URL.
+Investigated after the first successful preview deploy (`befitting-mink-637`):
+
+- The **web bundle already derives the site URL**: `chatStream.ts`,
+  `resolveAudioPlaybackUrl.ts`, and `vite.config.ts` all compute
+  `VITE_CONVEX_SITE_URL || VITE_CONVEX_URL.replace('.cloud', '.site')`. The
+  browser calls Convex HTTP actions (`/chat/stream`, `/research/execute`,
+  `/audio/:id`) **directly** at that derived `.site` URL — `grep` confirms
+  **nothing in `apps/web/src` calls `/api/*`**.
+- On a preview build `convex deploy` sets `VITE_CONVEX_URL` to the per-branch
+  preview `.convex.cloud`, so the derived `.site` URL is per-branch-correct —
+  **as long as `VITE_CONVEX_SITE_URL` is not set in Vercel's Preview scope**
+  (an explicit value there would override the derivation and leak to prod).
+
+**Action:** ensure `VITE_CONVEX_SITE_URL` in Vercel is **Production-scoped only**
+(or removed entirely — the code derives it). Do not set it for Preview.
+
+The `/api/(.*)` → `${VITE_CONVEX_SITE_URL}/api/$1` rewrite in `apps/web/vercel.json`
+is now **unused by the app**. It stays only as a convenience proxy; the Task 16
+smoke check should hit the Convex `.site` `/health` route directly (derived from
+the deploy's `VITE_CONVEX_URL`) rather than `$TARGET_URL/api/health`, or the
+rewrite can be dropped in that task.
 
 ## E2E test account (feeds Task 15)
 
