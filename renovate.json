@@ -8,9 +8,11 @@
   ],
   "timezone": "America/Toronto",
   "prHourlyLimit": 0,
+  "platformAutomerge": false,
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["* * * * 1"]
+    "schedule": ["* * * * 1"],
+    "automerge": true
   },
   "rangeStrategy": "bump",
   "labels": ["dependencies"],
@@ -33,6 +35,27 @@
         "@types/**",
         "@vitest/**"
       ]
+    },
+    {
+      "description": "Auto-merge low-risk dev/build tooling on patch + minor (Renovate merges once CI is green; repo auto-merge is off, so platformAutomerge is disabled globally).",
+      "matchPackageNames": [
+        "typescript",
+        "vitest",
+        "@playwright/test",
+        "@biomejs/**",
+        "@types/**",
+        "@vitest/**",
+        "postcss",
+        "autoprefixer"
+      ],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge GitHub Actions digest re-pins and patch bumps (helpers:pinGitHubActionDigests keeps SHAs current — these PRs are noise).",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pin", "patch"],
+      "automerge": true
     },
     {
       "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
