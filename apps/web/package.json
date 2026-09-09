@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage --config vitest.config.ts"
   },
   "dependencies": {
-    "@auth/core": "0.37.2",
+    "@auth/core": "0.41.3",
     "@convex-dev/auth": "^0.0.90",
     "@convex-dev/persistent-text-streaming": "^0.3.0",
     "@streamdown/code": "^1.1.1",
