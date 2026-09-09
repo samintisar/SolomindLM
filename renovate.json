@@ -1,0 +1,47 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "America/Toronto",
+  "schedule": ["before 9am on monday"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 9am on monday"]
+  },
+  "rangeStrategy": "bump",
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "groupName": "Convex",
+      "matchPackageNames": ["convex", "convex-helpers", "convex-test", "@convex-dev/**"]
+    },
+    {
+      "groupName": "LangChain",
+      "matchPackageNames": ["@langchain/**", "langsmith"]
+    },
+    {
+      "groupName": "dev tooling",
+      "matchPackageNames": [
+        "typescript",
+        "vitest",
+        "@playwright/test",
+        "@biomejs/**",
+        "@types/**",
+        "@vitest/**"
+      ]
+    },
+    {
+      "matchPackageNames": ["react", "react-dom"],
+      "enabled": false,
+      "description": "Pinned via root package.json overrides; bump manually with the app."
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  }
+}

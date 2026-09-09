@@ -1,0 +1,38 @@
+# Self-hosted Renovate — runs Renovate on GitHub Actions (no Mend-hosted app installed).
+#
+# `RENOVATE_TOKEN` must be a GitHub App installation token or a fine-grained PAT with:
+#   - contents: write        (branches / lockfile updates)
+#   - pull-requests: write    (open & update PRs)
+#   - workflows: write        (required by `helpers:pinGitHubActionDigests` to edit workflow files)
+# The job's own GITHUB_TOKEN stays read-only; write scope is carried by RENOVATE_TOKEN.
+#
+# Runs weekly (Monday ~09:00 America/Toronto ≈ 13:00 UTC); trigger manually via workflow_dispatch.
+
+name: Renovate
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@v46
+        with:
+          configurationFile: renovate.json
+          token: ${{ secrets.RENOVATE_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
