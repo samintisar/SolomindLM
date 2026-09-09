@@ -88,6 +88,7 @@ jobs:
   audit:
     name: Dependency audit (baseline)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,12 +119,19 @@ jobs:
           set -o pipefail
           echo "## bun audit (baseline — non-blocking)" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          if bun audit --audit-level=high 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"; then
+          # Wrap in `timeout` — `bun audit` can hang on registry stalls; a stall
+          # should degrade to a warning, not burn the job's whole time budget.
+          if timeout 300 bun audit --audit-level=high 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"; then
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "No advisories at or above 'high'." >> "$GITHUB_STEP_SUMMARY"
           else
+            code=$?
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "::warning::bun audit reported advisories at or above 'high' — see the job summary. Baseline is non-blocking; tighten in a follow-up."
+            if [ "$code" -eq 124 ]; then
+              echo "::warning::bun audit timed out after 300s — skipped this run. Baseline is non-blocking."
+            else
+              echo "::warning::bun audit reported advisories at or above 'high' — see the job summary. Baseline is non-blocking; tighten in a follow-up."
+            fi
           fi
 
   test-unit:
