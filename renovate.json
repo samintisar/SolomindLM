@@ -9,7 +9,8 @@
   "timezone": "America/Toronto",
   "prHourlyLimit": 0,
   "lockFileMaintenance": {
-    "enabled": true
+    "enabled": true,
+    "schedule": ["* * * * 1"]
   },
   "rangeStrategy": "bump",
   "labels": ["dependencies"],
