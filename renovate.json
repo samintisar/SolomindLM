@@ -37,7 +37,7 @@
       ]
     },
     {
-      "description": "Auto-merge low-risk dev/build tooling on patch + minor (Renovate merges once CI is green; repo auto-merge is off, so platformAutomerge is disabled globally).",
+      "description": "Auto-merge low-risk dev/build/test tooling on patch + minor (Renovate merges once CI is green; repo auto-merge is off, so platformAutomerge is disabled globally).",
       "matchPackageNames": [
         "typescript",
         "vitest",
@@ -45,6 +45,8 @@
         "@biomejs/**",
         "@types/**",
         "@vitest/**",
+        "@testing-library/**",
+        "react-test-renderer",
         "postcss",
         "autoprefixer"
       ],
