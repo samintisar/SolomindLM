@@ -43,5 +43,16 @@ export default defineConfig({
     env: {
       VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud",
     },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      // Floor = current measured coverage rounded down. Ratchet up over time.
+      thresholds: {
+        statements: 61,
+        branches: 52,
+        functions: 57,
+        lines: 62,
+      },
+    },
   },
 });
