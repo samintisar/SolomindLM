@@ -43,5 +43,18 @@ export default defineConfig({
     env: {
       VITE_CONVEX_URL: "https://ci-placeholder.convex.cloud",
     },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "text-summary", "html", "lcov"],
+      // Regression floor: ~1pt below measured coverage at introduction (statements
+      // 61.8 / branches 52.6 / functions 57.5 / lines 62.7) to absorb incidental
+      // drift. Raise these as coverage improves; never lower them.
+      thresholds: {
+        statements: 60,
+        branches: 51,
+        functions: 56,
+        lines: 61,
+      },
+    },
   },
 });

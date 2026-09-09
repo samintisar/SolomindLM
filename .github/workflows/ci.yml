@@ -85,6 +85,55 @@ jobs:
         with:
           args: -color
 
+  audit:
+    name: Dependency audit (baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Separate job (not a step in `lint`) so the repo's Bun pin (package.json
+      # packageManager, consumed by ./.github/actions/setup) stays untouched.
+      # `bun audit` landed after Bun 1.2.2, so this job runs a newer Bun.
+      # Keep >= package.json "packageManager"; bun audit was added after 1.2.2.
+      - name: Setup Bun (audit)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.21
+
+      - name: Restore dependency cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Dependency audit (baseline — non-blocking)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          echo "## bun audit (baseline — non-blocking)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Wrap in `timeout` — `bun audit` can hang on registry stalls; a stall
+          # should degrade to a warning, not burn the job's whole time budget.
+          if timeout 300 bun audit --audit-level=high 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"; then
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "No advisories at or above 'high'." >> "$GITHUB_STEP_SUMMARY"
+          else
+            code=$?
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            if [ "$code" -eq 124 ]; then
+              echo "::warning::bun audit timed out after 300s — skipped this run. Baseline is non-blocking."
+            else
+              echo "::warning::bun audit reported advisories at or above 'high' — see the job summary. Baseline is non-blocking; tighten in a follow-up."
+            fi
+          fi
+
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -109,9 +158,11 @@ jobs:
       - name: RAG eval fixture dry-run
         run: bun run eval:rag:dry
 
+  # Runs the web suite a second time (also in test-unit) to produce the coverage
+  # floor. Fold the web run out of test-unit once "Coverage Report" is a required
+  # check (see branch-protection follow-up in the Phase 4 plan).
   test-coverage:
     name: Coverage Report
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
