@@ -150,6 +150,9 @@ jobs:
       - name: RAG eval fixture dry-run
         run: bun run eval:rag:dry
 
+  # Runs the web suite a second time (also in test-unit) to produce the coverage
+  # floor. Fold the web run out of test-unit once "Coverage Report" is a required
+  # check (see branch-protection follow-up in the Phase 4 plan).
   test-coverage:
     name: Coverage Report
     runs-on: ubuntu-latest
