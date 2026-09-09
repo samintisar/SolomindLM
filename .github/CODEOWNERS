@@ -1,3 +1,8 @@
+# Advisory only: "Require review from Code Owners" is intentionally OFF in branch
+# protection (single maintainer; see .github/branch-protection.ps1). Do NOT enable it
+# while this repo has one owner — with 0 required approvals + no self-approval + admin
+# enforcement, every solo-authored PR to main would be permanently blocked.
+
 # Default owner
 *                       @samintisar
 
