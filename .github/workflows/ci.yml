@@ -85,6 +85,28 @@ jobs:
         with:
           args: -color
 
+  audit:
+    name: Dependency audit (baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Separate job (not a step in `lint`) so the repo's Bun pin (package.json
+      # packageManager, consumed by ./.github/actions/setup) stays untouched.
+      # `bun audit` landed after Bun 1.2.2, so this job runs a newer Bun.
+      - name: Setup Bun (audit)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.21
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Dependency audit (baseline — non-blocking)
+        continue-on-error: true
+        run: bun audit --audit-level=high
+
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest

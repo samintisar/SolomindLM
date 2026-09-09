@@ -1,0 +1,13 @@
+# Default owner
+*                       @samintisar
+
+# Auth, schema, HTTP surface — review carefully
+/convex/auth.ts         @samintisar
+/convex/schema.ts       @samintisar
+/convex/http.ts         @samintisar
+/convex/_lib/           @samintisar
+
+# Deploy + CI config
+/apps/web/vercel.json   @samintisar
+/.github/               @samintisar
+/renovate.json          @samintisar
