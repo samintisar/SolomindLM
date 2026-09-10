@@ -68,7 +68,7 @@ Manage literature: discover and import academic papers (DOI, BibTeX, Zotero, Men
 
 ## Pricing
 
-Free tier ($0): 20 notebooks with up to 200 sources each; daily limits on chat and Studio generation (e.g. 50 chat messages/day, 5 flashcards/quizzes/reports/day, 5 audio overviews/day, 5 infographics/day, 5 written questions/day). No credit card required.
+Free tier ($0): 5 notebooks with up to 20 sources each; daily limits on chat and Studio generation (e.g. 10 chat messages/day, 2 flashcards/quizzes/reports/day, 2 audio overviews/day, 2 infographics/day, 2 written questions/day). No credit card required.
 
 Pro: 200 notebooks with up to 200 sources each; higher daily limits (e.g. 500 chat messages/day, 100 generations/day for flashcards, quizzes, reports, audio, infographics, and written questions). $7.50/month billed yearly or $15/month billed monthly.
 
