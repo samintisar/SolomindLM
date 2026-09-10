@@ -24,6 +24,10 @@ export interface WrittenQuestionsViewProps {
   onBack?: () => void;
 }
 
+// Idle value for the grade-on-Finish progress state. Must be reset between runs
+// so a stale `failed` count can't leak the failure banner onto a later clean finish.
+const GRADING_ALL_IDLE = { active: false, done: 0, total: 0, failed: 0 };
+
 export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   note,
   onNoteUpdate,
@@ -47,7 +51,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     done: number;
     total: number;
     failed: number;
-  }>({ active: false, done: 0, total: 0, failed: 0 });
+  }>(GRADING_ALL_IDLE);
 
   // Hooks for mutations
   const submitAnswerMutation = useSubmitWrittenAnswer();
@@ -257,6 +261,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
 
     const pending = selectPendingGradeIds(questions, userAnswers);
     if (pending.length === 0) {
+      setGradingAll(GRADING_ALL_IDLE);
       setShowResults(true);
       return;
     }
@@ -334,6 +339,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       setShowResults(false);
       setReviewMode(false);
       setUserAnswers({});
+      setGradingAll(GRADING_ALL_IDLE);
       // Notify parent to refresh note
       if (latestNote && onNoteUpdate) {
         onNoteUpdate(latestNote);

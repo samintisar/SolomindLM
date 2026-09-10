@@ -311,6 +311,46 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
     expect(screen.getByText("You scored 5 out of 10 points")).toBeInTheDocument();
   });
 
+  it("clears a prior failure banner after a subsequent clean finish", async () => {
+    // First run: q2 grading fails -> gradingAll.failed = 1
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => {
+      if (questionId === "q2") throw new Error("grader down");
+      return { success: true, score: 5, maxScore: 5 };
+    });
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    const { rerender } = render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    expect(await screen.findByText(/1 answer\(s\) couldn't be graded/)).toBeInTheDocument();
+
+    // Try Again -> local state (incl. gradingAll) resets, then the server sync
+    // effect injects a fully-graded set, so the next Finish has nothing pending.
+    await user.click(screen.getByRole("button", { name: "Try Again" }));
+
+    const gradedNote = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: true, score: 5, maxScore: 5 },
+        q2: { answer: "answer two", graded: true, score: 4, maxScore: 5 },
+      },
+    });
+    latestNote = gradedNote;
+    rerender(<WrittenQuestionsView note={gradedNote} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(await screen.findByText("You scored 9 out of 10 points")).toBeInTheDocument();
+    expect(screen.queryByText(/couldn't be graded/)).not.toBeInTheDocument();
+  });
+
   it("shows progress and disables navigation while grading", async () => {
     let resolveFirst: (v: { success: boolean; score: number; maxScore: number }) => void;
     const firstCall = new Promise<{ success: boolean; score: number; maxScore: number }>((r) => {
