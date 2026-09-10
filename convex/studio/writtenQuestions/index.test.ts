@@ -46,8 +46,18 @@ async function seedWrittenQuestions(
       status: "completed",
       questionType: "short",
       questionsData: [
-        { id: "q1", question: "Q1?", questionType: "short", rubric: { maxPoints: 5, criteria: [] } },
-        { id: "q2", question: "Q2?", questionType: "short", rubric: { maxPoints: 5, criteria: [] } },
+        {
+          id: "q1",
+          question: "Q1?",
+          questionType: "short",
+          rubric: { maxPoints: 5, criteria: [] },
+        },
+        {
+          id: "q2",
+          question: "Q2?",
+          questionType: "short",
+          rubric: { maxPoints: 5, criteria: [] },
+        },
       ],
       metadata,
       createdAt: Date.now(),
@@ -62,8 +72,10 @@ async function readUserAnswers(
 ): Promise<Record<string, Record<string, unknown>>> {
   return t.run(async (ctx) => {
     const doc = await ctx.db.get(id);
-    return ((doc?.metadata as { userAnswers?: Record<string, Record<string, unknown>> }) ?? {})
-      .userAnswers ?? {};
+    return (
+      ((doc?.metadata as { userAnswers?: Record<string, Record<string, unknown>> }) ?? {})
+        .userAnswers ?? {}
+    );
   });
 }
 
