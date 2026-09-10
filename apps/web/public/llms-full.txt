@@ -118,7 +118,7 @@ Extract tabular data from PDFs and documents into editable spreadsheets for comp
 
 ## Pricing summary
 
-**Free ($0):** 20 notebooks, up to 200 sources each; daily limits on chat and Studio generation (e.g. 50 chat messages/day; 5 flashcards, quizzes, reports, audio overviews, infographics, and written questions per day). No credit card required.
+**Free ($0):** 5 notebooks, up to 20 sources each; daily limits on chat and Studio generation (e.g. 10 chat messages/day; 2 flashcards, quizzes, reports, audio overviews, infographics, and written questions per day). No credit card required.
 
 **Pro:** 200 notebooks, up to 200 sources each; higher daily limits (e.g. 500 chat messages/day; 100 generations/day for flashcards, quizzes, reports, audio, infographics, and written questions). $7.50/month billed yearly or $15/month billed monthly.
 
