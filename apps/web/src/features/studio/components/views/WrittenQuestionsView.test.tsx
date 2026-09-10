@@ -240,3 +240,74 @@ describe("WrittenQuestionsView draft autosave", () => {
     }
   });
 });
+
+describe("WrittenQuestionsView grade-on-Finish", () => {
+  it("grades answered-but-ungraded questions on Finish then shows a real score", async () => {
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => ({
+      success: true,
+      score: questionId === "q1" ? 4 : 3,
+      maxScore: 5,
+    }));
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    // Loop ran once per pending question
+    expect(submitAnswer).toHaveBeenCalledTimes(2);
+    expect(submitAnswer).toHaveBeenCalledWith({
+      writtenQuestionsId: "wq1",
+      questionId: "q1",
+      answer: "answer one",
+    });
+
+    expect(await screen.findByText("You scored 7 out of 10 points")).toBeInTheDocument();
+    expect(screen.getByText("Graded 2 of 2 questions")).toBeInTheDocument();
+  });
+
+  it("counts a grading failure as ungraded and surfaces it", async () => {
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => {
+      if (questionId === "q2") throw new Error("grader down");
+      return { success: true, score: 5, maxScore: 5 };
+    });
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(await screen.findByText("You scored 5 out of 10 points")).toBeInTheDocument();
+    expect(screen.getByText("Graded 1 of 2 questions")).toBeInTheDocument();
+    expect(screen.getByText(/1 answer\(s\) couldn't be graded/)).toBeInTheDocument();
+  });
+
+  it("skips grading and goes straight to results when nothing is pending", async () => {
+    const note = makeNote({
+      userAnswers: { q1: { answer: "a", graded: true, score: 5, maxScore: 5 } },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(submitAnswer).not.toHaveBeenCalled();
+    expect(screen.getByText("You scored 5 out of 10 points")).toBeInTheDocument();
+  });
+});

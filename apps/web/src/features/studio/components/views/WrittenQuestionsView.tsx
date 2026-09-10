@@ -7,7 +7,10 @@ import {
   useUpdateWrittenQuestionsProgress,
   useWrittenQuestionSet,
 } from "@/features/studio/services/writtenQuestionsApi";
-import { summarizeWrittenQuestions } from "@/features/studio/utils/writtenQuestionsScore";
+import {
+  selectPendingGradeIds,
+  summarizeWrittenQuestions,
+} from "@/features/studio/utils/writtenQuestionsScore";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 
@@ -39,6 +42,12 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [gradingAll, setGradingAll] = useState<{
+    active: boolean;
+    done: number;
+    total: number;
+    failed: number;
+  }>({ active: false, done: 0, total: 0, failed: 0 });
 
   // Hooks for mutations
   const submitAnswerMutation = useSubmitWrittenAnswer();
@@ -238,11 +247,50 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     }
   };
 
+  const runGradeAllThenShowResults = async () => {
+    const pending = selectPendingGradeIds(questions, userAnswers);
+    if (pending.length === 0) {
+      setShowResults(true);
+      return;
+    }
+
+    setGradingAll({ active: true, done: 0, total: pending.length, failed: 0 });
+    let failed = 0;
+    for (let i = 0; i < pending.length; i++) {
+      const qid = pending[i];
+      const answer = userAnswers[qid]?.answer ?? "";
+      try {
+        const res = await submitAnswerMutation({
+          writtenQuestionsId: note.id,
+          questionId: qid,
+          answer,
+        });
+        setUserAnswers((prev) => ({
+          ...prev,
+          [qid]: {
+            ...(prev[qid] || { answer: "" }),
+            answer,
+            graded: true,
+            score: res.score,
+            maxScore: res.maxScore,
+          },
+        }));
+      } catch (err) {
+        console.error("Failed to grade answer on finish:", err);
+        failed += 1;
+      }
+      setGradingAll((s) => ({ ...s, done: i + 1, failed }));
+    }
+
+    setGradingAll((s) => ({ ...s, active: false }));
+    setShowResults(true);
+  };
+
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      setShowResults(true);
+      void runGradeAllThenShowResults();
     }
   };
 
@@ -290,6 +338,19 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     setReviewMode(true);
   };
 
+  if (gradingAll.active) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-8">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">
+            Grading your answers… {gradingAll.done} of {gradingAll.total}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (showResults) {
     // `totalCount` is the outer `questions.length` — same value the summary reports.
     const { score, maxScore, gradedCount, percentage } = summarizeWrittenQuestions(
@@ -314,6 +375,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             {gradedCount < totalCount && (
               <p className="text-xs text-muted-foreground/80 mt-0.5">
                 Ungraded questions count as 0.
+              </p>
+            )}
+            {gradingAll.failed > 0 && (
+              <p className="text-xs text-vintage-orange-700 dark:text-vintage-orange-300 mt-0.5">
+                {gradingAll.failed} answer(s) couldn't be graded — use Review to resubmit.
               </p>
             )}
           </div>
@@ -575,14 +641,15 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={handlePrev}
-              disabled={currentIndex === 0}
+              disabled={currentIndex === 0 || gradingAll.active}
               className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
             >
               Previous
             </button>
             <button
               onClick={handleNext}
-              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
+              disabled={gradingAll.active}
+              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {currentIndex === questions.length - 1 ? "Finish" : "Next"}
             </button>
@@ -591,7 +658,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
           {!isGraded && !reviewMode && (
             <button
               onClick={handleSubmitAnswer}
-              disabled={!isAnswered || isSubmitting}
+              disabled={!isAnswered || isSubmitting || gradingAll.active}
               className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
