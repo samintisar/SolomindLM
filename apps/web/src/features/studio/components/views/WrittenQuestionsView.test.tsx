@@ -24,7 +24,8 @@ vi.mock("@/shared/components/MarkdownRenderer", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("@/shared/utils", () => ({
+vi.mock("@/shared/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/utils")>()),
   sanitizeMarkdown: (s: string) => s,
 }));
 
@@ -69,5 +70,40 @@ describe("WrittenQuestionsView results coverage", () => {
     expect(screen.getByText("You scored 4 out of 10 points")).toBeInTheDocument();
     expect(screen.getByText("Graded 1 of 2 questions")).toBeInTheDocument();
     expect(screen.getByText(/Ungraded questions count as 0/)).toBeInTheDocument();
+  });
+
+  it("renders 0% (never NaN) when maxScore is 0 on the banner and the results screen", async () => {
+    const note = makeNote({
+      questions: [
+        {
+          id: "q1",
+          question: "Q1?",
+          questionType: "short",
+          rubric: { maxPoints: 0, criteria: [] },
+        },
+      ],
+      userAnswers: {
+        q1: { answer: "a", graded: true, score: 0, maxScore: 0 },
+      },
+      metadata: { questionCount: 1, difficulty: "medium", questionType: "short" },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    // The answer is already graded, so the per-question banner renders immediately.
+    expect(screen.getByText("Answer Graded")).toBeInTheDocument();
+    expect(screen.getByText("0 / 0")).toBeInTheDocument();
+    // The guard at maxScore === 0 must yield 0, not NaN. The numeric guard output and
+    // the literal "%" are sibling text nodes in one element, so the text normalises to "0 %".
+    expect(screen.getByText(/^0\s*%$/)).toBeInTheDocument();
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(screen.getByText("You scored 0 out of 0 points")).toBeInTheDocument();
+    // Results screen `{percentage}%` line — no whitespace between value and unit.
+    expect(screen.getByText("0%")).toBeInTheDocument();
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
   });
 });

@@ -189,7 +189,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   };
 
   if (showResults) {
-    const { score, maxScore, gradedCount, totalCount, percentage } = summarizeWrittenQuestions(
+    // `totalCount` is the outer `questions.length` — same value the summary reports.
+    const { score, maxScore, gradedCount, percentage } = summarizeWrittenQuestions(
       questions,
       userAnswers
     );
