@@ -1,22 +1,11 @@
+import type { toAdminFeedbackRow } from "@convex/_model/feedback";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useToast } from "@/shared/contexts/useToast";
 import { useAllFeedback, useCreateGithubIssue, useIsFeedbackAdmin } from "../services/feedbackApi";
 
-type AdminFeedbackRow = {
-  id: string;
-  type: "bug" | "feature";
-  body: string;
-  detail?: string;
-  status: string;
-  route: string;
-  planTier: string;
-  surface: string;
-  appVersion: string;
-  githubIssueNumber?: number;
-  githubIssueUrl?: string;
-  createdAt: number;
-};
+/** Kept in lockstep with the server shaper so the row shape can't drift. */
+type AdminFeedbackRow = ReturnType<typeof toAdminFeedbackRow>;
 
 export function AdminFeedbackPage() {
   const isAdmin = useIsFeedbackAdmin(); // boolean | undefined (undefined while loading)

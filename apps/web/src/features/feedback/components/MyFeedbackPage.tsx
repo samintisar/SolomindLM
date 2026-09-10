@@ -1,3 +1,4 @@
+import type { toMyFeedbackRow } from "@convex/_model/feedback";
 import { useNavigate } from "react-router-dom";
 import { useFeedback } from "../FeedbackContext";
 import { useMyFeedback } from "../services/feedbackApi";
@@ -9,13 +10,8 @@ const STATUS_LABEL: Record<string, string> = {
   closed: "Closed",
 };
 
-type MyFeedbackRow = {
-  id: string;
-  type: "bug" | "feature";
-  body: string;
-  status: string;
-  createdAt: number;
-};
+/** Kept in lockstep with the server shaper so the row shape can't drift. */
+type MyFeedbackRow = ReturnType<typeof toMyFeedbackRow>;
 
 export function MyFeedbackPage() {
   const rows = useMyFeedback();
