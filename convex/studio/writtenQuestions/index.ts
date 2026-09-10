@@ -156,6 +156,26 @@ export const update = mutation({
   },
 });
 
+/**
+ * Persist a single question's draft answer text (no grading). Used by the
+ * client's debounced autosave so typed-but-unsubmitted answers survive reload.
+ */
+export const saveUserAnswerDraft = mutation({
+  args: {
+    id: v.id("writtenQuestions"),
+    questionId: v.string(),
+    answer: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+    const existing = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
+    if (!existing) throw new Error("Written question set not found or access denied");
+    await assertCanEditNotebook(ctx, existing.notebookId, userId);
+    await WrittenQuestions.saveUserAnswerDraft(ctx, args.id, args.questionId, args.answer);
+  },
+});
+
 export const updateWrittenQuestions = mutation({
   args: {
     writtenQuestionId: v.id("writtenQuestions"),
