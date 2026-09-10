@@ -229,6 +229,23 @@ export function useSubmitWrittenAnswer() {
 }
 
 /**
+ * Persist a single question's draft answer text without grading it.
+ * Called (debounced) as the user types / navigates so unsubmitted answers
+ * are not lost on reload.
+ */
+export function useSaveWrittenAnswerDraft() {
+  const save = useMutation(api.studio.writtenQuestions.index.saveUserAnswerDraft);
+
+  return async (params: { writtenQuestionsId: string; questionId: string; answer: string }) => {
+    return await save({
+      id: params.writtenQuestionsId as Id<"writtenQuestions">,
+      questionId: params.questionId,
+      answer: params.answer,
+    });
+  };
+}
+
+/**
  * Reset all answers for a written questions set
  */
 export function useResetWrittenAnswers() {
