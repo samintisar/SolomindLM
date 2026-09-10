@@ -35,7 +35,7 @@
     "react-dom": "19.2.0",
     "react-fast-marquee": "^1.6.5",
     "react-pdf": "^10.3.0",
-    "react-resizable-panels": "^4.12.3",
+    "react-resizable-panels": "^4.12.4",
     "react-router-dom": "7.13.0",
     "react-virtuoso": "^4.18.1",
     "streamdown": "^2.5.0",
