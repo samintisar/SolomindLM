@@ -6,6 +6,7 @@ import {
   useUpdateWrittenQuestionsProgress,
   useWrittenQuestionSet,
 } from "@/features/studio/services/writtenQuestionsApi";
+import { summarizeWrittenQuestions } from "@/features/studio/utils/writtenQuestionsScore";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 
@@ -187,26 +188,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     setReviewMode(true);
   };
 
-  // Calculate final score
-  const calculateTotalScore = () => {
-    let totalScore = 0;
-
-    // Sum up scores from graded answers only
-    Object.values(userAnswers).forEach((answerObj) => {
-      if (answerObj?.graded) {
-        totalScore += answerObj.score || 0;
-      }
-    });
-
-    // Calculate total possible points from ALL questions, not just answered ones
-    const maxTotalScore = questions.reduce((sum, q) => sum + (q.rubric?.maxPoints || 0), 0);
-
-    return { score: totalScore, maxScore: maxTotalScore };
-  };
-
   if (showResults) {
-    const { score, maxScore } = calculateTotalScore();
-    const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    const { score, maxScore, gradedCount, totalCount, percentage } = summarizeWrittenQuestions(
+      questions,
+      userAnswers
+    );
 
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-300">
@@ -219,6 +205,14 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             <p className="text-muted-foreground">
               You scored {score} out of {maxScore} points
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Graded {gradedCount} of {totalCount} questions
+            </p>
+            {gradedCount < totalCount && (
+              <p className="text-xs text-muted-foreground/80 mt-0.5">
+                Ungraded questions count as 0.
+              </p>
+            )}
           </div>
           <div className="w-full bg-secondary rounded-xl h-3 overflow-hidden">
             <div
@@ -397,7 +391,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
                   <div className="text-right">
                     <div className="text-sm text-muted-foreground">Score</div>
                     <div className="text-lg font-bold text-foreground">
-                      {Math.round((currentGradedResult.score / currentGradedResult.maxScore) * 100)}
+                      {currentGradedResult.maxScore > 0
+                        ? Math.round(
+                            (currentGradedResult.score / currentGradedResult.maxScore) * 100
+                          )
+                        : 0}
                       %
                     </div>
                   </div>
