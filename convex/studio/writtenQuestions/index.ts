@@ -5,6 +5,8 @@ import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/noteboo
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 
+const MAX_DRAFT_ANSWER_LENGTH = 50_000;
+
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
@@ -172,7 +174,15 @@ export const saveUserAnswerDraft = mutation({
     const existing = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!existing) throw new Error("Written question set not found or access denied");
     await assertCanEditNotebook(ctx, existing.notebookId, userId);
-    await WrittenQuestions.saveUserAnswerDraft(ctx, args.id, args.questionId, args.answer);
+    if (args.answer.length > MAX_DRAFT_ANSWER_LENGTH) {
+      throw new Error("Answer is too long to save");
+    }
+    await WrittenQuestions.saveWrittenQuestionUserAnswerDraft(
+      ctx,
+      args.id,
+      args.questionId,
+      args.answer
+    );
   },
 });
 

@@ -156,6 +156,76 @@ describe("studio.writtenQuestions.index.saveUserAnswerDraft", () => {
     ).rejects.toThrow();
   });
 
+  test("applies draft-over-draft without leaving stale keys", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const wqId = await seedWrittenQuestions(t, userId, notebookId);
+
+    await withAuth(t, userId).mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: wqId,
+      questionId: "q1",
+      answer: "first text",
+    });
+    await withAuth(t, userId).mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: wqId,
+      questionId: "q1",
+      answer: "second text",
+    });
+
+    const answers = await readUserAnswers(t, wqId);
+    expect(answers.q1).toEqual({ graded: false, answer: "second text" });
+  });
+
+  test("handles a written-question row whose metadata is undefined", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const wqId = await t.run(async (ctx) =>
+      ctx.db.insert("writtenQuestions", {
+        userId,
+        notebookId,
+        title: "WQ",
+        status: "completed",
+        questionType: "short",
+        questionsData: [
+          {
+            id: "q1",
+            question: "Q1?",
+            questionType: "short",
+            rubric: { maxPoints: 5, criteria: [] },
+          },
+        ],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    );
+
+    await withAuth(t, userId).mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: wqId,
+      questionId: "q1",
+      answer: "draft with no prior metadata",
+    });
+
+    const answers = await readUserAnswers(t, wqId);
+    expect(answers.q1).toEqual({ graded: false, answer: "draft with no prior metadata" });
+  });
+
+  test("rejects an over-length draft answer", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const wqId = await seedWrittenQuestions(t, userId, notebookId);
+
+    await expect(
+      withAuth(t, userId).mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+        id: wqId,
+        questionId: "q1",
+        answer: "x".repeat(50_001),
+      })
+    ).rejects.toThrow();
+  });
+
   test("rejects a user who cannot edit the notebook", async () => {
     const t = convexTest(schema, modules);
     const owner = await seedUser(t, "Owner");

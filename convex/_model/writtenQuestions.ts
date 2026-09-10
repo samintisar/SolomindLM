@@ -182,7 +182,7 @@ export async function patchWrittenQuestionUserAnswer(
  * grading (`graded`, `score`, `feedback`, ...) are never clobbered. Ensures a
  * `graded` key exists (defaulting to `false`) for brand-new drafts.
  */
-export async function saveUserAnswerDraft(
+export async function saveWrittenQuestionUserAnswerDraft(
   ctx: MutationCtx,
   writtenQuestionId: Id<"writtenQuestions">,
   questionId: string,
