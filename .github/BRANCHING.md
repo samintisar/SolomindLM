@@ -227,6 +227,18 @@ E2E on PRs is skipped with a warning until the `E2E_TEST_*` secrets are set; it 
 
 Deeper suites are not in CI — run them locally when the change warrants (see CLAUDE.md validation gates): `bun run test:e2e` before merging UI flows, `bun run eval:rag --case=… / --runner=…` or `eval:studio` for agent/prompt changes.
 
+## Code quality over time
+
+The habits and recurring passes that keep the codebase healthy — Boy Scout rule,
+tech-debt tracking, the weekly/monthly review cadence, the strictness ratchet, and
+which metrics to watch — live in
+[`docs/engineering/code-quality.md`](../docs/engineering/code-quality.md).
+Architecture decisions go in [`docs/adr/`](../docs/adr/).
+
+A **pre-push hook** (`.githooks/pre-push`, enabled automatically by `bun install`)
+runs typecheck + lint before every push. Bypass a WIP push with
+`git push --no-verify`.
+
 ## Best Practices
 
 1. **Keep branches short-lived** - Merge PRs within a few days
@@ -234,3 +246,4 @@ Deeper suites are not in CI — run them locally when the change warrants (see C
 3. **Write clear PR descriptions** - Use the provided template
 4. **Don't break the build** - Fix failing CI before merging
 5. **Update `main` frequently** - Sync your feature branch if `main` has moved ahead
+6. **Leave it better than you found it** - within the scope of your change; bigger cleanups get their own `type:refactor` issue
