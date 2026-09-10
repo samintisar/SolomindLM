@@ -9,7 +9,10 @@ type AdminFeedbackRow = ReturnType<typeof toAdminFeedbackRow>;
 
 export function AdminFeedbackPage() {
   const isAdmin = useIsFeedbackAdmin(); // boolean | undefined (undefined while loading)
-  const rows = useAllFeedback();
+  // Only subscribe once we know the caller is an admin — listAll throws for
+  // everyone else, and useQuery would re-throw that during render before the
+  // redirect below can run.
+  const rows = useAllFeedback(isAdmin === true);
   const createIssue = useCreateGithubIssue();
   const toast = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);

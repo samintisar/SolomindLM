@@ -49,6 +49,17 @@ export function feedbackIssueLabels(type: FeedbackType): string[] {
   return [type === "bug" ? "type:bug" : "type:feature", "status:triage"];
 }
 
+/**
+ * Wrap user-supplied free text in a code fence so GitHub renders it verbatim —
+ * no `@mention` notifications, no `#123` cross-links, no injected headings. The
+ * fence is made longer than any backtick run inside the text.
+ */
+function fenceUserText(text: string): string {
+  const longestRun = Math.max(0, ...(text.match(/`+/g) ?? []).map((r) => r.length));
+  const fence = "`".repeat(Math.max(3, longestRun + 1));
+  return `${fence}\n${text}\n${fence}`;
+}
+
 export function feedbackIssueBody(row: {
   type: FeedbackType;
   body: string;
@@ -62,10 +73,10 @@ export function feedbackIssueBody(row: {
 }): string {
   const detailLabel = row.type === "bug" ? "Steps to reproduce" : "Why / what for";
   return [
-    row.body.trim(),
+    fenceUserText(row.body.trim()),
     "",
     `### ${detailLabel}`,
-    row.detail?.trim() ? row.detail.trim() : "_none provided_",
+    row.detail?.trim() ? fenceUserText(row.detail.trim()) : "_none provided_",
     "",
     "### Context",
     `- Route: \`${row.route}\``,

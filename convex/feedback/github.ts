@@ -51,6 +51,14 @@ export const getForSync = internalQuery({
 export const attachGithubIssue = internalMutation({
   args: { feedbackId: v.id("feedback"), number: v.number(), url: v.string() },
   handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.feedbackId);
+    if (!row) throw new Error("Feedback not found");
+    // Re-check inside the mutation transaction: if two syncs raced past the
+    // getForSync guard, only the first write wins and the loser errors out
+    // rather than clobbering the recorded issue.
+    if (row.githubIssueNumber != null) {
+      throw new Error("This feedback already has a GitHub issue");
+    }
     await ctx.db.patch(args.feedbackId, {
       githubIssueNumber: args.number,
       githubIssueUrl: args.url,

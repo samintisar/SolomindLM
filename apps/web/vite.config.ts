@@ -68,8 +68,24 @@ export default defineConfig(({ mode }) => {
     (env.VITE_CONVEX_URL && env.VITE_CONVEX_URL.replace(".cloud", ".site")) ||
     "";
 
+  // App version stamped into feedback submissions / GitHub issues. Prefer an
+  // explicit env var (CI can set it to the git sha), else the package version.
+  const appVersion =
+    env.VITE_APP_VERSION ||
+    (() => {
+      try {
+        return JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8"))
+          .version as string;
+      } catch {
+        return "unknown";
+      }
+    })();
+
   return {
     plugins: [react(), katexFonts(), pdfjsWorker()],
+    define: {
+      "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
+    },
     optimizeDeps: {
       include: [
         "react",

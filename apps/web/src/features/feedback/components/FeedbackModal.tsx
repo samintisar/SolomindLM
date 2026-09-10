@@ -16,7 +16,11 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { useToast } from "@/shared/contexts/useToast";
 import { useFeedback } from "../FeedbackContext";
 import { captureFeedbackContext, type FeedbackType, validateFeedbackDraft } from "../feedbackTypes";
-import { useSubmitFeedback, useUploadFeedbackScreenshot } from "../services/feedbackApi";
+import {
+  useDiscardFeedbackScreenshot,
+  useSubmitFeedback,
+  useUploadFeedbackScreenshot,
+} from "../services/feedbackApi";
 
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
@@ -44,6 +48,7 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
 
   const submitFeedback = useSubmitFeedback();
   const uploadScreenshot = useUploadFeedbackScreenshot();
+  const discardScreenshot = useDiscardFeedbackScreenshot();
   const toast = useToast();
   const location = useLocation();
 
@@ -67,8 +72,9 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
     }
     setSubmitting(true);
     setError(null);
+    let screenshotId: Awaited<ReturnType<typeof uploadScreenshot>> | undefined;
     try {
-      const screenshotId = file ? await uploadScreenshot(file) : undefined;
+      screenshotId = file ? await uploadScreenshot(file) : undefined;
       await submitFeedback({
         type,
         body,
@@ -79,6 +85,10 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
       toast.success("Thanks — we got it.");
       onDone();
     } catch (err) {
+      // Submit failed after the upload succeeded — drop the orphaned blob.
+      if (screenshotId) {
+        void discardScreenshot(screenshotId).catch(() => undefined);
+      }
       setSubmitting(false);
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }

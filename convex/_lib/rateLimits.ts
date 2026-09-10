@@ -46,6 +46,8 @@ export const RATE_LIMIT_CONFIG = {
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
   /** In-app feedback submissions (per user, per hour) */
   feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
+  /** In-app feedback screenshot upload-URL requests (per user, per hour) */
+  feedbackUpload: { kind: "fixed window", rate: 20, period: HOUR },
 } satisfies Record<string, FixedWindow>;
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, RATE_LIMIT_CONFIG);

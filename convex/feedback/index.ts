@@ -36,7 +36,30 @@ export const generateUploadUrl = mutation({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
+    await rateLimiter.limit(ctx, "feedbackUpload", { key: userId, throws: true });
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Best-effort cleanup for a screenshot that was uploaded but whose `submit`
+ * then failed (rate limit, validation), so it never got attached to a row.
+ * No-op if the blob is already referenced by one of the caller's feedback rows.
+ */
+export const discardScreenshot = mutation({
+  args: { screenshotId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+    const attached = await ctx.db
+      .query("feedback")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("screenshotId"), args.screenshotId))
+      .first();
+    if (attached) return null;
+    await ctx.storage.delete(args.screenshotId);
+    return null;
   },
 });
 
@@ -52,6 +75,15 @@ export const submit = mutation({
     if (body.length > MAX_TEXT) throw new Error("Description is too long");
     const detail = args.detail?.trim() || undefined;
     if (detail && detail.length > MAX_TEXT) throw new Error("Detail is too long");
+
+    // The storage id comes from the client; make sure it points at a real
+    // image blob (a freshly uploaded screenshot) and not some other object.
+    if (args.screenshotId) {
+      const meta = await ctx.db.system.get(args.screenshotId);
+      if (!meta || !meta.contentType?.startsWith("image/")) {
+        throw new Error("Invalid screenshot");
+      }
+    }
 
     await rateLimiter.limit(ctx, "feedbackSubmit", { key: userId, throws: true });
 

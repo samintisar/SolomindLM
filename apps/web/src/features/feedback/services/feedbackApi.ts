@@ -42,13 +42,19 @@ export function useUploadFeedbackScreenshot() {
   };
 }
 
+/** Delete an uploaded screenshot whose feedback submission then failed. */
+export function useDiscardFeedbackScreenshot() {
+  const discard = useMutation(api.feedback.index.discardScreenshot);
+  return (screenshotId: Id<"_storage">) => discard({ screenshotId });
+}
+
 /** `undefined` while loading, then the boolean. */
 export function useIsFeedbackAdmin(): boolean | undefined {
   return useQuery(api.feedback.index.isAdmin, {});
 }
 
-export function useAllFeedback(status?: string) {
-  return useQuery(api.feedback.index.listAll, status ? { status } : {});
+export function useAllFeedback(enabled = true, status?: string) {
+  return useQuery(api.feedback.index.listAll, enabled ? (status ? { status } : {}) : "skip");
 }
 
 export function useCreateGithubIssue() {
