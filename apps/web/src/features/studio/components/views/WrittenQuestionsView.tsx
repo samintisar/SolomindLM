@@ -2,6 +2,7 @@ import { AlertCircle, ArrowLeft, Award, CheckCircle2, Eye, MessageSquareText } f
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   useResetWrittenAnswers,
+  useSaveWrittenAnswerDraft,
   useSubmitWrittenAnswer,
   useUpdateWrittenQuestionsProgress,
   useWrittenQuestionSet,
@@ -42,10 +43,13 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   // Hooks for mutations
   const submitAnswerMutation = useSubmitWrittenAnswer();
   const resetAnswersMutation = useResetWrittenAnswers();
+  const saveDraftMutation = useSaveWrittenAnswerDraft();
   const latestNote = useWrittenQuestionSet(note.id);
 
   // Track if we've initialized the index from saved progress
   const hasInitializedIndex = useRef(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastSavedDraftRef = useRef<Record<string, string>>({});
 
   // Restore saved index on mount (from latestNote which has the latest data from server)
   useEffect(() => {
@@ -71,8 +75,40 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   useEffect(() => {
     if (latestNote?.userAnswers) {
       setUserAnswers(latestNote.userAnswers);
+      // Seed the "already persisted" map so the autosave effect below does not
+      // re-save answers that the server already has on the first render.
+      const saved: Record<string, string> = {};
+      for (const [qid, entry] of Object.entries(latestNote.userAnswers)) {
+        saved[qid] = entry?.answer ?? "";
+      }
+      lastSavedDraftRef.current = saved;
     }
   }, [serverUserAnswersKey]);
+
+  // Debounced autosave of the current question's typed answer (ungraded only),
+  // so unsubmitted answers survive a reload. Mirrors useUpdateWrittenQuestionsProgress.
+  const currentQuestionId = questions[currentIndex]?.id;
+  const currentDraft = currentQuestionId ? (userAnswers[currentQuestionId]?.answer ?? "") : "";
+  const currentDraftGraded = currentQuestionId
+    ? userAnswers[currentQuestionId]?.graded === true
+    : false;
+  useEffect(() => {
+    if (!currentQuestionId || currentDraftGraded) return;
+    if (lastSavedDraftRef.current[currentQuestionId] === currentDraft) return;
+
+    draftTimerRef.current = setTimeout(() => {
+      lastSavedDraftRef.current[currentQuestionId] = currentDraft;
+      void saveDraftMutation({
+        writtenQuestionsId: note.id,
+        questionId: currentQuestionId,
+        answer: currentDraft,
+      }).catch((err) => console.error("Failed to autosave answer draft:", err));
+    }, 800);
+
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [currentQuestionId, currentDraft, currentDraftGraded, note.id, saveDraftMutation]);
 
   const currentQuestion = questions[currentIndex];
 

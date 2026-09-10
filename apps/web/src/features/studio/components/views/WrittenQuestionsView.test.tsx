@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,7 +7,7 @@ import { WrittenQuestionsView } from "./WrittenQuestionsView";
 
 // --- Mocks -------------------------------------------------------------------
 const submitAnswer = vi.fn();
-const saveDraft = vi.fn();
+const saveDraft = vi.fn().mockResolvedValue(undefined);
 const resetAnswers = vi.fn();
 let latestNote: WrittenQuestionsNote | null = null;
 
@@ -105,5 +105,50 @@ describe("WrittenQuestionsView results coverage", () => {
     // Results screen `{percentage}%` line — no whitespace between value and unit.
     expect(screen.getByText("0%")).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+  });
+});
+
+// --- Draft autosave ------------------------------------------------------
+describe("WrittenQuestionsView draft autosave", () => {
+  it("persists typed text for an ungraded question after a debounce", () => {
+    vi.useFakeTimers();
+    try {
+      const note = makeNote();
+      latestNote = note;
+      render(<WrittenQuestionsView note={note} />);
+
+      // fireEvent (not userEvent) because userEvent's internal scheduling
+      // deadlocks against fake timers + the lazy/Suspense subtree here.
+      fireEvent.change(screen.getByPlaceholderText(/Type your short answer/i), {
+        target: { value: "photosynthesis basics" },
+      });
+
+      expect(saveDraft).not.toHaveBeenCalled(); // still within debounce window
+      vi.advanceTimersByTime(900);
+
+      expect(saveDraft).toHaveBeenCalledWith({
+        writtenQuestionsId: "wq1",
+        questionId: "q1",
+        answer: "photosynthesis basics",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not autosave a question that is already graded", async () => {
+    vi.useFakeTimers();
+    try {
+      const note = makeNote({
+        userAnswers: { q1: { answer: "done", graded: true, score: 5, maxScore: 5 } },
+      });
+      latestNote = note;
+      render(<WrittenQuestionsView note={note} />);
+
+      vi.advanceTimersByTime(2000);
+      expect(saveDraft).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
