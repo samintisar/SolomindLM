@@ -13,6 +13,7 @@ export interface WrittenQuestionsSummary {
   percentage: number;
 }
 
+// Intentionally loosens `WrittenQuestionAnswer.answer` to optional so partial answer objects (and test fixtures) can be passed.
 type AnswerLike = Pick<WrittenQuestionAnswer, "graded" | "score"> & { answer?: string };
 
 export function summarizeWrittenQuestions(
@@ -43,11 +44,11 @@ export function summarizeWrittenQuestions(
  */
 export function selectPendingGradeIds(
   questions: WrittenQuestion[],
-  answers: Record<string, AnswerLike>
+  userAnswers: Record<string, AnswerLike> = {}
 ): string[] {
   const pending: string[] = [];
   for (const question of questions) {
-    const entry = answers[question.id];
+    const entry = userAnswers[question.id];
     if (entry && (entry.answer ?? "").trim().length > 0 && entry.graded !== true) {
       pending.push(question.id);
     }

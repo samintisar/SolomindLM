@@ -96,4 +96,9 @@ describe("selectPendingGradeIds", () => {
     const questions = [q("q1"), q("q2")];
     expect(selectPendingGradeIds(questions, { q1: { answer: "", graded: false } })).toEqual([]);
   });
+
+  it("ignores an entry with no answer key at all", () => {
+    const questions = [q("q1")];
+    expect(selectPendingGradeIds(questions, { q1: { graded: false } })).toEqual([]);
+  });
 });
