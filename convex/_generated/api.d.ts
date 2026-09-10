@@ -285,6 +285,7 @@ import type * as eval_researchEvalAction from "../eval/researchEvalAction.js";
 import type * as eval_retrieveClock from "../eval/retrieveClock.js";
 import type * as eval_studioEvalAction from "../eval/studioEvalAction.js";
 import type * as eval_studioEvalTelemetry from "../eval/studioEvalTelemetry.js";
+import type * as feedback_github from "../feedback/github.js";
 import type * as feedback_index from "../feedback/index.js";
 import type * as folders_index from "../folders/index.js";
 import type * as googleDrive from "../googleDrive.js";
@@ -654,6 +655,7 @@ declare const fullApi: ApiFromModules<{
   "eval/retrieveClock": typeof eval_retrieveClock;
   "eval/studioEvalAction": typeof eval_studioEvalAction;
   "eval/studioEvalTelemetry": typeof eval_studioEvalTelemetry;
+  "feedback/github": typeof feedback_github;
   "feedback/index": typeof feedback_index;
   "folders/index": typeof folders_index;
   googleDrive: typeof googleDrive;
