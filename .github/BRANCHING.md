@@ -60,6 +60,51 @@ git push -u origin feature/your-feature-name
 - Web → Vercel
 - Backend → Convex
 
+## Issues
+
+Every change starts as an issue and ends as one squash-merged PR. One issue = one
+PR = one logical change.
+
+### Filing
+
+Use the issue forms (`.github/ISSUE_TEMPLATE/`): **Bug report**, **Feature /
+enhancement**, or **Tech debt / refactor**. Blank issues are disabled. Security
+reports go through a private advisory, not a public issue.
+
+- **Feature** issues must have **acceptance criteria** — a checkbox list of what
+  "done" means. The PR is reviewed against that list.
+- Name what's **out of scope** so the PR doesn't sprawl.
+- Found debt while coding? File a `type:refactor` issue and reference it in a
+  code comment (`// TODO(#142): recomputes every render`) — don't leave bare
+  TODOs and don't expand the current PR to fix it.
+
+### Labels
+
+Managed as code in [`.github/labels.yml`](labels.yml), synced by
+[`labels.yml`](workflows/labels.yml). Every issue carries exactly one label from
+each group:
+
+| Group      | Values                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| `type:`    | `bug` `feature` `refactor` `chore` `docs` `test` `perf`                                    |
+| `area:`    | `web` `mobile` `convex` `agents` `rag` `studio` `billing` `auth` `sources` `chat` `ci`    |
+| `priority:`| `p0` (prod broken) `p1` (this cycle) `p2` (soon) `p3` (someday)                            |
+| `status:`  | `triage` `ready` `in-progress` `blocked` `needs-design` `needs-repro` `stale`              |
+
+### Triage
+
+New issues land as `status:triage` with no priority. Once a week, clear the triage
+queue: for each issue either assign `priority:` + `area:` + a milestone and set
+`status:ready`, or close it with a one-line reason. Anything you won't do in three
+months gets closed. Stale issues (60 days idle) are labelled and auto-closed by
+[`stale.yml`](workflows/stale.yml); `priority:p0`/`p1`, `status:blocked`, and
+pinned issues are exempt.
+
+### Linking
+
+- Branch name references the issue number: `fix/142-stale-grading-banner`.
+- PR body contains `Closes #142` so the issue closes on merge.
+
 ## Branch Naming Conventions
 
 | Prefix      | Usage              | Example                       |
