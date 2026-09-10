@@ -184,19 +184,16 @@ export async function patchWrittenQuestionUserAnswer(
  */
 export async function saveWrittenQuestionUserAnswerDraft(
   ctx: MutationCtx,
-  writtenQuestionId: Id<"writtenQuestions">,
+  writtenQuestion: Doc<"writtenQuestions">,
   questionId: string,
   answer: string
 ): Promise<void> {
-  const writtenQuestion = await getWrittenQuestion(ctx, writtenQuestionId);
-  if (!writtenQuestion) throw new Error("Written question set not found");
-
   const existingUserAnswers =
     (writtenQuestion.metadata as { userAnswers?: Record<string, Record<string, unknown>> })
       ?.userAnswers ?? {};
   const existingAnswer = existingUserAnswers[questionId] ?? {};
 
-  await ctx.db.patch("writtenQuestions", writtenQuestionId, {
+  await ctx.db.patch("writtenQuestions", writtenQuestion._id, {
     metadata: {
       ...writtenQuestion.metadata,
       userAnswers: {

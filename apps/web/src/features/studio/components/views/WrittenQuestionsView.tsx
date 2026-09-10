@@ -77,6 +77,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   // / `currentIndex` to their dependency arrays.
   const currentQuestionIdRef = useRef<string | undefined>(questions[currentIndex]?.id);
   currentQuestionIdRef.current = questions[currentIndex]?.id;
+  // Latest server note, readable from the async grade-on-Finish loop (whose
+  // closure captured a pre-grading `latestNote`) so freshly-graded feedback can
+  // be merged instead of leaving empty feedback panels until the reactive echo.
+  const latestNoteRef = useRef(latestNote);
+  latestNoteRef.current = latestNote;
 
   // Restore saved index on mount (from latestNote which has the latest data from server)
   useEffect(() => {
@@ -171,6 +176,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     if ((lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft) return;
 
     draftTimerRef.current = setTimeout(() => {
+      // Re-check against the persisted map: the server-sync effect can seed
+      // lastSavedDraftRef after this timer was scheduled (deps unchanged, so the
+      // effect never re-runs to clear it), and we must not re-save identical text.
+      if ((lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft) return;
       lastSavedDraftRef.current[currentQuestionId] = currentDraft;
       pendingDraftRef.current = null;
       void saveDraftMutation({
@@ -292,16 +301,24 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             questionId: qid,
             answer,
           });
-          setUserAnswers((prev) => ({
-            ...prev,
-            [qid]: {
-              ...(prev[qid] || { answer: "" }),
-              answer,
-              graded: true,
-              score: res.score,
-              maxScore: res.maxScore,
-            },
-          }));
+          setUserAnswers((prev) => {
+            // submitAndGrade persists the full graded result (feedback, strengths,
+            // improvements) server-side before returning, so prefer the server
+            // echo for this question when it has already landed; fall back to any
+            // prior grade fields, then apply the fresh score.
+            const serverEntry = latestNoteRef.current?.userAnswers?.[qid];
+            return {
+              ...prev,
+              [qid]: {
+                ...(prev[qid] || { answer: "" }),
+                ...(serverEntry ?? {}),
+                answer,
+                graded: true,
+                score: res.score,
+                maxScore: res.maxScore,
+              },
+            };
+          });
         } catch (err) {
           console.error("Failed to grade answer on finish:", err);
           failed += 1;
@@ -696,14 +713,13 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={handlePrev}
-              disabled={currentIndex === 0 || gradingAll.active}
+              disabled={currentIndex === 0}
               className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
             >
               Previous
             </button>
             <button
               onClick={handleNext}
-              disabled={gradingAll.active}
               className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {currentIndex === questions.length - 1 ? "Finish" : "Next"}
@@ -713,7 +729,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
           {!isGraded && !reviewMode && (
             <button
               onClick={handleSubmitAnswer}
-              disabled={!isAnswered || isSubmitting || gradingAll.active}
+              disabled={!isAnswered || isSubmitting}
               className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (

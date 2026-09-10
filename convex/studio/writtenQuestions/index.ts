@@ -183,7 +183,7 @@ export const saveUserAnswerDraft = mutation({
     }
     await WrittenQuestions.saveWrittenQuestionUserAnswerDraft(
       ctx,
-      args.id,
+      existing,
       args.questionId,
       args.answer
     );
