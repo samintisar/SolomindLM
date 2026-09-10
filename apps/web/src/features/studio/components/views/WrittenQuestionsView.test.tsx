@@ -136,7 +136,7 @@ describe("WrittenQuestionsView draft autosave", () => {
     }
   });
 
-  it("does not autosave a question that is already graded", async () => {
+  it("does not autosave a question that is already graded", () => {
     vi.useFakeTimers();
     try {
       const note = makeNote({
@@ -147,6 +147,60 @@ describe("WrittenQuestionsView draft autosave", () => {
 
       vi.advanceTimersByTime(2000);
       expect(saveDraft).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("coalesces rapid successive edits into exactly one save carrying the final text", () => {
+    vi.useFakeTimers();
+    try {
+      const note = makeNote();
+      latestNote = note;
+      render(<WrittenQuestionsView note={note} />);
+
+      const textarea = screen.getByPlaceholderText(/Type your short answer/i);
+      fireEvent.change(textarea, { target: { value: "photo" } });
+      vi.advanceTimersByTime(200);
+      fireEvent.change(textarea, { target: { value: "photosyn" } });
+      vi.advanceTimersByTime(200);
+      fireEvent.change(textarea, { target: { value: "photosynthesis, in full" } });
+
+      expect(saveDraft).not.toHaveBeenCalled(); // every edit stayed within the window
+      vi.advanceTimersByTime(900);
+
+      expect(saveDraft).toHaveBeenCalledTimes(1);
+      expect(saveDraft).toHaveBeenCalledWith({
+        writtenQuestionsId: "wq1",
+        questionId: "q1",
+        answer: "photosynthesis, in full",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("flushes the pending draft for q1 when navigating Next within the debounce window", () => {
+    vi.useFakeTimers();
+    try {
+      const note = makeNote();
+      latestNote = note;
+      render(<WrittenQuestionsView note={note} />);
+
+      fireEvent.change(screen.getByPlaceholderText(/Type your short answer/i), {
+        target: { value: "answer typed just before navigating" },
+      });
+      expect(saveDraft).not.toHaveBeenCalled(); // still mid-debounce
+
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+      // The debounce timer never elapsed; the flush-on-change effect persisted it.
+      expect(saveDraft).toHaveBeenCalledTimes(1);
+      expect(saveDraft).toHaveBeenCalledWith({
+        writtenQuestionsId: "wq1",
+        questionId: "q1",
+        answer: "answer typed just before navigating",
+      });
     } finally {
       vi.useRealTimers();
     }

@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { WrittenQuestion, WrittenQuestionsNote } from "@/shared/types/index";
 
 export interface CreateWrittenQuestionsParams {
@@ -236,13 +236,16 @@ export function useSubmitWrittenAnswer() {
 export function useSaveWrittenAnswerDraft() {
   const save = useMutation(api.studio.writtenQuestions.index.saveUserAnswerDraft);
 
-  return async (params: { writtenQuestionsId: string; questionId: string; answer: string }) => {
-    return await save({
-      id: params.writtenQuestionsId as Id<"writtenQuestions">,
-      questionId: params.questionId,
-      answer: params.answer,
-    });
-  };
+  return useCallback(
+    async (params: { writtenQuestionsId: string; questionId: string; answer: string }) => {
+      return await save({
+        id: params.writtenQuestionsId as Id<"writtenQuestions">,
+        questionId: params.questionId,
+        answer: params.answer,
+      });
+    },
+    [save]
+  );
 }
 
 /**

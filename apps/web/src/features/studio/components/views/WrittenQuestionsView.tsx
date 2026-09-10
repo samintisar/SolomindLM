@@ -1,5 +1,5 @@
 import { AlertCircle, ArrowLeft, Award, CheckCircle2, Eye, MessageSquareText } from "lucide-react";
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useResetWrittenAnswers,
   useSaveWrittenAnswerDraft,
@@ -50,6 +50,13 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const hasInitializedIndex = useRef(false);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastSavedDraftRef = useRef<Record<string, string>>({});
+  // Latest draft that has been scheduled but not yet persisted, so it can be
+  // flushed (not just cancelled) on question change / unmount.
+  const pendingDraftRef = useRef<{ questionId: string; answer: string } | null>(null);
+  // Latest resolved question id, readable from effects without adding `questions`
+  // / `currentIndex` to their dependency arrays.
+  const currentQuestionIdRef = useRef<string | undefined>(questions[currentIndex]?.id);
+  currentQuestionIdRef.current = questions[currentIndex]?.id;
 
   // Restore saved index on mount (from latestNote which has the latest data from server)
   useEffect(() => {
@@ -74,11 +81,23 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
   useEffect(() => {
     if (latestNote?.userAnswers) {
-      setUserAnswers(latestNote.userAnswers);
+      const serverAnswers = latestNote.userAnswers;
+      // Apply server state, but keep the local answer text for the question the
+      // user is currently on, so the autosave's own server echo can't revert the
+      // textarea / jump the cursor mid-typing. Grade fields still come from the
+      // server for every question, including the current one.
+      setUserAnswers((prev) => {
+        const merged: Record<string, WrittenQuestionAnswer> = { ...serverAnswers };
+        const curId = currentQuestionIdRef.current;
+        if (curId && prev[curId] && merged[curId]) {
+          merged[curId] = { ...merged[curId], answer: prev[curId].answer };
+        }
+        return merged;
+      });
       // Seed the "already persisted" map so the autosave effect below does not
       // re-save answers that the server already has on the first render.
       const saved: Record<string, string> = {};
-      for (const [qid, entry] of Object.entries(latestNote.userAnswers)) {
+      for (const [qid, entry] of Object.entries(serverAnswers)) {
         saved[qid] = entry?.answer ?? "";
       }
       lastSavedDraftRef.current = saved;
@@ -92,12 +111,33 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const currentDraftGraded = currentQuestionId
     ? userAnswers[currentQuestionId]?.graded === true
     : false;
+  // Persist whatever draft is currently pending immediately. Used on question
+  // change and unmount instead of only cancelling the debounce timer.
+  const flushDraft = useCallback(() => {
+    const pending = pendingDraftRef.current;
+    if (!pending) return;
+    if (lastSavedDraftRef.current[pending.questionId] === pending.answer) {
+      pendingDraftRef.current = null;
+      return;
+    }
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    lastSavedDraftRef.current[pending.questionId] = pending.answer;
+    pendingDraftRef.current = null;
+    void saveDraftMutation({
+      writtenQuestionsId: note.id,
+      questionId: pending.questionId,
+      answer: pending.answer,
+    }).catch((err) => console.error("Failed to flush answer draft:", err));
+  }, [saveDraftMutation, note.id]);
+
   useEffect(() => {
     if (!currentQuestionId || currentDraftGraded) return;
     if (lastSavedDraftRef.current[currentQuestionId] === currentDraft) return;
 
+    pendingDraftRef.current = { questionId: currentQuestionId, answer: currentDraft };
     draftTimerRef.current = setTimeout(() => {
       lastSavedDraftRef.current[currentQuestionId] = currentDraft;
+      pendingDraftRef.current = null;
       void saveDraftMutation({
         writtenQuestionsId: note.id,
         questionId: currentQuestionId,
@@ -109,6 +149,17 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     };
   }, [currentQuestionId, currentDraft, currentDraftGraded, note.id, saveDraftMutation]);
+
+  // Flush (not just cancel) the pending draft when the user navigates to another
+  // question or the view unmounts within the debounce window. The cleanup fires
+  // whenever currentQuestionId changes, i.e. right before the new question is
+  // handled, or on unmount.
+  useEffect(() => {
+    const leavingQuestionId = currentQuestionId;
+    return () => {
+      if (leavingQuestionId) flushDraft();
+    };
+  }, [currentQuestionId, flushDraft]);
 
   const currentQuestion = questions[currentIndex];
 
