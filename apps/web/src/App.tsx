@@ -457,9 +457,7 @@ const AppContent: React.FC = () => {
               path="/feedback"
               element={
                 <ProtectedRoute>
-                  <main className="flex-1 overflow-auto">
-                    <MyFeedbackPage />
-                  </main>
+                  <MyFeedbackPage />
                 </ProtectedRoute>
               }
             />
