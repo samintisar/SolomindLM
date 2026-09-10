@@ -174,6 +174,10 @@ export const saveUserAnswerDraft = mutation({
     const existing = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
     if (!existing) throw new Error("Written question set not found or access denied");
     await assertCanEditNotebook(ctx, existing.notebookId, userId);
+    const known = (existing.questionsData ?? []).some(
+      (q: { id?: string }) => q?.id === args.questionId
+    );
+    if (!known) throw new Error("Question not found");
     if (args.answer.length > MAX_DRAFT_ANSWER_LENGTH) {
       throw new Error("Answer is too long to save");
     }

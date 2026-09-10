@@ -253,4 +253,38 @@ describe("studio.writtenQuestions.index.saveUserAnswerDraft", () => {
       })
     ).rejects.toThrow();
   });
+
+  test("rejects a draft whose questionId is not in the set", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const wqId = await seedWrittenQuestions(t, userId, notebookId);
+
+    await expect(
+      withAuth(t, userId).mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+        id: wqId,
+        questionId: "does-not-exist",
+        answer: "junk key payload",
+      })
+    ).rejects.toThrow(/Question not found/);
+
+    const answers = await readUserAnswers(t, wqId);
+    expect(answers["does-not-exist"]).toBeUndefined();
+  });
+
+  test("still saves a draft for a valid questionId in the set", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await seedUser(t);
+    const notebookId = await seedNotebook(t, userId);
+    const wqId = await seedWrittenQuestions(t, userId, notebookId);
+
+    await withAuth(t, userId).mutation(api.studio.writtenQuestions.index.saveUserAnswerDraft, {
+      id: wqId,
+      questionId: "q2",
+      answer: "valid answer",
+    });
+
+    const answers = await readUserAnswers(t, wqId);
+    expect(answers.q2).toEqual({ graded: false, answer: "valid answer" });
+  });
 });
