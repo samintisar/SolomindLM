@@ -187,3 +187,15 @@ evals — grading prompt copy is untouched.
 | `apps/web/src/features/studio/utils/writtenQuestionsScore.test.ts` | new |
 | `convex/studio/writtenQuestions/index.test.ts` | new or extended |
 | `apps/web/` e2e spec | new or extended |
+
+---
+
+## Implementation
+
+Implemented on branch `fix/written-questions-score-tally` (2026-09-09).
+Commits: score/coverage util + tests; `saveUserAnswerDraft` Convex mutation + convex-test;
+`useSaveWrittenAnswerDraft` hook; honest results-screen coverage + NaN guard;
+debounced lossless draft autosave; interruptible grade-on-Finish loop.
+Note: the spec named Playwright for the `WrittenQuestionsView` surface; the repo has no
+Playwright setup, so that surface is covered by `@testing-library/react` component tests
+(`WrittenQuestionsView.test.tsx`) instead — same coverage intent.
