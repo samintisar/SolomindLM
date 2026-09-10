@@ -181,6 +181,7 @@ import type * as _lib_e5Embedding from "../_lib/e5Embedding.js";
 import type * as _lib_env from "../_lib/env.js";
 import type * as _lib_errors from "../_lib/errors.js";
 import type * as _lib_externalProviderCooldowns from "../_lib/externalProviderCooldowns.js";
+import type * as _lib_feedbackAdmin from "../_lib/feedbackAdmin.js";
 import type * as _lib_googleDriveDownload from "../_lib/googleDriveDownload.js";
 import type * as _lib_limits from "../_lib/limits.js";
 import type * as _lib_logging_serviceLogger from "../_lib/logging/serviceLogger.js";
@@ -201,6 +202,7 @@ import type * as _migration_removeSlidePrompts from "../_migration/removeSlidePr
 import type * as _model_audioOverviews from "../_model/audioOverviews.js";
 import type * as _model_conversations from "../_model/conversations.js";
 import type * as _model_documents from "../_model/documents.js";
+import type * as _model_feedback from "../_model/feedback.js";
 import type * as _model_flashcards from "../_model/flashcards.js";
 import type * as _model_folders from "../_model/folders.js";
 import type * as _model_infographics from "../_model/infographics.js";
@@ -283,6 +285,7 @@ import type * as eval_researchEvalAction from "../eval/researchEvalAction.js";
 import type * as eval_retrieveClock from "../eval/retrieveClock.js";
 import type * as eval_studioEvalAction from "../eval/studioEvalAction.js";
 import type * as eval_studioEvalTelemetry from "../eval/studioEvalTelemetry.js";
+import type * as feedback_index from "../feedback/index.js";
 import type * as folders_index from "../folders/index.js";
 import type * as googleDrive from "../googleDrive.js";
 import type * as http from "../http.js";
@@ -547,6 +550,7 @@ declare const fullApi: ApiFromModules<{
   "_lib/env": typeof _lib_env;
   "_lib/errors": typeof _lib_errors;
   "_lib/externalProviderCooldowns": typeof _lib_externalProviderCooldowns;
+  "_lib/feedbackAdmin": typeof _lib_feedbackAdmin;
   "_lib/googleDriveDownload": typeof _lib_googleDriveDownload;
   "_lib/limits": typeof _lib_limits;
   "_lib/logging/serviceLogger": typeof _lib_logging_serviceLogger;
@@ -567,6 +571,7 @@ declare const fullApi: ApiFromModules<{
   "_model/audioOverviews": typeof _model_audioOverviews;
   "_model/conversations": typeof _model_conversations;
   "_model/documents": typeof _model_documents;
+  "_model/feedback": typeof _model_feedback;
   "_model/flashcards": typeof _model_flashcards;
   "_model/folders": typeof _model_folders;
   "_model/infographics": typeof _model_infographics;
@@ -649,6 +654,7 @@ declare const fullApi: ApiFromModules<{
   "eval/retrieveClock": typeof eval_retrieveClock;
   "eval/studioEvalAction": typeof eval_studioEvalAction;
   "eval/studioEvalTelemetry": typeof eval_studioEvalTelemetry;
+  "feedback/index": typeof feedback_index;
   "folders/index": typeof folders_index;
   googleDrive: typeof googleDrive;
   http: typeof http;
