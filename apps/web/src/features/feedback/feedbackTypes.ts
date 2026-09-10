@@ -29,9 +29,9 @@ export function captureFeedbackContext(
   };
 }
 
-export function validateFeedbackDraft(
-  d: { body: string }
-): { ok: true } | { ok: false; error: string } {
+export function validateFeedbackDraft(d: {
+  body: string;
+}): { ok: true } | { ok: false; error: string } {
   const body = d.body.trim();
   if (!body) return { ok: false, error: "Enter a description first" };
   if (body.length > MAX_FEEDBACK_TEXT) {

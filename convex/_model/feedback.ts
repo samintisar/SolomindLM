@@ -52,8 +52,7 @@ export function toAdminFeedbackRow(row: FeedbackRowLike) {
 export function feedbackIssueTitle(body: string): string {
   const firstLine = (body.split("\n")[0] ?? "").trim();
   if (!firstLine) return `${TITLE_PREFIX}New submission`;
-  const clipped =
-    firstLine.length > TITLE_MAX ? firstLine.slice(0, TITLE_MAX) : firstLine;
+  const clipped = firstLine.length > TITLE_MAX ? firstLine.slice(0, TITLE_MAX) : firstLine;
   return `${TITLE_PREFIX}${clipped}`;
 }
 
@@ -72,8 +71,7 @@ export function feedbackIssueBody(row: {
   lastRequestId?: string;
   userId: string;
 }): string {
-  const detailLabel =
-    row.type === "bug" ? "Steps to reproduce" : "Why / what for";
+  const detailLabel = row.type === "bug" ? "Steps to reproduce" : "Why / what for";
   return [
     row.body.trim(),
     "",
