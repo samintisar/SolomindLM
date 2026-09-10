@@ -975,4 +975,35 @@ export default defineSchema({
   semanticScholarThrottle: defineTable({
     lastRequestAt: v.number(),
   }),
+
+  // In-app user feedback (bug reports + feature requests). Source of truth;
+  // optionally mirrored to GitHub Issues by staff from /admin/feedback.
+  feedback: defineTable({
+    userId: v.id("users"),
+    type: v.union(v.literal("bug"), v.literal("feature")),
+    /** Primary free-text: "what happened" (bug) or "what do you want" (feature). */
+    body: v.string(),
+    /** Optional secondary free-text: "steps to reproduce" (bug) or "why" (feature). */
+    detail: v.optional(v.string()),
+    screenshotId: v.optional(v.id("_storage")),
+    /** Auto-captured client context. */
+    route: v.string(),
+    surface: v.union(v.literal("web"), v.literal("mobile")),
+    appVersion: v.string(),
+    lastRequestId: v.optional(v.string()),
+    /** Server-derived at submit time from the active Stripe subscription. */
+    planTier: v.union(v.literal("free"), v.literal("pro")),
+    status: v.union(
+      v.literal("received"),
+      v.literal("planned"),
+      v.literal("shipped"),
+      v.literal("closed")
+    ),
+    githubIssueNumber: v.optional(v.number()),
+    githubIssueUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
 });

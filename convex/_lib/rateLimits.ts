@@ -44,6 +44,8 @@ export const RATE_LIMIT_CONFIG = {
   shareRedeem: { kind: "fixed window", rate: 60, period: HOUR },
   /** Forking a notebook from a fork link (per user, per hour) */
   notebookFork: { kind: "fixed window", rate: 20, period: HOUR },
+  /** In-app feedback submissions (per user, per hour) */
+  feedbackSubmit: { kind: "fixed window", rate: 5, period: HOUR },
 } satisfies Record<string, FixedWindow>;
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, RATE_LIMIT_CONFIG);
