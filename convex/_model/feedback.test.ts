@@ -5,7 +5,6 @@ import {
   feedbackIssueLabels,
   feedbackIssueTitle,
   toAdminFeedbackRow,
-  toMyFeedbackRow,
 } from "./feedback";
 
 const base = {
@@ -27,16 +26,6 @@ const base = {
 describe("feedback model", () => {
   it("exposes the two feedback types", () => {
     expect(FEEDBACK_TYPES).toEqual(["bug", "feature"]);
-  });
-
-  it("toMyFeedbackRow keeps only user-facing fields", () => {
-    expect(toMyFeedbackRow(base)).toEqual({
-      id: "fb1",
-      type: "bug",
-      body: base.body,
-      status: "received",
-      createdAt: 1000,
-    });
   });
 
   it("toAdminFeedbackRow keeps triage fields", () => {

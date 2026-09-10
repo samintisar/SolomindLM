@@ -52,13 +52,14 @@ describe("feedback.index", () => {
     const res = await asUser.mutation(api.feedback.index.submit, draft);
     expect(res.id).toBeDefined();
 
-    const mine = await asUser.query(api.feedback.index.listMine, {});
-    expect(mine).toHaveLength(1);
-    expect(mine[0]).toMatchObject({ type: "bug", status: "received", body: "Quiz won't submit" });
-
     const row = await t.run((ctx) => ctx.db.get(res.id as Id<"feedback">));
-    expect(row?.planTier).toBe("free");
-    expect(row?.userId).toBe(userId);
+    expect(row).toMatchObject({
+      type: "bug",
+      status: "received",
+      body: "Quiz won't submit",
+      planTier: "free",
+      userId,
+    });
   });
 
   test("submit derives pro tier from an active subscription", async () => {
@@ -109,14 +110,6 @@ describe("feedback.index", () => {
     await expect(
       asUser.mutation(api.feedback.index.submit, { ...draft, body: "x6" })
     ).rejects.toThrow();
-  });
-
-  test("listMine only returns the caller's rows", async () => {
-    const t = makeT();
-    const a = await seedUser(t);
-    const b = await seedUser(t);
-    await withAuth(t, a).mutation(api.feedback.index.submit, draft);
-    expect(await withAuth(t, b).query(api.feedback.index.listMine, {})).toHaveLength(0);
   });
 
   test("isAdmin reflects the allowlist", async () => {

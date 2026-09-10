@@ -1,7 +1,8 @@
 # In-app feedback
 
 Users send bug reports / feature requests from the user menu ("Send feedback").
-Submissions are stored in the Convex `feedback` table. Staff triage at
+Submissions are stored in the Convex `feedback` table and confirmed with a
+toast — there is no user-facing list of past submissions. Staff triage at
 `/admin/feedback` and can push a submission to GitHub Issues.
 
 ## Convex env vars

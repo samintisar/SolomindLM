@@ -20,17 +20,6 @@ export interface FeedbackRowLike {
   createdAt: number;
 }
 
-/** Fields safe to show a user about their own submission. */
-export function toMyFeedbackRow(row: FeedbackRowLike) {
-  return {
-    id: row._id,
-    type: row.type,
-    body: row.body,
-    status: row.status,
-    createdAt: row.createdAt,
-  };
-}
-
 /** Fields shown in the staff triage list. */
 export function toAdminFeedbackRow(row: FeedbackRowLike) {
   return {

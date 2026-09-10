@@ -88,14 +88,6 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
               <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
               <span>Send feedback</span>
             </button>
-            <button
-              onClick={() => navigate("/feedback")}
-              className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
-              role="menuitem"
-            >
-              <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span>My feedback</span>
-            </button>
             {isFeedbackAdmin && (
               <button
                 onClick={() => navigate("/admin/feedback")}

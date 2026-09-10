@@ -42,10 +42,6 @@ export function useUploadFeedbackScreenshot() {
   };
 }
 
-export function useMyFeedback() {
-  return useQuery(api.feedback.index.listMine, {});
-}
-
 /** `undefined` while loading, then the boolean. */
 export function useIsFeedbackAdmin(): boolean | undefined {
   return useQuery(api.feedback.index.isAdmin, {});

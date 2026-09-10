@@ -1,6 +1,6 @@
 import { Bug, Lightbulb, Paperclip, X } from "lucide-react";
 import { type ChangeEvent, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useToast } from "@/shared/contexts/useToast";
 import { useFeedback } from "../FeedbackContext";
 import { captureFeedbackContext, type FeedbackType, validateFeedbackDraft } from "../feedbackTypes";
@@ -19,7 +19,6 @@ export function FeedbackModal() {
   const uploadScreenshot = useUploadFeedbackScreenshot();
   const toast = useToast();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Re-sync the local type when the modal is (re)opened with a preset.
   if (isOpen && type !== defaultType && body === "" && detail === "" && !file && !error) {
@@ -65,9 +64,7 @@ export function FeedbackModal() {
         screenshotId,
         ...captureFeedbackContext({ pathname: location.pathname, search: location.search }),
       });
-      toast.success("Thanks — we got it.", {
-        action: { label: "View", onClick: () => navigate("/feedback") },
-      });
+      toast.success("Thanks — we got it.");
       onClose();
     } catch (err) {
       setSubmitting(false);

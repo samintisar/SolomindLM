@@ -3,7 +3,7 @@ import type { Id } from "../_generated/dataModel";
 import { type MutationCtx, mutation, query } from "../_generated/server";
 import { assertFeedbackAdmin, isFeedbackAdminEmail } from "../_lib/feedbackAdmin";
 import { rateLimiter } from "../_lib/rateLimits";
-import { toAdminFeedbackRow, toMyFeedbackRow } from "../_model/feedback";
+import { toAdminFeedbackRow } from "../_model/feedback";
 import { getAuthUserId } from "../auth";
 
 const MAX_TEXT = 5000;
@@ -72,20 +72,6 @@ export const submit = mutation({
       updatedAt: now,
     });
     return { id };
-  },
-});
-
-export const listMine = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const rows = await ctx.db
-      .query("feedback")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(100);
-    return rows.map(toMyFeedbackRow);
   },
 });
 
