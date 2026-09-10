@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -383,5 +383,148 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
     // Let the loop finish
     resolveFirst!({ success: true, score: 4, maxScore: 5 });
     expect(await screen.findByText("You scored 7 out of 10 points")).toBeInTheDocument();
+  });
+
+  // --- Hardening: re-entrancy, stop feedback, error recovery, no stale snapshot ---
+
+  type GradeResult = { success: boolean; score: number; maxScore: number };
+
+  // Reach into the React fiber to call the button's onClick directly, so two
+  // invocations land in the same tick with no re-render (and no fresh closure)
+  // between them — the double-click / double-tap / Enter+click race.
+  function reactOnClick(el: Element): () => void {
+    const key = Object.keys(el).find((k) => k.startsWith("__reactProps$"));
+    if (!key) throw new Error("no React props on element");
+    return (el as unknown as Record<string, { onClick: () => void }>)[key].onClick;
+  }
+
+  it("does not launch two grade loops when Finish fires twice before a re-render", async () => {
+    let resolve1!: (v: GradeResult) => void;
+    let resolve2!: (v: GradeResult) => void;
+    const queue: Promise<GradeResult>[] = [
+      new Promise<GradeResult>((r) => {
+        resolve1 = r;
+      }),
+      new Promise<GradeResult>((r) => {
+        resolve2 = r;
+      }),
+    ];
+    submitAnswer.mockImplementation(
+      () => queue.shift() ?? Promise.resolve({ success: true, score: 3, maxScore: 5 })
+    );
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    render(<WrittenQuestionsView note={note} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    const onFinish = reactOnClick(screen.getByRole("button", { name: "Finish" }));
+
+    act(() => {
+      onFinish();
+      onFinish();
+    });
+
+    resolve1({ success: true, score: 4, maxScore: 5 });
+    resolve2({ success: true, score: 3, maxScore: 5 });
+
+    expect(await screen.findByText(/You scored/)).toBeInTheDocument();
+    // One grade call per pending question — a second Finish must not double it.
+    expect(submitAnswer).toHaveBeenCalledTimes(2);
+  });
+
+  it("reflects a pressed Stop in render state before the in-flight grade call resolves", async () => {
+    let resolveFirst!: (v: GradeResult) => void;
+    const firstCall = new Promise<GradeResult>((r) => {
+      resolveFirst = r;
+    });
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) =>
+      questionId === "q1" ? firstCall : { success: true, score: 3, maxScore: 5 }
+    );
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    expect(await screen.findByText(/Grading your answers/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stop grading" }));
+
+    // Render state shows the stop immediately — the parked grade call is still
+    // unresolved, so this can only be driven by state, not the loop.
+    const stoppingBtn = screen.getByRole("button", { name: /Stopping/ });
+    expect(stoppingBtn).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Stop grading" })).not.toBeInTheDocument();
+
+    // Let the parked call resolve so the loop can exit cleanly.
+    resolveFirst({ success: true, score: 4, maxScore: 5 });
+    expect(await screen.findByText(/You scored/)).toBeInTheDocument();
+  });
+
+  it("does not strand the view when notifying the parent after grading throws", async () => {
+    submitAnswer.mockImplementation(async () => ({ success: true, score: 4, maxScore: 5 }));
+    const onNoteUpdate = vi.fn(() => {
+      throw new Error("parent boom");
+    });
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} onNoteUpdate={onNoteUpdate} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    // The grade-on-Finish flow must reach the results screen regardless of what
+    // the parent callback does, and must not get stuck on the grading spinner.
+    expect(await screen.findByText("Assessment Complete!")).toBeInTheDocument();
+    expect(screen.getByText(/You scored/)).toBeInTheDocument();
+    expect(screen.queryByText(/Grading your answers/)).not.toBeInTheDocument();
+  });
+
+  it("does not push a stale pre-grading note snapshot to the parent on Finish", async () => {
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) => ({
+      success: true,
+      score: questionId === "q1" ? 4 : 3,
+      maxScore: 5,
+    }));
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const onNoteUpdate = vi.fn();
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} onNoteUpdate={onNoteUpdate} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+    expect(await screen.findByText("You scored 7 out of 10 points")).toBeInTheDocument();
+
+    // The reactive useWrittenQuestionSet query already propagates freshly-persisted
+    // grades; Finish must not hand the parent a note captured before grading (its
+    // userAnswers still show graded !== true).
+    const staleCalls = onNoteUpdate.mock.calls.filter(
+      ([n]) => n && (n as WrittenQuestionsNote).userAnswers?.q1?.graded !== true
+    );
+    expect(staleCalls).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@ export interface WrittenQuestionsViewProps {
 
 // Idle value for the grade-on-Finish progress state. Must be reset between runs
 // so a stale `failed` count can't leak the failure banner onto a later clean finish.
-const GRADING_ALL_IDLE = { active: false, done: 0, total: 0, failed: 0 };
+const GRADING_ALL_IDLE = { active: false, done: 0, total: 0, failed: 0, stopping: false };
 
 export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   note,
@@ -51,6 +51,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     done: number;
     total: number;
     failed: number;
+    stopping: boolean;
   }>(GRADING_ALL_IDLE);
 
   // Hooks for mutations
@@ -63,6 +64,10 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const hasInitializedIndex = useRef(false);
   // Set by the "Stop grading" button to end the grade-on-Finish loop early.
   const gradingCancelledRef = useRef(false);
+  // Real re-entrancy guard for runGradeAllThenShowResults. A ref (not the
+  // `gradingAll` state read from a stale render closure) so a double Finish
+  // click fired before React re-renders can't launch two overlapping loops.
+  const gradingRunRef = useRef(false);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastSavedDraftRef = useRef<Record<string, string>>({});
   // Latest draft that has been scheduled but not yet persisted, so it can be
@@ -254,55 +259,68 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   };
 
   const runGradeAllThenShowResults = async () => {
-    // Re-entrancy guard: a fast double-click on Finish must not launch two
-    // overlapping grade loops.
-    if (gradingAll.active) return;
-    gradingCancelledRef.current = false;
+    // Re-entrancy guard: a fast double Finish (double-click / double-tap /
+    // Enter+click) must not launch two overlapping grade loops. The ref is
+    // authoritative because it updates synchronously, unlike `gradingAll` read
+    // from this render's closure.
+    if (gradingRunRef.current) return;
+    gradingRunRef.current = true;
+    try {
+      gradingCancelledRef.current = false;
 
-    const pending = selectPendingGradeIds(questions, userAnswers);
-    if (pending.length === 0) {
-      setGradingAll(GRADING_ALL_IDLE);
-      setShowResults(true);
-      return;
-    }
-
-    setGradingAll({ active: true, done: 0, total: pending.length, failed: 0 });
-    let failed = 0;
-    for (let i = 0; i < pending.length; i++) {
-      // "Stop grading" was pressed — bail out and show partial results. Each
-      // submitAnswerMutation call persists server-side, so a stopped or reloaded
-      // run loses no completed grading: pressing Finish again resumes the
-      // remainder because selectPendingGradeIds recomputes what is still pending.
-      if (gradingCancelledRef.current) break;
-      const qid = pending[i];
-      const answer = userAnswers[qid]?.answer ?? "";
-      try {
-        const res = await submitAnswerMutation({
-          writtenQuestionsId: note.id,
-          questionId: qid,
-          answer,
-        });
-        setUserAnswers((prev) => ({
-          ...prev,
-          [qid]: {
-            ...(prev[qid] || { answer: "" }),
-            answer,
-            graded: true,
-            score: res.score,
-            maxScore: res.maxScore,
-          },
-        }));
-      } catch (err) {
-        console.error("Failed to grade answer on finish:", err);
-        failed += 1;
+      const pending = selectPendingGradeIds(questions, userAnswers);
+      if (pending.length === 0) {
+        setGradingAll(GRADING_ALL_IDLE);
+        setShowResults(true);
+        return;
       }
-      setGradingAll((s) => ({ ...s, done: i + 1, failed }));
-    }
 
-    setGradingAll((s) => ({ ...s, active: false }));
-    // Parity with handleSubmitAnswer: notify the parent after batch grading.
-    if (latestNote && onNoteUpdate) onNoteUpdate(latestNote);
-    setShowResults(true);
+      setGradingAll({ active: true, done: 0, total: pending.length, failed: 0, stopping: false });
+      let failed = 0;
+      for (let i = 0; i < pending.length; i++) {
+        // "Stop grading" was pressed — bail out and show partial results. Each
+        // submitAnswerMutation call persists server-side, so a stopped or
+        // reloaded run loses no completed grading: pressing Finish again resumes
+        // the remainder because selectPendingGradeIds recomputes what is still
+        // pending.
+        if (gradingCancelledRef.current) break;
+        const qid = pending[i];
+        const answer = userAnswers[qid]?.answer ?? "";
+        try {
+          const res = await submitAnswerMutation({
+            writtenQuestionsId: note.id,
+            questionId: qid,
+            answer,
+          });
+          setUserAnswers((prev) => ({
+            ...prev,
+            [qid]: {
+              ...(prev[qid] || { answer: "" }),
+              answer,
+              graded: true,
+              score: res.score,
+              maxScore: res.maxScore,
+            },
+          }));
+        } catch (err) {
+          console.error("Failed to grade answer on finish:", err);
+          failed += 1;
+        }
+        setGradingAll((s) => ({ ...s, done: i + 1, failed }));
+      }
+
+      // No onNoteUpdate call here: the reactive useWrittenQuestionSet query
+      // already propagates the freshly-persisted grades to this view and to any
+      // parent that subscribes. Passing `latestNote` would ship a stale
+      // pre-grading snapshot captured when Finish was pressed.
+      setShowResults(true);
+    } finally {
+      // Always clear the spinner and release the run guard, even if something
+      // between iterations throws — otherwise the early-return grading screen
+      // renders forever and a further Finish stays blocked by the run ref.
+      setGradingAll((s) => ({ ...s, active: false, stopping: false }));
+      gradingRunRef.current = false;
+    }
   };
 
   const handleNext = () => {
@@ -373,10 +391,15 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             type="button"
             onClick={() => {
               gradingCancelledRef.current = true;
+              // Reflect the stop in render state right away; the loop only
+              // notices at the top of its next iteration, which can be tens of
+              // seconds out with real grading in flight.
+              setGradingAll((s) => ({ ...s, stopping: true }));
             }}
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2"
+            disabled={gradingAll.stopping}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Stop grading
+            {gradingAll.stopping ? "Stopping…" : "Stop grading"}
           </button>
         </div>
       </div>
