@@ -4,7 +4,7 @@
 
 **Goal:** Stop the Written Questions results screen from showing `0 out of N` when a user answered questions but did not press the per-question Submit button — by grading answered-but-ungraded questions on Finish, reporting graded coverage honestly, and persisting typed answers as the user navigates.
 
-**Architecture:** A new pure util (`writtenQuestionsScore.ts`) owns the score/coverage math and the "which answers still need grading" selection, unit-tested with vitest. A new Convex mutation (`saveUserAnswerDraft`) persists a single question's draft text server-side with a read-modify-write that preserves any existing grade fields, tested with convex-test. `WrittenQuestionsView.tsx` is changed in three focused passes: consume the util on the results screen, add debounced draft autosave, and run a client-side grading loop on Finish. Component behavior is covered by `@testing-library/react` tests with the `writtenQuestionsApi` hooks mocked (the repo has no Playwright setup; this matches the existing `SaveAsPromptModal.test.tsx` pattern).
+**Architecture:** A new pure util (`writtenQuestionsScore.ts`) owns the score/coverage math and the "which answers still need grading" selection, unit-tested with vitest. A new Convex mutation (`saveUserAnswerDraft`) persists a single question's draft text server-side with a read-modify-write that preserves any existing grade fields, tested with convex-test. `WrittenQuestionsView.tsx` is changed in three focused passes: consume the util on the results screen, add debounced draft autosave, and run a client-side grading loop on Finish. Component behavior is covered by `@testing-library/react` tests with the `writtenQuestionsApi` hooks mocked (matching the existing `SaveAsPromptModal.test.tsx` pattern). End-to-end coverage lives in `e2e/studio/written-questions-grading.spec.ts` — the repo DOES have Playwright (`playwright.config.ts` at root, `e2e/`, `bun run test:e2e`); the Finish→graded-score flow is `E2E_AI_ENABLED`-gated because live grading calls the AI grading service, and reload-persistence of unsubmitted answers is an always-on non-AI test.
 
 **Tech Stack:** React 19 + Vite + TypeScript (`apps/web`), Convex (`convex/`), vitest + jsdom + @testing-library/react (web), convex-test + vitest (backend), Biome (lint/format). Package manager: bun.
 
@@ -22,6 +22,9 @@
 - `apps/web/src/features/studio/utils/writtenQuestionsScore.test.ts` — vitest unit tests for the above.
 - `convex/studio/writtenQuestions/index.test.ts` — convex-test tests for `saveUserAnswerDraft`.
 - `apps/web/src/features/studio/components/views/WrittenQuestionsView.test.tsx` — component tests for results coverage, autosave, and grade-on-Finish.
+- `convex/e2e/seedWrittenQuestions.ts` — e2e seed mutation: a `completed` written-questions set with two known short questions.
+- `e2e/helpers/written-questions-seed.ts` — `seedWrittenQuestionSetForNotebook(page, title)` helper (shells out to `bunx convex run`).
+- `e2e/studio/written-questions-grading.spec.ts` — Playwright: always-on reload-persistence test + `E2E_AI_ENABLED`-gated Finish→graded-score test.
 
 **Modify:**
 
@@ -1179,13 +1182,13 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 - [ ] **Step 5: Hand off**
 
-Implementation complete. Next: `superpowers:finishing-a-development-branch` (open a PR to `main`) — CI runs Convex typecheck + web build; `test:e2e` is not configured in this repo so there is no e2e gate to run.
+Implementation complete. Next: `superpowers:finishing-a-development-branch` (open a PR to `main`) — CI runs Convex typecheck + web build. `bun run test:e2e` (Playwright) IS configured in this repo; the new `e2e/studio/written-questions-grading.spec.ts` adds an always-on reload-persistence test plus an `E2E_AI_ENABLED`-gated Finish→graded-score test (the latter is skipped unless `E2E_AI_ENABLED=1`, like the sibling studio specs).
 
 ---
 
 ## Self-Review Notes
 
-- **Spec coverage:** Goal 1 (grade on Finish) → Task 6. Goal 2 (honest coverage) → Task 4. Goal 3 (persist typed answers) → Tasks 2/3/5. Percentage `NaN` guard (spec "Contributing factors") → Task 4. Testability extraction (spec Part C) → Task 1. Testing plan (spec Testing) → Tasks 1, 2, 4, 5, 6 + Task 7; note e2e is replaced by component tests because the repo has no Playwright config — a deliberate deviation from the spec's "Playwright" wording, same coverage intent.
+- **Spec coverage:** Goal 1 (grade on Finish) → Task 6. Goal 2 (honest coverage) → Task 4. Goal 3 (persist typed answers) → Tasks 2/3/5. Percentage `NaN` guard (spec "Contributing factors") → Task 4. Testability extraction (spec Part C) → Task 1. Testing plan (spec Testing) → Tasks 1, 2, 4, 5, 6 + Task 7; e2e coverage is added in `e2e/studio/written-questions-grading.spec.ts` (the repo has Playwright): an always-on reload-persistence test and an `E2E_AI_ENABLED`-gated Finish→graded-score test, with the component tests covering the deterministic loop/UI/guard details.
 - **Non-goals honored:** no per-question Submit rework (Submit button logic untouched), no server-side batch grading (loop is client-side reusing `submitAndGrade`), no re-grading of edited graded answers (autosave and the loop both skip `graded === true`).
 - **Type consistency:** `summarizeWrittenQuestions` returns `{ score, maxScore, gradedCount, totalCount, percentage }` — consumed with those exact names in Task 4. `selectPendingGradeIds` returns `string[]` of question ids — consumed in Task 6. `submitAnswerMutation` result is used as `{ score, maxScore }` in Task 6, matching the `submitAndGrade` action's return (`{ success, score, maxScore }`). Convex mutation ref path `api.studio.writtenQuestions.index.saveUserAnswerDraft` is identical in Tasks 2 and 3.
 - **No placeholders:** every code step shows full code; every run step shows the command and expected result.

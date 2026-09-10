@@ -162,14 +162,16 @@ display that needs graded counts.
 - Does not modify other questions' answers.
 - Unauthenticated → rejects; user without notebook edit access → rejects.
 
-**E2E — Playwright (`test:e2e`)** — check for an existing written-questions spec
-under `apps/web`; add a focused one if absent:
+**E2E — Playwright (`test:e2e`)** — the repo DOES have Playwright e2e
+(`playwright.config.ts` at root, `e2e/`, `bun run test:e2e`). New spec
+`e2e/studio/written-questions-grading.spec.ts`:
 
-- Seed a set, type answers on several questions, click **Finish** without pressing
-  per-question **Submit**.
-- Assert the "Grading N of M" screen appears, then results show a **non-zero**
-  score and `Graded X of N questions`.
-- Reload mid-set and assert typed (unsubmitted) answers survive.
+- Seed a completed set, type answers on both questions, click **Finish** without
+  pressing per-question **Submit**; assert the "Grading N of M" screen appears,
+  then results show a **non-zero** score and `Graded X of N questions`. Live
+  written-answer grading calls the AI grading service, so this test is
+  `E2E_AI_ENABLED`-gated via `shouldSkipAITests()` (matching the sibling studio specs).
+- Reload mid-set and assert typed (unsubmitted) answers survive — no AI, always on.
 
 **Verification gates before PR** (CLAUDE.md): `typecheck:web` + `typecheck:convex`
 + `lint` + `test:convex` + `test:web`; `test:e2e` before merge. No RAG / studio
@@ -186,7 +188,9 @@ evals — grading prompt copy is untouched.
 | `apps/web/src/features/studio/utils/writtenQuestionsScore.ts` | new pure util (extracted) |
 | `apps/web/src/features/studio/utils/writtenQuestionsScore.test.ts` | new |
 | `convex/studio/writtenQuestions/index.test.ts` | new or extended |
-| `apps/web/` e2e spec | new or extended |
+| `convex/e2e/seedWrittenQuestions.ts` | new — completed-set seed mutation for e2e |
+| `e2e/helpers/written-questions-seed.ts` | new — `bunx convex run` seed helper |
+| `e2e/studio/written-questions-grading.spec.ts` | new — Finish→score (AI-gated) + reload-persistence (always-on) |
 
 ---
 
@@ -196,6 +200,12 @@ Implemented on branch `fix/written-questions-score-tally` (2026-09-09).
 Commits: score/coverage util + tests; `saveUserAnswerDraft` Convex mutation + convex-test;
 `useSaveWrittenAnswerDraft` hook; honest results-screen coverage + NaN guard;
 debounced lossless draft autosave; interruptible grade-on-Finish loop.
-Note: the spec named Playwright for the `WrittenQuestionsView` surface; the repo has no
-Playwright setup, so that surface is covered by `@testing-library/react` component tests
-(`WrittenQuestionsView.test.tsx`) instead — same coverage intent.
+Note: the repo DOES have Playwright e2e (`playwright.config.ts` at root, `e2e/`,
+`bun run test:e2e`). Live written-answer grading needs the AI grading service, so the
+answer→Finish→graded-score flow is covered by an `E2E_AI_ENABLED`-gated test in
+`e2e/studio/written-questions-grading.spec.ts` (matching the `shouldSkipAITests()`
+convention of the sibling studio specs). Always-on deterministic coverage of the
+grade-on-Finish loop, progress UI, failure counting, autosave debounce and the NaN
+guards lives in `WrittenQuestionsView.test.tsx` component tests. Reload-persistence of
+unsubmitted answers (spec goal 3) is covered by a non-AI e2e test in the same spec,
+plus `convex/e2e/seedWrittenQuestions.ts` + `e2e/helpers/written-questions-seed.ts`.
