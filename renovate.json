@@ -60,6 +60,20 @@
       "automerge": true
     },
     {
+      "description": "Auto-merge these leaf runtime/build deps on patch + minor — CI (typecheck + build + unit + e2e) genuinely gates them. Explicitly excludes convex, @langchain/*, langsmith, and the expo monorepo, whose runtime behavior CI does not exercise.",
+      "matchPackageNames": [
+        "vite",
+        "@tavily/core",
+        "p-limit",
+        "react-native-web",
+        "react-resizable-panels",
+        "react-virtuoso",
+        "zod-to-json-schema"
+      ],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
       "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
       "enabled": false,
       "description": "Pinned via root package.json overrides; bump manually with the app."
