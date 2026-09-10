@@ -46,8 +46,9 @@ export function useMyFeedback() {
   return useQuery(api.feedback.index.listMine, {});
 }
 
-export function useIsFeedbackAdmin(): boolean {
-  return useQuery(api.feedback.index.isAdmin, {}) ?? false;
+/** `undefined` while loading, then the boolean. */
+export function useIsFeedbackAdmin(): boolean | undefined {
+  return useQuery(api.feedback.index.isAdmin, {});
 }
 
 export function useAllFeedback(status?: string) {
