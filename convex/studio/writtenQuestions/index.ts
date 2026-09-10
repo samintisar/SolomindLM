@@ -5,6 +5,8 @@ import { assertCanEditNotebook, assertCanReadNotebook } from "../../_lib/noteboo
 import * as WrittenQuestions from "../../_model/writtenQuestions";
 import { getAuthUserId } from "../../auth";
 
+const MAX_DRAFT_ANSWER_LENGTH = 50_000;
+
 export const list = query({
   args: { notebookId: v.id("notebooks") },
   handler: async (ctx, args) => {
@@ -153,6 +155,38 @@ export const update = mutation({
       await WrittenQuestions.patchWrittenQuestion(ctx, id, { metadata });
     }
     return await WrittenQuestions.getWrittenQuestion(ctx, id);
+  },
+});
+
+/**
+ * Persist a single question's draft answer text (no grading). Used by the
+ * client's debounced autosave so typed-but-unsubmitted answers survive reload.
+ */
+export const saveUserAnswerDraft = mutation({
+  args: {
+    id: v.id("writtenQuestions"),
+    questionId: v.string(),
+    answer: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Unauthenticated");
+    const existing = await WrittenQuestions.getWrittenQuestion(ctx, args.id);
+    if (!existing) throw new Error("Written question set not found or access denied");
+    await assertCanEditNotebook(ctx, existing.notebookId, userId);
+    const known = (existing.questionsData ?? []).some(
+      (q: { id?: string }) => q?.id === args.questionId
+    );
+    if (!known) throw new Error("Question not found");
+    if (args.answer.length > MAX_DRAFT_ANSWER_LENGTH) {
+      throw new Error("Answer is too long to save");
+    }
+    await WrittenQuestions.saveWrittenQuestionUserAnswerDraft(
+      ctx,
+      existing,
+      args.questionId,
+      args.answer
+    );
   },
 });
 

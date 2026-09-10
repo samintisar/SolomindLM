@@ -1,11 +1,16 @@
 import { AlertCircle, ArrowLeft, Award, CheckCircle2, Eye, MessageSquareText } from "lucide-react";
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useResetWrittenAnswers,
+  useSaveWrittenAnswerDraft,
   useSubmitWrittenAnswer,
   useUpdateWrittenQuestionsProgress,
   useWrittenQuestionSet,
 } from "@/features/studio/services/writtenQuestionsApi";
+import {
+  selectPendingGradeIds,
+  summarizeWrittenQuestions,
+} from "@/features/studio/utils/writtenQuestionsScore";
 import { WrittenQuestionAnswer, WrittenQuestionsNote } from "@/shared/types/index";
 import { sanitizeMarkdown } from "@/shared/utils";
 
@@ -18,6 +23,10 @@ export interface WrittenQuestionsViewProps {
   onNoteUpdate?: (note: WrittenQuestionsNote) => void;
   onBack?: () => void;
 }
+
+// Idle value for the grade-on-Finish progress state. Must be reset between runs
+// so a stale `failed` count can't leak the failure banner onto a later clean finish.
+const GRADING_ALL_IDLE = { active: false, done: 0, total: 0, failed: 0, stopping: false };
 
 export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   note,
@@ -37,14 +46,42 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [gradingAll, setGradingAll] = useState<{
+    active: boolean;
+    done: number;
+    total: number;
+    failed: number;
+    stopping: boolean;
+  }>(GRADING_ALL_IDLE);
 
   // Hooks for mutations
   const submitAnswerMutation = useSubmitWrittenAnswer();
   const resetAnswersMutation = useResetWrittenAnswers();
+  const saveDraftMutation = useSaveWrittenAnswerDraft();
   const latestNote = useWrittenQuestionSet(note.id);
 
   // Track if we've initialized the index from saved progress
   const hasInitializedIndex = useRef(false);
+  // Set by the "Stop grading" button to end the grade-on-Finish loop early.
+  const gradingCancelledRef = useRef(false);
+  // Real re-entrancy guard for runGradeAllThenShowResults. A ref (not the
+  // `gradingAll` state read from a stale render closure) so a double Finish
+  // click fired before React re-renders can't launch two overlapping loops.
+  const gradingRunRef = useRef(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastSavedDraftRef = useRef<Record<string, string>>({});
+  // Latest draft that has been scheduled but not yet persisted, so it can be
+  // flushed (not just cancelled) on question change / unmount.
+  const pendingDraftRef = useRef<{ questionId: string; answer: string } | null>(null);
+  // Latest resolved question id, readable from effects without adding `questions`
+  // / `currentIndex` to their dependency arrays.
+  const currentQuestionIdRef = useRef<string | undefined>(questions[currentIndex]?.id);
+  currentQuestionIdRef.current = questions[currentIndex]?.id;
+  // Latest server note, readable from the async grade-on-Finish loop (whose
+  // closure captured a pre-grading `latestNote`) so freshly-graded feedback can
+  // be merged instead of leaving empty feedback panels until the reactive echo.
+  const latestNoteRef = useRef(latestNote);
+  latestNoteRef.current = latestNote;
 
   // Restore saved index on mount (from latestNote which has the latest data from server)
   useEffect(() => {
@@ -69,9 +106,104 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   const serverUserAnswersKey = JSON.stringify(latestNote?.userAnswers ?? {});
   useEffect(() => {
     if (latestNote?.userAnswers) {
-      setUserAnswers(latestNote.userAnswers);
+      const serverAnswers = latestNote.userAnswers;
+      // Apply server state, but keep the local answer text for the question the
+      // user is currently on, so the autosave's own server echo can't revert the
+      // textarea / jump the cursor mid-typing. Grade fields still come from the
+      // server for every question, including the current one.
+      setUserAnswers((prev) => {
+        const merged: Record<string, WrittenQuestionAnswer> = { ...serverAnswers };
+        const curId = currentQuestionIdRef.current;
+        if (curId && prev[curId] && merged[curId]) {
+          merged[curId] = { ...merged[curId], answer: prev[curId].answer };
+        }
+        return merged;
+      });
+      // Seed the "already persisted" map so the autosave effect below does not
+      // re-save answers that the server already has on the first render.
+      const saved: Record<string, string> = {};
+      for (const [qid, entry] of Object.entries(serverAnswers)) {
+        saved[qid] = entry?.answer ?? "";
+      }
+      lastSavedDraftRef.current = saved;
     }
   }, [serverUserAnswersKey]);
+
+  // Debounced autosave of the current question's typed answer (ungraded only),
+  // so unsubmitted answers survive a reload. Mirrors useUpdateWrittenQuestionsProgress.
+  const currentQuestionId = questions[currentIndex]?.id;
+  const currentDraft = currentQuestionId ? (userAnswers[currentQuestionId]?.answer ?? "") : "";
+  const currentDraftGraded = currentQuestionId
+    ? userAnswers[currentQuestionId]?.graded === true
+    : false;
+  // Persist whatever draft is currently pending immediately. Used on question
+  // change and unmount instead of only cancelling the debounce timer.
+  const flushDraft = useCallback(() => {
+    const pending = pendingDraftRef.current;
+    if (!pending) return;
+    if (lastSavedDraftRef.current[pending.questionId] === pending.answer) {
+      pendingDraftRef.current = null;
+      return;
+    }
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    lastSavedDraftRef.current[pending.questionId] = pending.answer;
+    pendingDraftRef.current = null;
+    void saveDraftMutation({
+      writtenQuestionsId: note.id,
+      questionId: pending.questionId,
+      answer: pending.answer,
+    }).catch((err) => console.error("Failed to flush answer draft:", err));
+  }, [saveDraftMutation, note.id]);
+
+  useEffect(() => {
+    // Keep the pending-flush snapshot in sync with the latest state so a flush
+    // (on nav / unmount) can never persist text the user has since retracted or
+    // a question that has since been graded. A question with no saved draft and
+    // an empty textarea has nothing worth persisting, so a missing entry is
+    // treated as an empty string here and in the early-return guard below.
+    if (currentQuestionId) {
+      const alreadySaved = (lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft;
+      if (currentDraftGraded || alreadySaved) {
+        if (pendingDraftRef.current?.questionId === currentQuestionId) {
+          pendingDraftRef.current = null;
+        }
+      } else {
+        pendingDraftRef.current = { questionId: currentQuestionId, answer: currentDraft };
+      }
+    }
+
+    if (!currentQuestionId || currentDraftGraded) return;
+    if ((lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft) return;
+
+    draftTimerRef.current = setTimeout(() => {
+      // Re-check against the persisted map: the server-sync effect can seed
+      // lastSavedDraftRef after this timer was scheduled (deps unchanged, so the
+      // effect never re-runs to clear it), and we must not re-save identical text.
+      if ((lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft) return;
+      lastSavedDraftRef.current[currentQuestionId] = currentDraft;
+      pendingDraftRef.current = null;
+      void saveDraftMutation({
+        writtenQuestionsId: note.id,
+        questionId: currentQuestionId,
+        answer: currentDraft,
+      }).catch((err) => console.error("Failed to autosave answer draft:", err));
+    }, 800);
+
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [currentQuestionId, currentDraft, currentDraftGraded, note.id, saveDraftMutation]);
+
+  // Flush (not just cancel) the pending draft when the user navigates to another
+  // question or the view unmounts within the debounce window. The cleanup fires
+  // whenever currentQuestionId changes, i.e. right before the new question is
+  // handled, or on unmount.
+  useEffect(() => {
+    const leavingQuestionId = currentQuestionId;
+    return () => {
+      if (leavingQuestionId) flushDraft();
+    };
+  }, [currentQuestionId, flushDraft]);
 
   const currentQuestion = questions[currentIndex];
 
@@ -135,11 +267,84 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     }
   };
 
+  const runGradeAllThenShowResults = async () => {
+    // Re-entrancy guard: a fast double Finish (double-click / double-tap /
+    // Enter+click) must not launch two overlapping grade loops. The ref is
+    // authoritative because it updates synchronously, unlike `gradingAll` read
+    // from this render's closure.
+    if (gradingRunRef.current) return;
+    gradingRunRef.current = true;
+    try {
+      gradingCancelledRef.current = false;
+
+      const pending = selectPendingGradeIds(questions, userAnswers);
+      if (pending.length === 0) {
+        setGradingAll(GRADING_ALL_IDLE);
+        setShowResults(true);
+        return;
+      }
+
+      setGradingAll({ active: true, done: 0, total: pending.length, failed: 0, stopping: false });
+      let failed = 0;
+      for (let i = 0; i < pending.length; i++) {
+        // "Stop grading" was pressed — bail out and show partial results. Each
+        // submitAnswerMutation call persists server-side, so a stopped or
+        // reloaded run loses no completed grading: pressing Finish again resumes
+        // the remainder because selectPendingGradeIds recomputes what is still
+        // pending.
+        if (gradingCancelledRef.current) break;
+        const qid = pending[i];
+        const answer = userAnswers[qid]?.answer ?? "";
+        try {
+          const res = await submitAnswerMutation({
+            writtenQuestionsId: note.id,
+            questionId: qid,
+            answer,
+          });
+          setUserAnswers((prev) => {
+            // submitAndGrade persists the full graded result (feedback, strengths,
+            // improvements) server-side before returning, so prefer the server
+            // echo for this question when it has already landed; fall back to any
+            // prior grade fields, then apply the fresh score.
+            const serverEntry = latestNoteRef.current?.userAnswers?.[qid];
+            return {
+              ...prev,
+              [qid]: {
+                ...(prev[qid] || { answer: "" }),
+                ...(serverEntry ?? {}),
+                answer,
+                graded: true,
+                score: res.score,
+                maxScore: res.maxScore,
+              },
+            };
+          });
+        } catch (err) {
+          console.error("Failed to grade answer on finish:", err);
+          failed += 1;
+        }
+        setGradingAll((s) => ({ ...s, done: i + 1, failed }));
+      }
+
+      // No onNoteUpdate call here: the reactive useWrittenQuestionSet query
+      // already propagates the freshly-persisted grades to this view and to any
+      // parent that subscribes. Passing `latestNote` would ship a stale
+      // pre-grading snapshot captured when Finish was pressed.
+      setShowResults(true);
+    } finally {
+      // Always clear the spinner and release the run guard, even if something
+      // between iterations throws — otherwise the early-return grading screen
+      // renders forever and a further Finish stays blocked by the run ref.
+      setGradingAll((s) => ({ ...s, active: false, stopping: false }));
+      gradingRunRef.current = false;
+    }
+  };
+
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
-      setShowResults(true);
+      void runGradeAllThenShowResults();
     }
   };
 
@@ -169,6 +374,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
       setShowResults(false);
       setReviewMode(false);
       setUserAnswers({});
+      setGradingAll(GRADING_ALL_IDLE);
       // Notify parent to refresh note
       if (latestNote && onNoteUpdate) {
         onNoteUpdate(latestNote);
@@ -187,26 +393,42 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     setReviewMode(true);
   };
 
-  // Calculate final score
-  const calculateTotalScore = () => {
-    let totalScore = 0;
-
-    // Sum up scores from graded answers only
-    Object.values(userAnswers).forEach((answerObj) => {
-      if (answerObj?.graded) {
-        totalScore += answerObj.score || 0;
-      }
-    });
-
-    // Calculate total possible points from ALL questions, not just answered ones
-    const maxTotalScore = questions.reduce((sum, q) => sum + (q.rubric?.maxPoints || 0), 0);
-
-    return { score: totalScore, maxScore: maxTotalScore };
-  };
+  if (gradingAll.active) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-8">
+        <div className="text-center space-y-4" role="status" aria-live="polite">
+          <div
+            className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto"
+            aria-hidden="true"
+          />
+          <p className="text-muted-foreground">
+            Grading your answers… {gradingAll.done} of {gradingAll.total}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              gradingCancelledRef.current = true;
+              // Reflect the stop in render state right away; the loop only
+              // notices at the top of its next iteration, which can be tens of
+              // seconds out with real grading in flight.
+              setGradingAll((s) => ({ ...s, stopping: true }));
+            }}
+            disabled={gradingAll.stopping}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {gradingAll.stopping ? "Stopping…" : "Stop grading"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (showResults) {
-    const { score, maxScore } = calculateTotalScore();
-    const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    // `totalCount` is the outer `questions.length` — same value the summary reports.
+    const { score, maxScore, gradedCount, percentage } = summarizeWrittenQuestions(
+      questions,
+      userAnswers
+    );
 
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-300">
@@ -219,6 +441,19 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             <p className="text-muted-foreground">
               You scored {score} out of {maxScore} points
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Graded {gradedCount} of {totalCount} questions
+            </p>
+            {gradedCount < totalCount && (
+              <p className="text-xs text-muted-foreground/80 mt-0.5">
+                Ungraded questions count as 0.
+              </p>
+            )}
+            {gradingAll.failed > 0 && (
+              <p className="text-xs text-vintage-orange-700 dark:text-vintage-orange-300 mt-0.5">
+                {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
+              </p>
+            )}
           </div>
           <div className="w-full bg-secondary rounded-xl h-3 overflow-hidden">
             <div
@@ -397,7 +632,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
                   <div className="text-right">
                     <div className="text-sm text-muted-foreground">Score</div>
                     <div className="text-lg font-bold text-foreground">
-                      {Math.round((currentGradedResult.score / currentGradedResult.maxScore) * 100)}
+                      {currentGradedResult.maxScore > 0
+                        ? Math.round(
+                            (currentGradedResult.score / currentGradedResult.maxScore) * 100
+                          )
+                        : 0}
                       %
                     </div>
                   </div>
@@ -481,7 +720,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             </button>
             <button
               onClick={handleNext}
-              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px]"
+              className="px-6 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-xl hover:bg-primary/90 transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {currentIndex === questions.length - 1 ? "Finish" : "Next"}
             </button>
