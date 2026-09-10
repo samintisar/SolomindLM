@@ -84,7 +84,7 @@
       },
       "devDependencies": {
         "@types/react": "~19.2.10",
-        "metro-resolver": "0.83.6",
+        "metro-resolver": "0.87.0",
         "react-test-renderer": "19.2.8",
         "typescript": "~5.9.2",
       },
@@ -1918,7 +1918,7 @@
 
     "metro-minify-terser": ["metro-minify-terser@0.83.7", "", { "dependencies": { "flow-enums-runtime": "^0.0.6", "terser": "^5.15.0" } }, "sha512-MfJar2IS4tBRuLb9svwb0Gu5l9BsH+pcRm8eGcEi/wy8MzZinfinh5dFLt2nWkocnulIgtGB5NkFDdbXqMXKhQ=="],
 
-    "metro-resolver": ["metro-resolver@0.83.6", "", { "dependencies": { "flow-enums-runtime": "^0.0.6" } }, "sha512-lAwR/FsT1uJ5iCt4AIsN3boKfJ88aN8bjvDT5FwBS0tKeKw4/sbdSTWlFxc7W/MUTN5RekJ3nQkJRIWsvs28tA=="],
+    "metro-resolver": ["metro-resolver@0.87.0", "", { "dependencies": { "flow-enums-runtime": "^0.0.6" } }, "sha512-Xl3M9R3KToaHJvXlI2lSOxtYHitzxite+195DSi00HL9PcS7Xik5+3xlRjfkKb3FA86SZxYPj+WJwlcfgaZoxg=="],
 
     "metro-runtime": ["metro-runtime@0.83.7", "", { "dependencies": { "@babel/runtime": "^7.25.0", "flow-enums-runtime": "^0.0.6" } }, "sha512-9GKkJURaB2iyYoEExKnedzAHzxmKtSi+k0tsZUvMoU27tBZJElchYt7JH/Ai/XzYAI9lCAaV7u5HZSI8J5Z+wQ=="],
 
