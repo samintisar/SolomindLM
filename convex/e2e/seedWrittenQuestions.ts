@@ -1,11 +1,11 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 
 /**
  * Create a completed written-questions set with known short questions for E2E.
  * No linked documents — grading (when exercised) runs answer-vs-rubric only.
  */
-export const createWrittenQuestionSet = mutation({
+export const createWrittenQuestionSet = internalMutation({
   args: {
     email: v.string(),
     notebookId: v.string(),
