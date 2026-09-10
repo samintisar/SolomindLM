@@ -1,0 +1,54 @@
+name: Feature / enhancement
+description: A new capability or a change to existing behavior
+labels: ["type:feature", "status:triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What can't the user do today? Who is asking and why?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkbox list of what "done" means — the PR is reviewed against this.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - mobile
+        - convex
+        - agents
+        - rag
+        - studio
+        - billing
+        - auth
+        - sources
+        - chat
+        - ci / infra
+        - unsure
+    validations:
+      required: true

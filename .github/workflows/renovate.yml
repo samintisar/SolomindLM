@@ -1,0 +1,56 @@
+# Self-hosted Renovate — runs Renovate on GitHub Actions (no Mend-hosted app installed).
+#
+# Auth: a dedicated GitHub App. Each run mints a short-lived (~1h) installation token
+# via actions/create-github-app-token and passes it to Renovate. No long-lived PAT,
+# no annual rotation, PRs authored by the App's bot identity, dedicated rate limit.
+#
+# One-time operator setup:
+#   1. Create a GitHub App (Settings > Developer settings > GitHub Apps > New),
+#      owned by your account. Uncheck "Webhook". Repository permissions:
+#        - Contents: Read and write        (branches / lockfile updates)
+#        - Pull requests: Read and write   (open & update PRs)
+#        - Workflows: Read and write       (helpers:pinGitHubActionDigests edits workflow files)
+#        - Issues: Read and write          (Dependency Dashboard issue + dependencies/security labels)
+#        - Dependabot alerts: Read-only    (vulnerabilityAlerts; repo must have Dependabot alerts on)
+#        - Metadata: Read-only             (auto-selected)
+#   2. Generate a private key (.pem). Install the App on this repo only.
+#   3. Repo config:
+#        - Actions variable  RENOVATE_APP_CLIENT_ID     = the App's Client ID (App settings page)
+#        - Actions secret    RENOVATE_APP_PRIVATE_KEY   = the full .pem contents
+#
+# Runs Monday 13:00 UTC (fixed; does not track DST); trigger manually via workflow_dispatch.
+
+name: Renovate
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Mint a GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.RENOVATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+          # Defaults to this repo's installation — matches RENOVATE_REPOSITORIES below.
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@37beffda261423addd537c33f2d126df7f6ffbab # v46.2.6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}

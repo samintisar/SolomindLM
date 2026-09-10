@@ -1,60 +1,45 @@
-## Description
+<!--
+Title = the squash-merge commit. Use conventional-commit form:
+  feat(chat): stream tool-call results incrementally
+  fix(studio): clear grading banner on retry
+The "Lint (PR title)" check enforces this.
+-->
 
-<!-- Briefly describe the changes in this PR -->
+## What
 
-## Type of Change
+<!-- One paragraph: what this PR changes. -->
 
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Refactoring
-- [ ] Documentation
-- [ ] Performance improvement
+## Why
 
-## Changes Made
+Closes #<!-- issue -->
 
-<!-- List the main changes -->
+<!-- The approach, and any alternative you rejected and why. -->
 
-## Affected Areas
+## How to test
 
-- [ ] `apps/web` (Frontend)
-- [ ] `convex/` (Backend)
-- [ ] `apps/mobile` (Mobile)
-- [ ] `e2e/` (Tests)
-- [ ] Documentation
+<!-- Exact steps or commands a reviewer runs to see it work.
+     e.g. `bun run test:convex -- writtenQuestions`
+     or "Open a notebook → generate written questions → submit blank → Finish" -->
 
-## Testing
+## Risk / rollout
 
-<!-- Describe how you tested these changes -->
+<!-- What could break. Delete the lines that don't apply. -->
 
-- [ ] Unit tests pass (`bun run test:convex`)
-- [ ] Web tests pass (`bun run test:web`)
-- [ ] Type checking passes (`bun run typecheck:web` and `bun run typecheck:convex`)
-- [ ] Linting passes (`bun run lint`)
-- [ ] Tested manually in browser
+- Schema/table change → migration: <!-- link the plan, or "n/a" -->
+- Prompt/agent change → `cacheVersions` bumped: <!-- yes / n/a -->
+- Eval impact → ran `eval:rag` / `eval:studio`: <!-- result, or "n/a" -->
+- New env var / secret: <!-- name, or "n/a" -->
 
-## Screenshots (if applicable)
+## Screenshots
 
-<!-- Add screenshots or GIFs for UI changes -->
+<!-- Before/after for any UI change. Delete if n/a. -->
 
-## Related Issues
+---
 
-<!-- Link to related issues: Fixes #123, Closes #456 -->
-
-## Checklist
-
-- [ ] My code follows the project's style guidelines
-- [ ] I have performed a self-review of my code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] All CI checks are passing
-- [ ] Commit messages follow conventional commits format
-
-## Deployment Notes
-
-<!-- Any special deployment considerations? -->
-
-## Additional Notes
-
-<!-- Any additional information for reviewers -->
+- [ ] Self-reviewed the diff line by line
+- [ ] `typecheck:web` + `typecheck:convex` + `lint` pass locally
+- [ ] `test:convex` / `test:web` pass (or explain why not applicable)
+- [ ] Tests added/updated for the change (regression test for a bugfix; `*.test.ts` for new queries/mutations)
+- [ ] Errors surface to the user — no silent catches or fallbacks
+- [ ] Convex functions validate all args and have indexes for new query patterns
+- [ ] No prompt text tuned to eval fixtures (see CLAUDE.md → Prompt authoring)

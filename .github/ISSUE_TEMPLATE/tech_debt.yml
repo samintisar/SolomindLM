@@ -1,0 +1,39 @@
+name: Tech debt / refactor
+description: Cleanup, refactor, deprecation, or risk that isn't user-facing
+labels: ["type:refactor", "status:triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What's the debt
+      description: What's wrong, where (paths), and how it slows work or creates risk.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk / cost if we don't do it
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - mobile
+        - convex
+        - agents
+        - rag
+        - studio
+        - billing
+        - auth
+        - sources
+        - chat
+        - ci / infra
+    validations:
+      required: true

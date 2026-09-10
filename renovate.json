@@ -1,0 +1,86 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "America/Toronto",
+  "prHourlyLimit": 0,
+  "platformAutomerge": false,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* * * * 1"],
+    "automerge": true
+  },
+  "rangeStrategy": "bump",
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "groupName": "Convex",
+      "matchPackageNames": ["convex", "convex-helpers", "convex-test", "@convex-dev/**"]
+    },
+    {
+      "groupName": "LangChain",
+      "matchPackageNames": ["@langchain/**", "langsmith"]
+    },
+    {
+      "groupName": "dev tooling",
+      "matchPackageNames": [
+        "typescript",
+        "vitest",
+        "@playwright/test",
+        "@biomejs/**",
+        "@types/**",
+        "@vitest/**"
+      ]
+    },
+    {
+      "description": "Auto-merge low-risk dev/build/test tooling on patch + minor (Renovate merges once CI is green; repo auto-merge is off, so platformAutomerge is disabled globally).",
+      "matchPackageNames": [
+        "typescript",
+        "vitest",
+        "@playwright/test",
+        "@biomejs/**",
+        "@types/**",
+        "@vitest/**",
+        "@testing-library/**",
+        "react-test-renderer",
+        "postcss",
+        "autoprefixer"
+      ],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge GitHub Actions digest re-pins and patch bumps (helpers:pinGitHubActionDigests keeps SHAs current — these PRs are noise).",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pin", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge these leaf runtime/build deps on patch + minor — CI (typecheck + build + unit + e2e) genuinely gates them. Explicitly excludes convex, @langchain/*, langsmith, and the expo monorepo, whose runtime behavior CI does not exercise.",
+      "matchPackageNames": [
+        "vite",
+        "@tavily/core",
+        "p-limit",
+        "react-native-web",
+        "react-resizable-panels",
+        "react-virtuoso",
+        "zod-to-json-schema"
+      ],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "enabled": false,
+      "description": "Pinned via root package.json overrides; bump manually with the app."
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  }
+}
