@@ -152,6 +152,40 @@ describe("WrittenQuestionsView draft autosave", () => {
     }
   });
 
+  it("does not flush a retracted edit", () => {
+    vi.useFakeTimers();
+    try {
+      const note = makeNote({
+        userAnswers: { q1: { answer: "cats", graded: false } },
+      });
+      latestNote = note;
+      render(<WrittenQuestionsView note={note} />);
+
+      const textarea = screen.getByPlaceholderText(/Type your short answer/i);
+      // Type an addition, then delete it back to exactly the saved server value,
+      // all inside the debounce window.
+      fireEvent.change(textarea, { target: { value: "cats and dogs" } });
+      vi.advanceTimersByTime(100);
+      fireEvent.change(textarea, { target: { value: "cats" } });
+      vi.advanceTimersByTime(100);
+
+      // Navigate away before the debounce timer could fire.
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+      // The reconcile step cleared the stale pending snapshot, so the flush on
+      // navigation has nothing to persist: the only edit was retracted.
+      expect(saveDraft).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(900);
+      expect(saveDraft).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Verifies debounce coalescing only. The mock keeps `saveDraft` identity
+  // stable across renders, so this is not a regression guard for the
+  // hook-identity fix — that fix is verified separately.
   it("coalesces rapid successive edits into exactly one save carrying the final text", () => {
     vi.useFakeTimers();
     try {

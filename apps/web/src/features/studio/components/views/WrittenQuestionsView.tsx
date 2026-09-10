@@ -131,10 +131,25 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   }, [saveDraftMutation, note.id]);
 
   useEffect(() => {
-    if (!currentQuestionId || currentDraftGraded) return;
-    if (lastSavedDraftRef.current[currentQuestionId] === currentDraft) return;
+    // Keep the pending-flush snapshot in sync with the latest state so a flush
+    // (on nav / unmount) can never persist text the user has since retracted or
+    // a question that has since been graded. A question with no saved draft and
+    // an empty textarea has nothing worth persisting, so a missing entry is
+    // treated as an empty string here and in the early-return guard below.
+    if (currentQuestionId) {
+      const alreadySaved = (lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft;
+      if (currentDraftGraded || alreadySaved) {
+        if (pendingDraftRef.current?.questionId === currentQuestionId) {
+          pendingDraftRef.current = null;
+        }
+      } else {
+        pendingDraftRef.current = { questionId: currentQuestionId, answer: currentDraft };
+      }
+    }
 
-    pendingDraftRef.current = { questionId: currentQuestionId, answer: currentDraft };
+    if (!currentQuestionId || currentDraftGraded) return;
+    if ((lastSavedDraftRef.current[currentQuestionId] ?? "") === currentDraft) return;
+
     draftTimerRef.current = setTimeout(() => {
       lastSavedDraftRef.current[currentQuestionId] = currentDraft;
       pendingDraftRef.current = null;
