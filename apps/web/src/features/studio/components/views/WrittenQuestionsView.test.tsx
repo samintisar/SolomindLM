@@ -310,4 +310,38 @@ describe("WrittenQuestionsView grade-on-Finish", () => {
     expect(submitAnswer).not.toHaveBeenCalled();
     expect(screen.getByText("You scored 5 out of 10 points")).toBeInTheDocument();
   });
+
+  it("shows progress and disables navigation while grading", async () => {
+    let resolveFirst: (v: { success: boolean; score: number; maxScore: number }) => void;
+    const firstCall = new Promise<{ success: boolean; score: number; maxScore: number }>((r) => {
+      resolveFirst = r;
+    });
+    // Set up inside the test (not a shared mockImplementationOnce) so leftover
+    // implementations from earlier tests in this block can't reach q2. The q1
+    // call parks on the deferred promise so the in-progress screen is observable.
+    submitAnswer.mockImplementation(async ({ questionId }: { questionId: string }) =>
+      questionId === "q1" ? firstCall : { success: true, score: 3, maxScore: 5 }
+    );
+    const note = makeNote({
+      userAnswers: {
+        q1: { answer: "answer one", graded: false },
+        q2: { answer: "answer two", graded: false },
+      },
+    });
+    latestNote = note;
+    const user = userEvent.setup();
+    render(<WrittenQuestionsView note={note} />);
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Finish" }));
+
+    // Progress screen is up, loop parked on the first (unresolved) grade call
+    expect(await screen.findByText(/Grading your answers/)).toBeInTheDocument();
+    expect(screen.getByText(/0 of 2/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finish" })).not.toBeInTheDocument();
+
+    // Let the loop finish
+    resolveFirst!({ success: true, score: 4, maxScore: 5 });
+    expect(await screen.findByText("You scored 7 out of 10 points")).toBeInTheDocument();
+  });
 });

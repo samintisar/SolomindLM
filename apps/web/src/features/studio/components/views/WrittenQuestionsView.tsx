@@ -57,6 +57,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
 
   // Track if we've initialized the index from saved progress
   const hasInitializedIndex = useRef(false);
+  // Set by the "Stop grading" button to end the grade-on-Finish loop early.
+  const gradingCancelledRef = useRef(false);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastSavedDraftRef = useRef<Record<string, string>>({});
   // Latest draft that has been scheduled but not yet persisted, so it can be
@@ -248,6 +250,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   };
 
   const runGradeAllThenShowResults = async () => {
+    // Re-entrancy guard: a fast double-click on Finish must not launch two
+    // overlapping grade loops.
+    if (gradingAll.active) return;
+    gradingCancelledRef.current = false;
+
     const pending = selectPendingGradeIds(questions, userAnswers);
     if (pending.length === 0) {
       setShowResults(true);
@@ -257,6 +264,11 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     setGradingAll({ active: true, done: 0, total: pending.length, failed: 0 });
     let failed = 0;
     for (let i = 0; i < pending.length; i++) {
+      // "Stop grading" was pressed — bail out and show partial results. Each
+      // submitAnswerMutation call persists server-side, so a stopped or reloaded
+      // run loses no completed grading: pressing Finish again resumes the
+      // remainder because selectPendingGradeIds recomputes what is still pending.
+      if (gradingCancelledRef.current) break;
       const qid = pending[i];
       const answer = userAnswers[qid]?.answer ?? "";
       try {
@@ -283,6 +295,8 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
     }
 
     setGradingAll((s) => ({ ...s, active: false }));
+    // Parity with handleSubmitAnswer: notify the parent after batch grading.
+    if (latestNote && onNoteUpdate) onNoteUpdate(latestNote);
     setShowResults(true);
   };
 
@@ -341,11 +355,23 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
   if (gradingAll.active) {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8">
-        <div className="text-center space-y-4">
-          <div className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+        <div className="text-center space-y-4" role="status" aria-live="polite">
+          <div
+            className="w-10 h-10 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto"
+            aria-hidden="true"
+          />
           <p className="text-muted-foreground">
             Grading your answers… {gradingAll.done} of {gradingAll.total}
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              gradingCancelledRef.current = true;
+            }}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground underline underline-offset-2"
+          >
+            Stop grading
+          </button>
         </div>
       </div>
     );
@@ -379,7 +405,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             )}
             {gradingAll.failed > 0 && (
               <p className="text-xs text-vintage-orange-700 dark:text-vintage-orange-300 mt-0.5">
-                {gradingAll.failed} answer(s) couldn't be graded — use Review to resubmit.
+                {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
               </p>
             )}
           </div>
