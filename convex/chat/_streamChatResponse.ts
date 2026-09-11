@@ -8,7 +8,7 @@ import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
 import { createServiceLogger } from "../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../_lib/resolveSmartModel";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 import {
   createChatVectorSearchRunner,
   createHybridSearch,
@@ -122,7 +122,7 @@ export async function streamChatResponse(
   const notebookGrounding = notebookDoc?.chatGroundingMode as "async" | "sync" | "off" | undefined;
 
   // Initialize HybridSearchHandler with both vector and keyword search
-  const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY || "");
+  const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
   const vectorSearchRunner = createChatVectorSearchRunner(ctx, notebookIdTyped, chatStreamLog);
   const keywordSearchRunner = createKeywordSearchRunner(

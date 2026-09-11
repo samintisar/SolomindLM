@@ -8,7 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService.js";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 import {
   createHybridSearch,
   createKeywordSearchRunner,
@@ -37,7 +37,7 @@ export async function buildResearchAgentDeps(
   const { apiKey, smartModel, ctx, researchId, notebookId, userId, sourcePolicy, onProgress, log } =
     config;
 
-  const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY ?? "");
+  const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY ?? "");
   const keywordSearchRunner = createKeywordSearchRunner(
     ctx ?? ({} as ActionCtx),
     notebookId,
