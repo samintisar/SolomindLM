@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
-      "associatedDomains": ["applinks:REPLACE_WITH_YOUR_DOMAIN"]
+      "associatedDomains": ["applinks:www.solomindlm.com"]
     },
     "android": {
       "adaptiveIcon": {
@@ -31,7 +31,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "REPLACE_WITH_YOUR_DOMAIN",
+              "host": "www.solomindlm.com",
               "pathPrefix": "/notebook"
             }
           ],
