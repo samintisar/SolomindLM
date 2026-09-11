@@ -975,4 +975,42 @@ export default defineSchema({
   semanticScholarThrottle: defineTable({
     lastRequestAt: v.number(),
   }),
+
+  // In-app user feedback (bug reports + feature requests). Source of truth;
+  // optionally mirrored to GitHub Issues by staff from /admin/feedback.
+  feedback: defineTable({
+    userId: v.id("users"),
+    type: v.union(v.literal("bug"), v.literal("feature")),
+    /** Primary free-text: "what happened" (bug) or "what do you want" (feature). */
+    body: v.string(),
+    /** Optional secondary free-text: "steps to reproduce" (bug) or "why" (feature). */
+    detail: v.optional(v.string()),
+    /** Auto-captured client context. */
+    route: v.string(),
+    surface: v.union(v.literal("web"), v.literal("mobile")),
+    appVersion: v.string(),
+    lastRequestId: v.optional(v.string()),
+    /** Server-derived at submit time from the active Stripe subscription. */
+    planTier: v.union(v.literal("free"), v.literal("pro")),
+    status: v.union(
+      v.literal("received"),
+      v.literal("planned"),
+      v.literal("shipped"),
+      v.literal("closed")
+    ),
+    githubIssueNumber: v.optional(v.number()),
+    githubIssueUrl: v.optional(v.string()),
+    /**
+     * Set when a staff-triggered GitHub sync starts, cleared once the issue is
+     * recorded. Acts as a short-lived idempotency lock so concurrent syncs
+     * can't both file an issue for the same row.
+     */
+    githubSyncStartedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    // No by_user index: the user-facing "My feedback" list was cut from
+    // scope (see docs/engineering/in-app-feedback.md) and nothing else reads
+    // this table by userId — add one back if/when that query returns.
+    .index("by_status", ["status"]),
 });
