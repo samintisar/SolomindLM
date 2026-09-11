@@ -612,7 +612,7 @@ bun run typecheck:mobile
 bun run lint
 ```
 
-Expected: PASS — 2 suites, 20 tests. Typecheck and lint clean. (`bun run typecheck:mobile` must confirm `__DEV__` typechecks without a `declare` — it's already used elsewhere in `apps/mobile`, e.g. via Expo's ambient RN types.)
+Expected: PASS — 1 suite (Jest counts test *files*, not `describe` blocks — this is still the only test file in the app), 18 tests (16 + 2 across the two `describe` blocks). Typecheck and lint clean. (`bun run typecheck:mobile` must confirm `__DEV__` typechecks without a `declare` — it's already used elsewhere in `apps/mobile`, e.g. via Expo's ambient RN types.)
 
 - [ ] **Step 4: Commit**
 
@@ -688,7 +688,7 @@ describe("parseMobileDeepLink", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 2 suites, 16 tests total.
+Expected: PASS — 2 suites, 25 tests total. (Updated from the original plan's "16" — `webViewUrlPolicy.test.ts` grew from 9 to 18 tests across Tasks 2.5/2.6's security fixes, a net +9 carried through every count below.)
 
 - [ ] **Step 3: Commit**
 
@@ -780,7 +780,7 @@ describe("buildWebViewAuthPostMessageScript", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 3 suites, 22 tests total.
+Expected: PASS — 3 suites, 31 tests total. (Updated from the original "22" — see the note in Task 3.)
 
 - [ ] **Step 3: Commit**
 
@@ -852,7 +852,7 @@ describe("buildNativeAuthResponseInjectScript", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 4 suites, 25 tests total.
+Expected: PASS — 4 suites, 34 tests total. (Updated from the original "25" — see the note in Task 3.)
 
 - [ ] **Step 3: Commit**
 
@@ -908,7 +908,7 @@ describe("convexAuthStorageKeys", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 28 tests total.
+Expected: PASS — 5 suites, 37 tests total. (Updated from the original "28" — see the note in Task 3.)
 
 - [ ] **Step 3: Commit**
 
@@ -1040,7 +1040,7 @@ Expected: PASS.
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 28 tests, 0 failures.
+Expected: PASS — 5 suites, 37 tests, 0 failures. (Updated from the original "28" — see the note in Task 3.)
 
 - [ ] **Step 7: Full aggregate test script**
 
