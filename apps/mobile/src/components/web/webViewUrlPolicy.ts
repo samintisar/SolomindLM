@@ -23,15 +23,25 @@ function parseUrl(url: string): URL | null {
  * (`https://<trusted-host>@evil.com/` starts with the trusted host as a
  * string, but a real browser resolves it to host `evil.com`).
  *
- * Restricted to http(s) schemes: `URL.origin` is the string `"null"` for
- * every non-special scheme (`javascript:`, `data:`, `file:`, ...), so without
- * this guard an unvalidated non-http(s) `webBaseUrl` would make any such URL
- * compare equal to the "trusted" origin.
+ * Restricted to http(s) schemes: for every non-special scheme (`javascript:`,
+ * `data:`, `file:`, ...) `URL.origin` collapses to a single sentinel value
+ * that ignores the rest of the URL — `"null"` per spec (Jest's Node `URL`),
+ * `""` under React Native's own `URL` shim (no `react-native-url-polyfill`
+ * is installed, so production parses with the RN shim, not a spec-compliant
+ * parser — this file's tests run on Node's `URL` and are therefore stricter
+ * than production, though every observed divergence denies in production
+ * cases this file's tests allow, never the reverse). Either sentinel would
+ * make a non-http(s) `webBaseUrl` compare equal to any URL of that scheme
+ * without this guard.
  *
  * Dev/LAN origins are only trusted in development builds (`__DEV__`) — this
  * function is the sole gate before the WebView is handed the user's Convex
  * auth JWT (see `buildWebViewAuthInjectScript`), so trusting a plaintext LAN
  * origin in a release build would make that origin a token-disclosure surface.
+ * Note `webBaseUrl` itself (the configured web app origin, from
+ * `EXPO_PUBLIC_WEB_URL`) is trusted unconditionally, including over plain
+ * http — this `__DEV__` gate covers only the hardcoded dev/LAN origins above,
+ * not a misconfigured or intentionally-plaintext configured base.
  */
 export function shouldLoadUrlInWebView(url: string, webBaseUrl: string): boolean {
   const parsed = parseUrl(url);
