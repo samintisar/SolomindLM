@@ -1,10 +1,10 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 
 /**
  * Create a flashcard deck with sample cards for E2E testing.
  */
-export const createFlashcardDeck = mutation({
+export const createFlashcardDeck = internalMutation({
   args: {
     email: v.string(),
     notebookId: v.string(),
