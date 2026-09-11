@@ -417,6 +417,214 @@ git commit -m "fix(mobile): compare parsed origins in WebView URL policy, not st
 
 ---
 
+## Task 2.6: Close two more findings from Task 2.5's own review (added during execution)
+
+**Why this task exists:** Code-quality review of Task 2.5's fix independently traced two more real, verified gaps in the same function:
+
+1. **Opaque-origin collision.** `URL.origin` is the literal string `"null"` for every non-special scheme (`javascript:`, `data:`, `file:`, ...). If `webBaseUrl` ever parses successfully but is non-http(s) (an unvalidated env var misconfiguration — and this app already owns a `solomindlm://` custom scheme, so that shape isn't far-fetched), `parsed.origin === parsedBase.origin` becomes `"null" === "null"` → `true`, letting a `javascript:`/`data:`/`file:` URL load. Verified directly against the function.
+2. **Dev/LAN origins aren't gated to development builds.** `MOBILE_DEV_WEB_ORIGINS` and the LAN check are unconditional, so they're trusted in production builds too. Traced end-to-end: `shouldLoadUrlInWebView` is the sole gate before `WebViewScreen.tsx` injects the user's Convex auth JWT into whatever page it approved (`onLoadEnd` → `syncAuthToWebView` → `injectJavaScript`, no further origin check). A trusted-but-unauthenticated plaintext LAN/localhost origin is therefore a token-disclosure surface in any build profile that isn't Android EAS `production` (the only profile with `usesCleartextTraffic: false`).
+
+**Files:**
+- Modify: `apps/mobile/src/components/web/webViewUrlPolicy.ts`
+- Modify: `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`
+
+- [ ] **Step 1: Add an http(s)-only scheme guard and gate dev/LAN origins behind `__DEV__`**
+
+Replace the full contents of `apps/mobile/src/components/web/webViewUrlPolicy.ts` with:
+
+```ts
+/** Dev origins for the Vite web app when loaded from Android emulator / LAN. */
+const MOBILE_DEV_WEB_ORIGINS = [
+  "http://10.0.2.2:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+] as const;
+
+const LAN_VITE_HOST = /^192\.168\.\d{1,3}\.\d{1,3}$/;
+
+function parseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Only the web app origin stays in the WebView — OAuth runs in expo-web-browser.
+ *
+ * Compares parsed `URL.origin` values, never raw string prefixes: a naive
+ * `url.startsWith(webBaseUrl)` check is bypassable via URL userinfo
+ * (`https://<trusted-host>@evil.com/` starts with the trusted host as a
+ * string, but a real browser resolves it to host `evil.com`).
+ *
+ * Restricted to http(s) schemes: `URL.origin` is the string `"null"` for
+ * every non-special scheme (`javascript:`, `data:`, `file:`, ...), so without
+ * this guard an unvalidated non-http(s) `webBaseUrl` would make any such URL
+ * compare equal to the "trusted" origin.
+ *
+ * Dev/LAN origins are only trusted in development builds (`__DEV__`) — this
+ * function is the sole gate before the WebView is handed the user's Convex
+ * auth JWT (see `buildWebViewAuthInjectScript`), so trusting a plaintext LAN
+ * origin in a release build would make that origin a token-disclosure surface.
+ */
+export function shouldLoadUrlInWebView(url: string, webBaseUrl: string): boolean {
+  const parsed = parseUrl(url);
+  if (!parsed) return false;
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+
+  const parsedBase = parseUrl(webBaseUrl);
+  if (parsedBase && parsed.origin === parsedBase.origin) return true;
+
+  if (__DEV__) {
+    for (const origin of MOBILE_DEV_WEB_ORIGINS) {
+      if (parsed.origin === origin) return true;
+    }
+
+    if (
+      parsed.protocol === "http:" &&
+      parsed.port === "5173" &&
+      LAN_VITE_HOST.test(parsed.hostname)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+```
+
+- [ ] **Step 2: Add regression tests for both fixes**
+
+Replace the full contents of `apps/mobile/src/components/web/webViewUrlPolicy.test.ts` with:
+
+```ts
+import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
+
+const WEB_BASE_URL = "https://app.solomindlm.com";
+
+describe("shouldLoadUrlInWebView", () => {
+  it("allows the exact web base origin", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com/home", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows the Android emulator dev origin", () => {
+    expect(shouldLoadUrlInWebView("http://10.0.2.2:5173/notebook/abc", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows the loopback dev origin", () => {
+    expect(shouldLoadUrlInWebView("http://127.0.0.1:5173/", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows the localhost dev origin", () => {
+    expect(shouldLoadUrlInWebView("http://localhost:5173/notebook/abc", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows a LAN Vite origin matching 192.168.x.x:5173", () => {
+    expect(shouldLoadUrlInWebView("http://192.168.1.42:5173/home", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("denies a non-192.168 LAN IP even on the Vite port", () => {
+    expect(shouldLoadUrlInWebView("http://10.0.0.5:5173/home", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies the right LAN IP on the wrong port", () => {
+    expect(shouldLoadUrlInWebView("http://192.168.1.42:51730/home", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("allows a same-origin URL with a different path or query", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com/other?x=1", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("denies a foreign origin", () => {
+    expect(shouldLoadUrlInWebView("https://evil.example.com", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies a malformed URL without throwing", () => {
+    expect(() => shouldLoadUrlInWebView("not a url", WEB_BASE_URL)).not.toThrow();
+    expect(shouldLoadUrlInWebView("not a url", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies a URL that embeds the trusted host as userinfo before a foreign host", () => {
+    // A naive `url.startsWith(webBaseUrl)` check would pass here — the string
+    // literally starts with the trusted origin — but a real browser resolves
+    // this to host "evil.com" with "app.solomindlm.com" as the username.
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com@evil.com/", WEB_BASE_URL)).toBe(
+      false
+    );
+  });
+
+  it("denies a dev origin embedded as userinfo before a foreign host", () => {
+    expect(shouldLoadUrlInWebView("http://localhost:5173@evil.com/", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies a subdomain-confusion host that textually starts with the trusted origin", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com.evil.com/", WEB_BASE_URL)).toBe(
+      false
+    );
+  });
+
+  it("denies an http downgrade of the trusted origin", () => {
+    expect(shouldLoadUrlInWebView("http://app.solomindlm.com/home", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies a javascript: URL", () => {
+    expect(shouldLoadUrlInWebView("javascript:alert(1)", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies a javascript: URL even when webBaseUrl is itself a non-http(s) value", () => {
+    // Without the http(s)-only scheme guard, URL.origin is the literal string
+    // "null" for every non-special scheme, so a non-http(s) webBaseUrl would
+    // make this compare equal to the "trusted" origin and incorrectly pass.
+    expect(shouldLoadUrlInWebView("javascript:alert(1)", "solomindlm://app")).toBe(false);
+  });
+});
+
+describe("shouldLoadUrlInWebView in production builds (__DEV__ = false)", () => {
+  const globalWithDevFlag = globalThis as typeof globalThis & { __DEV__: boolean };
+  const originalDev = globalWithDevFlag.__DEV__;
+
+  beforeAll(() => {
+    globalWithDevFlag.__DEV__ = false;
+  });
+
+  afterAll(() => {
+    globalWithDevFlag.__DEV__ = originalDev;
+  });
+
+  it("denies dev and LAN origins when __DEV__ is false", () => {
+    expect(shouldLoadUrlInWebView("http://localhost:5173/", WEB_BASE_URL)).toBe(false);
+    expect(shouldLoadUrlInWebView("http://10.0.2.2:5173/", WEB_BASE_URL)).toBe(false);
+    expect(shouldLoadUrlInWebView("http://192.168.1.42:5173/", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("still allows the real web base origin when __DEV__ is false", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com/home", WEB_BASE_URL)).toBe(true);
+  });
+});
+```
+
+- [ ] **Step 3: Run the test, typecheck, and lint**
+
+```bash
+bun run test:mobile
+bun run typecheck:mobile
+bun run lint
+```
+
+Expected: PASS — 2 suites, 20 tests. Typecheck and lint clean. (`bun run typecheck:mobile` must confirm `__DEV__` typechecks without a `declare` — it's already used elsewhere in `apps/mobile`, e.g. via Expo's ambient RN types.)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/mobile/src/components/web/webViewUrlPolicy.ts apps/mobile/src/components/web/webViewUrlPolicy.test.ts
+git commit -m "fix(mobile): restrict WebView URL policy to http(s) and gate dev/LAN origins to __DEV__"
+```
+
+**Deliberately not done here** (noted by the reviewer as minor/optional, not required): failing closed on an unparseable `webBaseUrl` (currently falls through to dev-origins-only), rejecting credentials-bearing URLs to the trusted host itself, and a couple of extra edge-case tests (IPv6 loopback, parser-identity assertion). None are required for this fix; revisit only if a future finding makes them relevant.
+
+---
+
 ## Task 3: deepLinking tests
 
 **Files:**
