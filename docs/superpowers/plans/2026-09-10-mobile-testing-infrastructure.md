@@ -1,0 +1,664 @@
+# Mobile Testing Infrastructure Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Give `apps/mobile` a `jest-expo` test runner wired into CI, and unit-test every pure-TypeScript module that's currently reachable with no native-module mocking — the WebView URL allowlist, deep-link parsing, and the hand-built auth inject-script builders whose escaping bugs silently break sign-in.
+
+**Architecture:** `jest-expo` (the Expo-maintained Jest preset) plus `babel-preset-expo` for the TS/JSX transform. All five target modules (`webViewUrlPolicy.ts`, `deepLinking.ts`, `buildWebViewAuthInjectScript.ts`, `buildNativeAuthResponseInjectScript.ts`, `convexAuthStorageKeys.ts`) have zero imports — no React Native, no Expo modules — so no mocking, no `jsdom`, no `testing-library` is needed for this PR. The inject-script builders return a JS-source string meant to run inside the WebView's browser context, not inside the RN/Jest process; tests verify them by regex-extracting the embedded JSON literal from the returned string and `JSON.parse`-ing it, never by executing the string.
+
+**Tech Stack:** `jest` + `jest-expo` preset, `@types/jest`, `babel-preset-expo`. Bun workspaces monorepo (`bun run --cwd apps/mobile ...`).
+
+**Deviations from the design doc:** One addition not called out in the spec: `biome.json` has a `!apps/mobile/components/__tests__/**` ignore entry (in both `formatter.includes` and `linter.includes`) that exists specifically to exempt the dead `StyledText-test.js`. Deleting that file without removing the ignore entries would leave stale dead-code references in `biome.json`, so Task 8 removes both. Everything else implements the spec as written.
+
+---
+
+## File Structure
+
+| File | Responsibility |
+|---|---|
+| `apps/mobile/package.json` (modify) | Add `jest`, `jest-expo`, `@types/jest`, `babel-preset-expo` devDependencies; add `"test": "jest"` script. |
+| `apps/mobile/babel.config.js` (create) | `babel-preset-expo` — required for Jest to transform TS/JSX (Expo Router relies on this preset; there's currently no babel config in the app at all). |
+| `apps/mobile/jest.config.js` (create) | `jest-expo` preset config. |
+| `apps/mobile/tsconfig.json` (modify) | Add `"types": ["jest"]` so `bun run typecheck:mobile` (which typechecks `**/*.ts` including new `*.test.ts` files) recognizes `describe`/`it`/`expect`. |
+| `package.json` (modify, repo root) | New `"test:mobile"` script; extend aggregate `"test"` to include it. |
+| `apps/mobile/src/components/web/webViewUrlPolicy.test.ts` (create) | Tests for `shouldLoadUrlInWebView`. |
+| `apps/mobile/src/services/platform/deepLinking.test.ts` (create) | Tests for `parseMobileDeepLink`. |
+| `apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts` (create) | Tests for `buildWebViewAuthInjectScript` + `buildWebViewAuthPostMessageScript`. |
+| `apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts` (create) | Tests for `buildNativeAuthResponseInjectScript`. |
+| `apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts` (create) | Tests for `convexAuthStorageKeys`. |
+| `.github/workflows/ci.yml` (modify) | New `test-mobile` job, parallel to `typecheck-mobile`. |
+| `apps/mobile/components/__tests__/StyledText-test.js` (delete) | Dead `create-expo-app` scaffold test, currently unrunnable. |
+| `biome.json` (modify) | Remove the now-stale `!apps/mobile/components/__tests__/**` ignore entries (formatter + linter `includes`) left over from the dead test file. |
+
+---
+
+## Task 1: Jest/jest-expo tooling setup
+
+**Files:**
+- Create: `apps/mobile/babel.config.js`
+- Create: `apps/mobile/jest.config.js`
+- Modify: `apps/mobile/package.json`
+- Modify: `apps/mobile/tsconfig.json`
+- Modify: `package.json` (repo root)
+
+- [ ] **Step 1: Install jest-expo at the SDK-matched version**
+
+Run from the repo root:
+
+```bash
+bunx --cwd apps/mobile expo install jest-expo --dev
+```
+
+`expo install` resolves the `jest-expo` version compatible with the app's installed Expo SDK (currently `~55.0.26`) instead of whatever `bun add` would pick from latest — this matters because `jest-expo` version-locks to the Expo SDK major version.
+
+Expected: `apps/mobile/package.json` gains a `jest-expo` devDependency; `bun.lock` updates.
+
+- [ ] **Step 2: Install jest, @types/jest, and babel-preset-expo**
+
+```bash
+bun add -d jest @types/jest babel-preset-expo --cwd apps/mobile
+```
+
+`babel-preset-expo` is already resolved transitively in `bun.lock` (as a dependency of `expo`), so this pins it as a direct devDependency at the same resolved version rather than relying on hoisting.
+
+Expected: `apps/mobile/package.json` devDependencies now include `jest`, `@types/jest`, `babel-preset-expo`, `jest-expo`.
+
+- [ ] **Step 3: Add babel.config.js**
+
+Create `apps/mobile/babel.config.js`:
+
+```js
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ["babel-preset-expo"],
+  };
+};
+```
+
+There is no existing babel config in `apps/mobile` (Metro/Expo Router currently resolve the preset implicitly at build time); Jest needs it declared explicitly to transform TS/JSX in test files.
+
+- [ ] **Step 4: Add jest.config.js**
+
+Create `apps/mobile/jest.config.js`:
+
+```js
+/** @type {import('jest').Config} */
+module.exports = {
+  preset: "jest-expo",
+  testPathIgnorePatterns: ["/node_modules/", "/.expo/", "/dist/"],
+};
+```
+
+- [ ] **Step 5: Add the test script to apps/mobile/package.json**
+
+Edit `apps/mobile/package.json` — add to `"scripts"` (after `"web"`):
+
+```json
+    "test": "jest"
+```
+
+- [ ] **Step 6: Add jest types to apps/mobile/tsconfig.json**
+
+Edit `apps/mobile/tsconfig.json` — add `"types": ["jest"]` inside `compilerOptions`, alongside the existing `"paths"`:
+
+```json
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "types": ["jest"],
+    "paths": {
+      "@/*": ["./*"],
+      "@mobile/*": ["./src/*"],
+      "@convex/*": ["../../convex/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "src/types/env.d.ts", "expo-env.d.ts"]
+}
+```
+
+- [ ] **Step 7: Add test:mobile to the root package.json**
+
+Edit `package.json` (repo root) — add a new script right after `"test:web:coverage"`:
+
+```json
+    "test:mobile": "bun run --cwd apps/mobile test",
+```
+
+And change the aggregate `"test"` script from:
+
+```json
+    "test": "bun run test:web && bun run test:convex",
+```
+
+to:
+
+```json
+    "test": "bun run test:web && bun run test:convex && bun run test:mobile",
+```
+
+- [ ] **Step 8: Verify the harness runs (no test files yet)**
+
+```bash
+bun run test:mobile
+```
+
+Expected: Jest starts under the `jest-expo` preset and reports `No tests found` — exit code 1. This confirms the runner, preset, and config are wired correctly; Task 2 adds the first real test file, after which this command should pass.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add apps/mobile/package.json apps/mobile/babel.config.js apps/mobile/jest.config.js apps/mobile/tsconfig.json package.json bun.lock
+git commit -m "chore(mobile): add jest-expo test runner"
+```
+
+---
+
+## Task 2: webViewUrlPolicy tests
+
+**Files:**
+- Test: `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`
+
+- [ ] **Step 1: Write the test file**
+
+Create `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`:
+
+```ts
+import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
+
+const WEB_BASE_URL = "https://app.solomindlm.com/entry";
+
+describe("shouldLoadUrlInWebView", () => {
+  it("allows a URL that starts with the web base URL", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com/entry/home", WEB_BASE_URL)).toBe(
+      true
+    );
+  });
+
+  it("allows the Android emulator dev origin", () => {
+    expect(shouldLoadUrlInWebView("http://10.0.2.2:5173/notebook/abc", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows the loopback dev origin", () => {
+    expect(shouldLoadUrlInWebView("http://127.0.0.1:5173/", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows the localhost dev origin", () => {
+    expect(shouldLoadUrlInWebView("http://localhost:5173/notebook/abc", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("allows a LAN Vite origin matching 192.168.x.x:5173", () => {
+    expect(shouldLoadUrlInWebView("http://192.168.1.42:5173/home", WEB_BASE_URL)).toBe(true);
+  });
+
+  it("denies a non-192.168 LAN IP even on the Vite port", () => {
+    expect(shouldLoadUrlInWebView("http://10.0.0.5:5173/home", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("allows a same-origin URL that doesn't textually start with the base URL", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com/other?x=1", WEB_BASE_URL)).toBe(
+      true
+    );
+  });
+
+  it("denies a foreign origin", () => {
+    expect(shouldLoadUrlInWebView("https://evil.example.com", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("denies a malformed URL without throwing", () => {
+    expect(() => shouldLoadUrlInWebView("not a url", WEB_BASE_URL)).not.toThrow();
+    expect(shouldLoadUrlInWebView("not a url", WEB_BASE_URL)).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Run the test**
+
+```bash
+bun run test:mobile
+```
+
+Expected: PASS — 1 suite, 9 tests.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/mobile/src/components/web/webViewUrlPolicy.test.ts
+git commit -m "test(mobile): cover WebView URL allowlist policy"
+```
+
+---
+
+## Task 3: deepLinking tests
+
+**Files:**
+- Test: `apps/mobile/src/services/platform/deepLinking.test.ts`
+
+- [ ] **Step 1: Write the test file**
+
+Create `apps/mobile/src/services/platform/deepLinking.test.ts`:
+
+```ts
+import { parseMobileDeepLink } from "./deepLinking";
+
+describe("parseMobileDeepLink", () => {
+  it("parses a notebook deep link", () => {
+    expect(parseMobileDeepLink("solomindlm://notebook/abc123")).toEqual({
+      kind: "notebook",
+      notebookId: "abc123",
+    });
+  });
+
+  it("parses a share-fork deep link", () => {
+    expect(parseMobileDeepLink("https://solomindlm.com/share/fork/xyz789")).toEqual({
+      kind: "shareFork",
+      token: "xyz789",
+    });
+  });
+
+  it("prefers the fork match when both a notebook and fork segment are present", () => {
+    expect(
+      parseMobileDeepLink("https://solomindlm.com/notebook/abc123/share/fork/xyz789")
+    ).toEqual({ kind: "shareFork", token: "xyz789" });
+  });
+
+  it("returns null for an unrecognized path", () => {
+    expect(parseMobileDeepLink("https://solomindlm.com/settings")).toBeNull();
+  });
+
+  it("returns null for a null URL", () => {
+    expect(parseMobileDeepLink(null)).toBeNull();
+  });
+
+  it("stops the notebook id capture at a query string", () => {
+    expect(parseMobileDeepLink("solomindlm://notebook/abc123?ref=email")).toEqual({
+      kind: "notebook",
+      notebookId: "abc123",
+    });
+  });
+
+  it("stops the fork token capture at a hash fragment", () => {
+    expect(parseMobileDeepLink("https://solomindlm.com/share/fork/xyz789#section")).toEqual({
+      kind: "shareFork",
+      token: "xyz789",
+    });
+  });
+});
+```
+
+- [ ] **Step 2: Run the test**
+
+```bash
+bun run test:mobile
+```
+
+Expected: PASS — 2 suites, 16 tests total.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/mobile/src/services/platform/deepLinking.test.ts
+git commit -m "test(mobile): cover deep link parsing"
+```
+
+---
+
+## Task 4: buildWebViewAuthInjectScript tests
+
+**Files:**
+- Test: `apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts`
+
+- [ ] **Step 1: Write the test file**
+
+Create `apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts`:
+
+```ts
+import {
+  buildWebViewAuthInjectScript,
+  buildWebViewAuthPostMessageScript,
+} from "./buildWebViewAuthInjectScript";
+
+function extractLiteral(script: string, varName: string): unknown {
+  const match = script.match(new RegExp(`var ${varName} = (.*);`));
+  if (!match) throw new Error(`no assignment found for ${varName} in script`);
+  return JSON.parse(match[1]);
+}
+
+describe("buildWebViewAuthInjectScript", () => {
+  it("embeds the deployment URL and JWT as valid JSON literals", () => {
+    const script = buildWebViewAuthInjectScript(
+      "https://foo-bar-123.convex.cloud",
+      "jwt-token-abc"
+    );
+
+    expect(extractLiteral(script, "CONVEX_URL")).toBe("https://foo-bar-123.convex.cloud");
+    expect(extractLiteral(script, "jwt")).toBe("jwt-token-abc");
+  });
+
+  it('embeds a null JWT as the JSON literal null, not the string "null"', () => {
+    const script = buildWebViewAuthInjectScript("https://foo-bar-123.convex.cloud", null);
+
+    expect(extractLiteral(script, "jwt")).toBeNull();
+  });
+
+  it("safely escapes a JWT containing quotes, backslashes, and newlines", () => {
+    const trickyJwt = 'part-one\\part-two"quoted"\npart-three';
+    const script = buildWebViewAuthInjectScript("https://foo-bar-123.convex.cloud", trickyJwt);
+
+    expect(extractLiteral(script, "jwt")).toBe(trickyJwt);
+  });
+
+  it("derives the namespace by stripping non-alphanumeric characters from the deployment URL", () => {
+    const script = buildWebViewAuthInjectScript("https://foo-bar-123.convex.cloud", "tok");
+
+    expect(script).toContain('var ns = CONVEX_URL.replace(/[^a-zA-Z0-9]/g, "")');
+  });
+});
+
+describe("buildWebViewAuthPostMessageScript", () => {
+  it("embeds a payload that round-trips through JSON.parse", () => {
+    const script = buildWebViewAuthPostMessageScript(
+      "https://foo-bar-123.convex.cloud",
+      "jwt-token-abc"
+    );
+
+    expect(extractLiteral(script, "data")).toEqual({
+      type: "native-auth:tokens",
+      deploymentUrl: "https://foo-bar-123.convex.cloud",
+      jwt: "jwt-token-abc",
+    });
+  });
+
+  it("embeds a null JWT as null in the payload", () => {
+    const script = buildWebViewAuthPostMessageScript("https://foo-bar-123.convex.cloud", null);
+    const payload = extractLiteral(script, "data") as { jwt: unknown };
+
+    expect(payload.jwt).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 2: Run the test**
+
+```bash
+bun run test:mobile
+```
+
+Expected: PASS — 3 suites, 22 tests total.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts
+git commit -m "test(mobile): cover WebView auth inject-script builder"
+```
+
+---
+
+## Task 5: buildNativeAuthResponseInjectScript tests
+
+**Files:**
+- Test: `apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts`
+
+- [ ] **Step 1: Write the test file**
+
+Create `apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts`:
+
+```ts
+import { buildNativeAuthResponseInjectScript } from "./buildNativeAuthResponseInjectScript";
+import type { NativeAuthResponsePayload } from "./buildNativeAuthResponseInjectScript";
+
+function extractDetail(script: string): unknown {
+  const match = script.match(/var detail = (.*);/);
+  if (!match) throw new Error("no detail assignment found in script");
+  return JSON.parse(match[1]);
+}
+
+describe("buildNativeAuthResponseInjectScript", () => {
+  it("embeds a success payload that round-trips through JSON.parse", () => {
+    const payload: NativeAuthResponsePayload = {
+      type: "native-auth:response",
+      requestId: "req-1",
+      success: true,
+      authenticated: true,
+    };
+
+    expect(extractDetail(buildNativeAuthResponseInjectScript(payload))).toEqual(payload);
+  });
+
+  it("embeds an error payload that round-trips through JSON.parse", () => {
+    const payload: NativeAuthResponsePayload = {
+      type: "native-auth:response",
+      requestId: "req-2",
+      success: false,
+      error: "network timeout",
+    };
+
+    expect(extractDetail(buildNativeAuthResponseInjectScript(payload))).toEqual(payload);
+  });
+
+  it("safely escapes an error message containing quotes and backslashes", () => {
+    const payload: NativeAuthResponsePayload = {
+      type: "native-auth:response",
+      requestId: "req-3",
+      success: false,
+      error: 'bad "token"\\format',
+    };
+
+    expect(extractDetail(buildNativeAuthResponseInjectScript(payload))).toEqual(payload);
+  });
+});
+```
+
+- [ ] **Step 2: Run the test**
+
+```bash
+bun run test:mobile
+```
+
+Expected: PASS — 4 suites, 25 tests total.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts
+git commit -m "test(mobile): cover native auth response inject-script builder"
+```
+
+---
+
+## Task 6: convexAuthStorageKeys tests
+
+**Files:**
+- Test: `apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts`
+
+- [ ] **Step 1: Write the test file**
+
+Create `apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts`:
+
+```ts
+import { convexAuthStorageKeys } from "./convexAuthStorageKeys";
+
+describe("convexAuthStorageKeys", () => {
+  it("strips non-alphanumeric characters from the deployment URL to build the namespace", () => {
+    expect(convexAuthStorageKeys("https://foo-bar-123.convex.cloud")).toEqual({
+      jwt: "__convexAuthJWT_httpsfoobar123convexcloud",
+      refresh: "__convexAuthRefreshToken_httpsfoobar123convexcloud",
+    });
+  });
+
+  it("derives the same namespace the WebView inject script computes at runtime", () => {
+    const deploymentUrl = "https://another-deployment.convex.cloud";
+    const expectedNs = deploymentUrl.replace(/[^a-zA-Z0-9]/g, "");
+
+    const keys = convexAuthStorageKeys(deploymentUrl);
+
+    expect(keys.jwt).toBe(`__convexAuthJWT_${expectedNs}`);
+    expect(keys.refresh).toBe(`__convexAuthRefreshToken_${expectedNs}`);
+  });
+
+  it("returns distinct keys for different deployment URLs", () => {
+    const a = convexAuthStorageKeys("https://deployment-a.convex.cloud");
+    const b = convexAuthStorageKeys("https://deployment-b.convex.cloud");
+
+    expect(a.jwt).not.toBe(b.jwt);
+  });
+});
+```
+
+- [ ] **Step 2: Run the test**
+
+```bash
+bun run test:mobile
+```
+
+Expected: PASS — 5 suites, 28 tests total.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts
+git commit -m "test(mobile): cover Convex auth storage key derivation"
+```
+
+---
+
+## Task 7: CI job
+
+**Files:**
+- Modify: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: Add the test-mobile job**
+
+In `.github/workflows/ci.yml`, insert a new job immediately after the `typecheck-mobile` job (before `build-web`):
+
+```yaml
+  test-mobile:
+    name: Test (Mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run mobile tests
+        run: bun run test:mobile
+```
+
+This mirrors `typecheck-mobile`'s shape and, like `test-unit`, is not added to `build-web` / `build-web-main`'s `needs:` — it's a signal job, not a build gate.
+
+- [ ] **Step 2: Validate the workflow file**
+
+```bash
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+```
+
+Expected: no errors reported for `.github/workflows/ci.yml`. (This mirrors the repo's own `workflow-lint` CI job locally; skip if Docker isn't available and rely on that CI job instead.)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add .github/workflows/ci.yml
+git commit -m "ci(mobile): add test-mobile job"
+```
+
+---
+
+## Task 8: Remove dead StyledText-test.js and stale biome ignores
+
+**Files:**
+- Delete: `apps/mobile/components/__tests__/StyledText-test.js`
+- Modify: `biome.json`
+
+- [ ] **Step 1: Delete the dead test file and its directory**
+
+```bash
+rm apps/mobile/components/__tests__/StyledText-test.js
+rmdir apps/mobile/components/__tests__
+```
+
+- [ ] **Step 2: Remove the now-stale biome ignore entries**
+
+In `biome.json`, remove the line `"!apps/mobile/components/__tests__/**",` from **both** the `formatter.includes` array and the top-level `linter.includes` array (it appears twice — once per section, each currently reading `"!apps/mobile/components/__tests__/**",`).
+
+- [ ] **Step 3: Verify biome still passes**
+
+```bash
+bun run lint
+```
+
+Expected: no new errors. (Existing warnings elsewhere in the repo, if any, are unrelated to this change.)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -u apps/mobile/components biome.json
+git commit -m "chore(mobile): remove dead StyledText-test.js scaffold"
+```
+
+---
+
+## Task 9: Final verification sweep
+
+**Files:** none (verification only)
+
+- [ ] **Step 1: Typecheck mobile**
+
+```bash
+bun run typecheck:mobile
+```
+
+Expected: PASS, no errors (confirms the new `*.test.ts` files typecheck cleanly with the `"types": ["jest"]` addition).
+
+- [ ] **Step 2: Typecheck web** (unaffected, but required by the project's verification gate)
+
+```bash
+bun run typecheck:web
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Typecheck convex** (unaffected, but required by the project's verification gate)
+
+```bash
+bun run typecheck:convex
+```
+
+Expected: PASS.
+
+- [ ] **Step 4: Lint**
+
+```bash
+bun run lint
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Convex tests** (unaffected, but required by the project's verification gate)
+
+```bash
+bun run test:convex
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Mobile tests**
+
+```bash
+bun run test:mobile
+```
+
+Expected: PASS — 5 suites, 28 tests, 0 failures.
+
+- [ ] **Step 7: Full aggregate test script**
+
+```bash
+bun run test
+```
+
+Expected: PASS (`test:web && test:convex && test:mobile`, all green).
+
+No commit for this task — it's a verification checkpoint only. If any step fails, fix the root cause in the relevant task's files and re-commit there rather than patching forward here.
