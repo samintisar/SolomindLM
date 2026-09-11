@@ -69,7 +69,6 @@ export function feedbackIssueBody(row: {
   surface: string;
   appVersion: string;
   lastRequestId?: string;
-  userId: string;
 }): string {
   const detailLabel = row.type === "bug" ? "Steps to reproduce" : "Why / what for";
   return [
@@ -85,6 +84,6 @@ export function feedbackIssueBody(row: {
     `- App version: \`${row.appVersion}\``,
     `- Last requestId: \`${row.lastRequestId ?? "n/a"}\``,
     "",
-    `_Filed from in-app feedback by user \`${row.userId}\`._`,
+    "_Filed from in-app feedback._",
   ].join("\n");
 }

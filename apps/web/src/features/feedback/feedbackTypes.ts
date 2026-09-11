@@ -31,11 +31,15 @@ export function captureFeedbackContext(
 
 export function validateFeedbackDraft(d: {
   body: string;
+  detail?: string;
 }): { ok: true } | { ok: false; error: string } {
   const body = d.body.trim();
   if (!body) return { ok: false, error: "Enter a description first" };
   if (body.length > MAX_FEEDBACK_TEXT) {
     return { ok: false, error: `Keep it under ${MAX_FEEDBACK_TEXT} characters` };
+  }
+  if ((d.detail?.trim().length ?? 0) > MAX_FEEDBACK_TEXT) {
+    return { ok: false, error: `Keep the extra details under ${MAX_FEEDBACK_TEXT} characters` };
   }
   return { ok: true };
 }

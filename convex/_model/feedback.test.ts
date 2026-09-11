@@ -52,13 +52,17 @@ describe("feedback model", () => {
   });
 
   it("feedbackIssueBody is deterministic and includes context", () => {
-    const md = feedbackIssueBody({ ...base, userId: "user123" });
+    const md = feedbackIssueBody(base);
     expect(md).toContain("Quiz won't submit");
     expect(md).toContain("### Steps to reproduce");
     expect(md).toContain("1. open quiz 2. click finish");
     expect(md).toContain("- Route: `/notebook/abc/quiz`");
     expect(md).toContain("- Plan: `pro`");
-    expect(md).toContain("user123");
+    expect(md).toContain("_Filed from in-app feedback._");
+  });
+
+  it("does not leak an internal user id into the issue body", () => {
+    expect(feedbackIssueBody({ ...base, userId: "user123" } as never)).not.toContain("user123");
   });
 
   it("feedbackIssueBody labels the detail section by type and handles missing detail", () => {
@@ -66,7 +70,6 @@ describe("feedback model", () => {
       ...base,
       type: "feature",
       detail: undefined,
-      userId: "u1",
     });
     expect(md).toContain("### Why / what for");
     expect(md).toContain("_none provided_");

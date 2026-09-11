@@ -37,6 +37,9 @@ describe("validateFeedbackDraft", () => {
   it("rejects an over-long body", () => {
     expect(validateFeedbackDraft({ body: "x".repeat(5001) }).ok).toBe(false);
   });
+  it("rejects an over-long detail", () => {
+    expect(validateFeedbackDraft({ body: "it broke", detail: "x".repeat(5001) }).ok).toBe(false);
+  });
   it("accepts a normal body", () => {
     expect(validateFeedbackDraft({ body: "it broke" })).toEqual({ ok: true });
   });

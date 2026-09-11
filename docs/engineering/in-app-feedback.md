@@ -30,10 +30,9 @@ account email.
 ## Behaviour notes
 
 - `planTier` is derived server-side from the active Stripe subscription — never trusted from the client.
-- Submissions are rate-limited to 5 per user per hour (`feedbackSubmit` window in `convex/_lib/rateLimits.ts`); screenshot upload-URL requests are capped at 20 per user per hour (`feedbackUpload` window). A screenshot whose submission then fails is deleted via `discardScreenshot` so it isn't orphaned in storage.
-- The screenshot `_storage` id is validated server-side to be an existing `image/*` blob before it's attached.
+- Submissions are rate-limited to 5 per user per hour (`feedbackSubmit` window in `convex/_lib/rateLimits.ts`).
 - `appVersion` is stamped at build time from `VITE_APP_VERSION` (set it in CI to the git sha) or the web `package.json` version — see `apps/web/vite.config.ts`.
-- The GitHub sync is one-directional and manual. Re-syncing a row is blocked once `githubIssueNumber` is set; the button in the triage list is replaced by the issue link.
+- The GitHub sync is one-directional and manual. `createGithubIssue` first claims the row (`githubSyncStartedAt`, a ~2-minute idempotency lock) so concurrent clicks can't file duplicate issues, embeds a hidden `<!-- solomind-feedback:<id> -->` marker so a crashed sync can recover the issue it already filed instead of creating another, and blocks re-syncing once `githubIssueNumber` is set; the triage-list button is then replaced by the issue link.
 - Issues are labelled `type:bug`/`type:feature` + `status:triage` and titled `[Feedback] <first line>`.
 - `lastRequestId` is captured if `setLastRequestId()` (in `apps/web/src/features/feedback/lastRequestId.ts`) has been called on the web client; no producers are wired yet.
 - The Expo mobile app is a WebView over the web routes, so the "Send feedback" entry point works there with no native change.

@@ -8,13 +8,17 @@ import { getAuthUserId } from "../auth";
 
 const MAX_TEXT = 5000;
 
-type FeedbackStatus = "received" | "planned" | "shipped" | "closed";
+const feedbackStatus = v.union(
+  v.literal("received"),
+  v.literal("planned"),
+  v.literal("shipped"),
+  v.literal("closed")
+);
 
 const submitArgs = {
   type: v.union(v.literal("bug"), v.literal("feature")),
   body: v.string(),
   detail: v.optional(v.string()),
-  screenshotId: v.optional(v.id("_storage")),
   route: v.string(),
   surface: v.union(v.literal("web"), v.literal("mobile")),
   appVersion: v.string(),
@@ -29,40 +33,6 @@ async function derivePlanTier(ctx: MutationCtx, userId: Id<"users">): Promise<"f
   return sub ? "pro" : "free";
 }
 
-/** Upload target for an optional screenshot. Auth-gated. */
-export const generateUploadUrl = mutation({
-  args: {},
-  returns: v.string(),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-    await rateLimiter.limit(ctx, "feedbackUpload", { key: userId, throws: true });
-    return await ctx.storage.generateUploadUrl();
-  },
-});
-
-/**
- * Best-effort cleanup for a screenshot that was uploaded but whose `submit`
- * then failed (rate limit, validation), so it never got attached to a row.
- * No-op if the blob is already referenced by one of the caller's feedback rows.
- */
-export const discardScreenshot = mutation({
-  args: { screenshotId: v.id("_storage") },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-    const attached = await ctx.db
-      .query("feedback")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("screenshotId"), args.screenshotId))
-      .first();
-    if (attached) return null;
-    await ctx.storage.delete(args.screenshotId);
-    return null;
-  },
-});
-
 export const submit = mutation({
   args: submitArgs,
   returns: v.object({ id: v.id("feedback") }),
@@ -76,15 +46,6 @@ export const submit = mutation({
     const detail = args.detail?.trim() || undefined;
     if (detail && detail.length > MAX_TEXT) throw new Error("Detail is too long");
 
-    // The storage id comes from the client; make sure it points at a real
-    // image blob (a freshly uploaded screenshot) and not some other object.
-    if (args.screenshotId) {
-      const meta = await ctx.db.system.get(args.screenshotId);
-      if (!meta || !meta.contentType?.startsWith("image/")) {
-        throw new Error("Invalid screenshot");
-      }
-    }
-
     await rateLimiter.limit(ctx, "feedbackSubmit", { key: userId, throws: true });
 
     const now = Date.now();
@@ -93,7 +54,6 @@ export const submit = mutation({
       type: args.type,
       body,
       detail,
-      screenshotId: args.screenshotId,
       route: args.route.slice(0, 512),
       surface: args.surface,
       appVersion: args.appVersion.slice(0, 64),
@@ -119,13 +79,13 @@ export const isAdmin = query({
 });
 
 export const listAll = query({
-  args: { status: v.optional(v.string()) },
+  args: { status: v.optional(feedbackStatus) },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Unauthenticated");
     await assertFeedbackAdmin(ctx, userId);
 
-    const status = args.status as FeedbackStatus | undefined;
+    const status = args.status;
     const rows = status
       ? await ctx.db
           .query("feedback")
@@ -134,19 +94,5 @@ export const listAll = query({
           .take(200)
       : await ctx.db.query("feedback").order("desc").take(200);
     return rows.map(toAdminFeedbackRow);
-  },
-});
-
-/** Signed URL for a submission's screenshot. Admin-only. */
-export const getScreenshotUrl = query({
-  args: { feedbackId: v.id("feedback") },
-  returns: v.union(v.string(), v.null()),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Unauthenticated");
-    await assertFeedbackAdmin(ctx, userId);
-    const row = await ctx.db.get(args.feedbackId);
-    if (!row?.screenshotId) return null;
-    return await ctx.storage.getUrl(row.screenshotId);
   },
 });

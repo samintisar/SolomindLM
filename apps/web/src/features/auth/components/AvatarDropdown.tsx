@@ -29,7 +29,9 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
 }) => {
   const navigate = useNavigate();
   const { open: openFeedback } = useFeedback();
-  const isFeedbackAdmin = useIsFeedbackAdmin();
+  // Only the "Feedback triage" item needs this, and it's staff-only — don't open
+  // the subscription for signed-out menus.
+  const isFeedbackAdmin = useIsFeedbackAdmin(isAuthenticated);
 
   const handleLogout = async () => {
     await onLogout();

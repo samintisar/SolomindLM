@@ -985,7 +985,6 @@ export default defineSchema({
     body: v.string(),
     /** Optional secondary free-text: "steps to reproduce" (bug) or "why" (feature). */
     detail: v.optional(v.string()),
-    screenshotId: v.optional(v.id("_storage")),
     /** Auto-captured client context. */
     route: v.string(),
     surface: v.union(v.literal("web"), v.literal("mobile")),
@@ -1001,6 +1000,12 @@ export default defineSchema({
     ),
     githubIssueNumber: v.optional(v.number()),
     githubIssueUrl: v.optional(v.string()),
+    /**
+     * Set when a staff-triggered GitHub sync starts, cleared once the issue is
+     * recorded. Acts as a short-lived idempotency lock so concurrent syncs
+     * can't both file an issue for the same row.
+     */
+    githubSyncStartedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

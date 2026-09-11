@@ -1,5 +1,5 @@
-import { Bug, Lightbulb, Loader2, Paperclip, X } from "lucide-react";
-import { type ChangeEvent, useRef, useState } from "react";
+import { Bug, Lightbulb, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -16,13 +16,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { useToast } from "@/shared/contexts/useToast";
 import { useFeedback } from "../FeedbackContext";
 import { captureFeedbackContext, type FeedbackType, validateFeedbackDraft } from "../feedbackTypes";
-import {
-  useDiscardFeedbackScreenshot,
-  useSubmitFeedback,
-  useUploadFeedbackScreenshot,
-} from "../services/feedbackApi";
-
-const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
+import { useSubmitFeedback } from "../services/feedbackApi";
 
 export function FeedbackModal() {
   const { isOpen, defaultType, close } = useFeedback();
@@ -41,54 +35,33 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
   const [type, setType] = useState<FeedbackType>(defaultType);
   const [body, setBody] = useState("");
   const [detail, setDetail] = useState("");
-  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const submitFeedback = useSubmitFeedback();
-  const uploadScreenshot = useUploadFeedbackScreenshot();
-  const discardScreenshot = useDiscardFeedbackScreenshot();
   const toast = useToast();
   const location = useLocation();
 
   const isBug = type === "bug";
 
-  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    if (f && f.size > MAX_SCREENSHOT_BYTES) {
-      setError("Screenshot must be under 5 MB");
-      return;
-    }
-    setError(null);
-    setFile(f);
-  };
-
   const onSubmit = async () => {
-    const check = validateFeedbackDraft({ body });
+    const check = validateFeedbackDraft({ body, detail });
     if (!check.ok) {
       setError(check.error);
       return;
     }
     setSubmitting(true);
     setError(null);
-    let screenshotId: Awaited<ReturnType<typeof uploadScreenshot>> | undefined;
     try {
-      screenshotId = file ? await uploadScreenshot(file) : undefined;
       await submitFeedback({
         type,
         body,
         detail: detail.trim() || undefined,
-        screenshotId,
         ...captureFeedbackContext({ pathname: location.pathname, search: location.search }),
       });
       toast.success("Thanks — we got it.");
       onDone();
     } catch (err) {
-      // Submit failed after the upload succeeded — drop the orphaned blob.
-      if (screenshotId) {
-        void discardScreenshot(screenshotId).catch(() => undefined);
-      }
       setSubmitting(false);
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }
@@ -142,44 +115,12 @@ function FeedbackForm({ defaultType, onDone }: { defaultType: FeedbackType; onDo
           <Textarea
             id="feedback-detail"
             value={detail}
-            onChange={(e) => setDetail(e.target.value)}
+            onChange={(e) => {
+              setDetail(e.target.value);
+              if (error) setError(null);
+            }}
             rows={3}
           />
-        </div>
-
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onFile}
-            className="hidden"
-          />
-          {file ? (
-            <div className="flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3 py-2 text-sm">
-              <Paperclip className="size-4 shrink-0 text-muted-foreground" />
-              <span className="flex-1 truncate">{file.name}</span>
-              <button
-                type="button"
-                onClick={() => setFile(null)}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label="Remove screenshot"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full justify-start font-normal text-muted-foreground"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip className="size-4" />
-              Attach screenshot (optional)
-            </Button>
-          )}
         </div>
 
         <p className="text-xs leading-relaxed text-muted-foreground">

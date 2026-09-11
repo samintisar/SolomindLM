@@ -7,7 +7,6 @@ export interface SubmitFeedbackInput extends FeedbackContextCapture {
   type: FeedbackType;
   body: string;
   detail?: string;
-  screenshotId?: Id<"_storage">;
 }
 
 /** Submit a feedback row. Returns `{ id }`. */
@@ -18,7 +17,6 @@ export function useSubmitFeedback() {
       type: input.type,
       body: input.body,
       detail: input.detail,
-      screenshotId: input.screenshotId,
       route: input.route,
       surface: input.surface,
       appVersion: input.appVersion,
@@ -26,35 +24,16 @@ export function useSubmitFeedback() {
     });
 }
 
-/** Upload a screenshot to Convex storage; returns its storage id. */
-export function useUploadFeedbackScreenshot() {
-  const generateUploadUrl = useMutation(api.feedback.index.generateUploadUrl);
-  return async (file: File): Promise<Id<"_storage">> => {
-    const url = await generateUploadUrl();
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
-    if (!res.ok) throw new Error("Screenshot upload failed");
-    const { storageId } = (await res.json()) as { storageId: string };
-    return storageId as Id<"_storage">;
-  };
+/**
+ * `undefined` while loading, then the boolean. Pass `enabled=false` to skip the
+ * query entirely (e.g. when the menu holding it isn't shown to signed-in users).
+ */
+export function useIsFeedbackAdmin(enabled = true): boolean | undefined {
+  return useQuery(api.feedback.index.isAdmin, enabled ? {} : "skip");
 }
 
-/** Delete an uploaded screenshot whose feedback submission then failed. */
-export function useDiscardFeedbackScreenshot() {
-  const discard = useMutation(api.feedback.index.discardScreenshot);
-  return (screenshotId: Id<"_storage">) => discard({ screenshotId });
-}
-
-/** `undefined` while loading, then the boolean. */
-export function useIsFeedbackAdmin(): boolean | undefined {
-  return useQuery(api.feedback.index.isAdmin, {});
-}
-
-export function useAllFeedback(enabled = true, status?: string) {
-  return useQuery(api.feedback.index.listAll, enabled ? (status ? { status } : {}) : "skip");
+export function useAllFeedback(enabled = true) {
+  return useQuery(api.feedback.index.listAll, enabled ? {} : "skip");
 }
 
 export function useCreateGithubIssue() {
