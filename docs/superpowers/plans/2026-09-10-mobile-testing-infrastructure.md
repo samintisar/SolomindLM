@@ -634,6 +634,8 @@ git commit -m "fix(mobile): restrict WebView URL policy to http(s) and gate dev/
 
 Create `apps/mobile/src/services/platform/deepLinking.test.ts`:
 
+> **Amended during execution:** code-quality review found the original 7-case snippet below failed `bun run lint` (a Biome line-wrap formatting error — the snippet as pasted here didn't match Biome's own output) and had two genuine coverage gaps: the empty-ID/empty-token truncation boundary, and the fact that matching is a whole-string regex scan, not host/path-scoped (harmless here since the caller discards the original URL, but worth pinning so a future rewrite doesn't silently change behavior). The snippet below is the corrected, Biome-formatted, 10-case final version — always run `bun run lint:fix` after pasting a plan snippet rather than assuming the plan's own formatting is Biome-clean.
+
 ```ts
 import { parseMobileDeepLink } from "./deepLinking";
 
@@ -653,9 +655,11 @@ describe("parseMobileDeepLink", () => {
   });
 
   it("prefers the fork match when both a notebook and fork segment are present", () => {
-    expect(
-      parseMobileDeepLink("https://solomindlm.com/notebook/abc123/share/fork/xyz789")
-    ).toEqual({ kind: "shareFork", token: "xyz789" });
+    // Fork is matched (and returned) before notebook is ever checked, so it
+    // wins regardless of which segment appears earlier in the URL.
+    expect(parseMobileDeepLink("https://solomindlm.com/notebook/abc123/share/fork/xyz789")).toEqual(
+      { kind: "shareFork", token: "xyz789" }
+    );
   });
 
   it("returns null for an unrecognized path", () => {
@@ -664,6 +668,27 @@ describe("parseMobileDeepLink", () => {
 
   it("returns null for a null URL", () => {
     expect(parseMobileDeepLink(null)).toBeNull();
+  });
+
+  it("returns null for an empty notebook id (truncated link)", () => {
+    expect(parseMobileDeepLink("solomindlm://notebook/")).toBeNull();
+  });
+
+  it("returns null for an empty fork token (truncated link)", () => {
+    expect(parseMobileDeepLink("https://solomindlm.com/share/fork/")).toBeNull();
+  });
+
+  it("matches a notebook segment appearing inside a query parameter value", () => {
+    // Known behavior, not a bug fix target: the regex scans the whole URL
+    // string rather than the parsed path, so a path-shaped substring inside
+    // a query value is treated as the route. The caller discards the
+    // original URL and rebuilds its own path from the extracted id, so this
+    // doesn't grant access to anything — see webViewUrlPolicy.ts for the
+    // actual trust boundary.
+    expect(parseMobileDeepLink("https://solomindlm.com/settings?return=/notebook/abc123")).toEqual({
+      kind: "notebook",
+      notebookId: "abc123",
+    });
   });
 
   it("stops the notebook id capture at a query string", () => {
@@ -688,7 +713,7 @@ describe("parseMobileDeepLink", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 2 suites, 25 tests total. (Updated from the original plan's "16" — `webViewUrlPolicy.test.ts` grew from 9 to 18 tests across Tasks 2.5/2.6's security fixes, a net +9 carried through every count below.)
+Expected: PASS — 2 suites, 28 tests total. (Updated from the original plan's "16" — `webViewUrlPolicy.test.ts` grew from 9 to 18 tests across Tasks 2.5/2.6's security fixes, and `deepLinking.test.ts` grew from 7 to 10 tests per the amendment note above, a net +12 carried through every count below.)
 
 - [ ] **Step 3: Commit**
 
@@ -780,7 +805,7 @@ describe("buildWebViewAuthPostMessageScript", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 3 suites, 31 tests total. (Updated from the original "22" — see the note in Task 3.)
+Expected: PASS — 3 suites, 34 tests total. (Updated from the original "22" — see the note in Task 3.)
 
 - [ ] **Step 3: Commit**
 
@@ -852,7 +877,7 @@ describe("buildNativeAuthResponseInjectScript", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 4 suites, 34 tests total. (Updated from the original "25" — see the note in Task 3.)
+Expected: PASS — 4 suites, 37 tests total. (Updated from the original "25" — see the note in Task 3.)
 
 - [ ] **Step 3: Commit**
 
@@ -908,7 +933,7 @@ describe("convexAuthStorageKeys", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 37 tests total. (Updated from the original "28" — see the note in Task 3.)
+Expected: PASS — 5 suites, 40 tests total. (Updated from the original "28" — see the note in Task 3.)
 
 - [ ] **Step 3: Commit**
 
@@ -1040,7 +1065,7 @@ Expected: PASS.
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 37 tests, 0 failures. (Updated from the original "28" — see the note in Task 3.)
+Expected: PASS — 5 suites, 40 tests, 0 failures. (Updated from the original "28" — see the note in Task 3.)
 
 - [ ] **Step 7: Full aggregate test script**
 
