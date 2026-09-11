@@ -70,4 +70,34 @@ describe("shouldLoadUrlInWebView", () => {
   it("denies a javascript: URL", () => {
     expect(shouldLoadUrlInWebView("javascript:alert(1)", WEB_BASE_URL)).toBe(false);
   });
+
+  it("denies a javascript: URL even when webBaseUrl is itself a non-http(s) value", () => {
+    // Without the http(s)-only scheme guard, URL.origin is the literal string
+    // "null" for every non-special scheme, so a non-http(s) webBaseUrl would
+    // make this compare equal to the "trusted" origin and incorrectly pass.
+    expect(shouldLoadUrlInWebView("javascript:alert(1)", "solomindlm://app")).toBe(false);
+  });
+});
+
+describe("shouldLoadUrlInWebView in production builds (__DEV__ = false)", () => {
+  const globalWithDevFlag = globalThis as typeof globalThis & { __DEV__: boolean };
+  const originalDev = globalWithDevFlag.__DEV__;
+
+  beforeAll(() => {
+    globalWithDevFlag.__DEV__ = false;
+  });
+
+  afterAll(() => {
+    globalWithDevFlag.__DEV__ = originalDev;
+  });
+
+  it("denies dev and LAN origins when __DEV__ is false", () => {
+    expect(shouldLoadUrlInWebView("http://localhost:5173/", WEB_BASE_URL)).toBe(false);
+    expect(shouldLoadUrlInWebView("http://10.0.2.2:5173/", WEB_BASE_URL)).toBe(false);
+    expect(shouldLoadUrlInWebView("http://192.168.1.42:5173/", WEB_BASE_URL)).toBe(false);
+  });
+
+  it("still allows the real web base origin when __DEV__ is false", () => {
+    expect(shouldLoadUrlInWebView("https://app.solomindlm.com/home", WEB_BASE_URL)).toBe(true);
+  });
 });

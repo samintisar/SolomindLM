@@ -22,24 +22,37 @@ function parseUrl(url: string): URL | null {
  * `url.startsWith(webBaseUrl)` check is bypassable via URL userinfo
  * (`https://<trusted-host>@evil.com/` starts with the trusted host as a
  * string, but a real browser resolves it to host `evil.com`).
+ *
+ * Restricted to http(s) schemes: `URL.origin` is the string `"null"` for
+ * every non-special scheme (`javascript:`, `data:`, `file:`, ...), so without
+ * this guard an unvalidated non-http(s) `webBaseUrl` would make any such URL
+ * compare equal to the "trusted" origin.
+ *
+ * Dev/LAN origins are only trusted in development builds (`__DEV__`) — this
+ * function is the sole gate before the WebView is handed the user's Convex
+ * auth JWT (see `buildWebViewAuthInjectScript`), so trusting a plaintext LAN
+ * origin in a release build would make that origin a token-disclosure surface.
  */
 export function shouldLoadUrlInWebView(url: string, webBaseUrl: string): boolean {
   const parsed = parseUrl(url);
   if (!parsed) return false;
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
 
   const parsedBase = parseUrl(webBaseUrl);
   if (parsedBase && parsed.origin === parsedBase.origin) return true;
 
-  for (const origin of MOBILE_DEV_WEB_ORIGINS) {
-    if (parsed.origin === origin) return true;
-  }
+  if (__DEV__) {
+    for (const origin of MOBILE_DEV_WEB_ORIGINS) {
+      if (parsed.origin === origin) return true;
+    }
 
-  if (
-    parsed.protocol === "http:" &&
-    parsed.port === "5173" &&
-    LAN_VITE_HOST.test(parsed.hostname)
-  ) {
-    return true;
+    if (
+      parsed.protocol === "http:" &&
+      parsed.port === "5173" &&
+      LAN_VITE_HOST.test(parsed.hostname)
+    ) {
+      return true;
+    }
   }
 
   return false;
