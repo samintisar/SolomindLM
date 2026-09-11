@@ -3,6 +3,11 @@ import {
   buildWebViewAuthPostMessageScript,
 } from "./buildWebViewAuthInjectScript";
 
+// Greedy `(.*)` plus a newline-excluding `.` are what make this safe against
+// payload-shaped inputs: `JSON.stringify` never emits a raw newline, so a
+// value containing e.g. `;\nvar jwt = "pwned` can't smuggle a second
+// assignment past the regex — the capture always spans to the last `;` on
+// the matched line, which can only close the real literal or fail to parse.
 function extractLiteral(script: string, varName: string): unknown {
   const match = script.match(new RegExp(`var ${varName} = (.*);`));
   if (!match) throw new Error(`no assignment found for ${varName} in script`);
@@ -38,6 +43,14 @@ describe("buildWebViewAuthInjectScript", () => {
 
     expect(script).toContain('var ns = CONVEX_URL.replace(/[^a-zA-Z0-9]/g, "")');
   });
+
+  it("emits syntactically valid JavaScript", () => {
+    const trickyJwt = 'part-one\\part-two"quoted"\npart-three';
+    expect(
+      () =>
+        new Function(buildWebViewAuthInjectScript("https://foo-bar-123.convex.cloud", trickyJwt))
+    ).not.toThrow();
+  });
 });
 
 describe("buildWebViewAuthPostMessageScript", () => {
@@ -59,5 +72,15 @@ describe("buildWebViewAuthPostMessageScript", () => {
     const payload = extractLiteral(script, "data") as { jwt: unknown };
 
     expect(payload.jwt).toBeNull();
+  });
+
+  it("emits syntactically valid JavaScript", () => {
+    const trickyJwt = 'part-one\\part-two"quoted"\npart-three';
+    expect(
+      () =>
+        new Function(
+          buildWebViewAuthPostMessageScript("https://foo-bar-123.convex.cloud", trickyJwt)
+        )
+    ).not.toThrow();
   });
 });
