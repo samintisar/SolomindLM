@@ -33,11 +33,19 @@ describe("callOpenAIEmbeddings", () => {
   });
 
   it("sends model, dimensions, and input, and returns vectors in request order", async () => {
-    fetchMock.mockResolvedValue(mockOpenAIResponse([[0.1, 0.2], [0.3, 0.4]]));
+    fetchMock.mockResolvedValue(
+      mockOpenAIResponse([
+        [0.1, 0.2],
+        [0.3, 0.4],
+      ])
+    );
 
     const result = await callOpenAIEmbeddings(["first", "second"], "test-key");
 
-    expect(result).toEqual([[0.1, 0.2], [0.3, 0.4]]);
+    expect(result).toEqual([
+      [0.1, 0.2],
+      [0.3, 0.4],
+    ]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/embeddings");
@@ -63,7 +71,10 @@ describe("callOpenAIEmbeddings", () => {
     });
 
     const result = await callOpenAIEmbeddings(["a", "b"], "test-key");
-    expect(result).toEqual([[0.1, 0.1], [0.9, 0.9]]);
+    expect(result).toEqual([
+      [0.1, 0.1],
+      [0.9, 0.9],
+    ]);
   });
 
   it("throws on a non-ok response", async () => {

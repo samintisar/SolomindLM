@@ -20,10 +20,7 @@ import { createCachedAction } from "../cache/cachedAgent";
  * else in this file (the direct-use class and the cacheable Convex actions)
  * calls into this. Returns vectors in the same order as `inputs`.
  */
-export async function callOpenAIEmbeddings(
-  inputs: string[],
-  apiKey: string
-): Promise<number[][]> {
+export async function callOpenAIEmbeddings(inputs: string[], apiKey: string): Promise<number[][]> {
   if (inputs.length === 0) {
     return [];
   }
