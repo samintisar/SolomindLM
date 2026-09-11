@@ -177,7 +177,6 @@ import type * as _lib_allowedOrigins from "../_lib/allowedOrigins.js";
 import type * as _lib_arxivThrottle from "../_lib/arxivThrottle.js";
 import type * as _lib_conversationAccess from "../_lib/conversationAccess.js";
 import type * as _lib_defaultSmartModel from "../_lib/defaultSmartModel.js";
-import type * as _lib_e5Embedding from "../_lib/e5Embedding.js";
 import type * as _lib_embeddingConfig from "../_lib/embeddingConfig.js";
 import type * as _lib_env from "../_lib/env.js";
 import type * as _lib_errors from "../_lib/errors.js";
@@ -216,7 +215,6 @@ import type * as _model_reports from "../_model/reports.js";
 import type * as _model_spreadsheets from "../_model/spreadsheets.js";
 import type * as _model_writtenQuestions from "../_model/writtenQuestions.js";
 import type * as _services_ai_embeddingClient from "../_services/ai/embeddingClient.js";
-import type * as _services_ai_embeddings from "../_services/ai/embeddings.js";
 import type * as _services_ai_mp3 from "../_services/ai/mp3.js";
 import type * as _services_ai_titleGenerator from "../_services/ai/titleGenerator.js";
 import type * as _services_ai_togetherClient from "../_services/ai/togetherClient.js";
@@ -236,7 +234,6 @@ import type * as _services_extraction_WebLoaderService from "../_services/extrac
 import type * as _services_extractors from "../_services/extractors.js";
 import type * as _services_grading_WrittenQuestionsGradingService from "../_services/grading/WrittenQuestionsGradingService.js";
 import type * as _services_processing_DocumentMetadataExtractor from "../_services/processing/DocumentMetadataExtractor.js";
-import type * as _services_processing_EmbeddingServiceClient from "../_services/processing/EmbeddingServiceClient.js";
 import type * as _services_processing_StructuralChunker from "../_services/processing/StructuralChunker.js";
 import type * as _services_processing_TextSplitterService from "../_services/processing/TextSplitterService.js";
 import type * as _services_search_AcademicSearchService from "../_services/search/AcademicSearchService.js";
@@ -550,7 +547,6 @@ declare const fullApi: ApiFromModules<{
   "_lib/arxivThrottle": typeof _lib_arxivThrottle;
   "_lib/conversationAccess": typeof _lib_conversationAccess;
   "_lib/defaultSmartModel": typeof _lib_defaultSmartModel;
-  "_lib/e5Embedding": typeof _lib_e5Embedding;
   "_lib/embeddingConfig": typeof _lib_embeddingConfig;
   "_lib/env": typeof _lib_env;
   "_lib/errors": typeof _lib_errors;
@@ -589,7 +585,6 @@ declare const fullApi: ApiFromModules<{
   "_model/spreadsheets": typeof _model_spreadsheets;
   "_model/writtenQuestions": typeof _model_writtenQuestions;
   "_services/ai/embeddingClient": typeof _services_ai_embeddingClient;
-  "_services/ai/embeddings": typeof _services_ai_embeddings;
   "_services/ai/mp3": typeof _services_ai_mp3;
   "_services/ai/titleGenerator": typeof _services_ai_titleGenerator;
   "_services/ai/togetherClient": typeof _services_ai_togetherClient;
@@ -609,7 +604,6 @@ declare const fullApi: ApiFromModules<{
   "_services/extractors": typeof _services_extractors;
   "_services/grading/WrittenQuestionsGradingService": typeof _services_grading_WrittenQuestionsGradingService;
   "_services/processing/DocumentMetadataExtractor": typeof _services_processing_DocumentMetadataExtractor;
-  "_services/processing/EmbeddingServiceClient": typeof _services_processing_EmbeddingServiceClient;
   "_services/processing/StructuralChunker": typeof _services_processing_StructuralChunker;
   "_services/processing/TextSplitterService": typeof _services_processing_TextSplitterService;
   "_services/search/AcademicSearchService": typeof _services_search_AcademicSearchService;
