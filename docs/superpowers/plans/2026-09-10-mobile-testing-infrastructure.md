@@ -799,13 +799,15 @@ describe("buildWebViewAuthPostMessageScript", () => {
 });
 ```
 
+> **Amended during execution:** code-quality review found this module has no security issue (unlike Task 2's), but flagged two gaps: the namespace test asserted implementation source text rather than behavior (left as-is — the alternative requires stubbing `window`/`localStorage`, not worth it for a "Yes" verdict), and nothing confirmed the generated scripts are actually parseable JavaScript. Added one `"emits syntactically valid JavaScript"` test per function (`new Function(script)` must not throw) and a short comment above `extractLiteral` documenting why its greedy-but-newline-bounded regex can't be fooled by a payload-shaped JWT. See commit `38c8d911` for the final file.
+
 - [ ] **Step 2: Run the test**
 
 ```bash
 bun run test:mobile
 ```
 
-Expected: PASS — 3 suites, 34 tests total. (Updated from the original "22" — see the note in Task 3.)
+Expected: PASS — 3 suites, 36 tests total. (Updated from the original "22" — see the note in Task 3; `buildWebViewAuthInjectScript.test.ts` also grew by 2 after its own code-quality review added two "emits syntactically valid JavaScript" smoke tests, a net +2 carried through the counts below.)
 
 - [ ] **Step 3: Commit**
 
@@ -877,7 +879,7 @@ describe("buildNativeAuthResponseInjectScript", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 4 suites, 37 tests total. (Updated from the original "25" — see the note in Task 3.)
+Expected: PASS — 4 suites, 39 tests total. (Updated from the original "25" — see the notes in Task 3 and Task 4.)
 
 - [ ] **Step 3: Commit**
 
@@ -933,7 +935,7 @@ describe("convexAuthStorageKeys", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 40 tests total. (Updated from the original "28" — see the note in Task 3.)
+Expected: PASS — 5 suites, 42 tests total. (Updated from the original "28" — see the notes in Task 3 and Task 4.)
 
 - [ ] **Step 3: Commit**
 
@@ -1065,7 +1067,7 @@ Expected: PASS.
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 40 tests, 0 failures. (Updated from the original "28" — see the note in Task 3.)
+Expected: PASS — 5 suites, 42 tests, 0 failures. (Updated from the original "28" — see the notes in Task 3 and Task 4.)
 
 - [ ] **Step 7: Full aggregate test script**
 
