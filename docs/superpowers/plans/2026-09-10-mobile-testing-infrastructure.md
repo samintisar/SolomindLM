@@ -879,7 +879,7 @@ describe("buildNativeAuthResponseInjectScript", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 4 suites, 39 tests total. (Updated from the original "25" — see the notes in Task 3 and Task 4.)
+Expected: PASS — 4 suites, 41 tests total. (Updated from the original "25" — see the notes in Task 3 and Task 4; `buildNativeAuthResponseInjectScript.test.ts` also grew by 2 after its own code-quality review added an event-name assertion and a parseability smoke test, a net +2 carried through the counts below. See commit `bc2587e2` for the final file.)
 
 - [ ] **Step 3: Commit**
 
@@ -935,7 +935,7 @@ describe("convexAuthStorageKeys", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 42 tests total. (Updated from the original "28" — see the notes in Task 3 and Task 4.)
+Expected: PASS — 5 suites, 44 tests total. (Updated from the original "28" — see the notes in Task 3, Task 4, and Task 5.)
 
 - [ ] **Step 3: Commit**
 
@@ -1067,7 +1067,7 @@ Expected: PASS.
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 42 tests, 0 failures. (Updated from the original "28" — see the notes in Task 3 and Task 4.)
+Expected: PASS — 5 suites, 44 tests, 0 failures. (Updated from the original "28" — see the notes in Task 3, Task 4, and Task 5.)
 
 - [ ] **Step 7: Full aggregate test script**
 
