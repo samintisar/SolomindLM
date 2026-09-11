@@ -74,4 +74,22 @@ describe("feedback model", () => {
     expect(md).toContain("### Why / what for");
     expect(md).toContain("_none provided_");
   });
+
+  it("keeps a crafted context field inside its code span instead of live markdown", () => {
+    // A single-backtick fence would let the embedded backtick close the span
+    // early, turning "@maintainer" / "#123" into live text outside code. The
+    // fence must be wider than any backtick run already inside the value.
+    const md = feedbackIssueBody({
+      ...base,
+      appVersion: "1.0` @maintainer please look `x",
+      route: "/x`#123`y",
+    });
+    expect(md).toContain("- App version: ``1.0` @maintainer please look `x``");
+    expect(md).toContain("- Route: ``/x`#123`y``");
+  });
+
+  it("pads a context value that starts or ends with a backtick", () => {
+    const md = feedbackIssueBody({ ...base, appVersion: "`v1" });
+    expect(md).toContain("- App version: `` `v1 ``");
+  });
 });

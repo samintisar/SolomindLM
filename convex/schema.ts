@@ -1009,6 +1009,8 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_user", ["userId"])
+    // No by_user index: the user-facing "My feedback" list was cut from
+    // scope (see docs/engineering/in-app-feedback.md) and nothing else reads
+    // this table by userId — add one back if/when that query returns.
     .index("by_status", ["status"]),
 });

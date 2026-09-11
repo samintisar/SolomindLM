@@ -60,6 +60,24 @@ function fenceUserText(text: string): string {
   return `${fence}\n${text}\n${fence}`;
 }
 
+/**
+ * Wrap a single value in a backtick-delimited inline code span, sized so the
+ * value's own backtick runs can't prematurely close it (same idea as
+ * `fenceUserText`, for the single-line "- Label: `value`" context lines).
+ * Content that starts/ends with a backtick or space gets a padding space per
+ * CommonMark's code-span rule. Every context field interpolated into the
+ * issue body — not just `body`/`detail` — is client-controlled, so this must
+ * run on all of them or a crafted value (e.g. a backtick-and-`@mention`
+ * pair in `appVersion`) can break out of code and trigger a live @mention,
+ * #-reference, or link in the issue.
+ */
+function inlineCode(text: string): string {
+  const longestRun = Math.max(0, ...(text.match(/`+/g) ?? []).map((r) => r.length));
+  const fence = "`".repeat(Math.max(1, longestRun + 1));
+  const needsPad = /^[` ]|[` ]$/.test(text);
+  return `${fence}${needsPad ? ` ${text} ` : text}${fence}`;
+}
+
 export function feedbackIssueBody(row: {
   type: FeedbackType;
   body: string;
@@ -78,11 +96,11 @@ export function feedbackIssueBody(row: {
     row.detail?.trim() ? fenceUserText(row.detail.trim()) : "_none provided_",
     "",
     "### Context",
-    `- Route: \`${row.route}\``,
-    `- Plan: \`${row.planTier}\``,
-    `- Surface: \`${row.surface}\``,
-    `- App version: \`${row.appVersion}\``,
-    `- Last requestId: \`${row.lastRequestId ?? "n/a"}\``,
+    `- Route: ${inlineCode(row.route)}`,
+    `- Plan: ${inlineCode(row.planTier)}`,
+    `- Surface: ${inlineCode(row.surface)}`,
+    `- App version: ${inlineCode(row.appVersion)}`,
+    `- Last requestId: ${inlineCode(row.lastRequestId ?? "n/a")}`,
     "",
     "_Filed from in-app feedback._",
   ].join("\n");

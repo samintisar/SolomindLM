@@ -97,22 +97,32 @@ const githubHeaders = (token: string) => ({
   "User-Agent": "SolomindLM-feedback",
 });
 
-/** Best-effort lookup of an issue this row already filed (recovery from a crashed sync). */
+/**
+ * Best-effort lookup of an issue this row already filed (recovery from a
+ * crashed sync). Uses the Issues *list* endpoint rather than `/search/issues`:
+ * search is only eventually consistent (indexing can lag tens of seconds to
+ * minutes), which could miss an issue created moments ago and file a
+ * duplicate; the list endpoint reflects writes immediately. Recovery only
+ * ever needs to check the most recently created issues, since the crashed
+ * sync's issue (if any) is necessarily fresh.
+ */
 async function findExistingIssue(
   repo: string,
   token: string,
   marker: string
 ): Promise<{ number: number; url: string } | null> {
   try {
-    const q = encodeURIComponent(`repo:${repo} in:body "${marker}"`);
-    const res = await fetch(`https://api.github.com/search/issues?q=${q}&per_page=1`, {
-      headers: githubHeaders(token),
-    });
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/issues?state=all&sort=created&direction=desc&per_page=30`,
+      { headers: githubHeaders(token) }
+    );
     if (!res.ok) return null;
-    const json = (await res.json()) as {
-      items?: Array<{ number?: number; html_url?: string }>;
-    };
-    const hit = json.items?.[0];
+    const issues = (await res.json()) as Array<{
+      number?: number;
+      html_url?: string;
+      body?: string | null;
+    }>;
+    const hit = issues.find((i) => typeof i.body === "string" && i.body.includes(marker));
     if (hit && typeof hit.number === "number" && typeof hit.html_url === "string") {
       return { number: hit.number, url: hit.html_url };
     }
@@ -122,7 +132,7 @@ async function findExistingIssue(
   }
 }
 
-/** Record the issue on the row, retrying a few times so a transient failure doesn't orphan it. */
+/** Record the issue on the row, retrying transient failures with backoff. */
 async function attachWithRetry(
   ctx: ActionCtx,
   feedbackId: Id<"feedback">,
@@ -138,7 +148,17 @@ async function attachWithRetry(
       });
       return;
     } catch (err) {
+      // Another sync already recorded an issue for this row (a lost race, or
+      // a stale-lock recovery that beat us to it) — that's the goal state,
+      // not a failure. Stop retrying instead of burning attempts and
+      // alarming the caller with a false "could not be recorded" error.
+      if (err instanceof Error && /already has a GitHub issue/i.test(err.message)) {
+        return;
+      }
       lastErr = err;
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt));
+      }
     }
   }
   throw new ExternalServiceError(

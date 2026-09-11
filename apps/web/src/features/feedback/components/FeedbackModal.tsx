@@ -24,8 +24,10 @@ export function FeedbackModal() {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent className="sm:max-w-md">
-        {/* Remounts on every open, so the form always starts from defaultType with cleared fields. */}
-        {isOpen && <FeedbackForm defaultType={defaultType} onDone={close} />}
+        {/* Radix doesn't render DialogContent's children while closed, so this
+            remounts on every open — the form always starts from defaultType
+            with cleared fields. */}
+        <FeedbackForm defaultType={defaultType} onDone={close} />
       </DialogContent>
     </Dialog>
   );

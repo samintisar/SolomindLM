@@ -27,7 +27,7 @@ export function AdminFeedbackPage() {
     try {
       const { url } = await createIssue(id);
       toast.success("GitHub issue created", {
-        action: { label: "Open", onClick: () => window.open(url, "_blank") },
+        action: { label: "Open", onClick: () => window.open(url, "_blank", "noopener,noreferrer") },
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create issue");
