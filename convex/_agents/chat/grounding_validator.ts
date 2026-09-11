@@ -7,7 +7,7 @@
  * with appropriate citations.
  */
 
-import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import type { EmbeddingService } from "../../_services/ai/embeddingClient";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { matchAllInlineCitations, stripInlineCitationMarkers } from "../_shared/citationExtract.js";
 
@@ -267,8 +267,8 @@ export async function validateSemanticGrounding(
 
   try {
     const [responseEmbed, sourceEmbed] = await Promise.all([
-      embeddingService.embedText(truncateForEmbedding(cleanResponse), "passage"),
-      embeddingService.embedText(truncateForEmbedding(citedSourceText), "passage"),
+      embeddingService.embedText(truncateForEmbedding(cleanResponse)),
+      embeddingService.embedText(truncateForEmbedding(citedSourceText)),
     ]);
 
     const similarity = cosineSimilarity(responseEmbed, sourceEmbed);

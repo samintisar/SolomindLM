@@ -1,8 +1,9 @@
 /**
- * Migration: Re-embed all document chunks with Together AI
+ * Migration: Re-embed all document chunks with OpenAI
  *
- * This script migrates from OpenAI text-embedding-3-small (1536 dimensions)
- * to Together AI intfloat/multilingual-e5-large-instruct (1024 dimensions)
+ * This script migrates from Together AI intfloat/multilingual-e5-large-instruct
+ * (1024 dimensions, deprecated 2026-09-14) to OpenAI text-embedding-3-small
+ * (1536 dimensions, native — not truncated).
  *
  * Run batched migration: npx convex run _migration/reembedChunks:reembedAllChunks
  *
@@ -13,7 +14,8 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EMBEDDING_MODEL } from "../_lib/embeddingConfig";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 
 /**
  * Query to get all document chunks (small dev datasets only)
@@ -55,9 +57,10 @@ export const updateChunkEmbedding = internalMutation({
   args: {
     chunkId: v.id("documentChunks"),
     newEmbedding: v.array(v.number()),
+    embeddingModel: v.string(),
   },
   handler: async (ctx, args) => {
-    const { chunkId, newEmbedding } = args;
+    const { chunkId, newEmbedding, embeddingModel } = args;
 
     // Verify the chunk exists
     const chunk = await ctx.db.get(chunkId);
@@ -65,9 +68,10 @@ export const updateChunkEmbedding = internalMutation({
       throw new Error(`Chunk ${chunkId} not found`);
     }
 
-    // Update with new embedding
+    // Update with new embedding and its provenance
     await ctx.db.patch(chunkId, {
       embedding: newEmbedding,
+      embeddingModel,
     });
 
     return { success: true, chunkId };
@@ -103,12 +107,12 @@ export const reembedDocumentChunks = internalAction({
   handler: async (ctx, args): Promise<{ total: number; processed: number; errors: number }> => {
     "use node";
 
-    const togetherApiKey = process.env.TOGETHER_AI_API_KEY;
-    if (!togetherApiKey) {
-      throw new Error("TOGETHER_AI_API_KEY environment variable not set");
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      throw new Error("OPENAI_API_KEY environment variable not set");
     }
 
-    const embeddingService = new EmbeddingService(togetherApiKey);
+    const embeddingService = new EmbeddingService(openaiApiKey);
 
     // Get chunks for the specific document
     const chunks = await ctx.runQuery(internal._migration.reembedChunks.listChunksByDocument, {
@@ -131,6 +135,7 @@ export const reembedDocumentChunks = internalAction({
       await ctx.runMutation(internal._migration.reembedChunks.updateChunkEmbedding, {
         chunkId: chunks[i]._id,
         newEmbedding: newEmbeddings[i],
+        embeddingModel: EMBEDDING_MODEL,
       });
       processed++;
     }

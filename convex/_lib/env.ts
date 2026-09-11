@@ -8,6 +8,9 @@ import { DEFAULT_SMART_MODEL_ID } from "./defaultSmartModel.js";
 export const env = {
   // Together AI
   TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY || "",
+
+  // OpenAI (embeddings)
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
   FAST_LLM: process.env.FAST_LLM || "Qwen/Qwen3.5-9B",
   SMART_LLM: process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
   REPORT_LLM: process.env.REPORT_LLM || DEFAULT_SMART_MODEL_ID,

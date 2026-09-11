@@ -9,7 +9,7 @@
 
 import { env } from "../../_lib/env";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import type { EmbeddingService } from "../../_services/ai/embeddingClient";
 import type { ChunkMetadata, ReferenceChunk } from "../../storage/ChatHistoryService";
 
 // Re-export ReferenceChunk for other modules

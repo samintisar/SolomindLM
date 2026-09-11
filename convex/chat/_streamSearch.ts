@@ -9,7 +9,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { env } from "../_lib/env";
 import type { ServiceLogger } from "../_lib/logging/serviceLogger";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 import type { ChunkMetadata } from "../storage/ChatHistoryService";
 
 type DocumentChunkDoc = Doc<"documentChunks">;
