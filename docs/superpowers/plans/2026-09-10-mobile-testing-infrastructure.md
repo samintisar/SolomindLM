@@ -27,8 +27,8 @@
 | `apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts` (create) | Tests for `buildNativeAuthResponseInjectScript`. |
 | `apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts` (create) | Tests for `convexAuthStorageKeys`. |
 | `.github/workflows/ci.yml` (modify) | New `test-mobile` job, parallel to `typecheck-mobile`. |
-| `apps/mobile/components/__tests__/StyledText-test.js` (delete) | Dead `create-expo-app` scaffold test, currently unrunnable. |
-| `biome.json` (modify) | Remove the now-stale `!apps/mobile/components/__tests__/**` ignore entries (formatter + linter `includes`) left over from the dead test file. |
+| `apps/mobile/components/__tests__/StyledText-test.js` (delete, in Task 1) | Dead `create-expo-app` scaffold test — deleted in Task 1, not Task 8, because it crashes on teardown when Jest runs it and would block verification for every task in between. |
+| `biome.json` (modify, in Task 8) | Remove the now-stale `!apps/mobile/components/__tests__/**` ignore entries (formatter + linter `includes`) left over from the dead test file. |
 
 ---
 
@@ -40,6 +40,7 @@
 - Modify: `apps/mobile/package.json`
 - Modify: `apps/mobile/tsconfig.json`
 - Modify: `package.json` (repo root)
+- Delete: `apps/mobile/components/__tests__/StyledText-test.js` (pulled forward from Task 8 — see amendment note before Step 8)
 
 - [ ] **Step 1: Install jest-expo at the SDK-matched version**
 
@@ -138,20 +139,44 @@ to:
     "test": "bun run test:web && bun run test:convex && bun run test:mobile",
 ```
 
-- [ ] **Step 8: Verify the harness runs (no test files yet)**
+> **Amended during execution:** Step 1's `bun add -d babel-preset-expo` originally grabbed latest (`57.0.11`) instead of the SDK-matched version already resolved transitively via `expo` (`55.0.22`) — fixed by reinstalling it with `expo install` like `jest-expo`. Also, running the harness (original Step 8) surfaced that the pre-existing dead scaffold `apps/mobile/components/__tests__/StyledText-test.js` doesn't just get skipped — Jest finds and runs it, and it crashes on teardown (`TypeError: window.dispatchEvent is not a function`), which would corrupt every subsequent task's "run tests, verify pass" step. Its removal was pulled forward from Task 8 into this task for that reason; Task 8 now only handles the `biome.json` cleanup.
+
+- [ ] **Step 8: Install babel-preset-expo via expo install instead of bun add**
+
+```bash
+bunx expo install babel-preset-expo --dev
+```
+
+Run from inside `apps/mobile` (or with an equivalent `--cwd`/`--prefix` flag if `bunx --cwd` doesn't pass through as expected — verify the resolved version afterward either way). Confirm `apps/mobile/package.json` / `bun.lock` now pin `babel-preset-expo` to the `~55.x` line, not `57.0.11`.
+
+- [ ] **Step 9: Remove the dead StyledText-test.js scaffold now (pulled forward from Task 8)**
+
+```bash
+rm apps/mobile/components/__tests__/StyledText-test.js
+rmdir apps/mobile/components/__tests__
+```
+
+This file is a `create-expo-app` scaffold leftover that crashes on teardown when Jest picks it up — leaving it in place blocks every later task's verification step. (`biome.json`'s stale ignore entry for this path is cleaned up separately in Task 8 — don't touch `biome.json` here.)
+
+- [ ] **Step 10: Verify the harness runs (no test files yet)**
 
 ```bash
 bun run test:mobile
 ```
 
-Expected: Jest starts under the `jest-expo` preset and reports `No tests found` — exit code 1. This confirms the runner, preset, and config are wired correctly; Task 2 adds the first real test file, after which this command should pass.
+Expected: Jest starts under the `jest-expo` preset and reports `No tests found` — exit code 1, with that specific message (not a crash trace). This confirms the runner, preset, and config are wired correctly; Task 2 adds the first real test file, after which this command should pass.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
 git add apps/mobile/package.json apps/mobile/babel.config.js apps/mobile/jest.config.js apps/mobile/tsconfig.json package.json bun.lock
 git commit -m "chore(mobile): add jest-expo test runner"
+
+git add -u apps/mobile/components
+git commit -m "chore(mobile): remove dead StyledText-test.js blocking jest harness verification"
 ```
+
+(Two commits — tooling setup, then the scaffold removal — or combine them if that's cleaner; either is fine.)
 
 ---
 
@@ -567,24 +592,18 @@ git commit -m "ci(mobile): add test-mobile job"
 
 ---
 
-## Task 8: Remove dead StyledText-test.js and stale biome ignores
+## Task 8: Remove stale biome ignore entries
 
 **Files:**
-- Delete: `apps/mobile/components/__tests__/StyledText-test.js`
 - Modify: `biome.json`
 
-- [ ] **Step 1: Delete the dead test file and its directory**
+> **Amended during execution:** `apps/mobile/components/__tests__/StyledText-test.js` was already deleted in Task 1 (its crash-on-teardown blocked every task's verification step in between — see Task 1's amendment note). This task now only removes the resulting stale `biome.json` ignore entries.
 
-```bash
-rm apps/mobile/components/__tests__/StyledText-test.js
-rmdir apps/mobile/components/__tests__
-```
-
-- [ ] **Step 2: Remove the now-stale biome ignore entries**
+- [ ] **Step 1: Remove the now-stale biome ignore entries**
 
 In `biome.json`, remove the line `"!apps/mobile/components/__tests__/**",` from **both** the `formatter.includes` array and the top-level `linter.includes` array (it appears twice — once per section, each currently reading `"!apps/mobile/components/__tests__/**",`).
 
-- [ ] **Step 3: Verify biome still passes**
+- [ ] **Step 2: Verify biome still passes**
 
 ```bash
 bun run lint
@@ -592,11 +611,11 @@ bun run lint
 
 Expected: no new errors. (Existing warnings elsewhere in the repo, if any, are unrelated to this change.)
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add -u apps/mobile/components biome.json
-git commit -m "chore(mobile): remove dead StyledText-test.js scaffold"
+git add biome.json
+git commit -m "chore(mobile): remove stale StyledText-test.js biome ignore entries"
 ```
 
 ---
