@@ -42,7 +42,7 @@
 - Modify: `package.json` (repo root)
 - Delete: `apps/mobile/components/__tests__/StyledText-test.js` (pulled forward from Task 8 — see amendment note before Step 8)
 
-- [ ] **Step 1: Install jest-expo at the SDK-matched version**
+- [x] **Step 1: Install jest-expo at the SDK-matched version**
 
 Run from the repo root:
 
@@ -54,7 +54,7 @@ bunx --cwd apps/mobile expo install jest-expo --dev
 
 Expected: `apps/mobile/package.json` gains a `jest-expo` devDependency; `bun.lock` updates.
 
-- [ ] **Step 2: Install jest, @types/jest, and babel-preset-expo**
+- [x] **Step 2: Install jest, @types/jest, and babel-preset-expo**
 
 ```bash
 bun add -d jest @types/jest babel-preset-expo --cwd apps/mobile
@@ -64,7 +64,7 @@ bun add -d jest @types/jest babel-preset-expo --cwd apps/mobile
 
 Expected: `apps/mobile/package.json` devDependencies now include `jest`, `@types/jest`, `babel-preset-expo`, `jest-expo`.
 
-- [ ] **Step 3: Add babel.config.js**
+- [x] **Step 3: Add babel.config.js**
 
 Create `apps/mobile/babel.config.js`:
 
@@ -79,7 +79,7 @@ module.exports = function (api) {
 
 There is no existing babel config in `apps/mobile` (Metro/Expo Router currently resolve the preset implicitly at build time); Jest needs it declared explicitly to transform TS/JSX in test files.
 
-- [ ] **Step 4: Add jest.config.js**
+- [x] **Step 4: Add jest.config.js**
 
 Create `apps/mobile/jest.config.js`:
 
@@ -91,7 +91,7 @@ module.exports = {
 };
 ```
 
-- [ ] **Step 5: Add the test script to apps/mobile/package.json**
+- [x] **Step 5: Add the test script to apps/mobile/package.json**
 
 Edit `apps/mobile/package.json` — add to `"scripts"` (after `"web"`):
 
@@ -99,7 +99,7 @@ Edit `apps/mobile/package.json` — add to `"scripts"` (after `"web"`):
     "test": "jest"
 ```
 
-- [ ] **Step 6: Add jest types to apps/mobile/tsconfig.json**
+- [x] **Step 6: Add jest types to apps/mobile/tsconfig.json**
 
 Edit `apps/mobile/tsconfig.json` — add `"types": ["jest"]` inside `compilerOptions`, alongside the existing `"paths"`:
 
@@ -119,7 +119,7 @@ Edit `apps/mobile/tsconfig.json` — add `"types": ["jest"]` inside `compilerOpt
 }
 ```
 
-- [ ] **Step 7: Add test:mobile to the root package.json**
+- [x] **Step 7: Add test:mobile to the root package.json**
 
 Edit `package.json` (repo root) — add a new script right after `"test:web:coverage"`:
 
@@ -141,7 +141,7 @@ to:
 
 > **Amended during execution:** Step 1's `bun add -d babel-preset-expo` originally grabbed latest (`57.0.11`) instead of the SDK-matched version already resolved transitively via `expo` (`55.0.22`) — fixed by reinstalling it with `expo install` like `jest-expo`. Also, running the harness (original Step 8) surfaced that the pre-existing dead scaffold `apps/mobile/components/__tests__/StyledText-test.js` doesn't just get skipped — Jest finds and runs it, and it crashes on teardown (`TypeError: window.dispatchEvent is not a function`), which would corrupt every subsequent task's "run tests, verify pass" step. Its removal was pulled forward from Task 8 into this task for that reason; Task 8 now only handles the `biome.json` cleanup.
 
-- [ ] **Step 8: Install babel-preset-expo via expo install instead of bun add**
+- [x] **Step 8: Install babel-preset-expo via expo install instead of bun add**
 
 ```bash
 bunx expo install babel-preset-expo --dev
@@ -149,7 +149,7 @@ bunx expo install babel-preset-expo --dev
 
 Run from inside `apps/mobile` (or with an equivalent `--cwd`/`--prefix` flag if `bunx --cwd` doesn't pass through as expected — verify the resolved version afterward either way). Confirm `apps/mobile/package.json` / `bun.lock` now pin `babel-preset-expo` to the `~55.x` line, not `57.0.11`.
 
-- [ ] **Step 9: Remove the dead StyledText-test.js scaffold now (pulled forward from Task 8)**
+- [x] **Step 9: Remove the dead StyledText-test.js scaffold now (pulled forward from Task 8)**
 
 ```bash
 rm apps/mobile/components/__tests__/StyledText-test.js
@@ -158,7 +158,7 @@ rmdir apps/mobile/components/__tests__
 
 This file is a `create-expo-app` scaffold leftover that crashes on teardown when Jest picks it up — leaving it in place blocks every later task's verification step. (`biome.json`'s stale ignore entry for this path is cleaned up separately in Task 8 — don't touch `biome.json` here.)
 
-- [ ] **Step 10: Verify the harness runs (no test files yet)**
+- [x] **Step 10: Verify the harness runs (no test files yet)**
 
 ```bash
 bun run test:mobile
@@ -166,7 +166,7 @@ bun run test:mobile
 
 Expected: Jest starts under the `jest-expo` preset and reports `No tests found` — exit code 1, with that specific message (not a crash trace). This confirms the runner, preset, and config are wired correctly; Task 2 adds the first real test file, after which this command should pass.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add apps/mobile/package.json apps/mobile/babel.config.js apps/mobile/jest.config.js apps/mobile/tsconfig.json package.json bun.lock
@@ -185,7 +185,7 @@ git commit -m "chore(mobile): remove dead StyledText-test.js blocking jest harne
 **Files:**
 - Test: `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`
 
-- [ ] **Step 1: Write the test file**
+- [x] **Step 1: Write the test file**
 
 Create `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`:
 
@@ -238,7 +238,7 @@ describe("shouldLoadUrlInWebView", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 ```bash
 bun run test:mobile
@@ -246,7 +246,7 @@ bun run test:mobile
 
 Expected: PASS — 1 suite, 9 tests.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/components/web/webViewUrlPolicy.test.ts
@@ -263,7 +263,7 @@ git commit -m "test(mobile): cover WebView URL allowlist policy"
 - Modify: `apps/mobile/src/components/web/webViewUrlPolicy.ts`
 - Modify: `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`
 
-- [ ] **Step 1: Rewrite webViewUrlPolicy.ts to compare parsed origins, not string prefixes**
+- [x] **Step 1: Rewrite webViewUrlPolicy.ts to compare parsed origins, not string prefixes**
 
 Replace the full contents of `apps/mobile/src/components/web/webViewUrlPolicy.ts` with:
 
@@ -316,7 +316,7 @@ export function shouldLoadUrlInWebView(url: string, webBaseUrl: string): boolean
 }
 ```
 
-- [ ] **Step 2: Replace the test file with a production-realistic fixture plus adversarial regression cases**
+- [x] **Step 2: Replace the test file with a production-realistic fixture plus adversarial regression cases**
 
 Replace the full contents of `apps/mobile/src/components/web/webViewUrlPolicy.test.ts` with:
 
@@ -398,7 +398,7 @@ describe("shouldLoadUrlInWebView", () => {
 });
 ```
 
-- [ ] **Step 3: Run the test and typecheck**
+- [x] **Step 3: Run the test and typecheck**
 
 ```bash
 bun run test:mobile
@@ -408,7 +408,7 @@ bun run lint
 
 Expected: PASS — 1 suite, 15 tests. Typecheck and lint clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/components/web/webViewUrlPolicy.ts apps/mobile/src/components/web/webViewUrlPolicy.test.ts
@@ -428,7 +428,7 @@ git commit -m "fix(mobile): compare parsed origins in WebView URL policy, not st
 - Modify: `apps/mobile/src/components/web/webViewUrlPolicy.ts`
 - Modify: `apps/mobile/src/components/web/webViewUrlPolicy.test.ts`
 
-- [ ] **Step 1: Add an http(s)-only scheme guard and gate dev/LAN origins behind `__DEV__`**
+- [x] **Step 1: Add an http(s)-only scheme guard and gate dev/LAN origins behind `__DEV__`**
 
 Replace the full contents of `apps/mobile/src/components/web/webViewUrlPolicy.ts` with:
 
@@ -494,7 +494,7 @@ export function shouldLoadUrlInWebView(url: string, webBaseUrl: string): boolean
 }
 ```
 
-- [ ] **Step 2: Add regression tests for both fixes**
+- [x] **Step 2: Add regression tests for both fixes**
 
 Replace the full contents of `apps/mobile/src/components/web/webViewUrlPolicy.test.ts` with:
 
@@ -604,7 +604,7 @@ describe("shouldLoadUrlInWebView in production builds (__DEV__ = false)", () => 
 });
 ```
 
-- [ ] **Step 3: Run the test, typecheck, and lint**
+- [x] **Step 3: Run the test, typecheck, and lint**
 
 ```bash
 bun run test:mobile
@@ -614,7 +614,7 @@ bun run lint
 
 Expected: PASS — 1 suite (Jest counts test *files*, not `describe` blocks — this is still the only test file in the app), 18 tests (16 + 2 across the two `describe` blocks). Typecheck and lint clean. (`bun run typecheck:mobile` must confirm `__DEV__` typechecks without a `declare` — it's already used elsewhere in `apps/mobile`, e.g. via Expo's ambient RN types.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/components/web/webViewUrlPolicy.ts apps/mobile/src/components/web/webViewUrlPolicy.test.ts
@@ -623,6 +623,8 @@ git commit -m "fix(mobile): restrict WebView URL policy to http(s) and gate dev/
 
 **Deliberately not done here** (noted by the reviewer as minor/optional, not required): failing closed on an unparseable `webBaseUrl` (currently falls through to dev-origins-only), rejecting credentials-bearing URLs to the trusted host itself, and a couple of extra edge-case tests (IPv6 loopback, parser-identity assertion). None are required for this fix; revisit only if a future finding makes them relevant.
 
+> **Amended during execution (two more commits, not previously recorded here):** the follow-up code-quality review recommended two comment-only doc additions with an explicit "stop iterating, this is a finishing state" verdict — commit `3927bd29` added them, recording (a) that production runs a real URL parser (framed at the time as "not the RN shim, so tests are stricter than production" — see below) and (b) that `webBaseUrl` itself is trusted unconditionally including over plaintext. The final whole-branch review then found (a) was factually wrong: Expo's winter runtime overrides the global `URL` with `whatwg-url-minimum` (a spec-compliant parser) at app start (`expo/src/winter/runtime.native.ts` → `expo/src/winter/url.ts`), so there is no test/production parser divergence — both run the same kind of parser. Commit `a495f645` corrected the comment to state that plainly instead. No logic changed in either commit; only the doc comment's accuracy. The lesson: this is the one commit on the branch that didn't get a plan amendment when it landed — worth noting that even a "just a comment" change to security-critical code benefits from the same audit-trail discipline as a logic change, since a documentation error here is exactly the kind of thing a future maintainer would trust without re-verifying.
+
 ---
 
 ## Task 3: deepLinking tests
@@ -630,7 +632,7 @@ git commit -m "fix(mobile): restrict WebView URL policy to http(s) and gate dev/
 **Files:**
 - Test: `apps/mobile/src/services/platform/deepLinking.test.ts`
 
-- [ ] **Step 1: Write the test file**
+- [x] **Step 1: Write the test file**
 
 Create `apps/mobile/src/services/platform/deepLinking.test.ts`:
 
@@ -707,7 +709,7 @@ describe("parseMobileDeepLink", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 ```bash
 bun run test:mobile
@@ -715,7 +717,7 @@ bun run test:mobile
 
 Expected: PASS — 2 suites, 28 tests total. (Updated from the original plan's "16" — `webViewUrlPolicy.test.ts` grew from 9 to 18 tests across Tasks 2.5/2.6's security fixes, and `deepLinking.test.ts` grew from 7 to 10 tests per the amendment note above, a net +12 carried through every count below.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/services/platform/deepLinking.test.ts
@@ -729,7 +731,7 @@ git commit -m "test(mobile): cover deep link parsing"
 **Files:**
 - Test: `apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts`
 
-- [ ] **Step 1: Write the test file**
+- [x] **Step 1: Write the test file**
 
 Create `apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts`:
 
@@ -801,7 +803,7 @@ describe("buildWebViewAuthPostMessageScript", () => {
 
 > **Amended during execution:** code-quality review found this module has no security issue (unlike Task 2's), but flagged two gaps: the namespace test asserted implementation source text rather than behavior (left as-is — the alternative requires stubbing `window`/`localStorage`, not worth it for a "Yes" verdict), and nothing confirmed the generated scripts are actually parseable JavaScript. Added one `"emits syntactically valid JavaScript"` test per function (`new Function(script)` must not throw) and a short comment above `extractLiteral` documenting why its greedy-but-newline-bounded regex can't be fooled by a payload-shaped JWT. See commit `38c8d911` for the final file.
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 ```bash
 bun run test:mobile
@@ -809,7 +811,7 @@ bun run test:mobile
 
 Expected: PASS — 3 suites, 36 tests total. (Updated from the original "22" — see the note in Task 3; `buildWebViewAuthInjectScript.test.ts` also grew by 2 after its own code-quality review added two "emits syntactically valid JavaScript" smoke tests, a net +2 carried through the counts below.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/components/web/buildWebViewAuthInjectScript.test.ts
@@ -823,7 +825,7 @@ git commit -m "test(mobile): cover WebView auth inject-script builder"
 **Files:**
 - Test: `apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts`
 
-- [ ] **Step 1: Write the test file**
+- [x] **Step 1: Write the test file**
 
 Create `apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts`:
 
@@ -873,7 +875,7 @@ describe("buildNativeAuthResponseInjectScript", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 ```bash
 bun run test:mobile
@@ -881,7 +883,7 @@ bun run test:mobile
 
 Expected: PASS — 4 suites, 41 tests total. (Updated from the original "25" — see the notes in Task 3 and Task 4; `buildNativeAuthResponseInjectScript.test.ts` also grew by 2 after its own code-quality review added an event-name assertion and a parseability smoke test, a net +2 carried through the counts below. See commit `bc2587e2` for the final file.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/components/web/buildNativeAuthResponseInjectScript.test.ts
@@ -895,7 +897,7 @@ git commit -m "test(mobile): cover native auth response inject-script builder"
 **Files:**
 - Test: `apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts`
 
-- [ ] **Step 1: Write the test file**
+- [x] **Step 1: Write the test file**
 
 Create `apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts`:
 
@@ -929,7 +931,7 @@ describe("convexAuthStorageKeys", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 ```bash
 bun run test:mobile
@@ -937,7 +939,7 @@ bun run test:mobile
 
 Expected: PASS — 5 suites, 46 tests total. (Updated from the original "28" — see the notes in Task 3, Task 4, and Task 5; `convexAuthStorageKeys.test.ts` also grew by 2 net after its own code-quality review found its "agrees with the WebView inject script" test was self-referential rather than a real cross-check — replaced with one that actually executes `buildWebViewAuthInjectScript`'s output in a stubbed sandbox and inspects where it wrote the JWT, plus added case-preservation and degenerate-input edge cases. See commit `45fbf866` for the final file.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/services/auth/convexAuthStorageKeys.test.ts
@@ -951,7 +953,7 @@ git commit -m "test(mobile): cover Convex auth storage key derivation"
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Add the test-mobile job**
+- [x] **Step 1: Add the test-mobile job**
 
 In `.github/workflows/ci.yml`, insert a new job immediately after the `typecheck-mobile` job (before `build-web`):
 
@@ -972,7 +974,7 @@ In `.github/workflows/ci.yml`, insert a new job immediately after the `typecheck
 
 This mirrors `typecheck-mobile`'s shape and, like `test-unit`, is not added to `build-web` / `build-web-main`'s `needs:` — it's a signal job, not a build gate.
 
-- [ ] **Step 2: Validate the workflow file**
+- [x] **Step 2: Validate the workflow file**
 
 ```bash
 docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
@@ -980,7 +982,7 @@ docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
 Expected: no errors reported for `.github/workflows/ci.yml`. (This mirrors the repo's own `workflow-lint` CI job locally; skip if Docker isn't available and rely on that CI job instead.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
@@ -1000,11 +1002,11 @@ git commit -m "ci(mobile): add test-mobile job"
 
 > **Amended during execution:** `apps/mobile/components/__tests__/StyledText-test.js` was already deleted in Task 1 (its crash-on-teardown blocked every task's verification step in between — see Task 1's amendment note). This task now only removes the resulting stale `biome.json` ignore entries.
 
-- [ ] **Step 1: Remove the now-stale biome ignore entries**
+- [x] **Step 1: Remove the now-stale biome ignore entries**
 
 In `biome.json`, remove the line `"!apps/mobile/components/__tests__/**",` from **both** the `formatter.includes` array and the top-level `linter.includes` array (it appears twice — once per section, each currently reading `"!apps/mobile/components/__tests__/**",`).
 
-- [ ] **Step 2: Verify biome still passes**
+- [x] **Step 2: Verify biome still passes**
 
 ```bash
 bun run lint
@@ -1012,7 +1014,7 @@ bun run lint
 
 Expected: no new errors. (Existing warnings elsewhere in the repo, if any, are unrelated to this change.)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add biome.json
@@ -1025,7 +1027,7 @@ git commit -m "chore(mobile): remove stale StyledText-test.js biome ignore entri
 
 **Files:** none (verification only)
 
-- [ ] **Step 1: Typecheck mobile**
+- [x] **Step 1: Typecheck mobile**
 
 ```bash
 bun run typecheck:mobile
@@ -1033,7 +1035,7 @@ bun run typecheck:mobile
 
 Expected: PASS, no errors (confirms the new `*.test.ts` files typecheck cleanly with the `"types": ["jest"]` addition).
 
-- [ ] **Step 2: Typecheck web** (unaffected, but required by the project's verification gate)
+- [x] **Step 2: Typecheck web** (unaffected, but required by the project's verification gate)
 
 ```bash
 bun run typecheck:web
@@ -1041,7 +1043,7 @@ bun run typecheck:web
 
 Expected: PASS.
 
-- [ ] **Step 3: Typecheck convex** (unaffected, but required by the project's verification gate)
+- [x] **Step 3: Typecheck convex** (unaffected, but required by the project's verification gate)
 
 ```bash
 bun run typecheck:convex
@@ -1049,7 +1051,7 @@ bun run typecheck:convex
 
 Expected: PASS.
 
-- [ ] **Step 4: Lint**
+- [x] **Step 4: Lint**
 
 ```bash
 bun run lint
@@ -1057,7 +1059,7 @@ bun run lint
 
 Expected: PASS.
 
-- [ ] **Step 5: Convex tests** (unaffected, but required by the project's verification gate)
+- [x] **Step 5: Convex tests** (unaffected, but required by the project's verification gate)
 
 ```bash
 bun run test:convex
@@ -1065,7 +1067,7 @@ bun run test:convex
 
 Expected: PASS.
 
-- [ ] **Step 6: Mobile tests**
+- [x] **Step 6: Mobile tests**
 
 ```bash
 bun run test:mobile
@@ -1073,7 +1075,7 @@ bun run test:mobile
 
 Expected: PASS — 5 suites, 46 tests, 0 failures. (Updated from the original "28" — see the notes in Task 3, Task 4, Task 5, and Task 6.)
 
-- [ ] **Step 7: Full aggregate test script**
+- [x] **Step 7: Full aggregate test script**
 
 ```bash
 bun run test
