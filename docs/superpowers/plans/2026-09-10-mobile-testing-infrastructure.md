@@ -987,6 +987,10 @@ git add .github/workflows/ci.yml
 git commit -m "ci(mobile): add test-mobile job"
 ```
 
+> **Amended during execution:** code-quality review found the new job wasn't wired into branch protection at all — `.github/branch-protection.ps1`'s `required_status_checks.checks` array and `.github/BRANCHING.md`'s documented Required list both omitted it, meaning it would run on every PR but block nothing (and would go undocumented). Added `Test (Mobile)` to both, and added `timeout-minutes: 10` to the job (matching the `audit` job's existing precedent for the one other tool in this file known to hang rather than cleanly fail — Task 1's own amendment note records exactly that failure mode from the dead `StyledText-test.js` scaffold). See commit `6a2b0613`.
+>
+> **Deliberately not done:** running `.github/branch-protection.ps1` itself — that applies the change to the *live* GitHub branch protection settings via `gh api`, a real, shared-system mutation outside what should happen without the repo owner's explicit go-ahead (and GitHub generally needs a required check to have actually run at least once on a PR before it reliably takes effect, so this is better done after this branch's PR has run once anyway). The script's source is updated and ready to run whenever the user chooses to. A pre-existing, unrelated drift was also noticed in the same two files (`BRANCHING.md` lists `Coverage Report` as required; the script's array never included it) and was left alone as out of scope for issue #104.
+
 ---
 
 ## Task 8: Remove stale biome ignore entries
