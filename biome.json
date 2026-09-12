@@ -35,7 +35,6 @@
       "!node_modules/**",
       "!archive/**",
       "!apps/mobile/.expo/**",
-      "!apps/mobile/components/__tests__/**",
       "!apps/mobile/metro.config.js",
       "!apps/web/public/**",
       "!**/.arcserve",
@@ -150,7 +149,6 @@
       "!node_modules/**",
       "!archive/**",
       "!apps/mobile/.expo/**",
-      "!apps/mobile/components/__tests__/**",
       "!apps/mobile/metro.config.js",
       "!apps/web/public/**"
     ]
