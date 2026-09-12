@@ -935,7 +935,7 @@ describe("convexAuthStorageKeys", () => {
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 44 tests total. (Updated from the original "28" — see the notes in Task 3, Task 4, and Task 5.)
+Expected: PASS — 5 suites, 46 tests total. (Updated from the original "28" — see the notes in Task 3, Task 4, and Task 5; `convexAuthStorageKeys.test.ts` also grew by 2 net after its own code-quality review found its "agrees with the WebView inject script" test was self-referential rather than a real cross-check — replaced with one that actually executes `buildWebViewAuthInjectScript`'s output in a stubbed sandbox and inspects where it wrote the JWT, plus added case-preservation and degenerate-input edge cases. See commit `45fbf866` for the final file.)
 
 - [ ] **Step 3: Commit**
 
@@ -1067,7 +1067,7 @@ Expected: PASS.
 bun run test:mobile
 ```
 
-Expected: PASS — 5 suites, 44 tests, 0 failures. (Updated from the original "28" — see the notes in Task 3, Task 4, and Task 5.)
+Expected: PASS — 5 suites, 46 tests, 0 failures. (Updated from the original "28" — see the notes in Task 3, Task 4, Task 5, and Task 6.)
 
 - [ ] **Step 7: Full aggregate test script**
 
