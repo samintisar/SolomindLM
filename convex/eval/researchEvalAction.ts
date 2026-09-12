@@ -16,7 +16,7 @@ import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { env } from "../_lib/env";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 import { sourcesFromDiscoverResult } from "./_discoverResult";
 import { assertRagEvalGate } from "./_gate";
 
@@ -141,14 +141,14 @@ export const runResearchEval = action({
       });
     };
 
-    const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY || "");
+    const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
     // Build deps for ResearchAgent
     const deps = {
       apiKey: process.env.TOGETHER_AI_API_KEY || "",
       smartModel: env.SMART_LLM,
       runHybridSearch: async (query: string, docIds?: string[]) => {
-        const embedding = await embeddingService.embedText(query, "query");
+        const embedding = await embeddingService.embedText(query);
         const vectorResults = await vectorSearchRunner(embedding, 10, docIds);
         const keywordResults = await keywordSearchRunner(query, 10, docIds);
         // Merge and deduplicate (simplified)

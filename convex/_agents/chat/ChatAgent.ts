@@ -9,7 +9,7 @@ import { env } from "../../_lib/env";
 import type { ServiceLogger } from "../../_lib/logging/serviceLogger";
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
 import { resolveSmartModel } from "../../_lib/resolveSmartModel";
-import { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import { EmbeddingService } from "../../_services/ai/embeddingClient";
 import type { ReferenceChunk } from "../../storage/ChatHistoryService";
 import { countTokens } from "../_shared/tokenizer";
 import { isListEnumerationQuery } from "./chat_retrieval_subqueries.js";
@@ -80,7 +80,7 @@ export class ChatAgent {
         maxResults: parseInt(env.CHAT_MAX_RESULTS ?? "7", 10),
       });
 
-    this.embeddingService = new EmbeddingService(env.TOGETHER_AI_API_KEY);
+    this.embeddingService = new EmbeddingService(env.OPENAI_API_KEY);
     this.globalRerankFn = options?.globalRerankFn;
     this.fetchDocumentFn = options?.fetchDocumentFn;
   }

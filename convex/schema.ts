@@ -168,6 +168,8 @@ export default defineSchema({
     content: v.string(),
     chunkIndex: v.number(),
     embedding: v.optional(v.array(v.float64())),
+    /** Which model produced `embedding`. Used by the re-embed migration to tell old vectors from new ones by provenance rather than by vector length (which can coincide across models). Unset on rows embedded before this field existed. */
+    embeddingModel: v.optional(v.string()),
     metadata: v.optional(v.any()),
     // Chunk-level metadata (extracted during chunking)
     totalChunks: v.optional(v.number()),
@@ -191,7 +193,7 @@ export default defineSchema({
     .index("by_document", ["documentId"])
     .index("by_notebook", ["notebookId"])
     .vectorIndex("by_embedding", {
-      dimensions: 1024, // NOTE: dimensions (plural), not dimension - updated for Together AI intfloat/multilingual-e5-large-instruct
+      dimensions: 1536, // NOTE: dimensions (plural), not dimension - OpenAI text-embedding-3-small, native size (not truncated)
       vectorField: "embedding",
       filterFields: ["userId", "notebookId"],
     })
