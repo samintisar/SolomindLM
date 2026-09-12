@@ -24,15 +24,13 @@ function parseUrl(url: string): URL | null {
  * string, but a real browser resolves it to host `evil.com`).
  *
  * Restricted to http(s) schemes: for every non-special scheme (`javascript:`,
- * `data:`, `file:`, ...) `URL.origin` collapses to a single sentinel value
- * that ignores the rest of the URL — `"null"` per spec (Jest's Node `URL`),
- * `""` under React Native's own `URL` shim (no `react-native-url-polyfill`
- * is installed, so production parses with the RN shim, not a spec-compliant
- * parser — this file's tests run on Node's `URL` and are therefore stricter
- * than production, though every observed divergence denies in production
- * cases this file's tests allow, never the reverse). Either sentinel would
- * make a non-http(s) `webBaseUrl` compare equal to any URL of that scheme
- * without this guard.
+ * `data:`, `file:`, ...) `URL.origin` collapses to the spec sentinel `"null"`,
+ * which would otherwise make a non-http(s) `webBaseUrl` compare equal to any
+ * URL of that scheme. Expo's winter runtime replaces the global `URL` with
+ * `whatwg-url-minimum` (`expo/src/winter/url.ts`, installed at app start via
+ * `expo/src/winter/runtime.native.ts`) — a spec-compliant parser, the same
+ * one these tests run on via Node's `URL`, so there is no test/production
+ * parser divergence to account for here.
  *
  * Dev/LAN origins are only trusted in development builds (`__DEV__`) — this
  * function is the sole gate before the WebView is handed the user's Convex
