@@ -193,6 +193,19 @@ jobs:
       - name: Typecheck mobile
         run: bun run typecheck:mobile
 
+  test-mobile:
+    name: Test (Mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run mobile tests
+        run: bun run test:mobile
+
   build-web:
     name: Build (Web, PR parity)
     needs: [typecheck-convex, typecheck-web, typecheck-mobile]
