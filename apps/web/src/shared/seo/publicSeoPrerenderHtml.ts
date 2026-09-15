@@ -1,4 +1,5 @@
 import { getClusterHubPageByPath } from "@/features/landing/clusterHubPages";
+import { HOME_RESOURCE_LINKS } from "@/features/landing/constants";
 import { LANDING_FAQS } from "@/features/landing/faqRegistry";
 import { getIntentLandingPageByPath } from "@/features/landing/intentLandingPages";
 import { getSeoContentPageByPath } from "@/features/landing/seoContentPages";
@@ -17,6 +18,10 @@ export function buildHomePrerenderBody(): string {
       `        <div>\n          <h3>${escapeHtml(faq.question)}</h3>\n          <p>${escapeHtml(faq.answer)}</p>\n        </div>`
   ).join("\n");
 
+  const resourceLinks = HOME_RESOURCE_LINKS.map(
+    (link) => `          <li><a href="${link.path}">${escapeHtml(link.label)}</a></li>`
+  ).join("\n");
+
   return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
         <h1>AI Study &amp; Research Assistant for Your PDFs</h1>
@@ -26,10 +31,7 @@ export function buildHomePrerenderBody(): string {
       <section aria-labelledby="seo-prerender-resources">
         <h2 id="seo-prerender-resources">Explore SolomindLM</h2>
         <ul>
-          <li><a href="/students">Study tools for students</a></li>
-          <li><a href="/research">Research tools</a></li>
-          <li><a href="/compare/solomindlm-vs-notebooklm">SolomindLM vs NotebookLM</a></li>
-          <li><a href="/guides/how-to-study-from-pdfs-with-ai">How to study from PDFs with AI</a></li>
+${resourceLinks}
         </ul>
       </section>
       <section aria-labelledby="seo-prerender-faq">

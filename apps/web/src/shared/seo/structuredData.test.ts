@@ -12,6 +12,7 @@ import {
   generateArticleStructuredData,
   generateBreadcrumbStructuredData,
   generateFAQStructuredData,
+  generateSoftwareApplicationStructuredData,
 } from "./structuredData";
 
 describe("generateFAQStructuredData", () => {
@@ -59,6 +60,35 @@ describe("generateBreadcrumbStructuredData", () => {
         item: "https://www.solomindlm.com/students/ai-flashcards",
       },
     ]);
+  });
+});
+
+describe("generateSoftwareApplicationStructuredData", () => {
+  it("returns a Free offer and two Pro offers with schema.org-valid billing periods", () => {
+    const data = generateSoftwareApplicationStructuredData();
+
+    expect(data["@type"]).toBe("SoftwareApplication");
+    expect(data.offers).toHaveLength(3);
+    expect(data.offers[0]).toMatchObject({
+      "@type": "Offer",
+      name: "Free",
+      price: "0",
+      priceCurrency: "USD",
+    });
+    for (const offer of data.offers.slice(1)) {
+      expect(offer).toMatchObject({
+        "@type": "Offer",
+        priceCurrency: "USD",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          billingDuration: 1,
+          unitCode: "MON",
+        },
+      });
+      // "billingDurationUnit" is not a schema.org property and would be silently
+      // ignored by structured-data consumers — guard against reintroducing it.
+      expect(offer.priceSpecification).not.toHaveProperty("billingDurationUnit");
+    }
   });
 });
 

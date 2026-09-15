@@ -59,7 +59,7 @@ export const generateSoftwareApplicationStructuredData = () => ({
       priceSpecification: {
         "@type": "UnitPriceSpecification",
         billingDuration: 1,
-        billingDurationUnit: "MONTH",
+        unitCode: "MON",
       },
     },
     {
@@ -70,7 +70,7 @@ export const generateSoftwareApplicationStructuredData = () => ({
       priceSpecification: {
         "@type": "UnitPriceSpecification",
         billingDuration: 1,
-        billingDurationUnit: "MONTH",
+        unitCode: "MON",
       },
     },
   ],
