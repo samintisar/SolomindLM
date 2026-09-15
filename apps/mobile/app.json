@@ -2,6 +2,7 @@
   "expo": {
     "name": "SolomindLM",
     "slug": "solomindlm",
+    "owner": "ibrokeass2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,7 +16,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
-      "associatedDomains": ["applinks:REPLACE_WITH_YOUR_DOMAIN"]
+      "associatedDomains": ["applinks:www.solomindlm.com"],
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -31,7 +35,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "REPLACE_WITH_YOUR_DOMAIN",
+              "host": "www.solomindlm.com",
               "pathPrefix": "/notebook"
             }
           ],
@@ -90,6 +94,11 @@
     },
     "updates": {
       "enabled": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "666fb4cb-5bce-4ed7-874f-526827e159c0"
+      }
     }
   }
 }

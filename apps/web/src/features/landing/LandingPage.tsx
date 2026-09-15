@@ -34,12 +34,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
       <SEOMeta pagePath="/" />
       <div className="min-h-screen landing-grid-pattern">
         <NavigationHeader onGetStarted={onGetStarted} onLogin={() => setAuthModalOpen(true)} />
-        <HeroSection onGetStarted={onGetStarted} />
-        <FeaturesGrid />
-        <UseCasesSection />
-        <ContentShowcase />
-        <PricingSection onGetStarted={onGetStarted} />
-        <FAQSection />
+        <main>
+          <HeroSection onGetStarted={onGetStarted} />
+          <FeaturesGrid />
+          <UseCasesSection />
+          <ContentShowcase />
+          <PricingSection onGetStarted={onGetStarted} />
+          <FAQSection />
+        </main>
         <Footer />
       </div>
       <AuthModal

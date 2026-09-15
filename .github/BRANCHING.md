@@ -193,7 +193,7 @@ pwsh -File .github/branch-protection.ps1
    | Require a pull request              | ✅ (1 approval)                             |
    | Require status checks               | ✅                                          |
    | Require branches to be up to date   | ✅                                          |
-   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Build (Web, PR parity)` |
+   | Require status checks to pass       | `Typecheck (Convex)`, `Typecheck (Web)`, `Typecheck (Expo mobile)`, `Lint (Biome)`, `Lint (Workflows)`, `Unit Tests`, `Test (Mobile)`, `Build (Web, PR parity)` |
    | Do not allow bypassing the settings | ✅                                          |
    | Require resolution of conversations | Optional                                    |
 
@@ -214,8 +214,9 @@ The `.github/workflows/ci.yml` runs on:
 4. **Lint (Biome)** - Biome lint + format check
 5. **Lint (Workflows)** - actionlint on GitHub workflow files
 6. **Unit Tests** - `test:convex` + `test:web` vitest suites, plus the RAG eval fixture dry-run
-7. **Build (Web, PR parity)** - Builds the React frontend
-8. **Coverage Report** - web coverage floor
+7. **Test (Mobile)** - `jest-expo` suite for `apps/mobile`
+8. **Build (Web, PR parity)** - Builds the React frontend
+9. **Coverage Report** - web coverage floor
 
 **Advisory** (run on PRs, not merge-blocking):
 
