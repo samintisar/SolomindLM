@@ -22,6 +22,7 @@ Disallow: /auth/
 
 # Disallow API endpoints (if any)
 Disallow: /api/
+Disallow: /admin/
 
 # Sitemap reference
 Sitemap: https://www.solomindlm.com/sitemap.xml
