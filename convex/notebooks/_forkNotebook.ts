@@ -95,6 +95,7 @@ export async function performNotebookFork(
       content: c.content,
       chunkIndex: c.chunkIndex,
       embedding: c.embedding,
+      embeddingModel: c.embeddingModel,
       metadata: c.metadata,
       totalChunks: c.totalChunks,
       relativePosition: c.relativePosition,

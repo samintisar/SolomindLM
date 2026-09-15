@@ -92,6 +92,7 @@ export const storeChunk = internalMutation({
     content: v.string(),
     chunkIndex: v.number(),
     embedding: v.array(v.float64()),
+    embeddingModel: v.optional(v.string()),
     metadata: v.optional(
       v.object({
         totalChunks: v.optional(v.number()),
@@ -121,6 +122,7 @@ export const storeChunk = internalMutation({
       content: args.content,
       chunkIndex: args.chunkIndex,
       embedding: args.embedding,
+      embeddingModel: args.embeddingModel,
       createdAt: Date.now(),
     };
 
