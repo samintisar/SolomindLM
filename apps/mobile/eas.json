@@ -19,6 +19,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "samintisaruni@gmail.com",
+        "ascAppId": "6812221524",
+        "appleTeamId": "5TNBJBPR85"
+      }
+    }
   }
 }
