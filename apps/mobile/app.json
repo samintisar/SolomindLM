@@ -16,7 +16,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.solomindlm.app",
-      "associatedDomains": ["applinks:www.solomindlm.com"]
+      "associatedDomains": ["applinks:www.solomindlm.com"],
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
