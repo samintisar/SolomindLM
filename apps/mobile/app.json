@@ -2,6 +2,7 @@
   "expo": {
     "name": "SolomindLM",
     "slug": "solomindlm",
+    "owner": "ibrokeass2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -90,6 +91,11 @@
     },
     "updates": {
       "enabled": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "666fb4cb-5bce-4ed7-874f-526827e159c0"
+      }
     }
   }
 }
