@@ -11,6 +11,7 @@
     "run:android:device": "node ./scripts/run-android.mjs --device",
     "ios": "bun run kill-port && bun x expo start --ios --port 8081",
     "web": "bun run kill-port && bun x expo start --web --port 8081",
+    "test": "jest",
     "build:dev:ios": "bun x eas-cli build --profile development --platform ios",
     "build:dev:android": "bun x eas-cli build --profile development --platform android"
   },
@@ -49,7 +50,11 @@
     "react-native-worklets": "0.7.4"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.2.10",
+    "babel-preset-expo": "~55.0.8",
+    "jest": "^30.5.1",
+    "jest-expo": "~55.0.22",
     "metro-resolver": "0.83.6",
     "react-test-renderer": "19.2.8",
     "typescript": "~5.9.2"

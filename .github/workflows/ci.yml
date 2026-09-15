@@ -193,6 +193,23 @@ jobs:
       - name: Typecheck mobile
         run: bun run typecheck:mobile
 
+  test-mobile:
+    name: Test (Mobile)
+    runs-on: ubuntu-latest
+    # Jest is prone to not exiting on open handles (a hanging teardown, not
+    # just a failing assertion) — see the dead scaffold test this suite
+    # replaced. Bound it like `audit` bounds its own hang-prone tool.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run mobile tests
+        run: bun run test:mobile
+
   build-web:
     name: Build (Web, PR parity)
     needs: [typecheck-convex, typecheck-web, typecheck-mobile]
