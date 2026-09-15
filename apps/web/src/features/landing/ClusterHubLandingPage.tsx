@@ -53,44 +53,46 @@ export function ClusterHubLandingPage({ pagePath }: ClusterHubLandingPageProps) 
       />
       <div className="min-h-screen landing-grid-pattern">
         <HubHeader />
-        <section className="px-6 md:px-8 pt-16 pb-12 md:pt-24 md:pb-16">
-          <div className="max-w-5xl mx-auto space-y-10">
-            <div className="max-w-3xl mx-auto text-center space-y-8">
-              <p className="text-sm font-medium uppercase tracking-wider text-primary">
-                {clusterLabel}
-              </p>
-              <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-tight">
-                {page.h1}
-              </h1>
-              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-                {page.subheadline}
-              </p>
-              <Button size="lg" onClick={openSignup} className="font-semibold px-8">
-                {page.ctaLabel}
-              </Button>
+        <main>
+          <section className="px-6 md:px-8 pt-16 pb-12 md:pt-24 md:pb-16">
+            <div className="max-w-5xl mx-auto space-y-10">
+              <div className="max-w-3xl mx-auto text-center space-y-8">
+                <p className="text-sm font-medium uppercase tracking-wider text-primary">
+                  {clusterLabel}
+                </p>
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight leading-tight">
+                  {page.h1}
+                </h1>
+                <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+                  {page.subheadline}
+                </p>
+                <Button size="lg" onClick={openSignup} className="font-semibold px-8">
+                  {page.ctaLabel}
+                </Button>
+              </div>
+
+              <ul className="grid gap-4 sm:grid-cols-2 max-w-4xl mx-auto">
+                {page.summaryBullets.map((bullet) => (
+                  <li
+                    key={bullet}
+                    className="rounded-xl border border-border bg-card/80 p-5 text-sm text-foreground leading-relaxed"
+                  >
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
             </div>
+          </section>
 
-            <ul className="grid gap-4 sm:grid-cols-2 max-w-4xl mx-auto">
-              {page.summaryBullets.map((bullet) => (
-                <li
-                  key={bullet}
-                  className="rounded-xl border border-border bg-card/80 p-5 text-sm text-foreground leading-relaxed"
-                >
-                  {bullet}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <HubChildPagesSection page={page} />
-        <HubGuideLinksSection page={page} />
-        <HubFaqSection
-          page={page}
-          openFaqIndex={openFaqIndex}
-          onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-        />
-        <HubFinalCta page={page} onSignup={openSignup} />
+          <HubChildPagesSection page={page} />
+          <HubGuideLinksSection page={page} />
+          <HubFaqSection
+            page={page}
+            openFaqIndex={openFaqIndex}
+            onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+          />
+          <HubFinalCta page={page} onSignup={openSignup} />
+        </main>
         <Footer />
       </div>
       <AuthModal

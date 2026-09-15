@@ -52,15 +52,17 @@ export function SeoContentPage({ pagePath }: SeoContentPageProps) {
       />
       <div className="min-h-screen landing-grid-pattern">
         <SeoContentHeader />
-        <SeoContentHero page={page} onSignup={openSignup} />
-        <SeoContentBody page={page} />
-        <SeoContentFaqSection
-          page={page}
-          openFaqIndex={openFaqIndex}
-          onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-        />
-        <SeoContentRelatedSection page={page} />
-        <SeoContentFinalCta page={page} onSignup={openSignup} />
+        <main>
+          <SeoContentHero page={page} onSignup={openSignup} />
+          <SeoContentBody page={page} />
+          <SeoContentFaqSection
+            page={page}
+            openFaqIndex={openFaqIndex}
+            onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+          />
+          <SeoContentRelatedSection page={page} />
+          <SeoContentFinalCta page={page} onSignup={openSignup} />
+        </main>
         <Footer />
       </div>
       <AuthModal

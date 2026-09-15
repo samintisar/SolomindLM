@@ -1,9 +1,9 @@
 export const SEO_BASE_URL = "https://www.solomindlm.com";
 
-export const SEO_DEFAULT_TITLE = "SolomindLM — Free AI Study Tool for PDFs, Flashcards & Research";
+export const SEO_DEFAULT_TITLE = "SolomindLM: AI Study & Research Assistant";
 
 export const SEO_DEFAULT_DESCRIPTION =
-  "Free AI study tool online: upload PDFs, videos, and articles, chat with your sources, and generate flashcards, quizzes, mind maps, and audio overviews—grounded in your documents.";
+  "Study and research with your PDFs: chat with sources, then create grounded flashcards, quizzes, mind maps, audio overviews, and reports.";
 
 export const SEO_DEFAULT_KEYWORDS =
   "free ai study tool, ai study tool online, ai pdf study tool, ai study tools for students, AI flashcards, quizzes, mind maps, educational AI";

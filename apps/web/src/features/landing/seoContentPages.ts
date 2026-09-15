@@ -1,6 +1,6 @@
 import type { FAQItem } from "./constants";
 
-export const SEO_CONTENT_LAST_UPDATED = "2026-06-07";
+export const SEO_CONTENT_LAST_UPDATED = "2026-09-15";
 
 export type SeoContentPageType = "compare" | "guide";
 
@@ -54,9 +54,9 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
   {
     path: "/compare/solomindlm-vs-notebooklm",
     pageType: "compare",
-    title: "Best NotebookLM Alternative for Students & Researchers | SolomindLM",
+    title: "SolomindLM vs NotebookLM: Study Tool Comparison",
     description:
-      "Looking for a NotebookLM alternative? Compare SolomindLM and NotebookLM for free PDF study, audio overviews, flashcards, literature review, and research workflows.",
+      "Compare SolomindLM and NotebookLM for PDF study, flashcards, audio, literature review, and research workflows.",
     keywords:
       "NotebookLM alternative, best NotebookLM alternative, NotebookLM alternative free, NotebookLM alternatives for studying, NotebookLM audio overview alternative, SolomindLM vs NotebookLM",
     h1: "Best NotebookLM alternative for PDFs, flashcards, and research",
@@ -434,9 +434,9 @@ export const SEO_CONTENT_PAGES: SeoContentPageConfig[] = [
   {
     path: "/guides/how-to-do-an-ai-literature-review",
     pageType: "guide",
-    title: "How to Do an AI Literature Review With Your Papers (Step-by-Step)",
+    title: "How to Do an AI Literature Review | SolomindLM",
     description:
-      "Learn how to use AI for literature review: build a paper set, chat across sources, run literature review mode, and synthesize themes and gaps with SolomindLM—without replacing scholarly judgment.",
+      "Learn a source-grounded workflow to build a paper set, screen studies, synthesize themes, and format citations with SolomindLM.",
     keywords:
       "ai for literature review, how to do literature review with AI, ai for research literature review, AI literature review from papers, import DOI BibTeX Zotero",
     h1: "How to use AI for literature review with your papers",

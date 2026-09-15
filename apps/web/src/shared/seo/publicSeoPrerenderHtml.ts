@@ -17,12 +17,21 @@ export function buildHomePrerenderBody(): string {
       `        <div>\n          <h3>${escapeHtml(faq.question)}</h3>\n          <p>${escapeHtml(faq.answer)}</p>\n        </div>`
   ).join("\n");
 
-  return `    <article data-seo-prerender="true" id="seo-prerender-content">
+  return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
-        <h1>Learn Anything</h1>
+        <h1>AI Study &amp; Research Assistant for Your PDFs</h1>
         <p>AI that enhances learning, not replaces thinking.</p>
         <p>${escapeHtml(SEO_DEFAULT_DESCRIPTION)}</p>
       </header>
+      <section aria-labelledby="seo-prerender-resources">
+        <h2 id="seo-prerender-resources">Explore SolomindLM</h2>
+        <ul>
+          <li><a href="/students">Study tools for students</a></li>
+          <li><a href="/research">Research tools</a></li>
+          <li><a href="/compare/solomindlm-vs-notebooklm">SolomindLM vs NotebookLM</a></li>
+          <li><a href="/guides/how-to-study-from-pdfs-with-ai">How to study from PDFs with AI</a></li>
+        </ul>
+      </section>
       <section aria-labelledby="seo-prerender-faq">
         <h2 id="seo-prerender-faq">Frequently asked questions</h2>
 ${faqItems}
@@ -30,7 +39,7 @@ ${faqItems}
       <footer>
         <p><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>
       </footer>
-    </article>`;
+      </article>\n    </main>`;
 }
 
 export function buildLegalPrerenderBody(title: string, path: "/privacy" | "/terms"): string {
@@ -44,7 +53,7 @@ export function buildLegalPrerenderBody(title: string, path: "/privacy" | "/term
       ? "How SolomindLM collects, uses, and shares information when you use notebooks, sources, AI features, and billing."
       : "Terms that apply when you use SolomindLM's AI research notebooks, sources, chat, and study tools.";
 
-  return `    <article data-seo-prerender="true" id="seo-prerender-content">
+  return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
         <p>Legal</p>
         <h1>${escapeHtml(title)}</h1>
@@ -54,7 +63,7 @@ export function buildLegalPrerenderBody(title: string, path: "/privacy" | "/term
       <footer>
         <p><a href="/">SolomindLM home</a> · <a href="${other.href}">${escapeHtml(other.label)}</a></p>
       </footer>
-    </article>`;
+      </article>\n    </main>`;
 }
 
 /** Returns prerender body HTML for indexable public SEO pages, or undefined if not needed. */

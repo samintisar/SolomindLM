@@ -106,6 +106,35 @@ export const FeaturesGrid: React.FC = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             AI-powered tools designed to help you learn faster and retain more
           </p>
+          <nav
+            aria-label="Explore SolomindLM resources"
+            className="mt-6 flex flex-wrap justify-center gap-3"
+          >
+            <Link
+              to="/students"
+              className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              Study tools for students
+            </Link>
+            <Link
+              to="/research"
+              className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              Research tools
+            </Link>
+            <Link
+              to="/compare/solomindlm-vs-notebooklm"
+              className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              SolomindLM vs NotebookLM
+            </Link>
+            <Link
+              to="/guides/how-to-study-from-pdfs-with-ai"
+              className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              Study from PDFs with AI
+            </Link>
+          </nav>
         </div>
 
         {/* Row 1: scrolls left */}
