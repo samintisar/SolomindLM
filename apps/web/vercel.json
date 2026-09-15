@@ -19,7 +19,17 @@
       "dest": "${VITE_CONVEX_SITE_URL}/api/$1",
       "env": ["VITE_CONVEX_SITE_URL"]
     },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/home/?", "dest": "/index.html" },
+    { "src": "/billing/?", "dest": "/index.html" },
+    { "src": "/sign-in/?", "dest": "/index.html" },
+    { "src": "/folder/([^/]+)/?", "dest": "/index.html" },
+    {
+      "src": "/notebook/([^/]+)(/table/[^/]+|/report/[^/]+)?/?",
+      "dest": "/index.html"
+    },
+    { "src": "/admin/feedback/?", "dest": "/index.html" },
+    { "src": "/share/fork/([^/]+)/?", "dest": "/index.html" },
+    { "src": "/(.*)", "status": 404, "dest": "/404.html" }
   ],
   "headers": [
     {
