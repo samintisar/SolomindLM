@@ -19,6 +19,7 @@ import {
   FEATURES_MARQUEE_ROW_1_ORDER,
   FEATURES_MARQUEE_ROW_2_ORDER,
   getLandingFeatureColor,
+  HOME_RESOURCE_LINKS,
   LANDING_CONTENT,
   orderLandingFeatures,
 } from "../constants";
@@ -106,6 +107,20 @@ export const FeaturesGrid: React.FC = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             AI-powered tools designed to help you learn faster and retain more
           </p>
+          <nav
+            aria-label="Explore SolomindLM resources"
+            className="mt-6 flex flex-wrap justify-center gap-3"
+          >
+            {HOME_RESOURCE_LINKS.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:border-primary/40 hover:text-primary"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
 
         {/* Row 1: scrolls left */}

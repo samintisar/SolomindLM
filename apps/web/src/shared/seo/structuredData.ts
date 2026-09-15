@@ -20,7 +20,7 @@ export const generateOrganizationStructuredData = () => ({
   url: SEO_BASE_URL,
   logo: SEO_DEFAULT_OG_IMAGE,
   description: SEO_DEFAULT_DESCRIPTION,
-  sameAs: ["https://github.com/solomindlm", "https://twitter.com/solomindlm"],
+  sameAs: ["https://github.com/samintisar/SolomindLM", "https://twitter.com/solomindlm"],
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer support",
@@ -44,11 +44,36 @@ export const generateSoftwareApplicationStructuredData = () => ({
   applicationCategory: "https://schema.org/ResearchTool",
   url: SEO_BASE_URL,
   description: SEO_DEFAULT_DESCRIPTION,
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
+  offers: [
+    {
+      "@type": "Offer",
+      name: "Free",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    {
+      "@type": "Offer",
+      name: "Pro (annual billing)",
+      price: "7.50",
+      priceCurrency: "USD",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        billingDuration: 1,
+        unitCode: "MON",
+      },
+    },
+    {
+      "@type": "Offer",
+      name: "Pro (monthly billing)",
+      price: "15",
+      priceCurrency: "USD",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        billingDuration: 1,
+        unitCode: "MON",
+      },
+    },
+  ],
 });
 
 export type BreadcrumbItem = {
