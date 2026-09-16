@@ -428,7 +428,14 @@ const AppContent: React.FC = () => {
               />
             ))}
 
-            <Route path="/home" element={<HomePage />} />
+            <Route
+              path="/home"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/folder/:folderId"
