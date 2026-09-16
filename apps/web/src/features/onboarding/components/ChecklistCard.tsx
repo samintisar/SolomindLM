@@ -18,6 +18,13 @@ const ITEM_LABELS: Record<string, string> = {
   generateArtifact: "Generate your first artifact",
 };
 
+const ITEM_HINTS: Record<string, string> = {
+  createNotebook: "Tap + Create new notebook",
+  addSource: "Open the Sources tab, then tap Add",
+  askQuestion: "Open the Chat tab and type a message",
+  generateArtifact: "Open the Studio tab and pick a card type",
+};
+
 const ORDER = ["createNotebook", "addSource", "askQuestion", "generateArtifact"] as const;
 
 function logOnboardingError(action: string, error: unknown) {
@@ -95,7 +102,12 @@ export const ChecklistCard: React.FC = () => {
       {!collapsed && (
         <ul className="p-3">
           {ORDER.map((id) => (
-            <ChecklistItem key={id} label={ITEM_LABELS[id]} done={progress[id]} />
+            <ChecklistItem
+              key={id}
+              label={ITEM_LABELS[id]}
+              hint={ITEM_HINTS[id]}
+              done={progress[id]}
+            />
           ))}
         </ul>
       )}
