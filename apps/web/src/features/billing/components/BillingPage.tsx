@@ -143,7 +143,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                         </span>
                       </p>
                       <div className="text-sm">
-                        <p className="text-success-foreground font-medium capitalize">
+                        <p className="inline-block rounded-md bg-success/10 px-2 py-0.5 font-medium capitalize text-success">
                           ✓ {status.status}
                         </p>
                       </div>
