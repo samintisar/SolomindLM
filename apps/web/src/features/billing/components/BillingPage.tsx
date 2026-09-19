@@ -4,6 +4,7 @@ import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 import {
   useCancelSubscription,
   useCreateCheckout,
+  useCreatePortalSession,
   useSubscriptionStatus,
 } from "../services/subscriptionApi";
 
@@ -37,6 +38,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
   const status = useSubscriptionStatus();
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const createCheckout = useCreateCheckout();
+  const createPortalSession = useCreatePortalSession();
   const cancelSubscription = useCancelSubscription();
 
   const handleUpgrade = async (interval: "month" | "year") => {
@@ -50,6 +52,19 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
     } catch (error) {
       console.error("Failed to create checkout:", error);
       alert(error instanceof Error ? error.message : "Failed to start checkout");
+    }
+  };
+
+  // Existing subscribers switch billing interval through the Stripe customer
+  // portal rather than a fresh Checkout Session, which would create a second,
+  // concurrent subscription instead of changing the current one.
+  const handleManagePlan = async () => {
+    try {
+      const { url } = await createPortalSession(window.location.origin);
+      window.location.href = url;
+    } catch (error) {
+      console.error("Failed to open billing portal:", error);
+      alert(error instanceof Error ? error.message : "Failed to open billing portal");
     }
   };
 
@@ -128,7 +143,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                         </span>
                       </p>
                       <div className="text-sm">
-                        <p className="text-success-foreground font-medium capitalize">
+                        <p className="inline-block rounded-md bg-success/10 px-2 py-0.5 font-medium capitalize text-success">
                           ✓ {status.status}
                         </p>
                       </div>
@@ -219,7 +234,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                     </div>
                   </div>
 
-                  {status?.hasSubscription ? (
+                  {status?.hasSubscription && status.interval === "year" ? (
                     <button
                       disabled={true}
                       className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
@@ -228,10 +243,12 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleUpgrade("year")}
+                      onClick={() =>
+                        status?.hasSubscription ? handleManagePlan() : handleUpgrade("year")
+                      }
                       className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
                     >
-                      Get Started
+                      {status?.hasSubscription ? "Switch to Yearly" : "Get Started"}
                     </button>
                   )}
 
@@ -263,7 +280,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   </p>
                 </div>
 
-                {status?.hasSubscription ? (
+                {status?.hasSubscription && status.interval === "month" ? (
                   <button
                     disabled={true}
                     className="w-full mb-8 py-3 bg-muted text-muted-foreground font-medium rounded-lg cursor-default opacity-50"
@@ -272,10 +289,12 @@ export const BillingPage: React.FC<BillingPageProps> = ({ onBack }) => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleUpgrade("month")}
+                    onClick={() =>
+                      status?.hasSubscription ? handleManagePlan() : handleUpgrade("month")
+                    }
                     className="w-full mb-8 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors"
                   >
-                    Get Started
+                    {status?.hasSubscription ? "Switch to Monthly" : "Get Started"}
                   </button>
                 )}
 
