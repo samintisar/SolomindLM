@@ -210,6 +210,51 @@ jobs:
       - name: Run mobile tests
         run: bun run test:mobile
 
+  publish-mobile-update:
+    name: Publish mobile OTA update
+    needs: [typecheck-mobile, test-mobile]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for EXPO_TOKEN
+        id: expo_token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "::warning::EXPO_TOKEN repo secret is not set — mobile OTA publish skipped. Generate a robot access token at expo.dev (Account Settings > Access Tokens) and add it as a repo secret named EXPO_TOKEN to enable."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.expo_token.outputs.run == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup
+        if: steps.expo_token.outputs.run == 'true'
+        uses: ./.github/actions/setup
+
+      # runtimeVersion.policy is "appVersion" (app.json), so this update only
+      # reaches installed binaries whose native `version` matches — an OTA
+      # push can never land on a build with incompatible native code.
+      - name: Publish update (production channel)
+        if: steps.expo_token.outputs.run == 'true'
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # Passed through an env var, not interpolated into the script directly —
+          # a commit message is attacker-controllable and could break out of an
+          # inline `${{ }}` expression (see actionlint's "expression" rule).
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          bun x eas-cli update \
+            --channel production \
+            --environment production \
+            --non-interactive \
+            --message "$UPDATE_MESSAGE"
+
   build-web:
     name: Build (Web, PR parity)
     needs: [typecheck-convex, typecheck-web, typecheck-mobile]

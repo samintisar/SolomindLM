@@ -10,10 +10,12 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": { "image": "latest" },
       "android": { "image": "latest" }
     },
     "production": {
+      "channel": "production",
       "ios": { "image": "latest" },
       "android": { "image": "latest" }
     }

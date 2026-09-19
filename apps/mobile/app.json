@@ -93,7 +93,8 @@
       "policy": "appVersion"
     },
     "updates": {
-      "enabled": false
+      "enabled": true,
+      "url": "https://u.expo.dev/666fb4cb-5bce-4ed7-874f-526827e159c0"
     },
     "extra": {
       "eas": {
