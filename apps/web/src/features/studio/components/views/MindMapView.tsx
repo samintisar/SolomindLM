@@ -117,19 +117,21 @@ export const MindMapView: React.FC<MindMapViewProps> = ({
       mind.init({ nodeData: sanitizedRoot });
       mindRef.current = mind;
 
-      // Center map on first render so root is visible.
+      // Fit the whole tree in the container on first render (falls back to
+      // just centering if scaleFit isn't available) so it's never stuck at
+      // 100% zoom showing a single cut-off node on a narrow viewport.
       requestAnimationFrame(() => {
         try {
-          if (typeof mind.toCenter === "function") {
+          if (typeof mind.scaleFit === "function") {
+            mind.scaleFit();
+          } else if (typeof mind.toCenter === "function") {
             mind.toCenter();
           }
         } catch {
-          // Ignore non-critical centering errors.
+          // Ignore non-critical fit/centering errors.
         }
+        setScale(mind.scaleVal || 1);
       });
-
-      // Set initial scale
-      setScale(mind.scaleVal || 1);
 
       // Track manual zoom changes via Ctrl+Scroll or mouse wheel
       let lastScale = mind.scaleVal || 1;
