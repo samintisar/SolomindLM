@@ -244,12 +244,16 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # Passed through an env var, not interpolated into the script directly —
+          # a commit message is attacker-controllable and could break out of an
+          # inline `${{ }}` expression (see actionlint's "expression" rule).
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           bun x eas-cli update \
             --channel production \
             --environment production \
             --non-interactive \
-            --message "${{ github.event.head_commit.message }}"
+            --message "$UPDATE_MESSAGE"
 
   build-web:
     name: Build (Web, PR parity)
