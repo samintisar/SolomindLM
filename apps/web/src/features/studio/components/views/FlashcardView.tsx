@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   Brain,
@@ -401,18 +402,46 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ note, onBack }) =>
           </div>
         )}
 
-        {(mode === "browse" || mode === "edit") && filteredCards.length === 0 && (
-          <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
-              <BookOpen className="h-6 w-6 text-muted-foreground" />
+        {(mode === "browse" || mode === "edit") &&
+          filteredCards.length === 0 &&
+          displayNote.status === "failed" && (
+            <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <p className="text-lg font-medium text-foreground">Generation failed</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {displayNote.metadata?.error ||
+                    "Something went wrong while generating these flashcards."}
+                </p>
+              </div>
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="rounded-xl bg-primary px-6 py-3 font-medium text-primary-foreground transition-all hover:bg-primary/90"
+                >
+                  Back to Studio to try again
+                </button>
+              )}
             </div>
-            <p className="text-lg text-muted-foreground">
-              {showMastered
-                ? "No flashcards available. Try showing all cards."
-                : "No flashcards available. All cards are mastered!"}
-            </p>
-          </div>
-        )}
+          )}
+
+        {(mode === "browse" || mode === "edit") &&
+          filteredCards.length === 0 &&
+          displayNote.status !== "failed" && (
+            <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
+                <BookOpen className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-lg text-muted-foreground">
+                {showMastered
+                  ? "No flashcards available. Try showing all cards."
+                  : "No flashcards available. All cards are mastered!"}
+              </p>
+            </div>
+          )}
 
         {(mode === "browse" || mode === "edit") && filteredCards.length > 0 && currentCard && (
           <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-6">
