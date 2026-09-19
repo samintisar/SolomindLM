@@ -77,7 +77,13 @@ export const fetchChunks = internalAction({
       return a.chunkIndex - b.chunkIndex;
     });
 
-    return allChunks;
+    // Callers only ever read `content` (see studio job phases). Stripping
+    // the embedding vector (EMBEDDING_DIMENSIONS floats/chunk, see
+    // convex/_lib/embeddingConfig.ts) and other chunk metadata before
+    // returning keeps this action's serialized result well under Convex's
+    // 16 MiB return-value limit for notebooks with many sources — the full
+    // rows previously blew past that limit around ~30 sources.
+    return allChunks.map((chunk) => ({ content: chunk.content }));
   },
 });
 

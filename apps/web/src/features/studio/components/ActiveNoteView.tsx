@@ -150,7 +150,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
         note={activeNote}
         isExpanded={isMindMapExpanded}
         onToggleExpanded={onToggleMindMap}
-        onBack={isMobile ? onBack : undefined}
+        onBack={undefined}
       />
     );
   }
@@ -164,7 +164,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
           audioUrl={activeNote.metadata.audioUrl}
           transcript={activeNote.content}
           title={activeNote.title}
-          onBack={isMobile ? onBack : undefined}
+          onBack={undefined}
         />
       );
     }
@@ -216,7 +216,7 @@ export const ActiveNoteView: React.FC<ActiveNoteViewProps> = ({
           audioOverviewId={activeNote.id}
           transcript={activeNote.transcript}
           title={activeNote.title}
-          onBack={isMobile ? onBack : undefined}
+          onBack={undefined}
         />
       );
     }

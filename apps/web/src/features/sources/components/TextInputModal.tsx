@@ -57,6 +57,7 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
