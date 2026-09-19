@@ -79,9 +79,6 @@ export const SourceList: React.FC<SourceListProps> = ({
             title="Add Source"
           >
             <Plus className="w-4 h-4 shrink-0" />
-            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
-              ADD…
-            </span>
             <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
               Add Source
             </span>
@@ -93,9 +90,6 @@ export const SourceList: React.FC<SourceListProps> = ({
             title="Discover sources"
           >
             <Search className="w-4 h-4 text-primary shrink-0" />
-            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
-              DISC…
-            </span>
             <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
               Discover
             </span>
@@ -110,9 +104,6 @@ export const SourceList: React.FC<SourceListProps> = ({
             title="Delete selected"
           >
             <Trash2 className="w-4 h-4 shrink-0" />
-            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
-              DEL…
-            </span>
             <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
               Delete
             </span>
@@ -125,9 +116,6 @@ export const SourceList: React.FC<SourceListProps> = ({
             title="Re-fetch web pages and Google Drive imports"
           >
             <RefreshCw className={`w-4 h-4 shrink-0 ${isRefreshing ? "animate-spin" : ""}`} />
-            <span className="hidden min-w-0 whitespace-nowrap truncate @min-[300px]:inline @min-[400px]:hidden">
-              REFRESH…
-            </span>
             <span className="hidden min-w-0 whitespace-nowrap truncate @min-[400px]:inline">
               Refresh all
             </span>
