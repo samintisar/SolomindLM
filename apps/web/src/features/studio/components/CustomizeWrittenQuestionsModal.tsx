@@ -66,7 +66,7 @@ export const CustomizeWrittenQuestionsModal: React.FC<CustomizeWrittenQuestionsM
         </div>
 
         <div className="p-6 md:p-10 space-y-8 bg-card/50">
-          <div className="grid grid-cols-3 gap-x-2 gap-y-2 sm:gap-x-3">
+          <div className="grid grid-cols-1 gap-x-2 gap-y-3 sm:grid-cols-3 sm:gap-y-2 sm:gap-x-3">
             <div className="flex min-w-0 flex-col gap-1">
               <label className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[11px]">
                 Count
