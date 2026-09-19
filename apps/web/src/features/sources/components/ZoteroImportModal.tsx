@@ -138,6 +138,7 @@ export const ZoteroImportModal: React.FC<ZoteroImportModalProps> = ({
           <button
             onClick={handleClose}
             className="p-2 hover:bg-secondary/50 rounded-xl transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
