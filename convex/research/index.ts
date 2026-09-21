@@ -14,6 +14,7 @@ import {
 } from "../_generated/server";
 import { assertCanEditNotebook, assertCanReadNotebook } from "../_lib/notebookAccess";
 import { getAuthUserId } from "../auth";
+import { scheduleResearchRunCompletionPush } from "../push/notify";
 import { normalizeResearchTitle } from "./titles";
 
 export { createResearchArtifacts } from "./artifacts";
@@ -336,6 +337,17 @@ export const updateRunProgress = internalMutation({
       updates.completedAt = Date.now();
     }
     await ctx.db.patch(args.runId, updates);
+
+    if (args.status === "completed") {
+      const run = await ctx.db.get(args.runId);
+      if (run) {
+        await scheduleResearchRunCompletionPush(ctx, {
+          userId: run.userId,
+          notebookId: run.notebookId,
+          runId: run._id,
+        });
+      }
+    }
   },
 });
 

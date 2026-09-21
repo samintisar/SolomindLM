@@ -9,7 +9,10 @@ import "react-native-reanimated";
 import { ShellAuthProvider } from "@mobile/auth/AuthContext";
 import { NativeConvexAuthBridgeProvider } from "@mobile/context/NativeConvexAuthBridgeContext";
 import { parseMobileDeepLink } from "@mobile/services/platform/deepLinking";
-import { useRegisterPushNotifications } from "@mobile/services/push/pushService";
+import {
+  useHandlePushNotificationResponse,
+  useRegisterPushNotifications,
+} from "@mobile/services/push/pushService";
 import * as Sentry from "@sentry/react-native";
 import { useColorScheme } from "@/components/useColorScheme";
 
@@ -33,6 +36,7 @@ Sentry.init({
 
 function PushNotificationsBootstrap() {
   useRegisterPushNotifications();
+  useHandlePushNotificationResponse();
   return null;
 }
 

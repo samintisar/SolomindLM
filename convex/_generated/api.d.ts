@@ -309,6 +309,8 @@ import type * as onboarding_mutations from "../onboarding/mutations.js";
 import type * as onboarding_progress from "../onboarding/progress.js";
 import type * as onboarding_state from "../onboarding/state.js";
 import type * as push_index from "../push/index.js";
+import type * as push_notify from "../push/notify.js";
+import type * as push_send from "../push/send.js";
 import type * as research_artifacts from "../research/artifacts.js";
 import type * as research_index from "../research/index.js";
 import type * as research_mapEvidenceForDb from "../research/mapEvidenceForDb.js";
@@ -679,6 +681,8 @@ declare const fullApi: ApiFromModules<{
   "onboarding/progress": typeof onboarding_progress;
   "onboarding/state": typeof onboarding_state;
   "push/index": typeof push_index;
+  "push/notify": typeof push_notify;
+  "push/send": typeof push_send;
   "research/artifacts": typeof research_artifacts;
   "research/index": typeof research_index;
   "research/mapEvidenceForDb": typeof research_mapEvidenceForDb;

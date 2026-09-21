@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { scheduleLiteratureReviewCompletionPush } from "../push/notify";
 import { compactPapersForSnapshot } from "./rankedPapersSnapshot.js";
 import {
   alignExtractedDataToColumns,
@@ -468,6 +469,17 @@ export const patchSessionStatus = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.patch(args.sessionId, { status: args.status, updatedAt: Date.now() });
+
+    if (args.status === "completed") {
+      const session = await ctx.db.get(args.sessionId);
+      if (session) {
+        await scheduleLiteratureReviewCompletionPush(ctx, {
+          userId: session.userId,
+          notebookId: session.notebookId,
+          sessionId: session._id,
+        });
+      }
+    }
     return null;
   },
 });
