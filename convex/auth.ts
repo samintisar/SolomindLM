@@ -1,7 +1,7 @@
 import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { type ActionCtx, type MutationCtx, type QueryCtx, query } from "./_generated/server";
 import { extraOrigins, siteUrl } from "./_lib/allowedOrigins";
@@ -48,13 +48,52 @@ function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
   return false;
 }
 
+/**
+ * `@convex-dev/auth`'s Password provider throws plain `Error`s for these known,
+ * user-facing conditions (see `retrieveAccount` / `Password.ts` in
+ * node_modules/@convex-dev/auth). Convex redacts plain Error messages in
+ * production, so the curated copy in authErrorMessage.ts on the client never
+ * matched anything there. Rethrowing as ConvexError preserves `.data` to the
+ * client even in production, restoring those mappings.
+ */
+const KNOWN_PASSWORD_ERROR_MESSAGES = new Set([
+  "InvalidAccountId",
+  "InvalidSecret",
+  "TooManyFailedAttempts",
+  "Invalid code",
+  "Invalid password",
+  "Invalid credentials",
+]);
+
+interface PasswordProviderInternals {
+  options: {
+    authorize: (params: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+  };
+}
+
+function withKnownErrorsAsConvexErrors<T>(provider: T): T {
+  const internals = provider as unknown as PasswordProviderInternals;
+  const authorize = internals.options.authorize;
+  internals.options.authorize = async (params, ctx) => {
+    try {
+      return await authorize(params, ctx);
+    } catch (error) {
+      if (error instanceof Error && KNOWN_PASSWORD_ERROR_MESSAGES.has(error.message)) {
+        throw new ConvexError(error.message);
+      }
+      throw error;
+    }
+  };
+  return provider;
+}
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
     }),
-    Password({ verify: ResendOTP, reset: ResendOTPPasswordReset }),
+    withKnownErrorsAsConvexErrors(Password({ verify: ResendOTP, reset: ResendOTPPasswordReset })),
   ],
   callbacks: {
     async redirect({ redirectTo }) {
