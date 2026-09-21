@@ -162,7 +162,7 @@ function AuthFormPanelContent({
 
   return (
     <div
-      className={`rounded-2xl border border-border/90 bg-card/90 p-6 shadow-lg shadow-primary/5 backdrop-blur-sm sm:p-8${className ? ` ${className}` : ""}`}
+      className={`auth-form-light rounded-2xl border border-border/90 bg-card/90 p-6 shadow-lg shadow-primary/5 backdrop-blur-sm sm:p-8${className ? ` ${className}` : ""}`}
     >
       <div className="mb-6 text-center">
         <h2 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
