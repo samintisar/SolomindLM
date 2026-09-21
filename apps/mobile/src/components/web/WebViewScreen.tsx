@@ -91,6 +91,7 @@ export function WebViewScreen({ path, onUrlChange }: WebViewScreenProps) {
       style={styles.webview}
       sharedCookiesEnabled
       thirdPartyCookiesEnabled={Platform.OS === "android"}
+      allowsBackForwardNavigationGestures={Platform.OS === "ios"}
       javaScriptEnabled
       domStorageEnabled
       startInLoadingState
