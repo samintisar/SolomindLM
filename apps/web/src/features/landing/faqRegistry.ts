@@ -60,7 +60,8 @@ const CORE_GENERAL_FAQS: RegisteredFaq[] = [
   {
     category: "getting-started",
     question: "What languages are supported?",
-    answer: "SolomindLM is currently focused on English-language study and research workflows.",
+    answer:
+      "Set an output language and generated study materials, reports, and chat responses come back in the language you pick—English, Spanish, French, German, Portuguese, Arabic, Hindi, Chinese (Simplified), Japanese, Korean, and several more. Your source material can be in any language.",
   },
   {
     category: "students",

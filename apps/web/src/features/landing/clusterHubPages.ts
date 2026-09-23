@@ -129,7 +129,7 @@ export const CLUSTER_HUB_PAGES: ClusterHubPageConfig[] = [
     cluster: "research",
     title: "AI Research & Literature Review Tools | SolomindLM",
     description:
-      "AI tools for literature review and research: discover and import papers, chat with your reading list, run literature review mode, format citations in 12 styles, and draft deep research reports.",
+      "AI research tools for discovering papers, chatting with sources, literature review, citations, and deep research report drafts.",
     keywords:
       "ai tools for literature review, ai literature review tools, ai for research literature review, research tools, chat with papers, deep research",
     h1: "AI research and literature review tools for your papers",

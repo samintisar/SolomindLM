@@ -459,7 +459,7 @@ function AuthFormPanelContent({
         {step === "signIn" || step === "signUp" ? (
           <div className="border-t border-border pt-5 text-center">
             <p className="text-sm text-muted-foreground font-sans">
-              By signing in, you agree to our{" "}
+              By continuing, you agree to our{" "}
               <Link
                 to="/terms"
                 className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"

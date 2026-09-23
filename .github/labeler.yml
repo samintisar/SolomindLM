@@ -1,0 +1,61 @@
+# Auto-applies area:* / type:docs labels to PRs from changed paths.
+# Config format: actions/labeler v5. Applied by .github/workflows/labeler.yml.
+# Multiple sections can match one PR — all matching labels are applied.
+
+"area:web":
+  - changed-files:
+      - any-glob-to-any-file: ["apps/web/**"]
+
+"area:mobile":
+  - changed-files:
+      - any-glob-to-any-file: ["apps/mobile/**"]
+
+"area:convex":
+  - changed-files:
+      - any-glob-to-any-file: ["convex/**"]
+
+"area:agents":
+  - changed-files:
+      - any-glob-to-any-file: ["convex/_agents/**"]
+
+"area:rag":
+  - changed-files:
+      - any-glob-to-any-file:
+          ["convex/storage/**", "convex/_services/search/**", "evals/rag/**"]
+
+"area:studio":
+  - changed-files:
+      - any-glob-to-any-file:
+          ["convex/studio/**", "apps/web/src/features/studio/**"]
+
+"area:billing":
+  - changed-files:
+      - any-glob-to-any-file:
+          ["convex/billing/**", "apps/web/src/features/billing/**"]
+
+"area:auth":
+  - changed-files:
+      - any-glob-to-any-file:
+          [
+            "convex/auth.ts",
+            "convex/auth.config.ts",
+            "apps/web/src/features/auth/**",
+          ]
+
+"area:sources":
+  - changed-files:
+      - any-glob-to-any-file:
+          ["convex/_services/extraction/**", "apps/web/src/features/sources/**"]
+
+"area:chat":
+  - changed-files:
+      - any-glob-to-any-file:
+          ["convex/chat/**", "apps/web/src/features/chat/**"]
+
+"area:ci":
+  - changed-files:
+      - any-glob-to-any-file: [".github/**"]
+
+"type:docs":
+  - changed-files:
+      - all-globs-to-all-files: ["**/*.md", "docs/**"]

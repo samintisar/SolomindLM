@@ -17,7 +17,7 @@ export function buildFaqPrerenderBody(): string {
     })
     .join("\n");
 
-  return `    <article data-seo-prerender="true" id="seo-prerender-content">
+  return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
         <h1>Frequently asked questions</h1>
         <p>Answers about SolomindLM study tools, research workflows, pricing, privacy, and getting started.</p>
@@ -26,5 +26,5 @@ ${sections}
       <footer>
         <p><a href="/">SolomindLM home</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>
       </footer>
-    </article>`;
+      </article>\n    </main>`;
 }

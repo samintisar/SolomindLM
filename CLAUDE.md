@@ -213,7 +213,9 @@ Troubleshooting: Cursor agent hooks live in `.cursor/hooks.json` (use `run-hook.
   3. `bun run test:web` — vitest for web utilities
   4. `bun run test:e2e` — Playwright for UI flows (slower; before merge)
   5. `bun run eval:rag --case=… / --runner=…` or `eval:studio` / `eval:literature-review` — agent or prompt changes (do NOT unit-test prompt outputs)
-- **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves.
+- **TS strictness:** Biome `noExplicitAny` is a warning (not error) to match `strict: false` in web tsconfig. Tighten as null safety improves — no new `any` in files you're already editing; ratchet per-directory (see `docs/engineering/code-quality.md`).
+- **Pre-push hook:** `.githooks/pre-push` (auto-enabled by `bun install`) runs typecheck + lint. Bypass a WIP push with `git push --no-verify`.
+- **Code-quality cadence & ADRs:** [`docs/engineering/code-quality.md`](docs/engineering/code-quality.md) (weekly/monthly passes, metrics) and [`docs/adr/`](docs/adr/) (architecture decisions — write one in the PR that makes a hard-to-reverse or contested change).
 - **Generated files excluded from lint:** `convex/_generated/` (see `biome.json` `linter.includes`).
 - **React Hooks v7 ESLint-only rules** (e.g. `set-state-in-effect`) are not in Biome; use `useExhaustiveDependencies` / `useHookAtTopLevel` instead.
 - **Port management:** `bun run dev:web` kills stale :5173 via `kill-port`.

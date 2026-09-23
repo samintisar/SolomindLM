@@ -8,6 +8,9 @@ import { DEFAULT_SMART_MODEL_ID } from "./defaultSmartModel.js";
 export const env = {
   // Together AI
   TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY || "",
+
+  // OpenAI (embeddings)
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
   FAST_LLM: process.env.FAST_LLM || "Qwen/Qwen3.5-9B",
   SMART_LLM: process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
   REPORT_LLM: process.env.REPORT_LLM || DEFAULT_SMART_MODEL_ID,
@@ -72,6 +75,12 @@ export const env = {
   // ZeroEntropy (reranking)
   ZEROENTROPY_API_KEY: process.env.ZEROENTROPY_API_KEY || "",
   ZEROENTROPY_RERANK_MODEL: process.env.ZEROENTROPY_RERANK_MODEL || "zerank-2",
+
+  // In-app feedback → GitHub Issues sync (staff-triggered)
+  FEEDBACK_GITHUB_TOKEN: process.env.FEEDBACK_GITHUB_TOKEN || "",
+  FEEDBACK_GITHUB_REPO: process.env.FEEDBACK_GITHUB_REPO || "samintisar/SolomindLM",
+  /** Comma-separated email allowlist for /admin/feedback and the GitHub sync action. */
+  FEEDBACK_ADMIN_EMAILS: process.env.FEEDBACK_ADMIN_EMAILS || "",
 
   // Convex deployment info
   CONVEX_CLOUD_URL: process.env.CONVEX_CLOUD_URL || "",

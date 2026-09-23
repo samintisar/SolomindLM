@@ -371,7 +371,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden">
             {/* Mode */}
-            <div className="relative">
+            <div className="relative min-w-0 shrink">
               <button
                 ref={modeAnchorRef}
                 type="button"
@@ -436,7 +436,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {/* Research paper corpus: literature review always; chat/deep research when Academic filter is on */}
             {showResearchDatabases && (
-              <div className="relative">
+              <div className="relative min-w-0 shrink">
                 <button
                   ref={corpusAnchorRef}
                   type="button"
@@ -445,7 +445,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   aria-expanded={openMenu === "corpus"}
                   aria-label="Research databases"
                   onClick={() => setOpenMenu((o) => (o === "corpus" ? "none" : "corpus"))}
-                  className="inline-flex h-9 max-w-[min(13rem,52vw)] min-w-0 items-center gap-2 rounded-full bg-muted/50 px-3 text-sm font-medium font-sans text-foreground hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50"
+                  className="inline-flex h-9 max-w-[min(13rem,52vw,100%)] min-w-0 items-center gap-2 rounded-full bg-muted/50 px-3 text-sm font-medium font-sans text-foreground hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50"
                 >
                   <DbButtonIcon className="size-4 shrink-0 opacity-70" aria-hidden />
                   <span className="min-w-0 truncate">{dbMeta.title}</span>
@@ -517,7 +517,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {/* Literature review: academic paper filters */}
             {showLiteratureAcademicFilters && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   ref={filtersAnchorRef}
                   type="button"
@@ -547,7 +547,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {/* Chat / deep research: source channels + academic filters */}
             {showSourceChannelFilters && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   ref={filtersAnchorRef}
                   type="button"

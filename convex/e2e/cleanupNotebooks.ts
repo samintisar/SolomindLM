@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { mutation } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 
 /**
  * Delete all notebooks with titles starting with "e2e-" for a given user email.
  * Used by E2E test global setup to clean up stale test notebooks.
  */
-export const deleteE2eNotebooksByEmail = mutation({
+export const deleteE2eNotebooksByEmail = internalMutation({
   args: {
     email: v.string(),
   },

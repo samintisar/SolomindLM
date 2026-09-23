@@ -1,0 +1,36 @@
+# Marks issues with no activity for 60 days as status:stale, closes them 14 days
+# later if still untouched. High-priority, blocked, and pinned issues are exempt.
+# PRs are left alone (days-before-pr-stale: -1).
+
+name: Close stale issues
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  stale:
+    name: Sweep stale issues
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark and close
+        uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # v9.1.0
+        with:
+          days-before-stale: 60
+          days-before-close: 14
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: "status:stale"
+          exempt-issue-labels: "priority:p0,priority:p1,status:blocked,pinned"
+          stale-issue-message: >
+            No activity for 60 days. Marking as `status:stale`. It will close in
+            14 days unless there's an update. Remove the label or comment to keep
+            it open.
+          close-issue-message: >
+            Closing after 74 days of inactivity. Reopen if it's still relevant.
+          operations-per-run: 60

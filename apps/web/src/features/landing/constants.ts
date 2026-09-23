@@ -99,6 +99,14 @@ export const FEATURES_MARQUEE_ROW_2_ORDER = [
   "writtenQuestions",
 ] as const;
 
+/** Shared with the homepage prerender body (publicSeoPrerenderHtml.ts) — keep both in sync. */
+export const HOME_RESOURCE_LINKS = [
+  { path: "/students", label: "Study tools for students" },
+  { path: "/research", label: "Research tools" },
+  { path: "/compare/solomindlm-vs-notebooklm", label: "SolomindLM vs NotebookLM" },
+  { path: "/guides/how-to-study-from-pdfs-with-ai", label: "Study from PDFs with AI" },
+] as const;
+
 export function orderLandingFeatures(
   features: typeof LANDING_CONTENT.features,
   order: readonly string[]

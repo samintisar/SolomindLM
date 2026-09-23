@@ -6,7 +6,7 @@
  */
 
 import { createServiceLogger } from "../../_lib/logging/serviceLogger";
-import type { EmbeddingService } from "../../_services/processing/EmbeddingServiceClient";
+import type { EmbeddingService } from "../../_services/ai/embeddingClient";
 import type { ChunkMetadata, ReferenceChunk } from "../../storage/ChatHistoryService";
 import {
   RerankFunction,

@@ -52,14 +52,16 @@ export function IntentLandingPage({ pagePath }: IntentLandingPageProps) {
       />
       <div className="min-h-screen landing-grid-pattern">
         <IntentHeader />
-        <IntentHero page={page} onSignup={openSignup} />
-        <IntentFaqSection
-          page={page}
-          openFaqIndex={openFaqIndex}
-          onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-        />
-        <IntentRelatedFeaturesSection page={page} />
-        <IntentFinalCta page={page} onSignup={openSignup} />
+        <main>
+          <IntentHero page={page} onSignup={openSignup} />
+          <IntentFaqSection
+            page={page}
+            openFaqIndex={openFaqIndex}
+            onToggleFaq={(index) => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+          />
+          <IntentRelatedFeaturesSection page={page} />
+          <IntentFinalCta page={page} onSignup={openSignup} />
+        </main>
         <Footer />
       </div>
       <AuthModal

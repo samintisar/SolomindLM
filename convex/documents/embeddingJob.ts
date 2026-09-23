@@ -4,10 +4,11 @@ import { createErrorMetadata, createJobLogger } from "../_agents/_shared/logging
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
 import {
-  E5_RAG_CHUNK_OVERLAP_TOKENS,
-  E5_RAG_CHUNK_SIZE_TOKENS,
-  E5_TOGETHER_EMBED_BATCH_SIZE,
-} from "../_lib/e5Embedding";
+  EMBEDDING_BATCH_SIZE,
+  EMBEDDING_MODEL,
+  RAG_CHUNK_OVERLAP_TOKENS,
+  RAG_CHUNK_SIZE_TOKENS,
+} from "../_lib/embeddingConfig";
 import { AcademicLoaderService } from "../_services/extraction/AcademicLoaderService";
 import { AudioTranscriptionService } from "../_services/extraction/AudioTranscriptionService";
 import { MistralOCRService } from "../_services/extraction/MistralOCRService";
@@ -336,12 +337,12 @@ export const docEmbedding = internalAction({
         language: docMetadata.language,
       });
 
-      // E5 (Together) max ~512 real tokens; chunk below that so RAG index matches embed input (see e5Embedding)
+      // Chunk sizing kept from the prior Together E5 migration — see embeddingConfig.ts
       const chunker = new StructuralChunker();
       const chunksWithMetadata = await chunker.chunk(
         extractedText,
-        E5_RAG_CHUNK_SIZE_TOKENS,
-        E5_RAG_CHUNK_OVERLAP_TOKENS
+        RAG_CHUNK_SIZE_TOKENS,
+        RAG_CHUNK_OVERLAP_TOKENS
       );
 
       logger.phaseComplete("chunking", { chunkCount: chunksWithMetadata.length });
@@ -406,14 +407,14 @@ export const docEmbedding = internalAction({
 
       const embeddingTimer = logger.createTimer();
 
-      // Together E5: batched `input: string[]` (fewer HTTP calls than one-per-chunk) + sequential batches to avoid 429s
+      // Batched `input: string[]` (fewer HTTP calls than one-per-chunk) + sequential batches to avoid 429s
       const chunkTexts = chunksWithMetadata.map((c) => c.content);
       const embeddingVectors: number[][] = [];
-      for (let off = 0; off < chunkTexts.length; off += E5_TOGETHER_EMBED_BATCH_SIZE) {
-        const batch = chunkTexts.slice(off, off + E5_TOGETHER_EMBED_BATCH_SIZE);
+      for (let off = 0; off < chunkTexts.length; off += EMBEDDING_BATCH_SIZE) {
+        const batch = chunkTexts.slice(off, off + EMBEDDING_BATCH_SIZE);
         const part = await ctx.runAction(
-          internal._services.ai.embeddings.generateEmbeddingsBatchInternal,
-          { texts: batch, inputType: "passage" }
+          internal._services.ai.embeddingClient.generateEmbeddingsBatchInternal,
+          { texts: batch }
         );
         embeddingVectors.push(...part);
       }
@@ -438,6 +439,7 @@ export const docEmbedding = internalAction({
           content: chunk.content,
           chunkIndex: chunk.metadata.chunkIndex,
           embedding: embeddingVectors[i],
+          embeddingModel: EMBEDDING_MODEL,
           metadata: {
             totalChunks: chunk.metadata.totalChunks ?? undefined,
             relativePosition: chunk.metadata.relativePosition ?? undefined,

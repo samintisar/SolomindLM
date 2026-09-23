@@ -1,0 +1,24 @@
+#!/bin/sh
+# Pre-push gate: the checks that are embarrassing to fail in CI.
+# Runs typecheck (convex/web/mobile) + Biome. Fast — tsgo, not tsc.
+#
+# Bypass for a work-in-progress push:  git push --no-verify
+#
+# Enabled by `core.hooksPath=.githooks`, set on `bun install` via the root
+# `prepare` script (scripts/setup-git-hooks.mjs).
+
+set -e
+
+# Skip when the push only deletes a remote branch (nothing to check).
+zero="0000000000000000000000000000000000000000"
+only_deletes=1
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero" ] || only_deletes=0
+done
+[ "$only_deletes" = "1" ] && exit 0
+
+echo "pre-push: typecheck + lint  (bypass: git push --no-verify)"
+bun run typecheck:convex
+bun run typecheck:web
+bun run typecheck:mobile
+bun run lint -- --diagnostic-level=error

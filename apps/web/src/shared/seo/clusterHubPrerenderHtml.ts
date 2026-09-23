@@ -54,7 +54,7 @@ ${guideLinks}
     )
     .join("\n");
 
-  return `    <article data-seo-prerender="true" id="seo-prerender-content">
+  return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <header>
         <p>${escapeHtml(clusterLabel)}</p>
         <h1>${escapeHtml(page.h1)}</h1>
@@ -82,5 +82,5 @@ ${faqItems}
       <footer>
         <p><a href="/">SolomindLM home</a></p>
       </footer>
-    </article>`;
+      </article>\n    </main>`;
 }

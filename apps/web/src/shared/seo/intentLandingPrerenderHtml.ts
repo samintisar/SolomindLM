@@ -34,7 +34,7 @@ export function buildIntentLandingPrerenderBody(page: IntentLandingPageConfig): 
     )
     .join("\n");
 
-  return `    <article data-seo-prerender="true" id="seo-prerender-content">
+  return `    <main>\n      <article data-seo-prerender="true" id="seo-prerender-content">
       <nav aria-label="Breadcrumb">
         <ol>
 ${breadcrumbNav}
@@ -81,5 +81,5 @@ ${relatedLinks}
       <footer>
         <p><a href="/">SolomindLM home</a></p>
       </footer>
-    </article>`;
+      </article>\n    </main>`;
 }

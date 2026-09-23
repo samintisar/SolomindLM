@@ -58,4 +58,45 @@ describe("DropdownMenu", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getByRole("listbox")).toHaveTextContent(/language options/i);
   });
+
+  test("a non-button trigger is focusable and opens via keyboard", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DropdownMenu trigger={<div>Account</div>}>
+        <button type="button" role="menuitem">
+          Logout
+        </button>
+      </DropdownMenu>
+    );
+
+    const trigger = screen.getByRole("button", { name: /account/i });
+    expect(trigger).toHaveAttribute("tabIndex", "0");
+
+    await user.tab();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    await user.keyboard(" ");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  test("a native button trigger does not double-toggle on keyboard activation", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DropdownMenu trigger={<button type="button">Open menu</button>}>
+        <button type="button" role="menuitem">
+          Logout
+        </button>
+      </DropdownMenu>
+    );
+
+    screen.getByRole("button", { name: /open menu/i }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
 });
