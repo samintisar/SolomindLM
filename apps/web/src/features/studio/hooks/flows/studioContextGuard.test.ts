@@ -24,6 +24,19 @@ describe("getStudioContextWarning", () => {
     expect(warning?.message).toMatch(/fewer, more targeted sources/);
     expect(warning?.message).toContain("about 400,000 words");
   });
+
+  it("warns when a selected source hasn't finished processing, even with no known size", () => {
+    const warning = getStudioContextWarning([{ selected: true }]);
+    expect(warning).not.toBeNull();
+    expect(warning?.title).toBe("Some sources are still processing");
+    expect(warning?.message).toContain("1 selected source");
+  });
+
+  it("does not count an unselected still-processing source", () => {
+    expect(
+      getStudioContextWarning([{ selected: true, wordCount: 5_000 }, { selected: false }])
+    ).toBeNull();
+  });
 });
 
 describe("confirmStudioContextBudget", () => {
