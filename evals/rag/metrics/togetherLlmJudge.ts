@@ -27,7 +27,7 @@ export interface TogetherJudgeConfig {
 }
 
 /** Default judge model for eval binary judges and pairwise compare */
-const DEFAULT_JUDGE_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731";
+const DEFAULT_JUDGE_MODEL = "deepseek-ai/DeepSeek-V4.1-Flash";
 
 /** Cheaper alternative for quick iterations */
 const FAST_JUDGE_MODEL = "meta-llama/Llama-3.3-8B-Instruct-Turbo";
@@ -124,7 +124,7 @@ export function createTogetherJudgeInvoker(
 // ============================================================
 
 export const JUDGE_PRESETS: Record<string, TogetherJudgeConfig> = {
-  /** Default: DeepSeek V4 Flash for eval judges */
+  /** Default: DeepSeek V4.1 Flash for eval judges */
   default: {
     model: DEFAULT_JUDGE_MODEL,
     temperature: 0.1,

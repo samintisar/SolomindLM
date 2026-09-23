@@ -22,12 +22,12 @@ export interface SmartModel {
 }
 
 /** Default RAG chat model when the notebook has no saved selection. */
-export const DEFAULT_SMART_MODEL_ID = "deepseek-ai/DeepSeek-V4-Flash-0731";
+export const DEFAULT_SMART_MODEL_ID = "deepseek-ai/DeepSeek-V4.1-Flash";
 
 export const AVAILABLE_SMART_MODELS: SmartModel[] = [
   {
     id: DEFAULT_SMART_MODEL_ID,
-    name: "DeepSeek V4 Flash",
+    name: "DeepSeek V4.1 Flash",
     description: "Fast reasoning and synthesis",
     brand: "deepseek",
   },
