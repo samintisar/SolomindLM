@@ -21,9 +21,10 @@ export { DEFAULT_SMART_MODEL_ID };
 const LEGACY_SMART_MODEL_ALIASES: Record<string, SmartModelId> = {
   "zai-org/GLM-5.2": "zai-org/GLM-5.3-Flash",
   "Qwen/Qwen3.7-Max": "Qwen/Qwen3.8-Flash",
+  "deepseek-ai/DeepSeek-V4-Flash-0731": DEFAULT_SMART_MODEL_ID,
 };
 
-/** Validate notebook/chat model selection; fall back to DeepSeek V4 Flash. */
+/** Validate notebook/chat model selection; fall back to DeepSeek V4.1 Flash. */
 export function resolveSmartModel(candidate?: string | null): SmartModelId {
   const validModelIds = new Set<string>(AVAILABLE_SMART_MODEL_IDS);
   const aliased = candidate ? LEGACY_SMART_MODEL_ALIASES[candidate] : undefined;

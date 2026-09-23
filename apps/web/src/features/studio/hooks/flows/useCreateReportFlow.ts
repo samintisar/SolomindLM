@@ -4,6 +4,7 @@ import type { Note } from "@/shared/types/index";
 import { getReportSubtitle } from "@/shared/types/reportTypes";
 import { useCreateReport } from "../../services/reportsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -28,6 +29,9 @@ export function useCreateReportFlow(ctx: CreateFlowContext) {
       const blocker = getStudioGenerationBlocker(ctx);
       if (blocker) {
         showErrorToast(blocker);
+        return;
+      }
+      if (!(await confirmStudioContextBudget(ctx))) {
         return;
       }
 
