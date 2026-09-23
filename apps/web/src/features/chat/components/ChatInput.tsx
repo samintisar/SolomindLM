@@ -625,7 +625,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     openMenu === "model" && "bg-muted/40 text-foreground"
                   )}
                   title={currentModel?.name ?? "Choose model"}
-                  aria-label={`Model: ${currentModel?.name ?? "DeepSeek V4 Flash"}`}
+                  aria-label={`Model: ${currentModel?.name ?? "DeepSeek V4.1 Flash"}`}
                 >
                   <ModelBrandIcon brand={currentModel?.brand ?? "deepseek"} />
                   <span
@@ -634,7 +634,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       hideModelButtonLabel ? "sr-only" : "@max-4xl/chat-input:sr-only"
                     )}
                   >
-                    {currentModel?.name ?? "DeepSeek V4 Flash"}
+                    {currentModel?.name ?? "DeepSeek V4.1 Flash"}
                   </span>
                   <ChevronDown
                     className={[
