@@ -55,8 +55,8 @@
     "babel-preset-expo": "~55.0.8",
     "jest": "^30.5.1",
     "jest-expo": "~55.0.22",
-    "metro-resolver": "0.83.6",
-    "react-test-renderer": "19.2.8",
+    "metro-resolver": "0.87.1",
+    "react-test-renderer": "19.3.0",
     "typescript": "~5.9.2"
   },
   "private": true
