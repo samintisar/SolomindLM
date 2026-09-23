@@ -399,9 +399,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         />
 
         <div className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-2 @max-xs/chat-input:gap-1">
-          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden @max-xs/chat-input:gap-1">
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden @max-xs/chat-input:gap-1">
             {/* Mode */}
-            {/* No min-w-0 on the wrapper or button: they must never shrink below icon + chevron, or those spill onto the next control. */}
+            {/* No min-w-0 on the wrapper or button: they must never shrink below icon + chevron, or those spill onto the next control.
+                overflow-x-auto (not -hidden) so if the icon+chevron floors still exceed the available width, controls scroll into view
+                instead of being clipped out of reach. */}
             <div className="relative shrink">
               <button
                 ref={modeAnchorRef}
