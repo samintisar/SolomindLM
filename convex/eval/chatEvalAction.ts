@@ -23,7 +23,7 @@ import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { env } from "../_lib/env";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 import { academicDiscoverSources } from "../_services/search/AcademicSearchService.js";
 import type { ReferenceChunk } from "../storage/ChatHistoryService";
 import { assertRagEvalGate } from "./_gate";
@@ -202,7 +202,7 @@ export const runChatEval = action({
 
     // ── Services ──
 
-    const embeddingService = new EmbeddingService(process.env.TOGETHER_AI_API_KEY || "");
+    const embeddingService = new EmbeddingService(process.env.OPENAI_API_KEY || "");
 
     const rerankFn = async (query: string, documents: Array<{ id: string; content: string }>) => {
       return cachedRerank(ctx, query, documents as RerankDocument[], "zerank-2", 15);

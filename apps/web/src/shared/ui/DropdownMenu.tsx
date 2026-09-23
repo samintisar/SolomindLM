@@ -101,11 +101,33 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
     setIsOpen((prev) => !prev);
   };
 
+  // Native <button> triggers already get Enter/Space-as-click for free from the
+  // browser; a non-button trigger (e.g. a styled <div>) needs role/tabIndex to be
+  // reachable by keyboard at all, and its own Enter/Space handling since there's
+  // no native activation behavior to rely on.
+  const isNativeButton = trigger.type === "button";
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    trigger.props.onKeyDown?.(e);
+    if (isNativeButton || e.defaultPrevented) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setIsOpen((prev) => !prev);
+    }
+  };
+
   // Clone trigger and add onClick handler
   const triggerWithProps = React.cloneElement(trigger, {
     onClick: handleTriggerClick,
+    onKeyDown: handleTriggerKeyDown,
     "aria-haspopup": "menu",
     "aria-expanded": isOpen,
+    ...(isNativeButton
+      ? {}
+      : {
+          role: trigger.props.role ?? "button",
+          tabIndex: trigger.props.tabIndex ?? 0,
+        }),
   });
 
   const menu =

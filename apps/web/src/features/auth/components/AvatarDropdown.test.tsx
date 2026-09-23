@@ -1,8 +1,16 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test, vi } from "vitest";
+import { FeedbackProvider } from "../../feedback/FeedbackContext";
 import { AvatarDropdown } from "./AvatarDropdown";
+
+vi.mock("convex/react", () => ({
+  useQuery: vi.fn(() => undefined),
+  useMutation: vi.fn(),
+  useAction: vi.fn(),
+}));
 
 vi.mock("./LanguageSelector", () => ({
   LanguageSelector: () => <div data-testid="language-selector" />,
@@ -20,7 +28,16 @@ function renderMenu(overrides: Partial<ComponentProps<typeof AvatarDropdown>> = 
     showChecklistDismissed: false,
     ...overrides,
   };
-  return { ...render(<AvatarDropdown {...props} />), props };
+  return {
+    ...render(
+      <MemoryRouter>
+        <FeedbackProvider>
+          <AvatarDropdown {...props} />
+        </FeedbackProvider>
+      </MemoryRouter>
+    ),
+    props,
+  };
 }
 
 describe("AvatarDropdown onboarding actions", () => {

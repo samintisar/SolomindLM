@@ -4,13 +4,19 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
-import { EmbeddingService } from "../_services/processing/EmbeddingServiceClient";
+import { EMBEDDING_MODEL } from "../_lib/embeddingConfig";
+import { EmbeddingService } from "../_services/ai/embeddingClient";
 
-const TARGET_DIM = 1024;
 const BATCH_SIZE = 40;
 
 /**
- * Worker: processes one page of chunks, skips ones already at 1024 dims, then reschedules until done.
+ * Worker: processes one page of chunks, skips ones already stamped with
+ * `embeddingModel === EMBEDDING_MODEL`, then reschedules until done.
+ *
+ * Filtering on `embeddingModel` (not vector length) is deliberate: two
+ * different embedding models can coincidentally produce vectors of the same
+ * length, so length alone can't reliably tell "already migrated" from "not
+ * yet migrated." Provenance can.
  */
 export const reembedBatchesWorker = internalAction({
   args: {
@@ -19,17 +25,17 @@ export const reembedBatchesWorker = internalAction({
     errors: v.number(),
   },
   handler: async (ctx, args) => {
-    const togetherApiKey = process.env.TOGETHER_AI_API_KEY;
-    if (!togetherApiKey) {
-      throw new Error("TOGETHER_AI_API_KEY environment variable not set");
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      throw new Error("OPENAI_API_KEY environment variable not set");
     }
 
-    const embeddingService = new EmbeddingService(togetherApiKey);
+    const embeddingService = new EmbeddingService(openaiApiKey);
 
     const page = (await ctx.runQuery(internal._migration.reembedChunks.listDocumentChunksPage, {
       paginationOpts: { numItems: BATCH_SIZE, cursor: args.cursor },
     })) as {
-      page: Array<Doc<"documentChunks"> & { embedding?: number[] }>;
+      page: Array<Doc<"documentChunks"> & { embedding?: number[]; embeddingModel?: string }>;
       isDone: boolean;
       continueCursor: string;
     };
@@ -37,10 +43,9 @@ export const reembedBatchesWorker = internalAction({
     let processed = args.processed;
     let errors = args.errors;
 
-    const toUpdate = page.page.filter((chunk: { embedding?: number[] }) => {
-      const len = chunk.embedding?.length ?? 0;
-      return len !== TARGET_DIM;
-    });
+    const toUpdate = page.page.filter(
+      (chunk: { embeddingModel?: string }) => chunk.embeddingModel !== EMBEDDING_MODEL
+    );
 
     if (toUpdate.length > 0) {
       try {
@@ -52,6 +57,7 @@ export const reembedBatchesWorker = internalAction({
             await ctx.runMutation(internal._migration.reembedChunks.updateChunkEmbedding, {
               chunkId: chunk._id,
               newEmbedding: newEmbeddings[j]!,
+              embeddingModel: EMBEDDING_MODEL,
             });
             processed++;
           } catch (e) {

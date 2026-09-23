@@ -101,7 +101,7 @@ describe("injectPrerenderBody", () => {
     const bodyHtml = buildHomePrerenderBody();
     const html = injectPrerenderBody(MINIMAL_HTML, bodyHtml);
 
-    expect(html).toContain("<h1>Learn Anything</h1>");
+    expect(html).toContain("<h1>AI Study &amp; Research Assistant for Your PDFs</h1>");
     expect(html).toContain('data-seo-prerender="true"');
   });
 

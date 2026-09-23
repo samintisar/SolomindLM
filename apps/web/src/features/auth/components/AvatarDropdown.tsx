@@ -1,5 +1,8 @@
-import { ListChecks, LogIn, LogOut, Moon, Sun } from "lucide-react";
+import { ListChecks, LogIn, LogOut, MessageSquarePlus, Moon, Sun, Wrench } from "lucide-react";
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useFeedback } from "../../feedback/FeedbackContext";
+import { useIsFeedbackAdmin } from "../../feedback/services/feedbackApi";
 import type { User } from "../useAuth";
 import { LanguageSelector } from "./LanguageSelector";
 
@@ -24,6 +27,12 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
   onShowChecklist,
   showChecklistDismissed,
 }) => {
+  const navigate = useNavigate();
+  const { open: openFeedback } = useFeedback();
+  // Only the "Feedback triage" item needs this, and it's staff-only — don't open
+  // the subscription for signed-out menus.
+  const isFeedbackAdmin = useIsFeedbackAdmin(isAuthenticated);
+
   const handleLogout = async () => {
     await onLogout();
   };
@@ -69,6 +78,29 @@ export const AvatarDropdown: React.FC<AvatarDropdownProps> = ({
             <ListChecks className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Show getting-started checklist</span>
           </button>
+        )}
+
+        {isAuthenticated && (
+          <>
+            <button
+              onClick={() => openFeedback("bug")}
+              className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+              role="menuitem"
+            >
+              <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span>Send feedback</span>
+            </button>
+            {isFeedbackAdmin && (
+              <button
+                onClick={() => navigate("/admin/feedback")}
+                className="w-full px-4 py-2.5 text-left hover:bg-accent transition-colors flex items-center gap-3 text-sm font-sans"
+                role="menuitem"
+              >
+                <Wrench className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span>Feedback triage</span>
+              </button>
+            )}
+          </>
         )}
 
         {/* Login/Logout */}

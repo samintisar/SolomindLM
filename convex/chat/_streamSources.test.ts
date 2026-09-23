@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createDiscoverSources, discoverChatExternalSources } from "./_streamSources";
 import type { StreamSourcePolicy } from "./stream";
 
+vi.mock("../_agents/chat/searchQueryRefiner", () => ({
+  refineWebSearchQuery: vi.fn(async (query: string) => query),
+}));
+
 describe("createDiscoverSources", () => {
   it("returns empty array when no channels match", async () => {
     const ctx = {

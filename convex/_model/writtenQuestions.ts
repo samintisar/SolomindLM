@@ -176,6 +176,35 @@ export async function patchWrittenQuestionUserAnswer(
   });
 }
 
+/**
+ * Persist ONLY the draft answer text for one question. Read-modify-write that
+ * merges over the existing per-question object so grade fields written by
+ * grading (`graded`, `score`, `feedback`, ...) are never clobbered. Ensures a
+ * `graded` key exists (defaulting to `false`) for brand-new drafts.
+ */
+export async function saveWrittenQuestionUserAnswerDraft(
+  ctx: MutationCtx,
+  writtenQuestion: Doc<"writtenQuestions">,
+  questionId: string,
+  answer: string
+): Promise<void> {
+  const existingUserAnswers =
+    (writtenQuestion.metadata as { userAnswers?: Record<string, Record<string, unknown>> })
+      ?.userAnswers ?? {};
+  const existingAnswer = existingUserAnswers[questionId] ?? {};
+
+  await ctx.db.patch("writtenQuestions", writtenQuestion._id, {
+    metadata: {
+      ...writtenQuestion.metadata,
+      userAnswers: {
+        ...existingUserAnswers,
+        [questionId]: { graded: false, ...existingAnswer, answer },
+      },
+    },
+    updatedAt: Date.now(),
+  });
+}
+
 export async function deleteWrittenQuestion(
   ctx: MutationCtx,
   writtenQuestionId: Id<"writtenQuestions">

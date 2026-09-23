@@ -1,0 +1,66 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+labels: ["type:bug", "status:triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. Repro steps and error text matter most — fill in what you can.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What's wrong
+      description: One or two sentences on the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a notebook with a PDF source
+        2. Generate written questions
+        3. Submit blank, click Finish
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error text, logs, screenshots, and a requestId if you have one.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - mobile
+        - convex
+        - agents
+        - rag
+        - studio
+        - billing
+        - auth
+        - sources
+        - chat
+        - ci / infra
+        - unsure
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: prod / dev, browser + OS, deployment URL
+  - type: textarea
+    id: notes
+    attributes:
+      label: Suspected cause / affected files (optional)

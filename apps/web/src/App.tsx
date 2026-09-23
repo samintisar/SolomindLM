@@ -17,6 +17,9 @@ import { useSubscriptionStatus } from "./features/billing/services/subscriptionA
 import { ChatStreamingProvider } from "./features/chat/ChatStreamingContext";
 import { useChatStream } from "./features/chat/hooks/useChatStream";
 import { useConversationCRUD } from "./features/chat/hooks/useConversationCRUD";
+import { AdminFeedbackPage } from "./features/feedback/components/AdminFeedbackPage";
+import { FeedbackModal } from "./features/feedback/components/FeedbackModal";
+import { FeedbackProvider } from "./features/feedback/FeedbackContext";
 import { ClusterHubLandingPage } from "./features/landing/ClusterHubLandingPage";
 import { CLUSTER_HUB_PAGES, isClusterHubPath } from "./features/landing/clusterHubPages";
 import { FaqPage } from "./features/landing/FaqPage";
@@ -425,7 +428,14 @@ const AppContent: React.FC = () => {
               />
             ))}
 
-            <Route path="/home" element={<HomePage />} />
+            <Route
+              path="/home"
+              element={
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/folder/:folderId"
@@ -445,6 +455,15 @@ const AppContent: React.FC = () => {
                   <main className="flex-1 overflow-auto">
                     <BillingPage onBack={() => navigate("/home")} />
                   </main>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/feedback"
+              element={
+                <ProtectedRoute>
+                  <AdminFeedbackPage />
                 </ProtectedRoute>
               }
             />
@@ -512,7 +531,10 @@ const App: React.FC = () => {
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
-              <AppContent />
+              <FeedbackProvider>
+                <AppContent />
+                <FeedbackModal />
+              </FeedbackProvider>
               <ToastContainer />
             </ToastProvider>
           </AuthProvider>
