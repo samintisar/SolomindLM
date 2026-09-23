@@ -269,6 +269,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     (showSourceChannelFilters ? 1 : 0);
   /** Icon-only model control when the left toolbar is crowded (e.g. literature review). */
   const hideModelButtonLabel = toolbarControlCount >= 3;
+  // Labels collapse by the composer's own width (container queries), not the viewport: in the
+  // tablet three-panel layout the chat column is narrower than a phone screen. The research
+  // database picker makes the toolbar crowded, so labels drop at wider widths when it's shown.
+  const modeLabelClass = showResearchDatabases
+    ? "@max-md/chat-input:hidden"
+    : "@max-xs/chat-input:hidden";
+  const filtersLabelClass = showResearchDatabases
+    ? "@max-lg/chat-input:hidden"
+    : "@max-sm/chat-input:hidden";
+  const menuChevronClass = "@max-xs/chat-input:hidden";
 
   const placeholder =
     mode === "literatureReview"
@@ -277,13 +287,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         ? "Ask a complex research question with multi-step investigation..."
         : "Ask a question about your sources...";
 
-  useLayoutEffect(() => {
+  const fitTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     // Reset before measuring so scrollHeight shrinks when content is cleared.
     textarea.style.height = "0px";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
-  }, [value, placeholder]);
+  }, []);
+
+  useLayoutEffect(() => {
+    fitTextareaHeight();
+  }, [value, placeholder, fitTextareaHeight]);
+
+  // Wrapping depends on width, so re-fit when it changes: panel resizes, and panels that mount
+  // hidden (measured at 0px) and are shown later.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || typeof ResizeObserver === "undefined") return;
+    let lastWidth = -1;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      fitTextareaHeight();
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [fitTextareaHeight]);
 
   useEffect(() => {
     if (openMenu === "none") return;
@@ -368,10 +398,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           disabled={disabled}
         />
 
-        <div className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden">
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-2 @max-xs/chat-input:gap-1">
+          <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden @max-xs/chat-input:gap-1">
             {/* Mode */}
-            <div className="relative min-w-0 shrink">
+            {/* No min-w-0 on the wrapper or button: they must never shrink below icon + chevron, or those spill onto the next control. */}
+            <div className="relative shrink">
               <button
                 ref={modeAnchorRef}
                 type="button"
@@ -381,7 +412,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 aria-label={`Composer mode: ${modeMeta.label}`}
                 onClick={() => setOpenMenu((o) => (o === "mode" ? "none" : "mode"))}
                 className={[
-                  "inline-flex h-9 max-w-full min-w-0 items-center gap-2 rounded-full border border-transparent px-3 text-sm font-medium font-sans transition-colors",
+                  "inline-flex h-9 max-w-full items-center gap-2 rounded-full border border-transparent px-3 @max-xs/chat-input:px-2.5 text-sm font-medium font-sans transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
                   "disabled:opacity-50 disabled:cursor-not-allowed",
                   mode === "literatureReview"
@@ -390,9 +421,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 ].join(" ")}
               >
                 <ModeIcon className="size-4 shrink-0 opacity-90" aria-hidden />
-                <span className="min-w-0 truncate">{modeMeta.label}</span>
+                <span className={cn("min-w-0 truncate", modeLabelClass)}>{modeMeta.label}</span>
                 <ChevronDown
-                  className="size-3.5 shrink-0 opacity-60"
+                  className={cn("size-3.5 shrink-0 opacity-60", menuChevronClass)}
                   strokeWidth={2.25}
                   aria-hidden
                 />
@@ -436,7 +467,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {/* Research paper corpus: literature review always; chat/deep research when Academic filter is on */}
             {showResearchDatabases && (
-              <div className="relative min-w-0 shrink">
+              <div className="relative shrink">
                 <button
                   ref={corpusAnchorRef}
                   type="button"
@@ -445,12 +476,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   aria-expanded={openMenu === "corpus"}
                   aria-label="Research databases"
                   onClick={() => setOpenMenu((o) => (o === "corpus" ? "none" : "corpus"))}
-                  className="inline-flex h-9 max-w-[min(13rem,52vw,100%)] min-w-0 items-center gap-2 rounded-full bg-muted/50 px-3 text-sm font-medium font-sans text-foreground hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50"
+                  className="inline-flex h-9 max-w-[min(13rem,100%)] items-center gap-2 rounded-full bg-muted/50 px-3 @max-xs/chat-input:px-2.5 text-sm font-medium font-sans text-foreground hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:opacity-50"
                 >
                   <DbButtonIcon className="size-4 shrink-0 opacity-70" aria-hidden />
-                  <span className="min-w-0 truncate">{dbMeta.title}</span>
+                  <span className="min-w-0 truncate @max-xl/chat-input:hidden">{dbMeta.title}</span>
                   <ChevronDown
-                    className="size-3.5 shrink-0 opacity-60"
+                    className={cn("size-3.5 shrink-0 opacity-60", menuChevronClass)}
                     strokeWidth={2.25}
                     aria-hidden
                   />
@@ -528,7 +559,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   className={filtersButtonClass(academicFiltersActive)}
                 >
                   <ListFilter className="size-4 shrink-0" strokeWidth={2} aria-hidden />
-                  Filters
+                  <span className={filtersLabelClass}>Filters</span>
                 </button>
                 <ComposerDropUp
                   anchorRef={filtersAnchorRef}
@@ -560,7 +591,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   )}
                 >
                   <ListFilter className="size-4 shrink-0" strokeWidth={2} aria-hidden />
-                  Filters
+                  <span className={filtersLabelClass}>Filters</span>
                 </button>
                 <ComposerDropUp
                   anchorRef={filtersAnchorRef}
@@ -605,7 +636,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             )}
           </div>
 
-          <div className="flex min-h-9 min-w-0 shrink-0 flex-nowrap items-center justify-end gap-2 pl-1">
+          <div className="flex min-h-9 min-w-0 shrink-0 flex-nowrap items-center justify-end gap-2 pl-1 @max-xs/chat-input:gap-1 @max-xs/chat-input:pl-0">
             {showModelRow && (
               <div className="relative max-w-full min-w-0">
                 <button
@@ -637,11 +668,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     {currentModel?.name ?? "DeepSeek V4 Flash"}
                   </span>
                   <ChevronDown
-                    className={[
+                    className={cn(
                       "size-3.5 shrink-0 opacity-50 transition-transform duration-200",
                       "group-hover:opacity-70",
                       openMenu === "model" && "-rotate-180 opacity-70",
-                    ].join(" ")}
+                      menuChevronClass
+                    )}
                     strokeWidth={2.25}
                     aria-hidden
                   />
