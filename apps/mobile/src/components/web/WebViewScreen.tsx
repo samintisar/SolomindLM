@@ -11,6 +11,8 @@ import { shouldLoadUrlInWebView } from "./webViewUrlPolicy";
 export type WebViewScreenProps = {
   path: string;
   onUrlChange?: (url: string) => void;
+  /** Called when the web app reports its active theme (`shell-web:theme`). */
+  onThemeChange?: (theme: "light" | "dark") => void;
 };
 
 function getWebBaseUrl(): string | null {
@@ -19,10 +21,30 @@ function getWebBaseUrl(): string | null {
   return url.replace(/\/+$/, "");
 }
 
-export function WebViewScreen({ path, onUrlChange }: WebViewScreenProps) {
+export function WebViewScreen({ path, onUrlChange, onThemeChange }: WebViewScreenProps) {
   const base = useMemo(() => getWebBaseUrl(), []);
-  const { onWebViewMessage, setWebViewRef, onWebViewLoadStart, onWebViewLoadEnd } =
-    useNativeConvexAuthBridge();
+  const {
+    onWebViewMessage: onAuthBridgeMessage,
+    setWebViewRef,
+    onWebViewLoadStart,
+    onWebViewLoadEnd,
+  } = useNativeConvexAuthBridge();
+
+  const onWebViewMessage = useCallback(
+    (raw: string) => {
+      try {
+        const msg = JSON.parse(raw) as { type?: string; theme?: unknown };
+        if (msg?.type === "shell-web:theme") {
+          if (msg.theme === "light" || msg.theme === "dark") onThemeChange?.(msg.theme);
+          return;
+        }
+      } catch {
+        /* not JSON — let the auth bridge decide */
+      }
+      onAuthBridgeMessage(raw);
+    },
+    [onAuthBridgeMessage, onThemeChange]
+  );
   const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
