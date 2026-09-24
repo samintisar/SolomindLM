@@ -268,6 +268,30 @@
     --shadow-2xl: 2px 3px 5px 0px hsl(35 30% 10% / 0.3);
   }
 
+  /* Pins the auth/landing pages to light-mode tokens regardless of an ancestor .dark class, since
+     those pages are deliberately always-light (see issue #147). */
+  .auth-form-light {
+    --background: oklch(0.9582 0.0152 90.2357);
+    --foreground: oklch(0.21 0.01 0);
+    --card: oklch(0.9914 0.0098 87.4695);
+    --card-foreground: oklch(0.21 0.01 0);
+    --primary: oklch(0.38 0.05 65.5444);
+    --primary-foreground: oklch(1 0 0);
+    --muted: oklch(0.9239 0.019 83.0636);
+    --muted-foreground: oklch(0.5391 0.0387 71.1655);
+    --accent: oklch(0.8348 0.025 88.8064);
+    --accent-foreground: oklch(0.21 0.01 0);
+    --border: oklch(0.8606 0.0321 84.5881);
+    --ring: oklch(0.38 0.05 65.5444);
+    --vintage-red-50: hsl(0, 50%, 94%);
+    --vintage-red-200: hsl(0, 30%, 85%);
+    --vintage-red-800: hsl(0, 70%, 15%);
+    --vintage-amber-50: hsl(40, 60%, 94%);
+    --vintage-amber-100: hsl(40, 55%, 92%);
+    --vintage-amber-200: hsl(40, 35%, 85%);
+    --vintage-amber-700: hsl(40, 65%, 20%);
+  }
+
   html {
     /* Slightly above 14px so rem-based UI (text-sm, text-xs, spacing) is easier to read without bloating headings */
     font-size: 15px;
