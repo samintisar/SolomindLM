@@ -1,6 +1,6 @@
 /**
  * Binary pass/fail LLM judges per failure mode.
- * Default model: deepseek-ai/DeepSeek-V4-Flash-0731 via Together JSON mode.
+ * Default model: deepseek-ai/DeepSeek-V4.1-Flash via Together JSON mode.
  */
 import type { EvalBaseline, EvalFixture, EvalRunArtifact, MetricResult } from "../types";
 import type { LlmJudgeOptions } from "./llmJudge";
