@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
+import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveMindMapResults = internalMutation({
@@ -9,15 +10,26 @@ export const saveMindMapResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const mindmap = await ctx.db.get(args.mindmapId);
+    if (!mindmap) return null;
+
+    const title = args.metadata?.title ?? "Mind Map";
     await ctx.db.patch(args.mindmapId, {
       data: args.mindmap,
       status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Mind Map",
+      title,
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
       },
+    });
+    await scheduleStudioJobCompletionPush(ctx, {
+      userId: mindmap.userId,
+      notebookId: mindmap.notebookId,
+      itemId: args.mindmapId,
+      kind: "mindmap",
+      title,
     });
   },
 });
