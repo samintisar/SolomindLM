@@ -1,4 +1,5 @@
 import { ReactNode, useCallback, useEffect, useState } from "react";
+import { getNativeWebViewBridge } from "@/utils/platformDetection";
 import { ThemeContext } from "./useTheme";
 
 type Theme = "light" | "dark";
@@ -25,6 +26,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
+    }
+
+    // Let the mobile shell match its status-bar inset to the web theme.
+    try {
+      getNativeWebViewBridge()?.postMessage(JSON.stringify({ type: "shell-web:theme", theme }));
+    } catch {
+      /* ignore */
     }
   }, [theme, isInitialized]);
 
