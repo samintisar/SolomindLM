@@ -235,17 +235,16 @@ ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
       );
     }
 
-    // If extraction completely failed, generate fallback
+    // If extraction completely failed, fail the job instead of returning filler content
     if (fullDialogueScript.length === 0) {
-      logger.warn("All chunks failed, using fallback script", {
+      logger.warn("All chunks failed to produce a parsable dialogue script", {
         agent: "AudioOverviewGraph",
         phase: "write_script",
+        numChunks,
       });
-      fullDialogueScript = [
-        { speaker: "host_a", text: "I've analyzed the content you provided." },
-        { speaker: "host_b", text: "What did you find most interesting?" },
-        { speaker: "host_a", text: "There were several key points worth discussing." },
-      ];
+      throw new Error(
+        `Dialogue script generation failed: none of the ${numChunks} chunk(s) produced a parsable script`
+      );
     }
 
     const elapsed = Date.now() - startTime;
@@ -268,14 +267,8 @@ ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
           : String(error),
     });
 
-    fullDialogueScript = [
-      { speaker: "host_a", text: "I apologize, but I had trouble processing this content." },
-      { speaker: "host_b", text: "That sounds frustrating. What went wrong?" },
-      {
-        speaker: "host_a",
-        text: "The system encountered an error. Please try again with different content.",
-      },
-    ];
+    // Surface the failure instead of returning filler dialogue as if generation succeeded.
+    throw error;
   }
 
   return {
