@@ -338,14 +338,14 @@ You can customize which models are used for different features. Models are hoste
 
 ```env
 FAST_LLM=Qwen/Qwen3.5-9B
-SMART_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-REPORT_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-FLASHCARDS_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-QUIZ_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-MINDMAP_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-SPREADSHEET_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-WRITTEN_QUESTIONS_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
-AUDIO_LLM=deepseek-ai/DeepSeek-V4-Flash-0731
+SMART_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+REPORT_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+FLASHCARDS_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+QUIZ_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+MINDMAP_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+SPREADSHEET_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+WRITTEN_QUESTIONS_LLM=deepseek-ai/DeepSeek-V4.1-Flash
+AUDIO_LLM=deepseek-ai/DeepSeek-V4.1-Flash
 ```
 
 ### Frontend Environment Variables
