@@ -12,12 +12,11 @@ import { fromProviderUsage } from "../../_agents/_shared/usageAggregate";
 import { internal } from "../../_generated/api";
 import { internalAction } from "../../_generated/server";
 import { env } from "../../_lib/env";
-import { createTogetherClient } from "../../_services/ai/togetherClient";
-
-/**
- * Map orientation to supported gpt-image-1.5 dimensions.
- * Supported: '1024x1024', '1536x1024', '1024x1536'
- */
+import { ExternalServiceError } from "../../_lib/errors";
+import {
+  callOpenAIImageGeneration,
+  describeImageGenerationError,
+} from "../../_services/ai/openaiImages";
 
 /**
  * Robust JSON parser for LLM responses.
@@ -61,6 +60,10 @@ function parseLlmJson(content: string): Record<string, unknown> {
   }
 }
 
+/**
+ * Map orientation to supported GPT image model dimensions.
+ * Supported: '1024x1024', '1536x1024', '1024x1536'
+ */
 function getImageSize(orientation: string | undefined): string {
   switch (orientation) {
     case "landscape":
@@ -118,7 +121,7 @@ function getDetailLevelInstruction(level: string | undefined): string {
 
 /**
  * Generate infographic action.
- * Simplified pipeline: map-reduce for large docs → single LLM prompt → Together AI image generation.
+ * Simplified pipeline: map-reduce for large docs → single LLM prompt → OpenAI image generation.
  */
 export const generateInfographicImage = internalAction({
   args: {
@@ -158,6 +161,14 @@ export const generateInfographicImage = internalAction({
     const jobTimer = logger.createTimer();
 
     try {
+      // Fail before the multi-minute design phase if image generation can't run.
+      if (!env.OPENAI_API_KEY) {
+        throw new ExternalServiceError("openai", "OPENAI_API_KEY is not set", {
+          statusCode: 401,
+          retryable: false,
+        });
+      }
+
       logger.phaseStart("status_update", { status: "generating" });
       await ctx.runMutation(internal.studio.infographic.index.updateStatus, {
         infographicId,
@@ -174,10 +185,6 @@ export const generateInfographicImage = internalAction({
       if (chunks.length === 0) {
         throw new Error("No content found in selected sources");
       }
-
-      logger.phaseStart("create_client");
-      const togetherClient = createTogetherClient();
-      logger.phaseComplete("create_client");
 
       // Concatenate chunk contents (up to ~8k tokens worth of text)
       logger.phaseStart("prepare_content", { chunkCount: chunks.length });
@@ -290,65 +297,19 @@ Return JSON: {
         `Professional infographic: ${design.title}. ${design.visual_metaphor}. Clean layout. ${styleInstruction}`;
       logger.phaseComplete("prompt_generation", { title: design.title || "(generated)" });
 
-      // Generate image via Together AI gpt-image-1.5
-      logger.phaseStart("image_generation", { size: getImageSize(orientation) });
+      // Generate image via OpenAI (GPT image models return base64 PNG)
       const size = getImageSize(orientation);
-      const [widthStr, heightStr] = size.split("x");
-      const width = parseInt(widthStr, 10);
-      const height = parseInt(heightStr, 10);
-
-      const imageResponse = await invokeWithRetry(
-        () =>
-          togetherClient.images.generate({
-            model: "openai/gpt-image-1.5",
-            prompt: imagePrompt,
-            width,
-            height,
-            n: 1,
-          }),
-        {
-          maxAttempts: 2,
-          baseDelayMs: 2000,
-          onRetry: (attempt, error, delayMs) => {
-            logger.warn(`Image generation retry ${attempt}/2 after ${delayMs}ms`, {
-              attempt,
-              error: error.message,
-            });
-          },
-        },
-        "InfographicImageGen"
-      );
-
-      const imageData = imageResponse.data?.[0];
-      let imageUrl: string;
-
-      if ((imageData as any)?.b64_json) {
-        imageUrl = `data:image/png;base64,${(imageData as any).b64_json}`;
-      } else if (imageData?.url) {
-        imageUrl = imageData.url;
-      } else {
-        throw new Error("No image data returned from Together AI");
-      }
-      logger.phaseComplete("image_generation", { imageUrl: imageUrl.slice(0, 80) });
+      logger.phaseStart("image_generation", { size, model: env.INFOGRAPHIC_IMAGE_MODEL });
+      const imageBytes = await callOpenAIImageGeneration({
+        apiKey: env.OPENAI_API_KEY,
+        model: env.INFOGRAPHIC_IMAGE_MODEL,
+        prompt: imagePrompt,
+        size,
+      });
+      logger.phaseComplete("image_generation", { bytes: imageBytes.byteLength });
 
       // Store image in Convex storage
       logger.phaseStart("storage");
-      let imageBytes: Uint8Array;
-      if (imageUrl.startsWith("data:")) {
-        // Extract base64 from data URL
-        const parts = imageUrl.split(",");
-        if (parts.length < 2 || !parts[1]) {
-          throw new Error("Together AI returned a malformed data URL — cannot decode image");
-        }
-        const base64Data = parts[1];
-        imageBytes = Uint8Array.from(Buffer.from(base64Data, "base64"));
-      } else {
-        const imgRes = await fetch(imageUrl);
-        if (!imgRes.ok) {
-          throw new Error(`Failed to fetch image: ${imgRes.status} ${imgRes.statusText}`);
-        }
-        imageBytes = new Uint8Array(await imgRes.arrayBuffer());
-      }
       const storageId = await ctx.storage.store(
         new Blob([imageBytes.buffer as ArrayBuffer], { type: "image/png" })
       );
@@ -420,18 +381,20 @@ Return JSON: {
     } catch (error) {
       const errorMeta = createErrorMetadata(error, "infographic_generation");
       logger.jobError(error, { errorMeta });
+      const rawMessage = error instanceof Error ? error.message : "Unknown error";
 
       await ctx.runMutation(internal.studio.infographic.index.patch, {
         infographicId,
         patch: {
           status: "failed",
+          // data keeps the raw provider error for debugging; metadata.error is what the UI shows.
           data: {
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: rawMessage,
             errorType: errorMeta.type,
             errorPhase: errorMeta.phase,
           },
           metadata: {
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: describeImageGenerationError(error),
             errorType: errorMeta.type,
             errorPhase: errorMeta.phase,
           },
