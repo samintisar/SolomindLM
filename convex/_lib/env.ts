@@ -9,8 +9,10 @@ export const env = {
   // Together AI
   TOGETHER_AI_API_KEY: process.env.TOGETHER_AI_API_KEY || "",
 
-  // OpenAI (embeddings)
+  // OpenAI (embeddings, infographic images)
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+  /** OpenAI GPT image model for infographics; sizes in studio/infographic assume a gpt-image model. */
+  INFOGRAPHIC_IMAGE_MODEL: process.env.INFOGRAPHIC_IMAGE_MODEL || "gpt-image-2",
   FAST_LLM: process.env.FAST_LLM || "Qwen/Qwen3.5-9B",
   SMART_LLM: process.env.SMART_LLM || DEFAULT_SMART_MODEL_ID,
   REPORT_LLM: process.env.REPORT_LLM || DEFAULT_SMART_MODEL_ID,
