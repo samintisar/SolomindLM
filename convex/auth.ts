@@ -55,14 +55,17 @@ function isAllowedRedirect(redirectTo: string, bases: string[]): boolean {
  * production, so the curated copy in authErrorMessage.ts on the client never
  * matched anything there. Rethrowing as ConvexError preserves `.data` to the
  * client even in production, restoring those mappings.
+ *
+ * `InvalidAccountId` and `InvalidSecret` both collapse to "Invalid credentials"
+ * so the client can't tell unregistered emails from wrong passwords.
  */
-const KNOWN_PASSWORD_ERROR_MESSAGES = new Set([
-  "InvalidAccountId",
-  "InvalidSecret",
-  "TooManyFailedAttempts",
-  "Invalid code",
-  "Invalid password",
-  "Invalid credentials",
+const KNOWN_PASSWORD_ERROR_MESSAGES = new Map([
+  ["InvalidAccountId", "Invalid credentials"],
+  ["InvalidSecret", "Invalid credentials"],
+  ["TooManyFailedAttempts", "TooManyFailedAttempts"],
+  ["Invalid code", "Invalid code"],
+  ["Invalid password", "Invalid password"],
+  ["Invalid credentials", "Invalid credentials"],
 ]);
 
 interface PasswordProviderInternals {
@@ -78,8 +81,15 @@ function withKnownErrorsAsConvexErrors<T>(provider: T): T {
     try {
       return await authorize(params, ctx);
     } catch (error) {
-      if (error instanceof Error && KNOWN_PASSWORD_ERROR_MESSAGES.has(error.message)) {
-        throw new ConvexError(error.message);
+      if (!(error instanceof Error)) throw error;
+      // A reset request for an unknown email must look like a successful one
+      // (which also resolves to null once the reset code is "sent").
+      if (params.flow === "reset" && error.message === "InvalidAccountId") {
+        return null;
+      }
+      const message = KNOWN_PASSWORD_ERROR_MESSAGES.get(error.message);
+      if (message !== undefined) {
+        throw new ConvexError(message);
       }
       throw error;
     }
