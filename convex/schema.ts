@@ -217,7 +217,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Audio Overviews table
   audioOverviews: defineTable({
@@ -235,7 +235,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Flashcards table
   flashcards: defineTable({
@@ -251,7 +251,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Mindmaps table
   mindmaps: defineTable({
@@ -267,7 +267,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Quizzes table
   quizzes: defineTable({
@@ -283,7 +283,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Infographics table
   infographics: defineTable({
@@ -304,7 +304,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Spreadsheets table
   spreadsheets: defineTable({
@@ -320,7 +320,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Written Questions table
   writtenQuestions: defineTable({
@@ -337,7 +337,7 @@ export default defineSchema({
     .index("by_notebook", ["notebookId"])
     .index("by_notebook_and_user", ["notebookId", "userId"])
     .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_status_and_updatedAt", ["status", "updatedAt"]),
 
   // Chat
   conversations: defineTable({

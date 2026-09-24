@@ -260,6 +260,7 @@ import type * as chat_sourceSuggestions from "../chat/sourceSuggestions.js";
 import type * as chat_stream from "../chat/stream.js";
 import type * as chat_voiceTranscription from "../chat/voiceTranscription.js";
 import type * as chat_voiceTranscriptionAccess from "../chat/voiceTranscriptionAccess.js";
+import type * as crons from "../crons.js";
 import type * as documents_bulkUpload from "../documents/bulkUpload.js";
 import type * as documents_chunks from "../documents/chunks.js";
 import type * as documents_embeddingJob from "../documents/embeddingJob.js";
@@ -341,6 +342,7 @@ import type * as studio_jobMutations_mindmaps from "../studio/jobMutations/mindm
 import type * as studio_jobMutations_quizzes from "../studio/jobMutations/quizzes.js";
 import type * as studio_jobMutations_reports from "../studio/jobMutations/reports.js";
 import type * as studio_jobMutations_spreadsheets from "../studio/jobMutations/spreadsheets.js";
+import type * as studio_jobMutations_stuckJobs from "../studio/jobMutations/stuckJobs.js";
 import type * as studio_jobMutations_writtenQuestions from "../studio/jobMutations/writtenQuestions.js";
 import type * as studio_literature_tables_index from "../studio/literature_tables/index.js";
 import type * as studio_literature_tables_literatureTableCsv from "../studio/literature_tables/literatureTableCsv.js";
@@ -630,6 +632,7 @@ declare const fullApi: ApiFromModules<{
   "chat/stream": typeof chat_stream;
   "chat/voiceTranscription": typeof chat_voiceTranscription;
   "chat/voiceTranscriptionAccess": typeof chat_voiceTranscriptionAccess;
+  crons: typeof crons;
   "documents/bulkUpload": typeof documents_bulkUpload;
   "documents/chunks": typeof documents_chunks;
   "documents/embeddingJob": typeof documents_embeddingJob;
@@ -711,6 +714,7 @@ declare const fullApi: ApiFromModules<{
   "studio/jobMutations/quizzes": typeof studio_jobMutations_quizzes;
   "studio/jobMutations/reports": typeof studio_jobMutations_reports;
   "studio/jobMutations/spreadsheets": typeof studio_jobMutations_spreadsheets;
+  "studio/jobMutations/stuckJobs": typeof studio_jobMutations_stuckJobs;
   "studio/jobMutations/writtenQuestions": typeof studio_jobMutations_writtenQuestions;
   "studio/literature_tables/index": typeof studio_literature_tables_index;
   "studio/literature_tables/literatureTableCsv": typeof studio_literature_tables_literatureTableCsv;
