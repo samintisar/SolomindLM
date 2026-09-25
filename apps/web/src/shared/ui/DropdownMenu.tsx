@@ -1,38 +1,11 @@
-import React, {
-  ReactElement,
-  ReactNode,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { ReactElement, ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPosition } from "./anchoredPosition";
 
 interface DropdownMenuProps {
   trigger: ReactElement<any>;
   children: ReactNode;
   align?: "left" | "right";
-}
-
-type MenuPosition =
-  | { top: number; left: number; right?: undefined }
-  | { top: number; right: number; left?: undefined };
-
-function getMenuPosition(trigger: HTMLElement, align: "left" | "right"): MenuPosition {
-  const rect = trigger.getBoundingClientRect();
-  const gap = 8;
-
-  if (align === "right") {
-    return {
-      top: rect.bottom + gap,
-      right: window.innerWidth - rect.right,
-    };
-  }
-
-  return {
-    top: rect.bottom + gap,
-    left: rect.left,
-  };
 }
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
@@ -41,32 +14,12 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   align = "right",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  const updateMenuPosition = () => {
-    if (!containerRef.current) return;
-    setMenuPosition(getMenuPosition(containerRef.current, align));
-  };
-
-  useLayoutEffect(() => {
-    if (!isOpen) {
-      setMenuPosition(null);
-      return;
-    }
-
-    updateMenuPosition();
-
-    const handleReposition = () => updateMenuPosition();
-    window.addEventListener("resize", handleReposition);
-    window.addEventListener("scroll", handleReposition, true);
-
-    return () => {
-      window.removeEventListener("resize", handleReposition);
-      window.removeEventListener("scroll", handleReposition, true);
-    };
-  }, [isOpen, align]);
+  const menuStyle = useAnchoredPosition(containerRef, menuRef, isOpen, {
+    side: "bottom",
+    align: align === "left" ? "start" : "end",
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -130,31 +83,26 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         }),
   });
 
-  const menu =
-    isOpen && menuPosition ? (
-      <div
-        ref={menuRef}
-        role="menu"
-        style={
-          menuPosition.right != null
-            ? { top: menuPosition.top, right: menuPosition.right }
-            : { top: menuPosition.top, left: menuPosition.left }
-        }
-        className="fixed z-200 min-w-[200px] bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
-        onClick={(e) => {
-          const menuItem = (e.target as HTMLElement).closest<HTMLElement>('[role="menuitem"]');
-          const opensSubmenu =
-            menuItem?.hasAttribute("aria-haspopup") &&
-            menuItem.getAttribute("aria-haspopup") !== "false";
+  const menu = isOpen ? (
+    <div
+      ref={menuRef}
+      role="menu"
+      style={menuStyle}
+      className="fixed z-200 min-w-[200px] max-h-(--anchored-max-height) overflow-y-auto bg-card border border-border rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
+      onClick={(e) => {
+        const menuItem = (e.target as HTMLElement).closest<HTMLElement>('[role="menuitem"]');
+        const opensSubmenu =
+          menuItem?.hasAttribute("aria-haspopup") &&
+          menuItem.getAttribute("aria-haspopup") !== "false";
 
-          if (menuItem && !opensSubmenu) {
-            setIsOpen(false);
-          }
-        }}
-      >
-        {children}
-      </div>
-    ) : null;
+        if (menuItem && !opensSubmenu) {
+          setIsOpen(false);
+        }
+      }}
+    >
+      {children}
+    </div>
+  ) : null;
 
   return (
     <div ref={containerRef} className="relative">

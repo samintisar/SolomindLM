@@ -466,7 +466,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ note, onNoteUpdate, onBack }
                 />
               </button>
               {showHint && (
-                <div className="absolute bottom-full left-0 mb-3 w-72 p-4 bg-popover border border-border rounded-xl shadow-xl text-sm leading-relaxed animate-in fade-in slide-in-from-bottom-2 z-20">
+                <div className="absolute bottom-full left-0 mb-3 w-72 max-w-[calc(100vw-2rem)] p-4 bg-popover border border-border rounded-xl shadow-xl text-sm leading-relaxed animate-in fade-in slide-in-from-bottom-2 z-20">
                   <span className="font-bold block mb-1 text-xs uppercase tracking-wide text-primary">
                     Hint
                   </span>

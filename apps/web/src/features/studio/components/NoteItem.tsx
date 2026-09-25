@@ -1,7 +1,8 @@
 import { MoreVertical, Pencil, Play, Trash2 } from "lucide-react";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { isAudioNote, isAudioOverviewNote, Note } from "@/shared/types/index";
+import { useAnchoredPosition } from "@/shared/ui/anchoredPosition";
 import { getStudioGeneratingListLines } from "../utils/studioGenerationLabels";
 import { NoteIcon } from "./NoteIcon";
 
@@ -44,37 +45,18 @@ export const NoteItem: React.FC<NoteItemProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Portaled so the sidebar's overflow-y-auto doesn't clip it; flips upward for bottom rows.
+  const menuStyle = useAnchoredPosition(menuButtonRef, menuRef, isMenuOpen, {
+    side: "bottom",
+    align: "end",
+  });
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isEditing]);
-
-  // Position dropdown via portal so it isn't clipped by sidebar overflow-y-auto
-  useLayoutEffect(() => {
-    if (!isMenuOpen || !menuButtonRef.current) {
-      setMenuPosition(null);
-      return;
-    }
-    const updatePosition = () => {
-      if (menuButtonRef.current) {
-        const rect = menuButtonRef.current.getBoundingClientRect();
-        setMenuPosition({
-          top: rect.bottom + 4,
-          right: window.innerWidth - rect.right,
-        });
-      }
-    };
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [isMenuOpen]);
 
   const isGenerating = note.status === "generating";
   const generatingLines = isGenerating ? getStudioGeneratingListLines(note) : null;
@@ -199,15 +181,12 @@ export const NoteItem: React.FC<NoteItemProps> = ({
               <MoreVertical className="w-3.5 h-3.5 shrink-0" />
             </button>
             {isMenuOpen &&
-              menuPosition &&
               createPortal(
                 <div
+                  ref={menuRef}
                   data-note-item-menu
                   className="fixed w-36 bg-popover border border-border shadow-lg rounded-md z-100 py-1 animate-in fade-in zoom-in-95 duration-100"
-                  style={{
-                    top: menuPosition.top,
-                    right: menuPosition.right,
-                  }}
+                  style={menuStyle}
                 >
                   <button
                     onClick={(e) => {
