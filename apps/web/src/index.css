@@ -304,6 +304,16 @@
   }
 }
 
+/* iOS Safari / WKWebView zoom the page when a focused field is under 16px, and the 15px root makes
+   every field qualify. Unlayered so it beats Tailwind's text-* utilities on touch devices only. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
