@@ -31,6 +31,7 @@ import {
 import { ModelBrandIcon } from "@/shared/components/icons/ModelBrandIcon";
 import { AVAILABLE_SMART_MODELS, findSmartModelById } from "@/shared/constants/models";
 import type { ChatSettings } from "@/shared/types";
+import { useAnchoredPosition } from "@/shared/ui/anchoredPosition";
 import { cn } from "@/shared/utils/cn";
 import { useChatVoiceTranscription } from "../hooks/useChatVoiceTranscription";
 
@@ -117,42 +118,6 @@ type OpenComposerMenu = "none" | "mode" | "corpus" | "filters" | "model";
 
 type DropUpAlign = "left" | "right";
 
-function useDropUpMenuStyle(
-  anchorRef: React.RefObject<HTMLElement | null>,
-  open: boolean,
-  align: DropUpAlign
-) {
-  const [style, setStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
-
-  useLayoutEffect(() => {
-    if (!open) return;
-
-    const update = () => {
-      const anchor = anchorRef.current;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      setStyle({
-        position: "fixed",
-        bottom: window.innerHeight - rect.top + 8,
-        ...(align === "right"
-          ? { right: window.innerWidth - rect.right, left: "auto" }
-          : { left: rect.left, right: "auto" }),
-        visibility: "visible",
-      });
-    };
-
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [anchorRef, open, align]);
-
-  return style;
-}
-
 type ComposerDropUpProps = {
   anchorRef: React.RefObject<HTMLElement | null>;
   open: boolean;
@@ -171,10 +136,18 @@ function ComposerDropUp({
   children,
   ...rest
 }: ComposerDropUpProps) {
-  const style = useDropUpMenuStyle(anchorRef, open, align);
+  const style = useAnchoredPosition(anchorRef, panelRef, open, {
+    side: "top",
+    align: align === "left" ? "start" : "end",
+  });
   if (!open) return null;
   return createPortal(
-    <div ref={panelRef} className={className} style={{ ...style, zIndex: 200 }} {...rest}>
+    <div
+      ref={panelRef}
+      className={cn("overflow-x-hidden overflow-y-auto", className)}
+      style={{ ...style, zIndex: 200 }}
+      {...rest}
+    >
       {children}
     </div>,
     document.body
@@ -434,7 +407,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 anchorRef={modeAnchorRef}
                 open={openMenu === "mode"}
                 panelRef={modePanelRef}
-                className="w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-border bg-card py-2 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                className="w-60 max-h-(--anchored-max-height) rounded-xl border border-border bg-card py-2 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
                 role="listbox"
                 aria-label="Choose chat mode"
               >
@@ -492,7 +465,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   anchorRef={corpusAnchorRef}
                   open={openMenu === "corpus"}
                   panelRef={corpusPanelRef}
-                  className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-border/80 bg-popover py-3 font-sans text-popover-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  className="w-80 max-h-(--anchored-max-height) rounded-xl border border-border/80 bg-popover py-3 font-sans text-popover-foreground shadow-lg ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in slide-in-from-bottom-2 duration-150"
                   role="listbox"
                   aria-label="Choose research database"
                 >
@@ -567,7 +540,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   anchorRef={filtersAnchorRef}
                   open={openMenu === "filters"}
                   panelRef={filtersPanelRef}
-                  className="max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  className="max-h-[min(65vh,480px,var(--anchored-max-height))] w-76 overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
                 >
                   <AcademicDiscoveryFiltersSection
                     academic={academicDiscoveryFilters ?? {}}
@@ -599,7 +572,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   anchorRef={filtersAnchorRef}
                   open={openMenu === "filters"}
                   panelRef={filtersPanelRef}
-                  className="max-h-[min(65vh,480px)] w-[min(19rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  className="max-h-[min(65vh,480px,var(--anchored-max-height))] w-76 overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card p-3 shadow-xl font-sans animate-in fade-in slide-in-from-bottom-2 duration-150"
                 >
                   <p className="text-xs font-semibold text-foreground">Source channels</p>
                   <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
@@ -686,7 +659,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     open={openMenu === "model"}
                     align="right"
                     panelRef={modelPanelRef}
-                    className="min-w-54 max-w-[min(18rem,calc(100vw-2rem))] max-h-[min(70vh,22rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
+                    className="min-w-54 max-w-72 max-h-[min(70vh,22rem,var(--anchored-max-height))] overflow-y-auto overflow-x-hidden rounded-xl border border-border/80 bg-popover py-1 font-sans text-popover-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150"
                     role="listbox"
                     aria-label="Choose model"
                   >

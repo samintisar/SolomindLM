@@ -3,6 +3,7 @@ import { Check, MoreVertical, Pencil, Pin, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/shared/contexts/useToast";
+import { useAnchoredPosition } from "@/shared/ui/anchoredPosition";
 import { useConfirmDialog } from "@/shared/ui/useConfirmDialog";
 
 interface ConversationListProps {
@@ -36,15 +37,17 @@ export function ConversationList({
   onTogglePin,
 }: ConversationListProps) {
   /** Submenu is portaled to body; position stored so it is not clipped by parent overflow. */
-  const [threadMenu, setThreadMenu] = useState<{
-    convId: string;
-    top: number;
-    right: number;
-  } | null>(null);
+  const [threadMenu, setThreadMenu] = useState<{ convId: string } | null>(null);
+  const threadMenuAnchorRef = useRef<HTMLElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
   const threadMenuBoxRef = useRef<HTMLDivElement>(null);
+  const threadMenuStyle = useAnchoredPosition(threadMenuAnchorRef, threadMenuBoxRef, !!threadMenu, {
+    side: "bottom",
+    align: "end",
+    repositionKey: threadMenu?.convId,
+  });
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const toast = useToast();
 
@@ -204,12 +207,8 @@ export function ConversationList({
                 setThreadMenu(null);
                 return;
               }
-              const r = e.currentTarget.getBoundingClientRect();
-              setThreadMenu({
-                convId: conv._id,
-                top: r.bottom + 4,
-                right: document.documentElement.clientWidth - r.right,
-              });
+              threadMenuAnchorRef.current = e.currentTarget;
+              setThreadMenu({ convId: conv._id });
             }}
             className={`rounded-md p-1.5 text-muted-foreground transition-[opacity,background-color,color] hover:bg-foreground/5 hover:text-foreground ${
               isActive || threadMenu?.convId === conv._id
@@ -266,8 +265,8 @@ export function ConversationList({
             ref={threadMenuBoxRef}
             role="menu"
             data-thread-submenu-root
-            className="fixed z-200 min-w-36 overflow-hidden rounded-lg border border-border bg-card py-1 font-sans text-sm antialiased shadow-lg"
-            style={{ top: threadMenu.top, right: threadMenu.right }}
+            className="fixed z-200 min-w-36 max-h-(--anchored-max-height) overflow-y-auto rounded-lg border border-border bg-card py-1 font-sans text-sm antialiased shadow-lg"
+            style={threadMenuStyle}
           >
             {onTogglePin && (
               <button
