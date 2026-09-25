@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import { AVAILABLE_SMART_MODELS, DEFAULT_SMART_MODEL_ID, findSmartModelById } from "./models";
 
 describe("smart model catalog", () => {
-  test("defaults chat to DeepSeek V4 Flash", () => {
-    expect(DEFAULT_SMART_MODEL_ID).toBe("deepseek-ai/DeepSeek-V4-Flash-0731");
+  test("defaults chat to DeepSeek V4.1 Flash", () => {
+    expect(DEFAULT_SMART_MODEL_ID).toBe("deepseek-ai/DeepSeek-V4.1-Flash");
     expect(AVAILABLE_SMART_MODELS[0]?.id).toBe(DEFAULT_SMART_MODEL_ID);
   });
 
@@ -37,8 +37,8 @@ describe("smart model catalog", () => {
 
 describe("findSmartModelById", () => {
   test("returns catalog entry for a known model id", () => {
-    expect(findSmartModelById("deepseek-ai/DeepSeek-V4-Flash-0731")?.id).toBe(
-      "deepseek-ai/DeepSeek-V4-Flash-0731"
+    expect(findSmartModelById("deepseek-ai/DeepSeek-V4.1-Flash")?.id).toBe(
+      "deepseek-ai/DeepSeek-V4.1-Flash"
     );
   });
 

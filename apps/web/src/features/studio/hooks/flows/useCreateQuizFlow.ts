@@ -4,6 +4,7 @@ import type { Note, QuizNote } from "@/shared/types/index";
 import type { QuizConfig } from "../../components/CustomizeQuizModal";
 import { useCreateQuiz } from "../../services/quizzesApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -30,6 +31,9 @@ export function useCreateQuizFlow(ctx: CreateFlowContext) {
       const blocker = getStudioGenerationBlocker(ctx);
       if (blocker) {
         showErrorToast(blocker);
+        return;
+      }
+      if (!(await confirmStudioContextBudget(ctx))) {
         return;
       }
 

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const updateWrittenQuestionsTitle = internalMutation({
@@ -23,18 +24,29 @@ export const saveWrittenQuestionsResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const writtenQuestion = await ctx.db.get(args.writtenQuestionId);
+    if (!writtenQuestion) return null;
+
     const normalizedQuestions = normalizeMathMarkdownDeep(args.questions);
+    const title = args.metadata?.title ?? "Written Questions";
 
     await ctx.db.patch(args.writtenQuestionId, {
       questionsData: normalizedQuestions,
       status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Written Questions",
+      title,
       metadata: {
         ...args.metadata,
         questionCount: normalizedQuestions.length,
         completedAt: Date.now(),
       },
+    });
+    await scheduleStudioJobCompletionPush(ctx, {
+      userId: writtenQuestion.userId,
+      notebookId: writtenQuestion.notebookId,
+      itemId: args.writtenQuestionId,
+      kind: "writtenQuestions",
+      title,
     });
   },
 });
