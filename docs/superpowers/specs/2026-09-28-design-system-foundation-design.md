@@ -1,7 +1,9 @@
 # Design System Foundation — Design Spec
 
 **Date:** 2026-09-28
-**Status:** Draft — awaiting user review
+**Status:** Approved 2026-09-28. Implementation plan: `docs/superpowers/plans/2026-09-28-design-system-foundation.md`
+(its "Deviations from the spec" section supersedes this spec where they differ: keyed route fade
+instead of `viewTransition`, cover-swatch `--vintage-*` tokens retained, tab indicator deferred).
 **Scope:** `apps/web` (the mobile app is a WebView shell, so it inherits these changes)
 
 ## Goal
