@@ -19,7 +19,7 @@
     --secondary: oklch(0.8846 0.02 85.5655);
     --secondary-foreground: oklch(0.4313 0.03 64.9288);
     --muted: oklch(0.9239 0.019 83.0636);
-    --muted-foreground: oklch(0.5391 0.0387 71.1655);
+    --muted-foreground: oklch(0.5 0.038 71.1655);
     --accent: oklch(0.8348 0.025 88.8064);
     --accent-foreground: oklch(0.21 0.01 0);
     --destructive: oklch(0.5471 0.08 32.9149);
@@ -31,6 +31,20 @@
     --success-foreground: oklch(1 0 0);
     --warning: oklch(0.75 0.08 85);
     --warning-foreground: oklch(0.21 0.01 0);
+    --info: oklch(0.52 0.08 245);
+    --info-foreground: oklch(1 0 0);
+    --success-muted: oklch(0.95 0.03 145);
+    --success-muted-foreground: oklch(0.33 0.07 145);
+    --success-border: oklch(0.85 0.05 145);
+    --warning-muted: oklch(0.95 0.04 85);
+    --warning-muted-foreground: oklch(0.36 0.07 70);
+    --warning-border: oklch(0.86 0.06 85);
+    --info-muted: oklch(0.95 0.025 245);
+    --info-muted-foreground: oklch(0.33 0.07 245);
+    --info-border: oklch(0.85 0.04 245);
+    --destructive-muted: oklch(0.95 0.025 30);
+    --destructive-muted-foreground: oklch(0.36 0.09 30);
+    --destructive-border: oklch(0.85 0.045 30);
     --chart-1: oklch(0.38 0.05 65.5444);
     --chart-2: oklch(0.5604 0.05 68.5805);
     --chart-3: oklch(0.4851 0.045 72.6827);
@@ -103,20 +117,14 @@
     --font-display: "Libre Baskerville", ui-serif, Georgia, serif;
     --font-mono: "IBM Plex Mono", monospace;
     --radius: 0.5rem;
-    --shadow-x: 2px;
-    --shadow-y: 3px;
-    --shadow-blur: 5px;
-    --shadow-spread: 0px;
-    --shadow-opacity: 0.12;
-    --shadow-color: hsl(28 13% 20%);
-    --shadow-2xs: 2px 3px 5px 0px hsl(28 13% 20% / 0.06);
-    --shadow-xs: 2px 3px 5px 0px hsl(28 13% 20% / 0.06);
-    --shadow-sm: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 1px 2px -1px hsl(28 13% 20% / 0.12);
-    --shadow: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 1px 2px -1px hsl(28 13% 20% / 0.12);
-    --shadow-md: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 2px 4px -1px hsl(28 13% 20% / 0.12);
-    --shadow-lg: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 4px 6px -1px hsl(28 13% 20% / 0.12);
-    --shadow-xl: 2px 3px 5px 0px hsl(28 13% 20% / 0.12), 2px 8px 10px -1px hsl(28 13% 20% / 0.12);
-    --shadow-2xl: 2px 3px 5px 0px hsl(28 13% 20% / 0.3);
+    --shadow-2xs: 0 1px 1px 0 hsl(28 20% 20% / 0.04);
+    --shadow-xs: 0 1px 2px 0 hsl(28 20% 20% / 0.06);
+    --shadow-sm: 0 1px 2px 0 hsl(28 20% 20% / 0.06), 0 1px 3px 0 hsl(28 20% 20% / 0.08);
+    --shadow: 0 1px 2px 0 hsl(28 20% 20% / 0.06), 0 1px 3px 0 hsl(28 20% 20% / 0.08);
+    --shadow-md: 0 2px 4px -1px hsl(28 20% 20% / 0.06), 0 4px 8px -2px hsl(28 20% 20% / 0.08);
+    --shadow-lg: 0 4px 6px -2px hsl(28 20% 20% / 0.05), 0 12px 24px -4px hsl(28 20% 20% / 0.1);
+    --shadow-xl: 0 8px 12px -4px hsl(28 20% 20% / 0.06), 0 24px 48px -8px hsl(28 20% 20% / 0.14);
+    --shadow-2xl: 0 32px 64px -12px hsl(28 20% 20% / 0.22);
     --tracking-normal: 0em;
     --spacing: 0.25rem;
   }
@@ -162,6 +170,24 @@
 
     --destructive: oklch(0.4 0.08 25);
     --destructive-foreground: oklch(0.97 0.004 85);
+    --success: oklch(0.62 0.09 145);
+    --success-foreground: oklch(0.19 0.006 65);
+    --warning: oklch(0.72 0.09 80);
+    --warning-foreground: oklch(0.19 0.006 65);
+    --info: oklch(0.64 0.08 245);
+    --info-foreground: oklch(0.19 0.006 65);
+    --success-muted: oklch(0.26 0.03 145);
+    --success-muted-foreground: oklch(0.85 0.06 145);
+    --success-border: oklch(0.36 0.04 145);
+    --warning-muted: oklch(0.27 0.03 80);
+    --warning-muted-foreground: oklch(0.87 0.07 85);
+    --warning-border: oklch(0.38 0.045 80);
+    --info-muted: oklch(0.26 0.03 245);
+    --info-muted-foreground: oklch(0.85 0.05 245);
+    --info-border: oklch(0.37 0.04 245);
+    --destructive-muted: oklch(0.26 0.035 25);
+    --destructive-muted-foreground: oklch(0.85 0.06 25);
+    --destructive-border: oklch(0.38 0.05 25);
 
     /* BORDERS:
        Very low contrast borders. They are there for structure, 
@@ -252,20 +278,14 @@
     --font-display: "Libre Baskerville", ui-serif, Georgia, serif;
     --font-mono: "IBM Plex Mono", monospace;
     --radius: 0.5rem;
-    --shadow-x: 2px;
-    --shadow-y: 3px;
-    --shadow-blur: 5px;
-    --shadow-spread: 0px;
-    --shadow-opacity: 0.12;
-    --shadow-color: hsl(35 30% 10%);
-    --shadow-2xs: 2px 3px 5px 0px hsl(35 30% 10% / 0.06);
-    --shadow-xs: 2px 3px 5px 0px hsl(35 30% 10% / 0.06);
-    --shadow-sm: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 1px 2px -1px hsl(35 30% 10% / 0.12);
-    --shadow: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 1px 2px -1px hsl(35 30% 10% / 0.12);
-    --shadow-md: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 2px 4px -1px hsl(35 30% 10% / 0.12);
-    --shadow-lg: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 4px 6px -1px hsl(35 30% 10% / 0.12);
-    --shadow-xl: 2px 3px 5px 0px hsl(35 30% 10% / 0.12), 2px 8px 10px -1px hsl(35 30% 10% / 0.12);
-    --shadow-2xl: 2px 3px 5px 0px hsl(35 30% 10% / 0.3);
+    --shadow-2xs: 0 1px 1px 0 hsl(35 30% 4% / 0.2);
+    --shadow-xs: 0 1px 2px 0 hsl(35 30% 4% / 0.25);
+    --shadow-sm: 0 1px 2px 0 hsl(35 30% 4% / 0.25), 0 1px 3px 0 hsl(35 30% 4% / 0.3);
+    --shadow: 0 1px 2px 0 hsl(35 30% 4% / 0.25), 0 1px 3px 0 hsl(35 30% 4% / 0.3);
+    --shadow-md: 0 2px 4px -1px hsl(35 30% 4% / 0.3), 0 4px 8px -2px hsl(35 30% 4% / 0.35);
+    --shadow-lg: 0 4px 6px -2px hsl(35 30% 4% / 0.3), 0 12px 24px -4px hsl(35 30% 4% / 0.4);
+    --shadow-xl: 0 8px 12px -4px hsl(35 30% 4% / 0.35), 0 24px 48px -8px hsl(35 30% 4% / 0.5);
+    --shadow-2xl: 0 32px 64px -12px hsl(35 30% 4% / 0.6);
   }
 
   /* Pins the auth/landing pages to light-mode tokens regardless of an ancestor .dark class, since
@@ -328,6 +348,20 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-success-muted-foreground: var(--success-muted-foreground);
+  --color-success-border: var(--success-border);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-muted-foreground: var(--warning-muted-foreground);
+  --color-warning-border: var(--warning-border);
+  --color-info-muted: var(--info-muted);
+  --color-info-muted-foreground: var(--info-muted-foreground);
+  --color-info-border: var(--info-border);
+  --color-destructive-muted: var(--destructive-muted);
+  --color-destructive-muted-foreground: var(--destructive-muted-foreground);
+  --color-destructive-border: var(--destructive-border);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
