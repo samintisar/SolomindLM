@@ -1,5 +1,5 @@
 import { type ReactNode, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigationType } from "react-router-dom";
 import { cn } from "@/shared/utils/cn";
 
 interface RouteTransitionProps {
@@ -14,25 +14,27 @@ interface RouteTransitionProps {
  * /home → /notebook/a gets a transition. Opacity only (a dedicated keyframe — tw-animate-css's
  * `enter` also animates transform): a transform here would make this div the
  * containing block for fixed-position modals during the animation. Skipped on the initial page
- * load so prerendered/first paint isn't faded from blank.
+ * load and on redirects (REPLACE navigations, e.g. <Navigate replace> to /sign-in), so first
+ * paint is never faded from blank.
  */
 export function RouteTransition({ children, fill }: RouteTransitionProps) {
   const { pathname } = useLocation();
+  const navigationType = useNavigationType();
   const section = pathname.split("/")[1] ?? "";
 
-  // Sticky: flips once the section first differs from the one we mounted on. Re-renders of the
-  // initial section (auth/data loading) must not add the class to the already-visible div.
-  const initialSection = useRef(section);
-  const hasNavigated = useRef(false);
-  if (section !== initialSection.current) hasNavigated.current = true;
+  // Decided once per section change. Re-renders within a section (auth/data loading) must not
+  // add the class to the already-visible div.
+  const currentSection = useRef(section);
+  const animate = useRef(false);
+  if (section !== currentSection.current) {
+    currentSection.current = section;
+    animate.current = navigationType !== "REPLACE";
+  }
 
   return (
     <div
       key={section}
-      className={cn(
-        hasNavigated.current && "animate-route-in",
-        fill && "flex min-h-0 flex-1 flex-col"
-      )}
+      className={cn(animate.current && "animate-route-in", fill && "flex min-h-0 flex-1 flex-col")}
     >
       {children}
     </div>
