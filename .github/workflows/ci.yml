@@ -100,7 +100,7 @@ jobs:
       - name: Setup Bun (audit)
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: 1.2.21
+          bun-version: 1.4.2
 
       - name: Restore dependency cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

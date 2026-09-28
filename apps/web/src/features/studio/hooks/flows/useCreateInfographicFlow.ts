@@ -4,6 +4,7 @@ import type { InfographicNote, Note } from "@/shared/types/index";
 import type { InfographicConfig } from "../../components/CustomizeInfographicModal";
 import { useCreateInfographic } from "../../services/infographicApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -28,6 +29,9 @@ export function useCreateInfographicFlow(ctx: CreateFlowContext) {
       const blocker = getStudioGenerationBlocker(ctx);
       if (blocker) {
         showErrorToast(blocker);
+        return;
+      }
+      if (!(await confirmStudioContextBudget(ctx))) {
         return;
       }
 

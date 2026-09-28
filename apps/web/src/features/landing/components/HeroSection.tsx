@@ -92,7 +92,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted }) => {
         {/* Headline + tagline */}
         <div className="space-y-5 sm:space-y-6">
           <h1
-            className="text-6xl md:text-8xl font-display font-extrabold text-foreground tracking-tight"
+            className="text-4xl sm:text-6xl md:text-8xl font-display font-extrabold text-foreground tracking-tight"
             style={{ lineHeight: "1.1" }}
           >
             Turn Your Sources Into{" "}

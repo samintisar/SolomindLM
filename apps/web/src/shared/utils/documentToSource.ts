@@ -27,6 +27,8 @@ export function documentToSource(doc: any): Source {
             ingestionStatus: doc.ingestionStatus,
           },
       sourceGuide: doc.sourceGuide,
+      wordCount: doc.wordCount,
+      totalChunks: doc.totalChunks,
     };
   }
 
@@ -128,5 +130,7 @@ export function documentToSource(doc: any): Source {
     url,
     remoteRefreshKind,
     sourceGuide: doc.sourceGuide,
+    wordCount: doc.wordCount,
+    totalChunks: doc.totalChunks,
   };
 }

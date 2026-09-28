@@ -4,6 +4,7 @@ import type { AudioOverviewNote, Note } from "@/shared/types/index";
 import type { AudioConfig } from "../../components/CustomizeAudioModal";
 import { useCreateAudioOverview } from "../../services/audioApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -28,6 +29,9 @@ export function useCreateAudioFlow(ctx: CreateFlowContext) {
       const blocker = getStudioGenerationBlocker(ctx);
       if (blocker) {
         showErrorToast(blocker);
+        return;
+      }
+      if (!(await confirmStudioContextBudget(ctx))) {
         return;
       }
 

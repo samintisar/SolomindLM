@@ -4,6 +4,7 @@ import type { FlashcardNote, Note } from "@/shared/types/index";
 import type { FlashcardConfig } from "../../components/CustomizeFlashcardsModal";
 import { useCreateFlashcard } from "../../services/flashcardsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -30,6 +31,9 @@ export function useCreateFlashcardsFlow(ctx: CreateFlowContext) {
       const blocker = getStudioGenerationBlocker(ctx);
       if (blocker) {
         showErrorToast(blocker);
+        return;
+      }
+      if (!(await confirmStudioContextBudget(ctx))) {
         return;
       }
 

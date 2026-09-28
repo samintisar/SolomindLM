@@ -4,6 +4,7 @@ import type { Note, WrittenQuestionsNote } from "@/shared/types/index";
 import type { WrittenQuestionsConfig } from "../../components/CustomizeWrittenQuestionsModal";
 import { useCreateWrittenQuestions } from "../../services/writtenQuestionsApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -30,6 +31,9 @@ export function useCreateWrittenQuestionsFlow(ctx: CreateFlowContext) {
       const blocker = getStudioGenerationBlocker(ctx);
       if (blocker) {
         showErrorToast(blocker);
+        return;
+      }
+      if (!(await confirmStudioContextBudget(ctx))) {
         return;
       }
 

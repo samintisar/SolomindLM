@@ -27,6 +27,7 @@ import { useUpdateNotebook } from "../../notebooks/services/notebooksApi";
 import { useAddExternalSources } from "../../sources/services/documentsApi";
 import { useSourcesContext } from "../../sources/useSourcesContext";
 import type { ChatStreamSourcePolicy } from "../chatStreamTypes";
+import { useComposerClearance } from "../hooks/useComposerClearance";
 import { usePersistedComposerPrefs } from "../hooks/usePersistedComposerPrefs";
 import { useStartLiteratureReview } from "../hooks/useStartLiteratureReview";
 import { CONVEX_SITE_URL } from "../services/chatApi";
@@ -49,6 +50,18 @@ import { LiteratureReviewMessage } from "./LiteratureReviewMessage";
 import { MessageBubble } from "./MessageBubble";
 import { ReferenceTooltip } from "./ReferenceTooltip";
 import { ResearchPlanMessage } from "./ResearchPlanMessage";
+
+/**
+ * Spacer below the last message so it can scroll clear of the floating composer. Its height
+ * tracks the composer's rendered height via `useComposerClearance` (fallback until measured).
+ */
+const MessageListFooter = () => (
+  <div
+    className="h-[var(--chat-composer-clearance,18rem)] shrink-0 md:h-[var(--chat-composer-clearance,14rem)]"
+    aria-hidden
+  />
+);
+const MESSAGE_LIST_COMPONENTS = { Footer: MessageListFooter };
 
 interface ChatPanelProps {
   isLeftOpen: boolean;
@@ -280,6 +293,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const virtuosoRef = useRef<any>(null);
+  const messageScrollerRef = useRef<HTMLElement | null>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  useComposerClearance(messagesContainerRef, composerRef, messageScrollerRef);
+  const setMessageScroller = useCallback((el: unknown) => {
+    messageScrollerRef.current = el instanceof HTMLElement ? el : null;
+  }, []);
 
   // --- Chat action handlers ---
 
@@ -909,9 +928,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     )}
                   </div>
                 )}
-                components={{
-                  Footer: () => <div className="h-72 shrink-0 md:h-56" aria-hidden />,
-                }}
+                scrollerRef={setMessageScroller}
+                components={MESSAGE_LIST_COMPONENTS}
                 defaultItemHeight={150}
                 increaseViewportBy={{ top: 200, bottom: 400 }}
               />
@@ -972,7 +990,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         {/* Input Area â€” wrapper is full-width for layout; without pointer-events-none it steals taps beside the input (e.g. message actions on mobile). */}
-        <div className="pointer-events-none absolute bottom-3 left-0 right-0 z-20 flex min-w-0 justify-center px-3 sm:px-4">
+        <div
+          ref={composerRef}
+          className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex min-w-0 justify-center px-3 pb-3 sm:px-4"
+        >
+          {/* Opaque band behind the disclaimer strip so messages scrolled under the composer don't show through its text. */}
+          <div
+            className="absolute inset-x-0 bottom-0 -z-10 h-28 max-h-full bg-linear-to-t from-background from-60% to-transparent"
+            aria-hidden
+          />
           <ChatInput
             value={inputMessage}
             onChange={setInputMessage}

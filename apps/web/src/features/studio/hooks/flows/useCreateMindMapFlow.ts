@@ -3,6 +3,7 @@ import { useToast } from "@/shared/contexts/useToast";
 import type { MindMapNote, Note } from "@/shared/types/index";
 import { useCreateMindMap } from "../../services/mindMapApi";
 import { useStudioGenerationCatch } from "../useStudioGenerationCatch";
+import { confirmStudioContextBudget } from "./studioContextGuard";
 import { getStudioGenerationBlocker } from "./studioGenerationGuard";
 import type { CreateFlowContext } from "./types";
 
@@ -26,6 +27,9 @@ export function useCreateMindMapFlow(ctx: CreateFlowContext) {
     const blocker = getStudioGenerationBlocker(ctx);
     if (blocker) {
       showErrorToast(blocker);
+      return;
+    }
+    if (!(await confirmStudioContextBudget(ctx))) {
       return;
     }
 

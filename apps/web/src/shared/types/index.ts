@@ -41,6 +41,10 @@ export interface Source {
   };
   /** AI-generated summary and topics for the source (NotebookLM-style) */
   sourceGuide?: SourceGuide;
+  /** Extracted word count (set when processing completes); used for studio context estimates */
+  wordCount?: number;
+  /** Stored chunk count; fallback size signal when wordCount is missing */
+  totalChunks?: number;
 }
 
 export interface ReferenceChunk {
