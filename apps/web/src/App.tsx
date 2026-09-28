@@ -50,7 +50,9 @@ import { LiteratureReportPage } from "./features/studio/components/LiteratureRep
 import { LiteratureTablePage } from "./features/studio/components/LiteratureTablePage";
 import { useNoteCRUD } from "./features/studio/hooks/useNoteCRUD";
 import { StudioProvider } from "./features/studio/StudioContext";
+import { MotionProvider } from "./shared/components/motion";
 import { ProtectedRoute } from "./shared/components/ProtectedRoute";
+import { RouteTransition } from "./shared/components/RouteTransition";
 import { ScrollToTop } from "./shared/components/ScrollToTop";
 import { ToastContainer } from "./shared/components/ToastContainer";
 import { ThemeProvider } from "./shared/contexts/ThemeContext";
@@ -397,121 +399,123 @@ const AppContent: React.FC = () => {
         )}
 
         <NotebookProvider value={notebookContextValue}>
-          <Routes>
-            <Route path="/" element={<LandingPage onGetStarted={() => navigate("/home")} />} />
-            <Route path="/sign-in" element={<AuthPage />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/faq" element={<FaqPage />} />
+          <RouteTransition fill={!isPublicPage}>
+            <Routes>
+              <Route path="/" element={<LandingPage onGetStarted={() => navigate("/home")} />} />
+              <Route path="/sign-in" element={<AuthPage />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/faq" element={<FaqPage />} />
 
-            {CLUSTER_HUB_PAGES.map((page) => (
+              {CLUSTER_HUB_PAGES.map((page) => (
+                <Route
+                  key={page.path}
+                  path={page.path}
+                  element={<ClusterHubLandingPage pagePath={page.path} />}
+                />
+              ))}
+
+              {INTENT_LANDING_PAGES.map((page) => (
+                <Route
+                  key={page.path}
+                  path={page.path}
+                  element={<IntentLandingPage pagePath={page.path} />}
+                />
+              ))}
+
+              {SEO_CONTENT_PAGES.map((page) => (
+                <Route
+                  key={page.path}
+                  path={page.path}
+                  element={<SeoContentPage pagePath={page.path} />}
+                />
+              ))}
+
               <Route
-                key={page.path}
-                path={page.path}
-                element={<ClusterHubLandingPage pagePath={page.path} />}
+                path="/home"
+                element={
+                  <ProtectedRoute>
+                    <HomePage />
+                  </ProtectedRoute>
+                }
               />
-            ))}
 
-            {INTENT_LANDING_PAGES.map((page) => (
               <Route
-                key={page.path}
-                path={page.path}
-                element={<IntentLandingPage pagePath={page.path} />}
+                path="/folder/:folderId"
+                element={
+                  <ProtectedRoute>
+                    <main className="flex-1 overflow-auto">
+                      <FolderView folderId={urlFolderId || ""} viewMode="grid" />
+                    </main>
+                  </ProtectedRoute>
+                }
               />
-            ))}
 
-            {SEO_CONTENT_PAGES.map((page) => (
               <Route
-                key={page.path}
-                path={page.path}
-                element={<SeoContentPage pagePath={page.path} />}
+                path="/billing"
+                element={
+                  <ProtectedRoute>
+                    <main className="flex-1 overflow-auto">
+                      <BillingPage onBack={() => navigate("/home")} />
+                    </main>
+                  </ProtectedRoute>
+                }
               />
-            ))}
 
-            <Route
-              path="/home"
-              element={
-                <ProtectedRoute>
-                  <HomePage />
-                </ProtectedRoute>
-              }
-            />
+              <Route
+                path="/admin/feedback"
+                element={
+                  <ProtectedRoute>
+                    <AdminFeedbackPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/folder/:folderId"
-              element={
-                <ProtectedRoute>
-                  <main className="flex-1 overflow-auto">
-                    <FolderView folderId={urlFolderId || ""} viewMode="grid" />
-                  </main>
-                </ProtectedRoute>
-              }
-            />
+              <Route
+                path="/share/fork/:token"
+                element={
+                  <ProtectedRoute>
+                    <main className="flex-1 overflow-auto">
+                      <ForkNotebookPage />
+                    </main>
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/billing"
-              element={
-                <ProtectedRoute>
-                  <main className="flex-1 overflow-auto">
-                    <BillingPage onBack={() => navigate("/home")} />
-                  </main>
-                </ProtectedRoute>
-              }
-            />
+              <Route
+                path="/notebook/:id"
+                element={
+                  <ProtectedRoute requireNotebookAccess={true}>
+                    <ChatStreamingProvider value={chatStreamingContextValue}>
+                      <SourcesProvider value={sourcesContextValue}>
+                        <StudioProvider value={studioContextValue}>
+                          <NotebookView />
+                        </StudioProvider>
+                      </SourcesProvider>
+                    </ChatStreamingProvider>
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/admin/feedback"
-              element={
-                <ProtectedRoute>
-                  <AdminFeedbackPage />
-                </ProtectedRoute>
-              }
-            />
+              <Route
+                path="/notebook/:id/table/:tableId"
+                element={
+                  <ProtectedRoute requireNotebookAccess={true}>
+                    <LiteratureTablePage />
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/share/fork/:token"
-              element={
-                <ProtectedRoute>
-                  <main className="flex-1 overflow-auto">
-                    <ForkNotebookPage />
-                  </main>
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/notebook/:id"
-              element={
-                <ProtectedRoute requireNotebookAccess={true}>
-                  <ChatStreamingProvider value={chatStreamingContextValue}>
-                    <SourcesProvider value={sourcesContextValue}>
-                      <StudioProvider value={studioContextValue}>
-                        <NotebookView />
-                      </StudioProvider>
-                    </SourcesProvider>
-                  </ChatStreamingProvider>
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/notebook/:id/table/:tableId"
-              element={
-                <ProtectedRoute requireNotebookAccess={true}>
-                  <LiteratureTablePage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/notebook/:id/report/:reportId"
-              element={
-                <ProtectedRoute requireNotebookAccess={true}>
-                  <LiteratureReportPage />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+              <Route
+                path="/notebook/:id/report/:reportId"
+                element={
+                  <ProtectedRoute requireNotebookAccess={true}>
+                    <LiteratureReportPage />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </RouteTransition>
         </NotebookProvider>
       </div>
 
@@ -529,15 +533,17 @@ const App: React.FC = () => {
       <BrowserRouter>
         <ScrollToTop />
         <ThemeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              <FeedbackProvider>
-                <AppContent />
-                <FeedbackModal />
-              </FeedbackProvider>
-              <ToastContainer />
-            </ToastProvider>
-          </AuthProvider>
+          <MotionProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <FeedbackProvider>
+                  <AppContent />
+                  <FeedbackModal />
+                </FeedbackProvider>
+                <ToastContainer />
+              </ToastProvider>
+            </AuthProvider>
+          </MotionProvider>
         </ThemeProvider>
       </BrowserRouter>
     </>
