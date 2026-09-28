@@ -1,10 +1,44 @@
 "use node";
 
 import { invokeWithHttpRetry } from "../../_agents/_shared/retry";
-import { createExternalServiceErrorFromResponse, ExternalServiceError } from "../../_lib/errors";
+import { ExternalServiceError } from "../../_lib/errors";
 
 const IMAGE_GENERATION_ENDPOINT = "/v1/images/generations";
 const IMAGE_GENERATION_TIMEOUT_MS = 180_000;
+
+/** Pull `error.code` (or `error.type` when code is null) out of an OpenAI error body. */
+function parseProviderCode(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: unknown; type?: unknown } };
+    const code = parsed.error?.code ?? parsed.error?.type;
+    return typeof code === "string" ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Non-2xx response from the image endpoint. OpenAI puts a long `message`
+ * before `code` in its error body, so the code is parsed from the full body
+ * rather than searched for in the (truncated) error message.
+ */
+export class OpenAIImageError extends ExternalServiceError {
+  /** OpenAI's error code, e.g. "moderation_blocked", "insufficient_quota". */
+  providerCode?: string;
+
+  constructor(status: number, body: string) {
+    const providerCode = parseProviderCode(body);
+    const message = `openai HTTP ${status}${providerCode ? ` (${providerCode})` : ""}: ${body.slice(0, 200)}`;
+    super("openai", message, {
+      statusCode: status,
+      endpoint: IMAGE_GENERATION_ENDPOINT,
+      // An exhausted quota comes back as 429 but won't succeed on retry.
+      retryable: providerCode === "insufficient_quota" ? false : undefined,
+    });
+    this.name = "OpenAIImageError";
+    this.providerCode = providerCode;
+  }
+}
 
 export interface OpenAIImageGenerationParams {
   apiKey: string;
@@ -37,13 +71,7 @@ export async function callOpenAIImageGeneration(
       });
 
       if (!response.ok) {
-        const errBody = await response.text();
-        throw createExternalServiceErrorFromResponse(
-          "openai",
-          response.status,
-          IMAGE_GENERATION_ENDPOINT,
-          errBody.slice(0, 400)
-        );
+        throw new OpenAIImageError(response.status, await response.text());
       }
 
       const data = (await response.json()) as { data?: Array<{ b64_json?: string }> };
@@ -69,12 +97,12 @@ export function describeImageGenerationError(error: unknown): string {
   }
 
   const status = error.statusCode;
-  const detail = error.message.toLowerCase();
+  const code = error instanceof OpenAIImageError ? error.providerCode : undefined;
 
-  if (detail.includes("moderation_blocked") || detail.includes("content_policy")) {
+  if (code === "moderation_blocked" || code === "content_policy_violation") {
     return "The image request was blocked by the provider's safety filter. Try different sources or adjust your custom prompt.";
   }
-  if (status === 429 && !detail.includes("insufficient_quota")) {
+  if (status === 429 && code !== "insufficient_quota") {
     return "The image generation service is busy right now. Please try again in a few minutes.";
   }
   if (status === 401 || status === 403 || status === 429) {
