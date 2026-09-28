@@ -1,19 +1,18 @@
-import * as React from "react"
-import { type VariantProps } from "class-variance-authority"
-import { cn } from "@/shared/utils/cn"
-import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui"
-
-import { toggleVariants } from "@/shared/components/ui/toggle"
+import { type VariantProps } from "class-variance-authority";
+import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui";
+import * as React from "react";
+import { toggleVariants } from "@/shared/components/ui/toggle";
+import { cn } from "@/shared/utils/cn";
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
-    spacing?: number
+    spacing?: number;
   }
 >({
   size: "default",
   variant: "default",
   spacing: 0,
-})
+});
 
 function ToggleGroup({
   className,
@@ -24,7 +23,7 @@ function ToggleGroup({
   ...props
 }: React.ComponentProps<typeof ToggleGroupPrimitive.Root> &
   VariantProps<typeof toggleVariants> & {
-    spacing?: number
+    spacing?: number;
   }) {
   return (
     <ToggleGroupPrimitive.Root
@@ -43,7 +42,7 @@ function ToggleGroup({
         {children}
       </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive.Root>
-  )
+  );
 }
 
 function ToggleGroupItem({
@@ -52,9 +51,8 @@ function ToggleGroupItem({
   variant,
   size,
   ...props
-}: React.ComponentProps<typeof ToggleGroupPrimitive.Item> &
-  VariantProps<typeof toggleVariants>) {
-  const context = React.useContext(ToggleGroupContext)
+}: React.ComponentProps<typeof ToggleGroupPrimitive.Item> & VariantProps<typeof toggleVariants>) {
+  const context = React.useContext(ToggleGroupContext);
 
   return (
     <ToggleGroupPrimitive.Item
@@ -75,7 +73,7 @@ function ToggleGroupItem({
     >
       {children}
     </ToggleGroupPrimitive.Item>
-  )
+  );
 }
 
-export { ToggleGroup, ToggleGroupItem }
+export { ToggleGroup, ToggleGroupItem };
