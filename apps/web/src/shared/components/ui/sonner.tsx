@@ -14,12 +14,14 @@ function Toaster(props: ToasterProps) {
     <Sonner
       theme={theme}
       className="toaster group"
+      closeButton
+      mobileOffset={{ bottom: "calc(16px + env(safe-area-inset-bottom))" }}
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
+        success: <CircleCheckIcon className="size-4 text-success" />,
+        info: <InfoIcon className="size-4 text-muted-foreground" />,
+        warning: <TriangleAlertIcon className="size-4 text-warning" />,
+        error: <OctagonXIcon className="size-4 text-destructive" />,
+        loading: <Loader2Icon className="size-4 animate-spin text-muted-foreground" />,
       }}
       {...props}
     />
