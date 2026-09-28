@@ -3,6 +3,7 @@ import { log } from "@mobile/utils/logger";
 import { useConvex, useConvexAuth } from "convex/react";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 
@@ -56,4 +57,29 @@ export function useRegisterPushNotifications() {
       cancelled = true;
     };
   }, [convex, isAuthenticated]);
+}
+
+function webPathFromNotificationData(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const notebookId = (data as Record<string, unknown>).notebookId;
+  return typeof notebookId === "string" ? `/notebook/${notebookId}` : null;
+}
+
+/** Deep-links a tapped push notification into the notebook it's about, mirroring deepLinking.ts. */
+export function useHandlePushNotificationResponse() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const handle = (response: Notifications.NotificationResponse) => {
+      const webPath = webPathFromNotificationData(response.notification.request.content.data);
+      if (!webPath) return;
+      router.replace({ pathname: "/", params: { webPath } });
+    };
+
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) handle(response);
+    });
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => sub.remove();
+  }, [router]);
 }

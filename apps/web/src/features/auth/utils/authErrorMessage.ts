@@ -1,6 +1,11 @@
+import { ConvexError } from "convex/values";
+
 /**
  * Maps @convex-dev/auth / Convex action errors to copy users can act on.
- * Server messages often look like: "[CONVEX A(auth:signIn)] Uncaught Error: InvalidAccountId"
+ * convex/auth.ts rethrows the known Password-provider error identifiers below
+ * (InvalidAccountId, InvalidSecret, etc.) as ConvexError so `.data` carries the
+ * exact identifier to the client even in production; other server messages
+ * still look like "[CONVEX A(auth:signIn)] Uncaught Error: ...".
  */
 const AUTH_ERROR_MESSAGES: readonly [needle: string, message: string][] = [
   [
@@ -26,6 +31,11 @@ const AUTH_ERROR_MESSAGES: readonly [needle: string, message: string][] = [
 ];
 
 export function getConvexAuthUserMessage(error: unknown, fallback: string): string {
+  if (error instanceof ConvexError && typeof error.data === "string") {
+    for (const [needle, message] of AUTH_ERROR_MESSAGES) {
+      if (error.data === needle) return message;
+    }
+  }
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   if (!raw) return fallback;
   for (const [needle, message] of AUTH_ERROR_MESSAGES) {

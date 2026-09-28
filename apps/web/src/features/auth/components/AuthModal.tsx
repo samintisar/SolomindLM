@@ -50,7 +50,7 @@ export function AuthModal({
         role="dialog"
         aria-modal="true"
         aria-label="Sign in or create account"
-        className="relative z-10 w-full max-w-md max-h-[min(90vh,720px)] overflow-y-auto"
+        className="auth-form-light relative z-10 w-full max-w-md max-h-[min(90vh,720px)] overflow-y-auto"
       >
         <button
           type="button"
