@@ -281,7 +281,7 @@ export const AgentActivityPanel = React.memo<AgentActivityPanelProps>(
                   {showClaudeDone ? (
                     <div className="mt-2 flex items-center gap-1.5 text-muted-foreground">
                       <CircleCheck
-                        className="h-3.5 w-3.5 shrink-0 text-vintage-green-600 dark:text-vintage-green-500"
+                        className="h-3.5 w-3.5 shrink-0 text-success"
                         strokeWidth={2}
                         aria-hidden
                       />

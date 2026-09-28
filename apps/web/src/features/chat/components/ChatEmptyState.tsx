@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 
+import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { getNotebookLucideIcon } from "@/shared/notebook/notebookLucideIcon";
 
 const STARTER_PROMPTS = [
@@ -21,7 +22,7 @@ interface ChatEmptyStateProps {
   isLoadingSuggestions?: boolean;
   /** Notebook customize modal icon key (e.g. Folder, Book). */
   notebookIcon?: string | null;
-  /** Tailwind bg class from notebook (e.g. bg-vintage-amber-300); used for icon tint. */
+  /** Tailwind bg class from notebook (a COVER_COLORS swatch); used as the icon tile fill. */
   notebookCoverColor?: string | null;
   notebookTitle?: string;
 }
@@ -49,12 +50,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
     });
   }, [hasSources, suggestions]);
   const notebookGlyph = getNotebookLucideIcon(notebookIcon);
-  const iconTintClass = notebookCoverColor?.length
-    ? notebookCoverColor.replace("bg-", "text-")
-    : "text-primary";
-  const iconBgClass = notebookCoverColor?.length
-    ? notebookCoverColor.replace("-300", "-50").replace("-400", "-50").replace("-600", "-100")
-    : "bg-primary/10";
+  const iconBgClass = coverFillClass(notebookCoverColor);
   const heading =
     notebookTitle?.trim() ||
     (hasSources ? "What would you like to know?" : "Ask anything about your sources");
@@ -70,7 +66,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
             aria-hidden
           >
             {React.createElement(notebookGlyph, {
-              className: `size-8 ${iconTintClass}`,
+              className: `size-8 ${COVER_ICON_CLASS}`,
               strokeWidth: 1.6,
             })}
           </div>

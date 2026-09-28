@@ -1,6 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
+
 const mockNavigate = vi.fn();
 const mockCreateNotebook = vi.fn();
 const mockUpdateNotebook = vi.fn();
@@ -75,7 +77,7 @@ describe("useNotebookCRUD", () => {
 
     expect(mockCreateNotebook).toHaveBeenCalledWith({
       title: "Untitled Notebook",
-      coverColor: "bg-vintage-brown-300",
+      coverColor: DEFAULT_COVER_COLOR,
       icon: "Folder",
     });
     expect(mockNavigate).toHaveBeenCalledWith("/notebook/nb-new");

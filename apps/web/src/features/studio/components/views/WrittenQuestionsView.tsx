@@ -450,7 +450,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
               </p>
             )}
             {gradingAll.failed > 0 && (
-              <p className="text-xs text-vintage-orange-700 dark:text-vintage-orange-300 mt-0.5">
+              <p className="text-xs text-warning-muted-foreground mt-0.5">
                 {gradingAll.failed} answer(s) couldn't be graded — press Finish again to retry.
               </p>
             )}
@@ -509,13 +509,13 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
         <div className="max-w-3xl mx-auto w-full min-h-full p-8 md:p-12 flex flex-col">
           {/* Review Mode Banner */}
           {reviewMode && (
-            <div className="mb-6 p-4 bg-vintage-amber-50 dark:bg-vintage-amber-900/20 border border-vintage-amber-200 dark:border-vintage-amber-800 rounded-xl flex items-center gap-3">
-              <Eye className="w-5 h-5 text-vintage-amber-700 dark:text-vintage-amber-300 shrink-0" />
+            <div className="mb-6 p-4 bg-warning-muted border border-warning-border rounded-xl flex items-center gap-3">
+              <Eye className="w-5 h-5 text-warning-muted-foreground shrink-0" />
               <div>
-                <span className="text-sm font-semibold text-vintage-amber-800 dark:text-vintage-amber-200">
+                <span className="text-sm font-semibold text-warning-muted-foreground">
                   Review Mode
                 </span>
-                <p className="text-xs text-vintage-amber-700 dark:text-vintage-amber-300">
+                <p className="text-xs text-warning-muted-foreground">
                   You are viewing your previous answers. Editing is disabled.
                 </p>
               </div>
@@ -654,26 +654,26 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
               </div>
 
               {/* Feedback */}
-              <div className="p-4 bg-vintage-blue-50 dark:bg-vintage-blue-50 rounded-xl border border-vintage-blue-200 dark:border-vintage-blue-200">
-                <span className="text-sm font-bold uppercase tracking-wide text-vintage-blue-700 dark:text-vintage-blue-700">
+              <div className="p-4 bg-info-muted rounded-xl border border-info-border">
+                <span className="text-sm font-bold uppercase tracking-wide text-info-muted-foreground">
                   Feedback
                 </span>
-                <div className="mt-2 text-base leading-relaxed text-vintage-blue-700 dark:text-vintage-blue-700">
+                <div className="mt-2 text-base leading-relaxed text-info-muted-foreground">
                   {currentGradedResult.feedback}
                 </div>
               </div>
 
               {/* Strengths */}
               {currentGradedResult.strengths && currentGradedResult.strengths.length > 0 && (
-                <div className="p-4 bg-vintage-green-50 dark:bg-vintage-green-50 rounded-xl border border-vintage-green-200 dark:border-vintage-green-200">
-                  <span className="text-sm font-bold uppercase tracking-wide text-vintage-green-700 dark:text-vintage-green-700">
+                <div className="p-4 bg-success-muted rounded-xl border border-success-border">
+                  <span className="text-sm font-bold uppercase tracking-wide text-success-muted-foreground">
                     Strengths
                   </span>
                   <ul className="mt-2 space-y-2">
                     {currentGradedResult.strengths.map((strength, idx) => (
                       <li
                         key={idx}
-                        className="text-base text-vintage-green-700 dark:text-vintage-green-700 flex items-start gap-2"
+                        className="text-base text-success-muted-foreground flex items-start gap-2"
                       >
                         <CheckCircle2 className="w-4 h-4 shrink-0 mt-1" />
                         <span>{strength}</span>
@@ -685,15 +685,15 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
 
               {/* Improvements */}
               {currentGradedResult.improvements && currentGradedResult.improvements.length > 0 && (
-                <div className="p-4 bg-vintage-orange-50 dark:bg-vintage-orange-50 rounded-xl border border-vintage-orange-200 dark:border-vintage-orange-200">
-                  <span className="text-sm font-bold uppercase tracking-wide text-vintage-orange-700 dark:text-vintage-orange-700">
+                <div className="p-4 bg-warning-muted rounded-xl border border-warning-border">
+                  <span className="text-sm font-bold uppercase tracking-wide text-warning-muted-foreground">
                     Areas for Improvement
                   </span>
                   <ul className="mt-2 space-y-2">
                     {currentGradedResult.improvements.map((improvement, idx) => (
                       <li
                         key={idx}
-                        className="text-base text-vintage-orange-700 dark:text-vintage-orange-700 flex items-start gap-2"
+                        className="text-base text-warning-muted-foreground flex items-start gap-2"
                       >
                         <AlertCircle className="w-4 h-4 shrink-0 mt-1" />
                         <span>{improvement}</span>
@@ -730,7 +730,7 @@ export const WrittenQuestionsView: React.FC<WrittenQuestionsViewProps> = ({
             <button
               onClick={handleSubmitAnswer}
               disabled={!isAnswered || isSubmitting}
-              className="px-6 py-2 bg-vintage-green-600 hover:bg-vintage-green-700 text-white text-sm font-bold rounded-xl transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-vintage-green-600 flex items-center justify-center gap-2"
+              className="px-6 py-2 bg-success hover:bg-success/90 text-success-foreground text-sm font-bold rounded-xl transition-all shadow-md active:translate-y-0.5 min-w-[100px] disabled:opacity-50 disabled:hover:bg-success flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>

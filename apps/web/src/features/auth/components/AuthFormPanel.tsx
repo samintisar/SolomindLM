@@ -17,7 +17,7 @@ type AuthStep =
   | { kind: "resetVerification"; email: string };
 
 const inputClass =
-  "w-full px-3 py-2.5 rounded-lg text-sm text-foreground placeholder:text-muted-foreground bg-vintage-amber-50 border border-border/70 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 font-sans shadow-none";
+  "w-full px-3 py-2.5 rounded-lg text-sm text-foreground placeholder:text-muted-foreground bg-muted border border-border/70 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 font-sans shadow-none";
 
 interface AuthFormPanelProps {
   authError?: string;
@@ -158,7 +158,7 @@ function AuthFormPanelContent({
     "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition hover:opacity-95 disabled:pointer-events-none disabled:opacity-50";
 
   const btnOutline =
-    "inline-flex w-full items-center justify-center gap-3 rounded-xl border-2 border-border bg-vintage-amber-100 px-4 py-3 text-sm font-medium text-vintage-amber-700 transition hover:bg-vintage-amber-200 disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex w-full items-center justify-center gap-3 rounded-xl border-2 border-border bg-muted px-4 py-3 text-sm font-medium text-foreground transition hover:bg-accent disabled:pointer-events-none disabled:opacity-50";
 
   return (
     <div
@@ -171,8 +171,8 @@ function AuthFormPanelContent({
       </div>
 
       {error && (
-        <div className="mb-5 rounded-lg border border-vintage-red-200 bg-vintage-red-50 p-3">
-          <p className="text-sm text-vintage-red-800 font-sans">{error}</p>
+        <div className="mb-5 rounded-lg border border-destructive-border bg-destructive-muted p-3">
+          <p className="text-sm text-destructive-muted-foreground font-sans">{error}</p>
         </div>
       )}
 
