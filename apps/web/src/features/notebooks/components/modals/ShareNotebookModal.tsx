@@ -72,12 +72,12 @@ function LinkUrlRow({
         >
           {done ? (
             <>
-              <Check className="h-3.5 w-3.5" />
+              <Check className="size-3.5" />
               <span>Copied</span>
             </>
           ) : (
             <>
-              <Copy className="h-3.5 w-3.5" />
+              <Copy className="size-3.5" />
               <span>Copy link</span>
             </>
           )}
@@ -299,14 +299,14 @@ export const ShareNotebookModal: React.FC<ShareNotebookModalProps> = ({ notebook
                         e.stopPropagation();
                         void handleRevoke(l.id as Id<"notebookShareLinks">);
                       }}
-                      className="w-full justify-center text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto sm:justify-end sm:shrink-0"
+                      className="w-full justify-center gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto sm:justify-end sm:shrink-0"
                       title="Revoke this link"
                     >
                       {revokingId === l.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <>
-                          <Ban className="mr-1.5 h-3.5 w-3.5" />
+                          <Ban className="size-3.5" />
                           Revoke
                         </>
                       )}
