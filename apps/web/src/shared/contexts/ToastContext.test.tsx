@@ -35,12 +35,12 @@ describe("ToastProvider (sonner adapter)", () => {
     spy.mockRestore();
   });
 
-  it("success uses the default 4000ms duration and returns the id", () => {
+  it("success uses the default 4000ms duration and returns the id it passed", () => {
     const { result } = renderToastHook();
-    expect(result.current.success("Done!")).toBe("id-success");
+    const id = result.current.success("Done!");
     expect(sonner.success).toHaveBeenCalledWith(
       "Done!",
-      expect.objectContaining({ duration: 4000 })
+      expect.objectContaining({ duration: 4000, id })
     );
   });
 
@@ -67,10 +67,32 @@ describe("ToastProvider (sonner adapter)", () => {
     );
   });
 
-  it("toast() defaults to info and stringifies numeric ids", () => {
+  it("toast() defaults to info and passes a generated string id that it returns", () => {
     const { result } = renderToastHook();
-    expect(result.current.toast("Hello")).toBe("7");
-    expect(sonner.info).toHaveBeenCalledWith("Hello", expect.objectContaining({ duration: 4000 }));
+    const returned = result.current.toast("Hello");
+    expect(sonner.info).toHaveBeenCalledWith(
+      "Hello",
+      expect.objectContaining({ duration: 4000, id: expect.any(String) })
+    );
+    const passedId = vi.mocked(sonner.info).mock.calls[0][1]?.id;
+    expect(typeof passedId).toBe("string");
+    expect(returned).toBe(passedId);
+  });
+
+  it("generates a different id for each call without an id", () => {
+    const { result } = renderToastHook();
+    const first = result.current.info("A");
+    const second = result.current.info("B");
+    expect(first).not.toBe(second);
+  });
+
+  it("loading() then dismiss(returnedId) dismisses exactly the id given to sonner", () => {
+    const { result } = renderToastHook();
+    const returned = result.current.loading("Working");
+    const passedId = vi.mocked(sonner.loading).mock.calls[0][1]?.id;
+    expect(returned).toBe(passedId);
+    result.current.dismiss(returned);
+    expect(sonner.dismiss).toHaveBeenCalledWith(passedId);
   });
 
   it("toast() routes by type", () => {
