@@ -11,7 +11,8 @@ interface RouteTransitionProps {
 /**
  * Fades pages in when the top-level section changes. Keyed by the first path segment, so
  * /notebook/a → /notebook/b keeps the tree mounted (no lost chat/stream state), while
- * /home → /notebook/a gets a transition. Opacity only: a transform here would make this div the
+ * /home → /notebook/a gets a transition. Opacity only (a dedicated keyframe — tw-animate-css's
+ * `enter` also animates transform): a transform here would make this div the
  * containing block for fixed-position modals during the animation.
  */
 export function RouteTransition({ children, fill }: RouteTransitionProps) {
@@ -19,13 +20,7 @@ export function RouteTransition({ children, fill }: RouteTransitionProps) {
   const section = pathname.split("/")[1] ?? "";
 
   return (
-    <div
-      key={section}
-      className={cn(
-        "animate-in fade-in duration-320 ease-out",
-        fill && "flex min-h-0 flex-1 flex-col"
-      )}
-    >
+    <div key={section} className={cn("animate-route-in", fill && "flex min-h-0 flex-1 flex-col")}>
       {children}
     </div>
   );
