@@ -37,6 +37,9 @@ const PAIRS: Array<[string, string, number]> = [
   ["info-foreground", "info", 4.5],
   ["success-muted-foreground", "success-muted", 4.5],
   ["warning-muted-foreground", "warning-muted", 4.5],
+  // Also used as standalone warning text (source status badges, "No DOI").
+  ["warning-muted-foreground", "background", 4.5],
+  ["warning-muted-foreground", "card", 4.5],
   ["info-muted-foreground", "info-muted", 4.5],
   ["destructive-muted-foreground", "destructive-muted", 4.5],
 ];
