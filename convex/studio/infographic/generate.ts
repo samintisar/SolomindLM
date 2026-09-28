@@ -299,12 +299,17 @@ Return JSON: {
 
       // Generate image via OpenAI (GPT image models return base64 PNG)
       const size = getImageSize(orientation);
-      logger.phaseStart("image_generation", { size, model: env.INFOGRAPHIC_IMAGE_MODEL });
+      logger.phaseStart("image_generation", {
+        size,
+        model: env.INFOGRAPHIC_IMAGE_MODEL,
+        quality: env.INFOGRAPHIC_IMAGE_QUALITY,
+      });
       const imageBytes = await callOpenAIImageGeneration({
         apiKey: env.OPENAI_API_KEY,
         model: env.INFOGRAPHIC_IMAGE_MODEL,
         prompt: imagePrompt,
         size,
+        quality: env.INFOGRAPHIC_IMAGE_QUALITY,
       });
       logger.phaseComplete("image_generation", { bytes: imageBytes.byteLength });
 

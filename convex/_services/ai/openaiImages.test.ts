@@ -35,6 +35,14 @@ const UNVERIFIED_ORG_BODY = openAIErrorBody(
   null
 );
 
+const IMAGE_PARAMS = {
+  apiKey: "test-key",
+  model: "gpt-image-2.5-flare",
+  prompt: "x",
+  size: "1024x1024",
+  quality: "high",
+};
+
 function okResponse(b64: string | undefined) {
   const body = { created: 1, data: b64 === undefined ? [] : [{ b64_json: b64 }] };
   return { ok: true, status: 200, text: async () => JSON.stringify(body), json: async () => body };
@@ -53,6 +61,7 @@ describe("callOpenAIImageGeneration", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -61,9 +70,10 @@ describe("callOpenAIImageGeneration", () => {
 
     const bytes = await callOpenAIImageGeneration({
       apiKey: "test-key",
-      model: "gpt-image-2",
+      model: "gpt-image-2.5-flare",
       prompt: "An infographic",
       size: "1536x1024",
+      quality: "high",
     });
 
     expect(Array.from(bytes)).toEqual(PNG_BYTES);
@@ -72,9 +82,10 @@ describe("callOpenAIImageGeneration", () => {
     expect(url).toBe("https://api.openai.com/v1/images/generations");
     expect(init.headers.Authorization).toBe("Bearer test-key");
     expect(JSON.parse(init.body)).toEqual({
-      model: "gpt-image-2",
+      model: "gpt-image-2.5-flare",
       prompt: "An infographic",
       size: "1536x1024",
+      quality: "high",
       n: 1,
       output_format: "png",
     });
@@ -83,12 +94,7 @@ describe("callOpenAIImageGeneration", () => {
   it("throws a non-retryable ExternalServiceError on 403 without retrying", async () => {
     fetchMock.mockResolvedValue(errorResponse(403, UNVERIFIED_ORG_BODY));
 
-    const promise = callOpenAIImageGeneration({
-      apiKey: "test-key",
-      model: "gpt-image-2",
-      prompt: "x",
-      size: "1024x1024",
-    });
+    const promise = callOpenAIImageGeneration(IMAGE_PARAMS);
 
     await expect(promise).rejects.toBeInstanceOf(ExternalServiceError);
     await expect(promise).rejects.toMatchObject({ statusCode: 403, retryable: false });
@@ -98,12 +104,7 @@ describe("callOpenAIImageGeneration", () => {
   it("reads the provider code from a full-length error body", async () => {
     fetchMock.mockResolvedValue(errorResponse(400, MODERATION_BODY));
 
-    const error = await callOpenAIImageGeneration({
-      apiKey: "test-key",
-      model: "gpt-image-2",
-      prompt: "x",
-      size: "1024x1024",
-    }).catch((e: unknown) => e);
+    const error = await callOpenAIImageGeneration(IMAGE_PARAMS).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(OpenAIImageError);
     expect(error).toMatchObject({ statusCode: 400, providerCode: "moderation_blocked" });
@@ -112,28 +113,60 @@ describe("callOpenAIImageGeneration", () => {
   it("does not retry a 429 caused by exhausted quota", async () => {
     fetchMock.mockResolvedValue(errorResponse(429, QUOTA_BODY));
 
-    const error = await callOpenAIImageGeneration({
-      apiKey: "test-key",
-      model: "gpt-image-2",
-      prompt: "x",
-      size: "1024x1024",
-    }).catch((e: unknown) => e);
+    const error = await callOpenAIImageGeneration(IMAGE_PARAMS).catch((e: unknown) => e);
 
     expect(error).toMatchObject({ providerCode: "insufficient_quota", retryable: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not retry a timeout and reports it without the raw abort message", async () => {
+    fetchMock.mockRejectedValue(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError")
+    );
+
+    const error = await callOpenAIImageGeneration(IMAGE_PARAMS).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ExternalServiceError);
+    expect(error).toMatchObject({ statusCode: undefined, retryable: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const message = describeImageGenerationError(error);
+    expect(message).toMatch(/try again/i);
+    expect(message).not.toMatch(/aborted/i);
+  });
+
+  it("retries a network failure once, then reports a temporary problem", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    const promise = callOpenAIImageGeneration(IMAGE_PARAMS).catch((e: unknown) => e);
+    await vi.runAllTimersAsync();
+    const error = await promise;
+
+    expect(error).toBeInstanceOf(ExternalServiceError);
+    expect(error).toMatchObject({ statusCode: undefined, retryable: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const message = describeImageGenerationError(error);
+    expect(message).toMatch(/try again/i);
+    expect(message).not.toMatch(/fetch failed/i);
+  });
+
+  it("succeeds when a retried network failure recovers", async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(okResponse(Buffer.from(PNG_BYTES).toString("base64")));
+
+    const promise = callOpenAIImageGeneration(IMAGE_PARAMS);
+    await vi.runAllTimersAsync();
+
+    expect(Array.from(await promise)).toEqual(PNG_BYTES);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("throws when the response has no image data", async () => {
     fetchMock.mockResolvedValue(okResponse(undefined));
 
-    await expect(
-      callOpenAIImageGeneration({
-        apiKey: "test-key",
-        model: "gpt-image-2",
-        prompt: "x",
-        size: "1024x1024",
-      })
-    ).rejects.toThrow(/no image data/i);
+    await expect(callOpenAIImageGeneration(IMAGE_PARAMS)).rejects.toThrow(/no image data/i);
   });
 });
 

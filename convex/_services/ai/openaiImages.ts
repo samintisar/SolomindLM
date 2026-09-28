@@ -46,6 +46,8 @@ export interface OpenAIImageGenerationParams {
   prompt: string;
   /** One of the GPT image model sizes: "1024x1024", "1536x1024", "1024x1536". */
   size: string;
+  /** "low" | "medium" | "high" | "auto" (GPT Image 2.5 also takes "xhigh" | "max"). */
+  quality: string;
 }
 
 /**
@@ -56,34 +58,65 @@ export interface OpenAIImageGenerationParams {
 export async function callOpenAIImageGeneration(
   params: OpenAIImageGenerationParams
 ): Promise<Uint8Array> {
-  const { apiKey, model, prompt, size } = params;
+  const { apiKey, model, prompt, size, quality } = params;
 
   return await invokeWithHttpRetry(
     async () => {
-      const response = await fetch(`https://api.openai.com${IMAGE_GENERATION_ENDPOINT}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ model, prompt, size, n: 1, output_format: "png" }),
-        signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
-      });
+      try {
+        const response = await fetch(`https://api.openai.com${IMAGE_GENERATION_ENDPOINT}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ model, prompt, size, quality, n: 1, output_format: "png" }),
+          signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
+        });
 
-      if (!response.ok) {
-        throw new OpenAIImageError(response.status, await response.text());
-      }
+        if (!response.ok) {
+          throw new OpenAIImageError(response.status, await response.text());
+        }
 
-      const data = (await response.json()) as { data?: Array<{ b64_json?: string }> };
-      const b64 = data.data?.[0]?.b64_json;
-      if (!b64) {
-        throw new Error("OpenAI returned no image data");
+        const data = (await response.json()) as { data?: Array<{ b64_json?: string }> };
+        const b64 = data.data?.[0]?.b64_json;
+        if (!b64) {
+          throw new Error("OpenAI returned no image data");
+        }
+        return Uint8Array.from(Buffer.from(b64, "base64"));
+      } catch (error) {
+        throw toRequestFailure(error);
       }
-      return Uint8Array.from(Buffer.from(b64, "base64"));
     },
     "openai_image_generation",
     { maxAttempts: 2, baseDelayMs: 2000 }
   );
+}
+
+/**
+ * Wrap failures that happen before an HTTP status arrives (timeout, network)
+ * as status-less ExternalServiceErrors so the UI gets a plain message.
+ * A timeout isn't retried: a second 3-minute attempt could push the job past
+ * Convex's 10-minute action limit. A network failure is retried once.
+ */
+function toRequestFailure(error: unknown): unknown {
+  if (!(error instanceof Error) || error instanceof ExternalServiceError) {
+    return error;
+  }
+  if (error.name === "TimeoutError" || error.name === "AbortError") {
+    return new ExternalServiceError(
+      "openai",
+      `openai image request timed out after ${IMAGE_GENERATION_TIMEOUT_MS / 1000}s`,
+      { endpoint: IMAGE_GENERATION_ENDPOINT, retryable: false }
+    );
+  }
+  // fetch() reports network failures (DNS, reset, refused) as TypeError.
+  if (error instanceof TypeError) {
+    return new ExternalServiceError("openai", `openai image request failed: ${error.message}`, {
+      endpoint: IMAGE_GENERATION_ENDPOINT,
+      retryable: true,
+    });
+  }
+  return error;
 }
 
 /**
@@ -108,7 +141,8 @@ export function describeImageGenerationError(error: unknown): string {
   if (status === 401 || status === 403 || status === 429) {
     return "Infographic generation is currently unavailable due to a service configuration issue. Please try again later or contact support.";
   }
-  if (status !== undefined && status >= 500) {
+  // No status: the request timed out or never reached OpenAI.
+  if (status === undefined || status >= 500) {
     return "The image generation service had a temporary problem. Please try again.";
   }
   return "Infographic generation failed. Please try again.";
