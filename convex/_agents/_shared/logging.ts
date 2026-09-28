@@ -34,6 +34,8 @@ export type JobErrorType =
   | "extraction_failure"
   | "storage_error"
   | "validation_error"
+  /** Studio job whose action was killed (timeout, OOM, crash) before it could report. */
+  | "job_stalled"
   | "unknown";
 
 /**
@@ -214,6 +216,7 @@ export function isRetryableError(errorType: JobErrorType): boolean {
     "rate_limit",
     "storage_error",
     "extraction_failure",
+    "job_stalled",
   ];
   return retryableTypes.includes(errorType);
 }
