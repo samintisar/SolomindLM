@@ -18,6 +18,10 @@ import { createServiceLogger } from "../../_lib/logging/serviceLogger";
  * A row idle this long cannot still have a live action: every phase is an
  * internalAction capped at 600s, and each one writes `updatedAt` when it
  * starts or finishes. The extra 5 minutes absorbs scheduler queueing.
+ *
+ * Any new phase must keep this true: a delayed `runAfter`, or a phase that can
+ * go longer than this without writing, needs to write `updatedAt` (a heartbeat)
+ * or this threshold must be raised. Otherwise live jobs get failed.
  */
 export const STUDIO_JOB_STALE_MS = 15 * 60 * 1000;
 
@@ -100,13 +104,26 @@ const FAIL_STUCK_JOB: { [T in StudioJobTable]: FailStuckJob<T> } = {
 
 const STUDIO_JOB_TABLES = Object.keys(FAIL_STUCK_JOB) as StudioJobTable[];
 
-/** Fails up to `limit` stale rows in one table; returns how many it failed. */
-async function failStuckJobs(
+export interface StuckJobBatchResult {
+  /** Rows marked failed. */
+  failed: number;
+  /** Rows whose failure write threw; they stay `generating` for a later sweep. */
+  errored: number;
+}
+
+/**
+ * Fails up to `limit` stale rows in one table. Each failure write runs as its
+ * own subtransaction, so a row that throws (e.g. fails schema validation) is
+ * rolled back and logged without aborting the rest of the sweep.
+ */
+export async function failStuckJobs(
   ctx: MutationCtx,
   table: StudioJobTable,
   cutoff: number,
-  limit: number
-): Promise<number> {
+  limit: number,
+  // Safe widening: every row id below comes from `table`, the same key we look up.
+  fail = FAIL_STUCK_JOB[table] as FailStuckJob<StudioJobTable>
+): Promise<StuckJobBatchResult> {
   const stuck = await ctx.db
     .query(table)
     .withIndex("by_status_and_updatedAt", (q) =>
@@ -115,41 +132,63 @@ async function failStuckJobs(
     .take(limit);
 
   const logger = createServiceLogger("studio", "stuckJobSweep");
-  // Safe widening: every row id below comes from `table`, the same key we look up.
-  const fail = FAIL_STUCK_JOB[table] as FailStuckJob<StudioJobTable>;
+  const result: StuckJobBatchResult = { failed: 0, errored: 0 };
   for (const row of stuck) {
-    const metadata: Record<string, unknown> = { ...(row.metadata ?? {}), isTimeout: true };
-    logger.warn("Failing stuck Studio job", {
-      table,
-      jobId: row._id,
-      phase: metadata.phase ?? "unknown",
-      idleMs: Date.now() - row.updatedAt,
-    });
-    await fail(ctx, row._id, metadata);
+    const phase = (row.metadata?.phase as string | undefined) ?? "unknown";
+    // errorType + errorPhase make buildErrorMetadata record them as given
+    // instead of classifying the (generic) message.
+    const metadata: Record<string, unknown> = {
+      ...(row.metadata ?? {}),
+      errorType: "job_stalled",
+      errorPhase: phase,
+      retryable: true,
+    };
+    const context = { table, jobId: row._id, phase, idleMs: Date.now() - row.updatedAt };
+    try {
+      await fail(ctx, row._id, metadata);
+      logger.warn("Failed stuck Studio job", context);
+      result.failed++;
+    } catch (error) {
+      logger.error("Could not fail stuck Studio job", {
+        ...context,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      result.errored++;
+    }
   }
-  return stuck.length;
+  return result;
+}
+
+/**
+ * Whether to run another sweep straight away. Only when some table filled its
+ * batch AND the sweep made progress: rows that keep throwing are re-read on
+ * every pass, so rescheduling on those alone would loop with no delay forever.
+ * They are retried by the next cron run instead.
+ */
+export function sweepHasMore(results: StuckJobBatchResult[], limit: number): boolean {
+  const madeProgress = results.some((r) => r.failed > 0);
+  return madeProgress && results.some((r) => r.failed + r.errored === limit);
 }
 
 export const sweepStuckStudioJobs = internalMutation({
   args: {},
-  handler: async (ctx): Promise<{ failed: number }> => {
+  handler: async (ctx): Promise<{ failed: number; errored: number }> => {
     const cutoff = Date.now() - STUDIO_JOB_STALE_MS;
-    let failed = 0;
-    let hasMore = false;
-
+    const results: StuckJobBatchResult[] = [];
     for (const table of STUDIO_JOB_TABLES) {
-      const count = await failStuckJobs(ctx, table, cutoff, STUCK_JOB_SWEEP_BATCH_SIZE);
-      failed += count;
-      if (count === STUCK_JOB_SWEEP_BATCH_SIZE) hasMore = true;
+      results.push(await failStuckJobs(ctx, table, cutoff, STUCK_JOB_SWEEP_BATCH_SIZE));
     }
 
-    if (hasMore) {
+    if (sweepHasMore(results, STUCK_JOB_SWEEP_BATCH_SIZE)) {
       await ctx.scheduler.runAfter(
         0,
         internal.studio.jobMutations.stuckJobs.sweepStuckStudioJobs,
         {}
       );
     }
-    return { failed };
+    return {
+      failed: results.reduce((n, r) => n + r.failed, 0),
+      errored: results.reduce((n, r) => n + r.errored, 0),
+    };
   },
 });
