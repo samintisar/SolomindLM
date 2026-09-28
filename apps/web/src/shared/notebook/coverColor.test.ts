@@ -45,3 +45,10 @@ describe("coverFillClass with legacy values", () => {
     expect(coverFillClass("bg-yellow-500")).toBe("bg-vintage-amber-400");
   });
 });
+
+describe("DEFAULT_COVER_COLOR", () => {
+  it("pins the persisted default", () => {
+    // The Convex backend hardcodes this literal.
+    expect(DEFAULT_COVER_COLOR).toBe("bg-vintage-brown-300");
+  });
+});

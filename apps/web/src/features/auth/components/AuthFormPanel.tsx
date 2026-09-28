@@ -171,7 +171,10 @@ function AuthFormPanelContent({
       </div>
 
       {error && (
-        <div className="mb-5 rounded-lg border border-destructive-border bg-destructive-muted p-3">
+        <div
+          role="alert"
+          className="mb-5 rounded-lg border border-destructive-border bg-destructive-muted p-3"
+        >
           <p className="text-sm text-destructive-muted-foreground font-sans">{error}</p>
         </div>
       )}
