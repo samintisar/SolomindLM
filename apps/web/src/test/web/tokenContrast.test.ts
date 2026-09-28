@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 import { wcagContrast } from "culori";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(fileURLToPath(new URL("../../index.css", import.meta.url)), "utf8");
+// Strip CSS comments. The guard skips `/*` glued to a path (e.g. `@source "…/dist/*.js"`).
+const css = readFileSync(
+  fileURLToPath(new URL("../../index.css", import.meta.url)),
+  "utf8"
+).replace(/(^|\s)\/\*[\s\S]*?\*\//g, "$1");
 function tokens(selector: string): Record<string, string> {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const block = css.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1];
@@ -40,6 +44,7 @@ const PAIRS: Array<[string, string, number]> = [
 describe.each([
   ["light", light],
   ["dark", dark],
+  ["auth (pinned light)", { ...light, ...tokens(".auth-form-light") }],
 ])("%s theme contrast (WCAG AA)", (_theme, t) => {
   it.each(PAIRS)("%s on %s ≥ %d:1", (fg, bg, min) => {
     expect(t[fg], `missing --${fg}`).toBeDefined();
