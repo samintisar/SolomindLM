@@ -57,7 +57,7 @@
     "jest-expo": "~55.0.22",
     "metro-resolver": "0.87.1",
     "react-test-renderer": "19.3.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.3"
   },
   "private": true
 }

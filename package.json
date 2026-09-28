@@ -69,10 +69,10 @@
     "e2e:convex:cleanup-notebooks": "node scripts/cleanup-e2e-notebooks.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.16",
-    "@playwright/test": "^1.62.1",
-    "@types/bun": "^1.4.0",
-    "@types/node": "^25.9.5",
+    "@biomejs/biome": "2.5.14",
+    "@playwright/test": "^1.63.0",
+    "@types/bun": "^1.4.2",
+    "@types/node": "^25.9.8",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
     "convex": "1.45.0",
     "convex-test": "^0.0.58",
