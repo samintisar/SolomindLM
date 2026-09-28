@@ -15,12 +15,7 @@ import {
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import {
-  COVER_COLORS,
-  COVER_ICON_CLASS,
-  coverFillClass,
-  DEFAULT_COVER_COLOR,
-} from "@/shared/notebook/coverColor";
+import { COVER_COLORS, COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { NotebookItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -62,14 +57,14 @@ export const CustomizeNotebookModal: React.FC<CustomizeNotebookModalProps> = ({
 }) => {
   const isCreateMode = !notebook;
   const [title, setTitle] = useState(notebook?.title || "");
-  const [selectedColor, setSelectedColor] = useState(notebook?.coverColor || DEFAULT_COVER_COLOR);
+  const [selectedColor, setSelectedColor] = useState(coverFillClass(notebook?.coverColor));
   const [selectedIcon, setSelectedIcon] = useState(notebook?.icon || "Folder");
 
   // Update state when notebook prop changes (when data is updated in parent)
   useEffect(() => {
     if (notebook) {
       setTitle(notebook.title);
-      setSelectedColor(notebook.coverColor || DEFAULT_COVER_COLOR);
+      setSelectedColor(coverFillClass(notebook.coverColor));
       setSelectedIcon(notebook.icon || "Folder");
     }
   }, [notebook?.id]); // Only update when notebook ID changes (different notebook selected)

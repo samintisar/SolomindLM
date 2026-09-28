@@ -38,3 +38,10 @@ describe("coverFillClass with unknown classes", () => {
     expect(coverFillClass("bg-pink-500")).toBe(DEFAULT_COVER_COLOR);
   });
 });
+
+describe("coverFillClass with legacy values", () => {
+  it("maps retired palette swatches to their current equivalents", () => {
+    expect(coverFillClass("bg-blue-500")).toBe("bg-vintage-blue-500");
+    expect(coverFillClass("bg-yellow-500")).toBe("bg-vintage-amber-400");
+  });
+});

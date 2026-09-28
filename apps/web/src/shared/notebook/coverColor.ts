@@ -29,6 +29,14 @@ export const COVER_ICON_CLASS = "text-foreground";
 
 const KNOWN = new Set<string>(COVER_COLORS);
 
+/** Swatches offered by earlier versions of the picker; may still be persisted. */
+const LEGACY_COVER_COLORS: Record<string, (typeof COVER_COLORS)[number]> = {
+  "bg-blue-500": "bg-vintage-blue-500",
+  "bg-yellow-500": "bg-vintage-amber-400",
+};
+
 export function coverFillClass(coverColor?: string | null): string {
-  return coverColor && KNOWN.has(coverColor) ? coverColor : DEFAULT_COVER_COLOR;
+  if (!coverColor) return DEFAULT_COVER_COLOR;
+  if (KNOWN.has(coverColor)) return coverColor;
+  return LEGACY_COVER_COLORS[coverColor] ?? DEFAULT_COVER_COLOR;
 }

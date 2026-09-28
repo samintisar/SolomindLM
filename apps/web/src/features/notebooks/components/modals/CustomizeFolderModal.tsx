@@ -15,12 +15,7 @@ import {
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import {
-  COVER_COLORS,
-  COVER_ICON_CLASS,
-  coverFillClass,
-  DEFAULT_COVER_COLOR,
-} from "@/shared/notebook/coverColor";
+import { COVER_COLORS, COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
 import { FolderItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -62,14 +57,14 @@ export const CustomizeFolderModal: React.FC<CustomizeFolderModalProps> = ({
 }) => {
   const isCreateMode = !folder;
   const [name, setName] = useState(folder?.name || "");
-  const [selectedColor, setSelectedColor] = useState(folder?.color || DEFAULT_COVER_COLOR);
+  const [selectedColor, setSelectedColor] = useState(coverFillClass(folder?.color));
   const [selectedIcon, setSelectedIcon] = useState(folder?.icon || "Folder");
 
   // Update state when folder prop changes (when data is updated in parent)
   useEffect(() => {
     if (folder) {
       setName(folder.name);
-      setSelectedColor(folder.color || DEFAULT_COVER_COLOR);
+      setSelectedColor(coverFillClass(folder.color));
       setSelectedIcon(folder.icon || "Folder");
     }
   }, [folder?.id]); // Only update when folder ID changes (different folder selected)
