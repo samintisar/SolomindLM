@@ -14,13 +14,12 @@ export interface Toast {
 }
 
 export interface ToastContextValue {
-  toasts: Toast[];
-  toast: (message: string, options?: Partial<Toast>) => void;
-  success: (message: string, options?: Partial<Toast>) => void;
-  error: (message: string, options?: Partial<Toast>) => void;
-  info: (message: string, options?: Partial<Toast>) => void;
-  loading: (message: string, options?: Partial<Toast>) => void;
-  dismiss: (id: string) => void;
+  toast: (message: string, options?: Partial<Toast>) => string;
+  success: (message: string, options?: Partial<Toast>) => string;
+  error: (message: string, options?: Partial<Toast>) => string;
+  info: (message: string, options?: Partial<Toast>) => string;
+  loading: (message: string, options?: Partial<Toast>) => string;
+  dismiss: (id?: string) => void;
 }
 
 export const ToastContext = createContext<ToastContextValue | undefined>(undefined);

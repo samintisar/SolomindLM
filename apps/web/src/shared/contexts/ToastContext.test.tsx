@@ -1,23 +1,33 @@
-import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
+import { toast as sonner } from "sonner";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/shared/contexts/ToastContext";
 import { useToast } from "@/shared/contexts/useToast";
 
-describe("ToastProvider", () => {
+vi.mock("sonner", () => {
+  const toast = Object.assign(
+    vi.fn(() => "id-default"),
+    {
+      success: vi.fn(() => "id-success"),
+      error: vi.fn(() => "id-error"),
+      info: vi.fn(() => 7),
+      loading: vi.fn(() => "id-loading"),
+      dismiss: vi.fn(),
+    }
+  );
+  return { toast };
+});
+
+function renderToastHook() {
+  return renderHook(() => useToast(), { wrapper: ToastProvider });
+}
+
+describe("ToastProvider (sonner adapter)", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.clearAllMocks();
   });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  function renderToastHook() {
-    return renderHook(() => useToast(), { wrapper: ToastProvider });
-  }
 
   it("throws when useToast is used outside provider", () => {
-    // Suppress console.error for expected error
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderHook(() => useToast())).toThrow(
       "useToast must be used within a ToastProvider"
@@ -25,128 +35,63 @@ describe("ToastProvider", () => {
     spy.mockRestore();
   });
 
-  it("starts with empty toasts", () => {
+  it("success uses the default 4000ms duration and returns the id", () => {
     const { result } = renderToastHook();
-    expect(result.current.toasts).toEqual([]);
+    expect(result.current.success("Done!")).toBe("id-success");
+    expect(sonner.success).toHaveBeenCalledWith(
+      "Done!",
+      expect.objectContaining({ duration: 4000 })
+    );
   });
 
-  it("adds a toast with default type info", () => {
+  it("error defaults to 6000ms and respects an override", () => {
     const { result } = renderToastHook();
-    act(() => {
-      result.current.toast("Hello");
-    });
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0].message).toBe("Hello");
-    expect(result.current.toasts[0].type).toBe("info");
+    result.current.error("Failed");
+    expect(sonner.error).toHaveBeenLastCalledWith(
+      "Failed",
+      expect.objectContaining({ duration: 6000 })
+    );
+    result.current.error("Failed", { duration: 3000 });
+    expect(sonner.error).toHaveBeenLastCalledWith(
+      "Failed",
+      expect.objectContaining({ duration: 3000 })
+    );
   });
 
-  it("adds a success toast", () => {
+  it("loading never auto-dismisses, even when a duration is passed", () => {
     const { result } = renderToastHook();
-    act(() => {
-      result.current.success("Done!");
-    });
-    expect(result.current.toasts[0].type).toBe("success");
-    expect(result.current.toasts[0].message).toBe("Done!");
+    result.current.loading("Working", { duration: 1000 });
+    expect(sonner.loading).toHaveBeenCalledWith(
+      "Working",
+      expect.objectContaining({ duration: Infinity })
+    );
   });
 
-  it("adds an error toast with 6000ms default duration", () => {
+  it("toast() defaults to info and stringifies numeric ids", () => {
     const { result } = renderToastHook();
-    act(() => {
-      result.current.error("Something failed");
-    });
-    expect(result.current.toasts[0].type).toBe("error");
-    expect(result.current.toasts[0].duration).toBe(6000);
+    expect(result.current.toast("Hello")).toBe("7");
+    expect(sonner.info).toHaveBeenCalledWith("Hello", expect.objectContaining({ duration: 4000 }));
   });
 
-  it("allows error toast with custom duration", () => {
+  it("toast() routes by type", () => {
     const { result } = renderToastHook();
-    act(() => {
-      result.current.error("Error", { duration: 3000 });
-    });
-    expect(result.current.toasts[0].duration).toBe(3000);
+    result.current.toast("Saved", { type: "success" });
+    expect(sonner.success).toHaveBeenCalledWith("Saved", expect.anything());
   });
 
-  it("adds a loading toast with infinite duration", () => {
-    const { result } = renderToastHook();
-    act(() => {
-      result.current.loading("Loading...");
-    });
-    expect(result.current.toasts[0].type).toBe("loading");
-    expect(result.current.toasts[0].duration).toBe(Infinity);
-  });
-
-  it("auto-dismisses non-loading toasts after duration", () => {
-    const { result } = renderToastHook();
-    act(() => {
-      result.current.toast("Temporary");
-    });
-    expect(result.current.toasts).toHaveLength(1);
-
-    act(() => {
-      vi.advanceTimersByTime(4000);
-    });
-    expect(result.current.toasts).toHaveLength(0);
-  });
-
-  it("does not auto-dismiss loading toasts", () => {
-    const { result } = renderToastHook();
-    act(() => {
-      result.current.loading("Still loading");
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(10000);
-    });
-    expect(result.current.toasts).toHaveLength(1);
-  });
-
-  it("dismisses a toast by id", () => {
-    const { result } = renderToastHook();
-    act(() => {
-      result.current.toast("Keep");
-      result.current.success("Remove me");
-    });
-    expect(result.current.toasts).toHaveLength(2);
-
-    act(() => {
-      result.current.dismiss(result.current.toasts[1].id);
-    });
-    expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0].message).toBe("Keep");
-  });
-
-  it("supports custom duration override", () => {
-    const { result } = renderToastHook();
-    act(() => {
-      result.current.toast("Custom", { duration: 1000 });
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(999);
-    });
-    expect(result.current.toasts).toHaveLength(1);
-
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(result.current.toasts).toHaveLength(0);
-  });
-
-  it("supports action in toast", () => {
+  it("passes id and action through", () => {
     const { result } = renderToastHook();
     const onClick = vi.fn();
-    act(() => {
-      result.current.toast("Undo?", { action: { label: "Undo", onClick } });
-    });
-    expect(result.current.toasts[0].action?.label).toBe("Undo");
-    expect(result.current.toasts[0].action?.onClick).toBe(onClick);
+    result.current.info("Undo?", { id: "undo-1", action: { label: "Undo", onClick } });
+    expect(sonner.info).toHaveBeenCalledWith(
+      "Undo?",
+      expect.objectContaining({ id: "undo-1", action: { label: "Undo", onClick } })
+    );
   });
 
-  it("returns toast id from toast methods", () => {
+  it("dismiss forwards to sonner", () => {
     const { result } = renderToastHook();
-    act(() => {
-      const _id = result.current.toast("test");
-      expect(_id).toBeTruthy();
-    });
+    result.current.dismiss("id-loading");
+    expect(sonner.dismiss).toHaveBeenCalledWith("id-loading");
   });
 });
