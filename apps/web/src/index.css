@@ -439,6 +439,7 @@
   --border-radius: var(--radius);
   --normal-bg-hover: var(--accent);
   --normal-border-hover: var(--border);
+  font-family: var(--font-sans);
 }
 
 /* Markdown/Prose Styling */

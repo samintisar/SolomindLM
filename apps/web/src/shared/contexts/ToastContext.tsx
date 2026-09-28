@@ -11,14 +11,19 @@ function durationFor(type: ToastType, requested?: number): number {
   return requested ?? DEFAULT_DURATION;
 }
 
+// sonner generates numeric ids and matches them with ===, so we own the ids and keep them strings.
+let counter = 0;
+
 function show(message: string, options: Partial<Toast> = {}): string {
   const type = options.type ?? "info";
+  const id = options.id ?? `toast-${++counter}`;
   const external = {
-    id: options.id,
+    id,
     action: options.action,
     duration: durationFor(type, options.duration),
   };
-  return String(sonner[type](message, external));
+  sonner[type](message, external);
+  return id;
 }
 
 // Stateless: sonner owns the toast queue, so the context value never changes.
