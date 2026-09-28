@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLimitErrorToast } from "@/shared/hooks/useLimitErrorToast";
+import { DEFAULT_COVER_COLOR } from "@/shared/notebook/coverColor";
 import { NotebookItem } from "@/shared/types/index";
 import { isNativeShell } from "@/utils/platformDetection";
 import { useCreateNotebook, useDeleteNotebook, useUpdateNotebook } from "../services/notebooksApi";
@@ -40,7 +41,7 @@ export function useNotebookCRUD({
     try {
       const newNotebook = await createNotebook({
         title: "Untitled Notebook",
-        coverColor: "bg-vintage-brown-300",
+        coverColor: DEFAULT_COVER_COLOR,
         icon: "Folder",
       });
       navigate(`/notebook/${newNotebook.id}`);

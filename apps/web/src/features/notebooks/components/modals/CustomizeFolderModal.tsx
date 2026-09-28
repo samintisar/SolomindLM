@@ -15,7 +15,12 @@ import {
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { COVER_ICON_CLASS, coverFillClass } from "@/shared/notebook/coverColor";
+import {
+  COVER_COLORS,
+  COVER_ICON_CLASS,
+  coverFillClass,
+  DEFAULT_COVER_COLOR,
+} from "@/shared/notebook/coverColor";
 import { FolderItem } from "@/shared/types/index";
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -30,27 +35,6 @@ const IconMap: Record<string, React.FC<any>> = {
   GraduationCap,
   Lightbulb,
 };
-
-const COVER_COLORS = [
-  "bg-vintage-brown-300",
-  "bg-vintage-red-300",
-  "bg-vintage-orange-300",
-  "bg-vintage-amber-300",
-  "bg-vintage-amber-400",
-  "bg-vintage-green-300",
-  "bg-vintage-green-400",
-  "bg-vintage-blue-300",
-  "bg-vintage-blue-400",
-  "bg-vintage-blue-500",
-  "bg-vintage-brown-400",
-  "bg-vintage-red-400",
-  "bg-vintage-orange-400",
-  "bg-vintage-amber-500",
-  "bg-vintage-green-500",
-  "bg-vintage-blue-200",
-  "bg-vintage-red-200",
-  "bg-vintage-orange-200",
-];
 
 const AVAILABLE_ICONS = [
   "Folder",
@@ -78,14 +62,14 @@ export const CustomizeFolderModal: React.FC<CustomizeFolderModalProps> = ({
 }) => {
   const isCreateMode = !folder;
   const [name, setName] = useState(folder?.name || "");
-  const [selectedColor, setSelectedColor] = useState(folder?.color || "bg-vintage-brown-300");
+  const [selectedColor, setSelectedColor] = useState(folder?.color || DEFAULT_COVER_COLOR);
   const [selectedIcon, setSelectedIcon] = useState(folder?.icon || "Folder");
 
   // Update state when folder prop changes (when data is updated in parent)
   useEffect(() => {
     if (folder) {
       setName(folder.name);
-      setSelectedColor(folder.color || "bg-vintage-brown-300");
+      setSelectedColor(folder.color || DEFAULT_COVER_COLOR);
       setSelectedIcon(folder.icon || "Folder");
     }
   }, [folder?.id]); // Only update when folder ID changes (different folder selected)
