@@ -54,7 +54,7 @@ export const RecentSection: React.FC<RecentSectionProps> = ({
   const notebooksWithoutFolder = recentNotebooks.filter((nb) => !nb.folderId);
 
   return (
-    <section className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 pb-20">
+    <section className="animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards duration-700 delay-100 pb-20">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-display font-bold text-foreground">My Notebooks</h2>
       </div>
