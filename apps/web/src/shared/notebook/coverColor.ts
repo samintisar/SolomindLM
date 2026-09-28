@@ -38,5 +38,7 @@ const LEGACY_COVER_COLORS: Record<string, (typeof COVER_COLORS)[number]> = {
 export function coverFillClass(coverColor?: string | null): string {
   if (!coverColor) return DEFAULT_COVER_COLOR;
   if (KNOWN.has(coverColor)) return coverColor;
-  return LEGACY_COVER_COLORS[coverColor] ?? DEFAULT_COVER_COLOR;
+  return Object.hasOwn(LEGACY_COVER_COLORS, coverColor)
+    ? LEGACY_COVER_COLORS[coverColor]
+    : DEFAULT_COVER_COLOR;
 }

@@ -37,6 +37,12 @@ describe("coverFillClass with unknown classes", () => {
   it("falls back when a stored bg- class is not a known swatch", () => {
     expect(coverFillClass("bg-pink-500")).toBe(DEFAULT_COVER_COLOR);
   });
+
+  it("does not resolve Object.prototype keys", () => {
+    for (const key of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
+      expect(coverFillClass(key)).toBe(DEFAULT_COVER_COLOR);
+    }
+  });
 });
 
 describe("coverFillClass with legacy values", () => {
