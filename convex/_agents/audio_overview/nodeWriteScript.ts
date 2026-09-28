@@ -21,7 +21,15 @@ import {
   REDUCE_SYSTEM_PROMPT,
   TARGET_LINE_COUNTS,
 } from "./prompts.js";
+import {
+  describeDialogueScriptParseFailure,
+  getMinimumDialogueLines,
+  parseDialogueScriptResponse,
+} from "./scriptParsing.js";
 import type { DialogueLine, OverallStateType } from "./state.js";
+
+/** Per-chunk floor: a chunk that yields a single line is treated as a failed chunk. */
+const MIN_CHUNK_DIALOGUE_LINES = 2;
 
 /**
  * Generate dialogue script from collapsed outputs (reduce phase).
@@ -142,33 +150,21 @@ export async function writeScript(
         responseLength: responseText.length,
       });
 
-      // Robust JSON extraction
-      const jsonStart = responseText.indexOf("[");
-      const jsonEnd = responseText.lastIndexOf("]");
+      const parseResult = parseDialogueScriptResponse(responseText, MIN_CHUNK_DIALOGUE_LINES);
 
-      if (jsonStart === -1 || jsonEnd === -1) {
-        logger.warn("No JSON array found in response", {
+      if (!parseResult.ok) {
+        logger.warn("Chunk response did not contain a valid dialogue script", {
           agent: "AudioOverviewGraph",
           phase: "write_script_chunk",
           chunkIndex: chunkIndex + 1,
+          reason: describeDialogueScriptParseFailure(parseResult),
           responsePreview: responseText.slice(0, 500),
         });
         continue;
       }
 
-      const jsonStr = responseText.substring(jsonStart, jsonEnd + 1);
-
       try {
-        const chunkDialogue = JSON.parse(jsonStr) as DialogueLine[];
-
-        // Validate structure
-        if (
-          !Array.isArray(chunkDialogue) ||
-          chunkDialogue.length === 0 ||
-          !chunkDialogue.every((line) => "speaker" in line && "text" in line)
-        ) {
-          throw new Error("Invalid dialogue script structure");
-        }
+        const chunkDialogue = parseResult.script;
 
         logger.info(`Successfully parsed ${chunkDialogue.length} lines`, {
           agent: "AudioOverviewGraph",
@@ -212,12 +208,11 @@ ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
           // Silently fail - example extraction is optional
         }
       } catch (parseError) {
-        logger.warn("JSON parsing failed for chunk", {
+        logger.warn("Post-processing failed for chunk", {
           agent: "AudioOverviewGraph",
           phase: "write_script_chunk",
           chunkIndex: chunkIndex + 1,
           error: parseError instanceof Error ? parseError.message : String(parseError),
-          jsonPreview: jsonStr.slice(0, 500),
         });
       }
     }
@@ -235,15 +230,18 @@ ${chunkDialogue.map((d) => `${d.speaker}: ${d.text}`).join("\n")}`;
       );
     }
 
-    // If extraction completely failed, fail the job instead of returning filler content
-    if (fullDialogueScript.length === 0) {
-      logger.warn("All chunks failed to produce a parsable dialogue script", {
+    // Fail the job instead of returning filler or a mostly-empty script as a success.
+    const minimumDialogueLines = getMinimumDialogueLines(targetLines);
+    if (fullDialogueScript.length < minimumDialogueLines) {
+      logger.warn("Chunks did not produce enough valid dialogue", {
         agent: "AudioOverviewGraph",
         phase: "write_script",
         numChunks,
+        actualLines: fullDialogueScript.length,
+        minimumDialogueLines,
       });
       throw new Error(
-        `Dialogue script generation failed: none of the ${numChunks} chunk(s) produced a parsable script`
+        `Dialogue script generation failed: ${fullDialogueScript.length} valid line(s) from ${numChunks} chunk(s); minimum ${minimumDialogueLines}`
       );
     }
 

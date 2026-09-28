@@ -17,7 +17,7 @@ import {
 } from "../../_agents/_shared/studioJobTelemetry";
 import { invokeTogetherText } from "../../_agents/_shared/studioTextLlm";
 import { countTokens } from "../../_agents/_shared/tokenizer";
-import type { TokenUsage } from "../../_agents/_shared/usageAggregate";
+import { addTokenUsage, type TokenUsage } from "../../_agents/_shared/usageAggregate";
 import {
   type AudioLength,
   type AudioType,
@@ -28,9 +28,8 @@ import {
   TARGET_LINE_COUNTS,
 } from "../../_agents/audio_overview/prompts";
 import {
-  describeDialogueScriptParseFailure,
+  generateValidatedDialogueScript,
   getMinimumDialogueLines,
-  parseDialogueScriptResponse,
 } from "../../_agents/audio_overview/scriptParsing";
 import type { DialogueLine } from "../../_agents/audio_overview/state";
 import { internal } from "../../_generated/api";
@@ -543,7 +542,6 @@ export async function runFinalizeAudioOverviewPhase(
     const targetLines = TARGET_LINE_COUNTS[length];
 
     const minimumDialogueLines = getMinimumDialogueLines(targetLines);
-    let fullDialogueScript: DialogueLine[] = [];
 
     console.log(
       `[AudioJob] Script config: type=${audioType}, length=${length}, targetLines=${targetLines}, minimumLines=${minimumDialogueLines}, focus=${sanitizedFocus || "general overview"}, reduceTimeoutMs=${CONFIG.REDUCE_TIMEOUT_MS}, reduceMaxOutputTokens=${CONFIG.REDUCE_MAX_OUTPUT_TOKENS}, thinking=false`
@@ -561,53 +559,49 @@ export async function runFinalizeAudioOverviewPhase(
       `[AudioJob] Writing script single-pass (promptChars=${reducePrompt.length}, promptTokens=${countTokens(reducePrompt)}, targetLines=${targetLines})`
     );
 
+    // Parse-failure retries are bounded: the first attempt keeps transport retries, a follow-up
+    // attempt only runs if the first one finished quickly, so the phase stays well inside the
+    // Convex action time limit.
     const REDUCE_MAX_ATTEMPTS = 2;
+    const REDUCE_PARSE_RETRY_BUDGET_MS = 180_000;
+    const REDUCE_FORMAT_REMINDER =
+      "\n\nIMPORTANT: Your previous reply could not be used because it was not a complete, valid JSON array of dialogue lines. Respond with ONLY the JSON array (no commentary, no code fences), make sure every object is complete, and close the array.";
     let reduceUsage: TokenUsage | undefined;
-    let lastParseFailureReason: string | null = null;
     const reduceStartTime = Date.now();
 
-    for (let attempt = 1; attempt <= REDUCE_MAX_ATTEMPTS; attempt++) {
-      const responseText = await invokeStudioLlm({
-        invoke: () =>
-          invokeTogetherText({
-            systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
-            userPrompt: reducePrompt,
-            model: env.AUDIO_LLM,
-            maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
-            temperature: 0.6,
-            reasoningEnabled: true,
-            onUsage: (usage) => {
-              reduceUsage = usage;
-            },
+    const { script: fullDialogueScript, attempt: scriptAttempt } =
+      await generateValidatedDialogueScript({
+        minimumLines: minimumDialogueLines,
+        maxAttempts: REDUCE_MAX_ATTEMPTS,
+        canRetry: () => Date.now() - reduceStartTime < REDUCE_PARSE_RETRY_BUDGET_MS,
+        onAttemptFailed: ({ attempt, reason, responseText }) => {
+          console.log(
+            `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${reason}. Response preview: ${responseText.slice(0, 500)}`
+          );
+        },
+        generate: (attempt) =>
+          invokeStudioLlm({
+            invoke: () =>
+              invokeTogetherText({
+                systemPrompt: withLanguageInstruction(REDUCE_SYSTEM_PROMPT, language),
+                userPrompt: attempt === 1 ? reducePrompt : reducePrompt + REDUCE_FORMAT_REMINDER,
+                model: env.AUDIO_LLM,
+                maxTokens: CONFIG.REDUCE_MAX_OUTPUT_TOKENS,
+                temperature: attempt === 1 ? 0.6 : 0.3,
+                reasoningEnabled: true,
+                onUsage: (usage) => {
+                  reduceUsage = addTokenUsage(reduceUsage, usage);
+                },
+              }),
+            timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
+            phaseLabel: "AudioReduce",
+            retry: { maxAttempts: attempt === 1 ? 2 : 1, baseDelayMs: 1000 },
           }),
-        timeoutMs: CONFIG.REDUCE_TIMEOUT_MS,
-        phaseLabel: "AudioReduce",
-        retry: { maxAttempts: 2, baseDelayMs: 1000 },
       });
 
-      const parseResult = parseDialogueScriptResponse(responseText, minimumDialogueLines);
-
-      if (parseResult.ok) {
-        fullDialogueScript = parseResult.script;
-        console.log(
-          `[AudioJob] Parsed ${fullDialogueScript.length} dialogue lines on attempt ${attempt}/${REDUCE_MAX_ATTEMPTS}`
-        );
-        break;
-      }
-
-      lastParseFailureReason = describeDialogueScriptParseFailure(parseResult);
-      console.log(
-        `[AudioJob] Script attempt ${attempt}/${REDUCE_MAX_ATTEMPTS} failed: ${lastParseFailureReason}. Response preview: ${responseText.slice(0, 500)}`
-      );
-    }
-
-    if (fullDialogueScript.length === 0) {
-      throw new Error(
-        `Dialogue script generation failed after ${REDUCE_MAX_ATTEMPTS} attempts: ${
-          lastParseFailureReason ?? "no usable script was produced"
-        }`
-      );
-    }
+    console.log(
+      `[AudioJob] Parsed ${fullDialogueScript.length} dialogue lines on attempt ${scriptAttempt}/${REDUCE_MAX_ATTEMPTS}`
+    );
 
     console.log(`[AudioJob] Generated ${fullDialogueScript.length} dialogue lines`);
 
