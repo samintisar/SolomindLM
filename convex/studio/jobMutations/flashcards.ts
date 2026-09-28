@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const updateFlashcardTitle = internalMutation({
@@ -23,18 +24,29 @@ export const saveFlashcardResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const flashcard = await ctx.db.get(args.flashcardId);
+    if (!flashcard) return null;
+
     const normalizedFlashcards = normalizeMathMarkdownDeep(args.flashcards);
+    const title = args.metadata?.title ?? "Flashcards";
 
     await ctx.db.patch(args.flashcardId, {
       cardsData: normalizedFlashcards,
       status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Flashcards",
+      title,
       metadata: {
         ...args.metadata,
         cardCount: normalizedFlashcards.length,
         completedAt: Date.now(),
       },
+    });
+    await scheduleStudioJobCompletionPush(ctx, {
+      userId: flashcard.userId,
+      notebookId: flashcard.notebookId,
+      itemId: args.flashcardId,
+      kind: "flashcards",
+      title,
     });
   },
 });

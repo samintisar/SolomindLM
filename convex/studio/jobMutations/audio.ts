@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdown } from "../../_shared/mathMarkdown";
+import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveAudioOverviewResults = internalMutation({
@@ -11,18 +12,29 @@ export const saveAudioOverviewResults = internalMutation({
     metadata: v.any(),
   },
   handler: async (ctx, args) => {
+    const audioOverview = await ctx.db.get(args.audioOverviewId);
+    if (!audioOverview) return null;
+
     const normalizedTranscript = normalizeMathMarkdown(args.transcript);
+    const title = args.metadata?.title ?? "Audio Overview";
 
     await ctx.db.patch(args.audioOverviewId, {
       transcript: normalizedTranscript,
       audioUrl: args.audioUrl,
       status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Audio Overview",
+      title,
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
       },
+    });
+    await scheduleStudioJobCompletionPush(ctx, {
+      userId: audioOverview.userId,
+      notebookId: audioOverview.notebookId,
+      itemId: args.audioOverviewId,
+      kind: "audioOverview",
+      title,
     });
   },
 });

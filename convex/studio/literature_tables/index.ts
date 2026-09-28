@@ -11,6 +11,7 @@ import { resolveSmartModel } from "../../_lib/resolveSmartModel.js";
 import { literatureSearchOptionsValidator } from "../../_model/literatureReviewSearchOptions";
 import { getAuthUserId } from "../../auth";
 import { literatureReviewWorkflowProvenanceValidator } from "../../literatureReview/workflowProvenance";
+import { scheduleLiteratureReviewCompletionPush } from "../../push/notify";
 import { literatureTableToCsv } from "./literatureTableCsv.js";
 
 const literatureTableColumnValidator = v.object({
@@ -188,6 +189,17 @@ export const updateLiteratureReviewSessionStatus = internalMutation({
     if (args.suggestedColumns !== undefined) updates.suggestedColumns = args.suggestedColumns;
     if (args.reviewTitle !== undefined) updates.reviewTitle = args.reviewTitle;
     await ctx.db.patch(args.sessionId, updates);
+
+    if (args.status === "completed") {
+      const session = await ctx.db.get(args.sessionId);
+      if (session) {
+        await scheduleLiteratureReviewCompletionPush(ctx, {
+          userId: session.userId,
+          notebookId: session.notebookId,
+          sessionId: session._id,
+        });
+      }
+    }
     return null;
   },
 });
