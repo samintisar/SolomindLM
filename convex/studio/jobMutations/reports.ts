@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { normalizeMathMarkdown, normalizeMathMarkdownDeep } from "../../_shared/mathMarkdown";
+import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveReportResults = internalMutation({
@@ -18,15 +19,23 @@ export const saveReportResults = internalMutation({
         ? normalizeMathMarkdown(args.content)
         : normalizeMathMarkdownDeep(args.content);
 
+    const title = args.metadata?.title ?? "Report";
     await ctx.db.patch(args.reportId, {
       content: normalizedContent,
       status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Report",
+      title,
       metadata: {
         ...args.metadata,
         completedAt: Date.now(),
       },
+    });
+    await scheduleStudioJobCompletionPush(ctx, {
+      userId: report.userId,
+      notebookId: report.notebookId,
+      itemId: args.reportId,
+      kind: "report",
+      title,
     });
     return args.reportId;
   },

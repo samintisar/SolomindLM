@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
+import { scheduleStudioJobCompletionPush } from "../../push/notify";
 import { buildErrorMetadata } from "./jobErrorUtils";
 
 export const saveSpreadsheetResults = internalMutation({
@@ -12,16 +13,24 @@ export const saveSpreadsheetResults = internalMutation({
     const spreadsheet = await ctx.db.get(args.spreadsheetId);
     if (!spreadsheet) return null;
 
+    const title = args.metadata?.title ?? "Spreadsheet";
     await ctx.db.patch(args.spreadsheetId, {
       data: args.spreadsheet,
       status: "completed",
       updatedAt: Date.now(),
-      title: args.metadata?.title ?? "Spreadsheet",
+      title,
       metadata: {
         ...spreadsheet.metadata,
         ...args.metadata,
         completedAt: Date.now(),
       },
+    });
+    await scheduleStudioJobCompletionPush(ctx, {
+      userId: spreadsheet.userId,
+      notebookId: spreadsheet.notebookId,
+      itemId: args.spreadsheetId,
+      kind: "spreadsheet",
+      title,
     });
     return args.spreadsheetId;
   },
