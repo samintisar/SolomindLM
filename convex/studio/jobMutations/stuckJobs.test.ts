@@ -5,9 +5,11 @@ import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import schema from "../../schema";
 import {
+  failStuckJobs,
   STUCK_JOB_ERROR_MESSAGE,
   STUCK_JOB_SWEEP_BATCH_SIZE,
   STUDIO_JOB_STALE_MS,
+  sweepHasMore,
 } from "./stuckJobs";
 
 const rawModules = import.meta.glob("/convex/**/*.ts") as Record<string, () => Promise<unknown>>;
@@ -103,6 +105,8 @@ describe("sweepStuckStudioJobs", () => {
     expect(job?.status).toBe("failed");
     expect(job?.metadata?.error?.message).toBe(STUCK_JOB_ERROR_MESSAGE);
     expect(job?.metadata?.error?.phase).toBe("collapsing");
+    expect(job?.metadata?.error?.type).toBe("job_stalled");
+    expect(job?.metadata?.error?.retryable).toBe(true);
     expect(job?.metadata?.progress).toBe(70);
     expect(job?.updatedAt).toBeGreaterThan(Date.now() - 60_000);
   });
@@ -181,5 +185,44 @@ describe("sweepStuckStudioJobs", () => {
     for (const id of ids) {
       expect((await getJob(t, id))?.status).toBe("failed");
     }
+  });
+
+  test("keeps failing other jobs when one job's failure write throws", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await seedNotebook(t);
+    const staleAt = Date.now() - STUDIO_JOB_STALE_MS - 1_000;
+    const bad = await seedJob(t, owner, "flashcards", { status: "generating", updatedAt: staleAt });
+    const good = await seedJob(t, owner, "flashcards", {
+      status: "generating",
+      updatedAt: staleAt + 1,
+    });
+
+    const result = await t.run((ctx) =>
+      failStuckJobs(ctx, "flashcards", Date.now() - STUDIO_JOB_STALE_MS, 10, async (c, id) => {
+        if (id === bad) throw new Error("schema validation failed");
+        await c.db.patch(id, { status: "failed", updatedAt: Date.now() });
+      })
+    );
+
+    expect(result).toEqual({ failed: 1, errored: 1 });
+    expect((await getJob(t, bad))?.status).toBe("generating");
+    expect((await getJob(t, good))?.status).toBe("failed");
+  });
+});
+
+describe("sweepHasMore", () => {
+  const limit = STUCK_JOB_SWEEP_BATCH_SIZE;
+
+  test("continues after a full batch that made progress", () => {
+    expect(sweepHasMore([{ failed: limit - 3, errored: 3 }], limit)).toBe(true);
+  });
+
+  test("stops when a full batch only hit rows that keep throwing", () => {
+    // Rescheduling here would re-read the same rows and loop with no delay forever.
+    expect(sweepHasMore([{ failed: 0, errored: limit }], limit)).toBe(false);
+  });
+
+  test("stops when no table filled its batch", () => {
+    expect(sweepHasMore([{ failed: limit - 1, errored: 0 }], limit)).toBe(false);
   });
 });
